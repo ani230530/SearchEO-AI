@@ -305,6 +305,8 @@ const [auditComplete, setAuditComplete] = useState(false);
     High: 8,
   });
   const [gscConnected, setGscConnected] = useState(false);
+  const [gscAnalysis, setGscAnalysis] = useState(null);
+const [improvedContent, setImprovedContent] = useState("");
   const [gscEmail, setGscEmail] = useState<string>("");
   const [gscSelectedProperty, setGscSelectedProperty] = useState<string>("");
   const [gscProperties, setGscProperties] = useState<
@@ -338,7 +340,12 @@ const [auditComplete, setAuditComplete] = useState(false);
   const isSidebarExpanded = sidebarOpen || isSidebarHovered;
 // PUBLISH PAGE STATES
 const [primaryKeyword, setPrimaryKeyword] = useState("");
-const [category, setCategory] = useState("");  // NEW FIELD
+const [longtailKeywords, setLongtailKeywords] = useState("");
+const [brandName, setBrandName] = useState("");
+const [brandDescription, setBrandDescription] = useState("");
+const [image, setImage] = useState(1);
+const [wordCount, setWordCount] = useState(1500);
+const [featuredImage, setFeaturedImage] = useState("");
 
 // UI STATES
 const [publishLoading, setPublishLoading] = useState(false);
@@ -410,7 +417,43 @@ const [publishError, setPublishError] = useState("");
     setDomainError("");
     return true;
   };
-  
+  const handleAnalyze = async () => {
+  try {
+    setCompanyDomainLoading(true);
+
+    // 1️⃣ Fetch GSC Analysis
+    const gscRes = await fetch(
+      `${import.meta.env.VITE_API_URL}/api/gsc/analyze?domain=${companyDomain}`,
+      {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("authToken")}`,
+        },
+      }
+    );
+
+    const gscData = await gscRes.json();
+    setGscAnalysis(gscData);
+
+    // 2️⃣ AI Improved Content
+    const improveRes = await fetch("/api/n8n-proxy", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        text: companyDomain.content,
+        task: "improve-seo-content",
+      }),
+    });
+
+    const improved = await improveRes.json();
+    setImprovedContent(improved.result);
+
+  } catch (err) {
+    console.error(err);
+  } finally {
+    setCompanyDomainLoading(false);
+  }
+};
+
 //Handle Run Audit
 const handleRunAudit = async (url?: string) => {
   const token = localStorage.getItem("authToken");   
@@ -3679,142 +3722,393 @@ const handlePublish = async () => {
     </div>
   </div>
 )}
-
                   </div>
                 );
               })()}
             </div>
           ): activeTab === "analyze" ? (
-  <div className="max-w-4xl mx-auto px-4 sm:px-6 py-12 sm:py-16 space-y-12">
+  <div className="max-w-8xl mx-auto px-4 sm:px-6 py-12 sm:py-16 space-y-12">
 
-  {/* 🔍 ANALYZE SECTION */}
-  <h2 className="text-3xl font-bold text-gray-900 tracking-tight">
-      Page Analysis
-    </h2>
-  <div
-    className="
-      mt-10 p-8 rounded-3xl 
-      bg-white/5 backdrop-blur-xl 
-      border border-white/10 
-      shadow-[0_0_40px_rgba(0,0,0,0.3)]
-      transition-all
-    "
-  >
-    
+  {/* PAGE ANALYSIS SECTION */}
+<h2 className="text-3xl font-bold text-gray-900 tracking-tight">
+  Page Analysis
+</h2>
 
-    {!companyDomain ? (
-      <p className="text-gray-400 text-lg">No content available to analyze.</p>
-    ) : (
-      <div className="space-y-10 text-gray-200">
+<div
+  className="
+    mt-10 p-8 rounded-3xl 
+    bg-white/5 backdrop-blur-xl 
+    border border-white/10 
+    shadow-[0_0_40px_rgba(0,0,0,0.3)]
+    transition-all
+  "
+>
+  {/* DOMAIN + ANALYZE BUTTON */}
+  <div className="flex items-center justify-between p-5 rounded-2xl border border-gray-700/50">
+     <div className="inline-flex items-center gap-3 bg-blue-50 border border-blue-200 text-blue-700 px-5 py-3 rounded-2xl shadow-sm">
+                    <img
+                      src={`https://www.google.com/s2/favicons?domain=${companyDomain}&sz=64`}
+                      alt="favicon"
+                      className="w-8 h-8 rounded-md"
+                    />
+                    <span className="font-medium text-lg tracking-tight">
+                      {" "}
+                      <a
+                        href={
+                          companyDomain.startsWith("http")
+                            ? companyDomain
+                            : `https://${companyDomain}`
+                        }
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-600 hover:underline text-lg"
+                      >
+                        {companyDomain
+                          .replace(/^https?:\/\//, "")
+                          .replace(/^www\./, "")}
+                      </a>
+                    </span>
+                  </div>
 
-        {/* SUMMARY CARDS */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-          
-          {/* SEO SCORE */}
-          <div
-            className="
-              p-5 rounded-2xl 
-              bg-gradient-to-br from-blue-600/20 to-indigo-700/20 
-              border border-blue-500/30
-            "
-          >
-            <p className="text-sm text-gray-300">SEO Score</p>
-            <p className="text-3xl font-bold text-blue-400 mt-1">
-              {Math.min(100, Math.floor(companyDomain.length / 20))}
-            </p>
-          </div>
+    <button
+      onClick={handleAnalyze}
+      className="
+    px-6 py-2 rounded-xl 
+    bg-black  
+    text-white font-semibold 
+    shadow-lg transition 
+    transform hover:scale-105 
+    duration-200 ease-in-out
+  "
+>
+      {companyDomainLoading ? "Analyzing..." : "Analyze"}
+    </button>
+  </div>
 
-          {/* WORD COUNT */}
-          <div
-            className="
-              p-5 rounded-2xl 
-              bg-gradient-to-br from-indigo-600/20 to-purple-700/20 
-              border border-indigo-500/30
-            "
-          >
-            <p className="text-sm text-gray-300">Word Count</p>
-            <p className="text-3xl font-bold text-indigo-400 mt-1">
-              {(companyDomain.content || "").split(/\s+/).length}
-            </p>
-          </div>
+  {!companyDomain ? (
+    <p className="text-gray-400 text-lg mt-8">
+      No content available to analyze.
+    </p>
+  ) : (
+    <div className="space-y-10 text-gray-200 mt-10">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
 
-          {/* READABILITY */}
-          <div
-            className="
-              p-5 rounded-2xl 
-              bg-gradient-to-br from-purple-600/20 to-pink-700/20 
-              border border-purple-500/30
-            "
-          >
-            <p className="text-sm text-gray-300">Readability</p>
-            <p className="text-xl font-semibold text-purple-300 mt-1">
-              {(companyDomain.content.length > 800 ? "Good" : "Needs Improvement")}
-            </p>
-          </div>
+        {/* SEO SCORE */}
+        {/* <div
+          className="
+            p-5 rounded-2xl 
+            bg-white  
+            border border-blue-500/30
+          "
+        >
+          <p className="text-sm text-gray-600">SEO Score</p>
 
-        </div>
-
-        {/* TITLE */}
-        <div>
-          <h3 className="text-xl font-semibold text-blue-300 mb-2">Page Title</h3>
-          <p className="text-gray-300 bg-white/5 p-4 rounded-xl border border-gray-700/50">
-            {companyDomain.title || "No title found"}
+          <p className="text-3xl font-bold text-black mt-1">
+            {
+              (() => {
+                const wordCount = (companyDomain?.content || "").split(/\s+/).length;
+                const titleScore = companyDomain?.title ? 20 : 0;
+                const lengthScore = Math.min(40, Math.floor(wordCount / 50));
+                return titleScore + lengthScore;
+              })()
+            }
           </p>
-        </div>
+        </div> */}
 
-        {/* META DESCRIPTION */}
-        <div>
-          <h3 className="text-xl font-semibold text-blue-300 mb-2">Meta Description</h3>
-          <p className="text-gray-300 bg-white/5 p-4 rounded-xl border border-gray-700/50">
-            {(companyDomain.content || "").substring(0, 160)}...
+        {/* WORD COUNT */}
+        {/* <div
+          className="
+            p-5 rounded-2xl 
+            bg-white 
+            border border-indigo-500/30
+          "
+        >
+          <p className="text-sm text-gray-600">Word Count</p>
+          <p className="text-3xl font-bold text-black mt-1">
+            {(companyDomain?.content || "").split(/\s+/).length}
           </p>
-        </div>
+        </div> */}
 
-        {/* HEADINGS */}
-        <div>
-          <h3 className="text-xl font-semibold text-blue-300 mb-3">Heading Structure</h3>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            {["h1", "h2", "h3", "h4"].map(tag => {
-              const count = (companyDomain.content.match(new RegExp(`<${tag}`, "gi")) || []).length;
-              return (
-                <div
-                  key={tag}
-                  className="
-                    p-4 rounded-xl border border-gray-700/50 bg-white/5 
-                    text-center hover:bg-blue-500/10 transition
-                  "
-                >
-                  <p className="font-semibold text-gray-200">{tag.toUpperCase()}</p>
-                  <p className="text-blue-400 font-bold">{count}</p>
-                </div>
-              );
-            })}
-          </div>
-        </div>
+        {/* READABILITY */}
+        {/* <div
+          className="
+            p-5 rounded-2xl 
+            bg-white 
+            border border-purple-500/30
+          "
+        >
+          <p className="text-sm text-gray-600">Readability</p>
 
-        {/* KEYWORD OCCURRENCES */}
-        <div>
-          <h3 className="text-xl font-semibold text-blue-300 mb-3">Keyword Occurrences</h3>
+          <p className="text-xl font-semibold text-black mt-1">
+            {(companyDomain?.content || "").length > 800
+              ? "Good"
+              : "Needs Improvement"}
+          </p>
+        </div> */}
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {(queryData || []).slice(0, 10).map((q) => (
+      </div>
+
+      {/* TITLE */}
+      {/* <div>
+        <h3 className="text-xl font-semibold text-black mb-2">Page Title</h3>
+        <p className="text-blue-600 bg-white/5 p-4 rounded-xl border border-gray-700/50">
+          {companyDomain?.title || "No title found"}
+        </p>
+      </div> */}
+
+      {/* META DESCRIPTION */}
+      {/* <div>
+        <h3 className="text-xl font-semibold text-black mb-2">Meta Description</h3>
+        <p className="text-blue-600 bg-white/5 p-4 rounded-xl border border-gray-700/50">
+          {(companyDomain?.content || "").substring(0, 160)}...
+        </p>
+      </div> */}
+
+      {/* HEADINGS */}
+      {/* <div>
+        <h3 className="text-xl font-semibold text-black mb-3">Heading Structure</h3>
+
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          {["h1", "h2", "h3", "h4"].map((tag) => {
+            const count =
+              (companyDomain?.content || "").match(new RegExp(`<${tag}`, "gi"))
+                ?.length || 0;
+
+            return (
               <div
-                key={q.query}
+                key={tag}
                 className="
-                  flex justify-between items-center 
-                  p-4 rounded-xl bg-white/5 border border-gray-700/50
+                  p-4 rounded-xl border border-gray-700/50 bg-white/5 
+                  text-center hover:bg-blue-500/10 transition
                 "
               >
-                <span className="text-gray-200">{q.query}</span>
-                <span className="text-blue-400 font-semibold">{q.occurrences}</span>
+                <p className="font-semibold text-black">{tag.toUpperCase()}</p>
+                <p className="text-blue-600 font-bold">{count}</p>
+              </div>
+            );
+          })}
+        </div>
+      </div> */}
+
+      {/* KEYWORD OCCURRENCES */}
+      
+   <div>
+  <h3 className="text-xl font-semibold text-black mb-3">
+    Keyword Occurrences
+  </h3>
+   <div className="bg-white rounded-3xl border border-gray-200 overflow-hidden shadow-sm">
+<div className="bg-gray-50/80 border-b border-gray-200">
+                                  <div className="grid grid-cols-10 gap-4 px-6 py-4 text-sm font-semibold text-gray-700">
+                                    <div
+                                      className="col-span-3 flex items-center space-x-2 cursor-pointer hover:text-gray-900 transition-colors"
+                                      onClick={() => handleSort("keyword")}
+                                    >
+                                      <span>Keyword</span>
+                                      {getSortIcon("keyword")}
+                                    </div>
+
+                                    <div
+                                      className="col-span-1 flex items-center space-x-2 cursor-pointer hover:text-gray-900 transition-colors justify-center"
+                                      onClick={() => handleSort("volume")}
+                                    >
+                                      <span>Volume</span>
+                                      {getSortIcon("volume")}
+                                    </div>
+
+                                    <div
+                                      className="col-span-1 flex items-center space-x-2 cursor-pointer hover:text-gray-900 transition-colors justify-center"
+                                      onClick={() => handleSort("competition")}
+                                    >
+                                      <span>Competition</span>
+                                      {getSortIcon("competition")}
+                                    </div>
+
+                                    <div
+                                      className="col-span-1 flex items-center space-x-2 cursor-pointer hover:text-gray-900 transition-colors justify-center"
+                                      onClick={() => handleSort("cpc")}
+                                    >
+                                      <span>CPC</span>
+                                      {getSortIcon("cpc")}
+                                    </div>
+
+                                    <div
+                                      className="col-span-1 flex items-center space-x-2 cursor-pointer hover:text-gray-900 transition-colors justify-center"
+                                      onClick={() => handleSort("organic")}
+                                    >
+                                      <span>Organic</span>
+                                      {getSortIcon("organic")}
+                                    </div>
+
+                                    <div
+                                      className="col-span-1 flex items-center space-x-2 cursor-pointer hover:text-gray-900 transition-colors justify-center"
+                                      onClick={() => handleSort("intent")}
+                                    >
+                                      <span>Intent</span>
+                                      {getSortIcon("intent")}
+                                    </div>
+
+                                    <div
+                                      className="col-span-2 flex items-center space-x-2 cursor-pointer hover:text-gray-900 transition-colors justify-center"
+                                      onClick={() => handleSort("trend")}
+                                    >
+                                      <span>Trend</span>
+                                      {getSortIcon("trend")}
+                                    </div>
+                                  </div>
+                                </div>
+   <div className="divide-y divide-gray-100">
+      {currentKeywords.map((keyword) => (
+        <div
+          key={keyword.id}
+          className="grid grid-cols-10 gap-4 px-6 py-4 hover:bg-gray-50/80 transition-all duration-200"
+        >
+          {/* Keyword Column */}
+          <div className="col-span-3 flex items-center space-x-3">
+            <div>
+              <div className="font-semibold text-gray-900 text-sm flex items-center space-x-2">
+                <span>{keyword.keyword}</span>
+                {keyword.isCustom && (
+                  <span className="bg-purple-100 text-purple-800 px-2 py-0.5 rounded-full text-xs font-semibold">
+                    Custom
+                  </span>
+                )}
+              </div>
+              <div className="text-xs text-gray-500 mt-0.5 truncate max-w-xs">
+                {keyword.url}
+              </div>
+            </div>
+          </div>
+
+          {/* Volume Column */}
+          <div className="col-span-1 flex items-center justify-center">
+            <span className="font-semibold text-gray-900 text-sm">
+              {keyword.volume >= 1000
+                ? `${(keyword.volume / 1000).toFixed(1)}K`
+                : keyword.volume.toLocaleString()}
+            </span>
+          </div>
+
+          {/* Competition Column */}
+          <div className="col-span-1 flex items-center justify-center">
+            <span
+              className={getCompetitionBadge(keyword.competition)}
+            >
+              {keyword.competition}
+            </span>
+          </div>
+
+          {/* CPC Column */}
+          <div className="col-span-1 flex items-center justify-center">
+            <span className="font-semibold text-gray-900 text-sm">
+              ${keyword.cpc.toFixed(2)}
+            </span>
+          </div>
+
+          {/* Organic Column */}
+          <div className="col-span-1 flex items-center justify-center">
+            <span className="text-gray-700 text-sm">
+              {keyword.organic.toLocaleString()}
+            </span>
+          </div>
+
+          {/* Intent Column */}
+          <div className="col-span-1 flex items-center justify-center">
+            <span
+              className={`px-2 py-1 rounded-full text-xs font-medium ${
+                keyword.intent === "Commercial"
+                  ? "bg-blue-100 text-blue-800"
+                  : keyword.intent === "Transactional"
+                  ? "bg-green-100 text-green-800"
+                  : "bg-gray-100 text-gray-800"
+              }`}
+            >
+              {keyword.intent}
+            </span>
+          </div>
+
+          {/* Trend Column */}
+          <div className="col-span-2 flex items-center justify-center">
+            <div className="flex items-center space-x-1">
+              <TrendingUp
+                className={`w-4 h-4 ${
+                  keyword.trend === "Rising"
+                    ? "text-green-500"
+                    : keyword.trend === "Falling"
+                    ? "text-red-500"
+                    : "text-gray-500"
+                }`}
+              />
+              <span className="text-sm text-gray-700">
+                {keyword.trend}
+              </span>
+            </div>
+          </div>
+          
+        </div>
+      ))} 
+      </div>
+    </div>
+</div>
+
+
+      {/* GSC ANALYSIS */}
+      {/* {gscAnalysis && (
+        <div className="space-y-4">
+          <h3 className="text-xl font-semibold text-black">GSC Insights</h3>
+
+          <div className="p-5 bg-black rounded-2xl border border-gray-700/50">
+            <p className="text-gray-300 mb-3">Top Pages</p>
+
+            {(gscAnalysis.pages || []).slice(0, 5).map((p) => (
+              <div
+                key={p.url}
+                className="text-blue-500 border-b border-gray-700/50 py-1"
+              >
+                {p.url} — {p.clicks} clicks
               </div>
             ))}
           </div>
         </div>
+      )} */}
 
-      </div>
-    )}
-  </div>
+      {/* IMPROVED CONTENT */}
+      {/* {improvedContent && (
+        <div>
+          <h3 className="text-xl font-semibold text-black mb-2">
+            Improved Content
+          </h3>
+
+          <p className="bg-white/5 border border-gray-700/50 p-4 rounded-xl text-blue-600 whitespace-pre-wrap">
+            {improvedContent}
+          </p>
+        </div>
+      )} */}
+
+      {/* IMPROVED KEYWORDS */}
+      {/* {keywords.length > 0 && (
+        <div>
+          <h3 className="text-xl font-semibold text-black mb-3">
+            Improved Keywords
+          </h3>
+
+          <div className="grid grid-cols-2 gap-3">
+            {keywords.slice(0, 10).map((k) => (
+              <div
+                key={k.id}
+                className="p-4 bg-black rounded-xl border border-gray-700/50"
+              >
+                <p className="text-blue-600 font-bold">{k.term}</p>
+                <p className="text-gray-300 text-sm">{k.intent}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )} */}
+
+    </div>
+  )}
+</div>
+
 </div>
 
 ): activeTab === "audit" ? (
@@ -3847,7 +4141,7 @@ const handlePublish = async () => {
     <div className="bg-white/50 backdrop-blur-md rounded-3xl shadow-2xl border border-gray-200/30 p-8 flex flex-col gap-6 transition-all hover:scale-[1.01] duration-300">
       
       <h2 className="text-3xl font-bold text-gray-900 tracking-tight flex items-center gap-3">
-        <Globe className="w-6 h-6 text-blue-500" />
+        {/* <Globe className="w-6 h-6 text-blue-500" /> */}
         Run Domain Audit
       </h2>
 
@@ -3980,121 +4274,153 @@ const handlePublish = async () => {
     </div>
   </div>
 ): activeTab === "publish" ? (
-  <div className="max-w-5xl mx-auto px-4 sm:px-6 py-12 sm:py-16">
+  <div className="seo-root">
+  <div className="seo-shell max-w-6xl mx-auto w-full">
 
-  {/* HEADER */}
-  <div className="flex items-center gap-3 mb-10">
-    <h2 className="text-3xl font-bold text-gray-900 tracking-tight">
-      Publish Article
-    </h2>
-  </div>
-
-  {/* TOAST NOTIFICATIONS */}
-  {(publishSuccess || publishError) && (
-    <div
-      className={`
-        fixed top-6 right-6 z-[9999] px-5 py-4 rounded-xl shadow-2xl
-        text-white flex items-center gap-3 animate-slide-in
-        transition-opacity duration-500
-        ${publishSuccess ? "bg-green-600" : "bg-red-600"}
-      `}
-    >
-      {publishSuccess ? (
-        <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-        </svg>
-      ) : (
-        <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-        </svg>
-      )}
-
-      <span className="font-medium">
-        {publishSuccess ? "Article Published Successfully!" : publishError}
-      </span>
-    </div>
-  )}
-
-  {/* MAIN CARD */}
-  <div
-    className="
-      bg-white/60 border border-gray-200 backdrop-blur-2xl 
-      rounded-3xl shadow-xl p-10 space-y-12
-    "
-  >
-
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-
-      {/* PRIMARY KEYWORD */}
-      <div className="space-y-2">
-        <label className="font-semibold text-gray-700 text-sm tracking-wide">
-          Primary Keyword
-        </label>
-        <input
-          className="
-            h-14 px-5 rounded-2xl border border-gray-300 bg-white/70 
-            focus:ring-2 focus:ring-blue-500 w-full transition text-gray-900 
-            shadow-sm
-          "
-          placeholder="Ex: Legal Expert Tips"
-          value={primaryKeyword}
-          onChange={(e) => setPrimaryKeyword(e.target.value)}
-        />
-      </div>
-
-      {/* CATEGORY */}
-      <div className="space-y-2">
-        <label className="font-semibold text-gray-700 text-sm tracking-wide">
-          Category
-        </label>
-        <select
-          className="
-            h-14 px-5 rounded-2xl border border-gray-300 bg-white/70 
-            focus:ring-2 focus:ring-blue-500 w-full transition text-gray-900
-            shadow-sm cursor-pointer
-          "
-          value={category}
-          onChange={(e) => setCategory(e.target.value)}
-        >
-          <option value="">Select Category</option>
-          <option value="legal">Legal</option>
-          <option value="sports">Sports</option>
-          <option value="finance">Finance</option>
-          <option value="tech">Tech</option>
-        </select>
+    {/* Page Header */}
+    <div className="seo-header">
+      <div>
+        <h1 className="seo-title">Publish Article</h1>
+        <p className="seo-sub">Finalize your article details before publishing</p>
       </div>
     </div>
 
-    {/* PUBLISH BUTTON */}
-    <div className="pt-4">
-      <button
-        onClick={handlePublish}
-        disabled={publishLoading}
-        className={`
-          w-[210px] h-16 text-white font-semibold rounded-2xl shadow-xl 
-          flex items-center justify-center gap-3 text-lg transition-all
-          ${
-            publishLoading
-              ? "bg-black  cursor-not-allowed"
-              : "bg-black hover:scale-[1.03] hover:shadow-2xl"
-          }
-        `}
+    {/* Toast */}
+    {(publishSuccess || publishError) && (
+      <div
+        className={`toast ${publishSuccess ? "toast-success" : "toast-error"}`}
       >
-        {publishLoading ? (
-          <>
-            <svg className="animate-spin h-6 w-6 text-white" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-            </svg>
-            Publishing…
-          </>
-        ) : (
-          "Publish Now"
-        )}
-      </button>
+        {publishSuccess ? "Article Published Successfully!" : publishError}
+      </div>
+    )}
+
+    {/* Main Publish Card */}
+    <div className="card">
+
+      <h2 className="card-title">Article Details</h2>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+
+        {/* Primary Keyword */}
+        <div className="floating">
+          <input
+            className="floating-input"
+            value={primaryKeyword}
+            onChange={(e) => setPrimaryKeyword(e.target.value)}
+          />
+          <label className={`floating-label ${primaryKeyword ? "filled" : ""}`}>
+            Primary Keyword
+          </label>
+        </div>
+
+        {/* Longtail Keywords */}
+        {/* <div className="floating">
+          <input
+            className="floating-input"
+            value={longtailKeywords}
+            onChange={(e) => setLongtailKeywords(e.target.value)}
+          />
+          <label
+            className={`floating-label ${longtailKeywords ? "filled" : ""}`}
+          >
+            Longtail Keywords
+          </label>
+        </div> */}
+
+        {/* Brand Name */}
+        <div className="floating">
+          <input
+            className="floating-input"
+            value={brandName}
+            onChange={(e) => setBrandName(e.target.value)}
+          />
+          <label className={`floating-label ${brandName ? "filled" : ""}`}>
+            Brand Name
+          </label>
+        </div>
+
+        {/* Brand Description */}
+        <div className="floating">
+          <input
+            className="floating-input"
+            value={brandDescription}
+            onChange={(e) => setBrandDescription(e.target.value)}
+          />
+          <label
+            className={`floating-label ${
+              brandDescription ? "filled" : ""
+            }`}
+          >
+            Brand Description
+          </label>
+        </div>
+
+        {/* Image Count */}
+        <div className="floating">
+          <input
+            type="number"
+            className="floating-input"
+            min="0"
+            value={image}
+            onChange={(e) => setImage(Number(e.target.value))}
+          />
+          <label className={`floating-label ${image ? "filled" : ""}`}>
+            Number of Images
+          </label>
+        </div>
+
+        {/* Word Count */}
+        <div className="floating">
+          <input
+            type="number"
+            className="floating-input"
+            min="300"
+            value={wordCount}
+            onChange={(e) => setWordCount(Number(e.target.value))}
+          />
+          <label className={`floating-label ${wordCount ? "filled" : ""}`}>
+            Word Count
+          </label>
+        </div>
+
+        {/* Featured Image */}
+        <div className="floating">
+          <select
+            className="floating-input"
+            value={featuredImage}
+            onChange={(e) => setFeaturedImage(e.target.value)}
+          >
+            <option value="">Select featured image option</option>
+            <option value="yes">Yes</option>
+            <option value="no">No</option>
+          </select>
+
+          <label
+            className={`floating-label ${
+              featuredImage ? "filled" : ""
+            }`}
+          >
+            Featured Image
+          </label>
+        </div>
+      </div>
+
+      {/* Publish Button */}
+      <div className="flex justify-end pt-6">
+        <button
+          onClick={handlePublish}
+          disabled={publishLoading}
+          className={`btn primary w-48 h-14 flex items-center justify-center text-lg ${
+            publishLoading ? "opacity-50 cursor-not-allowed" : ""
+          }`}
+        >
+          {publishLoading ? "Publishing..." : "Publish Now"}
+        </button>
+      </div>
     </div>
   </div>
 </div>
+
 
 
 )  : (
