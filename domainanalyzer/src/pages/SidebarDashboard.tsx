@@ -417,7 +417,9 @@ const [publishError, setPublishError] = useState("");
     setDomainError("");
     return true;
   };
-  const handleAnalyze = async () => {
+
+  //Handle Analyze Button----
+const handleAnalyze = async () => {
   try {
     setCompanyDomainLoading(true);
 
@@ -434,18 +436,18 @@ const [publishError, setPublishError] = useState("");
     const gscData = await gscRes.json();
     setGscAnalysis(gscData);
 
-    // 2️⃣ AI Improved Content
-    const improveRes = await fetch("/api/n8n-proxy", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        text: companyDomain.content,
-        task: "improve-seo-content",
-      }),
-    });
+    // 2️⃣ Fetch Page HTML Content
+    const pageRes = await fetch(
+      `${import.meta.env.VITE_API_URL}/api/scraper/content?domain=${companyDomain}`,
+      {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("authToken")}`,
+        },
+      }
+    );
 
-    const improved = await improveRes.json();
-    setImprovedContent(improved.result);
+    const pageData = await pageRes.json();
+    setImprovedContent(pageData.html); // store HTML content here
 
   } catch (err) {
     console.error(err);
@@ -453,6 +455,8 @@ const [publishError, setPublishError] = useState("");
     setCompanyDomainLoading(false);
   }
 };
+
+
 
 //Handle Run Audit
 const handleRunAudit = async (url?: string) => {
@@ -3784,6 +3788,34 @@ const handlePublish = async () => {
       {companyDomainLoading ? "Analyzing..." : "Analyze"}
     </button>
   </div>
+{!companyDomainLoading && gscAnalysis && improvedContent && (
+  <div className="mt-10 space-y-14">
+
+    {/* 🔵 GSC SECTION */}
+    <section className="p-6 rounded-xl bg-gray-900 border border-gray-700">
+      <h2 className="text-2xl font-bold text-blue-400 mb-4">
+        Google Search Console Analysis
+      </h2>
+
+      <pre className="bg-black/40 p-4 rounded-xl text-sm overflow-auto border border-gray-700">
+        {JSON.stringify(gscAnalysis, null, 2)}
+      </pre>
+    </section>
+
+    {/* 🟢 PAGE CONTENT SECTION */}
+    <section className="p-6 rounded-xl bg-gray-900 border border-gray-700">
+      <h2 className="text-2xl font-bold text-green-400 mb-4">
+        Page Content Extracted From Website
+      </h2>
+
+      <div
+        className="prose prose-invert max-w-none bg-black/30 p-5 rounded-lg border border-gray-700"
+        dangerouslySetInnerHTML={{ __html: improvedContent }}
+      />
+    </section>
+
+  </div>
+)}
 
   {!companyDomain ? (
     <p className="text-gray-400 text-lg mt-8">
@@ -3793,102 +3825,9 @@ const handlePublish = async () => {
     <div className="space-y-10 text-gray-200 mt-10">
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
 
-        {/* SEO SCORE */}
-        {/* <div
-          className="
-            p-5 rounded-2xl 
-            bg-white  
-            border border-blue-500/30
-          "
-        >
-          <p className="text-sm text-gray-600">SEO Score</p>
-
-          <p className="text-3xl font-bold text-black mt-1">
-            {
-              (() => {
-                const wordCount = (companyDomain?.content || "").split(/\s+/).length;
-                const titleScore = companyDomain?.title ? 20 : 0;
-                const lengthScore = Math.min(40, Math.floor(wordCount / 50));
-                return titleScore + lengthScore;
-              })()
-            }
-          </p>
-        </div> */}
-
-        {/* WORD COUNT */}
-        {/* <div
-          className="
-            p-5 rounded-2xl 
-            bg-white 
-            border border-indigo-500/30
-          "
-        >
-          <p className="text-sm text-gray-600">Word Count</p>
-          <p className="text-3xl font-bold text-black mt-1">
-            {(companyDomain?.content || "").split(/\s+/).length}
-          </p>
-        </div> */}
-
-        {/* READABILITY */}
-        {/* <div
-          className="
-            p-5 rounded-2xl 
-            bg-white 
-            border border-purple-500/30
-          "
-        >
-          <p className="text-sm text-gray-600">Readability</p>
-
-          <p className="text-xl font-semibold text-black mt-1">
-            {(companyDomain?.content || "").length > 800
-              ? "Good"
-              : "Needs Improvement"}
-          </p>
-        </div> */}
 
       </div>
 
-      {/* TITLE */}
-      {/* <div>
-        <h3 className="text-xl font-semibold text-black mb-2">Page Title</h3>
-        <p className="text-blue-600 bg-white/5 p-4 rounded-xl border border-gray-700/50">
-          {companyDomain?.title || "No title found"}
-        </p>
-      </div> */}
-
-      {/* META DESCRIPTION */}
-      {/* <div>
-        <h3 className="text-xl font-semibold text-black mb-2">Meta Description</h3>
-        <p className="text-blue-600 bg-white/5 p-4 rounded-xl border border-gray-700/50">
-          {(companyDomain?.content || "").substring(0, 160)}...
-        </p>
-      </div> */}
-
-      {/* HEADINGS */}
-      {/* <div>
-        <h3 className="text-xl font-semibold text-black mb-3">Heading Structure</h3>
-
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          {["h1", "h2", "h3", "h4"].map((tag) => {
-            const count =
-              (companyDomain?.content || "").match(new RegExp(`<${tag}`, "gi"))
-                ?.length || 0;
-
-            return (
-              <div
-                key={tag}
-                className="
-                  p-4 rounded-xl border border-gray-700/50 bg-white/5 
-                  text-center hover:bg-blue-500/10 transition
-                "
-              >
-                <p className="font-semibold text-black">{tag.toUpperCase()}</p>
-                <p className="text-blue-600 font-bold">{count}</p>
-              </div>
-            );
-          })}
-        </div>
-      </div> */}
 
       {/* KEYWORD OCCURRENCES */}
       
@@ -4205,34 +4144,63 @@ const handlePublish = async () => {
           </h3>
 
           {/* Metrics Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-6">
-            {[
-              { label: "Performance", value: auditResult.performance },
-              { label: "SEO", value: auditResult.seo },
-              { label: "Accessibility", value: auditResult.accessibility },
-              { label: "Best Practices", value: auditResult.bestPractices },
-              { label: "PWA (Progressive Web App)", value: auditResult.pwa },
-            ].map(({ label, value }) => {
-              const percent = value ? Math.round(value * 100) : 0;
-              const gradient =
-                "linear-gradient(90deg, hsl(10, 10%, 10%), hsl(920, 40%, 40%))";
+           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
+      {[
+        { label: "Performance", value: auditResult.performance, color: "from-blue-500 to-blue-300" },
+        { label: "SEO", value: auditResult.seo, color: "from-green-500 to-green-300" },
+        { label: "Accessibility", value: auditResult.accessibility, color: "from-yellow-400 to-yellow-200" },
+        { label: "Best Practices", value: auditResult.bestPractices, color: "from-pink-500 to-pink-300" },
+        { label: "PWA", value: auditResult.pwa, color: "from-purple-500 to-purple-300" },
+      ].map(({ label, value, color }) => {
+        const percent = value ? Math.round(value * 100) : 0;
 
-              return (
-                <div key={label} className="flex flex-col gap-2">
-                  <div className="flex justify-between text-sm font-semibold text-gray-800 mb-1">
-                    <span>{label}</span>
-                    <span>{percent}%</span>
-                  </div>
-                  <div className="w-full bg-gray-200/40 rounded-full h-3 overflow-hidden">
-                    <div
-                      className="h-3 rounded-full transition-all duration-700 shadow-md"
-                      style={{ width: `${percent}%`, background: gradient }}
-                    />
-                  </div>
-                </div>
-              );
-            })}
+        return (
+          <div
+            key={label}
+            className="relative flex flex-col items-center bg-gray-100 border border-gray-700 rounded-3xl shadow-lg p-6 hover:scale-105 transition-transform duration-500"
+          >
+            {/* Circular Neon Progress */}
+            <div className="relative w-28 h-28 flex items-center justify-center">
+              <svg className="w-28 h-28">
+                <circle
+                  className="text-gray-700"
+                  strokeWidth="8"
+                  stroke="currentColor"
+                  fill="transparent"
+                  r="44"
+                  cx="56"
+                  cy="56"
+                />
+                <circle
+                  className={`stroke-[8px]`}
+                  strokeWidth="8"
+                  strokeDasharray={2 * Math.PI * 44}
+                  strokeDashoffset={2 * Math.PI * 44 * (1 - percent / 100)}
+                  strokeLinecap="round"
+                  fill="transparent"
+                  r="44"
+                  cx="56"
+                  cy="56"
+                  style={{
+                    stroke: `url(#gradient-${label.replace(/\s+/g, "")})`,
+                  }}
+                />
+                <defs>
+                  <linearGradient id={`gradient-${label.replace(/\s+/g, "")}`} x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" className={`stop-color-${color.split(" ")[0]}`} />
+                    <stop offset="100%" className={`stop-color-${color.split(" ")[1]}`} />
+                  </linearGradient>
+                </defs>
+              </svg>
+
+              <span className="absolute text-gray-600 font-bold text-lg drop-shadow-md">{percent}%</span>
+            </div>
+
+            <span className="mt-4 text-gray-600 font-semibold text-center">{label}</span>
           </div>
+        );
+      })}
+    </div>
 
           {/* Collapsible Advanced Metrics */}
           {auditResult.audits && (
@@ -4314,7 +4282,7 @@ const handlePublish = async () => {
         </div>
 
         {/* Longtail Keywords */}
-        {/* <div className="floating">
+        <div className="floating">
           <input
             className="floating-input"
             value={longtailKeywords}
@@ -4325,7 +4293,7 @@ const handlePublish = async () => {
           >
             Longtail Keywords
           </label>
-        </div> */}
+        </div>
 
         {/* Brand Name */}
         <div className="floating">
@@ -4508,6 +4476,9 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
   const [newKeywordTerm, setNewKeywordTerm] = useState("");
   const [newKeywordVolume, setNewKeywordVolume] = useState("");
   const [newKeywordDifficulty, setNewKeywordDifficulty] = useState("Medium");
+const [showDeleteModal, setShowDeleteModal] = useState(false);
+const [deleteAction, setDeleteAction] = useState<null | (() => void)>(null);
+const [deleteLabel, setDeleteLabel] = useState("");
 
   const [targetTopicId, setTargetTopicId] = useState<number | null>(null);
   const { toast } = useToast();
@@ -4574,6 +4545,11 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
     },
     [getAuthHeaders, handleUnauthorized, toast]
   );
+const confirmDelete = (label: string, action: () => void) => {
+  setDeleteLabel(label);
+  setDeleteAction(() => action);
+  setShowDeleteModal(true);
+};
 
   const fetchStructure = useCallback(
     async (targetCampaignId: number) => {
@@ -4925,60 +4901,49 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
     }
   };
 
-  const handleDeleteTopic = (topicId: number) => {
-    if (!confirm("Are you sure you want to delete this topic?")) return;
+  const handleDeleteTopic = (topicId: number, topicTitle: string) => {
+  confirmDelete(`Topic`, () =>
     mutateStructure(
       `${CAMPAIGN_API_BASE}/topics/${topicId}`,
-      {
-        method: "DELETE",
-      },
+      { method: "DELETE" },
       { successMessage: "Topic deleted" }
-    ).catch(() => {
-      /* handled upstream */
-    });
-  };
+    )
+  );
+};
+
 
   const handleDeletePillarPage = (topicId: number) => {
-    if (!confirm("Are you sure you want to delete this pillar page?")) return;
+  confirmDelete("Pillar page", () =>
     mutateStructure(
       `${CAMPAIGN_API_BASE}/topics/${topicId}/pillar`,
-      {
-        method: "DELETE",
-      },
+      { method: "DELETE" },
       { successMessage: "Pillar page deleted" }
-    ).catch(() => {
-      /* handled upstream */
-    });
-  };
+    )
+  );
+};
 
-  const handleDeleteSubPage = (topicId: number, subPageId: number) => {
-    if (!confirm("Are you sure you want to delete this sub-page?")) return;
+  const handleDeleteSubPage = (subPageId: number) => {
+  confirmDelete("Sub-page", () =>
     mutateStructure(
       `${CAMPAIGN_API_BASE}/pages/${subPageId}`,
-      {
-        method: "DELETE",
-      },
+      { method: "DELETE" },
       { successMessage: "Sub-page deleted" }
-    ).catch(() => {
-      /* handled upstream */
-    });
-  };
+    )
+  );
+};
 
-  const handleDeleteKeyword = (
-    _context: { type: "pillar" | "subpage"; topicId: number; pageId: number },
-    keywordId: number
-  ) => {
-    if (!confirm("Are you sure you want to delete this keyword?")) return;
+  const handleDeleteKeyword = (keywordId: number) => {
+  console.log("Deleting keyword:", keywordId);
+  confirmDelete("keyword", () =>
     mutateStructure(
       `${CAMPAIGN_API_BASE}/keywords/${keywordId}`,
-      {
-        method: "DELETE",
-      },
+      { method: "DELETE" },
       { successMessage: "Keyword deleted" }
-    ).catch(() => {
-      /* handled upstream */
-    });
-  };
+    )
+  );
+};
+
+
 
   if (structureLoading) {
     return (
@@ -4989,6 +4954,7 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
             Loading campaign structure...
           </p>
         </div>
+        
       </div>
     );
   }
@@ -5039,6 +5005,37 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
           </div>
         )}
       </div>
+{showDeleteModal && (
+  <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50">
+    <div className="bg-white p-6 rounded-xl shadow-xl w-[90%] max-w-sm">
+      <h2 className="text-lg font-medium text-gray-800">Delete {deleteLabel}?</h2>
+
+      <p className="text-sm text-gray-500 mt-2">
+        Are you sure you want to delete this {deleteLabel}? 
+      </p>
+
+      <div className="flex justify-end gap-3 mt-6">
+        <button
+          onClick={() => setShowDeleteModal(false)}
+          className="px-4 py-2 rounded-lg text-sm bg-gray-100 hover:bg-gray-200"
+        >
+          Cancel
+        </button>
+
+        <button
+          onClick={() => {
+            if (deleteAction) deleteAction();
+            setShowDeleteModal(false);
+          }}
+          className="px-4 py-2 rounded-lg text-sm bg-black text-white hover:bg-red-700"
+        >
+          Delete
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+
 
       {/* Graph Overview */}
       <div className="w-full h-[700px] mb-10">
@@ -5307,16 +5304,7 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
                                     </div>
                                   </div>
                                   <button
-                                    onClick={() =>
-                                      handleDeleteKeyword(
-                                        {
-                                          type: "pillar",
-                                          topicId: topic.id,
-                                          pageId: topic.pillarPage!.id,
-                                        },
-                                        keyword.id
-                                      )
-                                    }
+                                    onClick={() => handleDeleteKeyword(keyword.id)}
                                     disabled={syncing}
                                     className="p-1 text-gray-400 hover:text-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                     title="Delete keyword"
@@ -5449,9 +5437,8 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
                                   </button>
                                 </div>
                                 <button
-                                  onClick={() =>
-                                    handleDeleteSubPage(topic.id, subPage.id)
-                                  }
+                                 onClick={() => handleDeleteSubPage(subPage.id)}
+
                                   disabled={syncing}
                                   className="p-1.5 text-gray-400 hover:text-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                   title="Delete sub-page"
@@ -5488,16 +5475,8 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
                                         </div>
                                       </div>
                                       <button
-                                        onClick={() =>
-                                          handleDeleteKeyword(
-                                            {
-                                              type: "subpage",
-                                              topicId: topic.id,
-                                              pageId: subPage.id,
-                                            },
-                                            keyword.id
-                                          )
-                                        }
+                                        onClick={() => handleDeleteKeyword(keyword.id)}
+
                                         disabled={syncing}
                                         className="p-1 text-gray-400 hover:text-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                         title="Delete keyword"
