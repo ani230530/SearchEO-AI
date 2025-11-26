@@ -1,4 +1,5 @@
 import express, { Request, Response } from "express";
+import puppeteer from "puppeteer";
 
 const router = express.Router();
 
@@ -10,48 +11,34 @@ function formatUrl(url: string) {
 }
 
 router.post("/", async (req: Request, res: Response) => {
-  console.log(" Incoming Body:", req.body);
-
   try {
     const { url } = req.body;
-
     if (!url || typeof url !== "string") {
-      console.log("❌ Invalid URL in request");
       return res.status(400).json({ error: "Invalid url" });
     }
 
     const formatted = formatUrl(url.trim());
-    console.log(" Formatted URL:", formatted);
-
-    // Validate URL
     try {
       new URL(formatted);
     } catch {
-      console.log("❌ URL failed validation");
       return res.status(400).json({ error: "Invalid URL format" });
     }
 
     const apiKey = process.env.PAGESPEED_API_KEY;
-    console.log(" API KEY exists?", !!apiKey);
-
     if (!apiKey) {
-      console.log("❌ Missing PAGESPEED_API_KEY");
       return res.status(500).json({ error: "Server missing API key" });
     }
 
+    // -----------------------------
+    // 1️⃣ Run PageSpeed Insights
+    // -----------------------------
     const endpoint = `https://pagespeedonline.googleapis.com/pagespeedonline/v5/runPagespeed?url=${encodeURIComponent(
       formatted
     )}&category=PERFORMANCE&category=SEO&category=BEST_PRACTICES&category=ACCESSIBILITY&strategy=DESKTOP&key=${apiKey}`;
 
-    console.log(" Calling:", endpoint);
-
     const response = await fetch(endpoint);
-  
-
     if (!response.ok) {
       const text = await response.text();
-      console.log("❌ Google Pagespeed Error:", text);
-
       return res.status(response.status).json({
         error: "Pagespeed API error",
         details: text,
@@ -59,13 +46,36 @@ router.post("/", async (req: Request, res: Response) => {
     }
 
     const data = await response.json();
-    console.log(" Pagespeed Success");
-
-    // --------------------------
-    // ✅ MINIMAL CHANGE SECTION
-    // --------------------------
     const lighthouse = data.lighthouseResult;
 
+    // -----------------------------
+    // 2️⃣ Capture viewport screenshot
+    // -----------------------------
+    const browser = await puppeteer.launch({ args: ["--no-sandbox"] });
+    const page = await browser.newPage();
+
+    // Set viewport to typical desktop resolution
+    await page.setViewport({ width: 1280, height: 800 });
+
+    // Navigate to page and wait until network is idle
+    await page.goto(formatted, { waitUntil: "networkidle2", timeout: 30000 });
+
+    // Capture **viewport only** screenshot
+    const screenshotBuffer = await page.screenshot({
+      type: "jpeg",
+      quality: 90,
+      fullPage: false, // IMPORTANT: only visible screen
+    });
+
+    await browser.close();
+
+    const screenshotBase64 = `data:image/jpeg;base64,${screenshotBuffer.toString(
+      "base64"
+    )}`;
+
+    // -----------------------------
+    // 3️⃣ Prepare normalized response
+    // -----------------------------
     const normalized = {
       performance: lighthouse?.categories?.performance?.score ?? 0,
       seo: lighthouse?.categories?.seo?.score ?? 0,
@@ -79,13 +89,14 @@ router.post("/", async (req: Request, res: Response) => {
         cls: lighthouse?.audits?.["cumulative-layout-shift"]?.displayValue,
         tbt: lighthouse?.audits?.["total-blocking-time"]?.displayValue,
         speedIndex: lighthouse?.audits?.["speed-index"]?.displayValue,
-      }
+      },
+
+      screenshot: screenshotBase64,
     };
-    // --------------------------
 
     return res.json({ url: formatted, normalized });
   } catch (err) {
-    console.error(" Uncaught Server Error:", err);
+    console.error("Uncaught Server Error:", err);
     return res.status(500).json({ error: "Internal server error" });
   }
 });

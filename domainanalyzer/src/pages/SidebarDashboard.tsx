@@ -483,7 +483,8 @@ const handleRunAudit = async (url?: string) => {
     if (!resp.ok) throw new Error('Failed to run audit');
 
     const data = await resp.json();
-    setAuditResult(data.normalized);
+    setAuditResult(data.normalized); 
+
     console.log("AUDIT RESPONSE:", data);
 
     setAuditComplete(true);
@@ -639,6 +640,13 @@ const handleRunAudit = async (url?: string) => {
       setCompanyDomainLoading(false);
     }
   };
+const tooltipInfo = {
+  Performance: "Measures how fast your domain loads and responds.",
+  SEO: "Shows how well your domain is optimized for search engines.",
+  Accessibility: "Indicates how usable the site is for all users, including disabilities.",
+  "Best Practices": "Checks if your site follows recommended web development standards.",
+  PWA: "Shows how well your domain qualifies as a Progressive Web App.",
+};
 
   // Helper function to determine intent based on keyword content
   const determineIntent = (keyword: string): string => {
@@ -4051,7 +4059,7 @@ const handlePublish = async () => {
 </div>
 
 ): activeTab === "audit" ? (
-  <div className="max-w-4xl mx-auto px-4 sm:px-6 py-12 sm:py-16 space-y-12">
+  <div className="max-w-8xl mx-auto px-4 sm:px-6 py-12 sm:py-16 space-y-12">
 
     {/* Audit Completed Toast */}
     {auditComplete && (
@@ -4136,109 +4144,206 @@ const handlePublish = async () => {
         </button>
       </div>
 
-      {/* Audit Result */}
-      {auditResult && (
-        <div className="bg-white/60 backdrop-blur-md rounded-2xl border border-gray-200/30 p-6 shadow-lg mt-6">
-          <h3 className="text-lg font-bold text-gray-900 mb-6">
-            Audit Result
-          </h3>
+     {/* Audit Result */}
+{auditResult && (
+  <div className="bg-white/60 backdrop-blur-md rounded-2xl border border-gray-200/30 p-6 shadow-lg mt-6 space-y-8">
+{/* Screenshot */}
+{auditResult?.screenshot && (
+  <img
+    src={auditResult.screenshot}
+    alt="Website Screenshot"
+    className="mt-6 max-w-8xl w-full rounded-xl shadow-xl border border-gray-300"
+  />
+)}
+  {/* Summary Card */}
+<div className="bg-white/60 backdrop-blur-md rounded-2xl border border-gray-200/40 p-6 shadow-lg mb-6 hover:shadow-xl transition-all">
 
-          {/* Metrics Grid */}
-           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
-      {[
-        { label: "Performance", value: auditResult.performance, color: "from-blue-500 to-blue-300" },
-        { label: "SEO", value: auditResult.seo, color: "from-green-500 to-green-300" },
-        { label: "Accessibility", value: auditResult.accessibility, color: "from-yellow-400 to-yellow-200" },
-        { label: "Best Practices", value: auditResult.bestPractices, color: "from-pink-500 to-pink-300" },
-        { label: "PWA", value: auditResult.pwa, color: "from-purple-500 to-purple-300" },
-      ].map(({ label, value, color }) => {
-        const percent = value ? Math.round(value * 100) : 0;
+  <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+    <span> Audit Summary</span>
+  </h3>
 
-        return (
-          <div
-            key={label}
-            className="relative flex flex-col items-center bg-gray-100 border border-gray-700 rounded-3xl shadow-lg p-6 hover:scale-105 transition-transform duration-500"
-          >
-            {/* Circular Neon Progress */}
-            <div className="relative w-28 h-28 flex items-center justify-center">
-              <svg className="w-28 h-28">
-                <circle
-                  className="text-gray-700"
-                  strokeWidth="8"
-                  stroke="currentColor"
-                  fill="transparent"
-                  r="44"
-                  cx="56"
-                  cy="56"
-                />
-                <circle
-                  className={`stroke-[8px]`}
-                  strokeWidth="8"
-                  strokeDasharray={2 * Math.PI * 44}
-                  strokeDashoffset={2 * Math.PI * 44 * (1 - percent / 100)}
-                  strokeLinecap="round"
-                  fill="transparent"
-                  r="44"
-                  cx="56"
-                  cy="56"
-                  style={{
-                    stroke: `url(#gradient-${label.replace(/\s+/g, "")})`,
-                  }}
-                />
-                <defs>
-                  <linearGradient id={`gradient-${label.replace(/\s+/g, "")}`} x1="0%" y1="0%" x2="100%" y2="0%">
-                    <stop offset="0%" className={`stop-color-${color.split(" ")[0]}`} />
-                    <stop offset="100%" className={`stop-color-${color.split(" ")[1]}`} />
-                  </linearGradient>
-                </defs>
-              </svg>
+  {/* Compute dynamic values */}
+  {(() => {
+    const categories = [
+      { label: "Performance", value: auditResult.performance },
+      { label: "SEO", value: auditResult.seo },
+      { label: "Accessibility", value: auditResult.accessibility },
+      { label: "Best Practices", value: auditResult.bestPractices },
+      { label: "PWA", value: auditResult.pwa },
+    ];
 
-              <span className="absolute text-gray-600 font-bold text-lg drop-shadow-md">{percent}%</span>
-            </div>
+    const scored = categories.map(c => ({ ...c, score: Math.round((c.value || 0) * 100) }));
+    const avg = Math.round(scored.reduce((a, b) => a + b.score, 0) / scored.length);
+    const best = scored.reduce((a, b) => (b.score > a.score ? b : a));
+    const worst = scored.reduce((a, b) => (b.score < a.score ? b : a));
 
-            <span className="mt-4 text-gray-600 font-semibold text-center">{label}</span>
-          </div>
-        );
-      })}
-    </div>
+    return (
+      <div className="space-y-4 text-gray-700 text-sm">
 
-          {/* Collapsible Advanced Metrics */}
-          {auditResult.audits && (
-            <details className="border border-gray-200/40 rounded-xl p-4 bg-white/50 backdrop-blur-sm shadow-inner group">
-              <summary className="cursor-pointer font-semibold text-gray-800 text-sm flex justify-between items-center hover:text-blue-600 transition-colors">
-                Advanced Metrics
-                <span className="transform group-open:rotate-90 transition-transform">
-                  ▶
-                </span>
-              </summary>
-
-              <div className="mt-4 space-y-3 text-sm text-gray-700">
-                {Object.entries(auditResult.audits).map(([key, value]) => {
-                  const fullForms = {
-                    fcp: "First Contentful Paint",
-                    lcp: "Largest Contentful Paint",
-                    cls: "Cumulative Layout Shift",
-                    tbt: "Total Blocking Time",
-                    speedIndex: "Speed Index",
-                  };
-
-                  return (
-                    <div
-                      key={key}
-                      className="flex justify-between px-3 py-2 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors"
-                    >
-                      <span className="font-medium text-gray-900">
-                        {key.toUpperCase()} ({fullForms[key] || key})
-                      </span>
-                      <span className="font-mono">{value}</span>
-                    </div>
-                  );
-                })}
-              </div>
-            </details>
-          )}
+        {/* Overall Score */}
+        <div className="flex justify-between items-center bg-gray-100/60 border border-gray-200 rounded-xl px-4 py-3">
+          <span className="font-semibold text-gray-900">Overall Score</span>
+          <span className="text-lg font-bold">{avg}%</span>
         </div>
-      )}
+
+        {/* Best & Weakest Section */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+
+          <div className="bg-green-50 border border-green-200 px-4 py-3 rounded-xl">
+            <span className="text-xs font-semibold text-green-800">Strongest Area</span>
+            <p className="font-bold text-green-900 mt-1">{best.label} ({best.score}%)</p>
+          </div>
+
+          <div className="bg-red-50 border border-red-200 px-4 py-3 rounded-xl">
+            <span className="text-xs font-semibold text-red-800">Needs Improvement</span>
+            <p className="font-bold text-red-900 mt-1">{worst.label} ({worst.score}%)</p>
+          </div>
+
+        </div>
+
+        {/* Quick Summary Points */}
+        <div className="bg-gray-50 border border-gray-200 px-4 py-3 rounded-xl">
+          <p className="text-xs font-semibold text-gray-800 mb-1">Information</p>
+
+          <ul className="list-disc list-inside text-gray-700 space-y-1">
+            <li>Your site performance affects loading time and user experience.</li>
+            <li>SEO score impacts visibility in search engines.</li>
+            <li>Accessibility ensures usability for all types of users.</li>
+            <li>Best Practices & PWA influence reliability and security.</li>
+          </ul>
+        </div>
+
+      </div>
+    );
+  })()}
+</div>
+
+
+
+
+    {/*  Detailed Metrics */}
+    <details className="group">
+      <summary className="cursor-pointer flex justify-between items-center px-4 py-3 bg-gray-100 rounded-xl border border-gray-300 shadow-sm text-gray-800 font-semibold hover:bg-gray-200 transition-all">
+    Domain  Scores
+        <span className="transition-transform group-open:rotate-90">▶</span>
+      </summary>
+
+      <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        {[
+          { label: "Performance", value: auditResult.performance, color: "from-blue-500 to-blue-300" },
+          { label: "SEO", value: auditResult.seo, color: "from-green-500 to-green-300" },
+          { label: "Accessibility", value: auditResult.accessibility, color: "from-yellow-400 to-yellow-200" },
+          { label: "Best Practices", value: auditResult.bestPractices, color: "from-pink-500 to-pink-300" },
+          { label: "PWA", value: auditResult.pwa, color: "from-purple-500 to-purple-300" },
+        ].map(({ label, value, color }) => {
+          const percent = value ? Math.round(value * 100) : 0;
+
+          return (
+            <div
+  key={label}
+  className="relative group/card flex flex-col items-center bg-gray-100 border border-gray-700 rounded-3xl shadow-lg p-6 hover:scale-105 transition-transform duration-500"
+>
+  {/* Tooltip */}
+  <div className="absolute -top-3 left-1/2 -translate-x-1/2 -translate-y-full 
+                  opacity-0 group-hover/card:opacity-100 
+                  pointer-events-none transition-all duration-300
+                  bg-black/80 text-white text-xs font-medium 
+                  px-3 py-2 rounded-lg shadow-md w-48 text-center z-50">
+    {tooltipInfo[label]}
+  </div>
+
+  {/* Circle Meter */}
+  <div className="relative w-28 h-28 flex items-center justify-center">
+    <svg className="w-28 h-28">
+      <circle
+        className="text-gray-700"
+        strokeWidth="8"
+        stroke="currentColor"
+        fill="transparent"
+        r="44"
+        cx="56"
+        cy="56"
+      />
+      <circle
+        strokeWidth="8"
+        strokeDasharray={2 * Math.PI * 44}
+        strokeDashoffset={2 * Math.PI * 44 * (1 - percent / 100)}
+        strokeLinecap="round"
+        fill="transparent"
+        r="44"
+        cx="56"
+        cy="56"
+        style={{
+          stroke: `url(#gradient-${label.replace(/\s+/g, "")})`,
+        }}
+      />
+      <defs>
+        <linearGradient
+          id={`gradient-${label.replace(/\s+/g, "")}`}
+          x1="0%"
+          y1="0%"
+          x2="100%"
+          y2="0%"
+        >
+          <stop offset="0%" className={`stop-color-${color.split(" ")[0]}`} />
+          <stop offset="100%" className={`stop-color-${color.split(" ")[1]}`} />
+        </linearGradient>
+      </defs>
+    </svg>
+
+    <span className="absolute text-gray-600 font-bold text-lg">
+      {percent}%
+    </span>
+  </div>
+
+  <span className="mt-4 text-gray-600 font-semibold text-center">
+    {label}
+  </span>
+</div>
+
+          );
+        })}
+      </div>
+    </details>
+
+    {/*  Advanced Metrics */}
+    {auditResult.audits && (
+      <details className="group border border-gray-300 rounded-xl p-4 bg-gray-100 backdrop-blur-sm shadow-inner hover:bg-gray-200">
+        <summary className="cursor-pointer font-semibold text-gray-800 text-sm flex justify-between items-center  transition-colors">
+          Advanced Metrics
+          <span className="transform group-open:rotate-90 transition-transform">
+            ▶
+          </span>
+        </summary>
+
+        <div className="mt-4 space-y-3 text-sm text-gray-700">
+          {Object.entries(auditResult.audits).map(([key, value]) => {
+            const fullForms = {
+              fcp: "First Contentful Paint",
+              lcp: "Largest Contentful Paint",
+              cls: "Cumulative Layout Shift",
+              tbt: "Total Blocking Time",
+              speedIndex: "Speed Index",
+            };
+
+            return (
+              <div
+                key={key}
+                className="flex justify-between px-3 py-2 rounded-lg hover:bg-gray-50 bg-gray-200 transition-colors"
+              >
+                <span className="font-medium text-gray-900">
+                  {key.toUpperCase()} ({fullForms[key] || key})
+                </span>
+                <span className="font-mono">{value}</span>
+              </div>
+            );
+          })}
+        </div>
+      </details>
+    )}
+  </div>
+)}
+
     </div>
   </div>
 ): activeTab === "publish" ? (
