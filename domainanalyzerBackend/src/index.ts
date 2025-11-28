@@ -13,6 +13,7 @@ import dashboardRouter from './routes/dashboard';
 import authRouter from './routes/auth';
 import userRouter from './routes/user';
 import googleSearchConsoleRouter, { handleOAuthCallback } from './routes/googleSearchConsole';
+import publishRouter from './routes/publish';
 import campaignsRouter from './routes/campaigns';
 import { PrismaClient } from '../generated/prisma';
 import { authenticateToken, AuthenticatedRequest } from './middleware/auth';
@@ -104,6 +105,7 @@ app.use('/api/user', userRouter);
 app.use('/api/domain', domainRouter);
 app.use('/api/gsc', googleSearchConsoleRouter);
 app.use('/api/campaigns', campaignsRouter);
+app.use('/api/publish', publishRouter);
 
 // OAuth callback route (must be at /api/auth/google/callback for Google redirect)
 app.get('/api/auth/google/callback', handleOAuthCallback);

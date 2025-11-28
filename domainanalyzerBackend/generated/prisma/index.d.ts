@@ -119,6 +119,16 @@ export type SearchPattern = $Result.DefaultSelection<Prisma.$SearchPatternPayloa
  */
 export type PhraseIntentClassification = $Result.DefaultSelection<Prisma.$PhraseIntentClassificationPayload>
 /**
+ * Model WordpressIntegration
+ * 
+ */
+export type WordpressIntegration = $Result.DefaultSelection<Prisma.$WordpressIntegrationPayload>
+/**
+ * Model WordpressPublishLog
+ * 
+ */
+export type WordpressPublishLog = $Result.DefaultSelection<Prisma.$WordpressPublishLogPayload>
+/**
  * Model PhraseScore
  * 
  */
@@ -542,6 +552,26 @@ export class PrismaClient<
     * ```
     */
   get phraseIntentClassification(): Prisma.PhraseIntentClassificationDelegate<ExtArgs, ClientOptions>;
+
+  /**
+   * `prisma.wordpressIntegration`: Exposes CRUD operations for the **WordpressIntegration** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more WordpressIntegrations
+    * const wordpressIntegrations = await prisma.wordpressIntegration.findMany()
+    * ```
+    */
+  get wordpressIntegration(): Prisma.WordpressIntegrationDelegate<ExtArgs, ClientOptions>;
+
+  /**
+   * `prisma.wordpressPublishLog`: Exposes CRUD operations for the **WordpressPublishLog** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more WordpressPublishLogs
+    * const wordpressPublishLogs = await prisma.wordpressPublishLog.findMany()
+    * ```
+    */
+  get wordpressPublishLog(): Prisma.WordpressPublishLogDelegate<ExtArgs, ClientOptions>;
 
   /**
    * `prisma.phraseScore`: Exposes CRUD operations for the **PhraseScore** model.
@@ -1123,6 +1153,8 @@ export namespace Prisma {
     CommunityInsight: 'CommunityInsight',
     SearchPattern: 'SearchPattern',
     PhraseIntentClassification: 'PhraseIntentClassification',
+    WordpressIntegration: 'WordpressIntegration',
+    WordpressPublishLog: 'WordpressPublishLog',
     PhraseScore: 'PhraseScore',
     IntentPhraseGeneration: 'IntentPhraseGeneration',
     CommunityMiningResult: 'CommunityMiningResult',
@@ -1153,7 +1185,7 @@ export namespace Prisma {
       omit: GlobalOmitOptions
     }
     meta: {
-      modelProps: "user" | "domain" | "crawlResult" | "keyword" | "phrase" | "aIQueryResult" | "analysisReport" | "modelPerformance" | "competitorTracking" | "performanceInsight" | "dashboardAnalysis" | "competitorAnalysis" | "suggestedCompetitor" | "analysisPhase" | "semanticAnalysis" | "keywordAnalysis" | "searchVolumeClassification" | "intentClassification" | "communityInsight" | "searchPattern" | "phraseIntentClassification" | "phraseScore" | "intentPhraseGeneration" | "communityMiningResult" | "searchPatternResult" | "intentClassificationResult" | "generatedIntentPhrase" | "relevanceScoreResult" | "googleSearchConsoleConnection" | "campaign" | "campaignTopic" | "campaignPage" | "campaignKeyword"
+      modelProps: "user" | "domain" | "crawlResult" | "keyword" | "phrase" | "aIQueryResult" | "analysisReport" | "modelPerformance" | "competitorTracking" | "performanceInsight" | "dashboardAnalysis" | "competitorAnalysis" | "suggestedCompetitor" | "analysisPhase" | "semanticAnalysis" | "keywordAnalysis" | "searchVolumeClassification" | "intentClassification" | "communityInsight" | "searchPattern" | "phraseIntentClassification" | "wordpressIntegration" | "wordpressPublishLog" | "phraseScore" | "intentPhraseGeneration" | "communityMiningResult" | "searchPatternResult" | "intentClassificationResult" | "generatedIntentPhrase" | "relevanceScoreResult" | "googleSearchConsoleConnection" | "campaign" | "campaignTopic" | "campaignPage" | "campaignKeyword"
       txIsolationLevel: Prisma.TransactionIsolationLevel
     }
     model: {
@@ -2627,6 +2659,146 @@ export namespace Prisma {
           }
         }
       }
+      WordpressIntegration: {
+        payload: Prisma.$WordpressIntegrationPayload<ExtArgs>
+        fields: Prisma.WordpressIntegrationFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.WordpressIntegrationFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$WordpressIntegrationPayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.WordpressIntegrationFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$WordpressIntegrationPayload>
+          }
+          findFirst: {
+            args: Prisma.WordpressIntegrationFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$WordpressIntegrationPayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.WordpressIntegrationFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$WordpressIntegrationPayload>
+          }
+          findMany: {
+            args: Prisma.WordpressIntegrationFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$WordpressIntegrationPayload>[]
+          }
+          create: {
+            args: Prisma.WordpressIntegrationCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$WordpressIntegrationPayload>
+          }
+          createMany: {
+            args: Prisma.WordpressIntegrationCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.WordpressIntegrationCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$WordpressIntegrationPayload>[]
+          }
+          delete: {
+            args: Prisma.WordpressIntegrationDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$WordpressIntegrationPayload>
+          }
+          update: {
+            args: Prisma.WordpressIntegrationUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$WordpressIntegrationPayload>
+          }
+          deleteMany: {
+            args: Prisma.WordpressIntegrationDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.WordpressIntegrationUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          upsert: {
+            args: Prisma.WordpressIntegrationUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$WordpressIntegrationPayload>
+          }
+          aggregate: {
+            args: Prisma.WordpressIntegrationAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateWordpressIntegration>
+          }
+          groupBy: {
+            args: Prisma.WordpressIntegrationGroupByArgs<ExtArgs>
+            result: $Utils.Optional<WordpressIntegrationGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.WordpressIntegrationCountArgs<ExtArgs>
+            result: $Utils.Optional<WordpressIntegrationCountAggregateOutputType> | number
+          }
+        }
+      }
+      WordpressPublishLog: {
+        payload: Prisma.$WordpressPublishLogPayload<ExtArgs>
+        fields: Prisma.WordpressPublishLogFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.WordpressPublishLogFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$WordpressPublishLogPayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.WordpressPublishLogFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$WordpressPublishLogPayload>
+          }
+          findFirst: {
+            args: Prisma.WordpressPublishLogFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$WordpressPublishLogPayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.WordpressPublishLogFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$WordpressPublishLogPayload>
+          }
+          findMany: {
+            args: Prisma.WordpressPublishLogFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$WordpressPublishLogPayload>[]
+          }
+          create: {
+            args: Prisma.WordpressPublishLogCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$WordpressPublishLogPayload>
+          }
+          createMany: {
+            args: Prisma.WordpressPublishLogCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.WordpressPublishLogCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$WordpressPublishLogPayload>[]
+          }
+          delete: {
+            args: Prisma.WordpressPublishLogDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$WordpressPublishLogPayload>
+          }
+          update: {
+            args: Prisma.WordpressPublishLogUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$WordpressPublishLogPayload>
+          }
+          deleteMany: {
+            args: Prisma.WordpressPublishLogDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.WordpressPublishLogUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          upsert: {
+            args: Prisma.WordpressPublishLogUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$WordpressPublishLogPayload>
+          }
+          aggregate: {
+            args: Prisma.WordpressPublishLogAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateWordpressPublishLog>
+          }
+          groupBy: {
+            args: Prisma.WordpressPublishLogGroupByArgs<ExtArgs>
+            result: $Utils.Optional<WordpressPublishLogGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.WordpressPublishLogCountArgs<ExtArgs>
+            result: $Utils.Optional<WordpressPublishLogCountAggregateOutputType> | number
+          }
+        }
+      }
       PhraseScore: {
         payload: Prisma.$PhraseScorePayload<ExtArgs>
         fields: Prisma.PhraseScoreFieldRefs
@@ -3572,6 +3744,8 @@ export namespace Prisma {
     communityInsight?: CommunityInsightOmit
     searchPattern?: SearchPatternOmit
     phraseIntentClassification?: PhraseIntentClassificationOmit
+    wordpressIntegration?: WordpressIntegrationOmit
+    wordpressPublishLog?: WordpressPublishLogOmit
     phraseScore?: PhraseScoreOmit
     intentPhraseGeneration?: IntentPhraseGenerationOmit
     communityMiningResult?: CommunityMiningResultOmit
@@ -3679,10 +3853,12 @@ export namespace Prisma {
 
   export type UserCountOutputType = {
     domains: number
+    publishLogs: number
   }
 
   export type UserCountOutputTypeSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     domains?: boolean | UserCountOutputTypeCountDomainsArgs
+    publishLogs?: boolean | UserCountOutputTypeCountPublishLogsArgs
   }
 
   // Custom InputTypes
@@ -3701,6 +3877,13 @@ export namespace Prisma {
    */
   export type UserCountOutputTypeCountDomainsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     where?: DomainWhereInput
+  }
+
+  /**
+   * UserCountOutputType without action
+   */
+  export type UserCountOutputTypeCountPublishLogsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: WordpressPublishLogWhereInput
   }
 
 
@@ -4059,6 +4242,37 @@ export namespace Prisma {
 
 
   /**
+   * Count Type WordpressIntegrationCountOutputType
+   */
+
+  export type WordpressIntegrationCountOutputType = {
+    publishLogs: number
+  }
+
+  export type WordpressIntegrationCountOutputTypeSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    publishLogs?: boolean | WordpressIntegrationCountOutputTypeCountPublishLogsArgs
+  }
+
+  // Custom InputTypes
+  /**
+   * WordpressIntegrationCountOutputType without action
+   */
+  export type WordpressIntegrationCountOutputTypeDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the WordpressIntegrationCountOutputType
+     */
+    select?: WordpressIntegrationCountOutputTypeSelect<ExtArgs> | null
+  }
+
+  /**
+   * WordpressIntegrationCountOutputType without action
+   */
+  export type WordpressIntegrationCountOutputTypeCountPublishLogsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: WordpressPublishLogWhereInput
+  }
+
+
+  /**
    * Count Type GeneratedIntentPhraseCountOutputType
    */
 
@@ -4412,6 +4626,8 @@ export namespace Prisma {
     updatedAt?: boolean
     domains?: boolean | User$domainsArgs<ExtArgs>
     googleSearchConsole?: boolean | User$googleSearchConsoleArgs<ExtArgs>
+    wordpressIntegration?: boolean | User$wordpressIntegrationArgs<ExtArgs>
+    publishLogs?: boolean | User$publishLogsArgs<ExtArgs>
     _count?: boolean | UserCountOutputTypeDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["user"]>
 
@@ -4438,6 +4654,8 @@ export namespace Prisma {
   export type UserInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     domains?: boolean | User$domainsArgs<ExtArgs>
     googleSearchConsole?: boolean | User$googleSearchConsoleArgs<ExtArgs>
+    wordpressIntegration?: boolean | User$wordpressIntegrationArgs<ExtArgs>
+    publishLogs?: boolean | User$publishLogsArgs<ExtArgs>
     _count?: boolean | UserCountOutputTypeDefaultArgs<ExtArgs>
   }
   export type UserIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {}
@@ -4447,6 +4665,8 @@ export namespace Prisma {
     objects: {
       domains: Prisma.$DomainPayload<ExtArgs>[]
       googleSearchConsole: Prisma.$GoogleSearchConsoleConnectionPayload<ExtArgs> | null
+      wordpressIntegration: Prisma.$WordpressIntegrationPayload<ExtArgs> | null
+      publishLogs: Prisma.$WordpressPublishLogPayload<ExtArgs>[]
     }
     scalars: $Extensions.GetPayloadResult<{
       id: number
@@ -4821,6 +5041,8 @@ export namespace Prisma {
     readonly [Symbol.toStringTag]: "PrismaPromise"
     domains<T extends User$domainsArgs<ExtArgs> = {}>(args?: Subset<T, User$domainsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$DomainPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     googleSearchConsole<T extends User$googleSearchConsoleArgs<ExtArgs> = {}>(args?: Subset<T, User$googleSearchConsoleArgs<ExtArgs>>): Prisma__GoogleSearchConsoleConnectionClient<$Result.GetResult<Prisma.$GoogleSearchConsoleConnectionPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+    wordpressIntegration<T extends User$wordpressIntegrationArgs<ExtArgs> = {}>(args?: Subset<T, User$wordpressIntegrationArgs<ExtArgs>>): Prisma__WordpressIntegrationClient<$Result.GetResult<Prisma.$WordpressIntegrationPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+    publishLogs<T extends User$publishLogsArgs<ExtArgs> = {}>(args?: Subset<T, User$publishLogsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$WordpressPublishLogPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     /**
      * Attaches callbacks for the resolution and/or rejection of the Promise.
      * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -5250,6 +5472,49 @@ export namespace Prisma {
      */
     include?: GoogleSearchConsoleConnectionInclude<ExtArgs> | null
     where?: GoogleSearchConsoleConnectionWhereInput
+  }
+
+  /**
+   * User.wordpressIntegration
+   */
+  export type User$wordpressIntegrationArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the WordpressIntegration
+     */
+    select?: WordpressIntegrationSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the WordpressIntegration
+     */
+    omit?: WordpressIntegrationOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WordpressIntegrationInclude<ExtArgs> | null
+    where?: WordpressIntegrationWhereInput
+  }
+
+  /**
+   * User.publishLogs
+   */
+  export type User$publishLogsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the WordpressPublishLog
+     */
+    select?: WordpressPublishLogSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the WordpressPublishLog
+     */
+    omit?: WordpressPublishLogOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WordpressPublishLogInclude<ExtArgs> | null
+    where?: WordpressPublishLogWhereInput
+    orderBy?: WordpressPublishLogOrderByWithRelationInput | WordpressPublishLogOrderByWithRelationInput[]
+    cursor?: WordpressPublishLogWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: WordpressPublishLogScalarFieldEnum | WordpressPublishLogScalarFieldEnum[]
   }
 
   /**
@@ -28343,6 +28608,2191 @@ export namespace Prisma {
 
 
   /**
+   * Model WordpressIntegration
+   */
+
+  export type AggregateWordpressIntegration = {
+    _count: WordpressIntegrationCountAggregateOutputType | null
+    _avg: WordpressIntegrationAvgAggregateOutputType | null
+    _sum: WordpressIntegrationSumAggregateOutputType | null
+    _min: WordpressIntegrationMinAggregateOutputType | null
+    _max: WordpressIntegrationMaxAggregateOutputType | null
+  }
+
+  export type WordpressIntegrationAvgAggregateOutputType = {
+    id: number | null
+    userId: number | null
+  }
+
+  export type WordpressIntegrationSumAggregateOutputType = {
+    id: number | null
+    userId: number | null
+  }
+
+  export type WordpressIntegrationMinAggregateOutputType = {
+    id: number | null
+    userId: number | null
+    siteUrl: string | null
+    username: string | null
+    password: string | null
+    lastPublishedAt: Date | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type WordpressIntegrationMaxAggregateOutputType = {
+    id: number | null
+    userId: number | null
+    siteUrl: string | null
+    username: string | null
+    password: string | null
+    lastPublishedAt: Date | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type WordpressIntegrationCountAggregateOutputType = {
+    id: number
+    userId: number
+    siteUrl: number
+    username: number
+    password: number
+    lastPublishedAt: number
+    createdAt: number
+    updatedAt: number
+    _all: number
+  }
+
+
+  export type WordpressIntegrationAvgAggregateInputType = {
+    id?: true
+    userId?: true
+  }
+
+  export type WordpressIntegrationSumAggregateInputType = {
+    id?: true
+    userId?: true
+  }
+
+  export type WordpressIntegrationMinAggregateInputType = {
+    id?: true
+    userId?: true
+    siteUrl?: true
+    username?: true
+    password?: true
+    lastPublishedAt?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type WordpressIntegrationMaxAggregateInputType = {
+    id?: true
+    userId?: true
+    siteUrl?: true
+    username?: true
+    password?: true
+    lastPublishedAt?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type WordpressIntegrationCountAggregateInputType = {
+    id?: true
+    userId?: true
+    siteUrl?: true
+    username?: true
+    password?: true
+    lastPublishedAt?: true
+    createdAt?: true
+    updatedAt?: true
+    _all?: true
+  }
+
+  export type WordpressIntegrationAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which WordpressIntegration to aggregate.
+     */
+    where?: WordpressIntegrationWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of WordpressIntegrations to fetch.
+     */
+    orderBy?: WordpressIntegrationOrderByWithRelationInput | WordpressIntegrationOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: WordpressIntegrationWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` WordpressIntegrations from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` WordpressIntegrations.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned WordpressIntegrations
+    **/
+    _count?: true | WordpressIntegrationCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to average
+    **/
+    _avg?: WordpressIntegrationAvgAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to sum
+    **/
+    _sum?: WordpressIntegrationSumAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: WordpressIntegrationMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: WordpressIntegrationMaxAggregateInputType
+  }
+
+  export type GetWordpressIntegrationAggregateType<T extends WordpressIntegrationAggregateArgs> = {
+        [P in keyof T & keyof AggregateWordpressIntegration]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateWordpressIntegration[P]>
+      : GetScalarType<T[P], AggregateWordpressIntegration[P]>
+  }
+
+
+
+
+  export type WordpressIntegrationGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: WordpressIntegrationWhereInput
+    orderBy?: WordpressIntegrationOrderByWithAggregationInput | WordpressIntegrationOrderByWithAggregationInput[]
+    by: WordpressIntegrationScalarFieldEnum[] | WordpressIntegrationScalarFieldEnum
+    having?: WordpressIntegrationScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: WordpressIntegrationCountAggregateInputType | true
+    _avg?: WordpressIntegrationAvgAggregateInputType
+    _sum?: WordpressIntegrationSumAggregateInputType
+    _min?: WordpressIntegrationMinAggregateInputType
+    _max?: WordpressIntegrationMaxAggregateInputType
+  }
+
+  export type WordpressIntegrationGroupByOutputType = {
+    id: number
+    userId: number
+    siteUrl: string
+    username: string
+    password: string
+    lastPublishedAt: Date | null
+    createdAt: Date
+    updatedAt: Date
+    _count: WordpressIntegrationCountAggregateOutputType | null
+    _avg: WordpressIntegrationAvgAggregateOutputType | null
+    _sum: WordpressIntegrationSumAggregateOutputType | null
+    _min: WordpressIntegrationMinAggregateOutputType | null
+    _max: WordpressIntegrationMaxAggregateOutputType | null
+  }
+
+  type GetWordpressIntegrationGroupByPayload<T extends WordpressIntegrationGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<WordpressIntegrationGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof WordpressIntegrationGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], WordpressIntegrationGroupByOutputType[P]>
+            : GetScalarType<T[P], WordpressIntegrationGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type WordpressIntegrationSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    userId?: boolean
+    siteUrl?: boolean
+    username?: boolean
+    password?: boolean
+    lastPublishedAt?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    user?: boolean | UserDefaultArgs<ExtArgs>
+    publishLogs?: boolean | WordpressIntegration$publishLogsArgs<ExtArgs>
+    _count?: boolean | WordpressIntegrationCountOutputTypeDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["wordpressIntegration"]>
+
+  export type WordpressIntegrationSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    userId?: boolean
+    siteUrl?: boolean
+    username?: boolean
+    password?: boolean
+    lastPublishedAt?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    user?: boolean | UserDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["wordpressIntegration"]>
+
+
+  export type WordpressIntegrationSelectScalar = {
+    id?: boolean
+    userId?: boolean
+    siteUrl?: boolean
+    username?: boolean
+    password?: boolean
+    lastPublishedAt?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+  }
+
+  export type WordpressIntegrationOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "userId" | "siteUrl" | "username" | "password" | "lastPublishedAt" | "createdAt" | "updatedAt", ExtArgs["result"]["wordpressIntegration"]>
+  export type WordpressIntegrationInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    user?: boolean | UserDefaultArgs<ExtArgs>
+    publishLogs?: boolean | WordpressIntegration$publishLogsArgs<ExtArgs>
+    _count?: boolean | WordpressIntegrationCountOutputTypeDefaultArgs<ExtArgs>
+  }
+  export type WordpressIntegrationIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    user?: boolean | UserDefaultArgs<ExtArgs>
+  }
+
+  export type $WordpressIntegrationPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "WordpressIntegration"
+    objects: {
+      user: Prisma.$UserPayload<ExtArgs>
+      publishLogs: Prisma.$WordpressPublishLogPayload<ExtArgs>[]
+    }
+    scalars: $Extensions.GetPayloadResult<{
+      id: number
+      userId: number
+      siteUrl: string
+      username: string
+      password: string
+      lastPublishedAt: Date | null
+      createdAt: Date
+      updatedAt: Date
+    }, ExtArgs["result"]["wordpressIntegration"]>
+    composites: {}
+  }
+
+  type WordpressIntegrationGetPayload<S extends boolean | null | undefined | WordpressIntegrationDefaultArgs> = $Result.GetResult<Prisma.$WordpressIntegrationPayload, S>
+
+  type WordpressIntegrationCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> =
+    Omit<WordpressIntegrationFindManyArgs, 'select' | 'include' | 'distinct' | 'omit'> & {
+      select?: WordpressIntegrationCountAggregateInputType | true
+    }
+
+  export interface WordpressIntegrationDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['WordpressIntegration'], meta: { name: 'WordpressIntegration' } }
+    /**
+     * Find zero or one WordpressIntegration that matches the filter.
+     * @param {WordpressIntegrationFindUniqueArgs} args - Arguments to find a WordpressIntegration
+     * @example
+     * // Get one WordpressIntegration
+     * const wordpressIntegration = await prisma.wordpressIntegration.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends WordpressIntegrationFindUniqueArgs>(args: SelectSubset<T, WordpressIntegrationFindUniqueArgs<ExtArgs>>): Prisma__WordpressIntegrationClient<$Result.GetResult<Prisma.$WordpressIntegrationPayload<ExtArgs>, T, "findUnique", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find one WordpressIntegration that matches the filter or throw an error with `error.code='P2025'`
+     * if no matches were found.
+     * @param {WordpressIntegrationFindUniqueOrThrowArgs} args - Arguments to find a WordpressIntegration
+     * @example
+     * // Get one WordpressIntegration
+     * const wordpressIntegration = await prisma.wordpressIntegration.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends WordpressIntegrationFindUniqueOrThrowArgs>(args: SelectSubset<T, WordpressIntegrationFindUniqueOrThrowArgs<ExtArgs>>): Prisma__WordpressIntegrationClient<$Result.GetResult<Prisma.$WordpressIntegrationPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first WordpressIntegration that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {WordpressIntegrationFindFirstArgs} args - Arguments to find a WordpressIntegration
+     * @example
+     * // Get one WordpressIntegration
+     * const wordpressIntegration = await prisma.wordpressIntegration.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends WordpressIntegrationFindFirstArgs>(args?: SelectSubset<T, WordpressIntegrationFindFirstArgs<ExtArgs>>): Prisma__WordpressIntegrationClient<$Result.GetResult<Prisma.$WordpressIntegrationPayload<ExtArgs>, T, "findFirst", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first WordpressIntegration that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {WordpressIntegrationFindFirstOrThrowArgs} args - Arguments to find a WordpressIntegration
+     * @example
+     * // Get one WordpressIntegration
+     * const wordpressIntegration = await prisma.wordpressIntegration.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends WordpressIntegrationFindFirstOrThrowArgs>(args?: SelectSubset<T, WordpressIntegrationFindFirstOrThrowArgs<ExtArgs>>): Prisma__WordpressIntegrationClient<$Result.GetResult<Prisma.$WordpressIntegrationPayload<ExtArgs>, T, "findFirstOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find zero or more WordpressIntegrations that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {WordpressIntegrationFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all WordpressIntegrations
+     * const wordpressIntegrations = await prisma.wordpressIntegration.findMany()
+     * 
+     * // Get first 10 WordpressIntegrations
+     * const wordpressIntegrations = await prisma.wordpressIntegration.findMany({ take: 10 })
+     * 
+     * // Only select the `id`
+     * const wordpressIntegrationWithIdOnly = await prisma.wordpressIntegration.findMany({ select: { id: true } })
+     * 
+     */
+    findMany<T extends WordpressIntegrationFindManyArgs>(args?: SelectSubset<T, WordpressIntegrationFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$WordpressIntegrationPayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
+
+    /**
+     * Create a WordpressIntegration.
+     * @param {WordpressIntegrationCreateArgs} args - Arguments to create a WordpressIntegration.
+     * @example
+     * // Create one WordpressIntegration
+     * const WordpressIntegration = await prisma.wordpressIntegration.create({
+     *   data: {
+     *     // ... data to create a WordpressIntegration
+     *   }
+     * })
+     * 
+     */
+    create<T extends WordpressIntegrationCreateArgs>(args: SelectSubset<T, WordpressIntegrationCreateArgs<ExtArgs>>): Prisma__WordpressIntegrationClient<$Result.GetResult<Prisma.$WordpressIntegrationPayload<ExtArgs>, T, "create", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Create many WordpressIntegrations.
+     * @param {WordpressIntegrationCreateManyArgs} args - Arguments to create many WordpressIntegrations.
+     * @example
+     * // Create many WordpressIntegrations
+     * const wordpressIntegration = await prisma.wordpressIntegration.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends WordpressIntegrationCreateManyArgs>(args?: SelectSubset<T, WordpressIntegrationCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many WordpressIntegrations and returns the data saved in the database.
+     * @param {WordpressIntegrationCreateManyAndReturnArgs} args - Arguments to create many WordpressIntegrations.
+     * @example
+     * // Create many WordpressIntegrations
+     * const wordpressIntegration = await prisma.wordpressIntegration.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many WordpressIntegrations and only return the `id`
+     * const wordpressIntegrationWithIdOnly = await prisma.wordpressIntegration.createManyAndReturn({
+     *   select: { id: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends WordpressIntegrationCreateManyAndReturnArgs>(args?: SelectSubset<T, WordpressIntegrationCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$WordpressIntegrationPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Delete a WordpressIntegration.
+     * @param {WordpressIntegrationDeleteArgs} args - Arguments to delete one WordpressIntegration.
+     * @example
+     * // Delete one WordpressIntegration
+     * const WordpressIntegration = await prisma.wordpressIntegration.delete({
+     *   where: {
+     *     // ... filter to delete one WordpressIntegration
+     *   }
+     * })
+     * 
+     */
+    delete<T extends WordpressIntegrationDeleteArgs>(args: SelectSubset<T, WordpressIntegrationDeleteArgs<ExtArgs>>): Prisma__WordpressIntegrationClient<$Result.GetResult<Prisma.$WordpressIntegrationPayload<ExtArgs>, T, "delete", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Update one WordpressIntegration.
+     * @param {WordpressIntegrationUpdateArgs} args - Arguments to update one WordpressIntegration.
+     * @example
+     * // Update one WordpressIntegration
+     * const wordpressIntegration = await prisma.wordpressIntegration.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends WordpressIntegrationUpdateArgs>(args: SelectSubset<T, WordpressIntegrationUpdateArgs<ExtArgs>>): Prisma__WordpressIntegrationClient<$Result.GetResult<Prisma.$WordpressIntegrationPayload<ExtArgs>, T, "update", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Delete zero or more WordpressIntegrations.
+     * @param {WordpressIntegrationDeleteManyArgs} args - Arguments to filter WordpressIntegrations to delete.
+     * @example
+     * // Delete a few WordpressIntegrations
+     * const { count } = await prisma.wordpressIntegration.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends WordpressIntegrationDeleteManyArgs>(args?: SelectSubset<T, WordpressIntegrationDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more WordpressIntegrations.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {WordpressIntegrationUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many WordpressIntegrations
+     * const wordpressIntegration = await prisma.wordpressIntegration.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends WordpressIntegrationUpdateManyArgs>(args: SelectSubset<T, WordpressIntegrationUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create or update one WordpressIntegration.
+     * @param {WordpressIntegrationUpsertArgs} args - Arguments to update or create a WordpressIntegration.
+     * @example
+     * // Update or create a WordpressIntegration
+     * const wordpressIntegration = await prisma.wordpressIntegration.upsert({
+     *   create: {
+     *     // ... data to create a WordpressIntegration
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the WordpressIntegration we want to update
+     *   }
+     * })
+     */
+    upsert<T extends WordpressIntegrationUpsertArgs>(args: SelectSubset<T, WordpressIntegrationUpsertArgs<ExtArgs>>): Prisma__WordpressIntegrationClient<$Result.GetResult<Prisma.$WordpressIntegrationPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+
+    /**
+     * Count the number of WordpressIntegrations.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {WordpressIntegrationCountArgs} args - Arguments to filter WordpressIntegrations to count.
+     * @example
+     * // Count the number of WordpressIntegrations
+     * const count = await prisma.wordpressIntegration.count({
+     *   where: {
+     *     // ... the filter for the WordpressIntegrations we want to count
+     *   }
+     * })
+    **/
+    count<T extends WordpressIntegrationCountArgs>(
+      args?: Subset<T, WordpressIntegrationCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], WordpressIntegrationCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a WordpressIntegration.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {WordpressIntegrationAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends WordpressIntegrationAggregateArgs>(args: Subset<T, WordpressIntegrationAggregateArgs>): Prisma.PrismaPromise<GetWordpressIntegrationAggregateType<T>>
+
+    /**
+     * Group by WordpressIntegration.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {WordpressIntegrationGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends WordpressIntegrationGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: WordpressIntegrationGroupByArgs['orderBy'] }
+        : { orderBy?: WordpressIntegrationGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, WordpressIntegrationGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetWordpressIntegrationGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the WordpressIntegration model
+   */
+  readonly fields: WordpressIntegrationFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for WordpressIntegration.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__WordpressIntegrationClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    user<T extends UserDefaultArgs<ExtArgs> = {}>(args?: Subset<T, UserDefaultArgs<ExtArgs>>): Prisma__UserClient<$Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+    publishLogs<T extends WordpressIntegration$publishLogsArgs<ExtArgs> = {}>(args?: Subset<T, WordpressIntegration$publishLogsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$WordpressPublishLogPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the WordpressIntegration model
+   */
+  interface WordpressIntegrationFieldRefs {
+    readonly id: FieldRef<"WordpressIntegration", 'Int'>
+    readonly userId: FieldRef<"WordpressIntegration", 'Int'>
+    readonly siteUrl: FieldRef<"WordpressIntegration", 'String'>
+    readonly username: FieldRef<"WordpressIntegration", 'String'>
+    readonly password: FieldRef<"WordpressIntegration", 'String'>
+    readonly lastPublishedAt: FieldRef<"WordpressIntegration", 'DateTime'>
+    readonly createdAt: FieldRef<"WordpressIntegration", 'DateTime'>
+    readonly updatedAt: FieldRef<"WordpressIntegration", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * WordpressIntegration findUnique
+   */
+  export type WordpressIntegrationFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the WordpressIntegration
+     */
+    select?: WordpressIntegrationSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the WordpressIntegration
+     */
+    omit?: WordpressIntegrationOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WordpressIntegrationInclude<ExtArgs> | null
+    /**
+     * Filter, which WordpressIntegration to fetch.
+     */
+    where: WordpressIntegrationWhereUniqueInput
+  }
+
+  /**
+   * WordpressIntegration findUniqueOrThrow
+   */
+  export type WordpressIntegrationFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the WordpressIntegration
+     */
+    select?: WordpressIntegrationSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the WordpressIntegration
+     */
+    omit?: WordpressIntegrationOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WordpressIntegrationInclude<ExtArgs> | null
+    /**
+     * Filter, which WordpressIntegration to fetch.
+     */
+    where: WordpressIntegrationWhereUniqueInput
+  }
+
+  /**
+   * WordpressIntegration findFirst
+   */
+  export type WordpressIntegrationFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the WordpressIntegration
+     */
+    select?: WordpressIntegrationSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the WordpressIntegration
+     */
+    omit?: WordpressIntegrationOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WordpressIntegrationInclude<ExtArgs> | null
+    /**
+     * Filter, which WordpressIntegration to fetch.
+     */
+    where?: WordpressIntegrationWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of WordpressIntegrations to fetch.
+     */
+    orderBy?: WordpressIntegrationOrderByWithRelationInput | WordpressIntegrationOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for WordpressIntegrations.
+     */
+    cursor?: WordpressIntegrationWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` WordpressIntegrations from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` WordpressIntegrations.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of WordpressIntegrations.
+     */
+    distinct?: WordpressIntegrationScalarFieldEnum | WordpressIntegrationScalarFieldEnum[]
+  }
+
+  /**
+   * WordpressIntegration findFirstOrThrow
+   */
+  export type WordpressIntegrationFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the WordpressIntegration
+     */
+    select?: WordpressIntegrationSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the WordpressIntegration
+     */
+    omit?: WordpressIntegrationOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WordpressIntegrationInclude<ExtArgs> | null
+    /**
+     * Filter, which WordpressIntegration to fetch.
+     */
+    where?: WordpressIntegrationWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of WordpressIntegrations to fetch.
+     */
+    orderBy?: WordpressIntegrationOrderByWithRelationInput | WordpressIntegrationOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for WordpressIntegrations.
+     */
+    cursor?: WordpressIntegrationWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` WordpressIntegrations from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` WordpressIntegrations.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of WordpressIntegrations.
+     */
+    distinct?: WordpressIntegrationScalarFieldEnum | WordpressIntegrationScalarFieldEnum[]
+  }
+
+  /**
+   * WordpressIntegration findMany
+   */
+  export type WordpressIntegrationFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the WordpressIntegration
+     */
+    select?: WordpressIntegrationSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the WordpressIntegration
+     */
+    omit?: WordpressIntegrationOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WordpressIntegrationInclude<ExtArgs> | null
+    /**
+     * Filter, which WordpressIntegrations to fetch.
+     */
+    where?: WordpressIntegrationWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of WordpressIntegrations to fetch.
+     */
+    orderBy?: WordpressIntegrationOrderByWithRelationInput | WordpressIntegrationOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing WordpressIntegrations.
+     */
+    cursor?: WordpressIntegrationWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` WordpressIntegrations from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` WordpressIntegrations.
+     */
+    skip?: number
+    distinct?: WordpressIntegrationScalarFieldEnum | WordpressIntegrationScalarFieldEnum[]
+  }
+
+  /**
+   * WordpressIntegration create
+   */
+  export type WordpressIntegrationCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the WordpressIntegration
+     */
+    select?: WordpressIntegrationSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the WordpressIntegration
+     */
+    omit?: WordpressIntegrationOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WordpressIntegrationInclude<ExtArgs> | null
+    /**
+     * The data needed to create a WordpressIntegration.
+     */
+    data: XOR<WordpressIntegrationCreateInput, WordpressIntegrationUncheckedCreateInput>
+  }
+
+  /**
+   * WordpressIntegration createMany
+   */
+  export type WordpressIntegrationCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many WordpressIntegrations.
+     */
+    data: WordpressIntegrationCreateManyInput | WordpressIntegrationCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * WordpressIntegration createManyAndReturn
+   */
+  export type WordpressIntegrationCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the WordpressIntegration
+     */
+    select?: WordpressIntegrationSelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the WordpressIntegration
+     */
+    omit?: WordpressIntegrationOmit<ExtArgs> | null
+    /**
+     * The data used to create many WordpressIntegrations.
+     */
+    data: WordpressIntegrationCreateManyInput | WordpressIntegrationCreateManyInput[]
+    skipDuplicates?: boolean
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WordpressIntegrationIncludeCreateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * WordpressIntegration update
+   */
+  export type WordpressIntegrationUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the WordpressIntegration
+     */
+    select?: WordpressIntegrationSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the WordpressIntegration
+     */
+    omit?: WordpressIntegrationOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WordpressIntegrationInclude<ExtArgs> | null
+    /**
+     * The data needed to update a WordpressIntegration.
+     */
+    data: XOR<WordpressIntegrationUpdateInput, WordpressIntegrationUncheckedUpdateInput>
+    /**
+     * Choose, which WordpressIntegration to update.
+     */
+    where: WordpressIntegrationWhereUniqueInput
+  }
+
+  /**
+   * WordpressIntegration updateMany
+   */
+  export type WordpressIntegrationUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update WordpressIntegrations.
+     */
+    data: XOR<WordpressIntegrationUpdateManyMutationInput, WordpressIntegrationUncheckedUpdateManyInput>
+    /**
+     * Filter which WordpressIntegrations to update
+     */
+    where?: WordpressIntegrationWhereInput
+  }
+
+  /**
+   * WordpressIntegration upsert
+   */
+  export type WordpressIntegrationUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the WordpressIntegration
+     */
+    select?: WordpressIntegrationSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the WordpressIntegration
+     */
+    omit?: WordpressIntegrationOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WordpressIntegrationInclude<ExtArgs> | null
+    /**
+     * The filter to search for the WordpressIntegration to update in case it exists.
+     */
+    where: WordpressIntegrationWhereUniqueInput
+    /**
+     * In case the WordpressIntegration found by the `where` argument doesn't exist, create a new WordpressIntegration with this data.
+     */
+    create: XOR<WordpressIntegrationCreateInput, WordpressIntegrationUncheckedCreateInput>
+    /**
+     * In case the WordpressIntegration was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<WordpressIntegrationUpdateInput, WordpressIntegrationUncheckedUpdateInput>
+  }
+
+  /**
+   * WordpressIntegration delete
+   */
+  export type WordpressIntegrationDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the WordpressIntegration
+     */
+    select?: WordpressIntegrationSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the WordpressIntegration
+     */
+    omit?: WordpressIntegrationOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WordpressIntegrationInclude<ExtArgs> | null
+    /**
+     * Filter which WordpressIntegration to delete.
+     */
+    where: WordpressIntegrationWhereUniqueInput
+  }
+
+  /**
+   * WordpressIntegration deleteMany
+   */
+  export type WordpressIntegrationDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which WordpressIntegrations to delete
+     */
+    where?: WordpressIntegrationWhereInput
+  }
+
+  /**
+   * WordpressIntegration.publishLogs
+   */
+  export type WordpressIntegration$publishLogsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the WordpressPublishLog
+     */
+    select?: WordpressPublishLogSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the WordpressPublishLog
+     */
+    omit?: WordpressPublishLogOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WordpressPublishLogInclude<ExtArgs> | null
+    where?: WordpressPublishLogWhereInput
+    orderBy?: WordpressPublishLogOrderByWithRelationInput | WordpressPublishLogOrderByWithRelationInput[]
+    cursor?: WordpressPublishLogWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: WordpressPublishLogScalarFieldEnum | WordpressPublishLogScalarFieldEnum[]
+  }
+
+  /**
+   * WordpressIntegration without action
+   */
+  export type WordpressIntegrationDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the WordpressIntegration
+     */
+    select?: WordpressIntegrationSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the WordpressIntegration
+     */
+    omit?: WordpressIntegrationOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WordpressIntegrationInclude<ExtArgs> | null
+  }
+
+
+  /**
+   * Model WordpressPublishLog
+   */
+
+  export type AggregateWordpressPublishLog = {
+    _count: WordpressPublishLogCountAggregateOutputType | null
+    _avg: WordpressPublishLogAvgAggregateOutputType | null
+    _sum: WordpressPublishLogSumAggregateOutputType | null
+    _min: WordpressPublishLogMinAggregateOutputType | null
+    _max: WordpressPublishLogMaxAggregateOutputType | null
+  }
+
+  export type WordpressPublishLogAvgAggregateOutputType = {
+    id: number | null
+    userId: number | null
+    integrationId: number | null
+  }
+
+  export type WordpressPublishLogSumAggregateOutputType = {
+    id: number | null
+    userId: number | null
+    integrationId: number | null
+  }
+
+  export type WordpressPublishLogMinAggregateOutputType = {
+    id: number | null
+    userId: number | null
+    wordpressUrl: string | null
+    primaryKeyword: string | null
+    title: string | null
+    slug: string | null
+    status: string | null
+    createdAt: Date | null
+    integrationId: number | null
+  }
+
+  export type WordpressPublishLogMaxAggregateOutputType = {
+    id: number | null
+    userId: number | null
+    wordpressUrl: string | null
+    primaryKeyword: string | null
+    title: string | null
+    slug: string | null
+    status: string | null
+    createdAt: Date | null
+    integrationId: number | null
+  }
+
+  export type WordpressPublishLogCountAggregateOutputType = {
+    id: number
+    userId: number
+    wordpressUrl: number
+    primaryKeyword: number
+    title: number
+    slug: number
+    status: number
+    response: number
+    createdAt: number
+    integrationId: number
+    _all: number
+  }
+
+
+  export type WordpressPublishLogAvgAggregateInputType = {
+    id?: true
+    userId?: true
+    integrationId?: true
+  }
+
+  export type WordpressPublishLogSumAggregateInputType = {
+    id?: true
+    userId?: true
+    integrationId?: true
+  }
+
+  export type WordpressPublishLogMinAggregateInputType = {
+    id?: true
+    userId?: true
+    wordpressUrl?: true
+    primaryKeyword?: true
+    title?: true
+    slug?: true
+    status?: true
+    createdAt?: true
+    integrationId?: true
+  }
+
+  export type WordpressPublishLogMaxAggregateInputType = {
+    id?: true
+    userId?: true
+    wordpressUrl?: true
+    primaryKeyword?: true
+    title?: true
+    slug?: true
+    status?: true
+    createdAt?: true
+    integrationId?: true
+  }
+
+  export type WordpressPublishLogCountAggregateInputType = {
+    id?: true
+    userId?: true
+    wordpressUrl?: true
+    primaryKeyword?: true
+    title?: true
+    slug?: true
+    status?: true
+    response?: true
+    createdAt?: true
+    integrationId?: true
+    _all?: true
+  }
+
+  export type WordpressPublishLogAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which WordpressPublishLog to aggregate.
+     */
+    where?: WordpressPublishLogWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of WordpressPublishLogs to fetch.
+     */
+    orderBy?: WordpressPublishLogOrderByWithRelationInput | WordpressPublishLogOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: WordpressPublishLogWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` WordpressPublishLogs from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` WordpressPublishLogs.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned WordpressPublishLogs
+    **/
+    _count?: true | WordpressPublishLogCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to average
+    **/
+    _avg?: WordpressPublishLogAvgAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to sum
+    **/
+    _sum?: WordpressPublishLogSumAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: WordpressPublishLogMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: WordpressPublishLogMaxAggregateInputType
+  }
+
+  export type GetWordpressPublishLogAggregateType<T extends WordpressPublishLogAggregateArgs> = {
+        [P in keyof T & keyof AggregateWordpressPublishLog]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateWordpressPublishLog[P]>
+      : GetScalarType<T[P], AggregateWordpressPublishLog[P]>
+  }
+
+
+
+
+  export type WordpressPublishLogGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: WordpressPublishLogWhereInput
+    orderBy?: WordpressPublishLogOrderByWithAggregationInput | WordpressPublishLogOrderByWithAggregationInput[]
+    by: WordpressPublishLogScalarFieldEnum[] | WordpressPublishLogScalarFieldEnum
+    having?: WordpressPublishLogScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: WordpressPublishLogCountAggregateInputType | true
+    _avg?: WordpressPublishLogAvgAggregateInputType
+    _sum?: WordpressPublishLogSumAggregateInputType
+    _min?: WordpressPublishLogMinAggregateInputType
+    _max?: WordpressPublishLogMaxAggregateInputType
+  }
+
+  export type WordpressPublishLogGroupByOutputType = {
+    id: number
+    userId: number
+    wordpressUrl: string
+    primaryKeyword: string | null
+    title: string | null
+    slug: string | null
+    status: string | null
+    response: JsonValue | null
+    createdAt: Date
+    integrationId: number | null
+    _count: WordpressPublishLogCountAggregateOutputType | null
+    _avg: WordpressPublishLogAvgAggregateOutputType | null
+    _sum: WordpressPublishLogSumAggregateOutputType | null
+    _min: WordpressPublishLogMinAggregateOutputType | null
+    _max: WordpressPublishLogMaxAggregateOutputType | null
+  }
+
+  type GetWordpressPublishLogGroupByPayload<T extends WordpressPublishLogGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<WordpressPublishLogGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof WordpressPublishLogGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], WordpressPublishLogGroupByOutputType[P]>
+            : GetScalarType<T[P], WordpressPublishLogGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type WordpressPublishLogSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    userId?: boolean
+    wordpressUrl?: boolean
+    primaryKeyword?: boolean
+    title?: boolean
+    slug?: boolean
+    status?: boolean
+    response?: boolean
+    createdAt?: boolean
+    integrationId?: boolean
+    user?: boolean | UserDefaultArgs<ExtArgs>
+    integration?: boolean | WordpressPublishLog$integrationArgs<ExtArgs>
+  }, ExtArgs["result"]["wordpressPublishLog"]>
+
+  export type WordpressPublishLogSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    userId?: boolean
+    wordpressUrl?: boolean
+    primaryKeyword?: boolean
+    title?: boolean
+    slug?: boolean
+    status?: boolean
+    response?: boolean
+    createdAt?: boolean
+    integrationId?: boolean
+    user?: boolean | UserDefaultArgs<ExtArgs>
+    integration?: boolean | WordpressPublishLog$integrationArgs<ExtArgs>
+  }, ExtArgs["result"]["wordpressPublishLog"]>
+
+
+  export type WordpressPublishLogSelectScalar = {
+    id?: boolean
+    userId?: boolean
+    wordpressUrl?: boolean
+    primaryKeyword?: boolean
+    title?: boolean
+    slug?: boolean
+    status?: boolean
+    response?: boolean
+    createdAt?: boolean
+    integrationId?: boolean
+  }
+
+  export type WordpressPublishLogOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "userId" | "wordpressUrl" | "primaryKeyword" | "title" | "slug" | "status" | "response" | "createdAt" | "integrationId", ExtArgs["result"]["wordpressPublishLog"]>
+  export type WordpressPublishLogInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    user?: boolean | UserDefaultArgs<ExtArgs>
+    integration?: boolean | WordpressPublishLog$integrationArgs<ExtArgs>
+  }
+  export type WordpressPublishLogIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    user?: boolean | UserDefaultArgs<ExtArgs>
+    integration?: boolean | WordpressPublishLog$integrationArgs<ExtArgs>
+  }
+
+  export type $WordpressPublishLogPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "WordpressPublishLog"
+    objects: {
+      user: Prisma.$UserPayload<ExtArgs>
+      integration: Prisma.$WordpressIntegrationPayload<ExtArgs> | null
+    }
+    scalars: $Extensions.GetPayloadResult<{
+      id: number
+      userId: number
+      wordpressUrl: string
+      primaryKeyword: string | null
+      title: string | null
+      slug: string | null
+      status: string | null
+      response: Prisma.JsonValue | null
+      createdAt: Date
+      integrationId: number | null
+    }, ExtArgs["result"]["wordpressPublishLog"]>
+    composites: {}
+  }
+
+  type WordpressPublishLogGetPayload<S extends boolean | null | undefined | WordpressPublishLogDefaultArgs> = $Result.GetResult<Prisma.$WordpressPublishLogPayload, S>
+
+  type WordpressPublishLogCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> =
+    Omit<WordpressPublishLogFindManyArgs, 'select' | 'include' | 'distinct' | 'omit'> & {
+      select?: WordpressPublishLogCountAggregateInputType | true
+    }
+
+  export interface WordpressPublishLogDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['WordpressPublishLog'], meta: { name: 'WordpressPublishLog' } }
+    /**
+     * Find zero or one WordpressPublishLog that matches the filter.
+     * @param {WordpressPublishLogFindUniqueArgs} args - Arguments to find a WordpressPublishLog
+     * @example
+     * // Get one WordpressPublishLog
+     * const wordpressPublishLog = await prisma.wordpressPublishLog.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends WordpressPublishLogFindUniqueArgs>(args: SelectSubset<T, WordpressPublishLogFindUniqueArgs<ExtArgs>>): Prisma__WordpressPublishLogClient<$Result.GetResult<Prisma.$WordpressPublishLogPayload<ExtArgs>, T, "findUnique", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find one WordpressPublishLog that matches the filter or throw an error with `error.code='P2025'`
+     * if no matches were found.
+     * @param {WordpressPublishLogFindUniqueOrThrowArgs} args - Arguments to find a WordpressPublishLog
+     * @example
+     * // Get one WordpressPublishLog
+     * const wordpressPublishLog = await prisma.wordpressPublishLog.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends WordpressPublishLogFindUniqueOrThrowArgs>(args: SelectSubset<T, WordpressPublishLogFindUniqueOrThrowArgs<ExtArgs>>): Prisma__WordpressPublishLogClient<$Result.GetResult<Prisma.$WordpressPublishLogPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first WordpressPublishLog that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {WordpressPublishLogFindFirstArgs} args - Arguments to find a WordpressPublishLog
+     * @example
+     * // Get one WordpressPublishLog
+     * const wordpressPublishLog = await prisma.wordpressPublishLog.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends WordpressPublishLogFindFirstArgs>(args?: SelectSubset<T, WordpressPublishLogFindFirstArgs<ExtArgs>>): Prisma__WordpressPublishLogClient<$Result.GetResult<Prisma.$WordpressPublishLogPayload<ExtArgs>, T, "findFirst", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first WordpressPublishLog that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {WordpressPublishLogFindFirstOrThrowArgs} args - Arguments to find a WordpressPublishLog
+     * @example
+     * // Get one WordpressPublishLog
+     * const wordpressPublishLog = await prisma.wordpressPublishLog.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends WordpressPublishLogFindFirstOrThrowArgs>(args?: SelectSubset<T, WordpressPublishLogFindFirstOrThrowArgs<ExtArgs>>): Prisma__WordpressPublishLogClient<$Result.GetResult<Prisma.$WordpressPublishLogPayload<ExtArgs>, T, "findFirstOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find zero or more WordpressPublishLogs that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {WordpressPublishLogFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all WordpressPublishLogs
+     * const wordpressPublishLogs = await prisma.wordpressPublishLog.findMany()
+     * 
+     * // Get first 10 WordpressPublishLogs
+     * const wordpressPublishLogs = await prisma.wordpressPublishLog.findMany({ take: 10 })
+     * 
+     * // Only select the `id`
+     * const wordpressPublishLogWithIdOnly = await prisma.wordpressPublishLog.findMany({ select: { id: true } })
+     * 
+     */
+    findMany<T extends WordpressPublishLogFindManyArgs>(args?: SelectSubset<T, WordpressPublishLogFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$WordpressPublishLogPayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
+
+    /**
+     * Create a WordpressPublishLog.
+     * @param {WordpressPublishLogCreateArgs} args - Arguments to create a WordpressPublishLog.
+     * @example
+     * // Create one WordpressPublishLog
+     * const WordpressPublishLog = await prisma.wordpressPublishLog.create({
+     *   data: {
+     *     // ... data to create a WordpressPublishLog
+     *   }
+     * })
+     * 
+     */
+    create<T extends WordpressPublishLogCreateArgs>(args: SelectSubset<T, WordpressPublishLogCreateArgs<ExtArgs>>): Prisma__WordpressPublishLogClient<$Result.GetResult<Prisma.$WordpressPublishLogPayload<ExtArgs>, T, "create", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Create many WordpressPublishLogs.
+     * @param {WordpressPublishLogCreateManyArgs} args - Arguments to create many WordpressPublishLogs.
+     * @example
+     * // Create many WordpressPublishLogs
+     * const wordpressPublishLog = await prisma.wordpressPublishLog.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends WordpressPublishLogCreateManyArgs>(args?: SelectSubset<T, WordpressPublishLogCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many WordpressPublishLogs and returns the data saved in the database.
+     * @param {WordpressPublishLogCreateManyAndReturnArgs} args - Arguments to create many WordpressPublishLogs.
+     * @example
+     * // Create many WordpressPublishLogs
+     * const wordpressPublishLog = await prisma.wordpressPublishLog.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many WordpressPublishLogs and only return the `id`
+     * const wordpressPublishLogWithIdOnly = await prisma.wordpressPublishLog.createManyAndReturn({
+     *   select: { id: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends WordpressPublishLogCreateManyAndReturnArgs>(args?: SelectSubset<T, WordpressPublishLogCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$WordpressPublishLogPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Delete a WordpressPublishLog.
+     * @param {WordpressPublishLogDeleteArgs} args - Arguments to delete one WordpressPublishLog.
+     * @example
+     * // Delete one WordpressPublishLog
+     * const WordpressPublishLog = await prisma.wordpressPublishLog.delete({
+     *   where: {
+     *     // ... filter to delete one WordpressPublishLog
+     *   }
+     * })
+     * 
+     */
+    delete<T extends WordpressPublishLogDeleteArgs>(args: SelectSubset<T, WordpressPublishLogDeleteArgs<ExtArgs>>): Prisma__WordpressPublishLogClient<$Result.GetResult<Prisma.$WordpressPublishLogPayload<ExtArgs>, T, "delete", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Update one WordpressPublishLog.
+     * @param {WordpressPublishLogUpdateArgs} args - Arguments to update one WordpressPublishLog.
+     * @example
+     * // Update one WordpressPublishLog
+     * const wordpressPublishLog = await prisma.wordpressPublishLog.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends WordpressPublishLogUpdateArgs>(args: SelectSubset<T, WordpressPublishLogUpdateArgs<ExtArgs>>): Prisma__WordpressPublishLogClient<$Result.GetResult<Prisma.$WordpressPublishLogPayload<ExtArgs>, T, "update", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Delete zero or more WordpressPublishLogs.
+     * @param {WordpressPublishLogDeleteManyArgs} args - Arguments to filter WordpressPublishLogs to delete.
+     * @example
+     * // Delete a few WordpressPublishLogs
+     * const { count } = await prisma.wordpressPublishLog.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends WordpressPublishLogDeleteManyArgs>(args?: SelectSubset<T, WordpressPublishLogDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more WordpressPublishLogs.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {WordpressPublishLogUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many WordpressPublishLogs
+     * const wordpressPublishLog = await prisma.wordpressPublishLog.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends WordpressPublishLogUpdateManyArgs>(args: SelectSubset<T, WordpressPublishLogUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create or update one WordpressPublishLog.
+     * @param {WordpressPublishLogUpsertArgs} args - Arguments to update or create a WordpressPublishLog.
+     * @example
+     * // Update or create a WordpressPublishLog
+     * const wordpressPublishLog = await prisma.wordpressPublishLog.upsert({
+     *   create: {
+     *     // ... data to create a WordpressPublishLog
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the WordpressPublishLog we want to update
+     *   }
+     * })
+     */
+    upsert<T extends WordpressPublishLogUpsertArgs>(args: SelectSubset<T, WordpressPublishLogUpsertArgs<ExtArgs>>): Prisma__WordpressPublishLogClient<$Result.GetResult<Prisma.$WordpressPublishLogPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+
+    /**
+     * Count the number of WordpressPublishLogs.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {WordpressPublishLogCountArgs} args - Arguments to filter WordpressPublishLogs to count.
+     * @example
+     * // Count the number of WordpressPublishLogs
+     * const count = await prisma.wordpressPublishLog.count({
+     *   where: {
+     *     // ... the filter for the WordpressPublishLogs we want to count
+     *   }
+     * })
+    **/
+    count<T extends WordpressPublishLogCountArgs>(
+      args?: Subset<T, WordpressPublishLogCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], WordpressPublishLogCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a WordpressPublishLog.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {WordpressPublishLogAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends WordpressPublishLogAggregateArgs>(args: Subset<T, WordpressPublishLogAggregateArgs>): Prisma.PrismaPromise<GetWordpressPublishLogAggregateType<T>>
+
+    /**
+     * Group by WordpressPublishLog.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {WordpressPublishLogGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends WordpressPublishLogGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: WordpressPublishLogGroupByArgs['orderBy'] }
+        : { orderBy?: WordpressPublishLogGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, WordpressPublishLogGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetWordpressPublishLogGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the WordpressPublishLog model
+   */
+  readonly fields: WordpressPublishLogFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for WordpressPublishLog.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__WordpressPublishLogClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    user<T extends UserDefaultArgs<ExtArgs> = {}>(args?: Subset<T, UserDefaultArgs<ExtArgs>>): Prisma__UserClient<$Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+    integration<T extends WordpressPublishLog$integrationArgs<ExtArgs> = {}>(args?: Subset<T, WordpressPublishLog$integrationArgs<ExtArgs>>): Prisma__WordpressIntegrationClient<$Result.GetResult<Prisma.$WordpressIntegrationPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the WordpressPublishLog model
+   */
+  interface WordpressPublishLogFieldRefs {
+    readonly id: FieldRef<"WordpressPublishLog", 'Int'>
+    readonly userId: FieldRef<"WordpressPublishLog", 'Int'>
+    readonly wordpressUrl: FieldRef<"WordpressPublishLog", 'String'>
+    readonly primaryKeyword: FieldRef<"WordpressPublishLog", 'String'>
+    readonly title: FieldRef<"WordpressPublishLog", 'String'>
+    readonly slug: FieldRef<"WordpressPublishLog", 'String'>
+    readonly status: FieldRef<"WordpressPublishLog", 'String'>
+    readonly response: FieldRef<"WordpressPublishLog", 'Json'>
+    readonly createdAt: FieldRef<"WordpressPublishLog", 'DateTime'>
+    readonly integrationId: FieldRef<"WordpressPublishLog", 'Int'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * WordpressPublishLog findUnique
+   */
+  export type WordpressPublishLogFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the WordpressPublishLog
+     */
+    select?: WordpressPublishLogSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the WordpressPublishLog
+     */
+    omit?: WordpressPublishLogOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WordpressPublishLogInclude<ExtArgs> | null
+    /**
+     * Filter, which WordpressPublishLog to fetch.
+     */
+    where: WordpressPublishLogWhereUniqueInput
+  }
+
+  /**
+   * WordpressPublishLog findUniqueOrThrow
+   */
+  export type WordpressPublishLogFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the WordpressPublishLog
+     */
+    select?: WordpressPublishLogSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the WordpressPublishLog
+     */
+    omit?: WordpressPublishLogOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WordpressPublishLogInclude<ExtArgs> | null
+    /**
+     * Filter, which WordpressPublishLog to fetch.
+     */
+    where: WordpressPublishLogWhereUniqueInput
+  }
+
+  /**
+   * WordpressPublishLog findFirst
+   */
+  export type WordpressPublishLogFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the WordpressPublishLog
+     */
+    select?: WordpressPublishLogSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the WordpressPublishLog
+     */
+    omit?: WordpressPublishLogOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WordpressPublishLogInclude<ExtArgs> | null
+    /**
+     * Filter, which WordpressPublishLog to fetch.
+     */
+    where?: WordpressPublishLogWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of WordpressPublishLogs to fetch.
+     */
+    orderBy?: WordpressPublishLogOrderByWithRelationInput | WordpressPublishLogOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for WordpressPublishLogs.
+     */
+    cursor?: WordpressPublishLogWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` WordpressPublishLogs from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` WordpressPublishLogs.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of WordpressPublishLogs.
+     */
+    distinct?: WordpressPublishLogScalarFieldEnum | WordpressPublishLogScalarFieldEnum[]
+  }
+
+  /**
+   * WordpressPublishLog findFirstOrThrow
+   */
+  export type WordpressPublishLogFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the WordpressPublishLog
+     */
+    select?: WordpressPublishLogSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the WordpressPublishLog
+     */
+    omit?: WordpressPublishLogOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WordpressPublishLogInclude<ExtArgs> | null
+    /**
+     * Filter, which WordpressPublishLog to fetch.
+     */
+    where?: WordpressPublishLogWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of WordpressPublishLogs to fetch.
+     */
+    orderBy?: WordpressPublishLogOrderByWithRelationInput | WordpressPublishLogOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for WordpressPublishLogs.
+     */
+    cursor?: WordpressPublishLogWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` WordpressPublishLogs from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` WordpressPublishLogs.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of WordpressPublishLogs.
+     */
+    distinct?: WordpressPublishLogScalarFieldEnum | WordpressPublishLogScalarFieldEnum[]
+  }
+
+  /**
+   * WordpressPublishLog findMany
+   */
+  export type WordpressPublishLogFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the WordpressPublishLog
+     */
+    select?: WordpressPublishLogSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the WordpressPublishLog
+     */
+    omit?: WordpressPublishLogOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WordpressPublishLogInclude<ExtArgs> | null
+    /**
+     * Filter, which WordpressPublishLogs to fetch.
+     */
+    where?: WordpressPublishLogWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of WordpressPublishLogs to fetch.
+     */
+    orderBy?: WordpressPublishLogOrderByWithRelationInput | WordpressPublishLogOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing WordpressPublishLogs.
+     */
+    cursor?: WordpressPublishLogWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` WordpressPublishLogs from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` WordpressPublishLogs.
+     */
+    skip?: number
+    distinct?: WordpressPublishLogScalarFieldEnum | WordpressPublishLogScalarFieldEnum[]
+  }
+
+  /**
+   * WordpressPublishLog create
+   */
+  export type WordpressPublishLogCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the WordpressPublishLog
+     */
+    select?: WordpressPublishLogSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the WordpressPublishLog
+     */
+    omit?: WordpressPublishLogOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WordpressPublishLogInclude<ExtArgs> | null
+    /**
+     * The data needed to create a WordpressPublishLog.
+     */
+    data: XOR<WordpressPublishLogCreateInput, WordpressPublishLogUncheckedCreateInput>
+  }
+
+  /**
+   * WordpressPublishLog createMany
+   */
+  export type WordpressPublishLogCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many WordpressPublishLogs.
+     */
+    data: WordpressPublishLogCreateManyInput | WordpressPublishLogCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * WordpressPublishLog createManyAndReturn
+   */
+  export type WordpressPublishLogCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the WordpressPublishLog
+     */
+    select?: WordpressPublishLogSelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the WordpressPublishLog
+     */
+    omit?: WordpressPublishLogOmit<ExtArgs> | null
+    /**
+     * The data used to create many WordpressPublishLogs.
+     */
+    data: WordpressPublishLogCreateManyInput | WordpressPublishLogCreateManyInput[]
+    skipDuplicates?: boolean
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WordpressPublishLogIncludeCreateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * WordpressPublishLog update
+   */
+  export type WordpressPublishLogUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the WordpressPublishLog
+     */
+    select?: WordpressPublishLogSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the WordpressPublishLog
+     */
+    omit?: WordpressPublishLogOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WordpressPublishLogInclude<ExtArgs> | null
+    /**
+     * The data needed to update a WordpressPublishLog.
+     */
+    data: XOR<WordpressPublishLogUpdateInput, WordpressPublishLogUncheckedUpdateInput>
+    /**
+     * Choose, which WordpressPublishLog to update.
+     */
+    where: WordpressPublishLogWhereUniqueInput
+  }
+
+  /**
+   * WordpressPublishLog updateMany
+   */
+  export type WordpressPublishLogUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update WordpressPublishLogs.
+     */
+    data: XOR<WordpressPublishLogUpdateManyMutationInput, WordpressPublishLogUncheckedUpdateManyInput>
+    /**
+     * Filter which WordpressPublishLogs to update
+     */
+    where?: WordpressPublishLogWhereInput
+  }
+
+  /**
+   * WordpressPublishLog upsert
+   */
+  export type WordpressPublishLogUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the WordpressPublishLog
+     */
+    select?: WordpressPublishLogSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the WordpressPublishLog
+     */
+    omit?: WordpressPublishLogOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WordpressPublishLogInclude<ExtArgs> | null
+    /**
+     * The filter to search for the WordpressPublishLog to update in case it exists.
+     */
+    where: WordpressPublishLogWhereUniqueInput
+    /**
+     * In case the WordpressPublishLog found by the `where` argument doesn't exist, create a new WordpressPublishLog with this data.
+     */
+    create: XOR<WordpressPublishLogCreateInput, WordpressPublishLogUncheckedCreateInput>
+    /**
+     * In case the WordpressPublishLog was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<WordpressPublishLogUpdateInput, WordpressPublishLogUncheckedUpdateInput>
+  }
+
+  /**
+   * WordpressPublishLog delete
+   */
+  export type WordpressPublishLogDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the WordpressPublishLog
+     */
+    select?: WordpressPublishLogSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the WordpressPublishLog
+     */
+    omit?: WordpressPublishLogOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WordpressPublishLogInclude<ExtArgs> | null
+    /**
+     * Filter which WordpressPublishLog to delete.
+     */
+    where: WordpressPublishLogWhereUniqueInput
+  }
+
+  /**
+   * WordpressPublishLog deleteMany
+   */
+  export type WordpressPublishLogDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which WordpressPublishLogs to delete
+     */
+    where?: WordpressPublishLogWhereInput
+  }
+
+  /**
+   * WordpressPublishLog.integration
+   */
+  export type WordpressPublishLog$integrationArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the WordpressIntegration
+     */
+    select?: WordpressIntegrationSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the WordpressIntegration
+     */
+    omit?: WordpressIntegrationOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WordpressIntegrationInclude<ExtArgs> | null
+    where?: WordpressIntegrationWhereInput
+  }
+
+  /**
+   * WordpressPublishLog without action
+   */
+  export type WordpressPublishLogDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the WordpressPublishLog
+     */
+    select?: WordpressPublishLogSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the WordpressPublishLog
+     */
+    omit?: WordpressPublishLogOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WordpressPublishLogInclude<ExtArgs> | null
+  }
+
+
+  /**
    * Model PhraseScore
    */
 
@@ -41995,6 +44445,36 @@ export namespace Prisma {
   export type PhraseIntentClassificationScalarFieldEnum = (typeof PhraseIntentClassificationScalarFieldEnum)[keyof typeof PhraseIntentClassificationScalarFieldEnum]
 
 
+  export const WordpressIntegrationScalarFieldEnum: {
+    id: 'id',
+    userId: 'userId',
+    siteUrl: 'siteUrl',
+    username: 'username',
+    password: 'password',
+    lastPublishedAt: 'lastPublishedAt',
+    createdAt: 'createdAt',
+    updatedAt: 'updatedAt'
+  };
+
+  export type WordpressIntegrationScalarFieldEnum = (typeof WordpressIntegrationScalarFieldEnum)[keyof typeof WordpressIntegrationScalarFieldEnum]
+
+
+  export const WordpressPublishLogScalarFieldEnum: {
+    id: 'id',
+    userId: 'userId',
+    wordpressUrl: 'wordpressUrl',
+    primaryKeyword: 'primaryKeyword',
+    title: 'title',
+    slug: 'slug',
+    status: 'status',
+    response: 'response',
+    createdAt: 'createdAt',
+    integrationId: 'integrationId'
+  };
+
+  export type WordpressPublishLogScalarFieldEnum = (typeof WordpressPublishLogScalarFieldEnum)[keyof typeof WordpressPublishLogScalarFieldEnum]
+
+
   export const PhraseScoreScalarFieldEnum: {
     id: 'id',
     phraseId: 'phraseId',
@@ -42352,6 +44832,8 @@ export namespace Prisma {
     updatedAt?: DateTimeFilter<"User"> | Date | string
     domains?: DomainListRelationFilter
     googleSearchConsole?: XOR<GoogleSearchConsoleConnectionNullableRelationFilter, GoogleSearchConsoleConnectionWhereInput> | null
+    wordpressIntegration?: XOR<WordpressIntegrationNullableRelationFilter, WordpressIntegrationWhereInput> | null
+    publishLogs?: WordpressPublishLogListRelationFilter
   }
 
   export type UserOrderByWithRelationInput = {
@@ -42363,6 +44845,8 @@ export namespace Prisma {
     updatedAt?: SortOrder
     domains?: DomainOrderByRelationAggregateInput
     googleSearchConsole?: GoogleSearchConsoleConnectionOrderByWithRelationInput
+    wordpressIntegration?: WordpressIntegrationOrderByWithRelationInput
+    publishLogs?: WordpressPublishLogOrderByRelationAggregateInput
   }
 
   export type UserWhereUniqueInput = Prisma.AtLeast<{
@@ -42377,6 +44861,8 @@ export namespace Prisma {
     updatedAt?: DateTimeFilter<"User"> | Date | string
     domains?: DomainListRelationFilter
     googleSearchConsole?: XOR<GoogleSearchConsoleConnectionNullableRelationFilter, GoogleSearchConsoleConnectionWhereInput> | null
+    wordpressIntegration?: XOR<WordpressIntegrationNullableRelationFilter, WordpressIntegrationWhereInput> | null
+    publishLogs?: WordpressPublishLogListRelationFilter
   }, "id" | "email">
 
   export type UserOrderByWithAggregationInput = {
@@ -44242,6 +46728,166 @@ export namespace Prisma {
     createdAt?: DateTimeWithAggregatesFilter<"PhraseIntentClassification"> | Date | string
   }
 
+  export type WordpressIntegrationWhereInput = {
+    AND?: WordpressIntegrationWhereInput | WordpressIntegrationWhereInput[]
+    OR?: WordpressIntegrationWhereInput[]
+    NOT?: WordpressIntegrationWhereInput | WordpressIntegrationWhereInput[]
+    id?: IntFilter<"WordpressIntegration"> | number
+    userId?: IntFilter<"WordpressIntegration"> | number
+    siteUrl?: StringFilter<"WordpressIntegration"> | string
+    username?: StringFilter<"WordpressIntegration"> | string
+    password?: StringFilter<"WordpressIntegration"> | string
+    lastPublishedAt?: DateTimeNullableFilter<"WordpressIntegration"> | Date | string | null
+    createdAt?: DateTimeFilter<"WordpressIntegration"> | Date | string
+    updatedAt?: DateTimeFilter<"WordpressIntegration"> | Date | string
+    user?: XOR<UserRelationFilter, UserWhereInput>
+    publishLogs?: WordpressPublishLogListRelationFilter
+  }
+
+  export type WordpressIntegrationOrderByWithRelationInput = {
+    id?: SortOrder
+    userId?: SortOrder
+    siteUrl?: SortOrder
+    username?: SortOrder
+    password?: SortOrder
+    lastPublishedAt?: SortOrderInput | SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    user?: UserOrderByWithRelationInput
+    publishLogs?: WordpressPublishLogOrderByRelationAggregateInput
+  }
+
+  export type WordpressIntegrationWhereUniqueInput = Prisma.AtLeast<{
+    id?: number
+    userId?: number
+    AND?: WordpressIntegrationWhereInput | WordpressIntegrationWhereInput[]
+    OR?: WordpressIntegrationWhereInput[]
+    NOT?: WordpressIntegrationWhereInput | WordpressIntegrationWhereInput[]
+    siteUrl?: StringFilter<"WordpressIntegration"> | string
+    username?: StringFilter<"WordpressIntegration"> | string
+    password?: StringFilter<"WordpressIntegration"> | string
+    lastPublishedAt?: DateTimeNullableFilter<"WordpressIntegration"> | Date | string | null
+    createdAt?: DateTimeFilter<"WordpressIntegration"> | Date | string
+    updatedAt?: DateTimeFilter<"WordpressIntegration"> | Date | string
+    user?: XOR<UserRelationFilter, UserWhereInput>
+    publishLogs?: WordpressPublishLogListRelationFilter
+  }, "id" | "userId">
+
+  export type WordpressIntegrationOrderByWithAggregationInput = {
+    id?: SortOrder
+    userId?: SortOrder
+    siteUrl?: SortOrder
+    username?: SortOrder
+    password?: SortOrder
+    lastPublishedAt?: SortOrderInput | SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    _count?: WordpressIntegrationCountOrderByAggregateInput
+    _avg?: WordpressIntegrationAvgOrderByAggregateInput
+    _max?: WordpressIntegrationMaxOrderByAggregateInput
+    _min?: WordpressIntegrationMinOrderByAggregateInput
+    _sum?: WordpressIntegrationSumOrderByAggregateInput
+  }
+
+  export type WordpressIntegrationScalarWhereWithAggregatesInput = {
+    AND?: WordpressIntegrationScalarWhereWithAggregatesInput | WordpressIntegrationScalarWhereWithAggregatesInput[]
+    OR?: WordpressIntegrationScalarWhereWithAggregatesInput[]
+    NOT?: WordpressIntegrationScalarWhereWithAggregatesInput | WordpressIntegrationScalarWhereWithAggregatesInput[]
+    id?: IntWithAggregatesFilter<"WordpressIntegration"> | number
+    userId?: IntWithAggregatesFilter<"WordpressIntegration"> | number
+    siteUrl?: StringWithAggregatesFilter<"WordpressIntegration"> | string
+    username?: StringWithAggregatesFilter<"WordpressIntegration"> | string
+    password?: StringWithAggregatesFilter<"WordpressIntegration"> | string
+    lastPublishedAt?: DateTimeNullableWithAggregatesFilter<"WordpressIntegration"> | Date | string | null
+    createdAt?: DateTimeWithAggregatesFilter<"WordpressIntegration"> | Date | string
+    updatedAt?: DateTimeWithAggregatesFilter<"WordpressIntegration"> | Date | string
+  }
+
+  export type WordpressPublishLogWhereInput = {
+    AND?: WordpressPublishLogWhereInput | WordpressPublishLogWhereInput[]
+    OR?: WordpressPublishLogWhereInput[]
+    NOT?: WordpressPublishLogWhereInput | WordpressPublishLogWhereInput[]
+    id?: IntFilter<"WordpressPublishLog"> | number
+    userId?: IntFilter<"WordpressPublishLog"> | number
+    wordpressUrl?: StringFilter<"WordpressPublishLog"> | string
+    primaryKeyword?: StringNullableFilter<"WordpressPublishLog"> | string | null
+    title?: StringNullableFilter<"WordpressPublishLog"> | string | null
+    slug?: StringNullableFilter<"WordpressPublishLog"> | string | null
+    status?: StringNullableFilter<"WordpressPublishLog"> | string | null
+    response?: JsonNullableFilter<"WordpressPublishLog">
+    createdAt?: DateTimeFilter<"WordpressPublishLog"> | Date | string
+    integrationId?: IntNullableFilter<"WordpressPublishLog"> | number | null
+    user?: XOR<UserRelationFilter, UserWhereInput>
+    integration?: XOR<WordpressIntegrationNullableRelationFilter, WordpressIntegrationWhereInput> | null
+  }
+
+  export type WordpressPublishLogOrderByWithRelationInput = {
+    id?: SortOrder
+    userId?: SortOrder
+    wordpressUrl?: SortOrder
+    primaryKeyword?: SortOrderInput | SortOrder
+    title?: SortOrderInput | SortOrder
+    slug?: SortOrderInput | SortOrder
+    status?: SortOrderInput | SortOrder
+    response?: SortOrderInput | SortOrder
+    createdAt?: SortOrder
+    integrationId?: SortOrderInput | SortOrder
+    user?: UserOrderByWithRelationInput
+    integration?: WordpressIntegrationOrderByWithRelationInput
+  }
+
+  export type WordpressPublishLogWhereUniqueInput = Prisma.AtLeast<{
+    id?: number
+    AND?: WordpressPublishLogWhereInput | WordpressPublishLogWhereInput[]
+    OR?: WordpressPublishLogWhereInput[]
+    NOT?: WordpressPublishLogWhereInput | WordpressPublishLogWhereInput[]
+    userId?: IntFilter<"WordpressPublishLog"> | number
+    wordpressUrl?: StringFilter<"WordpressPublishLog"> | string
+    primaryKeyword?: StringNullableFilter<"WordpressPublishLog"> | string | null
+    title?: StringNullableFilter<"WordpressPublishLog"> | string | null
+    slug?: StringNullableFilter<"WordpressPublishLog"> | string | null
+    status?: StringNullableFilter<"WordpressPublishLog"> | string | null
+    response?: JsonNullableFilter<"WordpressPublishLog">
+    createdAt?: DateTimeFilter<"WordpressPublishLog"> | Date | string
+    integrationId?: IntNullableFilter<"WordpressPublishLog"> | number | null
+    user?: XOR<UserRelationFilter, UserWhereInput>
+    integration?: XOR<WordpressIntegrationNullableRelationFilter, WordpressIntegrationWhereInput> | null
+  }, "id">
+
+  export type WordpressPublishLogOrderByWithAggregationInput = {
+    id?: SortOrder
+    userId?: SortOrder
+    wordpressUrl?: SortOrder
+    primaryKeyword?: SortOrderInput | SortOrder
+    title?: SortOrderInput | SortOrder
+    slug?: SortOrderInput | SortOrder
+    status?: SortOrderInput | SortOrder
+    response?: SortOrderInput | SortOrder
+    createdAt?: SortOrder
+    integrationId?: SortOrderInput | SortOrder
+    _count?: WordpressPublishLogCountOrderByAggregateInput
+    _avg?: WordpressPublishLogAvgOrderByAggregateInput
+    _max?: WordpressPublishLogMaxOrderByAggregateInput
+    _min?: WordpressPublishLogMinOrderByAggregateInput
+    _sum?: WordpressPublishLogSumOrderByAggregateInput
+  }
+
+  export type WordpressPublishLogScalarWhereWithAggregatesInput = {
+    AND?: WordpressPublishLogScalarWhereWithAggregatesInput | WordpressPublishLogScalarWhereWithAggregatesInput[]
+    OR?: WordpressPublishLogScalarWhereWithAggregatesInput[]
+    NOT?: WordpressPublishLogScalarWhereWithAggregatesInput | WordpressPublishLogScalarWhereWithAggregatesInput[]
+    id?: IntWithAggregatesFilter<"WordpressPublishLog"> | number
+    userId?: IntWithAggregatesFilter<"WordpressPublishLog"> | number
+    wordpressUrl?: StringWithAggregatesFilter<"WordpressPublishLog"> | string
+    primaryKeyword?: StringNullableWithAggregatesFilter<"WordpressPublishLog"> | string | null
+    title?: StringNullableWithAggregatesFilter<"WordpressPublishLog"> | string | null
+    slug?: StringNullableWithAggregatesFilter<"WordpressPublishLog"> | string | null
+    status?: StringNullableWithAggregatesFilter<"WordpressPublishLog"> | string | null
+    response?: JsonNullableWithAggregatesFilter<"WordpressPublishLog">
+    createdAt?: DateTimeWithAggregatesFilter<"WordpressPublishLog"> | Date | string
+    integrationId?: IntNullableWithAggregatesFilter<"WordpressPublishLog"> | number | null
+  }
+
   export type PhraseScoreWhereInput = {
     AND?: PhraseScoreWhereInput | PhraseScoreWhereInput[]
     OR?: PhraseScoreWhereInput[]
@@ -45266,6 +47912,8 @@ export namespace Prisma {
     updatedAt?: Date | string
     domains?: DomainCreateNestedManyWithoutUserInput
     googleSearchConsole?: GoogleSearchConsoleConnectionCreateNestedOneWithoutUserInput
+    wordpressIntegration?: WordpressIntegrationCreateNestedOneWithoutUserInput
+    publishLogs?: WordpressPublishLogCreateNestedManyWithoutUserInput
   }
 
   export type UserUncheckedCreateInput = {
@@ -45277,6 +47925,8 @@ export namespace Prisma {
     updatedAt?: Date | string
     domains?: DomainUncheckedCreateNestedManyWithoutUserInput
     googleSearchConsole?: GoogleSearchConsoleConnectionUncheckedCreateNestedOneWithoutUserInput
+    wordpressIntegration?: WordpressIntegrationUncheckedCreateNestedOneWithoutUserInput
+    publishLogs?: WordpressPublishLogUncheckedCreateNestedManyWithoutUserInput
   }
 
   export type UserUpdateInput = {
@@ -45287,6 +47937,8 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     domains?: DomainUpdateManyWithoutUserNestedInput
     googleSearchConsole?: GoogleSearchConsoleConnectionUpdateOneWithoutUserNestedInput
+    wordpressIntegration?: WordpressIntegrationUpdateOneWithoutUserNestedInput
+    publishLogs?: WordpressPublishLogUpdateManyWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateInput = {
@@ -45298,6 +47950,8 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     domains?: DomainUncheckedUpdateManyWithoutUserNestedInput
     googleSearchConsole?: GoogleSearchConsoleConnectionUncheckedUpdateOneWithoutUserNestedInput
+    wordpressIntegration?: WordpressIntegrationUncheckedUpdateOneWithoutUserNestedInput
+    publishLogs?: WordpressPublishLogUncheckedUpdateManyWithoutUserNestedInput
   }
 
   export type UserCreateManyInput = {
@@ -47318,6 +49972,169 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
+  export type WordpressIntegrationCreateInput = {
+    siteUrl: string
+    username: string
+    password: string
+    lastPublishedAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    user: UserCreateNestedOneWithoutWordpressIntegrationInput
+    publishLogs?: WordpressPublishLogCreateNestedManyWithoutIntegrationInput
+  }
+
+  export type WordpressIntegrationUncheckedCreateInput = {
+    id?: number
+    userId: number
+    siteUrl: string
+    username: string
+    password: string
+    lastPublishedAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    publishLogs?: WordpressPublishLogUncheckedCreateNestedManyWithoutIntegrationInput
+  }
+
+  export type WordpressIntegrationUpdateInput = {
+    siteUrl?: StringFieldUpdateOperationsInput | string
+    username?: StringFieldUpdateOperationsInput | string
+    password?: StringFieldUpdateOperationsInput | string
+    lastPublishedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    user?: UserUpdateOneRequiredWithoutWordpressIntegrationNestedInput
+    publishLogs?: WordpressPublishLogUpdateManyWithoutIntegrationNestedInput
+  }
+
+  export type WordpressIntegrationUncheckedUpdateInput = {
+    id?: IntFieldUpdateOperationsInput | number
+    userId?: IntFieldUpdateOperationsInput | number
+    siteUrl?: StringFieldUpdateOperationsInput | string
+    username?: StringFieldUpdateOperationsInput | string
+    password?: StringFieldUpdateOperationsInput | string
+    lastPublishedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    publishLogs?: WordpressPublishLogUncheckedUpdateManyWithoutIntegrationNestedInput
+  }
+
+  export type WordpressIntegrationCreateManyInput = {
+    id?: number
+    userId: number
+    siteUrl: string
+    username: string
+    password: string
+    lastPublishedAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type WordpressIntegrationUpdateManyMutationInput = {
+    siteUrl?: StringFieldUpdateOperationsInput | string
+    username?: StringFieldUpdateOperationsInput | string
+    password?: StringFieldUpdateOperationsInput | string
+    lastPublishedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type WordpressIntegrationUncheckedUpdateManyInput = {
+    id?: IntFieldUpdateOperationsInput | number
+    userId?: IntFieldUpdateOperationsInput | number
+    siteUrl?: StringFieldUpdateOperationsInput | string
+    username?: StringFieldUpdateOperationsInput | string
+    password?: StringFieldUpdateOperationsInput | string
+    lastPublishedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type WordpressPublishLogCreateInput = {
+    wordpressUrl: string
+    primaryKeyword?: string | null
+    title?: string | null
+    slug?: string | null
+    status?: string | null
+    response?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    user: UserCreateNestedOneWithoutPublishLogsInput
+    integration?: WordpressIntegrationCreateNestedOneWithoutPublishLogsInput
+  }
+
+  export type WordpressPublishLogUncheckedCreateInput = {
+    id?: number
+    userId: number
+    wordpressUrl: string
+    primaryKeyword?: string | null
+    title?: string | null
+    slug?: string | null
+    status?: string | null
+    response?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    integrationId?: number | null
+  }
+
+  export type WordpressPublishLogUpdateInput = {
+    wordpressUrl?: StringFieldUpdateOperationsInput | string
+    primaryKeyword?: NullableStringFieldUpdateOperationsInput | string | null
+    title?: NullableStringFieldUpdateOperationsInput | string | null
+    slug?: NullableStringFieldUpdateOperationsInput | string | null
+    status?: NullableStringFieldUpdateOperationsInput | string | null
+    response?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    user?: UserUpdateOneRequiredWithoutPublishLogsNestedInput
+    integration?: WordpressIntegrationUpdateOneWithoutPublishLogsNestedInput
+  }
+
+  export type WordpressPublishLogUncheckedUpdateInput = {
+    id?: IntFieldUpdateOperationsInput | number
+    userId?: IntFieldUpdateOperationsInput | number
+    wordpressUrl?: StringFieldUpdateOperationsInput | string
+    primaryKeyword?: NullableStringFieldUpdateOperationsInput | string | null
+    title?: NullableStringFieldUpdateOperationsInput | string | null
+    slug?: NullableStringFieldUpdateOperationsInput | string | null
+    status?: NullableStringFieldUpdateOperationsInput | string | null
+    response?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    integrationId?: NullableIntFieldUpdateOperationsInput | number | null
+  }
+
+  export type WordpressPublishLogCreateManyInput = {
+    id?: number
+    userId: number
+    wordpressUrl: string
+    primaryKeyword?: string | null
+    title?: string | null
+    slug?: string | null
+    status?: string | null
+    response?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    integrationId?: number | null
+  }
+
+  export type WordpressPublishLogUpdateManyMutationInput = {
+    wordpressUrl?: StringFieldUpdateOperationsInput | string
+    primaryKeyword?: NullableStringFieldUpdateOperationsInput | string | null
+    title?: NullableStringFieldUpdateOperationsInput | string | null
+    slug?: NullableStringFieldUpdateOperationsInput | string | null
+    status?: NullableStringFieldUpdateOperationsInput | string | null
+    response?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type WordpressPublishLogUncheckedUpdateManyInput = {
+    id?: IntFieldUpdateOperationsInput | number
+    userId?: IntFieldUpdateOperationsInput | number
+    wordpressUrl?: StringFieldUpdateOperationsInput | string
+    primaryKeyword?: NullableStringFieldUpdateOperationsInput | string | null
+    title?: NullableStringFieldUpdateOperationsInput | string | null
+    slug?: NullableStringFieldUpdateOperationsInput | string | null
+    status?: NullableStringFieldUpdateOperationsInput | string | null
+    response?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    integrationId?: NullableIntFieldUpdateOperationsInput | number | null
+  }
+
   export type PhraseScoreCreateInput = {
     score: number
     breakdown?: NullableJsonNullValueInput | InputJsonValue
@@ -48436,12 +51253,27 @@ export namespace Prisma {
     isNot?: GoogleSearchConsoleConnectionWhereInput | null
   }
 
+  export type WordpressIntegrationNullableRelationFilter = {
+    is?: WordpressIntegrationWhereInput | null
+    isNot?: WordpressIntegrationWhereInput | null
+  }
+
+  export type WordpressPublishLogListRelationFilter = {
+    every?: WordpressPublishLogWhereInput
+    some?: WordpressPublishLogWhereInput
+    none?: WordpressPublishLogWhereInput
+  }
+
   export type SortOrderInput = {
     sort: SortOrder
     nulls?: NullsOrder
   }
 
   export type DomainOrderByRelationAggregateInput = {
+    _count?: SortOrder
+  }
+
+  export type WordpressPublishLogOrderByRelationAggregateInput = {
     _count?: SortOrder
   }
 
@@ -50128,6 +52960,103 @@ export namespace Prisma {
     confidence?: SortOrder
   }
 
+  export type UserRelationFilter = {
+    is?: UserWhereInput
+    isNot?: UserWhereInput
+  }
+
+  export type WordpressIntegrationCountOrderByAggregateInput = {
+    id?: SortOrder
+    userId?: SortOrder
+    siteUrl?: SortOrder
+    username?: SortOrder
+    password?: SortOrder
+    lastPublishedAt?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type WordpressIntegrationAvgOrderByAggregateInput = {
+    id?: SortOrder
+    userId?: SortOrder
+  }
+
+  export type WordpressIntegrationMaxOrderByAggregateInput = {
+    id?: SortOrder
+    userId?: SortOrder
+    siteUrl?: SortOrder
+    username?: SortOrder
+    password?: SortOrder
+    lastPublishedAt?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type WordpressIntegrationMinOrderByAggregateInput = {
+    id?: SortOrder
+    userId?: SortOrder
+    siteUrl?: SortOrder
+    username?: SortOrder
+    password?: SortOrder
+    lastPublishedAt?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type WordpressIntegrationSumOrderByAggregateInput = {
+    id?: SortOrder
+    userId?: SortOrder
+  }
+
+  export type WordpressPublishLogCountOrderByAggregateInput = {
+    id?: SortOrder
+    userId?: SortOrder
+    wordpressUrl?: SortOrder
+    primaryKeyword?: SortOrder
+    title?: SortOrder
+    slug?: SortOrder
+    status?: SortOrder
+    response?: SortOrder
+    createdAt?: SortOrder
+    integrationId?: SortOrder
+  }
+
+  export type WordpressPublishLogAvgOrderByAggregateInput = {
+    id?: SortOrder
+    userId?: SortOrder
+    integrationId?: SortOrder
+  }
+
+  export type WordpressPublishLogMaxOrderByAggregateInput = {
+    id?: SortOrder
+    userId?: SortOrder
+    wordpressUrl?: SortOrder
+    primaryKeyword?: SortOrder
+    title?: SortOrder
+    slug?: SortOrder
+    status?: SortOrder
+    createdAt?: SortOrder
+    integrationId?: SortOrder
+  }
+
+  export type WordpressPublishLogMinOrderByAggregateInput = {
+    id?: SortOrder
+    userId?: SortOrder
+    wordpressUrl?: SortOrder
+    primaryKeyword?: SortOrder
+    title?: SortOrder
+    slug?: SortOrder
+    status?: SortOrder
+    createdAt?: SortOrder
+    integrationId?: SortOrder
+  }
+
+  export type WordpressPublishLogSumOrderByAggregateInput = {
+    id?: SortOrder
+    userId?: SortOrder
+    integrationId?: SortOrder
+  }
+
   export type PhraseScoreCountOrderByAggregateInput = {
     id?: SortOrder
     phraseId?: SortOrder
@@ -50493,11 +53422,6 @@ export namespace Prisma {
     tokenUsage?: SortOrder
   }
 
-  export type UserRelationFilter = {
-    is?: UserWhereInput
-    isNot?: UserWhereInput
-  }
-
   export type GoogleSearchConsoleConnectionCountOrderByAggregateInput = {
     id?: SortOrder
     userId?: SortOrder
@@ -50857,6 +53781,19 @@ export namespace Prisma {
     connect?: GoogleSearchConsoleConnectionWhereUniqueInput
   }
 
+  export type WordpressIntegrationCreateNestedOneWithoutUserInput = {
+    create?: XOR<WordpressIntegrationCreateWithoutUserInput, WordpressIntegrationUncheckedCreateWithoutUserInput>
+    connectOrCreate?: WordpressIntegrationCreateOrConnectWithoutUserInput
+    connect?: WordpressIntegrationWhereUniqueInput
+  }
+
+  export type WordpressPublishLogCreateNestedManyWithoutUserInput = {
+    create?: XOR<WordpressPublishLogCreateWithoutUserInput, WordpressPublishLogUncheckedCreateWithoutUserInput> | WordpressPublishLogCreateWithoutUserInput[] | WordpressPublishLogUncheckedCreateWithoutUserInput[]
+    connectOrCreate?: WordpressPublishLogCreateOrConnectWithoutUserInput | WordpressPublishLogCreateOrConnectWithoutUserInput[]
+    createMany?: WordpressPublishLogCreateManyUserInputEnvelope
+    connect?: WordpressPublishLogWhereUniqueInput | WordpressPublishLogWhereUniqueInput[]
+  }
+
   export type DomainUncheckedCreateNestedManyWithoutUserInput = {
     create?: XOR<DomainCreateWithoutUserInput, DomainUncheckedCreateWithoutUserInput> | DomainCreateWithoutUserInput[] | DomainUncheckedCreateWithoutUserInput[]
     connectOrCreate?: DomainCreateOrConnectWithoutUserInput | DomainCreateOrConnectWithoutUserInput[]
@@ -50868,6 +53805,19 @@ export namespace Prisma {
     create?: XOR<GoogleSearchConsoleConnectionCreateWithoutUserInput, GoogleSearchConsoleConnectionUncheckedCreateWithoutUserInput>
     connectOrCreate?: GoogleSearchConsoleConnectionCreateOrConnectWithoutUserInput
     connect?: GoogleSearchConsoleConnectionWhereUniqueInput
+  }
+
+  export type WordpressIntegrationUncheckedCreateNestedOneWithoutUserInput = {
+    create?: XOR<WordpressIntegrationCreateWithoutUserInput, WordpressIntegrationUncheckedCreateWithoutUserInput>
+    connectOrCreate?: WordpressIntegrationCreateOrConnectWithoutUserInput
+    connect?: WordpressIntegrationWhereUniqueInput
+  }
+
+  export type WordpressPublishLogUncheckedCreateNestedManyWithoutUserInput = {
+    create?: XOR<WordpressPublishLogCreateWithoutUserInput, WordpressPublishLogUncheckedCreateWithoutUserInput> | WordpressPublishLogCreateWithoutUserInput[] | WordpressPublishLogUncheckedCreateWithoutUserInput[]
+    connectOrCreate?: WordpressPublishLogCreateOrConnectWithoutUserInput | WordpressPublishLogCreateOrConnectWithoutUserInput[]
+    createMany?: WordpressPublishLogCreateManyUserInputEnvelope
+    connect?: WordpressPublishLogWhereUniqueInput | WordpressPublishLogWhereUniqueInput[]
   }
 
   export type StringFieldUpdateOperationsInput = {
@@ -50906,6 +53856,30 @@ export namespace Prisma {
     update?: XOR<XOR<GoogleSearchConsoleConnectionUpdateToOneWithWhereWithoutUserInput, GoogleSearchConsoleConnectionUpdateWithoutUserInput>, GoogleSearchConsoleConnectionUncheckedUpdateWithoutUserInput>
   }
 
+  export type WordpressIntegrationUpdateOneWithoutUserNestedInput = {
+    create?: XOR<WordpressIntegrationCreateWithoutUserInput, WordpressIntegrationUncheckedCreateWithoutUserInput>
+    connectOrCreate?: WordpressIntegrationCreateOrConnectWithoutUserInput
+    upsert?: WordpressIntegrationUpsertWithoutUserInput
+    disconnect?: WordpressIntegrationWhereInput | boolean
+    delete?: WordpressIntegrationWhereInput | boolean
+    connect?: WordpressIntegrationWhereUniqueInput
+    update?: XOR<XOR<WordpressIntegrationUpdateToOneWithWhereWithoutUserInput, WordpressIntegrationUpdateWithoutUserInput>, WordpressIntegrationUncheckedUpdateWithoutUserInput>
+  }
+
+  export type WordpressPublishLogUpdateManyWithoutUserNestedInput = {
+    create?: XOR<WordpressPublishLogCreateWithoutUserInput, WordpressPublishLogUncheckedCreateWithoutUserInput> | WordpressPublishLogCreateWithoutUserInput[] | WordpressPublishLogUncheckedCreateWithoutUserInput[]
+    connectOrCreate?: WordpressPublishLogCreateOrConnectWithoutUserInput | WordpressPublishLogCreateOrConnectWithoutUserInput[]
+    upsert?: WordpressPublishLogUpsertWithWhereUniqueWithoutUserInput | WordpressPublishLogUpsertWithWhereUniqueWithoutUserInput[]
+    createMany?: WordpressPublishLogCreateManyUserInputEnvelope
+    set?: WordpressPublishLogWhereUniqueInput | WordpressPublishLogWhereUniqueInput[]
+    disconnect?: WordpressPublishLogWhereUniqueInput | WordpressPublishLogWhereUniqueInput[]
+    delete?: WordpressPublishLogWhereUniqueInput | WordpressPublishLogWhereUniqueInput[]
+    connect?: WordpressPublishLogWhereUniqueInput | WordpressPublishLogWhereUniqueInput[]
+    update?: WordpressPublishLogUpdateWithWhereUniqueWithoutUserInput | WordpressPublishLogUpdateWithWhereUniqueWithoutUserInput[]
+    updateMany?: WordpressPublishLogUpdateManyWithWhereWithoutUserInput | WordpressPublishLogUpdateManyWithWhereWithoutUserInput[]
+    deleteMany?: WordpressPublishLogScalarWhereInput | WordpressPublishLogScalarWhereInput[]
+  }
+
   export type IntFieldUpdateOperationsInput = {
     set?: number
     increment?: number
@@ -50936,6 +53910,30 @@ export namespace Prisma {
     delete?: GoogleSearchConsoleConnectionWhereInput | boolean
     connect?: GoogleSearchConsoleConnectionWhereUniqueInput
     update?: XOR<XOR<GoogleSearchConsoleConnectionUpdateToOneWithWhereWithoutUserInput, GoogleSearchConsoleConnectionUpdateWithoutUserInput>, GoogleSearchConsoleConnectionUncheckedUpdateWithoutUserInput>
+  }
+
+  export type WordpressIntegrationUncheckedUpdateOneWithoutUserNestedInput = {
+    create?: XOR<WordpressIntegrationCreateWithoutUserInput, WordpressIntegrationUncheckedCreateWithoutUserInput>
+    connectOrCreate?: WordpressIntegrationCreateOrConnectWithoutUserInput
+    upsert?: WordpressIntegrationUpsertWithoutUserInput
+    disconnect?: WordpressIntegrationWhereInput | boolean
+    delete?: WordpressIntegrationWhereInput | boolean
+    connect?: WordpressIntegrationWhereUniqueInput
+    update?: XOR<XOR<WordpressIntegrationUpdateToOneWithWhereWithoutUserInput, WordpressIntegrationUpdateWithoutUserInput>, WordpressIntegrationUncheckedUpdateWithoutUserInput>
+  }
+
+  export type WordpressPublishLogUncheckedUpdateManyWithoutUserNestedInput = {
+    create?: XOR<WordpressPublishLogCreateWithoutUserInput, WordpressPublishLogUncheckedCreateWithoutUserInput> | WordpressPublishLogCreateWithoutUserInput[] | WordpressPublishLogUncheckedCreateWithoutUserInput[]
+    connectOrCreate?: WordpressPublishLogCreateOrConnectWithoutUserInput | WordpressPublishLogCreateOrConnectWithoutUserInput[]
+    upsert?: WordpressPublishLogUpsertWithWhereUniqueWithoutUserInput | WordpressPublishLogUpsertWithWhereUniqueWithoutUserInput[]
+    createMany?: WordpressPublishLogCreateManyUserInputEnvelope
+    set?: WordpressPublishLogWhereUniqueInput | WordpressPublishLogWhereUniqueInput[]
+    disconnect?: WordpressPublishLogWhereUniqueInput | WordpressPublishLogWhereUniqueInput[]
+    delete?: WordpressPublishLogWhereUniqueInput | WordpressPublishLogWhereUniqueInput[]
+    connect?: WordpressPublishLogWhereUniqueInput | WordpressPublishLogWhereUniqueInput[]
+    update?: WordpressPublishLogUpdateWithWhereUniqueWithoutUserInput | WordpressPublishLogUpdateWithWhereUniqueWithoutUserInput[]
+    updateMany?: WordpressPublishLogUpdateManyWithWhereWithoutUserInput | WordpressPublishLogUpdateManyWithWhereWithoutUserInput[]
+    deleteMany?: WordpressPublishLogScalarWhereInput | WordpressPublishLogScalarWhereInput[]
   }
 
   export type AnalysisPhaseCreateNestedManyWithoutDomainInput = {
@@ -52660,6 +55658,92 @@ export namespace Prisma {
     update?: XOR<XOR<PhraseUpdateToOneWithWhereWithoutPhraseIntentClassificationsInput, PhraseUpdateWithoutPhraseIntentClassificationsInput>, PhraseUncheckedUpdateWithoutPhraseIntentClassificationsInput>
   }
 
+  export type UserCreateNestedOneWithoutWordpressIntegrationInput = {
+    create?: XOR<UserCreateWithoutWordpressIntegrationInput, UserUncheckedCreateWithoutWordpressIntegrationInput>
+    connectOrCreate?: UserCreateOrConnectWithoutWordpressIntegrationInput
+    connect?: UserWhereUniqueInput
+  }
+
+  export type WordpressPublishLogCreateNestedManyWithoutIntegrationInput = {
+    create?: XOR<WordpressPublishLogCreateWithoutIntegrationInput, WordpressPublishLogUncheckedCreateWithoutIntegrationInput> | WordpressPublishLogCreateWithoutIntegrationInput[] | WordpressPublishLogUncheckedCreateWithoutIntegrationInput[]
+    connectOrCreate?: WordpressPublishLogCreateOrConnectWithoutIntegrationInput | WordpressPublishLogCreateOrConnectWithoutIntegrationInput[]
+    createMany?: WordpressPublishLogCreateManyIntegrationInputEnvelope
+    connect?: WordpressPublishLogWhereUniqueInput | WordpressPublishLogWhereUniqueInput[]
+  }
+
+  export type WordpressPublishLogUncheckedCreateNestedManyWithoutIntegrationInput = {
+    create?: XOR<WordpressPublishLogCreateWithoutIntegrationInput, WordpressPublishLogUncheckedCreateWithoutIntegrationInput> | WordpressPublishLogCreateWithoutIntegrationInput[] | WordpressPublishLogUncheckedCreateWithoutIntegrationInput[]
+    connectOrCreate?: WordpressPublishLogCreateOrConnectWithoutIntegrationInput | WordpressPublishLogCreateOrConnectWithoutIntegrationInput[]
+    createMany?: WordpressPublishLogCreateManyIntegrationInputEnvelope
+    connect?: WordpressPublishLogWhereUniqueInput | WordpressPublishLogWhereUniqueInput[]
+  }
+
+  export type UserUpdateOneRequiredWithoutWordpressIntegrationNestedInput = {
+    create?: XOR<UserCreateWithoutWordpressIntegrationInput, UserUncheckedCreateWithoutWordpressIntegrationInput>
+    connectOrCreate?: UserCreateOrConnectWithoutWordpressIntegrationInput
+    upsert?: UserUpsertWithoutWordpressIntegrationInput
+    connect?: UserWhereUniqueInput
+    update?: XOR<XOR<UserUpdateToOneWithWhereWithoutWordpressIntegrationInput, UserUpdateWithoutWordpressIntegrationInput>, UserUncheckedUpdateWithoutWordpressIntegrationInput>
+  }
+
+  export type WordpressPublishLogUpdateManyWithoutIntegrationNestedInput = {
+    create?: XOR<WordpressPublishLogCreateWithoutIntegrationInput, WordpressPublishLogUncheckedCreateWithoutIntegrationInput> | WordpressPublishLogCreateWithoutIntegrationInput[] | WordpressPublishLogUncheckedCreateWithoutIntegrationInput[]
+    connectOrCreate?: WordpressPublishLogCreateOrConnectWithoutIntegrationInput | WordpressPublishLogCreateOrConnectWithoutIntegrationInput[]
+    upsert?: WordpressPublishLogUpsertWithWhereUniqueWithoutIntegrationInput | WordpressPublishLogUpsertWithWhereUniqueWithoutIntegrationInput[]
+    createMany?: WordpressPublishLogCreateManyIntegrationInputEnvelope
+    set?: WordpressPublishLogWhereUniqueInput | WordpressPublishLogWhereUniqueInput[]
+    disconnect?: WordpressPublishLogWhereUniqueInput | WordpressPublishLogWhereUniqueInput[]
+    delete?: WordpressPublishLogWhereUniqueInput | WordpressPublishLogWhereUniqueInput[]
+    connect?: WordpressPublishLogWhereUniqueInput | WordpressPublishLogWhereUniqueInput[]
+    update?: WordpressPublishLogUpdateWithWhereUniqueWithoutIntegrationInput | WordpressPublishLogUpdateWithWhereUniqueWithoutIntegrationInput[]
+    updateMany?: WordpressPublishLogUpdateManyWithWhereWithoutIntegrationInput | WordpressPublishLogUpdateManyWithWhereWithoutIntegrationInput[]
+    deleteMany?: WordpressPublishLogScalarWhereInput | WordpressPublishLogScalarWhereInput[]
+  }
+
+  export type WordpressPublishLogUncheckedUpdateManyWithoutIntegrationNestedInput = {
+    create?: XOR<WordpressPublishLogCreateWithoutIntegrationInput, WordpressPublishLogUncheckedCreateWithoutIntegrationInput> | WordpressPublishLogCreateWithoutIntegrationInput[] | WordpressPublishLogUncheckedCreateWithoutIntegrationInput[]
+    connectOrCreate?: WordpressPublishLogCreateOrConnectWithoutIntegrationInput | WordpressPublishLogCreateOrConnectWithoutIntegrationInput[]
+    upsert?: WordpressPublishLogUpsertWithWhereUniqueWithoutIntegrationInput | WordpressPublishLogUpsertWithWhereUniqueWithoutIntegrationInput[]
+    createMany?: WordpressPublishLogCreateManyIntegrationInputEnvelope
+    set?: WordpressPublishLogWhereUniqueInput | WordpressPublishLogWhereUniqueInput[]
+    disconnect?: WordpressPublishLogWhereUniqueInput | WordpressPublishLogWhereUniqueInput[]
+    delete?: WordpressPublishLogWhereUniqueInput | WordpressPublishLogWhereUniqueInput[]
+    connect?: WordpressPublishLogWhereUniqueInput | WordpressPublishLogWhereUniqueInput[]
+    update?: WordpressPublishLogUpdateWithWhereUniqueWithoutIntegrationInput | WordpressPublishLogUpdateWithWhereUniqueWithoutIntegrationInput[]
+    updateMany?: WordpressPublishLogUpdateManyWithWhereWithoutIntegrationInput | WordpressPublishLogUpdateManyWithWhereWithoutIntegrationInput[]
+    deleteMany?: WordpressPublishLogScalarWhereInput | WordpressPublishLogScalarWhereInput[]
+  }
+
+  export type UserCreateNestedOneWithoutPublishLogsInput = {
+    create?: XOR<UserCreateWithoutPublishLogsInput, UserUncheckedCreateWithoutPublishLogsInput>
+    connectOrCreate?: UserCreateOrConnectWithoutPublishLogsInput
+    connect?: UserWhereUniqueInput
+  }
+
+  export type WordpressIntegrationCreateNestedOneWithoutPublishLogsInput = {
+    create?: XOR<WordpressIntegrationCreateWithoutPublishLogsInput, WordpressIntegrationUncheckedCreateWithoutPublishLogsInput>
+    connectOrCreate?: WordpressIntegrationCreateOrConnectWithoutPublishLogsInput
+    connect?: WordpressIntegrationWhereUniqueInput
+  }
+
+  export type UserUpdateOneRequiredWithoutPublishLogsNestedInput = {
+    create?: XOR<UserCreateWithoutPublishLogsInput, UserUncheckedCreateWithoutPublishLogsInput>
+    connectOrCreate?: UserCreateOrConnectWithoutPublishLogsInput
+    upsert?: UserUpsertWithoutPublishLogsInput
+    connect?: UserWhereUniqueInput
+    update?: XOR<XOR<UserUpdateToOneWithWhereWithoutPublishLogsInput, UserUpdateWithoutPublishLogsInput>, UserUncheckedUpdateWithoutPublishLogsInput>
+  }
+
+  export type WordpressIntegrationUpdateOneWithoutPublishLogsNestedInput = {
+    create?: XOR<WordpressIntegrationCreateWithoutPublishLogsInput, WordpressIntegrationUncheckedCreateWithoutPublishLogsInput>
+    connectOrCreate?: WordpressIntegrationCreateOrConnectWithoutPublishLogsInput
+    upsert?: WordpressIntegrationUpsertWithoutPublishLogsInput
+    disconnect?: WordpressIntegrationWhereInput | boolean
+    delete?: WordpressIntegrationWhereInput | boolean
+    connect?: WordpressIntegrationWhereUniqueInput
+    update?: XOR<XOR<WordpressIntegrationUpdateToOneWithWhereWithoutPublishLogsInput, WordpressIntegrationUpdateWithoutPublishLogsInput>, WordpressIntegrationUncheckedUpdateWithoutPublishLogsInput>
+  }
+
   export type PhraseCreateNestedOneWithoutPhraseScoresInput = {
     create?: XOR<PhraseCreateWithoutPhraseScoresInput, PhraseUncheckedCreateWithoutPhraseScoresInput>
     connectOrCreate?: PhraseCreateOrConnectWithoutPhraseScoresInput
@@ -53616,6 +56700,65 @@ export namespace Prisma {
     create: XOR<GoogleSearchConsoleConnectionCreateWithoutUserInput, GoogleSearchConsoleConnectionUncheckedCreateWithoutUserInput>
   }
 
+  export type WordpressIntegrationCreateWithoutUserInput = {
+    siteUrl: string
+    username: string
+    password: string
+    lastPublishedAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    publishLogs?: WordpressPublishLogCreateNestedManyWithoutIntegrationInput
+  }
+
+  export type WordpressIntegrationUncheckedCreateWithoutUserInput = {
+    id?: number
+    siteUrl: string
+    username: string
+    password: string
+    lastPublishedAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    publishLogs?: WordpressPublishLogUncheckedCreateNestedManyWithoutIntegrationInput
+  }
+
+  export type WordpressIntegrationCreateOrConnectWithoutUserInput = {
+    where: WordpressIntegrationWhereUniqueInput
+    create: XOR<WordpressIntegrationCreateWithoutUserInput, WordpressIntegrationUncheckedCreateWithoutUserInput>
+  }
+
+  export type WordpressPublishLogCreateWithoutUserInput = {
+    wordpressUrl: string
+    primaryKeyword?: string | null
+    title?: string | null
+    slug?: string | null
+    status?: string | null
+    response?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    integration?: WordpressIntegrationCreateNestedOneWithoutPublishLogsInput
+  }
+
+  export type WordpressPublishLogUncheckedCreateWithoutUserInput = {
+    id?: number
+    wordpressUrl: string
+    primaryKeyword?: string | null
+    title?: string | null
+    slug?: string | null
+    status?: string | null
+    response?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    integrationId?: number | null
+  }
+
+  export type WordpressPublishLogCreateOrConnectWithoutUserInput = {
+    where: WordpressPublishLogWhereUniqueInput
+    create: XOR<WordpressPublishLogCreateWithoutUserInput, WordpressPublishLogUncheckedCreateWithoutUserInput>
+  }
+
+  export type WordpressPublishLogCreateManyUserInputEnvelope = {
+    data: WordpressPublishLogCreateManyUserInput | WordpressPublishLogCreateManyUserInput[]
+    skipDuplicates?: boolean
+  }
+
   export type DomainUpsertWithWhereUniqueWithoutUserInput = {
     where: DomainWhereUniqueInput
     update: XOR<DomainUpdateWithoutUserInput, DomainUncheckedUpdateWithoutUserInput>
@@ -53688,6 +56831,70 @@ export namespace Prisma {
     lastSyncedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type WordpressIntegrationUpsertWithoutUserInput = {
+    update: XOR<WordpressIntegrationUpdateWithoutUserInput, WordpressIntegrationUncheckedUpdateWithoutUserInput>
+    create: XOR<WordpressIntegrationCreateWithoutUserInput, WordpressIntegrationUncheckedCreateWithoutUserInput>
+    where?: WordpressIntegrationWhereInput
+  }
+
+  export type WordpressIntegrationUpdateToOneWithWhereWithoutUserInput = {
+    where?: WordpressIntegrationWhereInput
+    data: XOR<WordpressIntegrationUpdateWithoutUserInput, WordpressIntegrationUncheckedUpdateWithoutUserInput>
+  }
+
+  export type WordpressIntegrationUpdateWithoutUserInput = {
+    siteUrl?: StringFieldUpdateOperationsInput | string
+    username?: StringFieldUpdateOperationsInput | string
+    password?: StringFieldUpdateOperationsInput | string
+    lastPublishedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    publishLogs?: WordpressPublishLogUpdateManyWithoutIntegrationNestedInput
+  }
+
+  export type WordpressIntegrationUncheckedUpdateWithoutUserInput = {
+    id?: IntFieldUpdateOperationsInput | number
+    siteUrl?: StringFieldUpdateOperationsInput | string
+    username?: StringFieldUpdateOperationsInput | string
+    password?: StringFieldUpdateOperationsInput | string
+    lastPublishedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    publishLogs?: WordpressPublishLogUncheckedUpdateManyWithoutIntegrationNestedInput
+  }
+
+  export type WordpressPublishLogUpsertWithWhereUniqueWithoutUserInput = {
+    where: WordpressPublishLogWhereUniqueInput
+    update: XOR<WordpressPublishLogUpdateWithoutUserInput, WordpressPublishLogUncheckedUpdateWithoutUserInput>
+    create: XOR<WordpressPublishLogCreateWithoutUserInput, WordpressPublishLogUncheckedCreateWithoutUserInput>
+  }
+
+  export type WordpressPublishLogUpdateWithWhereUniqueWithoutUserInput = {
+    where: WordpressPublishLogWhereUniqueInput
+    data: XOR<WordpressPublishLogUpdateWithoutUserInput, WordpressPublishLogUncheckedUpdateWithoutUserInput>
+  }
+
+  export type WordpressPublishLogUpdateManyWithWhereWithoutUserInput = {
+    where: WordpressPublishLogScalarWhereInput
+    data: XOR<WordpressPublishLogUpdateManyMutationInput, WordpressPublishLogUncheckedUpdateManyWithoutUserInput>
+  }
+
+  export type WordpressPublishLogScalarWhereInput = {
+    AND?: WordpressPublishLogScalarWhereInput | WordpressPublishLogScalarWhereInput[]
+    OR?: WordpressPublishLogScalarWhereInput[]
+    NOT?: WordpressPublishLogScalarWhereInput | WordpressPublishLogScalarWhereInput[]
+    id?: IntFilter<"WordpressPublishLog"> | number
+    userId?: IntFilter<"WordpressPublishLog"> | number
+    wordpressUrl?: StringFilter<"WordpressPublishLog"> | string
+    primaryKeyword?: StringNullableFilter<"WordpressPublishLog"> | string | null
+    title?: StringNullableFilter<"WordpressPublishLog"> | string | null
+    slug?: StringNullableFilter<"WordpressPublishLog"> | string | null
+    status?: StringNullableFilter<"WordpressPublishLog"> | string | null
+    response?: JsonNullableFilter<"WordpressPublishLog">
+    createdAt?: DateTimeFilter<"WordpressPublishLog"> | Date | string
+    integrationId?: IntNullableFilter<"WordpressPublishLog"> | number | null
   }
 
   export type AnalysisPhaseCreateWithoutDomainInput = {
@@ -53943,6 +57150,8 @@ export namespace Prisma {
     createdAt?: Date | string
     updatedAt?: Date | string
     googleSearchConsole?: GoogleSearchConsoleConnectionCreateNestedOneWithoutUserInput
+    wordpressIntegration?: WordpressIntegrationCreateNestedOneWithoutUserInput
+    publishLogs?: WordpressPublishLogCreateNestedManyWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutDomainsInput = {
@@ -53953,6 +57162,8 @@ export namespace Prisma {
     createdAt?: Date | string
     updatedAt?: Date | string
     googleSearchConsole?: GoogleSearchConsoleConnectionUncheckedCreateNestedOneWithoutUserInput
+    wordpressIntegration?: WordpressIntegrationUncheckedCreateNestedOneWithoutUserInput
+    publishLogs?: WordpressPublishLogUncheckedCreateNestedManyWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutDomainsInput = {
@@ -54738,6 +57949,8 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     googleSearchConsole?: GoogleSearchConsoleConnectionUpdateOneWithoutUserNestedInput
+    wordpressIntegration?: WordpressIntegrationUpdateOneWithoutUserNestedInput
+    publishLogs?: WordpressPublishLogUpdateManyWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutDomainsInput = {
@@ -54748,6 +57961,8 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     googleSearchConsole?: GoogleSearchConsoleConnectionUncheckedUpdateOneWithoutUserNestedInput
+    wordpressIntegration?: WordpressIntegrationUncheckedUpdateOneWithoutUserNestedInput
+    publishLogs?: WordpressPublishLogUncheckedUpdateManyWithoutUserNestedInput
   }
 
   export type GeneratedIntentPhraseUpsertWithWhereUniqueWithoutDomainInput = {
@@ -58855,6 +62070,237 @@ export namespace Prisma {
     phraseScores?: PhraseScoreUncheckedUpdateManyWithoutPhraseNestedInput
   }
 
+  export type UserCreateWithoutWordpressIntegrationInput = {
+    email: string
+    password: string
+    name?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    domains?: DomainCreateNestedManyWithoutUserInput
+    googleSearchConsole?: GoogleSearchConsoleConnectionCreateNestedOneWithoutUserInput
+    publishLogs?: WordpressPublishLogCreateNestedManyWithoutUserInput
+  }
+
+  export type UserUncheckedCreateWithoutWordpressIntegrationInput = {
+    id?: number
+    email: string
+    password: string
+    name?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    domains?: DomainUncheckedCreateNestedManyWithoutUserInput
+    googleSearchConsole?: GoogleSearchConsoleConnectionUncheckedCreateNestedOneWithoutUserInput
+    publishLogs?: WordpressPublishLogUncheckedCreateNestedManyWithoutUserInput
+  }
+
+  export type UserCreateOrConnectWithoutWordpressIntegrationInput = {
+    where: UserWhereUniqueInput
+    create: XOR<UserCreateWithoutWordpressIntegrationInput, UserUncheckedCreateWithoutWordpressIntegrationInput>
+  }
+
+  export type WordpressPublishLogCreateWithoutIntegrationInput = {
+    wordpressUrl: string
+    primaryKeyword?: string | null
+    title?: string | null
+    slug?: string | null
+    status?: string | null
+    response?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    user: UserCreateNestedOneWithoutPublishLogsInput
+  }
+
+  export type WordpressPublishLogUncheckedCreateWithoutIntegrationInput = {
+    id?: number
+    userId: number
+    wordpressUrl: string
+    primaryKeyword?: string | null
+    title?: string | null
+    slug?: string | null
+    status?: string | null
+    response?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+  }
+
+  export type WordpressPublishLogCreateOrConnectWithoutIntegrationInput = {
+    where: WordpressPublishLogWhereUniqueInput
+    create: XOR<WordpressPublishLogCreateWithoutIntegrationInput, WordpressPublishLogUncheckedCreateWithoutIntegrationInput>
+  }
+
+  export type WordpressPublishLogCreateManyIntegrationInputEnvelope = {
+    data: WordpressPublishLogCreateManyIntegrationInput | WordpressPublishLogCreateManyIntegrationInput[]
+    skipDuplicates?: boolean
+  }
+
+  export type UserUpsertWithoutWordpressIntegrationInput = {
+    update: XOR<UserUpdateWithoutWordpressIntegrationInput, UserUncheckedUpdateWithoutWordpressIntegrationInput>
+    create: XOR<UserCreateWithoutWordpressIntegrationInput, UserUncheckedCreateWithoutWordpressIntegrationInput>
+    where?: UserWhereInput
+  }
+
+  export type UserUpdateToOneWithWhereWithoutWordpressIntegrationInput = {
+    where?: UserWhereInput
+    data: XOR<UserUpdateWithoutWordpressIntegrationInput, UserUncheckedUpdateWithoutWordpressIntegrationInput>
+  }
+
+  export type UserUpdateWithoutWordpressIntegrationInput = {
+    email?: StringFieldUpdateOperationsInput | string
+    password?: StringFieldUpdateOperationsInput | string
+    name?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    domains?: DomainUpdateManyWithoutUserNestedInput
+    googleSearchConsole?: GoogleSearchConsoleConnectionUpdateOneWithoutUserNestedInput
+    publishLogs?: WordpressPublishLogUpdateManyWithoutUserNestedInput
+  }
+
+  export type UserUncheckedUpdateWithoutWordpressIntegrationInput = {
+    id?: IntFieldUpdateOperationsInput | number
+    email?: StringFieldUpdateOperationsInput | string
+    password?: StringFieldUpdateOperationsInput | string
+    name?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    domains?: DomainUncheckedUpdateManyWithoutUserNestedInput
+    googleSearchConsole?: GoogleSearchConsoleConnectionUncheckedUpdateOneWithoutUserNestedInput
+    publishLogs?: WordpressPublishLogUncheckedUpdateManyWithoutUserNestedInput
+  }
+
+  export type WordpressPublishLogUpsertWithWhereUniqueWithoutIntegrationInput = {
+    where: WordpressPublishLogWhereUniqueInput
+    update: XOR<WordpressPublishLogUpdateWithoutIntegrationInput, WordpressPublishLogUncheckedUpdateWithoutIntegrationInput>
+    create: XOR<WordpressPublishLogCreateWithoutIntegrationInput, WordpressPublishLogUncheckedCreateWithoutIntegrationInput>
+  }
+
+  export type WordpressPublishLogUpdateWithWhereUniqueWithoutIntegrationInput = {
+    where: WordpressPublishLogWhereUniqueInput
+    data: XOR<WordpressPublishLogUpdateWithoutIntegrationInput, WordpressPublishLogUncheckedUpdateWithoutIntegrationInput>
+  }
+
+  export type WordpressPublishLogUpdateManyWithWhereWithoutIntegrationInput = {
+    where: WordpressPublishLogScalarWhereInput
+    data: XOR<WordpressPublishLogUpdateManyMutationInput, WordpressPublishLogUncheckedUpdateManyWithoutIntegrationInput>
+  }
+
+  export type UserCreateWithoutPublishLogsInput = {
+    email: string
+    password: string
+    name?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    domains?: DomainCreateNestedManyWithoutUserInput
+    googleSearchConsole?: GoogleSearchConsoleConnectionCreateNestedOneWithoutUserInput
+    wordpressIntegration?: WordpressIntegrationCreateNestedOneWithoutUserInput
+  }
+
+  export type UserUncheckedCreateWithoutPublishLogsInput = {
+    id?: number
+    email: string
+    password: string
+    name?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    domains?: DomainUncheckedCreateNestedManyWithoutUserInput
+    googleSearchConsole?: GoogleSearchConsoleConnectionUncheckedCreateNestedOneWithoutUserInput
+    wordpressIntegration?: WordpressIntegrationUncheckedCreateNestedOneWithoutUserInput
+  }
+
+  export type UserCreateOrConnectWithoutPublishLogsInput = {
+    where: UserWhereUniqueInput
+    create: XOR<UserCreateWithoutPublishLogsInput, UserUncheckedCreateWithoutPublishLogsInput>
+  }
+
+  export type WordpressIntegrationCreateWithoutPublishLogsInput = {
+    siteUrl: string
+    username: string
+    password: string
+    lastPublishedAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    user: UserCreateNestedOneWithoutWordpressIntegrationInput
+  }
+
+  export type WordpressIntegrationUncheckedCreateWithoutPublishLogsInput = {
+    id?: number
+    userId: number
+    siteUrl: string
+    username: string
+    password: string
+    lastPublishedAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type WordpressIntegrationCreateOrConnectWithoutPublishLogsInput = {
+    where: WordpressIntegrationWhereUniqueInput
+    create: XOR<WordpressIntegrationCreateWithoutPublishLogsInput, WordpressIntegrationUncheckedCreateWithoutPublishLogsInput>
+  }
+
+  export type UserUpsertWithoutPublishLogsInput = {
+    update: XOR<UserUpdateWithoutPublishLogsInput, UserUncheckedUpdateWithoutPublishLogsInput>
+    create: XOR<UserCreateWithoutPublishLogsInput, UserUncheckedCreateWithoutPublishLogsInput>
+    where?: UserWhereInput
+  }
+
+  export type UserUpdateToOneWithWhereWithoutPublishLogsInput = {
+    where?: UserWhereInput
+    data: XOR<UserUpdateWithoutPublishLogsInput, UserUncheckedUpdateWithoutPublishLogsInput>
+  }
+
+  export type UserUpdateWithoutPublishLogsInput = {
+    email?: StringFieldUpdateOperationsInput | string
+    password?: StringFieldUpdateOperationsInput | string
+    name?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    domains?: DomainUpdateManyWithoutUserNestedInput
+    googleSearchConsole?: GoogleSearchConsoleConnectionUpdateOneWithoutUserNestedInput
+    wordpressIntegration?: WordpressIntegrationUpdateOneWithoutUserNestedInput
+  }
+
+  export type UserUncheckedUpdateWithoutPublishLogsInput = {
+    id?: IntFieldUpdateOperationsInput | number
+    email?: StringFieldUpdateOperationsInput | string
+    password?: StringFieldUpdateOperationsInput | string
+    name?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    domains?: DomainUncheckedUpdateManyWithoutUserNestedInput
+    googleSearchConsole?: GoogleSearchConsoleConnectionUncheckedUpdateOneWithoutUserNestedInput
+    wordpressIntegration?: WordpressIntegrationUncheckedUpdateOneWithoutUserNestedInput
+  }
+
+  export type WordpressIntegrationUpsertWithoutPublishLogsInput = {
+    update: XOR<WordpressIntegrationUpdateWithoutPublishLogsInput, WordpressIntegrationUncheckedUpdateWithoutPublishLogsInput>
+    create: XOR<WordpressIntegrationCreateWithoutPublishLogsInput, WordpressIntegrationUncheckedCreateWithoutPublishLogsInput>
+    where?: WordpressIntegrationWhereInput
+  }
+
+  export type WordpressIntegrationUpdateToOneWithWhereWithoutPublishLogsInput = {
+    where?: WordpressIntegrationWhereInput
+    data: XOR<WordpressIntegrationUpdateWithoutPublishLogsInput, WordpressIntegrationUncheckedUpdateWithoutPublishLogsInput>
+  }
+
+  export type WordpressIntegrationUpdateWithoutPublishLogsInput = {
+    siteUrl?: StringFieldUpdateOperationsInput | string
+    username?: StringFieldUpdateOperationsInput | string
+    password?: StringFieldUpdateOperationsInput | string
+    lastPublishedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    user?: UserUpdateOneRequiredWithoutWordpressIntegrationNestedInput
+  }
+
+  export type WordpressIntegrationUncheckedUpdateWithoutPublishLogsInput = {
+    id?: IntFieldUpdateOperationsInput | number
+    userId?: IntFieldUpdateOperationsInput | number
+    siteUrl?: StringFieldUpdateOperationsInput | string
+    username?: StringFieldUpdateOperationsInput | string
+    password?: StringFieldUpdateOperationsInput | string
+    lastPublishedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
   export type PhraseCreateWithoutPhraseScoresInput = {
     text: string
     createdAt?: Date | string
@@ -60607,6 +64053,8 @@ export namespace Prisma {
     createdAt?: Date | string
     updatedAt?: Date | string
     domains?: DomainCreateNestedManyWithoutUserInput
+    wordpressIntegration?: WordpressIntegrationCreateNestedOneWithoutUserInput
+    publishLogs?: WordpressPublishLogCreateNestedManyWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutGoogleSearchConsoleInput = {
@@ -60617,6 +64065,8 @@ export namespace Prisma {
     createdAt?: Date | string
     updatedAt?: Date | string
     domains?: DomainUncheckedCreateNestedManyWithoutUserInput
+    wordpressIntegration?: WordpressIntegrationUncheckedCreateNestedOneWithoutUserInput
+    publishLogs?: WordpressPublishLogUncheckedCreateNestedManyWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutGoogleSearchConsoleInput = {
@@ -60642,6 +64092,8 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     domains?: DomainUpdateManyWithoutUserNestedInput
+    wordpressIntegration?: WordpressIntegrationUpdateOneWithoutUserNestedInput
+    publishLogs?: WordpressPublishLogUpdateManyWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutGoogleSearchConsoleInput = {
@@ -60652,6 +64104,8 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     domains?: DomainUncheckedUpdateManyWithoutUserNestedInput
+    wordpressIntegration?: WordpressIntegrationUncheckedUpdateOneWithoutUserNestedInput
+    publishLogs?: WordpressPublishLogUncheckedUpdateManyWithoutUserNestedInput
   }
 
   export type DomainCreateWithoutCampaignsInput = {
@@ -61377,6 +64831,18 @@ export namespace Prisma {
     isCompanyDomain?: boolean
   }
 
+  export type WordpressPublishLogCreateManyUserInput = {
+    id?: number
+    wordpressUrl: string
+    primaryKeyword?: string | null
+    title?: string | null
+    slug?: string | null
+    status?: string | null
+    response?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    integrationId?: number | null
+  }
+
   export type DomainUpdateWithoutUserInput = {
     url?: StringFieldUpdateOperationsInput | string
     context?: NullableStringFieldUpdateOperationsInput | string | null
@@ -61468,6 +64934,41 @@ export namespace Prisma {
     locationContext?: NullableStringFieldUpdateOperationsInput | string | null
     currentStep?: IntFieldUpdateOperationsInput | number
     isCompanyDomain?: BoolFieldUpdateOperationsInput | boolean
+  }
+
+  export type WordpressPublishLogUpdateWithoutUserInput = {
+    wordpressUrl?: StringFieldUpdateOperationsInput | string
+    primaryKeyword?: NullableStringFieldUpdateOperationsInput | string | null
+    title?: NullableStringFieldUpdateOperationsInput | string | null
+    slug?: NullableStringFieldUpdateOperationsInput | string | null
+    status?: NullableStringFieldUpdateOperationsInput | string | null
+    response?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    integration?: WordpressIntegrationUpdateOneWithoutPublishLogsNestedInput
+  }
+
+  export type WordpressPublishLogUncheckedUpdateWithoutUserInput = {
+    id?: IntFieldUpdateOperationsInput | number
+    wordpressUrl?: StringFieldUpdateOperationsInput | string
+    primaryKeyword?: NullableStringFieldUpdateOperationsInput | string | null
+    title?: NullableStringFieldUpdateOperationsInput | string | null
+    slug?: NullableStringFieldUpdateOperationsInput | string | null
+    status?: NullableStringFieldUpdateOperationsInput | string | null
+    response?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    integrationId?: NullableIntFieldUpdateOperationsInput | number | null
+  }
+
+  export type WordpressPublishLogUncheckedUpdateManyWithoutUserInput = {
+    id?: IntFieldUpdateOperationsInput | number
+    wordpressUrl?: StringFieldUpdateOperationsInput | string
+    primaryKeyword?: NullableStringFieldUpdateOperationsInput | string | null
+    title?: NullableStringFieldUpdateOperationsInput | string | null
+    slug?: NullableStringFieldUpdateOperationsInput | string | null
+    status?: NullableStringFieldUpdateOperationsInput | string | null
+    response?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    integrationId?: NullableIntFieldUpdateOperationsInput | number | null
   }
 
   export type AnalysisPhaseCreateManyDomainInput = {
@@ -62903,6 +66404,53 @@ export namespace Prisma {
     id?: IntFieldUpdateOperationsInput | number
     score?: IntFieldUpdateOperationsInput | number
     breakdown?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type WordpressPublishLogCreateManyIntegrationInput = {
+    id?: number
+    userId: number
+    wordpressUrl: string
+    primaryKeyword?: string | null
+    title?: string | null
+    slug?: string | null
+    status?: string | null
+    response?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+  }
+
+  export type WordpressPublishLogUpdateWithoutIntegrationInput = {
+    wordpressUrl?: StringFieldUpdateOperationsInput | string
+    primaryKeyword?: NullableStringFieldUpdateOperationsInput | string | null
+    title?: NullableStringFieldUpdateOperationsInput | string | null
+    slug?: NullableStringFieldUpdateOperationsInput | string | null
+    status?: NullableStringFieldUpdateOperationsInput | string | null
+    response?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    user?: UserUpdateOneRequiredWithoutPublishLogsNestedInput
+  }
+
+  export type WordpressPublishLogUncheckedUpdateWithoutIntegrationInput = {
+    id?: IntFieldUpdateOperationsInput | number
+    userId?: IntFieldUpdateOperationsInput | number
+    wordpressUrl?: StringFieldUpdateOperationsInput | string
+    primaryKeyword?: NullableStringFieldUpdateOperationsInput | string | null
+    title?: NullableStringFieldUpdateOperationsInput | string | null
+    slug?: NullableStringFieldUpdateOperationsInput | string | null
+    status?: NullableStringFieldUpdateOperationsInput | string | null
+    response?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type WordpressPublishLogUncheckedUpdateManyWithoutIntegrationInput = {
+    id?: IntFieldUpdateOperationsInput | number
+    userId?: IntFieldUpdateOperationsInput | number
+    wordpressUrl?: StringFieldUpdateOperationsInput | string
+    primaryKeyword?: NullableStringFieldUpdateOperationsInput | string | null
+    title?: NullableStringFieldUpdateOperationsInput | string | null
+    slug?: NullableStringFieldUpdateOperationsInput | string | null
+    status?: NullableStringFieldUpdateOperationsInput | string | null
+    response?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 

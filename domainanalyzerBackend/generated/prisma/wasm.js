@@ -407,6 +407,30 @@ exports.Prisma.PhraseIntentClassificationScalarFieldEnum = {
   createdAt: 'createdAt'
 };
 
+exports.Prisma.WordpressIntegrationScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  siteUrl: 'siteUrl',
+  username: 'username',
+  password: 'password',
+  lastPublishedAt: 'lastPublishedAt',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
+exports.Prisma.WordpressPublishLogScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  wordpressUrl: 'wordpressUrl',
+  primaryKeyword: 'primaryKeyword',
+  title: 'title',
+  slug: 'slug',
+  status: 'status',
+  response: 'response',
+  createdAt: 'createdAt',
+  integrationId: 'integrationId'
+};
+
 exports.Prisma.PhraseScoreScalarFieldEnum = {
   id: 'id',
   phraseId: 'phraseId',
@@ -623,6 +647,8 @@ exports.Prisma.ModelName = {
   CommunityInsight: 'CommunityInsight',
   SearchPattern: 'SearchPattern',
   PhraseIntentClassification: 'PhraseIntentClassification',
+  WordpressIntegration: 'WordpressIntegration',
+  WordpressPublishLog: 'WordpressPublishLog',
   PhraseScore: 'PhraseScore',
   IntentPhraseGeneration: 'IntentPhraseGeneration',
   CommunityMiningResult: 'CommunityMiningResult',

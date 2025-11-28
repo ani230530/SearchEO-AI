@@ -164,11 +164,16 @@ const ensureCampaignOwnership = async (campaignId: number, userId: number) => {
     },
     include: {
       domain: {
-        include: {
+        select: {
+          id: true,
+          url: true,
+          userId: true,
+          isCompanyDomain: true,
+          context: true,
           keywords: {
-            select: { term: true },
-            orderBy: { volume: 'desc' },
-            take: 25
+            select: {
+              term: true
+            }
           }
         }
       }
@@ -366,6 +371,66 @@ router.post('/', authenticateToken, asyncHandler(async (req: Request, res: Respo
       createdAt: campaign.createdAt,
       updatedAt: campaign.updatedAt
     }
+  });
+}));
+
+/**
+ * GET /api/campaigns/:id/keywords
+ * Get keywords for a campaign's domain
+ */
+router.get('/:id/keywords', authenticateToken, asyncHandler(async (req: Request, res: Response) => {
+  const authReq = req as AuthenticatedRequest;
+  const userId = authReq.user.userId;
+  const campaignId = parseInt(req.params.id, 10);
+
+  if (isNaN(campaignId)) {
+    return res.status(400).json({ success: false, error: 'Invalid campaign ID' });
+  }
+
+  const campaign = await ensureCampaignOwnership(campaignId, userId);
+  if (!campaign) {
+    console.log(`Campaign ${campaignId} not found for user ${userId}`);
+    return res.status(404).json({ success: false, error: 'Campaign not found' });
+  }
+
+  if (!campaign.domainId) {
+    console.log(`Campaign ${campaignId} has no domainId`);
+    return res.status(400).json({ success: false, error: 'Campaign has no associated domain' });
+  }
+
+  console.log(`Fetching keywords for domainId: ${campaign.domainId}`);
+
+  const keywords = await prisma.keyword.findMany({
+    where: {
+      domainId: campaign.domainId
+    },
+    select: {
+      id: true,
+      term: true,
+      volume: true,
+      difficulty: true,
+      intent: true,
+      cpc: true
+    },
+    orderBy: [
+      { volume: 'desc' },
+      { term: 'asc' }
+    ],
+    take: 500 // Limit to top 500 keywords
+  });
+
+  console.log(`Found ${keywords.length} keywords for domainId: ${campaign.domainId}`);
+
+  return res.json({
+    success: true,
+    keywords: keywords.map(k => ({
+      id: k.id,
+      term: k.term,
+      volume: k.volume,
+      difficulty: k.difficulty,
+      intent: k.intent || null,
+      cpc: k.cpc || 0
+    }))
   });
 }));
 

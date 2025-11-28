@@ -17,6 +17,8 @@ model User {
   updatedAt DateTime @updatedAt
   domains   Domain[]
   googleSearchConsole GoogleSearchConsoleConnection?
+  wordpressIntegration WordpressIntegration?
+  publishLogs WordpressPublishLog[]
 }
 
 model Domain {
@@ -391,6 +393,36 @@ model PhraseIntentClassification {
   phrase     Phrase   @relation(fields: [phraseId], references: [id])
 
   @@index([phraseId])
+}
+
+model WordpressIntegration {
+  id             Int      @id @default(autoincrement())
+  userId         Int      @unique
+  siteUrl        String
+  username       String
+  password       String
+  lastPublishedAt DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  user           User     @relation(fields: [userId], references: [id])
+  publishLogs    WordpressPublishLog[]
+}
+
+model WordpressPublishLog {
+  id            Int      @id @default(autoincrement())
+  userId        Int
+  wordpressUrl  String
+  primaryKeyword String?
+  title         String?
+  slug          String?
+  status        String?
+  response      Json?
+  createdAt     DateTime @default(now())
+  user          User     @relation(fields: [userId], references: [id])
+  integration   WordpressIntegration? @relation(fields: [integrationId], references: [id])
+  integrationId Int?
+
+  @@index([userId])
 }
 
 model PhraseScore {
