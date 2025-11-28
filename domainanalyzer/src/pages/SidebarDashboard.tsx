@@ -1,16 +1,24 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LayoutDashboard, BarChart3, Settings, User, LogOut, Menu, X, Building, Globe, CheckCircle, Info, Plug, FileText, ChevronDown, ChevronRight, ChevronLeft, Megaphone, Plus, ChevronUp, Trash2, Sparkles, ArrowLeft, Search, TrendingUp, Grid3X3, List, ArrowUpDown, Loader2, AlertCircle } from 'lucide-react';
+import { LayoutDashboard, BarChart3, Settings, User, LogOut, Menu, X, Building, Globe, CheckCircle, Info, Plug, FileText, ChevronDown, ChevronRight, ChevronLeft, Megaphone, Plus, ChevronUp, Trash2, Sparkles, ArrowLeft, Search, TrendingUp, Grid3X3, List, ArrowUpDown, Loader2, AlertCircle, Check, Send } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/use-toast';
 import { maskDomainId } from '@/lib/domainUtils';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import CampaignGraph from '@/components/CampaignGraph';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { cn } from '@/lib/utils';
+import PublishExperience from '@/features/publish/PublishExperience';
+import { CompanyInfoSkeleton } from '@/components/dashboard/CompanyInfoSkeleton';
+import { KeywordTableItem } from '@/types/keywords';
+import { WordpressIntegration } from '@/types/publish';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3002';
 
-type TabId = 'overview' | 'analytics' | 'campaign' | 'settings' | 'profile' | 'ai-checker';
+type TabId = 'overview' | 'analytics' | 'campaign' | 'publish' | 'settings' | 'profile' | 'ai-checker';
 type CompanySubTabId = 'company-info' | 'integration';
 
 interface Tab {
@@ -35,25 +43,6 @@ interface Keyword {
   difficulty: string;
   intent?: string | null;
   cpc?: number;
-}
-
-// Keyword interface for table display (matches DomainExtraction.tsx)
-interface KeywordTableItem {
-  id: string;
-  keyword: string;
-  intent: string;
-  volume: number;
-  kd: number;
-  competition: string;
-  cpc: number;
-  organic: number;
-  paid: number;
-  trend: string;
-  position: number;
-  url: string;
-  updated: string;
-  isCustom?: boolean;
-  selected?: boolean;
 }
 
 interface SubPage {
@@ -87,51 +76,25 @@ interface CampaignStructure {
   topics: Topic[];
 }
 
+const summarizeDomainContext = (input: string, maxLines = 6, maxChars = 800) => {
+  if (!input) return '';
+  const normalized = input.replace(/\r\n/g, '\n');
+  const lines = normalized
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const limited = lines.slice(0, maxLines).join('\n');
+  if (limited.length <= maxChars) {
+    return limited;
+  }
+  return `${limited.slice(0, maxChars)}…`;
+};
+
 const ButtonSpinner = () => (
   <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24">
     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4l3-3-3-3v4A8 8 0 104 12z" />
   </svg>
-);
-
-const CompanyInfoSkeleton = () => (
-  <div className="max-w-6xl mx-auto px-4 sm:px-6 py-12 sm:py-16 animate-pulse">
-    <div className="text-center mb-12">
-      <div className="h-10 w-64 bg-gray-200 rounded-full mx-auto" />
-    </div>
-    <div className="space-y-12">
-      <div className="bg-white rounded-3xl p-10 border border-gray-100 shadow-sm">
-        <div className="space-y-4 max-w-3xl mx-auto">
-          <div className="h-6 w-48 bg-gray-200 rounded-full mx-auto" />
-          <div className="h-4 w-full bg-gray-100 rounded-full" />
-          <div className="h-4 w-5/6 bg-gray-100 rounded-full mx-auto" />
-          <div className="h-4 w-2/3 bg-gray-100 rounded-full mx-auto" />
-          <div className="h-4 w-3/5 bg-gray-100 rounded-full mx-auto" />
-        </div>
-      </div>
-      <div>
-        <div className="text-center mb-8">
-          <div className="h-8 w-48 bg-gray-200 rounded-full mx-auto mb-2" />
-          <div className="h-4 w-32 bg-gray-100 rounded-full mx-auto" />
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {Array.from({ length: 8 }).map((_, idx) => (
-            <div
-              key={idx}
-              className="bg-white rounded-2xl p-5 border border-gray-100"
-            >
-              <div className="h-5 w-3/4 bg-gray-200 rounded-full mb-4" />
-              <div className="space-y-2">
-                <div className="h-3 w-2/3 bg-gray-100 rounded-full" />
-                <div className="h-3 w-1/2 bg-gray-100 rounded-full" />
-                <div className="h-3 w-1/3 bg-gray-100 rounded-full" />
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  </div>
 );
 
 const IntegrationSkeleton = () => (
@@ -221,6 +184,11 @@ const SidebarDashboard = () => {
   const [gscLoading, setGscLoading] = useState(false);
   const [gscStatusLoading, setGscStatusLoading] = useState(false);
   const [gscLastSynced, setGscLastSynced] = useState<Date | null>(null);
+  const [wpIntegration, setWpIntegration] = useState<WordpressIntegration | null>(null);
+  const [wpIntegrationLoading, setWpIntegrationLoading] = useState(false);
+  const [wpIntegrationSaving, setWpIntegrationSaving] = useState(false);
+  const [wpIntegrationDeleting, setWpIntegrationDeleting] = useState(false);
+  const [wpForm, setWpForm] = useState({ siteUrl: '', username: '', password: '' });
   const [campaigns, setCampaigns] = useState<Array<{ id: number; title: string; description: string | null; createdAt: string; updatedAt: string }>>([]);
   const [campaignsLoading, setCampaignsLoading] = useState(false);
   const [showCreateCampaign, setShowCreateCampaign] = useState(false);
@@ -243,6 +211,7 @@ const SidebarDashboard = () => {
     { id: 'overview', label: 'Overview', icon: <LayoutDashboard className="h-5 w-5" /> },
     { id: 'analytics', label: 'Company', icon: <Building className="h-5 w-5" /> },
     { id: 'campaign', label: 'Campaign', icon: <Megaphone className="h-5 w-5" /> },
+    { id: 'publish', label: 'Publish', icon: <Send className="h-5 w-5" /> },
     { id: 'settings', label: 'Settings', icon: <Settings className="h-5 w-5" /> },
     { id: 'profile', label: 'Profile', icon: <User className="h-5 w-5" /> },
     { id: 'ai-checker', label: 'AI Checker', icon: <Sparkles className="h-5 w-5" /> },
@@ -275,7 +244,7 @@ const SidebarDashboard = () => {
 
     if (tabParam === 'ai-checker') {
       navigate('/ai-checker');
-    } else if (tabParam && ['overview', 'analytics', 'campaign', 'settings', 'profile'].includes(tabParam)) {
+    } else if (tabParam && ['overview', 'analytics', 'campaign', 'publish', 'settings', 'profile'].includes(tabParam)) {
       setActiveTab(tabParam as TabId);
     }
 
@@ -284,64 +253,6 @@ const SidebarDashboard = () => {
     }
   }, [navigate]);
 
-  // Fetch company domain when Company tab is active
-  useEffect(() => {
-    if (activeTab === 'analytics') {
-      fetchCompanyDomain();
-    } else {
-      setCompanyDomainLoading(false);
-    }
-  }, [activeTab]);
-
-  // Fetch campaigns when Campaign tab is active
-  useEffect(() => {
-    if (activeTab === 'campaign') {
-      fetchCampaigns();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab]);
-
-  // Fetch GSC status when Integration tab is active
-  useEffect(() => {
-    if (activeTab === 'analytics' && activeCompanySubTab === 'integration') {
-      fetchGscStatus();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, activeCompanySubTab]);
-
-  // Handle OAuth callback from URL params
-  useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const success = urlParams.get('success');
-    const error = urlParams.get('error');
-
-    if (activeTab === 'analytics' && activeCompanySubTab === 'integration') {
-      if (success === 'true') {
-        toast({
-          title: "Connected Successfully",
-          description: "Google Search Console has been connected",
-        });
-        // Clean URL but keep tab params
-        const newUrl = new URL(window.location.href);
-        newUrl.searchParams.delete('success');
-        newUrl.searchParams.delete('error');
-        window.history.replaceState({}, '', newUrl.toString());
-        fetchGscStatus();
-      } else if (error) {
-        toast({
-          title: "Connection Failed",
-          description: `Failed to connect: ${error}`,
-          variant: "destructive"
-        });
-        // Clean URL but keep tab params
-        const newUrl = new URL(window.location.href);
-        newUrl.searchParams.delete('success');
-        newUrl.searchParams.delete('error');
-        window.history.replaceState({}, '', newUrl.toString());
-      }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, activeCompanySubTab]);
 
   // Auto-advance carousel to show running task
   useEffect(() => {
@@ -355,7 +266,7 @@ const SidebarDashboard = () => {
     return () => clearInterval(interval);
   }, [loadingSteps]);
 
-  const fetchCompanyDomain = async () => {
+  const fetchCompanyDomain = useCallback(async () => {
     try {
       setCompanyDomainLoading(true);
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/user/company-domain`, {
@@ -393,7 +304,15 @@ const SidebarDashboard = () => {
     } finally {
       setCompanyDomainLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    if (activeTab === 'analytics' || activeTab === 'publish') {
+      fetchCompanyDomain();
+    } else {
+      setCompanyDomainLoading(false);
+    }
+  }, [activeTab, fetchCompanyDomain]);
 
   // Helper function to determine intent based on keyword content
   const determineIntent = (keyword: string): string => {
@@ -630,48 +549,9 @@ const SidebarDashboard = () => {
     setIsContextExpanded(false);
   }, [trimmedDomainContext]);
 
-  const fetchGscStatus = async () => {
-    try {
-      setGscStatusLoading(true);
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/gsc/status`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
-          'Content-Type': 'application/json',
-        },
-      });
+  const hasWordpressIntegration = Boolean(wpIntegration);
 
-      if (!response.ok) {
-        throw new Error('Failed to fetch GSC status');
-      }
-
-      const data = await response.json();
-      
-      if (data.success && data.connected) {
-        setGscConnected(true);
-        setGscEmail(data.email || '');
-        setGscSelectedProperty(data.selectedProperty || '');
-        setGscLastSynced(data.lastSyncedAt ? new Date(data.lastSyncedAt) : null);
-        
-        // If no property selected, fetch properties
-        if (!data.selectedProperty) {
-          fetchGscProperties();
-        }
-      } else {
-        setGscConnected(false);
-        setGscEmail('');
-        setGscSelectedProperty('');
-        setGscProperties([]);
-        setGscLastSynced(null);
-      }
-    } catch (error) {
-      console.error('Error fetching GSC status:', error);
-      setGscConnected(false);
-    } finally {
-      setGscStatusLoading(false);
-    }
-  };
-
-  const fetchGscProperties = async () => {
+  const fetchGscProperties = useCallback(async () => {
     setGscLoading(true);
     try {
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/gsc/properties`, {
@@ -700,7 +580,77 @@ const SidebarDashboard = () => {
     } finally {
       setGscLoading(false);
     }
-  };
+  }, [toast]);
+
+  const fetchGscStatus = useCallback(async () => {
+    try {
+      setGscStatusLoading(true);
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/gsc/status`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch GSC status');
+      }
+
+      const data = await response.json();
+      
+      if (data.success && data.connected) {
+        setGscConnected(true);
+        setGscEmail(data.email || '');
+        setGscSelectedProperty(data.selectedProperty || '');
+        setGscLastSynced(data.lastSyncedAt ? new Date(data.lastSyncedAt) : null);
+        
+        if (!data.selectedProperty) {
+          fetchGscProperties();
+        }
+      } else {
+        setGscConnected(false);
+        setGscEmail('');
+        setGscSelectedProperty('');
+        setGscProperties([]);
+        setGscLastSynced(null);
+      }
+    } catch (error) {
+      console.error('Error fetching GSC status:', error);
+      setGscConnected(false);
+    } finally {
+      setGscStatusLoading(false);
+    }
+  }, [fetchGscProperties]);
+
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const success = urlParams.get('success');
+    const error = urlParams.get('error');
+      
+    if (activeTab === 'analytics' && activeCompanySubTab === 'integration') {
+      if (success === 'true') {
+      toast({
+          title: "Connected Successfully",
+          description: "Google Search Console has been connected",
+        });
+        const newUrl = new URL(window.location.href);
+        newUrl.searchParams.delete('success');
+        newUrl.searchParams.delete('error');
+        window.history.replaceState({}, '', newUrl.toString());
+        fetchGscStatus();
+      } else if (error) {
+        toast({
+          title: "Connection Failed",
+          description: `Failed to connect: ${error}`,
+        variant: "destructive"
+      });
+        const newUrl = new URL(window.location.href);
+        newUrl.searchParams.delete('success');
+        newUrl.searchParams.delete('error');
+        window.history.replaceState({}, '', newUrl.toString());
+    }
+    }
+  }, [activeTab, activeCompanySubTab, toast, fetchGscStatus]);
 
   const handleConnectGsc = async () => {
     try {
@@ -802,7 +752,159 @@ const SidebarDashboard = () => {
     }
   };
 
-  const fetchCampaigns = async () => {
+  const fetchWordpressIntegration = useCallback(async () => {
+    try {
+      setWpIntegrationLoading(true);
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/publish/wordpress`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch WordPress integration');
+      }
+
+      const data = await response.json();
+      if (data.success) {
+        setWpIntegration(data.integration || null);
+        setWpForm((prev) => ({
+          ...prev,
+          siteUrl: data.integration?.siteUrl || '',
+          username: data.integration?.username || '',
+          password: '',
+        }));
+      }
+    } catch (error) {
+      console.error('Error fetching WordPress integration:', error);
+      toast({
+        title: "WordPress",
+        description: "Unable to load WordPress integration details",
+        variant: "destructive"
+      });
+    } finally {
+      setWpIntegrationLoading(false);
+    }
+  }, [toast]);
+
+  const handleSaveWordpressIntegration = async () => {
+    if (!wpForm.siteUrl.trim() || !wpForm.username.trim()) {
+      toast({
+        title: "Missing Information",
+        description: "Site URL and username are required",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!wpIntegration && !wpForm.password.trim()) {
+      toast({
+        title: "Password Required",
+        description: "Enter your WordPress password or application password to connect",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      setWpIntegrationSaving(true);
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/publish/wordpress`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          siteUrl: wpForm.siteUrl.trim(),
+          username: wpForm.username.trim(),
+          password: wpForm.password,
+        })
+      });
+
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || 'Failed to save integration');
+      }
+
+      toast({
+        title: "WordPress Connected",
+        description: "WordPress credentials saved securely",
+      });
+      setWpForm((prev) => ({ ...prev, password: '' }));
+      fetchWordpressIntegration();
+    } catch (error) {
+      console.error('Error saving WordPress integration:', error);
+      toast({
+        title: "Connection Failed",
+        description: error instanceof Error ? error.message : "Unable to save WordPress credentials",
+        variant: "destructive"
+      });
+    } finally {
+      setWpIntegrationSaving(false);
+    }
+  };
+
+  const handleDisconnectWordpress = async () => {
+    if (!wpIntegration || wpIntegrationDeleting) return;
+    if (!confirm('Disconnect WordPress publishing? Stored credentials will be removed.')) {
+      return;
+    }
+
+    try {
+      setWpIntegrationDeleting(true);
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/publish/wordpress`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || 'Failed to disconnect WordPress');
+      }
+
+      setWpIntegration(null);
+      setWpForm({ siteUrl: '', username: '', password: '' });
+      toast({
+        title: "WordPress Disconnected",
+        description: "Credentials have been removed",
+      });
+    } catch (error) {
+      console.error('Error disconnecting WordPress:', error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Unable to disconnect WordPress",
+        variant: "destructive"
+      });
+    } finally {
+      setWpIntegrationDeleting(false);
+    }
+  };
+
+  const handleConfigureWordpress = useCallback(() => {
+    setActiveTab('analytics');
+    setActiveCompanySubTab('integration');
+  }, []);
+
+
+
+  useEffect(() => {
+    if (activeTab === 'analytics' && activeCompanySubTab === 'integration') {
+      fetchGscStatus();
+      fetchWordpressIntegration();
+    }
+  }, [activeTab, activeCompanySubTab, fetchGscStatus, fetchWordpressIntegration]);
+
+  useEffect(() => {
+    if (activeTab === 'publish') {
+      fetchWordpressIntegration();
+    }
+  }, [activeTab, fetchWordpressIntegration]);
+
+  const fetchCampaigns = useCallback(async () => {
     setCampaignsLoading(true);
     try {
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/campaigns`, {
@@ -831,7 +933,13 @@ const SidebarDashboard = () => {
     } finally {
       setCampaignsLoading(false);
     }
-  };
+  }, [toast]);
+
+  useEffect(() => {
+    if (activeTab === 'campaign') {
+      fetchCampaigns();
+    }
+  }, [activeTab, fetchCampaigns]);
 
   const handleCreateCampaign = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -2459,11 +2567,10 @@ const SidebarDashboard = () => {
 
                 {/* Integration Tab Content */}
                 {activeCompanySubTab === 'integration' && (
-                  <div className="max-w-4xl mx-auto">
+                  <div className="max-w-4xl mx-auto space-y-6">
                     {gscStatusLoading ? (
                       <IntegrationSkeleton />
                     ) : !gscConnected ? (
-                      // Not Connected - Show Connect Button
                       <div className="bg-white rounded-3xl p-12 border border-gray-100 shadow-sm text-center">
                         <div className="w-16 h-16 mx-auto mb-6 bg-gray-100 rounded-full flex items-center justify-center">
                           <Plug className="h-8 w-8 text-gray-400" />
@@ -2482,9 +2589,7 @@ const SidebarDashboard = () => {
                         </button>
                       </div>
                     ) : (
-                      // Connected - Show Status and Options
                       <div className="space-y-6">
-                        {/* Connection Status Card */}
                         <div className="bg-white rounded-3xl p-8 border border-gray-100 shadow-sm">
                           <div className="flex items-center justify-between mb-6">
                             <div className="flex items-center gap-3">
@@ -2514,7 +2619,6 @@ const SidebarDashboard = () => {
                           )}
                         </div>
 
-                        {/* Property Selection */}
                         {!gscSelectedProperty ? (
                           <div className="bg-white rounded-3xl p-8 border border-gray-100 shadow-sm">
                             <h3 className="text-xl font-light text-black tracking-tight mb-4">
@@ -2592,6 +2696,93 @@ const SidebarDashboard = () => {
                         )}
                       </div>
                     )}
+
+                    <div className="bg-white rounded-3xl p-8 border border-gray-100 shadow-sm">
+                      <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+                        <div>
+                          <h3 className="text-2xl font-light text-black tracking-tight">
+                            WordPress Publishing
+                          </h3>
+                          <p className="text-sm font-light text-gray-600">
+                            Securely store credentials to auto-publish generated content
+                          </p>
+                        </div>
+                        <div
+                          className={`px-4 py-1.5 rounded-full text-xs font-semibold ${
+                            hasWordpressIntegration ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                          }`}
+                        >
+                          {hasWordpressIntegration ? 'Connected' : 'Not Connected'}
+                        </div>
+                      </div>
+
+                      {wpIntegrationLoading ? (
+                        <div className="animate-pulse space-y-3">
+                          <div className="h-4 bg-gray-100 rounded"></div>
+                          <div className="h-4 bg-gray-100 rounded"></div>
+                          <div className="h-4 bg-gray-100 rounded w-1/2"></div>
+                        </div>
+                      ) : (
+                        <div className="space-y-5">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">WordPress URL</label>
+                            <input
+                              type="text"
+                              value={wpForm.siteUrl}
+                              onChange={(e) => setWpForm((prev) => ({ ...prev, siteUrl: e.target.value }))}
+                              placeholder="https://example.com"
+                              className="w-full px-4 py-3 text-sm rounded-2xl border border-gray-200 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-900"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">Username or Email</label>
+                            <input
+                              type="text"
+                              value={wpForm.username}
+                              onChange={(e) => setWpForm((prev) => ({ ...prev, username: e.target.value }))}
+                              placeholder="admin"
+                              className="w-full px-4 py-3 text-sm rounded-2xl border border-gray-200 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-900"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">Application Password</label>
+                            <input
+                              type="password"
+                              value={wpForm.password}
+                              onChange={(e) => setWpForm((prev) => ({ ...prev, password: e.target.value }))}
+                              placeholder={hasWordpressIntegration ? 'Enter new password to update (optional)' : '•••••••'}
+                              className="w-full px-4 py-3 text-sm rounded-2xl border border-gray-200 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-900"
+                            />
+                            <p className="text-xs text-gray-500 mt-2">
+                              Passwords are encrypted before storage. Leave blank to keep the current password.
+                            </p>
+                          </div>
+                          {wpIntegration?.lastPublishedAt && (
+                            <p className="text-xs text-gray-500">
+                              Last published {new Date(wpIntegration.lastPublishedAt).toLocaleString()}
+                            </p>
+                          )}
+                          <div className="flex flex-wrap gap-3 pt-2">
+                            <button
+                              onClick={handleSaveWordpressIntegration}
+                              disabled={wpIntegrationSaving}
+                              className="px-6 py-3 bg-black text-white rounded-full hover:bg-black/90 disabled:opacity-60"
+                            >
+                              {wpIntegrationSaving ? 'Saving…' : hasWordpressIntegration ? 'Update Connection' : 'Save Connection'}
+                            </button>
+                            {hasWordpressIntegration && (
+                              <button
+                                onClick={handleDisconnectWordpress}
+                                disabled={wpIntegrationDeleting}
+                                className="px-6 py-3 border border-gray-200 text-gray-700 rounded-full hover:bg-gray-50 disabled:opacity-60"
+                              >
+                                {wpIntegrationDeleting ? 'Removing…' : 'Disconnect'}
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
@@ -2915,6 +3106,23 @@ const SidebarDashboard = () => {
                 );
               })()}
             </div>
+          ) : activeTab === 'publish' ? (
+            companyDomainLoading ? (
+              <CompanyInfoSkeleton />
+                ) : (
+              <div className="max-w-6xl mx-auto px-4 sm:px-6 py-12 sm:py-16 space-y-8">
+                <PublishExperience
+                  companyDomain={companyDomain}
+                  domainContext={domainContext}
+                  keywordsTableData={keywordsTableData}
+                  hasWordpressIntegration={hasWordpressIntegration}
+                  wpIntegration={wpIntegration}
+                  onConfigureWordpress={handleConfigureWordpress}
+                  onRefreshWordpressIntegration={fetchWordpressIntegration}
+                  isActive={activeTab === 'publish'}
+                />
+                                    </div>
+            )
           ) : (
             <div style={{
               background: 'rgba(255, 255, 255, 0.8)',
@@ -2975,6 +3183,10 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({ campaign,
   const [newKeywordTerm, setNewKeywordTerm] = useState('');
   const [newKeywordVolume, setNewKeywordVolume] = useState('');
   const [newKeywordDifficulty, setNewKeywordDifficulty] = useState('Medium');
+  const [availableKeywords, setAvailableKeywords] = useState<Keyword[]>([]);
+  const [keywordSearchOpen, setKeywordSearchOpen] = useState(false);
+  const [keywordSearchValue, setKeywordSearchValue] = useState('');
+  const [loadingKeywords, setLoadingKeywords] = useState(false);
 
   const [targetTopicId, setTargetTopicId] = useState<number | null>(null);
   const { toast } = useToast();
@@ -3283,16 +3495,70 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({ campaign,
     }
   };
 
+  const fetchDomainKeywords = useCallback(async (campaignId: number) => {
+    setLoadingKeywords(true);
+    try {
+      const response = await fetch(`${CAMPAIGN_API_BASE}/${campaignId}/keywords`, {
+        method: 'GET',
+        headers: getAuthHeaders()
+      });
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          handleUnauthorized();
+          return;
+        }
+        const errorData = await response.json().catch(() => ({}));
+        console.error('Failed to fetch keywords:', response.status, errorData);
+        setAvailableKeywords([]);
+        return;
+      }
+
+      const data = await response.json();
+      console.log('Keywords API Response:', {
+        success: data.success,
+        keywordCount: data.keywords?.length || 0,
+        sampleKeywords: data.keywords?.slice(0, 3)
+      });
+      if (data.success && data.keywords) {
+        const keywords = data.keywords || [];
+        console.log('Setting keywords:', keywords.length, 'keywords');
+        setAvailableKeywords(keywords);
+      } else {
+        console.log('No keywords in response or success=false');
+        setAvailableKeywords([]);
+      }
+    } catch (error) {
+      console.error('Error fetching keywords:', error);
+      setAvailableKeywords([]);
+    } finally {
+      setLoadingKeywords(false);
+    }
+  }, [CAMPAIGN_API_BASE, getAuthHeaders, handleUnauthorized]);
+
+  // Debug: Log when availableKeywords changes
+  useEffect(() => {
+    console.log('Available keywords changed:', {
+      count: availableKeywords.length,
+      keywords: availableKeywords.slice(0, 5).map(k => k.term)
+    });
+  }, [availableKeywords]);
+
   const handleAddKeyword = (type: 'pillar' | 'subpage', topicId: number, pageId: number, isAI: boolean) => {
     if (isAI) {
       if (aiLoading === `keyword-${pageId}`) return;
       triggerAiKeywords(pageId);
       return;
     }
+    console.log('Opening keyword modal for campaign:', campaign.id);
     setAddKeywordContext({ type, topicId, pageId });
     setNewKeywordTerm('');
     setNewKeywordVolume('');
     setNewKeywordDifficulty('Medium');
+    setKeywordSearchValue('');
+    setKeywordSearchOpen(false);
+    // Fetch keywords for the campaign's domain
+    fetchDomainKeywords(campaign.id);
     setShowAddKeywordModal(true);
   };
 
@@ -3930,14 +4196,114 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({ campaign,
             <h3 className="text-xl font-light text-black tracking-tight mb-6">Add New Keyword</h3>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-light text-gray-900 mb-2">Keyword Term</label>
+                <label className="block text-sm font-light text-gray-900 mb-2">
+                  Keyword Term
+                  {availableKeywords.length > 0 && (
+                    <span className="ml-2 text-xs text-gray-500">
+                      ({availableKeywords.length} keywords available)
+                    </span>
+                  )}
+                </label>
+                <Popover open={keywordSearchOpen} onOpenChange={setKeywordSearchOpen}>
+                  <PopoverTrigger asChild>
+                    <button
+                      type="button"
+                      role="combobox"
+                      aria-expanded={keywordSearchOpen}
+                      className="w-full px-4 py-3 text-base font-light rounded-2xl border border-gray-200 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all flex items-center justify-between text-left"
+                    >
+                      <span className={cn("truncate", !newKeywordTerm && "text-gray-400")}>
+                        {newKeywordTerm || "Search or type keyword..."}
+                      </span>
+                      <Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[calc(100vw-4rem)] max-w-md p-0" align="start">
+                    <Command shouldFilter={false}>
+                      <CommandInput
+                        placeholder="Search keywords..."
+                        value={keywordSearchValue}
+                        onValueChange={(value) => {
+                          console.log('Search value changed:', value);
+                          setKeywordSearchValue(value);
+                        }}
+                        className="h-9"
+                      />
+                      <CommandList>
+                        {loadingKeywords ? (
+                          <div className="py-6 text-center text-sm text-gray-500">Loading keywords...</div>
+                        ) : (
+                          <>
+                            <CommandEmpty>
+                              {availableKeywords.length === 0 
+                                ? "No keywords in domain yet. Type to create new."
+                                : "No keywords match your search. Type to create new."}
+                            </CommandEmpty>
+                            {availableKeywords.length > 0 && (
+                              <CommandGroup>
+                                {availableKeywords
+                                  .filter((kw) => {
+                                    if (!keywordSearchValue) return true;
+                                    return kw.term.toLowerCase().includes(keywordSearchValue.toLowerCase());
+                                  })
+                                  .map((keyword) => {
+                                    console.log('Rendering keyword item:', keyword.term, 'matches search:', !keywordSearchValue || keyword.term.toLowerCase().includes(keywordSearchValue.toLowerCase()));
+                                    return (
+                                    <CommandItem
+                                      key={keyword.id}
+                                      value={keyword.term}
+                                      onSelect={() => {
+                                        console.log('Keyword selected:', keyword.term);
+                                        setNewKeywordTerm(keyword.term);
+                                        setNewKeywordVolume(keyword.volume?.toString() || '');
+                                        setNewKeywordDifficulty(keyword.difficulty || 'Medium');
+                                        setKeywordSearchValue('');
+                                        setKeywordSearchOpen(false);
+                                      }}
+                                      className="cursor-pointer"
+                                    >
+                                      <Check
+                                        className={cn(
+                                          "mr-2 h-4 w-4",
+                                          newKeywordTerm === keyword.term ? "opacity-100" : "opacity-0"
+                                        )}
+                                      />
+                                      <div className="flex-1">
+                                        <div className="font-medium">{keyword.term}</div>
+                                        <div className="text-xs text-gray-500">
+                                          Volume: {keyword.volume?.toLocaleString() || 'N/A'} • 
+                                          Difficulty: {keyword.difficulty || 'N/A'}
+                                          {keyword.intent && ` • Intent: ${keyword.intent}`}
+                                        </div>
+                                      </div>
+                                    </CommandItem>
+                                    );
+                                  })}
+                              </CommandGroup>
+                            )}
+                          </>
+                        )}
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
                 <input
                   type="text"
                   value={newKeywordTerm}
-                  onChange={(e) => setNewKeywordTerm(e.target.value)}
-                  placeholder="Enter keyword"
-                  className="w-full px-4 py-3 text-base font-light rounded-2xl border border-gray-200 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all"
-                  autoFocus
+                  onChange={(e) => {
+                    setNewKeywordTerm(e.target.value);
+                    setKeywordSearchValue(e.target.value);
+                    // Try to find matching keyword and auto-fill
+                    const matching = availableKeywords.find(
+                      kw => kw.term.toLowerCase() === e.target.value.toLowerCase()
+                    );
+                    if (matching) {
+                      setNewKeywordVolume(matching.volume?.toString() || '');
+                      setNewKeywordDifficulty(matching.difficulty || 'Medium');
+                    }
+                  }}
+                  placeholder="Or type a new keyword"
+                  className="w-full mt-2 px-4 py-3 text-base font-light rounded-2xl border border-gray-200 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all"
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
@@ -3972,6 +4338,8 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({ campaign,
                   setNewKeywordTerm('');
                   setNewKeywordVolume('');
                   setNewKeywordDifficulty('Medium');
+                  setKeywordSearchValue('');
+                  setKeywordSearchOpen(false);
                   setAddKeywordContext(null);
                 }}
                 className="px-6 py-3 bg-gray-100 text-gray-900 rounded-full hover:bg-gray-200 transition-all text-base font-light"
@@ -3993,4 +4361,5 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({ campaign,
 };
 
 export default SidebarDashboard;
+
 
