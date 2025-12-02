@@ -40,6 +40,7 @@ import { maskDomainId } from "@/lib/domainUtils";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import CampaignGraph from "@/components/CampaignGraph";
+import Profile from "./Profile";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3002";
 
@@ -377,7 +378,7 @@ const [publishError, setPublishError] = useState("");
     },
     {
       id: "analyze",
-      label: "Analyze",
+      label: "GSC Analyze",
       icon: <ScanSearch className="h-5 w-5" />,
     },
     {
@@ -447,7 +448,7 @@ const handleAnalyze = async () => {
     );
 
     const pageData = await pageRes.json();
-    setImprovedContent(pageData.html); // store HTML content here
+    setImprovedContent(pageData.html); 
 
   } catch (err) {
     console.error(err);
@@ -543,12 +544,10 @@ const handleRunAudit = async (url?: string) => {
   }, [activeTab]);
 
   // Fetch GSC status when Integration tab is active
-  useEffect(() => {
-    if (activeTab === "analytics" && activeCompanySubTab === "integration") {
-      fetchGscStatus();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, activeCompanySubTab]);
+ useEffect(() => {
+  fetchCompanyDomain();
+}, [activeTab]);
+
 
   // Handle OAuth callback from URL params
   useEffect(() => {
@@ -4198,18 +4197,17 @@ const handlePublish = async () => {
             <span className="text-xs font-semibold text-red-800">Needs Improvement</span>
             <p className="font-bold text-red-900 mt-1">{worst.label} ({worst.score}%)</p>
           </div>
-
         </div>
 
         {/* Quick Summary Points */}
         <div className="bg-gray-50 border border-gray-200 px-4 py-3 rounded-xl">
-          <p className="text-xs font-semibold text-gray-800 mb-1">Information</p>
+          <p className="text-xs font-semibold text-gray-800 mb-1">Given Information</p>
 
           <ul className="list-disc list-inside text-gray-700 space-y-1">
             <li>Your site performance affects loading time and user experience.</li>
-            <li>SEO score impacts visibility in search engines.</li>
+            <li>SEO (Search Engine Optimization) score impacts visibility in search engines.</li>
             <li>Accessibility ensures usability for all types of users.</li>
-            <li>Best Practices & PWA influence reliability and security.</li>
+            <li>Best Practices & PWA (Progressive Web App) influence reliability and security.</li>
           </ul>
         </div>
 
@@ -4307,40 +4305,47 @@ const handlePublish = async () => {
     </details>
 
     {/*  Advanced Metrics */}
-    {auditResult.audits && (
-      <details className="group border border-gray-300 rounded-xl p-4 bg-gray-100 backdrop-blur-sm shadow-inner hover:bg-gray-200">
-        <summary className="cursor-pointer font-semibold text-gray-800 text-sm flex justify-between items-center  transition-colors">
-          Advanced Metrics
-          <span className="transform group-open:rotate-90 transition-transform">
-            ▶
-          </span>
-        </summary>
+   {auditResult.audits && (
+  <details className="group border border-gray-300 rounded-xl p-4 bg-gray-100 backdrop-blur-sm shadow-inner">
+    <summary className="cursor-pointer font-semibold text-gray-800 text-sm flex justify-between items-center transition-colors hover:bg-gray-200 px-2 py-1 rounded-lg">
+      Advanced Metrics
+      <span className="transform group-open:rotate-90 transition-transform">▶</span>
+    </summary>
 
-        <div className="mt-4 space-y-3 text-sm text-gray-700">
-          {Object.entries(auditResult.audits).map(([key, value]) => {
-            const fullForms = {
-              fcp: "First Contentful Paint",
-              lcp: "Largest Contentful Paint",
-              cls: "Cumulative Layout Shift",
-              tbt: "Total Blocking Time",
-              speedIndex: "Speed Index",
-            };
+    <div className="mt-4 space-y-2 text-sm">
+      {Object.entries(auditResult.audits).map(([key, value]) => {
+        const fullForms = {
+          fcp: "First Contentful Paint",
+          lcp: "Largest Contentful Paint",
+          cls: "Cumulative Layout Shift",
+          tbt: "Total Blocking Time",
+          speedIndex: "Speed Index",
+        };
 
-            return (
-              <div
-                key={key}
-                className="flex justify-between px-3 py-2 rounded-lg hover:bg-gray-50 bg-gray-200 transition-colors"
-              >
-                <span className="font-medium text-gray-900">
-                  {key.toUpperCase()} ({fullForms[key] || key})
-                </span>
-                <span className="font-mono">{value}</span>
-              </div>
-            );
-          })}
-        </div>
-      </details>
-    )}
+        return (
+          <div
+            key={key}
+            className="
+              flex justify-between items-center 
+              px-4 py-3 rounded-xl 
+              bg-gray-100 border border-gray-300 
+              shadow-sm transition-all
+              hover:bg-gray-200 hover:shadow-md
+            "
+          >
+            <span className="font-medium text-gray-900">
+              {key.toUpperCase()} ({fullForms[key] || key})
+            </span>
+            <span className="font-mono text-gray-700 bg-gray-300/60 px-3 py-1 rounded-lg">
+              {value}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  </details>
+)}
+
   </div>
 )}
 
@@ -4496,7 +4501,17 @@ const handlePublish = async () => {
 
 
 
-)  : (
+)  : activeTab === "settings" ? (
+  <div className="max-w-8xl mx-auto px-4 sm:px-6 py-12 sm:py-16 space-y-12">
+
+</div>
+
+) : activeTab === "profile" ? (
+  <div className="max-w-8xl mx-auto px-4 sm:px-6 py-12 sm:py-16 space-y-12">
+<Profile />
+</div>
+
+):(
             <div
               style={{
                 background: "rgba(255, 255, 255, 0.8)",
