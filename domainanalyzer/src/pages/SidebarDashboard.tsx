@@ -4306,43 +4306,50 @@ const handlePublish = async () => {
 
     {/*  Advanced Metrics */}
    {auditResult.audits && (
-  <details className="group border border-gray-300 rounded-xl p-4 bg-gray-100 backdrop-blur-sm shadow-inner">
-    <summary className="cursor-pointer font-semibold text-gray-800 text-sm flex justify-between items-center transition-colors hover:bg-gray-200 px-2 py-1 rounded-lg">
-      Advanced Metrics
-      <span className="transform group-open:rotate-90 transition-transform">▶</span>
-    </summary>
+  <details className="group">
+   <summary className="
+  cursor-pointer flex justify-between items-center 
+  px-4 py-3 bg-gray-100 rounded-xl border border-gray-300 
+  shadow-sm text-gray-800 font-semibold 
+  hover:bg-gray-200 transition-all
+">
+  Advanced Metrics
+  <span className="transition-transform group-open:rotate-90">▶</span>
+</summary>
 
-    <div className="mt-4 space-y-2 text-sm">
-      {Object.entries(auditResult.audits).map(([key, value]) => {
-        const fullForms = {
-          fcp: "First Contentful Paint",
-          lcp: "Largest Contentful Paint",
-          cls: "Cumulative Layout Shift",
-          tbt: "Total Blocking Time",
-          speedIndex: "Speed Index",
-        };
+<div className="mt-6 p-4 bg-white/70 border border-gray-300 rounded-xl shadow-inner space-y-3">
+  {Object.entries(auditResult.audits).map(([key, value]) => {
+    const fullForms = {
+      fcp: "First Contentful Paint",
+      lcp: "Largest Contentful Paint",
+      cls: "Cumulative Layout Shift",
+      tbt: "Total Blocking Time",
+      speedIndex: "Speed Index",
+    };
 
-        return (
-          <div
-            key={key}
-            className="
-              flex justify-between items-center 
-              px-4 py-3 rounded-xl 
-              bg-gray-100 border border-gray-300 
-              shadow-sm transition-all
-              hover:bg-gray-200 hover:shadow-md
-            "
-          >
-            <span className="font-medium text-gray-900">
-              {key.toUpperCase()} ({fullForms[key] || key})
-            </span>
-            <span className="font-mono text-gray-700 bg-gray-300/60 px-3 py-1 rounded-lg">
-              {value}
-            </span>
-          </div>
-        );
-      })}
-    </div>
+    return (
+      <div
+        key={key}
+        className="
+          flex justify-between items-center 
+          px-4 py-3 rounded-xl 
+          bg-gray-100 border border-gray-300 
+          shadow-sm transition-all
+          hover:bg-gray-200 hover:shadow-md
+        "
+      >
+        <span className="font-medium text-gray-900">
+          {key.toUpperCase()} ({fullForms[key] || key})
+        </span>
+
+        <span className="font-mono text-gray-700 bg-gray-300/60 px-3 py-1 rounded-lg">
+          {value}
+        </span>
+      </div>
+    );
+  })}
+</div>
+
   </details>
 )}
 
