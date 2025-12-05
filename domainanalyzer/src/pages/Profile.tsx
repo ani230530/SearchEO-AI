@@ -115,10 +115,13 @@ const Profile: React.FC = () => {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <Button type="button" onClick={() => navigate("/dashboard")} variant="secondary" className="bg-white border border-gray-200 hover:bg-gray-100 text-gray-800">
+              {/* <Button type="button" onClick={() => navigate("/dashboard", { state: { tab: "overview" } })} variant="secondary" className="bg-white border border-gray-200 hover:bg-gray-100 text-gray-800">
                 ← Back to Dashboard
-              </Button>
-              <Button type="button" onClick={logout} variant="ghost" className="text-gray-700 hover:bg-gray-100 transition-colors">
+              </Button> */}
+              <Button type="button" onClick={() => {
+    logout();
+    navigate("/");
+  }} variant="ghost" className="text-gray-700 hover:bg-gray-100 transition-colors">
                 <LogOut className="h-4 w-4 mr-2" /> Sign out
               </Button>
             </div>
