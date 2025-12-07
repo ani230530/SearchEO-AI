@@ -40,6 +40,26 @@ const asyncHandler =
     Promise.resolve(fn(req, res, next)).catch(next);
 
 const callWebhook = async (url: string, payload: any) => {
+  if (process.env.NODE_ENV !== 'production') {
+    // Log what we are sending to n8n, masking sensitive fields
+    const maskSecrets = (value: any): any => {
+      if (!value || typeof value !== 'object') return value;
+      if (Array.isArray(value)) {
+        return value.map((item) => maskSecrets(item));
+      }
+      const clone: Record<string, any> = { ...value };
+      if (clone.password) clone.password = '***';
+      if (clone.Password) clone.Password = '***';
+      if (clone.token) clone.token = '***';
+      return clone;
+    };
+
+    console.log('[n8n webhook request]', {
+      url,
+      payload: maskSecrets(payload),
+    });
+  }
+
   const response = await axios.post(url, payload, {
     headers: {
       'Content-Type': 'application/json',
@@ -54,7 +74,7 @@ const callWebhook = async (url: string, payload: any) => {
       status: response.status,
       statusText: response.statusText,
       data: response.data,
-    });
+  });
   }
 
   return response.data;
@@ -668,6 +688,14 @@ router.post(
       integration?.siteUrl ||
       'draft://pending';
 
+    const {
+      campaignId,
+      topicId,
+      pageId,
+      pageType,
+      pageIndex,
+    } = req.body;
+
     const responsePayload = {
       primaryKeyword,
       htmlContent,
@@ -678,6 +706,12 @@ router.post(
       longtailKeywords,
       wordpressUrl: resolvedWordpressUrl,
       savedAt: new Date().toISOString(),
+      // Campaign metadata to track which topic/page this draft belongs to
+      ...(campaignId && { campaignId }),
+      ...(topicId && { topicId }),
+      ...(pageId && { pageId }),
+      ...(pageType && { pageType }),
+      ...(pageIndex !== undefined && { pageIndex }),
     };
 
     try {
