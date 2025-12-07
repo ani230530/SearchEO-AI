@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LayoutDashboard, BarChart3, Settings, User, LogOut, Menu, X, Building, Globe, CheckCircle, Info, Plug, FileText, ChevronDown, ChevronRight, ChevronLeft, Megaphone, Plus, ChevronUp, Trash2, Sparkles, ArrowLeft, Search, TrendingUp, Grid3X3, List, ArrowUpDown, Loader2, AlertCircle, Check, Send } from 'lucide-react';
+import { LayoutDashboard, BarChart3, Settings, User, LogOut, Menu, X, Building, Globe, CheckCircle, Info, Plug, FileText, ChevronDown, ChevronRight, ChevronLeft, Megaphone, Plus, ChevronUp, Trash2, Sparkles, ArrowLeft, Search, TrendingUp, Grid3X3, List, ArrowUpDown, Loader2, AlertCircle, Check, Send, RefreshCw } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/use-toast';
 import { maskDomainId } from '@/lib/domainUtils';
@@ -2753,9 +2753,22 @@ const SidebarDashboard = () => {
                               placeholder={hasWordpressIntegration ? 'Enter new password to update (optional)' : '•••••••'}
                               className="w-full px-4 py-3 text-sm rounded-2xl border border-gray-200 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-900"
                             />
-                            <p className="text-xs text-gray-500 mt-2">
-                              Passwords are encrypted before storage. Leave blank to keep the current password.
-                            </p>
+                            <div className="mt-2 space-y-1.5 text-xs text-gray-500">
+                              <p className="">
+                                Use a <span className="font-medium text-gray-700">WordPress Application Password</span>, not your normal login password.
+                              </p>
+                              <ul className="list-disc list-inside space-y-0.5">
+                                <li>
+                                  In your WordPress admin go to{' '}
+                                  <span className="font-medium text-gray-700">Users → Profile → Application Passwords</span>.
+                                </li>
+                                <li>Generate a new application password and copy it once.</li>
+                                <li>Paste that value here to allow secure REST API publishing.</li>
+                              </ul>
+                              <p className="">
+                                We encrypt this token before storing it. Leave blank to keep the existing one.
+                              </p>
+                            </div>
                           </div>
                           {wpIntegration?.lastPublishedAt && (
                             <p className="text-xs text-gray-500">
@@ -3190,6 +3203,48 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({ campaign,
 
   const [targetTopicId, setTargetTopicId] = useState<number | null>(null);
   const { toast } = useToast();
+
+  // Topic-level content generation states
+  const [generationDrawerOpen, setGenerationDrawerOpen] = useState(false);
+  const [generationDrawerStep, setGenerationDrawerStep] = useState(1);
+  const [selectedTopicForGeneration, setSelectedTopicForGeneration] = useState<number | null>(null);
+  const [generationForm, setGenerationForm] = useState({
+    wordCount: 800,
+    images: 2,
+    featuredImage: true,
+    brandName: '',
+    brandDescription: '',
+  });
+  const [wpIntegrationForGeneration, setWpIntegrationForGeneration] = useState<WordpressIntegration | null>(null);
+  const [wpIntegrationLoadingForDrawer, setWpIntegrationLoadingForDrawer] = useState(false);
+  const [companyDomainForGeneration, setCompanyDomainForGeneration] = useState<{ url: string; context: string } | null>(null);
+  
+  // Generation jobs tracking (one job per topic, tracks all pages)
+  const [generationJobs, setGenerationJobs] = useState<Map<number, {
+    jobId: string;
+    topicId: number;
+    status: 'pending' | 'generating' | 'completed' | 'failed';
+    pages: {
+      pageId: number;
+      pageType: 'pillar' | 'subpage';
+      status: 'pending' | 'generating' | 'completed' | 'failed';
+      draftId?: number;
+      progress?: number;
+      primaryKeyword?: string;
+    }[];
+    startedAt: Date;
+    estimatedCompletion?: Date;
+  }>>(new Map());
+  
+  const [pollingIntervals, setPollingIntervals] = useState<Map<number, NodeJS.Timeout>>(new Map());
+  const [previewPageId, setPreviewPageId] = useState<number | null>(null);
+  const [previewDraft, setPreviewDraft] = useState<{
+    htmlContent: string;
+    title: string;
+    metaDescription?: string;
+    slug?: string;
+    featuredImage?: string;
+  } | null>(null);
 
   const getAuthHeaders = useCallback((): HeadersInit => {
     const token = localStorage.getItem('authToken');
@@ -3626,6 +3681,338 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({ campaign,
     });
   };
 
+  // Topic-level content generation handlers
+  const handleGenerateTopicContent = (topicId: number) => {
+    const topic = campaignStructure.topics.find(t => t.id === topicId);
+    
+    if (!topic) return;
+    
+    // Validate topic has required pages
+    if (!topic.pillarPage) {
+      toast({
+        title: 'Pillar Page Required',
+        description: 'Add a pillar page before generating content',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
+    if (topic.subPages.length === 0) {
+      toast({
+        title: 'Sub Pages Required',
+        description: 'Add at least one sub-page before generating content',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
+    // Fetch WordPress integration and company domain for drawer
+    const fetchDataForDrawer = async () => {
+      try {
+        setWpIntegrationLoadingForDrawer(true);
+        
+        // Fetch WordPress integration - use same endpoint as publish tab
+        const wpResponse = await fetch(`${API_BASE_URL}/api/publish/wordpress`, {
+          headers: getAuthHeaders(),
+        });
+        
+        if (!wpResponse.ok) {
+          console.warn('WordPress integration fetch failed:', wpResponse.status);
+          setWpIntegrationForGeneration(null);
+        } else {
+          const wpData = await wpResponse.json();
+          if (wpData.success) {
+            // Set integration if it exists, otherwise null
+            setWpIntegrationForGeneration(wpData.integration || null);
+          } else {
+            setWpIntegrationForGeneration(null);
+          }
+        }
+        
+        // Fetch company domain
+        const domainResponse = await fetch(`${API_BASE_URL}/api/user/company-domain`, {
+          headers: getAuthHeaders(),
+        });
+        
+        if (domainResponse.ok) {
+          const domainData = await domainResponse.json();
+          if (domainData.success && domainData.domain) {
+            setCompanyDomainForGeneration({
+              url: domainData.domain.url,
+              context: domainData.domain.context || '',
+            });
+            
+            // Auto-fill brand name from domain
+            const sanitizedDomainName = domainData.domain.url
+              ?.replace(/^https?:\/\//i, '')
+              ?.replace(/^www\./i, '')
+              ?.split('/')[0] || 'Brand';
+            
+            setGenerationForm({
+              wordCount: 800,
+              images: 2,
+              featuredImage: true,
+              brandName: sanitizedDomainName,
+              brandDescription: summarizeDomainContext(domainData.domain.context || ''),
+            });
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching data for drawer:', error);
+        setWpIntegrationForGeneration(null);
+      } finally {
+        setWpIntegrationLoadingForDrawer(false);
+      }
+    };
+    
+    fetchDataForDrawer();
+    
+    setSelectedTopicForGeneration(topicId);
+    setGenerationDrawerOpen(true);
+    setGenerationDrawerStep(1);
+  };
+
+  const handleGenerationDrawerNext = () => {
+    if (generationDrawerStep === 3 && !generationForm.brandName.trim()) {
+      toast({
+        title: 'Brand name required',
+        description: 'Enter a brand name before continuing.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    setGenerationDrawerStep((prev) => Math.min(4, prev + 1));
+  };
+
+  const handleGenerationDrawerBack = () => {
+    setGenerationDrawerStep((prev) => Math.max(1, prev - 1));
+  };
+
+  const startPolling = useCallback((topicId: number, jobId: string) => {
+    // Clear existing polling for this topic
+    const existingInterval = pollingIntervals.get(topicId);
+    if (existingInterval) {
+      clearInterval(existingInterval);
+    }
+    
+    // Poll every 15 seconds
+    const interval = setInterval(async () => {
+      try {
+        const response = await fetch(
+          `${API_BASE_URL}/api/campaigns/generation-status/${jobId}`,
+          {
+            headers: getAuthHeaders(),
+          }
+        );
+        
+        if (response.status === 401 || response.status === 403) {
+          handleUnauthorized();
+          return;
+        }
+        
+        const data = await response.json();
+        if (!response.ok || !data.success) {
+          console.error('Error polling generation status:', data.error);
+          return;
+        }
+        
+        const { status, pages } = data;
+        
+        // Update job status
+        setGenerationJobs(prev => {
+          const updated = new Map(prev);
+          const job = updated.get(topicId);
+          
+          if (job) {
+            updated.set(topicId, {
+              ...job,
+              status: status.status as 'pending' | 'generating' | 'completed' | 'failed',
+              pages: job.pages.map(page => {
+                const pageStatus = pages.find((p: { pageId: number; status: string; progress?: number; draftId?: number }) => p.pageId === page.pageId);
+                return {
+                  ...page,
+                  status: (pageStatus?.status || page.status) as 'pending' | 'generating' | 'completed' | 'failed',
+                  progress: pageStatus?.progress || page.progress,
+                  draftId: pageStatus?.draftId || page.draftId,
+                };
+              }),
+            });
+          }
+          
+          return updated;
+        });
+        
+        // Check if all pages complete
+        const allComplete = pages.every((p: { status: string }) => 
+          p.status === 'completed' || p.status === 'failed'
+        );
+        
+        if (allComplete) {
+          clearInterval(interval);
+          setPollingIntervals(prev => {
+            const updated = new Map(prev);
+            updated.delete(topicId);
+            return updated;
+          });
+          
+          const completedCount = pages.filter((p: { status: string }) => p.status === 'completed').length;
+          toast({
+            title: 'Generation Complete',
+            description: `${completedCount} of ${pages.length} pages generated successfully`,
+          });
+        }
+      } catch (error) {
+        console.error('Error polling generation status:', error);
+      }
+    }, 15000); // Poll every 15 seconds
+    
+    setPollingIntervals(prev => {
+      const updated = new Map(prev);
+      updated.set(topicId, interval);
+      return updated;
+    });
+  }, [pollingIntervals, getAuthHeaders, handleUnauthorized, toast]);
+
+  const handleGenerateAndSubmit = async () => {
+    if (!selectedTopicForGeneration) return;
+    
+    const topic = campaignStructure.topics.find(t => t.id === selectedTopicForGeneration);
+    if (!topic || !topic.pillarPage) return;
+    
+    // Validate WordPress integration
+    if (!wpIntegrationForGeneration) {
+      toast({
+        title: 'WordPress Required',
+        description: 'Configure WordPress integration first',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
+    // Close drawer
+    setGenerationDrawerOpen(false);
+    
+    try {
+      // Build payload structure
+      // Keywords are already selected in the campaign page, so we use them directly
+      const payload = {
+        user_id: 'user_123', // Backend will use authenticated user ID
+        campaign_name: campaign.title,
+        
+        // Pillar page config - use keywords already selected in campaign page
+        pillar_page: {
+          primary_keyword: topic.pillarPage.keywords[0]?.term || topic.pillarPage.title,
+          longtail_keywords: topic.pillarPage.keywords.slice(1).map(k => k.term).filter(Boolean),
+          options: {
+            image: generationForm.images,
+            word_count: generationForm.wordCount,
+            featured_image: generationForm.featuredImage ? 'yes' : 'no',
+          },
+        },
+        
+        // Sub-pillar pages config - use keywords already selected in campaign page
+        sub_pillar_pages: topic.subPages.map(subPage => ({
+          primary_keyword: subPage.keywords[0]?.term || subPage.title,
+          longtail_keywords: subPage.keywords.slice(1).map(k => k.term).filter(Boolean),
+          options: {
+            image: generationForm.images,
+            word_count: generationForm.wordCount,
+            featured_image: generationForm.featuredImage ? 'yes' : 'no',
+          },
+        })),
+        
+        // Brand info - from drawer form
+        brand: {
+          brand_name: generationForm.brandName || 'Brand',
+          brand_description: generationForm.brandDescription || '',
+        },
+        
+        // WordPress credentials - from fetched integration
+        // Password is encrypted, backend will decrypt it
+        wordpress: {
+          username: wpIntegrationForGeneration.username,
+          password: '', // Backend will use stored encrypted password
+          url: wpIntegrationForGeneration.siteUrl,
+        },
+      };
+      
+      // Call backend to start generation
+      const response = await fetch(`${API_BASE_URL}/api/campaigns/topics/${selectedTopicForGeneration}/generate-content`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(payload),
+      });
+      
+      if (response.status === 401 || response.status === 403) {
+        handleUnauthorized();
+        return;
+      }
+      
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || 'Failed to start generation');
+      }
+      
+      const { jobId, pages } = data;
+      
+      // Initialize job tracking
+      const totalPages = 1 + topic.subPages.length; // 1 pillar + N sub-pages
+      const estimatedMinutes = totalPages * 3; // 3 min per page
+      
+      setGenerationJobs(prev => {
+        const updated = new Map(prev);
+        updated.set(selectedTopicForGeneration, {
+          jobId,
+          topicId: selectedTopicForGeneration,
+          status: 'pending',
+          pages: [
+            {
+              pageId: topic.pillarPage!.id,
+              pageType: 'pillar',
+              status: 'pending',
+              primaryKeyword: topic.pillarPage.keywords[0]?.term,
+            },
+            ...topic.subPages.map(sp => ({
+              pageId: sp.id,
+              pageType: 'subpage' as const,
+              status: 'pending' as const,
+              primaryKeyword: sp.keywords[0]?.term || sp.title,
+            })),
+          ],
+          startedAt: new Date(),
+          estimatedCompletion: new Date(Date.now() + estimatedMinutes * 60 * 1000),
+        });
+        return updated;
+      });
+      
+      // Start polling
+      startPolling(selectedTopicForGeneration, jobId);
+      
+      toast({
+        title: 'Generation Started',
+        description: `Generating ${totalPages} pages (estimated ${estimatedMinutes} minutes)`,
+      });
+    } catch (error) {
+      toast({
+        title: 'Generation Failed',
+        description: error instanceof Error ? error.message : 'Failed to start generation',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const isGeneratingTopic = (topicId: number) => {
+    const job = generationJobs.get(topicId);
+    return job && (job.status === 'pending' || job.status === 'generating');
+  };
+
+  // Cleanup polling on unmount
+  useEffect(() => {
+    return () => {
+      pollingIntervals.forEach(interval => clearInterval(interval));
+    };
+  }, [pollingIntervals]);
+
   if (structureLoading) {
     return (
       <div className="w-full flex items-center justify-center py-32">
@@ -3774,14 +4161,70 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({ campaign,
                   </p>
                 </div>
               </div>
-              <button
-                onClick={() => handleDeleteTopic(topic.id)}
-                disabled={syncing}
-                className="p-2 text-gray-400 hover:text-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                title="Delete topic"
-              >
-                <Trash2 className="h-4 w-4" />
-              </button>
+              <div className="flex items-center gap-2">
+                {/* Generation Status Badge */}
+                {generationJobs.has(topic.id) && (() => {
+                  const job = generationJobs.get(topic.id)!;
+                  const completedPages = job.pages.filter(p => p.status === 'completed').length;
+                  const totalPages = job.pages.length;
+                  
+                  return (
+                    <div className="flex items-center gap-2 text-xs">
+                      {job.status === 'generating' && (
+                        <>
+                          <Loader2 className="h-3 w-3 animate-spin text-blue-600" />
+                          <span className="text-blue-600">
+                            {completedPages}/{totalPages} ready
+                          </span>
+                        </>
+                      )}
+                      {job.status === 'completed' && (
+                        <>
+                          <CheckCircle className="h-3 w-3 text-green-600" />
+                          <span className="text-green-600">All ready</span>
+                        </>
+                      )}
+                      {job.status === 'failed' && (
+                        <>
+                          <AlertCircle className="h-3 w-3 text-red-600" />
+                          <span className="text-red-600">Failed</span>
+                        </>
+                      )}
+                    </div>
+                  );
+                })()}
+                
+                {/* Generate Content Button */}
+                {topic.pillarPage && topic.subPages.length > 0 && (
+                  <button
+                    onClick={() => handleGenerateTopicContent(topic.id)}
+                    disabled={isGeneratingTopic(topic.id) || syncing}
+                    className="px-4 py-2 bg-black text-white rounded-full hover:bg-black/90 disabled:opacity-60 disabled:cursor-not-allowed text-sm font-medium flex items-center gap-2 transition-all"
+                  >
+                    {isGeneratingTopic(topic.id) ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Generating...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="h-4 w-4" />
+                        Generate Content
+                      </>
+                    )}
+                  </button>
+                )}
+                
+                {/* Delete button */}
+                <button
+                  onClick={() => handleDeleteTopic(topic.id)}
+                  disabled={syncing}
+                  className="p-2 text-gray-400 hover:text-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Delete topic"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
             </div>
 
             {/* Topic Content */}
@@ -3867,6 +4310,74 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({ campaign,
                             </button>
                           </div>
                         </div>
+
+                        {/* Generation Status for Pillar Page */}
+                        {generationJobs.has(topic.id) && (() => {
+                          const job = generationJobs.get(topic.id)!;
+                          const pillarPageStatus = job.pages.find(p => 
+                            p.pageId === topic.pillarPage!.id && p.pageType === 'pillar'
+                          );
+                          
+                          if (!pillarPageStatus) return null;
+                          
+                          return (
+                            <div className="mt-3 flex items-center justify-between p-2 bg-white rounded-lg border border-gray-200">
+                              <div className="flex items-center gap-2">
+                                {pillarPageStatus.status === 'pending' && (
+                                  <>
+                                    <Loader2 className="h-3 w-3 animate-spin text-gray-400" />
+                                    <span className="text-xs text-gray-500">Queued...</span>
+                                  </>
+                                )}
+                                {pillarPageStatus.status === 'generating' && (
+                                  <>
+                                    <Loader2 className="h-3 w-3 animate-spin text-blue-600" />
+                                    <span className="text-xs text-blue-600">
+                                      Generating... ({pillarPageStatus.progress || 0}%)
+                                    </span>
+                                  </>
+                                )}
+                                {pillarPageStatus.status === 'completed' && (
+                                  <>
+                                    <CheckCircle className="h-4 w-4 text-green-600" />
+                                    <button
+                                      onClick={async () => {
+                                        if (pillarPageStatus.draftId) {
+                                          try {
+                                            const response = await fetch(
+                                              `${API_BASE_URL}/api/campaigns/drafts/${pillarPageStatus.draftId}`,
+                                              { headers: getAuthHeaders() }
+                                            );
+                                            const data = await response.json();
+                                            if (data.success) {
+                                              setPreviewDraft(data.draft);
+                                              setPreviewPageId(topic.pillarPage!.id);
+                                            }
+                                          } catch (error) {
+                                            toast({
+                                              title: 'Error',
+                                              description: 'Failed to load draft',
+                                              variant: 'destructive',
+                                            });
+                                          }
+                                        }
+                                      }}
+                                      className="text-xs font-medium text-blue-600 hover:text-blue-700"
+                                    >
+                                      View Page
+                                    </button>
+                                  </>
+                                )}
+                                {pillarPageStatus.status === 'failed' && (
+                                  <>
+                                    <AlertCircle className="h-3 w-3 text-red-600" />
+                                    <span className="text-xs text-red-600">Generation failed</span>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })()}
 
                         {/* Pillar Page Keywords */}
                         {expandedPillarPages.has(topic.pillarPage.id) && (
@@ -3985,12 +4496,80 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({ campaign,
                                   title="Delete sub-page"
                                 >
                                   <Trash2 className="h-3.5 w-3.5" />
-                                </button>
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Generation Status for Sub Page */}
+                        {generationJobs.has(topic.id) && (() => {
+                          const job = generationJobs.get(topic.id)!;
+                          const subPageStatus = job.pages.find(p => 
+                            p.pageId === subPage.id && p.pageType === 'subpage'
+                          );
+                          
+                          if (!subPageStatus) return null;
+                          
+                          return (
+                            <div className="mt-3 flex items-center justify-between p-2 bg-white rounded-lg border border-gray-200">
+                              <div className="flex items-center gap-2">
+                                {subPageStatus.status === 'pending' && (
+                                  <>
+                                    <Loader2 className="h-3 w-3 animate-spin text-gray-400" />
+                                    <span className="text-xs text-gray-500">Queued...</span>
+                                  </>
+                                )}
+                                {subPageStatus.status === 'generating' && (
+                                  <>
+                                    <Loader2 className="h-3 w-3 animate-spin text-blue-600" />
+                                    <span className="text-xs text-blue-600">
+                                      Generating... ({subPageStatus.progress || 0}%)
+                                    </span>
+                                  </>
+                                )}
+                                {subPageStatus.status === 'completed' && (
+                                  <>
+                                    <CheckCircle className="h-4 w-4 text-green-600" />
+                                    <button
+                                      onClick={async () => {
+                                        if (subPageStatus.draftId) {
+                                          try {
+                                            const response = await fetch(
+                                              `${API_BASE_URL}/api/campaigns/drafts/${subPageStatus.draftId}`,
+                                              { headers: getAuthHeaders() }
+                                            );
+                                            const data = await response.json();
+                                            if (data.success) {
+                                              setPreviewDraft(data.draft);
+                                              setPreviewPageId(subPage.id);
+                                            }
+                                          } catch (error) {
+                                            toast({
+                                              title: 'Error',
+                                              description: 'Failed to load draft',
+                                              variant: 'destructive',
+                                            });
+                                          }
+                                        }
+                                      }}
+                                      className="text-xs font-medium text-blue-600 hover:text-blue-700"
+                                    >
+                                      View Page
+                                    </button>
+                                  </>
+                                )}
+                                {subPageStatus.status === 'failed' && (
+                                  <>
+                                    <AlertCircle className="h-3 w-3 text-red-600" />
+                                    <span className="text-xs text-red-600">Generation failed</span>
+                                  </>
+                                )}
                               </div>
                             </div>
+                          );
+                        })()}
 
-                            {/* Sub Page Keywords */}
-                            {expandedSubPages.has(subPage.id) && (
+                        {/* Sub Page Keywords */}
+                        {expandedSubPages.has(subPage.id) && (
                               <div className="ml-11 mt-3 space-y-2">
                                 {subPage.keywords.length > 0 ? (
                                   subPage.keywords.map((keyword) => (
@@ -4356,6 +4935,300 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({ campaign,
           </div>
         </div>
       )}
+
+      {/* Generation Drawer */}
+      <Sheet
+        open={generationDrawerOpen}
+        onOpenChange={(open) => {
+          setGenerationDrawerOpen(open);
+          if (!open) {
+            setGenerationDrawerStep(1);
+            setSelectedTopicForGeneration(null);
+          }
+        }}
+      >
+        <SheetContent
+          side="right"
+          className="w-full sm:max-w-3xl border-l border-[#e2e4ea] bg-[#f5f6fa] px-10 py-12 overflow-y-auto font-light"
+        >
+          <div className="space-y-10">
+            <div className="rounded-[32px] border border-white/80 bg-white/90 px-6 py-6 shadow-[0_30px_80px_rgba(15,23,42,0.10)] backdrop-blur">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <div className="space-y-3">
+                  <div className="inline-flex items-center gap-2 rounded-full border border-black/10 px-4 py-1 text-[10px] tracking-[0.35em] uppercase text-gray-500">
+                    Content Generation
+                  </div>
+                  <div>
+                    <h3 className="text-[28px] font-light text-gray-900 tracking-tight">
+                      Step {generationDrawerStep} of 4
+                    </h3>
+                  </div>
+                </div>
+                <div className="flex flex-col items-end gap-2">
+                  <div className="flex items-center gap-1">
+                    {[1, 2, 3, 4].map((step) => (
+                      <span
+                        key={`progress-${step}`}
+                        className={`h-1.5 w-12 rounded-full transition-all ${
+                          step <= generationDrawerStep ? 'bg-black/80' : 'bg-black/10'
+                        }`}
+                      />
+                    ))}
+                  </div>
+                  <p className="text-xs uppercase tracking-[0.3em] text-gray-400">
+                    Generation flow
+                  </p>
+                </div>
+              </div>
+              <div className="mt-6">
+                <p className="text-xs text-gray-500">
+                  Keywords are already configured in your campaign pages. This flow sets content preferences.
+                </p>
+              </div>
+            </div>
+
+            {generationDrawerStep === 1 && (
+              <section className="rounded-[36px] border border-white/70 bg-white p-8 shadow-[0_30px_80px_rgba(15,23,42,0.08)] space-y-8">
+                <div className="space-y-2">
+                  <span className="text-[11px] uppercase tracking-[0.35em] text-gray-400">Word cadence</span>
+                  <h4 className="text-2xl font-light text-gray-900">Dial in the depth and pace.</h4>
+                  <p className="text-sm text-gray-500 max-w-2xl">
+                    Glide between quick reads and flagship editorials. Every notch subtly changes paragraph
+                    length, transitions, and how immersive the narration should feel.
+                  </p>
+                </div>
+                <div className="rounded-[28px] border border-gray-100 bg-gray-50/70 p-5 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-semibold text-gray-800">Projected read time</p>
+                      <p className="text-xs text-gray-500">A calm slider tuned for editorial pacing.</p>
+                    </div>
+                    <div className="inline-flex items-baseline gap-2 rounded-full bg-white px-5 py-1.5 shadow-inner">
+                      <span className="text-2xl font-light">{generationForm.wordCount}</span>
+                      <span className="text-xs uppercase tracking-[0.25em] text-gray-500">words</span>
+                    </div>
+                  </div>
+                  <div>
+                    <div className="flex justify-between text-[10px] uppercase tracking-[0.3em] text-gray-400 mb-2">
+                      <span>Brief</span>
+                      <span>Feature</span>
+                      <span>Chronicle</span>
+                    </div>
+                    <input
+                      type="range"
+                      min={500}
+                      max={2000}
+                      step={50}
+                      value={generationForm.wordCount}
+                      onChange={(e) =>
+                        setGenerationForm((prev) => ({ ...prev, wordCount: Number(e.target.value) }))
+                      }
+                      className="w-full h-2 rounded-full bg-gradient-to-r from-gray-200 via-gray-300 to-gray-400 accent-black"
+                    />
+                    <div className="mt-2 flex justify-between text-xs text-gray-500">
+                      <span>Snackable insight</span>
+                      <span>Premium editorial</span>
+                      <span>Marquee deep dive</span>
+                    </div>
+                  </div>
+                </div>
+              </section>
+            )}
+
+            {generationDrawerStep === 2 && (
+              <section className="rounded-[36px] border border-white/70 bg-white p-8 shadow-[0_30px_80px_rgba(15,23,42,0.08)] space-y-8">
+                <div className="space-y-2">
+                  <span className="text-[11px] uppercase tracking-[0.35em] text-gray-400">Imagery</span>
+                  <h4 className="text-2xl font-light text-gray-900">Compose a modern visual cadence.</h4>
+                  <p className="text-sm text-gray-500 max-w-2xl">
+                    Control how often imagery appears and whether a cinematic banner crowns the experience.
+                  </p>
+                </div>
+                <div className="grid gap-6 md:grid-cols-2">
+                  <div className="rounded-3xl border border-gray-100 bg-gray-50/80 p-5">
+                    <div className="flex items-center justify-between mb-4">
+                      <div>
+                        <p className="text-sm font-semibold text-gray-800">Inline images</p>
+                        <p className="text-xs text-gray-500">Slide to fine-tune the visual tempo.</p>
+                      </div>
+                      <span className="text-lg font-semibold text-gray-900">{generationForm.images}</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={() =>
+                          setGenerationForm((prev) => ({ ...prev, images: Math.max(0, prev.images - 1) }))
+                        }
+                        className="w-12 h-12 rounded-full border border-gray-200 text-2xl leading-none flex items-center justify-center hover:border-gray-300"
+                      >
+                        −
+                      </button>
+                      <div className="flex-1 h-2 rounded-full bg-gray-100">
+                        <div
+                          className="h-full rounded-full bg-gray-900 transition-all"
+                          style={{ width: `${(generationForm.images / 4) * 100}%` }}
+                        />
+                      </div>
+                      <button
+                        onClick={() =>
+                          setGenerationForm((prev) => ({ ...prev, images: Math.min(4, prev.images + 1) }))
+                        }
+                        className="w-12 h-12 rounded-full border border-gray-200 text-2xl leading-none flex items-center justify-center hover:border-gray-300"
+                      >
+                        +
+                      </button>
+                    </div>
+                  </div>
+                  <div className="rounded-3xl border border-gray-100 bg-gray-50/80 p-5 space-y-3">
+                    <p className="text-sm font-semibold text-gray-800">Hero banner</p>
+                    <p className="text-xs text-gray-500">
+                      Perfect for featured cards, WordPress previews, and shareable link thumbnails.
+                    </p>
+                    <button
+                      onClick={() =>
+                        setGenerationForm((prev) => ({ ...prev, featuredImage: !prev.featuredImage }))
+                      }
+                      className={`w-full px-4 py-3 rounded-[30px] border text-sm font-medium transition-all ${
+                        generationForm.featuredImage
+                          ? 'bg-black text-white border-black shadow-lg'
+                          : 'border-gray-200 text-gray-700 hover:bg-gray-100'
+                      }`}
+                    >
+                      {generationForm.featuredImage ? 'Use banner imagery' : 'Skip banner imagery'}
+                    </button>
+                  </div>
+                </div>
+              </section>
+            )}
+
+            {generationDrawerStep === 3 && (
+              <section className="rounded-[36px] bg-white border border-white/70 shadow-[0_30px_80px_rgba(15,23,42,0.08)] p-8 space-y-6">
+                <div className="space-y-2">
+                  <span className="text-[11px] uppercase tracking-[0.35em] text-gray-400">Brand Identity</span>
+                  <h4 className="text-2xl font-light text-gray-900">Define your brand voice.</h4>
+                  <p className="text-sm text-gray-500 max-w-2xl">
+                    Set the brand name and description that will be used across all generated content.
+                  </p>
+                </div>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Brand Name</label>
+                    <input
+                      type="text"
+                      value={generationForm.brandName}
+                      onChange={(e) =>
+                        setGenerationForm((prev) => ({ ...prev, brandName: e.target.value }))
+                      }
+                      placeholder="Your brand name"
+                      className="w-full px-5 py-4 rounded-[28px] border border-gray-200 bg-gradient-to-br from-white via-white to-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent text-base shadow-inner"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Brand Description</label>
+                    <textarea
+                      value={generationForm.brandDescription}
+                      onChange={(e) =>
+                        setGenerationForm((prev) => ({ ...prev, brandDescription: e.target.value }))
+                      }
+                      placeholder="Describe your brand, values, and tone..."
+                      rows={6}
+                      className="w-full px-5 py-4 rounded-[28px] border border-gray-200 bg-gradient-to-br from-white via-white to-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent text-base shadow-inner resize-none"
+                    />
+                    <p className="text-xs text-gray-500 mt-2">
+                      This context helps shape the content's voice and messaging.
+                    </p>
+                  </div>
+                </div>
+              </section>
+            )}
+
+            {generationDrawerStep === 4 && (
+              <section className="rounded-[36px] bg-white border border-white/70 shadow-[0_30px_80px_rgba(15,23,42,0.08)] p-8 space-y-6">
+                <div className="space-y-2">
+                  <span className="text-[11px] uppercase tracking-[0.35em] text-gray-400">WordPress Integration</span>
+                  <h4 className="text-2xl font-light text-gray-900">Publishing destination.</h4>
+                  <p className="text-sm text-gray-500 max-w-2xl">
+                    Verify your WordPress connection. Generated content will be saved as drafts.
+                  </p>
+                </div>
+                {wpIntegrationLoadingForDrawer ? (
+                  <div className="rounded-[28px] border border-gray-100 bg-gray-50/70 p-6">
+                    <div className="flex items-center gap-3">
+                      <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
+                      <p className="text-sm text-gray-600">Checking WordPress connection...</p>
+                    </div>
+                  </div>
+                ) : wpIntegrationForGeneration ? (
+                  <div className="rounded-[28px] border border-gray-100 bg-gray-50/70 p-6 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-semibold text-gray-800">WordPress Site</p>
+                        <p className="text-xs text-gray-500 mt-1">
+                          {wpIntegrationForGeneration.siteUrl?.replace(/^https?:\/\//, '') || 'Not configured'}
+                        </p>
+                      </div>
+                      <div className="px-4 py-2 rounded-full bg-green-50 text-green-700 text-sm font-medium">
+                        <CheckCircle className="h-4 w-4 inline mr-2" />
+                        Connected
+                      </div>
+                    </div>
+                    <div className="pt-4 border-t border-gray-200">
+                      <p className="text-xs text-gray-500">
+                        Username: <span className="font-medium text-gray-700">{wpIntegrationForGeneration.username}</span>
+                      </p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Content will be saved as drafts and can be published later.
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="rounded-[28px] border border-red-100 bg-red-50/70 p-6">
+                    <div className="flex items-center gap-3">
+                      <AlertCircle className="h-5 w-5 text-red-600" />
+                      <div>
+                        <p className="text-sm font-semibold text-red-800">WordPress Not Connected</p>
+                        <p className="text-xs text-red-600 mt-1">
+                          Please configure WordPress integration in the Settings tab before generating content.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </section>
+            )}
+
+            <div className="flex items-center justify-between pt-4 border-t border-gray-200">
+              <button
+                onClick={handleGenerationDrawerBack}
+                disabled={generationDrawerStep === 1}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-40"
+              >
+                <ChevronLeft className="h-4 w-4" />
+                Back
+              </button>
+              <div className="flex items-center gap-3">
+                {generationDrawerStep < 4 && (
+                  <button
+                    onClick={handleGenerationDrawerNext}
+                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-gray-900 text-white text-sm font-semibold hover:bg-black/90"
+                  >
+                    Next
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
+                )}
+                {generationDrawerStep === 4 && (
+                  <button
+                    onClick={handleGenerateAndSubmit}
+                    disabled={!generationForm.brandName.trim() || !wpIntegrationForGeneration}
+                    className="px-6 py-2.5 rounded-full bg-black text-white text-sm font-semibold shadow-lg hover:bg-black/90 disabled:opacity-60 transition-colors"
+                  >
+                    Generate & Preview
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 };

@@ -99,6 +99,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
   const [drawerStep, setDrawerStep] = useState(1);
   const totalDrawerSteps = 4;
   const [savingDraft, setSavingDraft] = useState(false);
+  const [currentDraftId, setCurrentDraftId] = useState<number | null>(null);
   const [selectedText, setSelectedText] = useState('');
   const [textEditNote, setTextEditNote] = useState('');
   const [textEditing, setTextEditing] = useState(false);
@@ -427,6 +428,61 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
     setPublishStage('compose');
   }, []);
 
+  const saveDraftToDatabase = useCallback(async (result: GeneratedArticleContent, silent = false) => {
+    if (!result) {
+      return false;
+    }
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/publish/drafts`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('authToken')}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          draftId: currentDraftId || undefined,
+          primaryKeyword: result.primaryKeyword,
+          htmlContent: result.htmlContent,
+          featuredImage: result.featuredImage,
+          title: result.title,
+          metaDescription: result.metaDescription,
+          slug: result.slug,
+          longtailKeywords: result.longtailKeywords,
+          wordpressUrl: result.wordpressUrl,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || 'Failed to save draft');
+      }
+      
+      // Update the current draft ID if we got one back
+      if (data.draftId && !currentDraftId) {
+        setCurrentDraftId(data.draftId);
+      }
+      
+      if (!silent) {
+        toast({
+          title: 'Draft Saved',
+          description: 'You can resume it anytime from the drafts table.',
+        });
+      }
+      fetchPublishHistory();
+      return true;
+    } catch (error) {
+      console.error('Error saving draft:', error);
+      if (!silent) {
+        toast({
+          title: 'Unable to Save Draft',
+          description: error instanceof Error ? error.message : 'Please try again.',
+          variant: 'destructive',
+        });
+      }
+      return false;
+    }
+  }, [toast, fetchPublishHistory, currentDraftId]);
+
   const handleSaveDraft = useCallback(async () => {
     if (!publishResult) {
       toast({
@@ -439,43 +495,11 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
 
     setSavingDraft(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/api/publish/drafts`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem('authToken')}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          primaryKeyword: publishResult.primaryKeyword,
-          htmlContent: publishResult.htmlContent,
-          featuredImage: publishResult.featuredImage,
-          title: publishResult.title,
-          metaDescription: publishResult.metaDescription,
-          slug: publishResult.slug,
-          longtailKeywords: publishResult.longtailKeywords,
-          wordpressUrl: publishResult.wordpressUrl,
-        }),
-      });
-      const data = await response.json();
-      if (!response.ok || !data.success) {
-        throw new Error(data.error || 'Failed to save draft');
-      }
-      toast({
-        title: 'Draft Saved',
-        description: 'You can resume it anytime from the drafts table.',
-      });
-      fetchPublishHistory();
-    } catch (error) {
-      console.error('Error saving draft:', error);
-      toast({
-        title: 'Unable to Save Draft',
-        description: error instanceof Error ? error.message : 'Please try again.',
-        variant: 'destructive',
-      });
+      await saveDraftToDatabase(publishResult, false);
     } finally {
       setSavingDraft(false);
     }
-  }, [publishResult, toast, fetchPublishHistory]);
+  }, [publishResult, toast, saveDraftToDatabase]);
 
   const handleResumeDraft = useCallback(
     (entry: PublishHistoryEntry) => {
@@ -530,6 +554,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
         : [];
 
       setPublishResult(nextResult);
+      setCurrentDraftId(entry.id);
       setPublishForm((prev) => ({
         ...prev,
         primaryKeyword: nextResult.primaryKeyword || prev.primaryKeyword,
@@ -668,6 +693,8 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
               wordpressUrl: normalized.wordpressUrl,
             }),
           });
+          // Set the current draft ID so future edits update this draft
+          setCurrentDraftId(generatingDraftId);
           // Refresh history to show updated draft
           fetchPublishHistory();
         } catch (error) {
@@ -764,7 +791,8 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
         updatedHtml = publishResult.htmlContent.replace(selectedText, updatedText);
       }
 
-      setPublishResult((prev) => (prev ? { ...prev, htmlContent: updatedHtml } : prev));
+      const updatedResult = publishResult ? { ...publishResult, htmlContent: updatedHtml } : null;
+      setPublishResult(updatedResult);
       setSelectedText(updatedText);
       setTextEditNote('');
       setSelectedRange(null);
@@ -784,6 +812,11 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
         title: 'Text Updated',
         description: 'Your selection has been rewritten',
       });
+
+      // Auto-save the draft after successful edit
+      if (updatedResult) {
+        saveDraftToDatabase(updatedResult, true);
+      }
     } catch (error) {
       console.error('Error editing text:', error);
       toast({
@@ -794,7 +827,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
     } finally {
       setTextEditing(false);
     }
-  }, [publishResult, selectedText, textEditNote, toast, selectedRange, extractEditedText]);
+  }, [publishResult, selectedText, textEditNote, toast, selectedRange, extractEditedText, saveDraftToDatabase]);
 
   const handleImageEdit = useCallback(async () => {
     if (!publishResult || !selectedImage || !imageEditNote.trim()) {
@@ -833,15 +866,15 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
       }
 
       const updatedHtml = publishResult.htmlContent.replace(selectedImage, updatedImage);
-      setPublishResult((prev) =>
-        prev
-          ? {
-              ...prev,
-              htmlContent: updatedHtml,
-              featuredImage: prev.featuredImage === selectedImage ? updatedImage : prev.featuredImage,
-            }
-          : prev
-      );
+      const updatedResult = publishResult
+        ? {
+            ...publishResult,
+            htmlContent: updatedHtml,
+            featuredImage: publishResult.featuredImage === selectedImage ? updatedImage : publishResult.featuredImage,
+          }
+        : null;
+      
+      setPublishResult(updatedResult);
       setSelectedImage(updatedImage);
       setImageEditNote('');
       imageTooltipInstanceRef.current?.hide();
@@ -849,6 +882,11 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
         title: 'Image Updated',
         description: 'Image updated successfully',
       });
+
+      // Auto-save the draft after successful edit
+      if (updatedResult) {
+        saveDraftToDatabase(updatedResult, true);
+      }
     } catch (error) {
       console.error('Error editing image:', error);
       toast({
@@ -859,7 +897,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
     } finally {
       setImageEditing(false);
     }
-  }, [publishResult, selectedImage, imageEditNote, toast, extractEditedImage]);
+  }, [publishResult, selectedImage, imageEditNote, toast, extractEditedImage, saveDraftToDatabase]);
 
   const handlePublishToWordpress = async () => {
     if (!publishResult || !publishResult.htmlContent) {
@@ -882,6 +920,14 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
 
     setPublishLoading(true);
     try {
+      // Get the latest HTML content from the DOM if available (includes any edits)
+      // This ensures we publish the most up-to-date content, including any DOM changes
+      let latestHtmlContent = publishResult.htmlContent;
+      if (previewRef.current) {
+        // Use the current DOM content which includes all edits
+        latestHtmlContent = previewRef.current.innerHTML;
+      }
+
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/publish/publish`, {
         method: 'POST',
         headers: {
@@ -890,7 +936,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
         },
         body: JSON.stringify({
           primaryKeyword: publishResult.primaryKeyword || publishForm.primaryKeyword,
-          htmlContent: publishResult.htmlContent,
+          htmlContent: latestHtmlContent,
           featuredImage: publishResult.featuredImage,
           title: publishResult.title,
           metaDescription: publishResult.metaDescription,
@@ -984,6 +1030,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
 
   const handleResetDraft = useCallback(() => {
     setPublishResult(null);
+    setCurrentDraftId(null);
     setSelectedText('');
     setSelectedImage('');
     setTextEditNote('');
