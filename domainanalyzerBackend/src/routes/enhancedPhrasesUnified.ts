@@ -1022,7 +1022,10 @@ const generateEnhancedIntentPhrases = async (
           posts
         });
       }
-    } catch {}
+    } catch (error) {
+      // Silently fail debug event emission - non-critical
+      console.debug(`Failed to emit Reddit debug event for ${keyword.term}:`, error);
+    }
     
     // Use intent-focused prompt
     const prompt = createOptimizedRealDataPhrasePrompt(
@@ -1063,7 +1066,10 @@ const generateEnhancedIntentPhrases = async (
           responseRaw: response
         });
       }
-    } catch {}
+    } catch (error) {
+      // Silently fail debug event emission - non-critical
+      console.debug(`Failed to emit AI debug event for ${keyword.term}:`, error);
+    }
     
     if (response && response.trim()) {
       let phraseData = parseAIResponse(response, null);

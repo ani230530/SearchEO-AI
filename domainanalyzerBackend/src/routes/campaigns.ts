@@ -1936,7 +1936,7 @@ router.post('/generation-webhook', asyncHandler(async (req: Request, res: Respon
       
       // UPSERT: Update existing draft (each page has only one draft)
       const currentResponse = draft.response as any;
-      const pageId = currentResponse?.pageId || draft.pageId;
+      const pageId = currentResponse?.pageId;
       
       if (!pageId) {
         console.warn(`[generation-webhook] Draft ${draft.id} missing pageId, skipping update`);
