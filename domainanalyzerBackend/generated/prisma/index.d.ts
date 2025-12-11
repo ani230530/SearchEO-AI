@@ -129,6 +129,16 @@ export type WordpressIntegration = $Result.DefaultSelection<Prisma.$WordpressInt
  */
 export type WordpressPublishLog = $Result.DefaultSelection<Prisma.$WordpressPublishLogPayload>
 /**
+ * Model GenerationJob
+ * 
+ */
+export type GenerationJob = $Result.DefaultSelection<Prisma.$GenerationJobPayload>
+/**
+ * Model GenerationJobPage
+ * 
+ */
+export type GenerationJobPage = $Result.DefaultSelection<Prisma.$GenerationJobPagePayload>
+/**
  * Model PhraseScore
  * 
  */
@@ -572,6 +582,26 @@ export class PrismaClient<
     * ```
     */
   get wordpressPublishLog(): Prisma.WordpressPublishLogDelegate<ExtArgs, ClientOptions>;
+
+  /**
+   * `prisma.generationJob`: Exposes CRUD operations for the **GenerationJob** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more GenerationJobs
+    * const generationJobs = await prisma.generationJob.findMany()
+    * ```
+    */
+  get generationJob(): Prisma.GenerationJobDelegate<ExtArgs, ClientOptions>;
+
+  /**
+   * `prisma.generationJobPage`: Exposes CRUD operations for the **GenerationJobPage** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more GenerationJobPages
+    * const generationJobPages = await prisma.generationJobPage.findMany()
+    * ```
+    */
+  get generationJobPage(): Prisma.GenerationJobPageDelegate<ExtArgs, ClientOptions>;
 
   /**
    * `prisma.phraseScore`: Exposes CRUD operations for the **PhraseScore** model.
@@ -1155,6 +1185,8 @@ export namespace Prisma {
     PhraseIntentClassification: 'PhraseIntentClassification',
     WordpressIntegration: 'WordpressIntegration',
     WordpressPublishLog: 'WordpressPublishLog',
+    GenerationJob: 'GenerationJob',
+    GenerationJobPage: 'GenerationJobPage',
     PhraseScore: 'PhraseScore',
     IntentPhraseGeneration: 'IntentPhraseGeneration',
     CommunityMiningResult: 'CommunityMiningResult',
@@ -1185,7 +1217,7 @@ export namespace Prisma {
       omit: GlobalOmitOptions
     }
     meta: {
-      modelProps: "user" | "domain" | "crawlResult" | "keyword" | "phrase" | "aIQueryResult" | "analysisReport" | "modelPerformance" | "competitorTracking" | "performanceInsight" | "dashboardAnalysis" | "competitorAnalysis" | "suggestedCompetitor" | "analysisPhase" | "semanticAnalysis" | "keywordAnalysis" | "searchVolumeClassification" | "intentClassification" | "communityInsight" | "searchPattern" | "phraseIntentClassification" | "wordpressIntegration" | "wordpressPublishLog" | "phraseScore" | "intentPhraseGeneration" | "communityMiningResult" | "searchPatternResult" | "intentClassificationResult" | "generatedIntentPhrase" | "relevanceScoreResult" | "googleSearchConsoleConnection" | "campaign" | "campaignTopic" | "campaignPage" | "campaignKeyword"
+      modelProps: "user" | "domain" | "crawlResult" | "keyword" | "phrase" | "aIQueryResult" | "analysisReport" | "modelPerformance" | "competitorTracking" | "performanceInsight" | "dashboardAnalysis" | "competitorAnalysis" | "suggestedCompetitor" | "analysisPhase" | "semanticAnalysis" | "keywordAnalysis" | "searchVolumeClassification" | "intentClassification" | "communityInsight" | "searchPattern" | "phraseIntentClassification" | "wordpressIntegration" | "wordpressPublishLog" | "generationJob" | "generationJobPage" | "phraseScore" | "intentPhraseGeneration" | "communityMiningResult" | "searchPatternResult" | "intentClassificationResult" | "generatedIntentPhrase" | "relevanceScoreResult" | "googleSearchConsoleConnection" | "campaign" | "campaignTopic" | "campaignPage" | "campaignKeyword"
       txIsolationLevel: Prisma.TransactionIsolationLevel
     }
     model: {
@@ -2799,6 +2831,146 @@ export namespace Prisma {
           }
         }
       }
+      GenerationJob: {
+        payload: Prisma.$GenerationJobPayload<ExtArgs>
+        fields: Prisma.GenerationJobFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.GenerationJobFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$GenerationJobPayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.GenerationJobFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$GenerationJobPayload>
+          }
+          findFirst: {
+            args: Prisma.GenerationJobFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$GenerationJobPayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.GenerationJobFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$GenerationJobPayload>
+          }
+          findMany: {
+            args: Prisma.GenerationJobFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$GenerationJobPayload>[]
+          }
+          create: {
+            args: Prisma.GenerationJobCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$GenerationJobPayload>
+          }
+          createMany: {
+            args: Prisma.GenerationJobCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.GenerationJobCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$GenerationJobPayload>[]
+          }
+          delete: {
+            args: Prisma.GenerationJobDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$GenerationJobPayload>
+          }
+          update: {
+            args: Prisma.GenerationJobUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$GenerationJobPayload>
+          }
+          deleteMany: {
+            args: Prisma.GenerationJobDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.GenerationJobUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          upsert: {
+            args: Prisma.GenerationJobUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$GenerationJobPayload>
+          }
+          aggregate: {
+            args: Prisma.GenerationJobAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateGenerationJob>
+          }
+          groupBy: {
+            args: Prisma.GenerationJobGroupByArgs<ExtArgs>
+            result: $Utils.Optional<GenerationJobGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.GenerationJobCountArgs<ExtArgs>
+            result: $Utils.Optional<GenerationJobCountAggregateOutputType> | number
+          }
+        }
+      }
+      GenerationJobPage: {
+        payload: Prisma.$GenerationJobPagePayload<ExtArgs>
+        fields: Prisma.GenerationJobPageFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.GenerationJobPageFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$GenerationJobPagePayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.GenerationJobPageFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$GenerationJobPagePayload>
+          }
+          findFirst: {
+            args: Prisma.GenerationJobPageFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$GenerationJobPagePayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.GenerationJobPageFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$GenerationJobPagePayload>
+          }
+          findMany: {
+            args: Prisma.GenerationJobPageFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$GenerationJobPagePayload>[]
+          }
+          create: {
+            args: Prisma.GenerationJobPageCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$GenerationJobPagePayload>
+          }
+          createMany: {
+            args: Prisma.GenerationJobPageCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.GenerationJobPageCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$GenerationJobPagePayload>[]
+          }
+          delete: {
+            args: Prisma.GenerationJobPageDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$GenerationJobPagePayload>
+          }
+          update: {
+            args: Prisma.GenerationJobPageUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$GenerationJobPagePayload>
+          }
+          deleteMany: {
+            args: Prisma.GenerationJobPageDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.GenerationJobPageUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          upsert: {
+            args: Prisma.GenerationJobPageUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$GenerationJobPagePayload>
+          }
+          aggregate: {
+            args: Prisma.GenerationJobPageAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateGenerationJobPage>
+          }
+          groupBy: {
+            args: Prisma.GenerationJobPageGroupByArgs<ExtArgs>
+            result: $Utils.Optional<GenerationJobPageGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.GenerationJobPageCountArgs<ExtArgs>
+            result: $Utils.Optional<GenerationJobPageCountAggregateOutputType> | number
+          }
+        }
+      }
       PhraseScore: {
         payload: Prisma.$PhraseScorePayload<ExtArgs>
         fields: Prisma.PhraseScoreFieldRefs
@@ -3746,6 +3918,8 @@ export namespace Prisma {
     phraseIntentClassification?: PhraseIntentClassificationOmit
     wordpressIntegration?: WordpressIntegrationOmit
     wordpressPublishLog?: WordpressPublishLogOmit
+    generationJob?: GenerationJobOmit
+    generationJobPage?: GenerationJobPageOmit
     phraseScore?: PhraseScoreOmit
     intentPhraseGeneration?: IntentPhraseGenerationOmit
     communityMiningResult?: CommunityMiningResultOmit
@@ -3854,11 +4028,13 @@ export namespace Prisma {
   export type UserCountOutputType = {
     domains: number
     publishLogs: number
+    generationJobs: number
   }
 
   export type UserCountOutputTypeSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     domains?: boolean | UserCountOutputTypeCountDomainsArgs
     publishLogs?: boolean | UserCountOutputTypeCountPublishLogsArgs
+    generationJobs?: boolean | UserCountOutputTypeCountGenerationJobsArgs
   }
 
   // Custom InputTypes
@@ -3884,6 +4060,13 @@ export namespace Prisma {
    */
   export type UserCountOutputTypeCountPublishLogsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     where?: WordpressPublishLogWhereInput
+  }
+
+  /**
+   * UserCountOutputType without action
+   */
+  export type UserCountOutputTypeCountGenerationJobsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: GenerationJobWhereInput
   }
 
 
@@ -4273,6 +4456,37 @@ export namespace Prisma {
 
 
   /**
+   * Count Type GenerationJobCountOutputType
+   */
+
+  export type GenerationJobCountOutputType = {
+    pages: number
+  }
+
+  export type GenerationJobCountOutputTypeSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    pages?: boolean | GenerationJobCountOutputTypeCountPagesArgs
+  }
+
+  // Custom InputTypes
+  /**
+   * GenerationJobCountOutputType without action
+   */
+  export type GenerationJobCountOutputTypeDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the GenerationJobCountOutputType
+     */
+    select?: GenerationJobCountOutputTypeSelect<ExtArgs> | null
+  }
+
+  /**
+   * GenerationJobCountOutputType without action
+   */
+  export type GenerationJobCountOutputTypeCountPagesArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: GenerationJobPageWhereInput
+  }
+
+
+  /**
    * Count Type GeneratedIntentPhraseCountOutputType
    */
 
@@ -4350,11 +4564,13 @@ export namespace Prisma {
   export type CampaignTopicCountOutputType = {
     pages: number
     keywords: number
+    generationJobs: number
   }
 
   export type CampaignTopicCountOutputTypeSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     pages?: boolean | CampaignTopicCountOutputTypeCountPagesArgs
     keywords?: boolean | CampaignTopicCountOutputTypeCountKeywordsArgs
+    generationJobs?: boolean | CampaignTopicCountOutputTypeCountGenerationJobsArgs
   }
 
   // Custom InputTypes
@@ -4380,6 +4596,13 @@ export namespace Prisma {
    */
   export type CampaignTopicCountOutputTypeCountKeywordsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     where?: CampaignKeywordWhereInput
+  }
+
+  /**
+   * CampaignTopicCountOutputType without action
+   */
+  export type CampaignTopicCountOutputTypeCountGenerationJobsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: GenerationJobWhereInput
   }
 
 
@@ -4443,6 +4666,8 @@ export namespace Prisma {
     email: string | null
     password: string | null
     name: string | null
+    refreshToken: string | null
+    refreshTokenExpiry: Date | null
     createdAt: Date | null
     updatedAt: Date | null
   }
@@ -4452,6 +4677,8 @@ export namespace Prisma {
     email: string | null
     password: string | null
     name: string | null
+    refreshToken: string | null
+    refreshTokenExpiry: Date | null
     createdAt: Date | null
     updatedAt: Date | null
   }
@@ -4461,6 +4688,8 @@ export namespace Prisma {
     email: number
     password: number
     name: number
+    refreshToken: number
+    refreshTokenExpiry: number
     createdAt: number
     updatedAt: number
     _all: number
@@ -4480,6 +4709,8 @@ export namespace Prisma {
     email?: true
     password?: true
     name?: true
+    refreshToken?: true
+    refreshTokenExpiry?: true
     createdAt?: true
     updatedAt?: true
   }
@@ -4489,6 +4720,8 @@ export namespace Prisma {
     email?: true
     password?: true
     name?: true
+    refreshToken?: true
+    refreshTokenExpiry?: true
     createdAt?: true
     updatedAt?: true
   }
@@ -4498,6 +4731,8 @@ export namespace Prisma {
     email?: true
     password?: true
     name?: true
+    refreshToken?: true
+    refreshTokenExpiry?: true
     createdAt?: true
     updatedAt?: true
     _all?: true
@@ -4594,6 +4829,8 @@ export namespace Prisma {
     email: string
     password: string
     name: string | null
+    refreshToken: string | null
+    refreshTokenExpiry: Date | null
     createdAt: Date
     updatedAt: Date
     _count: UserCountAggregateOutputType | null
@@ -4622,12 +4859,15 @@ export namespace Prisma {
     email?: boolean
     password?: boolean
     name?: boolean
+    refreshToken?: boolean
+    refreshTokenExpiry?: boolean
     createdAt?: boolean
     updatedAt?: boolean
     domains?: boolean | User$domainsArgs<ExtArgs>
     googleSearchConsole?: boolean | User$googleSearchConsoleArgs<ExtArgs>
     wordpressIntegration?: boolean | User$wordpressIntegrationArgs<ExtArgs>
     publishLogs?: boolean | User$publishLogsArgs<ExtArgs>
+    generationJobs?: boolean | User$generationJobsArgs<ExtArgs>
     _count?: boolean | UserCountOutputTypeDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["user"]>
 
@@ -4636,6 +4876,8 @@ export namespace Prisma {
     email?: boolean
     password?: boolean
     name?: boolean
+    refreshToken?: boolean
+    refreshTokenExpiry?: boolean
     createdAt?: boolean
     updatedAt?: boolean
   }, ExtArgs["result"]["user"]>
@@ -4646,16 +4888,19 @@ export namespace Prisma {
     email?: boolean
     password?: boolean
     name?: boolean
+    refreshToken?: boolean
+    refreshTokenExpiry?: boolean
     createdAt?: boolean
     updatedAt?: boolean
   }
 
-  export type UserOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "email" | "password" | "name" | "createdAt" | "updatedAt", ExtArgs["result"]["user"]>
+  export type UserOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "email" | "password" | "name" | "refreshToken" | "refreshTokenExpiry" | "createdAt" | "updatedAt", ExtArgs["result"]["user"]>
   export type UserInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     domains?: boolean | User$domainsArgs<ExtArgs>
     googleSearchConsole?: boolean | User$googleSearchConsoleArgs<ExtArgs>
     wordpressIntegration?: boolean | User$wordpressIntegrationArgs<ExtArgs>
     publishLogs?: boolean | User$publishLogsArgs<ExtArgs>
+    generationJobs?: boolean | User$generationJobsArgs<ExtArgs>
     _count?: boolean | UserCountOutputTypeDefaultArgs<ExtArgs>
   }
   export type UserIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {}
@@ -4667,12 +4912,15 @@ export namespace Prisma {
       googleSearchConsole: Prisma.$GoogleSearchConsoleConnectionPayload<ExtArgs> | null
       wordpressIntegration: Prisma.$WordpressIntegrationPayload<ExtArgs> | null
       publishLogs: Prisma.$WordpressPublishLogPayload<ExtArgs>[]
+      generationJobs: Prisma.$GenerationJobPayload<ExtArgs>[]
     }
     scalars: $Extensions.GetPayloadResult<{
       id: number
       email: string
       password: string
       name: string | null
+      refreshToken: string | null
+      refreshTokenExpiry: Date | null
       createdAt: Date
       updatedAt: Date
     }, ExtArgs["result"]["user"]>
@@ -5043,6 +5291,7 @@ export namespace Prisma {
     googleSearchConsole<T extends User$googleSearchConsoleArgs<ExtArgs> = {}>(args?: Subset<T, User$googleSearchConsoleArgs<ExtArgs>>): Prisma__GoogleSearchConsoleConnectionClient<$Result.GetResult<Prisma.$GoogleSearchConsoleConnectionPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
     wordpressIntegration<T extends User$wordpressIntegrationArgs<ExtArgs> = {}>(args?: Subset<T, User$wordpressIntegrationArgs<ExtArgs>>): Prisma__WordpressIntegrationClient<$Result.GetResult<Prisma.$WordpressIntegrationPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
     publishLogs<T extends User$publishLogsArgs<ExtArgs> = {}>(args?: Subset<T, User$publishLogsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$WordpressPublishLogPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+    generationJobs<T extends User$generationJobsArgs<ExtArgs> = {}>(args?: Subset<T, User$generationJobsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$GenerationJobPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     /**
      * Attaches callbacks for the resolution and/or rejection of the Promise.
      * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -5076,6 +5325,8 @@ export namespace Prisma {
     readonly email: FieldRef<"User", 'String'>
     readonly password: FieldRef<"User", 'String'>
     readonly name: FieldRef<"User", 'String'>
+    readonly refreshToken: FieldRef<"User", 'String'>
+    readonly refreshTokenExpiry: FieldRef<"User", 'DateTime'>
     readonly createdAt: FieldRef<"User", 'DateTime'>
     readonly updatedAt: FieldRef<"User", 'DateTime'>
   }
@@ -5515,6 +5766,30 @@ export namespace Prisma {
     take?: number
     skip?: number
     distinct?: WordpressPublishLogScalarFieldEnum | WordpressPublishLogScalarFieldEnum[]
+  }
+
+  /**
+   * User.generationJobs
+   */
+  export type User$generationJobsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the GenerationJob
+     */
+    select?: GenerationJobSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the GenerationJob
+     */
+    omit?: GenerationJobOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: GenerationJobInclude<ExtArgs> | null
+    where?: GenerationJobWhereInput
+    orderBy?: GenerationJobOrderByWithRelationInput | GenerationJobOrderByWithRelationInput[]
+    cursor?: GenerationJobWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: GenerationJobScalarFieldEnum | GenerationJobScalarFieldEnum[]
   }
 
   /**
@@ -30793,6 +31068,2196 @@ export namespace Prisma {
 
 
   /**
+   * Model GenerationJob
+   */
+
+  export type AggregateGenerationJob = {
+    _count: GenerationJobCountAggregateOutputType | null
+    _avg: GenerationJobAvgAggregateOutputType | null
+    _sum: GenerationJobSumAggregateOutputType | null
+    _min: GenerationJobMinAggregateOutputType | null
+    _max: GenerationJobMaxAggregateOutputType | null
+  }
+
+  export type GenerationJobAvgAggregateOutputType = {
+    id: number | null
+    topicId: number | null
+    userId: number | null
+  }
+
+  export type GenerationJobSumAggregateOutputType = {
+    id: number | null
+    topicId: number | null
+    userId: number | null
+  }
+
+  export type GenerationJobMinAggregateOutputType = {
+    id: number | null
+    jobId: string | null
+    topicId: number | null
+    userId: number | null
+    status: string | null
+    startedAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type GenerationJobMaxAggregateOutputType = {
+    id: number | null
+    jobId: string | null
+    topicId: number | null
+    userId: number | null
+    status: string | null
+    startedAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type GenerationJobCountAggregateOutputType = {
+    id: number
+    jobId: number
+    topicId: number
+    userId: number
+    status: number
+    startedAt: number
+    updatedAt: number
+    _all: number
+  }
+
+
+  export type GenerationJobAvgAggregateInputType = {
+    id?: true
+    topicId?: true
+    userId?: true
+  }
+
+  export type GenerationJobSumAggregateInputType = {
+    id?: true
+    topicId?: true
+    userId?: true
+  }
+
+  export type GenerationJobMinAggregateInputType = {
+    id?: true
+    jobId?: true
+    topicId?: true
+    userId?: true
+    status?: true
+    startedAt?: true
+    updatedAt?: true
+  }
+
+  export type GenerationJobMaxAggregateInputType = {
+    id?: true
+    jobId?: true
+    topicId?: true
+    userId?: true
+    status?: true
+    startedAt?: true
+    updatedAt?: true
+  }
+
+  export type GenerationJobCountAggregateInputType = {
+    id?: true
+    jobId?: true
+    topicId?: true
+    userId?: true
+    status?: true
+    startedAt?: true
+    updatedAt?: true
+    _all?: true
+  }
+
+  export type GenerationJobAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which GenerationJob to aggregate.
+     */
+    where?: GenerationJobWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of GenerationJobs to fetch.
+     */
+    orderBy?: GenerationJobOrderByWithRelationInput | GenerationJobOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: GenerationJobWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` GenerationJobs from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` GenerationJobs.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned GenerationJobs
+    **/
+    _count?: true | GenerationJobCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to average
+    **/
+    _avg?: GenerationJobAvgAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to sum
+    **/
+    _sum?: GenerationJobSumAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: GenerationJobMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: GenerationJobMaxAggregateInputType
+  }
+
+  export type GetGenerationJobAggregateType<T extends GenerationJobAggregateArgs> = {
+        [P in keyof T & keyof AggregateGenerationJob]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateGenerationJob[P]>
+      : GetScalarType<T[P], AggregateGenerationJob[P]>
+  }
+
+
+
+
+  export type GenerationJobGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: GenerationJobWhereInput
+    orderBy?: GenerationJobOrderByWithAggregationInput | GenerationJobOrderByWithAggregationInput[]
+    by: GenerationJobScalarFieldEnum[] | GenerationJobScalarFieldEnum
+    having?: GenerationJobScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: GenerationJobCountAggregateInputType | true
+    _avg?: GenerationJobAvgAggregateInputType
+    _sum?: GenerationJobSumAggregateInputType
+    _min?: GenerationJobMinAggregateInputType
+    _max?: GenerationJobMaxAggregateInputType
+  }
+
+  export type GenerationJobGroupByOutputType = {
+    id: number
+    jobId: string
+    topicId: number
+    userId: number
+    status: string
+    startedAt: Date
+    updatedAt: Date
+    _count: GenerationJobCountAggregateOutputType | null
+    _avg: GenerationJobAvgAggregateOutputType | null
+    _sum: GenerationJobSumAggregateOutputType | null
+    _min: GenerationJobMinAggregateOutputType | null
+    _max: GenerationJobMaxAggregateOutputType | null
+  }
+
+  type GetGenerationJobGroupByPayload<T extends GenerationJobGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<GenerationJobGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof GenerationJobGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], GenerationJobGroupByOutputType[P]>
+            : GetScalarType<T[P], GenerationJobGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type GenerationJobSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    jobId?: boolean
+    topicId?: boolean
+    userId?: boolean
+    status?: boolean
+    startedAt?: boolean
+    updatedAt?: boolean
+    topic?: boolean | CampaignTopicDefaultArgs<ExtArgs>
+    user?: boolean | UserDefaultArgs<ExtArgs>
+    pages?: boolean | GenerationJob$pagesArgs<ExtArgs>
+    _count?: boolean | GenerationJobCountOutputTypeDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["generationJob"]>
+
+  export type GenerationJobSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    jobId?: boolean
+    topicId?: boolean
+    userId?: boolean
+    status?: boolean
+    startedAt?: boolean
+    updatedAt?: boolean
+    topic?: boolean | CampaignTopicDefaultArgs<ExtArgs>
+    user?: boolean | UserDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["generationJob"]>
+
+
+  export type GenerationJobSelectScalar = {
+    id?: boolean
+    jobId?: boolean
+    topicId?: boolean
+    userId?: boolean
+    status?: boolean
+    startedAt?: boolean
+    updatedAt?: boolean
+  }
+
+  export type GenerationJobOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "jobId" | "topicId" | "userId" | "status" | "startedAt" | "updatedAt", ExtArgs["result"]["generationJob"]>
+  export type GenerationJobInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    topic?: boolean | CampaignTopicDefaultArgs<ExtArgs>
+    user?: boolean | UserDefaultArgs<ExtArgs>
+    pages?: boolean | GenerationJob$pagesArgs<ExtArgs>
+    _count?: boolean | GenerationJobCountOutputTypeDefaultArgs<ExtArgs>
+  }
+  export type GenerationJobIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    topic?: boolean | CampaignTopicDefaultArgs<ExtArgs>
+    user?: boolean | UserDefaultArgs<ExtArgs>
+  }
+
+  export type $GenerationJobPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "GenerationJob"
+    objects: {
+      topic: Prisma.$CampaignTopicPayload<ExtArgs>
+      user: Prisma.$UserPayload<ExtArgs>
+      pages: Prisma.$GenerationJobPagePayload<ExtArgs>[]
+    }
+    scalars: $Extensions.GetPayloadResult<{
+      id: number
+      jobId: string
+      topicId: number
+      userId: number
+      status: string
+      startedAt: Date
+      updatedAt: Date
+    }, ExtArgs["result"]["generationJob"]>
+    composites: {}
+  }
+
+  type GenerationJobGetPayload<S extends boolean | null | undefined | GenerationJobDefaultArgs> = $Result.GetResult<Prisma.$GenerationJobPayload, S>
+
+  type GenerationJobCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> =
+    Omit<GenerationJobFindManyArgs, 'select' | 'include' | 'distinct' | 'omit'> & {
+      select?: GenerationJobCountAggregateInputType | true
+    }
+
+  export interface GenerationJobDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['GenerationJob'], meta: { name: 'GenerationJob' } }
+    /**
+     * Find zero or one GenerationJob that matches the filter.
+     * @param {GenerationJobFindUniqueArgs} args - Arguments to find a GenerationJob
+     * @example
+     * // Get one GenerationJob
+     * const generationJob = await prisma.generationJob.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends GenerationJobFindUniqueArgs>(args: SelectSubset<T, GenerationJobFindUniqueArgs<ExtArgs>>): Prisma__GenerationJobClient<$Result.GetResult<Prisma.$GenerationJobPayload<ExtArgs>, T, "findUnique", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find one GenerationJob that matches the filter or throw an error with `error.code='P2025'`
+     * if no matches were found.
+     * @param {GenerationJobFindUniqueOrThrowArgs} args - Arguments to find a GenerationJob
+     * @example
+     * // Get one GenerationJob
+     * const generationJob = await prisma.generationJob.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends GenerationJobFindUniqueOrThrowArgs>(args: SelectSubset<T, GenerationJobFindUniqueOrThrowArgs<ExtArgs>>): Prisma__GenerationJobClient<$Result.GetResult<Prisma.$GenerationJobPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first GenerationJob that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {GenerationJobFindFirstArgs} args - Arguments to find a GenerationJob
+     * @example
+     * // Get one GenerationJob
+     * const generationJob = await prisma.generationJob.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends GenerationJobFindFirstArgs>(args?: SelectSubset<T, GenerationJobFindFirstArgs<ExtArgs>>): Prisma__GenerationJobClient<$Result.GetResult<Prisma.$GenerationJobPayload<ExtArgs>, T, "findFirst", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first GenerationJob that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {GenerationJobFindFirstOrThrowArgs} args - Arguments to find a GenerationJob
+     * @example
+     * // Get one GenerationJob
+     * const generationJob = await prisma.generationJob.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends GenerationJobFindFirstOrThrowArgs>(args?: SelectSubset<T, GenerationJobFindFirstOrThrowArgs<ExtArgs>>): Prisma__GenerationJobClient<$Result.GetResult<Prisma.$GenerationJobPayload<ExtArgs>, T, "findFirstOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find zero or more GenerationJobs that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {GenerationJobFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all GenerationJobs
+     * const generationJobs = await prisma.generationJob.findMany()
+     * 
+     * // Get first 10 GenerationJobs
+     * const generationJobs = await prisma.generationJob.findMany({ take: 10 })
+     * 
+     * // Only select the `id`
+     * const generationJobWithIdOnly = await prisma.generationJob.findMany({ select: { id: true } })
+     * 
+     */
+    findMany<T extends GenerationJobFindManyArgs>(args?: SelectSubset<T, GenerationJobFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$GenerationJobPayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
+
+    /**
+     * Create a GenerationJob.
+     * @param {GenerationJobCreateArgs} args - Arguments to create a GenerationJob.
+     * @example
+     * // Create one GenerationJob
+     * const GenerationJob = await prisma.generationJob.create({
+     *   data: {
+     *     // ... data to create a GenerationJob
+     *   }
+     * })
+     * 
+     */
+    create<T extends GenerationJobCreateArgs>(args: SelectSubset<T, GenerationJobCreateArgs<ExtArgs>>): Prisma__GenerationJobClient<$Result.GetResult<Prisma.$GenerationJobPayload<ExtArgs>, T, "create", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Create many GenerationJobs.
+     * @param {GenerationJobCreateManyArgs} args - Arguments to create many GenerationJobs.
+     * @example
+     * // Create many GenerationJobs
+     * const generationJob = await prisma.generationJob.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends GenerationJobCreateManyArgs>(args?: SelectSubset<T, GenerationJobCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many GenerationJobs and returns the data saved in the database.
+     * @param {GenerationJobCreateManyAndReturnArgs} args - Arguments to create many GenerationJobs.
+     * @example
+     * // Create many GenerationJobs
+     * const generationJob = await prisma.generationJob.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many GenerationJobs and only return the `id`
+     * const generationJobWithIdOnly = await prisma.generationJob.createManyAndReturn({
+     *   select: { id: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends GenerationJobCreateManyAndReturnArgs>(args?: SelectSubset<T, GenerationJobCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$GenerationJobPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Delete a GenerationJob.
+     * @param {GenerationJobDeleteArgs} args - Arguments to delete one GenerationJob.
+     * @example
+     * // Delete one GenerationJob
+     * const GenerationJob = await prisma.generationJob.delete({
+     *   where: {
+     *     // ... filter to delete one GenerationJob
+     *   }
+     * })
+     * 
+     */
+    delete<T extends GenerationJobDeleteArgs>(args: SelectSubset<T, GenerationJobDeleteArgs<ExtArgs>>): Prisma__GenerationJobClient<$Result.GetResult<Prisma.$GenerationJobPayload<ExtArgs>, T, "delete", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Update one GenerationJob.
+     * @param {GenerationJobUpdateArgs} args - Arguments to update one GenerationJob.
+     * @example
+     * // Update one GenerationJob
+     * const generationJob = await prisma.generationJob.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends GenerationJobUpdateArgs>(args: SelectSubset<T, GenerationJobUpdateArgs<ExtArgs>>): Prisma__GenerationJobClient<$Result.GetResult<Prisma.$GenerationJobPayload<ExtArgs>, T, "update", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Delete zero or more GenerationJobs.
+     * @param {GenerationJobDeleteManyArgs} args - Arguments to filter GenerationJobs to delete.
+     * @example
+     * // Delete a few GenerationJobs
+     * const { count } = await prisma.generationJob.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends GenerationJobDeleteManyArgs>(args?: SelectSubset<T, GenerationJobDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more GenerationJobs.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {GenerationJobUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many GenerationJobs
+     * const generationJob = await prisma.generationJob.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends GenerationJobUpdateManyArgs>(args: SelectSubset<T, GenerationJobUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create or update one GenerationJob.
+     * @param {GenerationJobUpsertArgs} args - Arguments to update or create a GenerationJob.
+     * @example
+     * // Update or create a GenerationJob
+     * const generationJob = await prisma.generationJob.upsert({
+     *   create: {
+     *     // ... data to create a GenerationJob
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the GenerationJob we want to update
+     *   }
+     * })
+     */
+    upsert<T extends GenerationJobUpsertArgs>(args: SelectSubset<T, GenerationJobUpsertArgs<ExtArgs>>): Prisma__GenerationJobClient<$Result.GetResult<Prisma.$GenerationJobPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+
+    /**
+     * Count the number of GenerationJobs.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {GenerationJobCountArgs} args - Arguments to filter GenerationJobs to count.
+     * @example
+     * // Count the number of GenerationJobs
+     * const count = await prisma.generationJob.count({
+     *   where: {
+     *     // ... the filter for the GenerationJobs we want to count
+     *   }
+     * })
+    **/
+    count<T extends GenerationJobCountArgs>(
+      args?: Subset<T, GenerationJobCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], GenerationJobCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a GenerationJob.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {GenerationJobAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends GenerationJobAggregateArgs>(args: Subset<T, GenerationJobAggregateArgs>): Prisma.PrismaPromise<GetGenerationJobAggregateType<T>>
+
+    /**
+     * Group by GenerationJob.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {GenerationJobGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends GenerationJobGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: GenerationJobGroupByArgs['orderBy'] }
+        : { orderBy?: GenerationJobGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, GenerationJobGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetGenerationJobGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the GenerationJob model
+   */
+  readonly fields: GenerationJobFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for GenerationJob.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__GenerationJobClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    topic<T extends CampaignTopicDefaultArgs<ExtArgs> = {}>(args?: Subset<T, CampaignTopicDefaultArgs<ExtArgs>>): Prisma__CampaignTopicClient<$Result.GetResult<Prisma.$CampaignTopicPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+    user<T extends UserDefaultArgs<ExtArgs> = {}>(args?: Subset<T, UserDefaultArgs<ExtArgs>>): Prisma__UserClient<$Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+    pages<T extends GenerationJob$pagesArgs<ExtArgs> = {}>(args?: Subset<T, GenerationJob$pagesArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$GenerationJobPagePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the GenerationJob model
+   */
+  interface GenerationJobFieldRefs {
+    readonly id: FieldRef<"GenerationJob", 'Int'>
+    readonly jobId: FieldRef<"GenerationJob", 'String'>
+    readonly topicId: FieldRef<"GenerationJob", 'Int'>
+    readonly userId: FieldRef<"GenerationJob", 'Int'>
+    readonly status: FieldRef<"GenerationJob", 'String'>
+    readonly startedAt: FieldRef<"GenerationJob", 'DateTime'>
+    readonly updatedAt: FieldRef<"GenerationJob", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * GenerationJob findUnique
+   */
+  export type GenerationJobFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the GenerationJob
+     */
+    select?: GenerationJobSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the GenerationJob
+     */
+    omit?: GenerationJobOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: GenerationJobInclude<ExtArgs> | null
+    /**
+     * Filter, which GenerationJob to fetch.
+     */
+    where: GenerationJobWhereUniqueInput
+  }
+
+  /**
+   * GenerationJob findUniqueOrThrow
+   */
+  export type GenerationJobFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the GenerationJob
+     */
+    select?: GenerationJobSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the GenerationJob
+     */
+    omit?: GenerationJobOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: GenerationJobInclude<ExtArgs> | null
+    /**
+     * Filter, which GenerationJob to fetch.
+     */
+    where: GenerationJobWhereUniqueInput
+  }
+
+  /**
+   * GenerationJob findFirst
+   */
+  export type GenerationJobFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the GenerationJob
+     */
+    select?: GenerationJobSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the GenerationJob
+     */
+    omit?: GenerationJobOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: GenerationJobInclude<ExtArgs> | null
+    /**
+     * Filter, which GenerationJob to fetch.
+     */
+    where?: GenerationJobWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of GenerationJobs to fetch.
+     */
+    orderBy?: GenerationJobOrderByWithRelationInput | GenerationJobOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for GenerationJobs.
+     */
+    cursor?: GenerationJobWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` GenerationJobs from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` GenerationJobs.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of GenerationJobs.
+     */
+    distinct?: GenerationJobScalarFieldEnum | GenerationJobScalarFieldEnum[]
+  }
+
+  /**
+   * GenerationJob findFirstOrThrow
+   */
+  export type GenerationJobFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the GenerationJob
+     */
+    select?: GenerationJobSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the GenerationJob
+     */
+    omit?: GenerationJobOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: GenerationJobInclude<ExtArgs> | null
+    /**
+     * Filter, which GenerationJob to fetch.
+     */
+    where?: GenerationJobWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of GenerationJobs to fetch.
+     */
+    orderBy?: GenerationJobOrderByWithRelationInput | GenerationJobOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for GenerationJobs.
+     */
+    cursor?: GenerationJobWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` GenerationJobs from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` GenerationJobs.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of GenerationJobs.
+     */
+    distinct?: GenerationJobScalarFieldEnum | GenerationJobScalarFieldEnum[]
+  }
+
+  /**
+   * GenerationJob findMany
+   */
+  export type GenerationJobFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the GenerationJob
+     */
+    select?: GenerationJobSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the GenerationJob
+     */
+    omit?: GenerationJobOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: GenerationJobInclude<ExtArgs> | null
+    /**
+     * Filter, which GenerationJobs to fetch.
+     */
+    where?: GenerationJobWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of GenerationJobs to fetch.
+     */
+    orderBy?: GenerationJobOrderByWithRelationInput | GenerationJobOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing GenerationJobs.
+     */
+    cursor?: GenerationJobWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` GenerationJobs from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` GenerationJobs.
+     */
+    skip?: number
+    distinct?: GenerationJobScalarFieldEnum | GenerationJobScalarFieldEnum[]
+  }
+
+  /**
+   * GenerationJob create
+   */
+  export type GenerationJobCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the GenerationJob
+     */
+    select?: GenerationJobSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the GenerationJob
+     */
+    omit?: GenerationJobOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: GenerationJobInclude<ExtArgs> | null
+    /**
+     * The data needed to create a GenerationJob.
+     */
+    data: XOR<GenerationJobCreateInput, GenerationJobUncheckedCreateInput>
+  }
+
+  /**
+   * GenerationJob createMany
+   */
+  export type GenerationJobCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many GenerationJobs.
+     */
+    data: GenerationJobCreateManyInput | GenerationJobCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * GenerationJob createManyAndReturn
+   */
+  export type GenerationJobCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the GenerationJob
+     */
+    select?: GenerationJobSelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the GenerationJob
+     */
+    omit?: GenerationJobOmit<ExtArgs> | null
+    /**
+     * The data used to create many GenerationJobs.
+     */
+    data: GenerationJobCreateManyInput | GenerationJobCreateManyInput[]
+    skipDuplicates?: boolean
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: GenerationJobIncludeCreateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * GenerationJob update
+   */
+  export type GenerationJobUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the GenerationJob
+     */
+    select?: GenerationJobSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the GenerationJob
+     */
+    omit?: GenerationJobOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: GenerationJobInclude<ExtArgs> | null
+    /**
+     * The data needed to update a GenerationJob.
+     */
+    data: XOR<GenerationJobUpdateInput, GenerationJobUncheckedUpdateInput>
+    /**
+     * Choose, which GenerationJob to update.
+     */
+    where: GenerationJobWhereUniqueInput
+  }
+
+  /**
+   * GenerationJob updateMany
+   */
+  export type GenerationJobUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update GenerationJobs.
+     */
+    data: XOR<GenerationJobUpdateManyMutationInput, GenerationJobUncheckedUpdateManyInput>
+    /**
+     * Filter which GenerationJobs to update
+     */
+    where?: GenerationJobWhereInput
+  }
+
+  /**
+   * GenerationJob upsert
+   */
+  export type GenerationJobUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the GenerationJob
+     */
+    select?: GenerationJobSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the GenerationJob
+     */
+    omit?: GenerationJobOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: GenerationJobInclude<ExtArgs> | null
+    /**
+     * The filter to search for the GenerationJob to update in case it exists.
+     */
+    where: GenerationJobWhereUniqueInput
+    /**
+     * In case the GenerationJob found by the `where` argument doesn't exist, create a new GenerationJob with this data.
+     */
+    create: XOR<GenerationJobCreateInput, GenerationJobUncheckedCreateInput>
+    /**
+     * In case the GenerationJob was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<GenerationJobUpdateInput, GenerationJobUncheckedUpdateInput>
+  }
+
+  /**
+   * GenerationJob delete
+   */
+  export type GenerationJobDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the GenerationJob
+     */
+    select?: GenerationJobSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the GenerationJob
+     */
+    omit?: GenerationJobOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: GenerationJobInclude<ExtArgs> | null
+    /**
+     * Filter which GenerationJob to delete.
+     */
+    where: GenerationJobWhereUniqueInput
+  }
+
+  /**
+   * GenerationJob deleteMany
+   */
+  export type GenerationJobDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which GenerationJobs to delete
+     */
+    where?: GenerationJobWhereInput
+  }
+
+  /**
+   * GenerationJob.pages
+   */
+  export type GenerationJob$pagesArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the GenerationJobPage
+     */
+    select?: GenerationJobPageSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the GenerationJobPage
+     */
+    omit?: GenerationJobPageOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: GenerationJobPageInclude<ExtArgs> | null
+    where?: GenerationJobPageWhereInput
+    orderBy?: GenerationJobPageOrderByWithRelationInput | GenerationJobPageOrderByWithRelationInput[]
+    cursor?: GenerationJobPageWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: GenerationJobPageScalarFieldEnum | GenerationJobPageScalarFieldEnum[]
+  }
+
+  /**
+   * GenerationJob without action
+   */
+  export type GenerationJobDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the GenerationJob
+     */
+    select?: GenerationJobSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the GenerationJob
+     */
+    omit?: GenerationJobOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: GenerationJobInclude<ExtArgs> | null
+  }
+
+
+  /**
+   * Model GenerationJobPage
+   */
+
+  export type AggregateGenerationJobPage = {
+    _count: GenerationJobPageCountAggregateOutputType | null
+    _avg: GenerationJobPageAvgAggregateOutputType | null
+    _sum: GenerationJobPageSumAggregateOutputType | null
+    _min: GenerationJobPageMinAggregateOutputType | null
+    _max: GenerationJobPageMaxAggregateOutputType | null
+  }
+
+  export type GenerationJobPageAvgAggregateOutputType = {
+    id: number | null
+    pageId: number | null
+    draftId: number | null
+    progress: number | null
+  }
+
+  export type GenerationJobPageSumAggregateOutputType = {
+    id: number | null
+    pageId: number | null
+    draftId: number | null
+    progress: number | null
+  }
+
+  export type GenerationJobPageMinAggregateOutputType = {
+    id: number | null
+    jobId: string | null
+    pageId: number | null
+    pageType: string | null
+    status: string | null
+    draftId: number | null
+    primaryKeyword: string | null
+    progress: number | null
+    error: string | null
+    hasHtml: boolean | null
+    updatedAt: Date | null
+    createdAt: Date | null
+  }
+
+  export type GenerationJobPageMaxAggregateOutputType = {
+    id: number | null
+    jobId: string | null
+    pageId: number | null
+    pageType: string | null
+    status: string | null
+    draftId: number | null
+    primaryKeyword: string | null
+    progress: number | null
+    error: string | null
+    hasHtml: boolean | null
+    updatedAt: Date | null
+    createdAt: Date | null
+  }
+
+  export type GenerationJobPageCountAggregateOutputType = {
+    id: number
+    jobId: number
+    pageId: number
+    pageType: number
+    status: number
+    draftId: number
+    primaryKeyword: number
+    progress: number
+    error: number
+    hasHtml: number
+    updatedAt: number
+    createdAt: number
+    _all: number
+  }
+
+
+  export type GenerationJobPageAvgAggregateInputType = {
+    id?: true
+    pageId?: true
+    draftId?: true
+    progress?: true
+  }
+
+  export type GenerationJobPageSumAggregateInputType = {
+    id?: true
+    pageId?: true
+    draftId?: true
+    progress?: true
+  }
+
+  export type GenerationJobPageMinAggregateInputType = {
+    id?: true
+    jobId?: true
+    pageId?: true
+    pageType?: true
+    status?: true
+    draftId?: true
+    primaryKeyword?: true
+    progress?: true
+    error?: true
+    hasHtml?: true
+    updatedAt?: true
+    createdAt?: true
+  }
+
+  export type GenerationJobPageMaxAggregateInputType = {
+    id?: true
+    jobId?: true
+    pageId?: true
+    pageType?: true
+    status?: true
+    draftId?: true
+    primaryKeyword?: true
+    progress?: true
+    error?: true
+    hasHtml?: true
+    updatedAt?: true
+    createdAt?: true
+  }
+
+  export type GenerationJobPageCountAggregateInputType = {
+    id?: true
+    jobId?: true
+    pageId?: true
+    pageType?: true
+    status?: true
+    draftId?: true
+    primaryKeyword?: true
+    progress?: true
+    error?: true
+    hasHtml?: true
+    updatedAt?: true
+    createdAt?: true
+    _all?: true
+  }
+
+  export type GenerationJobPageAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which GenerationJobPage to aggregate.
+     */
+    where?: GenerationJobPageWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of GenerationJobPages to fetch.
+     */
+    orderBy?: GenerationJobPageOrderByWithRelationInput | GenerationJobPageOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: GenerationJobPageWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` GenerationJobPages from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` GenerationJobPages.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned GenerationJobPages
+    **/
+    _count?: true | GenerationJobPageCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to average
+    **/
+    _avg?: GenerationJobPageAvgAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to sum
+    **/
+    _sum?: GenerationJobPageSumAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: GenerationJobPageMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: GenerationJobPageMaxAggregateInputType
+  }
+
+  export type GetGenerationJobPageAggregateType<T extends GenerationJobPageAggregateArgs> = {
+        [P in keyof T & keyof AggregateGenerationJobPage]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateGenerationJobPage[P]>
+      : GetScalarType<T[P], AggregateGenerationJobPage[P]>
+  }
+
+
+
+
+  export type GenerationJobPageGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: GenerationJobPageWhereInput
+    orderBy?: GenerationJobPageOrderByWithAggregationInput | GenerationJobPageOrderByWithAggregationInput[]
+    by: GenerationJobPageScalarFieldEnum[] | GenerationJobPageScalarFieldEnum
+    having?: GenerationJobPageScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: GenerationJobPageCountAggregateInputType | true
+    _avg?: GenerationJobPageAvgAggregateInputType
+    _sum?: GenerationJobPageSumAggregateInputType
+    _min?: GenerationJobPageMinAggregateInputType
+    _max?: GenerationJobPageMaxAggregateInputType
+  }
+
+  export type GenerationJobPageGroupByOutputType = {
+    id: number
+    jobId: string
+    pageId: number
+    pageType: string
+    status: string
+    draftId: number | null
+    primaryKeyword: string | null
+    progress: number | null
+    error: string | null
+    hasHtml: boolean
+    updatedAt: Date
+    createdAt: Date
+    _count: GenerationJobPageCountAggregateOutputType | null
+    _avg: GenerationJobPageAvgAggregateOutputType | null
+    _sum: GenerationJobPageSumAggregateOutputType | null
+    _min: GenerationJobPageMinAggregateOutputType | null
+    _max: GenerationJobPageMaxAggregateOutputType | null
+  }
+
+  type GetGenerationJobPageGroupByPayload<T extends GenerationJobPageGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<GenerationJobPageGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof GenerationJobPageGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], GenerationJobPageGroupByOutputType[P]>
+            : GetScalarType<T[P], GenerationJobPageGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type GenerationJobPageSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    jobId?: boolean
+    pageId?: boolean
+    pageType?: boolean
+    status?: boolean
+    draftId?: boolean
+    primaryKeyword?: boolean
+    progress?: boolean
+    error?: boolean
+    hasHtml?: boolean
+    updatedAt?: boolean
+    createdAt?: boolean
+    job?: boolean | GenerationJobDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["generationJobPage"]>
+
+  export type GenerationJobPageSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    jobId?: boolean
+    pageId?: boolean
+    pageType?: boolean
+    status?: boolean
+    draftId?: boolean
+    primaryKeyword?: boolean
+    progress?: boolean
+    error?: boolean
+    hasHtml?: boolean
+    updatedAt?: boolean
+    createdAt?: boolean
+    job?: boolean | GenerationJobDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["generationJobPage"]>
+
+
+  export type GenerationJobPageSelectScalar = {
+    id?: boolean
+    jobId?: boolean
+    pageId?: boolean
+    pageType?: boolean
+    status?: boolean
+    draftId?: boolean
+    primaryKeyword?: boolean
+    progress?: boolean
+    error?: boolean
+    hasHtml?: boolean
+    updatedAt?: boolean
+    createdAt?: boolean
+  }
+
+  export type GenerationJobPageOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "jobId" | "pageId" | "pageType" | "status" | "draftId" | "primaryKeyword" | "progress" | "error" | "hasHtml" | "updatedAt" | "createdAt", ExtArgs["result"]["generationJobPage"]>
+  export type GenerationJobPageInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    job?: boolean | GenerationJobDefaultArgs<ExtArgs>
+  }
+  export type GenerationJobPageIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    job?: boolean | GenerationJobDefaultArgs<ExtArgs>
+  }
+
+  export type $GenerationJobPagePayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "GenerationJobPage"
+    objects: {
+      job: Prisma.$GenerationJobPayload<ExtArgs>
+    }
+    scalars: $Extensions.GetPayloadResult<{
+      id: number
+      jobId: string
+      pageId: number
+      pageType: string
+      status: string
+      draftId: number | null
+      primaryKeyword: string | null
+      progress: number | null
+      error: string | null
+      hasHtml: boolean
+      updatedAt: Date
+      createdAt: Date
+    }, ExtArgs["result"]["generationJobPage"]>
+    composites: {}
+  }
+
+  type GenerationJobPageGetPayload<S extends boolean | null | undefined | GenerationJobPageDefaultArgs> = $Result.GetResult<Prisma.$GenerationJobPagePayload, S>
+
+  type GenerationJobPageCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> =
+    Omit<GenerationJobPageFindManyArgs, 'select' | 'include' | 'distinct' | 'omit'> & {
+      select?: GenerationJobPageCountAggregateInputType | true
+    }
+
+  export interface GenerationJobPageDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['GenerationJobPage'], meta: { name: 'GenerationJobPage' } }
+    /**
+     * Find zero or one GenerationJobPage that matches the filter.
+     * @param {GenerationJobPageFindUniqueArgs} args - Arguments to find a GenerationJobPage
+     * @example
+     * // Get one GenerationJobPage
+     * const generationJobPage = await prisma.generationJobPage.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends GenerationJobPageFindUniqueArgs>(args: SelectSubset<T, GenerationJobPageFindUniqueArgs<ExtArgs>>): Prisma__GenerationJobPageClient<$Result.GetResult<Prisma.$GenerationJobPagePayload<ExtArgs>, T, "findUnique", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find one GenerationJobPage that matches the filter or throw an error with `error.code='P2025'`
+     * if no matches were found.
+     * @param {GenerationJobPageFindUniqueOrThrowArgs} args - Arguments to find a GenerationJobPage
+     * @example
+     * // Get one GenerationJobPage
+     * const generationJobPage = await prisma.generationJobPage.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends GenerationJobPageFindUniqueOrThrowArgs>(args: SelectSubset<T, GenerationJobPageFindUniqueOrThrowArgs<ExtArgs>>): Prisma__GenerationJobPageClient<$Result.GetResult<Prisma.$GenerationJobPagePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first GenerationJobPage that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {GenerationJobPageFindFirstArgs} args - Arguments to find a GenerationJobPage
+     * @example
+     * // Get one GenerationJobPage
+     * const generationJobPage = await prisma.generationJobPage.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends GenerationJobPageFindFirstArgs>(args?: SelectSubset<T, GenerationJobPageFindFirstArgs<ExtArgs>>): Prisma__GenerationJobPageClient<$Result.GetResult<Prisma.$GenerationJobPagePayload<ExtArgs>, T, "findFirst", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first GenerationJobPage that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {GenerationJobPageFindFirstOrThrowArgs} args - Arguments to find a GenerationJobPage
+     * @example
+     * // Get one GenerationJobPage
+     * const generationJobPage = await prisma.generationJobPage.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends GenerationJobPageFindFirstOrThrowArgs>(args?: SelectSubset<T, GenerationJobPageFindFirstOrThrowArgs<ExtArgs>>): Prisma__GenerationJobPageClient<$Result.GetResult<Prisma.$GenerationJobPagePayload<ExtArgs>, T, "findFirstOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find zero or more GenerationJobPages that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {GenerationJobPageFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all GenerationJobPages
+     * const generationJobPages = await prisma.generationJobPage.findMany()
+     * 
+     * // Get first 10 GenerationJobPages
+     * const generationJobPages = await prisma.generationJobPage.findMany({ take: 10 })
+     * 
+     * // Only select the `id`
+     * const generationJobPageWithIdOnly = await prisma.generationJobPage.findMany({ select: { id: true } })
+     * 
+     */
+    findMany<T extends GenerationJobPageFindManyArgs>(args?: SelectSubset<T, GenerationJobPageFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$GenerationJobPagePayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
+
+    /**
+     * Create a GenerationJobPage.
+     * @param {GenerationJobPageCreateArgs} args - Arguments to create a GenerationJobPage.
+     * @example
+     * // Create one GenerationJobPage
+     * const GenerationJobPage = await prisma.generationJobPage.create({
+     *   data: {
+     *     // ... data to create a GenerationJobPage
+     *   }
+     * })
+     * 
+     */
+    create<T extends GenerationJobPageCreateArgs>(args: SelectSubset<T, GenerationJobPageCreateArgs<ExtArgs>>): Prisma__GenerationJobPageClient<$Result.GetResult<Prisma.$GenerationJobPagePayload<ExtArgs>, T, "create", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Create many GenerationJobPages.
+     * @param {GenerationJobPageCreateManyArgs} args - Arguments to create many GenerationJobPages.
+     * @example
+     * // Create many GenerationJobPages
+     * const generationJobPage = await prisma.generationJobPage.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends GenerationJobPageCreateManyArgs>(args?: SelectSubset<T, GenerationJobPageCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many GenerationJobPages and returns the data saved in the database.
+     * @param {GenerationJobPageCreateManyAndReturnArgs} args - Arguments to create many GenerationJobPages.
+     * @example
+     * // Create many GenerationJobPages
+     * const generationJobPage = await prisma.generationJobPage.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many GenerationJobPages and only return the `id`
+     * const generationJobPageWithIdOnly = await prisma.generationJobPage.createManyAndReturn({
+     *   select: { id: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends GenerationJobPageCreateManyAndReturnArgs>(args?: SelectSubset<T, GenerationJobPageCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$GenerationJobPagePayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Delete a GenerationJobPage.
+     * @param {GenerationJobPageDeleteArgs} args - Arguments to delete one GenerationJobPage.
+     * @example
+     * // Delete one GenerationJobPage
+     * const GenerationJobPage = await prisma.generationJobPage.delete({
+     *   where: {
+     *     // ... filter to delete one GenerationJobPage
+     *   }
+     * })
+     * 
+     */
+    delete<T extends GenerationJobPageDeleteArgs>(args: SelectSubset<T, GenerationJobPageDeleteArgs<ExtArgs>>): Prisma__GenerationJobPageClient<$Result.GetResult<Prisma.$GenerationJobPagePayload<ExtArgs>, T, "delete", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Update one GenerationJobPage.
+     * @param {GenerationJobPageUpdateArgs} args - Arguments to update one GenerationJobPage.
+     * @example
+     * // Update one GenerationJobPage
+     * const generationJobPage = await prisma.generationJobPage.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends GenerationJobPageUpdateArgs>(args: SelectSubset<T, GenerationJobPageUpdateArgs<ExtArgs>>): Prisma__GenerationJobPageClient<$Result.GetResult<Prisma.$GenerationJobPagePayload<ExtArgs>, T, "update", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Delete zero or more GenerationJobPages.
+     * @param {GenerationJobPageDeleteManyArgs} args - Arguments to filter GenerationJobPages to delete.
+     * @example
+     * // Delete a few GenerationJobPages
+     * const { count } = await prisma.generationJobPage.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends GenerationJobPageDeleteManyArgs>(args?: SelectSubset<T, GenerationJobPageDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more GenerationJobPages.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {GenerationJobPageUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many GenerationJobPages
+     * const generationJobPage = await prisma.generationJobPage.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends GenerationJobPageUpdateManyArgs>(args: SelectSubset<T, GenerationJobPageUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create or update one GenerationJobPage.
+     * @param {GenerationJobPageUpsertArgs} args - Arguments to update or create a GenerationJobPage.
+     * @example
+     * // Update or create a GenerationJobPage
+     * const generationJobPage = await prisma.generationJobPage.upsert({
+     *   create: {
+     *     // ... data to create a GenerationJobPage
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the GenerationJobPage we want to update
+     *   }
+     * })
+     */
+    upsert<T extends GenerationJobPageUpsertArgs>(args: SelectSubset<T, GenerationJobPageUpsertArgs<ExtArgs>>): Prisma__GenerationJobPageClient<$Result.GetResult<Prisma.$GenerationJobPagePayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+
+    /**
+     * Count the number of GenerationJobPages.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {GenerationJobPageCountArgs} args - Arguments to filter GenerationJobPages to count.
+     * @example
+     * // Count the number of GenerationJobPages
+     * const count = await prisma.generationJobPage.count({
+     *   where: {
+     *     // ... the filter for the GenerationJobPages we want to count
+     *   }
+     * })
+    **/
+    count<T extends GenerationJobPageCountArgs>(
+      args?: Subset<T, GenerationJobPageCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], GenerationJobPageCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a GenerationJobPage.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {GenerationJobPageAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends GenerationJobPageAggregateArgs>(args: Subset<T, GenerationJobPageAggregateArgs>): Prisma.PrismaPromise<GetGenerationJobPageAggregateType<T>>
+
+    /**
+     * Group by GenerationJobPage.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {GenerationJobPageGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends GenerationJobPageGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: GenerationJobPageGroupByArgs['orderBy'] }
+        : { orderBy?: GenerationJobPageGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, GenerationJobPageGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetGenerationJobPageGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the GenerationJobPage model
+   */
+  readonly fields: GenerationJobPageFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for GenerationJobPage.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__GenerationJobPageClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    job<T extends GenerationJobDefaultArgs<ExtArgs> = {}>(args?: Subset<T, GenerationJobDefaultArgs<ExtArgs>>): Prisma__GenerationJobClient<$Result.GetResult<Prisma.$GenerationJobPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the GenerationJobPage model
+   */
+  interface GenerationJobPageFieldRefs {
+    readonly id: FieldRef<"GenerationJobPage", 'Int'>
+    readonly jobId: FieldRef<"GenerationJobPage", 'String'>
+    readonly pageId: FieldRef<"GenerationJobPage", 'Int'>
+    readonly pageType: FieldRef<"GenerationJobPage", 'String'>
+    readonly status: FieldRef<"GenerationJobPage", 'String'>
+    readonly draftId: FieldRef<"GenerationJobPage", 'Int'>
+    readonly primaryKeyword: FieldRef<"GenerationJobPage", 'String'>
+    readonly progress: FieldRef<"GenerationJobPage", 'Int'>
+    readonly error: FieldRef<"GenerationJobPage", 'String'>
+    readonly hasHtml: FieldRef<"GenerationJobPage", 'Boolean'>
+    readonly updatedAt: FieldRef<"GenerationJobPage", 'DateTime'>
+    readonly createdAt: FieldRef<"GenerationJobPage", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * GenerationJobPage findUnique
+   */
+  export type GenerationJobPageFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the GenerationJobPage
+     */
+    select?: GenerationJobPageSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the GenerationJobPage
+     */
+    omit?: GenerationJobPageOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: GenerationJobPageInclude<ExtArgs> | null
+    /**
+     * Filter, which GenerationJobPage to fetch.
+     */
+    where: GenerationJobPageWhereUniqueInput
+  }
+
+  /**
+   * GenerationJobPage findUniqueOrThrow
+   */
+  export type GenerationJobPageFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the GenerationJobPage
+     */
+    select?: GenerationJobPageSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the GenerationJobPage
+     */
+    omit?: GenerationJobPageOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: GenerationJobPageInclude<ExtArgs> | null
+    /**
+     * Filter, which GenerationJobPage to fetch.
+     */
+    where: GenerationJobPageWhereUniqueInput
+  }
+
+  /**
+   * GenerationJobPage findFirst
+   */
+  export type GenerationJobPageFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the GenerationJobPage
+     */
+    select?: GenerationJobPageSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the GenerationJobPage
+     */
+    omit?: GenerationJobPageOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: GenerationJobPageInclude<ExtArgs> | null
+    /**
+     * Filter, which GenerationJobPage to fetch.
+     */
+    where?: GenerationJobPageWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of GenerationJobPages to fetch.
+     */
+    orderBy?: GenerationJobPageOrderByWithRelationInput | GenerationJobPageOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for GenerationJobPages.
+     */
+    cursor?: GenerationJobPageWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` GenerationJobPages from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` GenerationJobPages.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of GenerationJobPages.
+     */
+    distinct?: GenerationJobPageScalarFieldEnum | GenerationJobPageScalarFieldEnum[]
+  }
+
+  /**
+   * GenerationJobPage findFirstOrThrow
+   */
+  export type GenerationJobPageFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the GenerationJobPage
+     */
+    select?: GenerationJobPageSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the GenerationJobPage
+     */
+    omit?: GenerationJobPageOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: GenerationJobPageInclude<ExtArgs> | null
+    /**
+     * Filter, which GenerationJobPage to fetch.
+     */
+    where?: GenerationJobPageWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of GenerationJobPages to fetch.
+     */
+    orderBy?: GenerationJobPageOrderByWithRelationInput | GenerationJobPageOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for GenerationJobPages.
+     */
+    cursor?: GenerationJobPageWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` GenerationJobPages from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` GenerationJobPages.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of GenerationJobPages.
+     */
+    distinct?: GenerationJobPageScalarFieldEnum | GenerationJobPageScalarFieldEnum[]
+  }
+
+  /**
+   * GenerationJobPage findMany
+   */
+  export type GenerationJobPageFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the GenerationJobPage
+     */
+    select?: GenerationJobPageSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the GenerationJobPage
+     */
+    omit?: GenerationJobPageOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: GenerationJobPageInclude<ExtArgs> | null
+    /**
+     * Filter, which GenerationJobPages to fetch.
+     */
+    where?: GenerationJobPageWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of GenerationJobPages to fetch.
+     */
+    orderBy?: GenerationJobPageOrderByWithRelationInput | GenerationJobPageOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing GenerationJobPages.
+     */
+    cursor?: GenerationJobPageWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` GenerationJobPages from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` GenerationJobPages.
+     */
+    skip?: number
+    distinct?: GenerationJobPageScalarFieldEnum | GenerationJobPageScalarFieldEnum[]
+  }
+
+  /**
+   * GenerationJobPage create
+   */
+  export type GenerationJobPageCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the GenerationJobPage
+     */
+    select?: GenerationJobPageSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the GenerationJobPage
+     */
+    omit?: GenerationJobPageOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: GenerationJobPageInclude<ExtArgs> | null
+    /**
+     * The data needed to create a GenerationJobPage.
+     */
+    data: XOR<GenerationJobPageCreateInput, GenerationJobPageUncheckedCreateInput>
+  }
+
+  /**
+   * GenerationJobPage createMany
+   */
+  export type GenerationJobPageCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many GenerationJobPages.
+     */
+    data: GenerationJobPageCreateManyInput | GenerationJobPageCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * GenerationJobPage createManyAndReturn
+   */
+  export type GenerationJobPageCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the GenerationJobPage
+     */
+    select?: GenerationJobPageSelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the GenerationJobPage
+     */
+    omit?: GenerationJobPageOmit<ExtArgs> | null
+    /**
+     * The data used to create many GenerationJobPages.
+     */
+    data: GenerationJobPageCreateManyInput | GenerationJobPageCreateManyInput[]
+    skipDuplicates?: boolean
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: GenerationJobPageIncludeCreateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * GenerationJobPage update
+   */
+  export type GenerationJobPageUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the GenerationJobPage
+     */
+    select?: GenerationJobPageSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the GenerationJobPage
+     */
+    omit?: GenerationJobPageOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: GenerationJobPageInclude<ExtArgs> | null
+    /**
+     * The data needed to update a GenerationJobPage.
+     */
+    data: XOR<GenerationJobPageUpdateInput, GenerationJobPageUncheckedUpdateInput>
+    /**
+     * Choose, which GenerationJobPage to update.
+     */
+    where: GenerationJobPageWhereUniqueInput
+  }
+
+  /**
+   * GenerationJobPage updateMany
+   */
+  export type GenerationJobPageUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update GenerationJobPages.
+     */
+    data: XOR<GenerationJobPageUpdateManyMutationInput, GenerationJobPageUncheckedUpdateManyInput>
+    /**
+     * Filter which GenerationJobPages to update
+     */
+    where?: GenerationJobPageWhereInput
+  }
+
+  /**
+   * GenerationJobPage upsert
+   */
+  export type GenerationJobPageUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the GenerationJobPage
+     */
+    select?: GenerationJobPageSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the GenerationJobPage
+     */
+    omit?: GenerationJobPageOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: GenerationJobPageInclude<ExtArgs> | null
+    /**
+     * The filter to search for the GenerationJobPage to update in case it exists.
+     */
+    where: GenerationJobPageWhereUniqueInput
+    /**
+     * In case the GenerationJobPage found by the `where` argument doesn't exist, create a new GenerationJobPage with this data.
+     */
+    create: XOR<GenerationJobPageCreateInput, GenerationJobPageUncheckedCreateInput>
+    /**
+     * In case the GenerationJobPage was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<GenerationJobPageUpdateInput, GenerationJobPageUncheckedUpdateInput>
+  }
+
+  /**
+   * GenerationJobPage delete
+   */
+  export type GenerationJobPageDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the GenerationJobPage
+     */
+    select?: GenerationJobPageSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the GenerationJobPage
+     */
+    omit?: GenerationJobPageOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: GenerationJobPageInclude<ExtArgs> | null
+    /**
+     * Filter which GenerationJobPage to delete.
+     */
+    where: GenerationJobPageWhereUniqueInput
+  }
+
+  /**
+   * GenerationJobPage deleteMany
+   */
+  export type GenerationJobPageDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which GenerationJobPages to delete
+     */
+    where?: GenerationJobPageWhereInput
+  }
+
+  /**
+   * GenerationJobPage without action
+   */
+  export type GenerationJobPageDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the GenerationJobPage
+     */
+    select?: GenerationJobPageSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the GenerationJobPage
+     */
+    omit?: GenerationJobPageOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: GenerationJobPageInclude<ExtArgs> | null
+  }
+
+
+  /**
    * Model PhraseScore
    */
 
@@ -40899,6 +43364,7 @@ export namespace Prisma {
     campaign?: boolean | CampaignDefaultArgs<ExtArgs>
     pages?: boolean | CampaignTopic$pagesArgs<ExtArgs>
     keywords?: boolean | CampaignTopic$keywordsArgs<ExtArgs>
+    generationJobs?: boolean | CampaignTopic$generationJobsArgs<ExtArgs>
     _count?: boolean | CampaignTopicCountOutputTypeDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["campaignTopic"]>
 
@@ -40935,6 +43401,7 @@ export namespace Prisma {
     campaign?: boolean | CampaignDefaultArgs<ExtArgs>
     pages?: boolean | CampaignTopic$pagesArgs<ExtArgs>
     keywords?: boolean | CampaignTopic$keywordsArgs<ExtArgs>
+    generationJobs?: boolean | CampaignTopic$generationJobsArgs<ExtArgs>
     _count?: boolean | CampaignTopicCountOutputTypeDefaultArgs<ExtArgs>
   }
   export type CampaignTopicIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
@@ -40947,6 +43414,7 @@ export namespace Prisma {
       campaign: Prisma.$CampaignPayload<ExtArgs>
       pages: Prisma.$CampaignPagePayload<ExtArgs>[]
       keywords: Prisma.$CampaignKeywordPayload<ExtArgs>[]
+      generationJobs: Prisma.$GenerationJobPayload<ExtArgs>[]
     }
     scalars: $Extensions.GetPayloadResult<{
       id: number
@@ -41326,6 +43794,7 @@ export namespace Prisma {
     campaign<T extends CampaignDefaultArgs<ExtArgs> = {}>(args?: Subset<T, CampaignDefaultArgs<ExtArgs>>): Prisma__CampaignClient<$Result.GetResult<Prisma.$CampaignPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
     pages<T extends CampaignTopic$pagesArgs<ExtArgs> = {}>(args?: Subset<T, CampaignTopic$pagesArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$CampaignPagePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     keywords<T extends CampaignTopic$keywordsArgs<ExtArgs> = {}>(args?: Subset<T, CampaignTopic$keywordsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$CampaignKeywordPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+    generationJobs<T extends CampaignTopic$generationJobsArgs<ExtArgs> = {}>(args?: Subset<T, CampaignTopic$generationJobsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$GenerationJobPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     /**
      * Attaches callbacks for the resolution and/or rejection of the Promise.
      * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -41768,6 +44237,30 @@ export namespace Prisma {
     take?: number
     skip?: number
     distinct?: CampaignKeywordScalarFieldEnum | CampaignKeywordScalarFieldEnum[]
+  }
+
+  /**
+   * CampaignTopic.generationJobs
+   */
+  export type CampaignTopic$generationJobsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the GenerationJob
+     */
+    select?: GenerationJobSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the GenerationJob
+     */
+    omit?: GenerationJobOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: GenerationJobInclude<ExtArgs> | null
+    where?: GenerationJobWhereInput
+    orderBy?: GenerationJobOrderByWithRelationInput | GenerationJobOrderByWithRelationInput[]
+    cursor?: GenerationJobWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: GenerationJobScalarFieldEnum | GenerationJobScalarFieldEnum[]
   }
 
   /**
@@ -44100,6 +46593,8 @@ export namespace Prisma {
     email: 'email',
     password: 'password',
     name: 'name',
+    refreshToken: 'refreshToken',
+    refreshTokenExpiry: 'refreshTokenExpiry',
     createdAt: 'createdAt',
     updatedAt: 'updatedAt'
   };
@@ -44475,6 +46970,37 @@ export namespace Prisma {
   export type WordpressPublishLogScalarFieldEnum = (typeof WordpressPublishLogScalarFieldEnum)[keyof typeof WordpressPublishLogScalarFieldEnum]
 
 
+  export const GenerationJobScalarFieldEnum: {
+    id: 'id',
+    jobId: 'jobId',
+    topicId: 'topicId',
+    userId: 'userId',
+    status: 'status',
+    startedAt: 'startedAt',
+    updatedAt: 'updatedAt'
+  };
+
+  export type GenerationJobScalarFieldEnum = (typeof GenerationJobScalarFieldEnum)[keyof typeof GenerationJobScalarFieldEnum]
+
+
+  export const GenerationJobPageScalarFieldEnum: {
+    id: 'id',
+    jobId: 'jobId',
+    pageId: 'pageId',
+    pageType: 'pageType',
+    status: 'status',
+    draftId: 'draftId',
+    primaryKeyword: 'primaryKeyword',
+    progress: 'progress',
+    error: 'error',
+    hasHtml: 'hasHtml',
+    updatedAt: 'updatedAt',
+    createdAt: 'createdAt'
+  };
+
+  export type GenerationJobPageScalarFieldEnum = (typeof GenerationJobPageScalarFieldEnum)[keyof typeof GenerationJobPageScalarFieldEnum]
+
+
   export const PhraseScoreScalarFieldEnum: {
     id: 'id',
     phraseId: 'phraseId',
@@ -44828,12 +47354,15 @@ export namespace Prisma {
     email?: StringFilter<"User"> | string
     password?: StringFilter<"User"> | string
     name?: StringNullableFilter<"User"> | string | null
+    refreshToken?: StringNullableFilter<"User"> | string | null
+    refreshTokenExpiry?: DateTimeNullableFilter<"User"> | Date | string | null
     createdAt?: DateTimeFilter<"User"> | Date | string
     updatedAt?: DateTimeFilter<"User"> | Date | string
     domains?: DomainListRelationFilter
     googleSearchConsole?: XOR<GoogleSearchConsoleConnectionNullableRelationFilter, GoogleSearchConsoleConnectionWhereInput> | null
     wordpressIntegration?: XOR<WordpressIntegrationNullableRelationFilter, WordpressIntegrationWhereInput> | null
     publishLogs?: WordpressPublishLogListRelationFilter
+    generationJobs?: GenerationJobListRelationFilter
   }
 
   export type UserOrderByWithRelationInput = {
@@ -44841,12 +47370,15 @@ export namespace Prisma {
     email?: SortOrder
     password?: SortOrder
     name?: SortOrderInput | SortOrder
+    refreshToken?: SortOrderInput | SortOrder
+    refreshTokenExpiry?: SortOrderInput | SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     domains?: DomainOrderByRelationAggregateInput
     googleSearchConsole?: GoogleSearchConsoleConnectionOrderByWithRelationInput
     wordpressIntegration?: WordpressIntegrationOrderByWithRelationInput
     publishLogs?: WordpressPublishLogOrderByRelationAggregateInput
+    generationJobs?: GenerationJobOrderByRelationAggregateInput
   }
 
   export type UserWhereUniqueInput = Prisma.AtLeast<{
@@ -44857,12 +47389,15 @@ export namespace Prisma {
     NOT?: UserWhereInput | UserWhereInput[]
     password?: StringFilter<"User"> | string
     name?: StringNullableFilter<"User"> | string | null
+    refreshToken?: StringNullableFilter<"User"> | string | null
+    refreshTokenExpiry?: DateTimeNullableFilter<"User"> | Date | string | null
     createdAt?: DateTimeFilter<"User"> | Date | string
     updatedAt?: DateTimeFilter<"User"> | Date | string
     domains?: DomainListRelationFilter
     googleSearchConsole?: XOR<GoogleSearchConsoleConnectionNullableRelationFilter, GoogleSearchConsoleConnectionWhereInput> | null
     wordpressIntegration?: XOR<WordpressIntegrationNullableRelationFilter, WordpressIntegrationWhereInput> | null
     publishLogs?: WordpressPublishLogListRelationFilter
+    generationJobs?: GenerationJobListRelationFilter
   }, "id" | "email">
 
   export type UserOrderByWithAggregationInput = {
@@ -44870,6 +47405,8 @@ export namespace Prisma {
     email?: SortOrder
     password?: SortOrder
     name?: SortOrderInput | SortOrder
+    refreshToken?: SortOrderInput | SortOrder
+    refreshTokenExpiry?: SortOrderInput | SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     _count?: UserCountOrderByAggregateInput
@@ -44887,6 +47424,8 @@ export namespace Prisma {
     email?: StringWithAggregatesFilter<"User"> | string
     password?: StringWithAggregatesFilter<"User"> | string
     name?: StringNullableWithAggregatesFilter<"User"> | string | null
+    refreshToken?: StringNullableWithAggregatesFilter<"User"> | string | null
+    refreshTokenExpiry?: DateTimeNullableWithAggregatesFilter<"User"> | Date | string | null
     createdAt?: DateTimeWithAggregatesFilter<"User"> | Date | string
     updatedAt?: DateTimeWithAggregatesFilter<"User"> | Date | string
   }
@@ -46888,6 +49427,171 @@ export namespace Prisma {
     integrationId?: IntNullableWithAggregatesFilter<"WordpressPublishLog"> | number | null
   }
 
+  export type GenerationJobWhereInput = {
+    AND?: GenerationJobWhereInput | GenerationJobWhereInput[]
+    OR?: GenerationJobWhereInput[]
+    NOT?: GenerationJobWhereInput | GenerationJobWhereInput[]
+    id?: IntFilter<"GenerationJob"> | number
+    jobId?: StringFilter<"GenerationJob"> | string
+    topicId?: IntFilter<"GenerationJob"> | number
+    userId?: IntFilter<"GenerationJob"> | number
+    status?: StringFilter<"GenerationJob"> | string
+    startedAt?: DateTimeFilter<"GenerationJob"> | Date | string
+    updatedAt?: DateTimeFilter<"GenerationJob"> | Date | string
+    topic?: XOR<CampaignTopicRelationFilter, CampaignTopicWhereInput>
+    user?: XOR<UserRelationFilter, UserWhereInput>
+    pages?: GenerationJobPageListRelationFilter
+  }
+
+  export type GenerationJobOrderByWithRelationInput = {
+    id?: SortOrder
+    jobId?: SortOrder
+    topicId?: SortOrder
+    userId?: SortOrder
+    status?: SortOrder
+    startedAt?: SortOrder
+    updatedAt?: SortOrder
+    topic?: CampaignTopicOrderByWithRelationInput
+    user?: UserOrderByWithRelationInput
+    pages?: GenerationJobPageOrderByRelationAggregateInput
+  }
+
+  export type GenerationJobWhereUniqueInput = Prisma.AtLeast<{
+    id?: number
+    jobId?: string
+    AND?: GenerationJobWhereInput | GenerationJobWhereInput[]
+    OR?: GenerationJobWhereInput[]
+    NOT?: GenerationJobWhereInput | GenerationJobWhereInput[]
+    topicId?: IntFilter<"GenerationJob"> | number
+    userId?: IntFilter<"GenerationJob"> | number
+    status?: StringFilter<"GenerationJob"> | string
+    startedAt?: DateTimeFilter<"GenerationJob"> | Date | string
+    updatedAt?: DateTimeFilter<"GenerationJob"> | Date | string
+    topic?: XOR<CampaignTopicRelationFilter, CampaignTopicWhereInput>
+    user?: XOR<UserRelationFilter, UserWhereInput>
+    pages?: GenerationJobPageListRelationFilter
+  }, "id" | "jobId">
+
+  export type GenerationJobOrderByWithAggregationInput = {
+    id?: SortOrder
+    jobId?: SortOrder
+    topicId?: SortOrder
+    userId?: SortOrder
+    status?: SortOrder
+    startedAt?: SortOrder
+    updatedAt?: SortOrder
+    _count?: GenerationJobCountOrderByAggregateInput
+    _avg?: GenerationJobAvgOrderByAggregateInput
+    _max?: GenerationJobMaxOrderByAggregateInput
+    _min?: GenerationJobMinOrderByAggregateInput
+    _sum?: GenerationJobSumOrderByAggregateInput
+  }
+
+  export type GenerationJobScalarWhereWithAggregatesInput = {
+    AND?: GenerationJobScalarWhereWithAggregatesInput | GenerationJobScalarWhereWithAggregatesInput[]
+    OR?: GenerationJobScalarWhereWithAggregatesInput[]
+    NOT?: GenerationJobScalarWhereWithAggregatesInput | GenerationJobScalarWhereWithAggregatesInput[]
+    id?: IntWithAggregatesFilter<"GenerationJob"> | number
+    jobId?: StringWithAggregatesFilter<"GenerationJob"> | string
+    topicId?: IntWithAggregatesFilter<"GenerationJob"> | number
+    userId?: IntWithAggregatesFilter<"GenerationJob"> | number
+    status?: StringWithAggregatesFilter<"GenerationJob"> | string
+    startedAt?: DateTimeWithAggregatesFilter<"GenerationJob"> | Date | string
+    updatedAt?: DateTimeWithAggregatesFilter<"GenerationJob"> | Date | string
+  }
+
+  export type GenerationJobPageWhereInput = {
+    AND?: GenerationJobPageWhereInput | GenerationJobPageWhereInput[]
+    OR?: GenerationJobPageWhereInput[]
+    NOT?: GenerationJobPageWhereInput | GenerationJobPageWhereInput[]
+    id?: IntFilter<"GenerationJobPage"> | number
+    jobId?: StringFilter<"GenerationJobPage"> | string
+    pageId?: IntFilter<"GenerationJobPage"> | number
+    pageType?: StringFilter<"GenerationJobPage"> | string
+    status?: StringFilter<"GenerationJobPage"> | string
+    draftId?: IntNullableFilter<"GenerationJobPage"> | number | null
+    primaryKeyword?: StringNullableFilter<"GenerationJobPage"> | string | null
+    progress?: IntNullableFilter<"GenerationJobPage"> | number | null
+    error?: StringNullableFilter<"GenerationJobPage"> | string | null
+    hasHtml?: BoolFilter<"GenerationJobPage"> | boolean
+    updatedAt?: DateTimeFilter<"GenerationJobPage"> | Date | string
+    createdAt?: DateTimeFilter<"GenerationJobPage"> | Date | string
+    job?: XOR<GenerationJobRelationFilter, GenerationJobWhereInput>
+  }
+
+  export type GenerationJobPageOrderByWithRelationInput = {
+    id?: SortOrder
+    jobId?: SortOrder
+    pageId?: SortOrder
+    pageType?: SortOrder
+    status?: SortOrder
+    draftId?: SortOrderInput | SortOrder
+    primaryKeyword?: SortOrderInput | SortOrder
+    progress?: SortOrderInput | SortOrder
+    error?: SortOrderInput | SortOrder
+    hasHtml?: SortOrder
+    updatedAt?: SortOrder
+    createdAt?: SortOrder
+    job?: GenerationJobOrderByWithRelationInput
+  }
+
+  export type GenerationJobPageWhereUniqueInput = Prisma.AtLeast<{
+    id?: number
+    AND?: GenerationJobPageWhereInput | GenerationJobPageWhereInput[]
+    OR?: GenerationJobPageWhereInput[]
+    NOT?: GenerationJobPageWhereInput | GenerationJobPageWhereInput[]
+    jobId?: StringFilter<"GenerationJobPage"> | string
+    pageId?: IntFilter<"GenerationJobPage"> | number
+    pageType?: StringFilter<"GenerationJobPage"> | string
+    status?: StringFilter<"GenerationJobPage"> | string
+    draftId?: IntNullableFilter<"GenerationJobPage"> | number | null
+    primaryKeyword?: StringNullableFilter<"GenerationJobPage"> | string | null
+    progress?: IntNullableFilter<"GenerationJobPage"> | number | null
+    error?: StringNullableFilter<"GenerationJobPage"> | string | null
+    hasHtml?: BoolFilter<"GenerationJobPage"> | boolean
+    updatedAt?: DateTimeFilter<"GenerationJobPage"> | Date | string
+    createdAt?: DateTimeFilter<"GenerationJobPage"> | Date | string
+    job?: XOR<GenerationJobRelationFilter, GenerationJobWhereInput>
+  }, "id">
+
+  export type GenerationJobPageOrderByWithAggregationInput = {
+    id?: SortOrder
+    jobId?: SortOrder
+    pageId?: SortOrder
+    pageType?: SortOrder
+    status?: SortOrder
+    draftId?: SortOrderInput | SortOrder
+    primaryKeyword?: SortOrderInput | SortOrder
+    progress?: SortOrderInput | SortOrder
+    error?: SortOrderInput | SortOrder
+    hasHtml?: SortOrder
+    updatedAt?: SortOrder
+    createdAt?: SortOrder
+    _count?: GenerationJobPageCountOrderByAggregateInput
+    _avg?: GenerationJobPageAvgOrderByAggregateInput
+    _max?: GenerationJobPageMaxOrderByAggregateInput
+    _min?: GenerationJobPageMinOrderByAggregateInput
+    _sum?: GenerationJobPageSumOrderByAggregateInput
+  }
+
+  export type GenerationJobPageScalarWhereWithAggregatesInput = {
+    AND?: GenerationJobPageScalarWhereWithAggregatesInput | GenerationJobPageScalarWhereWithAggregatesInput[]
+    OR?: GenerationJobPageScalarWhereWithAggregatesInput[]
+    NOT?: GenerationJobPageScalarWhereWithAggregatesInput | GenerationJobPageScalarWhereWithAggregatesInput[]
+    id?: IntWithAggregatesFilter<"GenerationJobPage"> | number
+    jobId?: StringWithAggregatesFilter<"GenerationJobPage"> | string
+    pageId?: IntWithAggregatesFilter<"GenerationJobPage"> | number
+    pageType?: StringWithAggregatesFilter<"GenerationJobPage"> | string
+    status?: StringWithAggregatesFilter<"GenerationJobPage"> | string
+    draftId?: IntNullableWithAggregatesFilter<"GenerationJobPage"> | number | null
+    primaryKeyword?: StringNullableWithAggregatesFilter<"GenerationJobPage"> | string | null
+    progress?: IntNullableWithAggregatesFilter<"GenerationJobPage"> | number | null
+    error?: StringNullableWithAggregatesFilter<"GenerationJobPage"> | string | null
+    hasHtml?: BoolWithAggregatesFilter<"GenerationJobPage"> | boolean
+    updatedAt?: DateTimeWithAggregatesFilter<"GenerationJobPage"> | Date | string
+    createdAt?: DateTimeWithAggregatesFilter<"GenerationJobPage"> | Date | string
+  }
+
   export type PhraseScoreWhereInput = {
     AND?: PhraseScoreWhereInput | PhraseScoreWhereInput[]
     OR?: PhraseScoreWhereInput[]
@@ -47637,6 +50341,7 @@ export namespace Prisma {
     campaign?: XOR<CampaignRelationFilter, CampaignWhereInput>
     pages?: CampaignPageListRelationFilter
     keywords?: CampaignKeywordListRelationFilter
+    generationJobs?: GenerationJobListRelationFilter
   }
 
   export type CampaignTopicOrderByWithRelationInput = {
@@ -47653,6 +50358,7 @@ export namespace Prisma {
     campaign?: CampaignOrderByWithRelationInput
     pages?: CampaignPageOrderByRelationAggregateInput
     keywords?: CampaignKeywordOrderByRelationAggregateInput
+    generationJobs?: GenerationJobOrderByRelationAggregateInput
   }
 
   export type CampaignTopicWhereUniqueInput = Prisma.AtLeast<{
@@ -47672,6 +50378,7 @@ export namespace Prisma {
     campaign?: XOR<CampaignRelationFilter, CampaignWhereInput>
     pages?: CampaignPageListRelationFilter
     keywords?: CampaignKeywordListRelationFilter
+    generationJobs?: GenerationJobListRelationFilter
   }, "id">
 
   export type CampaignTopicOrderByWithAggregationInput = {
@@ -47908,12 +50615,15 @@ export namespace Prisma {
     email: string
     password: string
     name?: string | null
+    refreshToken?: string | null
+    refreshTokenExpiry?: Date | string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     domains?: DomainCreateNestedManyWithoutUserInput
     googleSearchConsole?: GoogleSearchConsoleConnectionCreateNestedOneWithoutUserInput
     wordpressIntegration?: WordpressIntegrationCreateNestedOneWithoutUserInput
     publishLogs?: WordpressPublishLogCreateNestedManyWithoutUserInput
+    generationJobs?: GenerationJobCreateNestedManyWithoutUserInput
   }
 
   export type UserUncheckedCreateInput = {
@@ -47921,24 +50631,30 @@ export namespace Prisma {
     email: string
     password: string
     name?: string | null
+    refreshToken?: string | null
+    refreshTokenExpiry?: Date | string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     domains?: DomainUncheckedCreateNestedManyWithoutUserInput
     googleSearchConsole?: GoogleSearchConsoleConnectionUncheckedCreateNestedOneWithoutUserInput
     wordpressIntegration?: WordpressIntegrationUncheckedCreateNestedOneWithoutUserInput
     publishLogs?: WordpressPublishLogUncheckedCreateNestedManyWithoutUserInput
+    generationJobs?: GenerationJobUncheckedCreateNestedManyWithoutUserInput
   }
 
   export type UserUpdateInput = {
     email?: StringFieldUpdateOperationsInput | string
     password?: StringFieldUpdateOperationsInput | string
     name?: NullableStringFieldUpdateOperationsInput | string | null
+    refreshToken?: NullableStringFieldUpdateOperationsInput | string | null
+    refreshTokenExpiry?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     domains?: DomainUpdateManyWithoutUserNestedInput
     googleSearchConsole?: GoogleSearchConsoleConnectionUpdateOneWithoutUserNestedInput
     wordpressIntegration?: WordpressIntegrationUpdateOneWithoutUserNestedInput
     publishLogs?: WordpressPublishLogUpdateManyWithoutUserNestedInput
+    generationJobs?: GenerationJobUpdateManyWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateInput = {
@@ -47946,12 +50662,15 @@ export namespace Prisma {
     email?: StringFieldUpdateOperationsInput | string
     password?: StringFieldUpdateOperationsInput | string
     name?: NullableStringFieldUpdateOperationsInput | string | null
+    refreshToken?: NullableStringFieldUpdateOperationsInput | string | null
+    refreshTokenExpiry?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     domains?: DomainUncheckedUpdateManyWithoutUserNestedInput
     googleSearchConsole?: GoogleSearchConsoleConnectionUncheckedUpdateOneWithoutUserNestedInput
     wordpressIntegration?: WordpressIntegrationUncheckedUpdateOneWithoutUserNestedInput
     publishLogs?: WordpressPublishLogUncheckedUpdateManyWithoutUserNestedInput
+    generationJobs?: GenerationJobUncheckedUpdateManyWithoutUserNestedInput
   }
 
   export type UserCreateManyInput = {
@@ -47959,6 +50678,8 @@ export namespace Prisma {
     email: string
     password: string
     name?: string | null
+    refreshToken?: string | null
+    refreshTokenExpiry?: Date | string | null
     createdAt?: Date | string
     updatedAt?: Date | string
   }
@@ -47967,6 +50688,8 @@ export namespace Prisma {
     email?: StringFieldUpdateOperationsInput | string
     password?: StringFieldUpdateOperationsInput | string
     name?: NullableStringFieldUpdateOperationsInput | string | null
+    refreshToken?: NullableStringFieldUpdateOperationsInput | string | null
+    refreshTokenExpiry?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -47976,6 +50699,8 @@ export namespace Prisma {
     email?: StringFieldUpdateOperationsInput | string
     password?: StringFieldUpdateOperationsInput | string
     name?: NullableStringFieldUpdateOperationsInput | string | null
+    refreshToken?: NullableStringFieldUpdateOperationsInput | string | null
+    refreshTokenExpiry?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -50135,6 +52860,176 @@ export namespace Prisma {
     integrationId?: NullableIntFieldUpdateOperationsInput | number | null
   }
 
+  export type GenerationJobCreateInput = {
+    jobId: string
+    status?: string
+    startedAt?: Date | string
+    updatedAt?: Date | string
+    topic: CampaignTopicCreateNestedOneWithoutGenerationJobsInput
+    user: UserCreateNestedOneWithoutGenerationJobsInput
+    pages?: GenerationJobPageCreateNestedManyWithoutJobInput
+  }
+
+  export type GenerationJobUncheckedCreateInput = {
+    id?: number
+    jobId: string
+    topicId: number
+    userId: number
+    status?: string
+    startedAt?: Date | string
+    updatedAt?: Date | string
+    pages?: GenerationJobPageUncheckedCreateNestedManyWithoutJobInput
+  }
+
+  export type GenerationJobUpdateInput = {
+    jobId?: StringFieldUpdateOperationsInput | string
+    status?: StringFieldUpdateOperationsInput | string
+    startedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    topic?: CampaignTopicUpdateOneRequiredWithoutGenerationJobsNestedInput
+    user?: UserUpdateOneRequiredWithoutGenerationJobsNestedInput
+    pages?: GenerationJobPageUpdateManyWithoutJobNestedInput
+  }
+
+  export type GenerationJobUncheckedUpdateInput = {
+    id?: IntFieldUpdateOperationsInput | number
+    jobId?: StringFieldUpdateOperationsInput | string
+    topicId?: IntFieldUpdateOperationsInput | number
+    userId?: IntFieldUpdateOperationsInput | number
+    status?: StringFieldUpdateOperationsInput | string
+    startedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    pages?: GenerationJobPageUncheckedUpdateManyWithoutJobNestedInput
+  }
+
+  export type GenerationJobCreateManyInput = {
+    id?: number
+    jobId: string
+    topicId: number
+    userId: number
+    status?: string
+    startedAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type GenerationJobUpdateManyMutationInput = {
+    jobId?: StringFieldUpdateOperationsInput | string
+    status?: StringFieldUpdateOperationsInput | string
+    startedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type GenerationJobUncheckedUpdateManyInput = {
+    id?: IntFieldUpdateOperationsInput | number
+    jobId?: StringFieldUpdateOperationsInput | string
+    topicId?: IntFieldUpdateOperationsInput | number
+    userId?: IntFieldUpdateOperationsInput | number
+    status?: StringFieldUpdateOperationsInput | string
+    startedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type GenerationJobPageCreateInput = {
+    pageId: number
+    pageType: string
+    status?: string
+    draftId?: number | null
+    primaryKeyword?: string | null
+    progress?: number | null
+    error?: string | null
+    hasHtml?: boolean
+    updatedAt?: Date | string
+    createdAt?: Date | string
+    job: GenerationJobCreateNestedOneWithoutPagesInput
+  }
+
+  export type GenerationJobPageUncheckedCreateInput = {
+    id?: number
+    jobId: string
+    pageId: number
+    pageType: string
+    status?: string
+    draftId?: number | null
+    primaryKeyword?: string | null
+    progress?: number | null
+    error?: string | null
+    hasHtml?: boolean
+    updatedAt?: Date | string
+    createdAt?: Date | string
+  }
+
+  export type GenerationJobPageUpdateInput = {
+    pageId?: IntFieldUpdateOperationsInput | number
+    pageType?: StringFieldUpdateOperationsInput | string
+    status?: StringFieldUpdateOperationsInput | string
+    draftId?: NullableIntFieldUpdateOperationsInput | number | null
+    primaryKeyword?: NullableStringFieldUpdateOperationsInput | string | null
+    progress?: NullableIntFieldUpdateOperationsInput | number | null
+    error?: NullableStringFieldUpdateOperationsInput | string | null
+    hasHtml?: BoolFieldUpdateOperationsInput | boolean
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    job?: GenerationJobUpdateOneRequiredWithoutPagesNestedInput
+  }
+
+  export type GenerationJobPageUncheckedUpdateInput = {
+    id?: IntFieldUpdateOperationsInput | number
+    jobId?: StringFieldUpdateOperationsInput | string
+    pageId?: IntFieldUpdateOperationsInput | number
+    pageType?: StringFieldUpdateOperationsInput | string
+    status?: StringFieldUpdateOperationsInput | string
+    draftId?: NullableIntFieldUpdateOperationsInput | number | null
+    primaryKeyword?: NullableStringFieldUpdateOperationsInput | string | null
+    progress?: NullableIntFieldUpdateOperationsInput | number | null
+    error?: NullableStringFieldUpdateOperationsInput | string | null
+    hasHtml?: BoolFieldUpdateOperationsInput | boolean
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type GenerationJobPageCreateManyInput = {
+    id?: number
+    jobId: string
+    pageId: number
+    pageType: string
+    status?: string
+    draftId?: number | null
+    primaryKeyword?: string | null
+    progress?: number | null
+    error?: string | null
+    hasHtml?: boolean
+    updatedAt?: Date | string
+    createdAt?: Date | string
+  }
+
+  export type GenerationJobPageUpdateManyMutationInput = {
+    pageId?: IntFieldUpdateOperationsInput | number
+    pageType?: StringFieldUpdateOperationsInput | string
+    status?: StringFieldUpdateOperationsInput | string
+    draftId?: NullableIntFieldUpdateOperationsInput | number | null
+    primaryKeyword?: NullableStringFieldUpdateOperationsInput | string | null
+    progress?: NullableIntFieldUpdateOperationsInput | number | null
+    error?: NullableStringFieldUpdateOperationsInput | string | null
+    hasHtml?: BoolFieldUpdateOperationsInput | boolean
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type GenerationJobPageUncheckedUpdateManyInput = {
+    id?: IntFieldUpdateOperationsInput | number
+    jobId?: StringFieldUpdateOperationsInput | string
+    pageId?: IntFieldUpdateOperationsInput | number
+    pageType?: StringFieldUpdateOperationsInput | string
+    status?: StringFieldUpdateOperationsInput | string
+    draftId?: NullableIntFieldUpdateOperationsInput | number | null
+    primaryKeyword?: NullableStringFieldUpdateOperationsInput | string | null
+    progress?: NullableIntFieldUpdateOperationsInput | number | null
+    error?: NullableStringFieldUpdateOperationsInput | string | null
+    hasHtml?: BoolFieldUpdateOperationsInput | boolean
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
   export type PhraseScoreCreateInput = {
     score: number
     breakdown?: NullableJsonNullValueInput | InputJsonValue
@@ -50895,6 +53790,7 @@ export namespace Prisma {
     campaign: CampaignCreateNestedOneWithoutTopicsInput
     pages?: CampaignPageCreateNestedManyWithoutTopicInput
     keywords?: CampaignKeywordCreateNestedManyWithoutTopicInput
+    generationJobs?: GenerationJobCreateNestedManyWithoutTopicInput
   }
 
   export type CampaignTopicUncheckedCreateInput = {
@@ -50910,6 +53806,7 @@ export namespace Prisma {
     updatedAt?: Date | string
     pages?: CampaignPageUncheckedCreateNestedManyWithoutTopicInput
     keywords?: CampaignKeywordUncheckedCreateNestedManyWithoutTopicInput
+    generationJobs?: GenerationJobUncheckedCreateNestedManyWithoutTopicInput
   }
 
   export type CampaignTopicUpdateInput = {
@@ -50924,6 +53821,7 @@ export namespace Prisma {
     campaign?: CampaignUpdateOneRequiredWithoutTopicsNestedInput
     pages?: CampaignPageUpdateManyWithoutTopicNestedInput
     keywords?: CampaignKeywordUpdateManyWithoutTopicNestedInput
+    generationJobs?: GenerationJobUpdateManyWithoutTopicNestedInput
   }
 
   export type CampaignTopicUncheckedUpdateInput = {
@@ -50939,6 +53837,7 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     pages?: CampaignPageUncheckedUpdateManyWithoutTopicNestedInput
     keywords?: CampaignKeywordUncheckedUpdateManyWithoutTopicNestedInput
+    generationJobs?: GenerationJobUncheckedUpdateManyWithoutTopicNestedInput
   }
 
   export type CampaignTopicCreateManyInput = {
@@ -51231,6 +54130,17 @@ export namespace Prisma {
     not?: NestedStringNullableFilter<$PrismaModel> | string | null
   }
 
+  export type DateTimeNullableFilter<$PrismaModel = never> = {
+    equals?: Date | string | DateTimeFieldRefInput<$PrismaModel> | null
+    in?: Date[] | string[] | ListDateTimeFieldRefInput<$PrismaModel> | null
+    notIn?: Date[] | string[] | ListDateTimeFieldRefInput<$PrismaModel> | null
+    lt?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    lte?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    gt?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    gte?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    not?: NestedDateTimeNullableFilter<$PrismaModel> | Date | string | null
+  }
+
   export type DateTimeFilter<$PrismaModel = never> = {
     equals?: Date | string | DateTimeFieldRefInput<$PrismaModel>
     in?: Date[] | string[] | ListDateTimeFieldRefInput<$PrismaModel>
@@ -51264,6 +54174,12 @@ export namespace Prisma {
     none?: WordpressPublishLogWhereInput
   }
 
+  export type GenerationJobListRelationFilter = {
+    every?: GenerationJobWhereInput
+    some?: GenerationJobWhereInput
+    none?: GenerationJobWhereInput
+  }
+
   export type SortOrderInput = {
     sort: SortOrder
     nulls?: NullsOrder
@@ -51277,11 +54193,17 @@ export namespace Prisma {
     _count?: SortOrder
   }
 
+  export type GenerationJobOrderByRelationAggregateInput = {
+    _count?: SortOrder
+  }
+
   export type UserCountOrderByAggregateInput = {
     id?: SortOrder
     email?: SortOrder
     password?: SortOrder
     name?: SortOrder
+    refreshToken?: SortOrder
+    refreshTokenExpiry?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
   }
@@ -51295,6 +54217,8 @@ export namespace Prisma {
     email?: SortOrder
     password?: SortOrder
     name?: SortOrder
+    refreshToken?: SortOrder
+    refreshTokenExpiry?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
   }
@@ -51304,6 +54228,8 @@ export namespace Prisma {
     email?: SortOrder
     password?: SortOrder
     name?: SortOrder
+    refreshToken?: SortOrder
+    refreshTokenExpiry?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
   }
@@ -51362,6 +54288,20 @@ export namespace Prisma {
     _count?: NestedIntNullableFilter<$PrismaModel>
     _min?: NestedStringNullableFilter<$PrismaModel>
     _max?: NestedStringNullableFilter<$PrismaModel>
+  }
+
+  export type DateTimeNullableWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: Date | string | DateTimeFieldRefInput<$PrismaModel> | null
+    in?: Date[] | string[] | ListDateTimeFieldRefInput<$PrismaModel> | null
+    notIn?: Date[] | string[] | ListDateTimeFieldRefInput<$PrismaModel> | null
+    lt?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    lte?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    gt?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    gte?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    not?: NestedDateTimeNullableWithAggregatesFilter<$PrismaModel> | Date | string | null
+    _count?: NestedIntNullableFilter<$PrismaModel>
+    _min?: NestedDateTimeNullableFilter<$PrismaModel>
+    _max?: NestedDateTimeNullableFilter<$PrismaModel>
   }
 
   export type DateTimeWithAggregatesFilter<$PrismaModel = never> = {
@@ -52576,17 +55516,6 @@ export namespace Prisma {
     domainId?: SortOrder
   }
 
-  export type DateTimeNullableFilter<$PrismaModel = never> = {
-    equals?: Date | string | DateTimeFieldRefInput<$PrismaModel> | null
-    in?: Date[] | string[] | ListDateTimeFieldRefInput<$PrismaModel> | null
-    notIn?: Date[] | string[] | ListDateTimeFieldRefInput<$PrismaModel> | null
-    lt?: Date | string | DateTimeFieldRefInput<$PrismaModel>
-    lte?: Date | string | DateTimeFieldRefInput<$PrismaModel>
-    gt?: Date | string | DateTimeFieldRefInput<$PrismaModel>
-    gte?: Date | string | DateTimeFieldRefInput<$PrismaModel>
-    not?: NestedDateTimeNullableFilter<$PrismaModel> | Date | string | null
-  }
-
   export type AnalysisPhaseDomainIdPhaseCompoundUniqueInput = {
     domainId: number
     phase: string
@@ -52647,20 +55576,6 @@ export namespace Prisma {
     domainId?: SortOrder
     progress?: SortOrder
     tokenUsage?: SortOrder
-  }
-
-  export type DateTimeNullableWithAggregatesFilter<$PrismaModel = never> = {
-    equals?: Date | string | DateTimeFieldRefInput<$PrismaModel> | null
-    in?: Date[] | string[] | ListDateTimeFieldRefInput<$PrismaModel> | null
-    notIn?: Date[] | string[] | ListDateTimeFieldRefInput<$PrismaModel> | null
-    lt?: Date | string | DateTimeFieldRefInput<$PrismaModel>
-    lte?: Date | string | DateTimeFieldRefInput<$PrismaModel>
-    gt?: Date | string | DateTimeFieldRefInput<$PrismaModel>
-    gte?: Date | string | DateTimeFieldRefInput<$PrismaModel>
-    not?: NestedDateTimeNullableWithAggregatesFilter<$PrismaModel> | Date | string | null
-    _count?: NestedIntNullableFilter<$PrismaModel>
-    _min?: NestedDateTimeNullableFilter<$PrismaModel>
-    _max?: NestedDateTimeNullableFilter<$PrismaModel>
   }
 
   export type SemanticAnalysisCountOrderByAggregateInput = {
@@ -53055,6 +55970,127 @@ export namespace Prisma {
     id?: SortOrder
     userId?: SortOrder
     integrationId?: SortOrder
+  }
+
+  export type CampaignTopicRelationFilter = {
+    is?: CampaignTopicWhereInput
+    isNot?: CampaignTopicWhereInput
+  }
+
+  export type GenerationJobPageListRelationFilter = {
+    every?: GenerationJobPageWhereInput
+    some?: GenerationJobPageWhereInput
+    none?: GenerationJobPageWhereInput
+  }
+
+  export type GenerationJobPageOrderByRelationAggregateInput = {
+    _count?: SortOrder
+  }
+
+  export type GenerationJobCountOrderByAggregateInput = {
+    id?: SortOrder
+    jobId?: SortOrder
+    topicId?: SortOrder
+    userId?: SortOrder
+    status?: SortOrder
+    startedAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type GenerationJobAvgOrderByAggregateInput = {
+    id?: SortOrder
+    topicId?: SortOrder
+    userId?: SortOrder
+  }
+
+  export type GenerationJobMaxOrderByAggregateInput = {
+    id?: SortOrder
+    jobId?: SortOrder
+    topicId?: SortOrder
+    userId?: SortOrder
+    status?: SortOrder
+    startedAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type GenerationJobMinOrderByAggregateInput = {
+    id?: SortOrder
+    jobId?: SortOrder
+    topicId?: SortOrder
+    userId?: SortOrder
+    status?: SortOrder
+    startedAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type GenerationJobSumOrderByAggregateInput = {
+    id?: SortOrder
+    topicId?: SortOrder
+    userId?: SortOrder
+  }
+
+  export type GenerationJobRelationFilter = {
+    is?: GenerationJobWhereInput
+    isNot?: GenerationJobWhereInput
+  }
+
+  export type GenerationJobPageCountOrderByAggregateInput = {
+    id?: SortOrder
+    jobId?: SortOrder
+    pageId?: SortOrder
+    pageType?: SortOrder
+    status?: SortOrder
+    draftId?: SortOrder
+    primaryKeyword?: SortOrder
+    progress?: SortOrder
+    error?: SortOrder
+    hasHtml?: SortOrder
+    updatedAt?: SortOrder
+    createdAt?: SortOrder
+  }
+
+  export type GenerationJobPageAvgOrderByAggregateInput = {
+    id?: SortOrder
+    pageId?: SortOrder
+    draftId?: SortOrder
+    progress?: SortOrder
+  }
+
+  export type GenerationJobPageMaxOrderByAggregateInput = {
+    id?: SortOrder
+    jobId?: SortOrder
+    pageId?: SortOrder
+    pageType?: SortOrder
+    status?: SortOrder
+    draftId?: SortOrder
+    primaryKeyword?: SortOrder
+    progress?: SortOrder
+    error?: SortOrder
+    hasHtml?: SortOrder
+    updatedAt?: SortOrder
+    createdAt?: SortOrder
+  }
+
+  export type GenerationJobPageMinOrderByAggregateInput = {
+    id?: SortOrder
+    jobId?: SortOrder
+    pageId?: SortOrder
+    pageType?: SortOrder
+    status?: SortOrder
+    draftId?: SortOrder
+    primaryKeyword?: SortOrder
+    progress?: SortOrder
+    error?: SortOrder
+    hasHtml?: SortOrder
+    updatedAt?: SortOrder
+    createdAt?: SortOrder
+  }
+
+  export type GenerationJobPageSumOrderByAggregateInput = {
+    id?: SortOrder
+    pageId?: SortOrder
+    draftId?: SortOrder
+    progress?: SortOrder
   }
 
   export type PhraseScoreCountOrderByAggregateInput = {
@@ -53622,11 +56658,6 @@ export namespace Prisma {
     not?: NestedEnumCampaignPageTypeFilter<$PrismaModel> | $Enums.CampaignPageType
   }
 
-  export type CampaignTopicRelationFilter = {
-    is?: CampaignTopicWhereInput
-    isNot?: CampaignTopicWhereInput
-  }
-
   export type CampaignPageCountOrderByAggregateInput = {
     id?: SortOrder
     topicId?: SortOrder
@@ -53794,6 +56825,13 @@ export namespace Prisma {
     connect?: WordpressPublishLogWhereUniqueInput | WordpressPublishLogWhereUniqueInput[]
   }
 
+  export type GenerationJobCreateNestedManyWithoutUserInput = {
+    create?: XOR<GenerationJobCreateWithoutUserInput, GenerationJobUncheckedCreateWithoutUserInput> | GenerationJobCreateWithoutUserInput[] | GenerationJobUncheckedCreateWithoutUserInput[]
+    connectOrCreate?: GenerationJobCreateOrConnectWithoutUserInput | GenerationJobCreateOrConnectWithoutUserInput[]
+    createMany?: GenerationJobCreateManyUserInputEnvelope
+    connect?: GenerationJobWhereUniqueInput | GenerationJobWhereUniqueInput[]
+  }
+
   export type DomainUncheckedCreateNestedManyWithoutUserInput = {
     create?: XOR<DomainCreateWithoutUserInput, DomainUncheckedCreateWithoutUserInput> | DomainCreateWithoutUserInput[] | DomainUncheckedCreateWithoutUserInput[]
     connectOrCreate?: DomainCreateOrConnectWithoutUserInput | DomainCreateOrConnectWithoutUserInput[]
@@ -53820,12 +56858,23 @@ export namespace Prisma {
     connect?: WordpressPublishLogWhereUniqueInput | WordpressPublishLogWhereUniqueInput[]
   }
 
+  export type GenerationJobUncheckedCreateNestedManyWithoutUserInput = {
+    create?: XOR<GenerationJobCreateWithoutUserInput, GenerationJobUncheckedCreateWithoutUserInput> | GenerationJobCreateWithoutUserInput[] | GenerationJobUncheckedCreateWithoutUserInput[]
+    connectOrCreate?: GenerationJobCreateOrConnectWithoutUserInput | GenerationJobCreateOrConnectWithoutUserInput[]
+    createMany?: GenerationJobCreateManyUserInputEnvelope
+    connect?: GenerationJobWhereUniqueInput | GenerationJobWhereUniqueInput[]
+  }
+
   export type StringFieldUpdateOperationsInput = {
     set?: string
   }
 
   export type NullableStringFieldUpdateOperationsInput = {
     set?: string | null
+  }
+
+  export type NullableDateTimeFieldUpdateOperationsInput = {
+    set?: Date | string | null
   }
 
   export type DateTimeFieldUpdateOperationsInput = {
@@ -53878,6 +56927,20 @@ export namespace Prisma {
     update?: WordpressPublishLogUpdateWithWhereUniqueWithoutUserInput | WordpressPublishLogUpdateWithWhereUniqueWithoutUserInput[]
     updateMany?: WordpressPublishLogUpdateManyWithWhereWithoutUserInput | WordpressPublishLogUpdateManyWithWhereWithoutUserInput[]
     deleteMany?: WordpressPublishLogScalarWhereInput | WordpressPublishLogScalarWhereInput[]
+  }
+
+  export type GenerationJobUpdateManyWithoutUserNestedInput = {
+    create?: XOR<GenerationJobCreateWithoutUserInput, GenerationJobUncheckedCreateWithoutUserInput> | GenerationJobCreateWithoutUserInput[] | GenerationJobUncheckedCreateWithoutUserInput[]
+    connectOrCreate?: GenerationJobCreateOrConnectWithoutUserInput | GenerationJobCreateOrConnectWithoutUserInput[]
+    upsert?: GenerationJobUpsertWithWhereUniqueWithoutUserInput | GenerationJobUpsertWithWhereUniqueWithoutUserInput[]
+    createMany?: GenerationJobCreateManyUserInputEnvelope
+    set?: GenerationJobWhereUniqueInput | GenerationJobWhereUniqueInput[]
+    disconnect?: GenerationJobWhereUniqueInput | GenerationJobWhereUniqueInput[]
+    delete?: GenerationJobWhereUniqueInput | GenerationJobWhereUniqueInput[]
+    connect?: GenerationJobWhereUniqueInput | GenerationJobWhereUniqueInput[]
+    update?: GenerationJobUpdateWithWhereUniqueWithoutUserInput | GenerationJobUpdateWithWhereUniqueWithoutUserInput[]
+    updateMany?: GenerationJobUpdateManyWithWhereWithoutUserInput | GenerationJobUpdateManyWithWhereWithoutUserInput[]
+    deleteMany?: GenerationJobScalarWhereInput | GenerationJobScalarWhereInput[]
   }
 
   export type IntFieldUpdateOperationsInput = {
@@ -53934,6 +56997,20 @@ export namespace Prisma {
     update?: WordpressPublishLogUpdateWithWhereUniqueWithoutUserInput | WordpressPublishLogUpdateWithWhereUniqueWithoutUserInput[]
     updateMany?: WordpressPublishLogUpdateManyWithWhereWithoutUserInput | WordpressPublishLogUpdateManyWithWhereWithoutUserInput[]
     deleteMany?: WordpressPublishLogScalarWhereInput | WordpressPublishLogScalarWhereInput[]
+  }
+
+  export type GenerationJobUncheckedUpdateManyWithoutUserNestedInput = {
+    create?: XOR<GenerationJobCreateWithoutUserInput, GenerationJobUncheckedCreateWithoutUserInput> | GenerationJobCreateWithoutUserInput[] | GenerationJobUncheckedCreateWithoutUserInput[]
+    connectOrCreate?: GenerationJobCreateOrConnectWithoutUserInput | GenerationJobCreateOrConnectWithoutUserInput[]
+    upsert?: GenerationJobUpsertWithWhereUniqueWithoutUserInput | GenerationJobUpsertWithWhereUniqueWithoutUserInput[]
+    createMany?: GenerationJobCreateManyUserInputEnvelope
+    set?: GenerationJobWhereUniqueInput | GenerationJobWhereUniqueInput[]
+    disconnect?: GenerationJobWhereUniqueInput | GenerationJobWhereUniqueInput[]
+    delete?: GenerationJobWhereUniqueInput | GenerationJobWhereUniqueInput[]
+    connect?: GenerationJobWhereUniqueInput | GenerationJobWhereUniqueInput[]
+    update?: GenerationJobUpdateWithWhereUniqueWithoutUserInput | GenerationJobUpdateWithWhereUniqueWithoutUserInput[]
+    updateMany?: GenerationJobUpdateManyWithWhereWithoutUserInput | GenerationJobUpdateManyWithWhereWithoutUserInput[]
+    deleteMany?: GenerationJobScalarWhereInput | GenerationJobScalarWhereInput[]
   }
 
   export type AnalysisPhaseCreateNestedManyWithoutDomainInput = {
@@ -55502,10 +58579,6 @@ export namespace Prisma {
     connect?: DomainWhereUniqueInput
   }
 
-  export type NullableDateTimeFieldUpdateOperationsInput = {
-    set?: Date | string | null
-  }
-
   export type DomainUpdateOneWithoutAnalysisPhasesNestedInput = {
     create?: XOR<DomainCreateWithoutAnalysisPhasesInput, DomainUncheckedCreateWithoutAnalysisPhasesInput>
     connectOrCreate?: DomainCreateOrConnectWithoutAnalysisPhasesInput
@@ -55742,6 +58815,90 @@ export namespace Prisma {
     delete?: WordpressIntegrationWhereInput | boolean
     connect?: WordpressIntegrationWhereUniqueInput
     update?: XOR<XOR<WordpressIntegrationUpdateToOneWithWhereWithoutPublishLogsInput, WordpressIntegrationUpdateWithoutPublishLogsInput>, WordpressIntegrationUncheckedUpdateWithoutPublishLogsInput>
+  }
+
+  export type CampaignTopicCreateNestedOneWithoutGenerationJobsInput = {
+    create?: XOR<CampaignTopicCreateWithoutGenerationJobsInput, CampaignTopicUncheckedCreateWithoutGenerationJobsInput>
+    connectOrCreate?: CampaignTopicCreateOrConnectWithoutGenerationJobsInput
+    connect?: CampaignTopicWhereUniqueInput
+  }
+
+  export type UserCreateNestedOneWithoutGenerationJobsInput = {
+    create?: XOR<UserCreateWithoutGenerationJobsInput, UserUncheckedCreateWithoutGenerationJobsInput>
+    connectOrCreate?: UserCreateOrConnectWithoutGenerationJobsInput
+    connect?: UserWhereUniqueInput
+  }
+
+  export type GenerationJobPageCreateNestedManyWithoutJobInput = {
+    create?: XOR<GenerationJobPageCreateWithoutJobInput, GenerationJobPageUncheckedCreateWithoutJobInput> | GenerationJobPageCreateWithoutJobInput[] | GenerationJobPageUncheckedCreateWithoutJobInput[]
+    connectOrCreate?: GenerationJobPageCreateOrConnectWithoutJobInput | GenerationJobPageCreateOrConnectWithoutJobInput[]
+    createMany?: GenerationJobPageCreateManyJobInputEnvelope
+    connect?: GenerationJobPageWhereUniqueInput | GenerationJobPageWhereUniqueInput[]
+  }
+
+  export type GenerationJobPageUncheckedCreateNestedManyWithoutJobInput = {
+    create?: XOR<GenerationJobPageCreateWithoutJobInput, GenerationJobPageUncheckedCreateWithoutJobInput> | GenerationJobPageCreateWithoutJobInput[] | GenerationJobPageUncheckedCreateWithoutJobInput[]
+    connectOrCreate?: GenerationJobPageCreateOrConnectWithoutJobInput | GenerationJobPageCreateOrConnectWithoutJobInput[]
+    createMany?: GenerationJobPageCreateManyJobInputEnvelope
+    connect?: GenerationJobPageWhereUniqueInput | GenerationJobPageWhereUniqueInput[]
+  }
+
+  export type CampaignTopicUpdateOneRequiredWithoutGenerationJobsNestedInput = {
+    create?: XOR<CampaignTopicCreateWithoutGenerationJobsInput, CampaignTopicUncheckedCreateWithoutGenerationJobsInput>
+    connectOrCreate?: CampaignTopicCreateOrConnectWithoutGenerationJobsInput
+    upsert?: CampaignTopicUpsertWithoutGenerationJobsInput
+    connect?: CampaignTopicWhereUniqueInput
+    update?: XOR<XOR<CampaignTopicUpdateToOneWithWhereWithoutGenerationJobsInput, CampaignTopicUpdateWithoutGenerationJobsInput>, CampaignTopicUncheckedUpdateWithoutGenerationJobsInput>
+  }
+
+  export type UserUpdateOneRequiredWithoutGenerationJobsNestedInput = {
+    create?: XOR<UserCreateWithoutGenerationJobsInput, UserUncheckedCreateWithoutGenerationJobsInput>
+    connectOrCreate?: UserCreateOrConnectWithoutGenerationJobsInput
+    upsert?: UserUpsertWithoutGenerationJobsInput
+    connect?: UserWhereUniqueInput
+    update?: XOR<XOR<UserUpdateToOneWithWhereWithoutGenerationJobsInput, UserUpdateWithoutGenerationJobsInput>, UserUncheckedUpdateWithoutGenerationJobsInput>
+  }
+
+  export type GenerationJobPageUpdateManyWithoutJobNestedInput = {
+    create?: XOR<GenerationJobPageCreateWithoutJobInput, GenerationJobPageUncheckedCreateWithoutJobInput> | GenerationJobPageCreateWithoutJobInput[] | GenerationJobPageUncheckedCreateWithoutJobInput[]
+    connectOrCreate?: GenerationJobPageCreateOrConnectWithoutJobInput | GenerationJobPageCreateOrConnectWithoutJobInput[]
+    upsert?: GenerationJobPageUpsertWithWhereUniqueWithoutJobInput | GenerationJobPageUpsertWithWhereUniqueWithoutJobInput[]
+    createMany?: GenerationJobPageCreateManyJobInputEnvelope
+    set?: GenerationJobPageWhereUniqueInput | GenerationJobPageWhereUniqueInput[]
+    disconnect?: GenerationJobPageWhereUniqueInput | GenerationJobPageWhereUniqueInput[]
+    delete?: GenerationJobPageWhereUniqueInput | GenerationJobPageWhereUniqueInput[]
+    connect?: GenerationJobPageWhereUniqueInput | GenerationJobPageWhereUniqueInput[]
+    update?: GenerationJobPageUpdateWithWhereUniqueWithoutJobInput | GenerationJobPageUpdateWithWhereUniqueWithoutJobInput[]
+    updateMany?: GenerationJobPageUpdateManyWithWhereWithoutJobInput | GenerationJobPageUpdateManyWithWhereWithoutJobInput[]
+    deleteMany?: GenerationJobPageScalarWhereInput | GenerationJobPageScalarWhereInput[]
+  }
+
+  export type GenerationJobPageUncheckedUpdateManyWithoutJobNestedInput = {
+    create?: XOR<GenerationJobPageCreateWithoutJobInput, GenerationJobPageUncheckedCreateWithoutJobInput> | GenerationJobPageCreateWithoutJobInput[] | GenerationJobPageUncheckedCreateWithoutJobInput[]
+    connectOrCreate?: GenerationJobPageCreateOrConnectWithoutJobInput | GenerationJobPageCreateOrConnectWithoutJobInput[]
+    upsert?: GenerationJobPageUpsertWithWhereUniqueWithoutJobInput | GenerationJobPageUpsertWithWhereUniqueWithoutJobInput[]
+    createMany?: GenerationJobPageCreateManyJobInputEnvelope
+    set?: GenerationJobPageWhereUniqueInput | GenerationJobPageWhereUniqueInput[]
+    disconnect?: GenerationJobPageWhereUniqueInput | GenerationJobPageWhereUniqueInput[]
+    delete?: GenerationJobPageWhereUniqueInput | GenerationJobPageWhereUniqueInput[]
+    connect?: GenerationJobPageWhereUniqueInput | GenerationJobPageWhereUniqueInput[]
+    update?: GenerationJobPageUpdateWithWhereUniqueWithoutJobInput | GenerationJobPageUpdateWithWhereUniqueWithoutJobInput[]
+    updateMany?: GenerationJobPageUpdateManyWithWhereWithoutJobInput | GenerationJobPageUpdateManyWithWhereWithoutJobInput[]
+    deleteMany?: GenerationJobPageScalarWhereInput | GenerationJobPageScalarWhereInput[]
+  }
+
+  export type GenerationJobCreateNestedOneWithoutPagesInput = {
+    create?: XOR<GenerationJobCreateWithoutPagesInput, GenerationJobUncheckedCreateWithoutPagesInput>
+    connectOrCreate?: GenerationJobCreateOrConnectWithoutPagesInput
+    connect?: GenerationJobWhereUniqueInput
+  }
+
+  export type GenerationJobUpdateOneRequiredWithoutPagesNestedInput = {
+    create?: XOR<GenerationJobCreateWithoutPagesInput, GenerationJobUncheckedCreateWithoutPagesInput>
+    connectOrCreate?: GenerationJobCreateOrConnectWithoutPagesInput
+    upsert?: GenerationJobUpsertWithoutPagesInput
+    connect?: GenerationJobWhereUniqueInput
+    update?: XOR<XOR<GenerationJobUpdateToOneWithWhereWithoutPagesInput, GenerationJobUpdateWithoutPagesInput>, GenerationJobUncheckedUpdateWithoutPagesInput>
   }
 
   export type PhraseCreateNestedOneWithoutPhraseScoresInput = {
@@ -56096,6 +59253,13 @@ export namespace Prisma {
     connect?: CampaignKeywordWhereUniqueInput | CampaignKeywordWhereUniqueInput[]
   }
 
+  export type GenerationJobCreateNestedManyWithoutTopicInput = {
+    create?: XOR<GenerationJobCreateWithoutTopicInput, GenerationJobUncheckedCreateWithoutTopicInput> | GenerationJobCreateWithoutTopicInput[] | GenerationJobUncheckedCreateWithoutTopicInput[]
+    connectOrCreate?: GenerationJobCreateOrConnectWithoutTopicInput | GenerationJobCreateOrConnectWithoutTopicInput[]
+    createMany?: GenerationJobCreateManyTopicInputEnvelope
+    connect?: GenerationJobWhereUniqueInput | GenerationJobWhereUniqueInput[]
+  }
+
   export type CampaignPageUncheckedCreateNestedManyWithoutTopicInput = {
     create?: XOR<CampaignPageCreateWithoutTopicInput, CampaignPageUncheckedCreateWithoutTopicInput> | CampaignPageCreateWithoutTopicInput[] | CampaignPageUncheckedCreateWithoutTopicInput[]
     connectOrCreate?: CampaignPageCreateOrConnectWithoutTopicInput | CampaignPageCreateOrConnectWithoutTopicInput[]
@@ -56108,6 +59272,13 @@ export namespace Prisma {
     connectOrCreate?: CampaignKeywordCreateOrConnectWithoutTopicInput | CampaignKeywordCreateOrConnectWithoutTopicInput[]
     createMany?: CampaignKeywordCreateManyTopicInputEnvelope
     connect?: CampaignKeywordWhereUniqueInput | CampaignKeywordWhereUniqueInput[]
+  }
+
+  export type GenerationJobUncheckedCreateNestedManyWithoutTopicInput = {
+    create?: XOR<GenerationJobCreateWithoutTopicInput, GenerationJobUncheckedCreateWithoutTopicInput> | GenerationJobCreateWithoutTopicInput[] | GenerationJobUncheckedCreateWithoutTopicInput[]
+    connectOrCreate?: GenerationJobCreateOrConnectWithoutTopicInput | GenerationJobCreateOrConnectWithoutTopicInput[]
+    createMany?: GenerationJobCreateManyTopicInputEnvelope
+    connect?: GenerationJobWhereUniqueInput | GenerationJobWhereUniqueInput[]
   }
 
   export type EnumCampaignNodeSourceFieldUpdateOperationsInput = {
@@ -56150,6 +59321,20 @@ export namespace Prisma {
     deleteMany?: CampaignKeywordScalarWhereInput | CampaignKeywordScalarWhereInput[]
   }
 
+  export type GenerationJobUpdateManyWithoutTopicNestedInput = {
+    create?: XOR<GenerationJobCreateWithoutTopicInput, GenerationJobUncheckedCreateWithoutTopicInput> | GenerationJobCreateWithoutTopicInput[] | GenerationJobUncheckedCreateWithoutTopicInput[]
+    connectOrCreate?: GenerationJobCreateOrConnectWithoutTopicInput | GenerationJobCreateOrConnectWithoutTopicInput[]
+    upsert?: GenerationJobUpsertWithWhereUniqueWithoutTopicInput | GenerationJobUpsertWithWhereUniqueWithoutTopicInput[]
+    createMany?: GenerationJobCreateManyTopicInputEnvelope
+    set?: GenerationJobWhereUniqueInput | GenerationJobWhereUniqueInput[]
+    disconnect?: GenerationJobWhereUniqueInput | GenerationJobWhereUniqueInput[]
+    delete?: GenerationJobWhereUniqueInput | GenerationJobWhereUniqueInput[]
+    connect?: GenerationJobWhereUniqueInput | GenerationJobWhereUniqueInput[]
+    update?: GenerationJobUpdateWithWhereUniqueWithoutTopicInput | GenerationJobUpdateWithWhereUniqueWithoutTopicInput[]
+    updateMany?: GenerationJobUpdateManyWithWhereWithoutTopicInput | GenerationJobUpdateManyWithWhereWithoutTopicInput[]
+    deleteMany?: GenerationJobScalarWhereInput | GenerationJobScalarWhereInput[]
+  }
+
   export type CampaignPageUncheckedUpdateManyWithoutTopicNestedInput = {
     create?: XOR<CampaignPageCreateWithoutTopicInput, CampaignPageUncheckedCreateWithoutTopicInput> | CampaignPageCreateWithoutTopicInput[] | CampaignPageUncheckedCreateWithoutTopicInput[]
     connectOrCreate?: CampaignPageCreateOrConnectWithoutTopicInput | CampaignPageCreateOrConnectWithoutTopicInput[]
@@ -56176,6 +59361,20 @@ export namespace Prisma {
     update?: CampaignKeywordUpdateWithWhereUniqueWithoutTopicInput | CampaignKeywordUpdateWithWhereUniqueWithoutTopicInput[]
     updateMany?: CampaignKeywordUpdateManyWithWhereWithoutTopicInput | CampaignKeywordUpdateManyWithWhereWithoutTopicInput[]
     deleteMany?: CampaignKeywordScalarWhereInput | CampaignKeywordScalarWhereInput[]
+  }
+
+  export type GenerationJobUncheckedUpdateManyWithoutTopicNestedInput = {
+    create?: XOR<GenerationJobCreateWithoutTopicInput, GenerationJobUncheckedCreateWithoutTopicInput> | GenerationJobCreateWithoutTopicInput[] | GenerationJobUncheckedCreateWithoutTopicInput[]
+    connectOrCreate?: GenerationJobCreateOrConnectWithoutTopicInput | GenerationJobCreateOrConnectWithoutTopicInput[]
+    upsert?: GenerationJobUpsertWithWhereUniqueWithoutTopicInput | GenerationJobUpsertWithWhereUniqueWithoutTopicInput[]
+    createMany?: GenerationJobCreateManyTopicInputEnvelope
+    set?: GenerationJobWhereUniqueInput | GenerationJobWhereUniqueInput[]
+    disconnect?: GenerationJobWhereUniqueInput | GenerationJobWhereUniqueInput[]
+    delete?: GenerationJobWhereUniqueInput | GenerationJobWhereUniqueInput[]
+    connect?: GenerationJobWhereUniqueInput | GenerationJobWhereUniqueInput[]
+    update?: GenerationJobUpdateWithWhereUniqueWithoutTopicInput | GenerationJobUpdateWithWhereUniqueWithoutTopicInput[]
+    updateMany?: GenerationJobUpdateManyWithWhereWithoutTopicInput | GenerationJobUpdateManyWithWhereWithoutTopicInput[]
+    deleteMany?: GenerationJobScalarWhereInput | GenerationJobScalarWhereInput[]
   }
 
   export type CampaignTopicCreateNestedOneWithoutPagesInput = {
@@ -56309,6 +59508,17 @@ export namespace Prisma {
     not?: NestedStringNullableFilter<$PrismaModel> | string | null
   }
 
+  export type NestedDateTimeNullableFilter<$PrismaModel = never> = {
+    equals?: Date | string | DateTimeFieldRefInput<$PrismaModel> | null
+    in?: Date[] | string[] | ListDateTimeFieldRefInput<$PrismaModel> | null
+    notIn?: Date[] | string[] | ListDateTimeFieldRefInput<$PrismaModel> | null
+    lt?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    lte?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    gt?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    gte?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    not?: NestedDateTimeNullableFilter<$PrismaModel> | Date | string | null
+  }
+
   export type NestedDateTimeFilter<$PrismaModel = never> = {
     equals?: Date | string | DateTimeFieldRefInput<$PrismaModel>
     in?: Date[] | string[] | ListDateTimeFieldRefInput<$PrismaModel>
@@ -56390,6 +59600,20 @@ export namespace Prisma {
     gt?: number | IntFieldRefInput<$PrismaModel>
     gte?: number | IntFieldRefInput<$PrismaModel>
     not?: NestedIntNullableFilter<$PrismaModel> | number | null
+  }
+
+  export type NestedDateTimeNullableWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: Date | string | DateTimeFieldRefInput<$PrismaModel> | null
+    in?: Date[] | string[] | ListDateTimeFieldRefInput<$PrismaModel> | null
+    notIn?: Date[] | string[] | ListDateTimeFieldRefInput<$PrismaModel> | null
+    lt?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    lte?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    gt?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    gte?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    not?: NestedDateTimeNullableWithAggregatesFilter<$PrismaModel> | Date | string | null
+    _count?: NestedIntNullableFilter<$PrismaModel>
+    _min?: NestedDateTimeNullableFilter<$PrismaModel>
+    _max?: NestedDateTimeNullableFilter<$PrismaModel>
   }
 
   export type NestedDateTimeWithAggregatesFilter<$PrismaModel = never> = {
@@ -56520,31 +59744,6 @@ export namespace Prisma {
     gt?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
     gte?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
     not?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
-  }
-
-  export type NestedDateTimeNullableFilter<$PrismaModel = never> = {
-    equals?: Date | string | DateTimeFieldRefInput<$PrismaModel> | null
-    in?: Date[] | string[] | ListDateTimeFieldRefInput<$PrismaModel> | null
-    notIn?: Date[] | string[] | ListDateTimeFieldRefInput<$PrismaModel> | null
-    lt?: Date | string | DateTimeFieldRefInput<$PrismaModel>
-    lte?: Date | string | DateTimeFieldRefInput<$PrismaModel>
-    gt?: Date | string | DateTimeFieldRefInput<$PrismaModel>
-    gte?: Date | string | DateTimeFieldRefInput<$PrismaModel>
-    not?: NestedDateTimeNullableFilter<$PrismaModel> | Date | string | null
-  }
-
-  export type NestedDateTimeNullableWithAggregatesFilter<$PrismaModel = never> = {
-    equals?: Date | string | DateTimeFieldRefInput<$PrismaModel> | null
-    in?: Date[] | string[] | ListDateTimeFieldRefInput<$PrismaModel> | null
-    notIn?: Date[] | string[] | ListDateTimeFieldRefInput<$PrismaModel> | null
-    lt?: Date | string | DateTimeFieldRefInput<$PrismaModel>
-    lte?: Date | string | DateTimeFieldRefInput<$PrismaModel>
-    gt?: Date | string | DateTimeFieldRefInput<$PrismaModel>
-    gte?: Date | string | DateTimeFieldRefInput<$PrismaModel>
-    not?: NestedDateTimeNullableWithAggregatesFilter<$PrismaModel> | Date | string | null
-    _count?: NestedIntNullableFilter<$PrismaModel>
-    _min?: NestedDateTimeNullableFilter<$PrismaModel>
-    _max?: NestedDateTimeNullableFilter<$PrismaModel>
   }
 
   export type NestedEnumCampaignNodeSourceFilter<$PrismaModel = never> = {
@@ -56759,6 +59958,35 @@ export namespace Prisma {
     skipDuplicates?: boolean
   }
 
+  export type GenerationJobCreateWithoutUserInput = {
+    jobId: string
+    status?: string
+    startedAt?: Date | string
+    updatedAt?: Date | string
+    topic: CampaignTopicCreateNestedOneWithoutGenerationJobsInput
+    pages?: GenerationJobPageCreateNestedManyWithoutJobInput
+  }
+
+  export type GenerationJobUncheckedCreateWithoutUserInput = {
+    id?: number
+    jobId: string
+    topicId: number
+    status?: string
+    startedAt?: Date | string
+    updatedAt?: Date | string
+    pages?: GenerationJobPageUncheckedCreateNestedManyWithoutJobInput
+  }
+
+  export type GenerationJobCreateOrConnectWithoutUserInput = {
+    where: GenerationJobWhereUniqueInput
+    create: XOR<GenerationJobCreateWithoutUserInput, GenerationJobUncheckedCreateWithoutUserInput>
+  }
+
+  export type GenerationJobCreateManyUserInputEnvelope = {
+    data: GenerationJobCreateManyUserInput | GenerationJobCreateManyUserInput[]
+    skipDuplicates?: boolean
+  }
+
   export type DomainUpsertWithWhereUniqueWithoutUserInput = {
     where: DomainWhereUniqueInput
     update: XOR<DomainUpdateWithoutUserInput, DomainUncheckedUpdateWithoutUserInput>
@@ -56895,6 +60123,35 @@ export namespace Prisma {
     response?: JsonNullableFilter<"WordpressPublishLog">
     createdAt?: DateTimeFilter<"WordpressPublishLog"> | Date | string
     integrationId?: IntNullableFilter<"WordpressPublishLog"> | number | null
+  }
+
+  export type GenerationJobUpsertWithWhereUniqueWithoutUserInput = {
+    where: GenerationJobWhereUniqueInput
+    update: XOR<GenerationJobUpdateWithoutUserInput, GenerationJobUncheckedUpdateWithoutUserInput>
+    create: XOR<GenerationJobCreateWithoutUserInput, GenerationJobUncheckedCreateWithoutUserInput>
+  }
+
+  export type GenerationJobUpdateWithWhereUniqueWithoutUserInput = {
+    where: GenerationJobWhereUniqueInput
+    data: XOR<GenerationJobUpdateWithoutUserInput, GenerationJobUncheckedUpdateWithoutUserInput>
+  }
+
+  export type GenerationJobUpdateManyWithWhereWithoutUserInput = {
+    where: GenerationJobScalarWhereInput
+    data: XOR<GenerationJobUpdateManyMutationInput, GenerationJobUncheckedUpdateManyWithoutUserInput>
+  }
+
+  export type GenerationJobScalarWhereInput = {
+    AND?: GenerationJobScalarWhereInput | GenerationJobScalarWhereInput[]
+    OR?: GenerationJobScalarWhereInput[]
+    NOT?: GenerationJobScalarWhereInput | GenerationJobScalarWhereInput[]
+    id?: IntFilter<"GenerationJob"> | number
+    jobId?: StringFilter<"GenerationJob"> | string
+    topicId?: IntFilter<"GenerationJob"> | number
+    userId?: IntFilter<"GenerationJob"> | number
+    status?: StringFilter<"GenerationJob"> | string
+    startedAt?: DateTimeFilter<"GenerationJob"> | Date | string
+    updatedAt?: DateTimeFilter<"GenerationJob"> | Date | string
   }
 
   export type AnalysisPhaseCreateWithoutDomainInput = {
@@ -57147,11 +60404,14 @@ export namespace Prisma {
     email: string
     password: string
     name?: string | null
+    refreshToken?: string | null
+    refreshTokenExpiry?: Date | string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     googleSearchConsole?: GoogleSearchConsoleConnectionCreateNestedOneWithoutUserInput
     wordpressIntegration?: WordpressIntegrationCreateNestedOneWithoutUserInput
     publishLogs?: WordpressPublishLogCreateNestedManyWithoutUserInput
+    generationJobs?: GenerationJobCreateNestedManyWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutDomainsInput = {
@@ -57159,11 +60419,14 @@ export namespace Prisma {
     email: string
     password: string
     name?: string | null
+    refreshToken?: string | null
+    refreshTokenExpiry?: Date | string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     googleSearchConsole?: GoogleSearchConsoleConnectionUncheckedCreateNestedOneWithoutUserInput
     wordpressIntegration?: WordpressIntegrationUncheckedCreateNestedOneWithoutUserInput
     publishLogs?: WordpressPublishLogUncheckedCreateNestedManyWithoutUserInput
+    generationJobs?: GenerationJobUncheckedCreateNestedManyWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutDomainsInput = {
@@ -57946,11 +61209,14 @@ export namespace Prisma {
     email?: StringFieldUpdateOperationsInput | string
     password?: StringFieldUpdateOperationsInput | string
     name?: NullableStringFieldUpdateOperationsInput | string | null
+    refreshToken?: NullableStringFieldUpdateOperationsInput | string | null
+    refreshTokenExpiry?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     googleSearchConsole?: GoogleSearchConsoleConnectionUpdateOneWithoutUserNestedInput
     wordpressIntegration?: WordpressIntegrationUpdateOneWithoutUserNestedInput
     publishLogs?: WordpressPublishLogUpdateManyWithoutUserNestedInput
+    generationJobs?: GenerationJobUpdateManyWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutDomainsInput = {
@@ -57958,11 +61224,14 @@ export namespace Prisma {
     email?: StringFieldUpdateOperationsInput | string
     password?: StringFieldUpdateOperationsInput | string
     name?: NullableStringFieldUpdateOperationsInput | string | null
+    refreshToken?: NullableStringFieldUpdateOperationsInput | string | null
+    refreshTokenExpiry?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     googleSearchConsole?: GoogleSearchConsoleConnectionUncheckedUpdateOneWithoutUserNestedInput
     wordpressIntegration?: WordpressIntegrationUncheckedUpdateOneWithoutUserNestedInput
     publishLogs?: WordpressPublishLogUncheckedUpdateManyWithoutUserNestedInput
+    generationJobs?: GenerationJobUncheckedUpdateManyWithoutUserNestedInput
   }
 
   export type GeneratedIntentPhraseUpsertWithWhereUniqueWithoutDomainInput = {
@@ -62074,11 +65343,14 @@ export namespace Prisma {
     email: string
     password: string
     name?: string | null
+    refreshToken?: string | null
+    refreshTokenExpiry?: Date | string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     domains?: DomainCreateNestedManyWithoutUserInput
     googleSearchConsole?: GoogleSearchConsoleConnectionCreateNestedOneWithoutUserInput
     publishLogs?: WordpressPublishLogCreateNestedManyWithoutUserInput
+    generationJobs?: GenerationJobCreateNestedManyWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutWordpressIntegrationInput = {
@@ -62086,11 +65358,14 @@ export namespace Prisma {
     email: string
     password: string
     name?: string | null
+    refreshToken?: string | null
+    refreshTokenExpiry?: Date | string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     domains?: DomainUncheckedCreateNestedManyWithoutUserInput
     googleSearchConsole?: GoogleSearchConsoleConnectionUncheckedCreateNestedOneWithoutUserInput
     publishLogs?: WordpressPublishLogUncheckedCreateNestedManyWithoutUserInput
+    generationJobs?: GenerationJobUncheckedCreateNestedManyWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutWordpressIntegrationInput = {
@@ -62146,11 +65421,14 @@ export namespace Prisma {
     email?: StringFieldUpdateOperationsInput | string
     password?: StringFieldUpdateOperationsInput | string
     name?: NullableStringFieldUpdateOperationsInput | string | null
+    refreshToken?: NullableStringFieldUpdateOperationsInput | string | null
+    refreshTokenExpiry?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     domains?: DomainUpdateManyWithoutUserNestedInput
     googleSearchConsole?: GoogleSearchConsoleConnectionUpdateOneWithoutUserNestedInput
     publishLogs?: WordpressPublishLogUpdateManyWithoutUserNestedInput
+    generationJobs?: GenerationJobUpdateManyWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutWordpressIntegrationInput = {
@@ -62158,11 +65436,14 @@ export namespace Prisma {
     email?: StringFieldUpdateOperationsInput | string
     password?: StringFieldUpdateOperationsInput | string
     name?: NullableStringFieldUpdateOperationsInput | string | null
+    refreshToken?: NullableStringFieldUpdateOperationsInput | string | null
+    refreshTokenExpiry?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     domains?: DomainUncheckedUpdateManyWithoutUserNestedInput
     googleSearchConsole?: GoogleSearchConsoleConnectionUncheckedUpdateOneWithoutUserNestedInput
     publishLogs?: WordpressPublishLogUncheckedUpdateManyWithoutUserNestedInput
+    generationJobs?: GenerationJobUncheckedUpdateManyWithoutUserNestedInput
   }
 
   export type WordpressPublishLogUpsertWithWhereUniqueWithoutIntegrationInput = {
@@ -62185,11 +65466,14 @@ export namespace Prisma {
     email: string
     password: string
     name?: string | null
+    refreshToken?: string | null
+    refreshTokenExpiry?: Date | string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     domains?: DomainCreateNestedManyWithoutUserInput
     googleSearchConsole?: GoogleSearchConsoleConnectionCreateNestedOneWithoutUserInput
     wordpressIntegration?: WordpressIntegrationCreateNestedOneWithoutUserInput
+    generationJobs?: GenerationJobCreateNestedManyWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutPublishLogsInput = {
@@ -62197,11 +65481,14 @@ export namespace Prisma {
     email: string
     password: string
     name?: string | null
+    refreshToken?: string | null
+    refreshTokenExpiry?: Date | string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     domains?: DomainUncheckedCreateNestedManyWithoutUserInput
     googleSearchConsole?: GoogleSearchConsoleConnectionUncheckedCreateNestedOneWithoutUserInput
     wordpressIntegration?: WordpressIntegrationUncheckedCreateNestedOneWithoutUserInput
+    generationJobs?: GenerationJobUncheckedCreateNestedManyWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutPublishLogsInput = {
@@ -62250,11 +65537,14 @@ export namespace Prisma {
     email?: StringFieldUpdateOperationsInput | string
     password?: StringFieldUpdateOperationsInput | string
     name?: NullableStringFieldUpdateOperationsInput | string | null
+    refreshToken?: NullableStringFieldUpdateOperationsInput | string | null
+    refreshTokenExpiry?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     domains?: DomainUpdateManyWithoutUserNestedInput
     googleSearchConsole?: GoogleSearchConsoleConnectionUpdateOneWithoutUserNestedInput
     wordpressIntegration?: WordpressIntegrationUpdateOneWithoutUserNestedInput
+    generationJobs?: GenerationJobUpdateManyWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutPublishLogsInput = {
@@ -62262,11 +65552,14 @@ export namespace Prisma {
     email?: StringFieldUpdateOperationsInput | string
     password?: StringFieldUpdateOperationsInput | string
     name?: NullableStringFieldUpdateOperationsInput | string | null
+    refreshToken?: NullableStringFieldUpdateOperationsInput | string | null
+    refreshTokenExpiry?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     domains?: DomainUncheckedUpdateManyWithoutUserNestedInput
     googleSearchConsole?: GoogleSearchConsoleConnectionUncheckedUpdateOneWithoutUserNestedInput
     wordpressIntegration?: WordpressIntegrationUncheckedUpdateOneWithoutUserNestedInput
+    generationJobs?: GenerationJobUncheckedUpdateManyWithoutUserNestedInput
   }
 
   export type WordpressIntegrationUpsertWithoutPublishLogsInput = {
@@ -62298,6 +65591,279 @@ export namespace Prisma {
     password?: StringFieldUpdateOperationsInput | string
     lastPublishedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type CampaignTopicCreateWithoutGenerationJobsInput = {
+    title: string
+    description?: string | null
+    status?: string
+    source?: $Enums.CampaignNodeSource
+    order?: number
+    aiMetadata?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    campaign: CampaignCreateNestedOneWithoutTopicsInput
+    pages?: CampaignPageCreateNestedManyWithoutTopicInput
+    keywords?: CampaignKeywordCreateNestedManyWithoutTopicInput
+  }
+
+  export type CampaignTopicUncheckedCreateWithoutGenerationJobsInput = {
+    id?: number
+    campaignId: number
+    title: string
+    description?: string | null
+    status?: string
+    source?: $Enums.CampaignNodeSource
+    order?: number
+    aiMetadata?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    pages?: CampaignPageUncheckedCreateNestedManyWithoutTopicInput
+    keywords?: CampaignKeywordUncheckedCreateNestedManyWithoutTopicInput
+  }
+
+  export type CampaignTopicCreateOrConnectWithoutGenerationJobsInput = {
+    where: CampaignTopicWhereUniqueInput
+    create: XOR<CampaignTopicCreateWithoutGenerationJobsInput, CampaignTopicUncheckedCreateWithoutGenerationJobsInput>
+  }
+
+  export type UserCreateWithoutGenerationJobsInput = {
+    email: string
+    password: string
+    name?: string | null
+    refreshToken?: string | null
+    refreshTokenExpiry?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    domains?: DomainCreateNestedManyWithoutUserInput
+    googleSearchConsole?: GoogleSearchConsoleConnectionCreateNestedOneWithoutUserInput
+    wordpressIntegration?: WordpressIntegrationCreateNestedOneWithoutUserInput
+    publishLogs?: WordpressPublishLogCreateNestedManyWithoutUserInput
+  }
+
+  export type UserUncheckedCreateWithoutGenerationJobsInput = {
+    id?: number
+    email: string
+    password: string
+    name?: string | null
+    refreshToken?: string | null
+    refreshTokenExpiry?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    domains?: DomainUncheckedCreateNestedManyWithoutUserInput
+    googleSearchConsole?: GoogleSearchConsoleConnectionUncheckedCreateNestedOneWithoutUserInput
+    wordpressIntegration?: WordpressIntegrationUncheckedCreateNestedOneWithoutUserInput
+    publishLogs?: WordpressPublishLogUncheckedCreateNestedManyWithoutUserInput
+  }
+
+  export type UserCreateOrConnectWithoutGenerationJobsInput = {
+    where: UserWhereUniqueInput
+    create: XOR<UserCreateWithoutGenerationJobsInput, UserUncheckedCreateWithoutGenerationJobsInput>
+  }
+
+  export type GenerationJobPageCreateWithoutJobInput = {
+    pageId: number
+    pageType: string
+    status?: string
+    draftId?: number | null
+    primaryKeyword?: string | null
+    progress?: number | null
+    error?: string | null
+    hasHtml?: boolean
+    updatedAt?: Date | string
+    createdAt?: Date | string
+  }
+
+  export type GenerationJobPageUncheckedCreateWithoutJobInput = {
+    id?: number
+    pageId: number
+    pageType: string
+    status?: string
+    draftId?: number | null
+    primaryKeyword?: string | null
+    progress?: number | null
+    error?: string | null
+    hasHtml?: boolean
+    updatedAt?: Date | string
+    createdAt?: Date | string
+  }
+
+  export type GenerationJobPageCreateOrConnectWithoutJobInput = {
+    where: GenerationJobPageWhereUniqueInput
+    create: XOR<GenerationJobPageCreateWithoutJobInput, GenerationJobPageUncheckedCreateWithoutJobInput>
+  }
+
+  export type GenerationJobPageCreateManyJobInputEnvelope = {
+    data: GenerationJobPageCreateManyJobInput | GenerationJobPageCreateManyJobInput[]
+    skipDuplicates?: boolean
+  }
+
+  export type CampaignTopicUpsertWithoutGenerationJobsInput = {
+    update: XOR<CampaignTopicUpdateWithoutGenerationJobsInput, CampaignTopicUncheckedUpdateWithoutGenerationJobsInput>
+    create: XOR<CampaignTopicCreateWithoutGenerationJobsInput, CampaignTopicUncheckedCreateWithoutGenerationJobsInput>
+    where?: CampaignTopicWhereInput
+  }
+
+  export type CampaignTopicUpdateToOneWithWhereWithoutGenerationJobsInput = {
+    where?: CampaignTopicWhereInput
+    data: XOR<CampaignTopicUpdateWithoutGenerationJobsInput, CampaignTopicUncheckedUpdateWithoutGenerationJobsInput>
+  }
+
+  export type CampaignTopicUpdateWithoutGenerationJobsInput = {
+    title?: StringFieldUpdateOperationsInput | string
+    description?: NullableStringFieldUpdateOperationsInput | string | null
+    status?: StringFieldUpdateOperationsInput | string
+    source?: EnumCampaignNodeSourceFieldUpdateOperationsInput | $Enums.CampaignNodeSource
+    order?: IntFieldUpdateOperationsInput | number
+    aiMetadata?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    campaign?: CampaignUpdateOneRequiredWithoutTopicsNestedInput
+    pages?: CampaignPageUpdateManyWithoutTopicNestedInput
+    keywords?: CampaignKeywordUpdateManyWithoutTopicNestedInput
+  }
+
+  export type CampaignTopicUncheckedUpdateWithoutGenerationJobsInput = {
+    id?: IntFieldUpdateOperationsInput | number
+    campaignId?: IntFieldUpdateOperationsInput | number
+    title?: StringFieldUpdateOperationsInput | string
+    description?: NullableStringFieldUpdateOperationsInput | string | null
+    status?: StringFieldUpdateOperationsInput | string
+    source?: EnumCampaignNodeSourceFieldUpdateOperationsInput | $Enums.CampaignNodeSource
+    order?: IntFieldUpdateOperationsInput | number
+    aiMetadata?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    pages?: CampaignPageUncheckedUpdateManyWithoutTopicNestedInput
+    keywords?: CampaignKeywordUncheckedUpdateManyWithoutTopicNestedInput
+  }
+
+  export type UserUpsertWithoutGenerationJobsInput = {
+    update: XOR<UserUpdateWithoutGenerationJobsInput, UserUncheckedUpdateWithoutGenerationJobsInput>
+    create: XOR<UserCreateWithoutGenerationJobsInput, UserUncheckedCreateWithoutGenerationJobsInput>
+    where?: UserWhereInput
+  }
+
+  export type UserUpdateToOneWithWhereWithoutGenerationJobsInput = {
+    where?: UserWhereInput
+    data: XOR<UserUpdateWithoutGenerationJobsInput, UserUncheckedUpdateWithoutGenerationJobsInput>
+  }
+
+  export type UserUpdateWithoutGenerationJobsInput = {
+    email?: StringFieldUpdateOperationsInput | string
+    password?: StringFieldUpdateOperationsInput | string
+    name?: NullableStringFieldUpdateOperationsInput | string | null
+    refreshToken?: NullableStringFieldUpdateOperationsInput | string | null
+    refreshTokenExpiry?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    domains?: DomainUpdateManyWithoutUserNestedInput
+    googleSearchConsole?: GoogleSearchConsoleConnectionUpdateOneWithoutUserNestedInput
+    wordpressIntegration?: WordpressIntegrationUpdateOneWithoutUserNestedInput
+    publishLogs?: WordpressPublishLogUpdateManyWithoutUserNestedInput
+  }
+
+  export type UserUncheckedUpdateWithoutGenerationJobsInput = {
+    id?: IntFieldUpdateOperationsInput | number
+    email?: StringFieldUpdateOperationsInput | string
+    password?: StringFieldUpdateOperationsInput | string
+    name?: NullableStringFieldUpdateOperationsInput | string | null
+    refreshToken?: NullableStringFieldUpdateOperationsInput | string | null
+    refreshTokenExpiry?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    domains?: DomainUncheckedUpdateManyWithoutUserNestedInput
+    googleSearchConsole?: GoogleSearchConsoleConnectionUncheckedUpdateOneWithoutUserNestedInput
+    wordpressIntegration?: WordpressIntegrationUncheckedUpdateOneWithoutUserNestedInput
+    publishLogs?: WordpressPublishLogUncheckedUpdateManyWithoutUserNestedInput
+  }
+
+  export type GenerationJobPageUpsertWithWhereUniqueWithoutJobInput = {
+    where: GenerationJobPageWhereUniqueInput
+    update: XOR<GenerationJobPageUpdateWithoutJobInput, GenerationJobPageUncheckedUpdateWithoutJobInput>
+    create: XOR<GenerationJobPageCreateWithoutJobInput, GenerationJobPageUncheckedCreateWithoutJobInput>
+  }
+
+  export type GenerationJobPageUpdateWithWhereUniqueWithoutJobInput = {
+    where: GenerationJobPageWhereUniqueInput
+    data: XOR<GenerationJobPageUpdateWithoutJobInput, GenerationJobPageUncheckedUpdateWithoutJobInput>
+  }
+
+  export type GenerationJobPageUpdateManyWithWhereWithoutJobInput = {
+    where: GenerationJobPageScalarWhereInput
+    data: XOR<GenerationJobPageUpdateManyMutationInput, GenerationJobPageUncheckedUpdateManyWithoutJobInput>
+  }
+
+  export type GenerationJobPageScalarWhereInput = {
+    AND?: GenerationJobPageScalarWhereInput | GenerationJobPageScalarWhereInput[]
+    OR?: GenerationJobPageScalarWhereInput[]
+    NOT?: GenerationJobPageScalarWhereInput | GenerationJobPageScalarWhereInput[]
+    id?: IntFilter<"GenerationJobPage"> | number
+    jobId?: StringFilter<"GenerationJobPage"> | string
+    pageId?: IntFilter<"GenerationJobPage"> | number
+    pageType?: StringFilter<"GenerationJobPage"> | string
+    status?: StringFilter<"GenerationJobPage"> | string
+    draftId?: IntNullableFilter<"GenerationJobPage"> | number | null
+    primaryKeyword?: StringNullableFilter<"GenerationJobPage"> | string | null
+    progress?: IntNullableFilter<"GenerationJobPage"> | number | null
+    error?: StringNullableFilter<"GenerationJobPage"> | string | null
+    hasHtml?: BoolFilter<"GenerationJobPage"> | boolean
+    updatedAt?: DateTimeFilter<"GenerationJobPage"> | Date | string
+    createdAt?: DateTimeFilter<"GenerationJobPage"> | Date | string
+  }
+
+  export type GenerationJobCreateWithoutPagesInput = {
+    jobId: string
+    status?: string
+    startedAt?: Date | string
+    updatedAt?: Date | string
+    topic: CampaignTopicCreateNestedOneWithoutGenerationJobsInput
+    user: UserCreateNestedOneWithoutGenerationJobsInput
+  }
+
+  export type GenerationJobUncheckedCreateWithoutPagesInput = {
+    id?: number
+    jobId: string
+    topicId: number
+    userId: number
+    status?: string
+    startedAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type GenerationJobCreateOrConnectWithoutPagesInput = {
+    where: GenerationJobWhereUniqueInput
+    create: XOR<GenerationJobCreateWithoutPagesInput, GenerationJobUncheckedCreateWithoutPagesInput>
+  }
+
+  export type GenerationJobUpsertWithoutPagesInput = {
+    update: XOR<GenerationJobUpdateWithoutPagesInput, GenerationJobUncheckedUpdateWithoutPagesInput>
+    create: XOR<GenerationJobCreateWithoutPagesInput, GenerationJobUncheckedCreateWithoutPagesInput>
+    where?: GenerationJobWhereInput
+  }
+
+  export type GenerationJobUpdateToOneWithWhereWithoutPagesInput = {
+    where?: GenerationJobWhereInput
+    data: XOR<GenerationJobUpdateWithoutPagesInput, GenerationJobUncheckedUpdateWithoutPagesInput>
+  }
+
+  export type GenerationJobUpdateWithoutPagesInput = {
+    jobId?: StringFieldUpdateOperationsInput | string
+    status?: StringFieldUpdateOperationsInput | string
+    startedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    topic?: CampaignTopicUpdateOneRequiredWithoutGenerationJobsNestedInput
+    user?: UserUpdateOneRequiredWithoutGenerationJobsNestedInput
+  }
+
+  export type GenerationJobUncheckedUpdateWithoutPagesInput = {
+    id?: IntFieldUpdateOperationsInput | number
+    jobId?: StringFieldUpdateOperationsInput | string
+    topicId?: IntFieldUpdateOperationsInput | number
+    userId?: IntFieldUpdateOperationsInput | number
+    status?: StringFieldUpdateOperationsInput | string
+    startedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
@@ -64050,11 +67616,14 @@ export namespace Prisma {
     email: string
     password: string
     name?: string | null
+    refreshToken?: string | null
+    refreshTokenExpiry?: Date | string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     domains?: DomainCreateNestedManyWithoutUserInput
     wordpressIntegration?: WordpressIntegrationCreateNestedOneWithoutUserInput
     publishLogs?: WordpressPublishLogCreateNestedManyWithoutUserInput
+    generationJobs?: GenerationJobCreateNestedManyWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutGoogleSearchConsoleInput = {
@@ -64062,11 +67631,14 @@ export namespace Prisma {
     email: string
     password: string
     name?: string | null
+    refreshToken?: string | null
+    refreshTokenExpiry?: Date | string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     domains?: DomainUncheckedCreateNestedManyWithoutUserInput
     wordpressIntegration?: WordpressIntegrationUncheckedCreateNestedOneWithoutUserInput
     publishLogs?: WordpressPublishLogUncheckedCreateNestedManyWithoutUserInput
+    generationJobs?: GenerationJobUncheckedCreateNestedManyWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutGoogleSearchConsoleInput = {
@@ -64089,11 +67661,14 @@ export namespace Prisma {
     email?: StringFieldUpdateOperationsInput | string
     password?: StringFieldUpdateOperationsInput | string
     name?: NullableStringFieldUpdateOperationsInput | string | null
+    refreshToken?: NullableStringFieldUpdateOperationsInput | string | null
+    refreshTokenExpiry?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     domains?: DomainUpdateManyWithoutUserNestedInput
     wordpressIntegration?: WordpressIntegrationUpdateOneWithoutUserNestedInput
     publishLogs?: WordpressPublishLogUpdateManyWithoutUserNestedInput
+    generationJobs?: GenerationJobUpdateManyWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutGoogleSearchConsoleInput = {
@@ -64101,11 +67676,14 @@ export namespace Prisma {
     email?: StringFieldUpdateOperationsInput | string
     password?: StringFieldUpdateOperationsInput | string
     name?: NullableStringFieldUpdateOperationsInput | string | null
+    refreshToken?: NullableStringFieldUpdateOperationsInput | string | null
+    refreshTokenExpiry?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     domains?: DomainUncheckedUpdateManyWithoutUserNestedInput
     wordpressIntegration?: WordpressIntegrationUncheckedUpdateOneWithoutUserNestedInput
     publishLogs?: WordpressPublishLogUncheckedUpdateManyWithoutUserNestedInput
+    generationJobs?: GenerationJobUncheckedUpdateManyWithoutUserNestedInput
   }
 
   export type DomainCreateWithoutCampaignsInput = {
@@ -64201,6 +67779,7 @@ export namespace Prisma {
     updatedAt?: Date | string
     pages?: CampaignPageCreateNestedManyWithoutTopicInput
     keywords?: CampaignKeywordCreateNestedManyWithoutTopicInput
+    generationJobs?: GenerationJobCreateNestedManyWithoutTopicInput
   }
 
   export type CampaignTopicUncheckedCreateWithoutCampaignInput = {
@@ -64215,6 +67794,7 @@ export namespace Prisma {
     updatedAt?: Date | string
     pages?: CampaignPageUncheckedCreateNestedManyWithoutTopicInput
     keywords?: CampaignKeywordUncheckedCreateNestedManyWithoutTopicInput
+    generationJobs?: GenerationJobUncheckedCreateNestedManyWithoutTopicInput
   }
 
   export type CampaignTopicCreateOrConnectWithoutCampaignInput = {
@@ -64447,6 +68027,35 @@ export namespace Prisma {
     skipDuplicates?: boolean
   }
 
+  export type GenerationJobCreateWithoutTopicInput = {
+    jobId: string
+    status?: string
+    startedAt?: Date | string
+    updatedAt?: Date | string
+    user: UserCreateNestedOneWithoutGenerationJobsInput
+    pages?: GenerationJobPageCreateNestedManyWithoutJobInput
+  }
+
+  export type GenerationJobUncheckedCreateWithoutTopicInput = {
+    id?: number
+    jobId: string
+    userId: number
+    status?: string
+    startedAt?: Date | string
+    updatedAt?: Date | string
+    pages?: GenerationJobPageUncheckedCreateNestedManyWithoutJobInput
+  }
+
+  export type GenerationJobCreateOrConnectWithoutTopicInput = {
+    where: GenerationJobWhereUniqueInput
+    create: XOR<GenerationJobCreateWithoutTopicInput, GenerationJobUncheckedCreateWithoutTopicInput>
+  }
+
+  export type GenerationJobCreateManyTopicInputEnvelope = {
+    data: GenerationJobCreateManyTopicInput | GenerationJobCreateManyTopicInput[]
+    skipDuplicates?: boolean
+  }
+
   export type CampaignUpsertWithoutTopicsInput = {
     update: XOR<CampaignUpdateWithoutTopicsInput, CampaignUncheckedUpdateWithoutTopicsInput>
     create: XOR<CampaignCreateWithoutTopicsInput, CampaignUncheckedCreateWithoutTopicsInput>
@@ -64544,6 +68153,22 @@ export namespace Prisma {
     updatedAt?: DateTimeFilter<"CampaignKeyword"> | Date | string
   }
 
+  export type GenerationJobUpsertWithWhereUniqueWithoutTopicInput = {
+    where: GenerationJobWhereUniqueInput
+    update: XOR<GenerationJobUpdateWithoutTopicInput, GenerationJobUncheckedUpdateWithoutTopicInput>
+    create: XOR<GenerationJobCreateWithoutTopicInput, GenerationJobUncheckedCreateWithoutTopicInput>
+  }
+
+  export type GenerationJobUpdateWithWhereUniqueWithoutTopicInput = {
+    where: GenerationJobWhereUniqueInput
+    data: XOR<GenerationJobUpdateWithoutTopicInput, GenerationJobUncheckedUpdateWithoutTopicInput>
+  }
+
+  export type GenerationJobUpdateManyWithWhereWithoutTopicInput = {
+    where: GenerationJobScalarWhereInput
+    data: XOR<GenerationJobUpdateManyMutationInput, GenerationJobUncheckedUpdateManyWithoutTopicInput>
+  }
+
   export type CampaignTopicCreateWithoutPagesInput = {
     title: string
     description?: string | null
@@ -64555,6 +68180,7 @@ export namespace Prisma {
     updatedAt?: Date | string
     campaign: CampaignCreateNestedOneWithoutTopicsInput
     keywords?: CampaignKeywordCreateNestedManyWithoutTopicInput
+    generationJobs?: GenerationJobCreateNestedManyWithoutTopicInput
   }
 
   export type CampaignTopicUncheckedCreateWithoutPagesInput = {
@@ -64569,6 +68195,7 @@ export namespace Prisma {
     createdAt?: Date | string
     updatedAt?: Date | string
     keywords?: CampaignKeywordUncheckedCreateNestedManyWithoutTopicInput
+    generationJobs?: GenerationJobUncheckedCreateNestedManyWithoutTopicInput
   }
 
   export type CampaignTopicCreateOrConnectWithoutPagesInput = {
@@ -64635,6 +68262,7 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     campaign?: CampaignUpdateOneRequiredWithoutTopicsNestedInput
     keywords?: CampaignKeywordUpdateManyWithoutTopicNestedInput
+    generationJobs?: GenerationJobUpdateManyWithoutTopicNestedInput
   }
 
   export type CampaignTopicUncheckedUpdateWithoutPagesInput = {
@@ -64649,6 +68277,7 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     keywords?: CampaignKeywordUncheckedUpdateManyWithoutTopicNestedInput
+    generationJobs?: GenerationJobUncheckedUpdateManyWithoutTopicNestedInput
   }
 
   export type CampaignKeywordUpsertWithWhereUniqueWithoutPageInput = {
@@ -64678,6 +68307,7 @@ export namespace Prisma {
     updatedAt?: Date | string
     campaign: CampaignCreateNestedOneWithoutTopicsInput
     pages?: CampaignPageCreateNestedManyWithoutTopicInput
+    generationJobs?: GenerationJobCreateNestedManyWithoutTopicInput
   }
 
   export type CampaignTopicUncheckedCreateWithoutKeywordsInput = {
@@ -64692,6 +68322,7 @@ export namespace Prisma {
     createdAt?: Date | string
     updatedAt?: Date | string
     pages?: CampaignPageUncheckedCreateNestedManyWithoutTopicInput
+    generationJobs?: GenerationJobUncheckedCreateNestedManyWithoutTopicInput
   }
 
   export type CampaignTopicCreateOrConnectWithoutKeywordsInput = {
@@ -64757,6 +68388,7 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     campaign?: CampaignUpdateOneRequiredWithoutTopicsNestedInput
     pages?: CampaignPageUpdateManyWithoutTopicNestedInput
+    generationJobs?: GenerationJobUpdateManyWithoutTopicNestedInput
   }
 
   export type CampaignTopicUncheckedUpdateWithoutKeywordsInput = {
@@ -64771,6 +68403,7 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     pages?: CampaignPageUncheckedUpdateManyWithoutTopicNestedInput
+    generationJobs?: GenerationJobUncheckedUpdateManyWithoutTopicNestedInput
   }
 
   export type CampaignPageUpsertWithoutKeywordsInput = {
@@ -64841,6 +68474,15 @@ export namespace Prisma {
     response?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: Date | string
     integrationId?: number | null
+  }
+
+  export type GenerationJobCreateManyUserInput = {
+    id?: number
+    jobId: string
+    topicId: number
+    status?: string
+    startedAt?: Date | string
+    updatedAt?: Date | string
   }
 
   export type DomainUpdateWithoutUserInput = {
@@ -64969,6 +68611,34 @@ export namespace Prisma {
     response?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     integrationId?: NullableIntFieldUpdateOperationsInput | number | null
+  }
+
+  export type GenerationJobUpdateWithoutUserInput = {
+    jobId?: StringFieldUpdateOperationsInput | string
+    status?: StringFieldUpdateOperationsInput | string
+    startedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    topic?: CampaignTopicUpdateOneRequiredWithoutGenerationJobsNestedInput
+    pages?: GenerationJobPageUpdateManyWithoutJobNestedInput
+  }
+
+  export type GenerationJobUncheckedUpdateWithoutUserInput = {
+    id?: IntFieldUpdateOperationsInput | number
+    jobId?: StringFieldUpdateOperationsInput | string
+    topicId?: IntFieldUpdateOperationsInput | number
+    status?: StringFieldUpdateOperationsInput | string
+    startedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    pages?: GenerationJobPageUncheckedUpdateManyWithoutJobNestedInput
+  }
+
+  export type GenerationJobUncheckedUpdateManyWithoutUserInput = {
+    id?: IntFieldUpdateOperationsInput | number
+    jobId?: StringFieldUpdateOperationsInput | string
+    topicId?: IntFieldUpdateOperationsInput | number
+    status?: StringFieldUpdateOperationsInput | string
+    startedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
   export type AnalysisPhaseCreateManyDomainInput = {
@@ -66454,6 +70124,61 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
+  export type GenerationJobPageCreateManyJobInput = {
+    id?: number
+    pageId: number
+    pageType: string
+    status?: string
+    draftId?: number | null
+    primaryKeyword?: string | null
+    progress?: number | null
+    error?: string | null
+    hasHtml?: boolean
+    updatedAt?: Date | string
+    createdAt?: Date | string
+  }
+
+  export type GenerationJobPageUpdateWithoutJobInput = {
+    pageId?: IntFieldUpdateOperationsInput | number
+    pageType?: StringFieldUpdateOperationsInput | string
+    status?: StringFieldUpdateOperationsInput | string
+    draftId?: NullableIntFieldUpdateOperationsInput | number | null
+    primaryKeyword?: NullableStringFieldUpdateOperationsInput | string | null
+    progress?: NullableIntFieldUpdateOperationsInput | number | null
+    error?: NullableStringFieldUpdateOperationsInput | string | null
+    hasHtml?: BoolFieldUpdateOperationsInput | boolean
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type GenerationJobPageUncheckedUpdateWithoutJobInput = {
+    id?: IntFieldUpdateOperationsInput | number
+    pageId?: IntFieldUpdateOperationsInput | number
+    pageType?: StringFieldUpdateOperationsInput | string
+    status?: StringFieldUpdateOperationsInput | string
+    draftId?: NullableIntFieldUpdateOperationsInput | number | null
+    primaryKeyword?: NullableStringFieldUpdateOperationsInput | string | null
+    progress?: NullableIntFieldUpdateOperationsInput | number | null
+    error?: NullableStringFieldUpdateOperationsInput | string | null
+    hasHtml?: BoolFieldUpdateOperationsInput | boolean
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type GenerationJobPageUncheckedUpdateManyWithoutJobInput = {
+    id?: IntFieldUpdateOperationsInput | number
+    pageId?: IntFieldUpdateOperationsInput | number
+    pageType?: StringFieldUpdateOperationsInput | string
+    status?: StringFieldUpdateOperationsInput | string
+    draftId?: NullableIntFieldUpdateOperationsInput | number | null
+    primaryKeyword?: NullableStringFieldUpdateOperationsInput | string | null
+    progress?: NullableIntFieldUpdateOperationsInput | number | null
+    error?: NullableStringFieldUpdateOperationsInput | string | null
+    hasHtml?: BoolFieldUpdateOperationsInput | boolean
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
   export type AIQueryResultCreateManyPhraseInput = {
     id?: number
     model: string
@@ -66663,6 +70388,7 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     pages?: CampaignPageUpdateManyWithoutTopicNestedInput
     keywords?: CampaignKeywordUpdateManyWithoutTopicNestedInput
+    generationJobs?: GenerationJobUpdateManyWithoutTopicNestedInput
   }
 
   export type CampaignTopicUncheckedUpdateWithoutCampaignInput = {
@@ -66677,6 +70403,7 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     pages?: CampaignPageUncheckedUpdateManyWithoutTopicNestedInput
     keywords?: CampaignKeywordUncheckedUpdateManyWithoutTopicNestedInput
+    generationJobs?: GenerationJobUncheckedUpdateManyWithoutTopicNestedInput
   }
 
   export type CampaignTopicUncheckedUpdateManyWithoutCampaignInput = {
@@ -66717,6 +70444,15 @@ export namespace Prisma {
     source?: $Enums.CampaignNodeSource
     aiMetadata?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type GenerationJobCreateManyTopicInput = {
+    id?: number
+    jobId: string
+    userId: number
+    status?: string
+    startedAt?: Date | string
     updatedAt?: Date | string
   }
 
@@ -66804,6 +70540,34 @@ export namespace Prisma {
     source?: EnumCampaignNodeSourceFieldUpdateOperationsInput | $Enums.CampaignNodeSource
     aiMetadata?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type GenerationJobUpdateWithoutTopicInput = {
+    jobId?: StringFieldUpdateOperationsInput | string
+    status?: StringFieldUpdateOperationsInput | string
+    startedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    user?: UserUpdateOneRequiredWithoutGenerationJobsNestedInput
+    pages?: GenerationJobPageUpdateManyWithoutJobNestedInput
+  }
+
+  export type GenerationJobUncheckedUpdateWithoutTopicInput = {
+    id?: IntFieldUpdateOperationsInput | number
+    jobId?: StringFieldUpdateOperationsInput | string
+    userId?: IntFieldUpdateOperationsInput | number
+    status?: StringFieldUpdateOperationsInput | string
+    startedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    pages?: GenerationJobPageUncheckedUpdateManyWithoutJobNestedInput
+  }
+
+  export type GenerationJobUncheckedUpdateManyWithoutTopicInput = {
+    id?: IntFieldUpdateOperationsInput | number
+    jobId?: StringFieldUpdateOperationsInput | string
+    userId?: IntFieldUpdateOperationsInput | number
+    status?: StringFieldUpdateOperationsInput | string
+    startedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 

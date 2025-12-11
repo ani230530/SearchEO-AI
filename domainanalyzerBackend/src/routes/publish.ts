@@ -414,6 +414,7 @@ router.post(
     const authReq = req as AuthenticatedRequest;
     const userId = authReq.user.userId;
     const {
+      draftId,
       primaryKeyword,
       htmlContent,
       featuredImage,
@@ -439,6 +440,20 @@ router.post(
       });
     }
 
+    // If draftId is provided, check if draft exists and can be published
+    let existingDraft = null;
+    if (draftId) {
+      existingDraft = await prisma.wordpressPublishLog.findFirst({
+        where: { id: Number(draftId), userId },
+      });
+      if (!existingDraft) {
+        return res.status(404).json({
+          success: false,
+          error: 'Draft not found',
+        });
+      }
+    }
+
     const decryptedPassword = decryptToken(integration.password);
     const payload = [
       {
@@ -456,6 +471,49 @@ router.post(
 
     try {
       const response = await callWebhook(PUBLISH_WEBHOOK_URL, payload);
+      
+      // Check if response is empty or invalid
+      const isResponseEmpty = 
+        !response || 
+        response === '' || 
+        (Array.isArray(response) && response.length === 0) ||
+        (typeof response === 'object' && Object.keys(response).length === 0);
+      
+      if (isResponseEmpty) {
+        // Empty response means publishing failed
+        const updateData = {
+          status: 'draft', // Keep as draft so View button still works, but don't mark as published
+          wordpressUrl: existingDraft?.wordpressUrl || 'draft://pending',
+          primaryKeyword,
+          title,
+          slug,
+          response: { error: 'Empty response from publishing service', originalResponse: response },
+          integrationId: integration.id,
+        };
+
+        if (existingDraft) {
+          await prisma.$transaction([
+            prisma.wordpressPublishLog.update({
+              where: { id: existingDraft.id },
+              data: updateData,
+            }),
+          ]);
+
+          return res.status(500).json({
+            success: false,
+            error: 'Publishing failed: Empty response from publishing service',
+            draftId: existingDraft.id,
+            publishedUrl: null,
+            status: 'draft',
+          });
+        } else {
+          return res.status(500).json({
+            success: false,
+            error: 'Publishing failed: Empty response from publishing service',
+          });
+        }
+      }
+      
       const entry = Array.isArray(response) ? response[0] : response;
 
       // Extract the published post URL - prioritize Link (actual post URL) over base WordPress URL
@@ -470,35 +528,126 @@ router.post(
         getStringValue(entry?.link) ??
         getStringValue(entry?.['wordpress url']) ??
         getStringValue(entry?.wordpressUrl) ??
-        (typeof integration.siteUrl === 'string' ? integration.siteUrl : '');
+        undefined;
 
-      await prisma.$transaction([
-        prisma.wordpressPublishLog.create({
-          data: {
-            userId,
-            wordpressUrl: publishedUrl,
-            primaryKeyword,
-            title,
-            slug: entry?.slug ?? slug,
-            status: entry?.Status ?? entry?.status ?? 'submitted',
-            response,
-            integrationId: integration.id,
-          },
-        }),
-        prisma.wordpressIntegration.update({
-          where: { userId },
-          data: {
-            lastPublishedAt: new Date(),
-          },
-        }),
-      ]);
+      // Determine status: published if we have a URL that's different from base siteUrl, otherwise keep as draft (failed)
+      const baseSiteUrl = typeof integration.siteUrl === 'string' ? integration.siteUrl.trim() : '';
+      const hasValidUrl = publishedUrl && publishedUrl !== baseSiteUrl && !publishedUrl.startsWith('draft://');
+      
+      // Only mark as published if we have a valid URL, otherwise treat as failed and keep as draft
+      // This ensures we only mark as published when publishing is truly successful
+      // Only mark as published if we have a valid URL - otherwise treat as failed
+      if (!hasValidUrl) {
+        // Publishing failed - no valid URL returned
+        const updateData = {
+          status: existingDraft?.status || 'draft', // Keep existing status (draft/completed) so View button still works
+          wordpressUrl: existingDraft?.wordpressUrl || 'draft://pending',
+          primaryKeyword,
+          title,
+          slug: entry?.slug ?? slug,
+          response,
+          integrationId: integration.id,
+        };
 
-      res.json({
-        success: true,
-        result: response,
-      });
+        if (existingDraft) {
+          await prisma.wordpressPublishLog.update({
+            where: { id: existingDraft.id },
+            data: updateData,
+          });
+
+          return res.status(500).json({
+            success: false,
+            error: 'Publishing failed: No valid published URL returned from publishing service',
+            draftId: existingDraft.id,
+            publishedUrl: null,
+            status: updateData.status,
+          });
+        } else {
+          return res.status(500).json({
+            success: false,
+            error: 'Publishing failed: No valid published URL returned from publishing service',
+          });
+        }
+      }
+
+      // Publishing successful - we have a valid URL
+      const finalStatus = 'published';
+      const finalUrl = publishedUrl!;
+
+      const updateData = {
+        wordpressUrl: finalUrl,
+        primaryKeyword,
+        title,
+        slug: entry?.slug ?? slug,
+        status: finalStatus,
+        response,
+        integrationId: integration.id,
+      };
+
+      if (existingDraft) {
+        // Update existing draft to published status
+        await prisma.$transaction([
+          prisma.wordpressPublishLog.update({
+            where: { id: existingDraft.id },
+            data: updateData,
+          }),
+          prisma.wordpressIntegration.update({
+            where: { userId },
+            data: {
+              lastPublishedAt: new Date(),
+            },
+          }),
+        ]);
+
+        res.json({
+          success: true,
+          result: response,
+          draftId: existingDraft.id,
+          publishedUrl: finalUrl,
+          status: finalStatus,
+        });
+      } else {
+        // Create new entry (for backward compatibility)
+        const newEntry = await prisma.$transaction([
+          prisma.wordpressPublishLog.create({
+            data: {
+              userId,
+              ...updateData,
+            },
+          }),
+          prisma.wordpressIntegration.update({
+            where: { userId },
+            data: {
+              lastPublishedAt: new Date(),
+            },
+          }),
+        ]);
+
+        res.json({
+          success: true,
+          result: response,
+          draftId: newEntry[0].id,
+          publishedUrl: finalUrl,
+          status: finalStatus,
+        });
+      }
     } catch (error: any) {
       console.error('Error publishing content:', error?.response?.data || error);
+      
+      // If we have a draftId, keep it as draft (not failed) so View button still works
+      if (existingDraft) {
+        try {
+          await prisma.wordpressPublishLog.update({
+            where: { id: existingDraft.id },
+            data: {
+              status: 'draft', // Keep as draft so user can still view and retry
+            },
+          });
+        } catch (updateError) {
+          console.error('Error updating draft status:', updateError);
+        }
+      }
+      
       res.status(500).json({
         success: false,
         error: 'Failed to publish content to WordPress',
@@ -770,6 +919,47 @@ router.post(
         error: 'Failed to save draft',
       });
     }
+  })
+);
+
+router.get(
+  '/drafts/:draftId',
+  authenticateToken,
+  asyncHandler(async (req: Request, res: Response) => {
+    const authReq = req as AuthenticatedRequest;
+    const userId = authReq.user.userId;
+    const draftId = parseInt(req.params.draftId, 10);
+
+    if (isNaN(draftId)) {
+      return res.status(400).json({ success: false, error: 'Invalid draft ID' });
+    }
+
+    const draft = await prisma.wordpressPublishLog.findFirst({
+      where: {
+        id: draftId,
+        userId
+      }
+    });
+
+    if (!draft) {
+      return res.status(404).json({ success: false, error: 'Draft not found' });
+    }
+
+    const response = draft.response as any;
+    
+    res.json({
+      success: true,
+      draft: {
+        htmlContent: response.htmlContent || response['Html Content'] || '',
+        title: response.title || response.Title || draft.title,
+        metaDescription: response.metaDescription || response['Meta Description'] || '',
+        slug: response.slug || response.Slug || draft.slug,
+        featuredImage: response.featuredImage || response['Featured Image'] || '',
+        primaryKeyword: draft.primaryKeyword || '',
+        longtailKeywords: response.longtailKeywords || response['longtail keywords'] || '',
+        wordpressUrl: draft.wordpressUrl
+      }
+    });
   })
 );
 

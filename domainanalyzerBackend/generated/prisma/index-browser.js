@@ -125,6 +125,8 @@ exports.Prisma.UserScalarFieldEnum = {
   email: 'email',
   password: 'password',
   name: 'name',
+  refreshToken: 'refreshToken',
+  refreshTokenExpiry: 'refreshTokenExpiry',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 };
@@ -431,6 +433,31 @@ exports.Prisma.WordpressPublishLogScalarFieldEnum = {
   integrationId: 'integrationId'
 };
 
+exports.Prisma.GenerationJobScalarFieldEnum = {
+  id: 'id',
+  jobId: 'jobId',
+  topicId: 'topicId',
+  userId: 'userId',
+  status: 'status',
+  startedAt: 'startedAt',
+  updatedAt: 'updatedAt'
+};
+
+exports.Prisma.GenerationJobPageScalarFieldEnum = {
+  id: 'id',
+  jobId: 'jobId',
+  pageId: 'pageId',
+  pageType: 'pageType',
+  status: 'status',
+  draftId: 'draftId',
+  primaryKeyword: 'primaryKeyword',
+  progress: 'progress',
+  error: 'error',
+  hasHtml: 'hasHtml',
+  updatedAt: 'updatedAt',
+  createdAt: 'createdAt'
+};
+
 exports.Prisma.PhraseScoreScalarFieldEnum = {
   id: 'id',
   phraseId: 'phraseId',
@@ -649,6 +676,8 @@ exports.Prisma.ModelName = {
   PhraseIntentClassification: 'PhraseIntentClassification',
   WordpressIntegration: 'WordpressIntegration',
   WordpressPublishLog: 'WordpressPublishLog',
+  GenerationJob: 'GenerationJob',
+  GenerationJobPage: 'GenerationJobPage',
   PhraseScore: 'PhraseScore',
   IntentPhraseGeneration: 'IntentPhraseGeneration',
   CommunityMiningResult: 'CommunityMiningResult',

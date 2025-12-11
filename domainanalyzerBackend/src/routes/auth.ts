@@ -138,4 +138,33 @@ router.post('/verify', asyncHandler(async (req: Request, res: Response) => {
   }
 }));
 
+// POST /api/auth/refresh - Refresh access token
+router.post('/refresh', asyncHandler(async (req: Request, res: Response) => {
+  const { refreshToken } = req.body;
+
+  if (!refreshToken) {
+    res.status(400).json({ error: 'Refresh token is required' });
+    return;
+  }
+
+  try {
+    const result = await authService.refreshAccessToken(refreshToken);
+    res.json(result);
+  } catch (error) {
+    if (error instanceof Error) {
+      if (error.message.includes('expired') || error.message.includes('Invalid')) {
+        res.status(401).json({ error: error.message });
+        return;
+      }
+    }
+    throw error;
+  }
+}));
+
+// POST /api/auth/logout - Logout and invalidate refresh token
+router.post('/logout', authenticateToken, asyncHandler(async (req: Request, res: Response) => {
+  await authService.invalidateRefreshToken(req.user!.userId);
+  res.json({ message: 'Logged out successfully' });
+}));
+
 export default router; 

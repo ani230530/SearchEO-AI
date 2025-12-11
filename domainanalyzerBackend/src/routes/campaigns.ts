@@ -9,15 +9,88 @@ import {
 } from '../services/campaignAiService';
 import axios from 'axios';
 import { decryptToken } from '../services/tokenEncryption';
+import { authService } from '../services/authService';
 
 const router = Router();
 const prisma = new PrismaClient();
+
+// Helper to compute aggregate job status
+const computeJobStatus = (pages: { status: string }[]) => {
+  if (pages.every(p => p.status === 'completed')) return 'completed';
+  if (pages.some(p => p.status === 'failed')) return 'failed';
+  if (pages.some(p => p.status === 'generating')) return 'generating';
+  return 'pending';
+};
 
 function asyncHandler(fn: (req: Request, res: Response, next: any) => Promise<any>) {
   return function (req: Request, res: Response, next: any) {
     Promise.resolve(fn(req, res, next)).catch(next);
   };
 }
+
+// SSE endpoint for generation updates (auth via token query param because EventSource cannot set headers)
+router.get('/events', async (req: Request, res: Response) => {
+  try {
+    const token = (req.query.token as string) || '';
+    if (!token) {
+      return res.status(401).end();
+    }
+
+    const decoded = await authService.verifyToken(token);
+    const userId = decoded.userId;
+
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    (res as any).flushHeaders?.();
+
+    const client: SSEClient = { res };
+    addSSEClient(userId, client);
+
+    res.write(`: connected\n\n`);
+    const keepAlive = setInterval(() => {
+      res.write(': keep-alive\n\n');
+    }, 25000);
+
+    req.on('close', () => {
+      clearInterval(keepAlive);
+      removeSSEClient(userId, client);
+      res.end();
+    });
+  } catch (error) {
+    console.error('SSE auth error', error);
+    return res.status(403).end();
+  }
+});
+
+// --- SSE support for generation updates (per-user) ---
+type SSEClient = { res: Response };
+const sseClients = new Map<number, Set<SSEClient>>();
+
+const addSSEClient = (userId: number, client: SSEClient) => {
+  if (!sseClients.has(userId)) sseClients.set(userId, new Set());
+  sseClients.get(userId)!.add(client);
+};
+
+const removeSSEClient = (userId: number, client: SSEClient) => {
+  const set = sseClients.get(userId);
+  if (!set) return;
+  set.delete(client);
+  if (set.size === 0) sseClients.delete(userId);
+};
+
+const broadcastToUser = (userId: number, event: any) => {
+  const set = sseClients.get(userId);
+  if (!set) return;
+  const payload = `data: ${JSON.stringify(event)}\n\n`;
+  for (const client of set) {
+    try {
+      client.res.write(payload);
+    } catch (err) {
+      console.error('SSE write error', err);
+    }
+  }
+};
 
 type CampaignWithStructure = Prisma.CampaignGetPayload<{
   include: {
@@ -1159,10 +1232,24 @@ router.post('/topics/:topicId/generate-content', authenticateToken, asyncHandler
   // Create generation job
   const jobId = `job_${topicId}_${Date.now()}`;
   
-  // Create draft entries for each page
+  // Upsert draft entries for each page (update if exists, create if not)
+  // Each page has only one draft - we update it on regenerate
+  // Since pageId is stored in JSON, fetch all user drafts and match by pageId
+  const allUserDrafts = await prisma.wordpressPublishLog.findMany({
+    where: { userId }
+  });
+
+  const findDraftByPageId = (pageId: number) => {
+    return allUserDrafts.find(draft => {
+      const resp = draft.response as any;
+      return resp?.pageId === pageId;
+    });
+  };
+
   const draftPromises = [
-    prisma.wordpressPublishLog.create({
-      data: {
+    (async () => {
+      const existingDraft = findDraftByPageId(pillarPage.id);
+      const draftData = {
         userId,
         primaryKeyword: pillarPage.keywords[0]?.term || pillarPage.title,
         title: `${pillarPage.title} - Generating...`,
@@ -1175,11 +1262,25 @@ router.post('/topics/:topicId/generate-content', authenticateToken, asyncHandler
           status: 'pending'
         },
         integrationId: integration.id,
+      };
+
+      if (existingDraft) {
+        // Update existing draft (overwrite HTML on regenerate)
+        return prisma.wordpressPublishLog.update({
+          where: { id: existingDraft.id },
+          data: draftData
+        });
+      } else {
+        // Create new draft
+        return prisma.wordpressPublishLog.create({
+          data: draftData
+        });
       }
-    }),
+    })(),
     ...subPages.map(subPage =>
-      prisma.wordpressPublishLog.create({
-        data: {
+      (async () => {
+        const existingDraft = findDraftByPageId(subPage.id);
+        const draftData = {
           userId,
           primaryKeyword: subPage.keywords[0]?.term || subPage.title,
           title: `${subPage.title} - Generating...`,
@@ -1192,12 +1293,80 @@ router.post('/topics/:topicId/generate-content', authenticateToken, asyncHandler
             status: 'pending'
           },
           integrationId: integration.id,
+        };
+
+        if (existingDraft) {
+          // Update existing draft (overwrite HTML on regenerate)
+          return prisma.wordpressPublishLog.update({
+            where: { id: existingDraft.id },
+            data: draftData
+          });
+        } else {
+          // Create new draft
+          return prisma.wordpressPublishLog.create({
+            data: draftData
+          });
         }
-      })
+      })()
     )
   ];
 
   const drafts = await Promise.all(draftPromises);
+
+  // Create generation job and page rows
+  await prisma.generationJob.create({
+    data: {
+      jobId,
+      topicId,
+      userId,
+      status: 'generating',
+      pages: {
+        create: [
+          {
+            pageId: pillarPage.id,
+            pageType: 'pillar',
+            status: 'pending',
+            draftId: drafts[0].id,
+            primaryKeyword: pillarPage.keywords[0]?.term || pillarPage.title,
+          },
+          ...subPages.map((sp, idx) => ({
+            pageId: sp.id,
+            pageType: 'subpage',
+            status: 'pending',
+            draftId: drafts[idx + 1].id,
+            primaryKeyword: sp.keywords[0]?.term || sp.title,
+          }))
+        ]
+      }
+    }
+  });
+
+  // Broadcast initial pending drafts to SSE clients
+  broadcastToUser(userId, {
+    type: 'drafts',
+    jobId,
+    topicId,
+    pages: [
+      {
+        pageId: pillarPage.id,
+        pageType: 'pillar',
+        status: 'pending',
+        draftId: drafts[0].id,
+        primaryKeyword: pillarPage.keywords[0]?.term || pillarPage.title,
+        hasHtml: false,
+        progress: 0
+      },
+      ...subPages.map((sp, idx) => ({
+        pageId: sp.id,
+        pageType: 'subpage',
+        status: 'pending',
+        draftId: drafts[idx + 1].id,
+        primaryKeyword: sp.keywords[0]?.term || sp.title,
+        hasHtml: false,
+        progress: 0
+      }))
+    ]
+  });
 
   // Call n8n webhook asynchronously (don't wait for response)
   const decryptedPassword = decryptToken(integration.password);
@@ -1206,18 +1375,37 @@ router.post('/topics/:topicId/generate-content', authenticateToken, asyncHandler
     ?.replace(/^www\./i, '')
     ?.split('/')[0] || 'Brand';
 
+  // Construct callback URL from environment variable (for deployment/prod) or fallback to request host
+  // Set CALLBACK_BASE_URL env var in deployment/production (e.g., https://your-domain.com)
+  // For local development, it will use the request host
+  const callbackBaseUrl = process.env.CALLBACK_BASE_URL || `${req.protocol}://${req.get('host')}`;
+  const callbackUrl = `${callbackBaseUrl}/api/campaigns/generation-webhook`;
+
   const payload = {
     ...req.body,
     // Include job_id so n8n can return it in the callback
     // job_id is unique and sufficient to identify the request
     job_id: jobId,
-    callback_url: `${req.protocol}://${req.get('host')}/api/campaigns/generation-webhook`, // URL for n8n to call back
+    callback_url: callbackUrl, // Environment-based callback URL for n8n to call back
     wordpress: {
       username: integration.username,
       password: decryptedPassword,
       url: integration.siteUrl,
     }
   };
+
+  // Log sanitized payload details for debugging (avoid logging passwords)
+  console.log('[generation-init] Sending payload to n8n', {
+    jobId,
+    topicId,
+    campaignId: topic.campaignId,
+    pillarKeyword: pillarPage.keywords[0]?.term || pillarPage.title,
+    subPageCount: subPages.length,
+    callbackUrl: payload.callback_url,
+    callbackBaseUrl: callbackBaseUrl, // Log the base URL used
+    wordpressUrl: payload.wordpress?.url,
+    usingEnvCallbackUrl: !!process.env.CALLBACK_BASE_URL, // Indicate if env var is set
+  });
 
   // Fire and forget - process in background
   const PILLAR_WEBHOOK_URL = process.env.N8N_PILLAR_WEBHOOK_URL || 'https://n8n.srv891599.hstgr.cloud/webhook/d235dd55-3392-4093-b3dd-095baf5c337b';
@@ -1243,6 +1431,12 @@ router.post('/topics/:topicId/generate-content', authenticateToken, asyncHandler
       }).then((response) => {
         // Success! n8n returned response (unlikely but possible)
         console.log(`[n8n request] Received response for job ${jobId}. Status: ${response.status}`);
+        console.log('[n8n request] Response body (truncated)', {
+          jobId,
+          status: response.status,
+          bodyType: Array.isArray(response.data) ? 'array' : typeof response.data,
+          pages: Array.isArray(response.data) ? response.data.length : 1,
+        });
         
         // Process the response immediately
         const pages = Array.isArray(response.data) ? response.data : [response.data];
@@ -1252,6 +1446,11 @@ router.post('/topics/:topicId/generate-content', authenticateToken, asyncHandler
         if (error.response?.data) {
           console.log(`[n8n request] Got response data despite timeout for job ${jobId}`);
           const pages = Array.isArray(error.response.data) ? error.response.data : [error.response.data];
+          console.log('[n8n request] Timeout body (truncated)', {
+            jobId,
+            pages: pages.length,
+            keys: Object.keys(pages[0] || {}),
+          });
           await processN8nResponse(pages, drafts, jobId);
           return;
         }
@@ -1297,6 +1496,7 @@ router.post('/topics/:topicId/generate-content', authenticateToken, asyncHandler
         
         for (const page of pages) {
           const primaryKeyword = page['Primary Keyword'] || page.primaryKeyword || '';
+          const html = page['Html Content'] || page.htmlContent || '';
           
           if (!primaryKeyword) {
             console.warn('[n8n response] Page missing primary keyword');
@@ -1319,7 +1519,7 @@ router.post('/topics/:topicId/generate-content', authenticateToken, asyncHandler
                 slug: page.slug || page.Slug || null,
                 response: {
                   ...currentResponse,
-                  htmlContent: page['Html Content'] || page.htmlContent || '',
+                  htmlContent: html,
                   title: page.Title || page.title,
                   metaDescription: page['Meta Description'] || page.metaDescription,
                   slug: page.slug || page.Slug,
@@ -1329,7 +1529,13 @@ router.post('/topics/:topicId/generate-content', authenticateToken, asyncHandler
                 }
               }
             });
-            console.log(`[n8n response] Updated draft ${matchingDraft.id} for "${primaryKeyword}"`);
+            console.log(`[n8n response] Updated draft ${matchingDraft.id} for "${primaryKeyword}"`, {
+              jobId: jobIdStr,
+              htmlLength: typeof html === 'string' ? html.length : 0,
+              hasTitle: Boolean(page.Title || page.title),
+              hasMeta: Boolean(page['Meta Description'] || page.metaDescription),
+              hasSlug: Boolean(page.slug || page.Slug),
+            });
           }
         }
       }
@@ -1614,6 +1820,15 @@ router.get('/generation-status/:jobId', authenticateToken, asyncHandler(async (r
  */
 router.post('/generation-webhook', asyncHandler(async (req: Request, res: Response) => {
   try {
+    // Log the full n8n response for debugging
+    console.log('[generation-webhook] ===== N8N RESPONSE RECEIVED =====');
+    console.log('[generation-webhook] Full request body from n8n:', JSON.stringify(req.body, null, 2));
+    console.log('[generation-webhook] Request headers:', {
+      'content-type': req.headers['content-type'],
+      'user-agent': req.headers['user-agent'],
+      'x-forwarded-for': req.headers['x-forwarded-for'],
+    });
+    
     // n8n can send data in different formats:
     // 1. Object with job_id and pages array
     // 2. Direct array of pages (with job_id in each page or first page)
@@ -1633,111 +1848,375 @@ router.post('/generation-webhook', asyncHandler(async (req: Request, res: Respon
       pages = [req.body];
       jobId = req.body.job_id || req.body.jobId || req.body['Job Id'] || null;
     }
+  
+    console.log('[generation-webhook] Parsed payload summary', {
+      isArray: Array.isArray(req.body),
+      topLevelKeys: typeof req.body === 'object' && req.body ? Object.keys(req.body) : [],
+      pagesCount: pages?.length || 0,
+      jobId,
+      pageKeywords: pages.map((p: any) => p['Primary Keyword'] || p.primaryKeyword || 'N/A').slice(0, 5), // First 5 keywords
+    });
+    
+    // STRICT VALIDATION: Require job_id at top level
+    if (!jobId) {
+      console.error('[generation-webhook] REJECTED: Missing job_id in payload');
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Invalid payload: job_id is required' 
+      });
+    }
     
     if (!pages || pages.length === 0) {
-      console.warn('[generation-webhook] Received empty or invalid payload');
+      console.error('[generation-webhook] REJECTED: No pages found in payload');
       return res.status(400).json({ success: false, error: 'Invalid payload: no pages found' });
     }
     
-    if (!jobId) {
-      console.warn('[generation-webhook] Missing job_id - will try to match by primary keyword only');
-    } else {
-      console.log(`[generation-webhook] Received ${pages.length} pages for job_id: ${jobId}`);
-    }
+    console.log(`[generation-webhook] Processing ${pages.length} pages for job_id: ${jobId}`);
     
-    // Find all drafts with this job_id (job_id is unique, so this is reliable)
-    let allDrafts: any[] = [];
-    if (jobId) {
-      const allUserDrafts = await prisma.wordpressPublishLog.findMany({
-        where: {
-          status: 'generating'
-        }
-      });
-      
-      allDrafts = allUserDrafts.filter(draft => {
-        const resp = draft.response as any;
-        return resp?.jobId === jobId;
-      });
-      
-      if (allDrafts.length === 0) {
-        console.warn(`[generation-webhook] No drafts found with job_id: ${jobId}`);
-      } else {
-        console.log(`[generation-webhook] Found ${allDrafts.length} drafts for job_id: ${jobId}`);
+    // Find all drafts with this job_id
+    const allUserDrafts = await prisma.wordpressPublishLog.findMany({
+      where: {
+        status: { in: ['generating', 'draft'] }
       }
+    });
+    
+    const allDrafts = allUserDrafts.filter(draft => {
+      const resp = draft.response as any;
+      return resp?.jobId === jobId;
+    });
+    
+    if (allDrafts.length === 0) {
+      console.warn(`[generation-webhook] No drafts found with job_id: ${jobId}`);
+    } else {
+      console.log(`[generation-webhook] Found ${allDrafts.length} drafts for job_id: ${jobId}`);
     }
     
-    // Match pages to drafts using job_id (most reliable)
+    const processedPages: string[] = [];
+    const skippedPages: string[] = [];
+    
+    // Match pages to drafts using job_id + Primary Keyword (STRICT VALIDATION)
     for (const page of pages) {
       const primaryKeyword = page['Primary Keyword'] || page.primaryKeyword || '';
-      const pageJobId = page['Job Id'] || page.job_id || page.jobId || jobId;
+      const htmlContent = page['Html Content'] || page.htmlContent || '';
       
+      // STRICT VALIDATION: Require Primary Keyword
       if (!primaryKeyword) {
-        console.warn('[generation-webhook] Page missing primary keyword:', page);
+        console.error(`[generation-webhook] REJECTED: Page missing Primary Keyword:`, {
+          hasTitle: !!page.Title,
+          hasHtmlContent: !!htmlContent,
+          keys: Object.keys(page)
+        });
+        skippedPages.push('missing Primary Keyword');
+        await prisma.generationJobPage.updateMany({
+          where: { jobId, pageId: page.pageId || undefined },
+          data: { status: 'failed', error: 'Missing Primary Keyword', hasHtml: false, progress: 0 }
+        });
         continue;
       }
       
-      // Try to find draft by job_id + primary keyword (most reliable)
-      let draft = null;
-      
-      if (pageJobId && allDrafts.length > 0) {
-        draft = allDrafts.find(d => d.primaryKeyword === primaryKeyword);
-        
-        if (draft) {
-          console.log(`[generation-webhook] Matched draft by job_id (${pageJobId}) + keyword (${primaryKeyword})`);
-        }
+      // STRICT VALIDATION: Require Html Content
+      if (!htmlContent || htmlContent.trim() === '') {
+        console.error(`[generation-webhook] REJECTED: Page "${primaryKeyword}" missing Html Content`);
+        skippedPages.push(`${primaryKeyword} (missing Html Content)`);
+        await prisma.generationJobPage.updateMany({
+          where: { jobId, pageId: page.pageId || undefined },
+          data: { status: 'failed', error: 'Missing Html Content', hasHtml: false, progress: 0 }
+        });
+        continue;
       }
       
-      // Fallback: Find by primary keyword only (if job_id not available)
+      // Find draft by job_id + primary keyword
+      const draft = allDrafts.find(d => d.primaryKeyword === primaryKeyword);
+      
       if (!draft) {
-        draft = await prisma.wordpressPublishLog.findFirst({
-          where: {
-            primaryKeyword: primaryKeyword,
-            status: 'generating'
-          },
-          orderBy: {
-            createdAt: 'desc'
-          }
-        });
-        
-        if (draft) {
-          console.log(`[generation-webhook] Matched draft by keyword only (${primaryKeyword}) - WARNING: less reliable`);
-        }
+        console.warn(`[generation-webhook] No draft found for keyword "${primaryKeyword}" with job_id: ${jobId}`);
+        skippedPages.push(`${primaryKeyword} (draft not found)`);
+        continue;
       }
       
-      if (draft) {
-        const currentResponse = draft.response as any;
-        const jobId = currentResponse?.jobId;
-        
-        await prisma.wordpressPublishLog.update({
-          where: { id: draft.id },
-          data: {
-            status: 'draft',
-            title: page.Title || page.title || draft.title,
-            slug: page.slug || page.Slug || null,
-            response: {
-              ...currentResponse,
-              htmlContent: page['Html Content'] || page.htmlContent || '',
-              title: page.Title || page.title,
-              metaDescription: page['Meta Description'] || page.metaDescription,
-              slug: page.slug || page.Slug,
-              featuredImage: page['Featured Image'] || page.featuredImage,
-              status: 'completed',
-              completedAt: new Date().toISOString()
-            }
-          }
-        });
-        
-        console.log(`[generation-webhook] Updated draft ${draft.id} for keyword "${primaryKeyword}" (job: ${jobId || 'unknown'})`);
-      } else {
-        console.warn(`[generation-webhook] Could not find draft for keyword "${primaryKeyword}"`);
+      // UPSERT: Update existing draft (each page has only one draft)
+      const currentResponse = draft.response as any;
+      const pageId = currentResponse?.pageId || draft.pageId;
+      
+      if (!pageId) {
+        console.warn(`[generation-webhook] Draft ${draft.id} missing pageId, skipping update`);
+        skippedPages.push(`${primaryKeyword} (missing pageId)`);
+        continue;
       }
+      
+      // Update draft with new HTML content (overwrites existing)
+      const updatedDraft = await prisma.wordpressPublishLog.update({
+        where: { id: draft.id },
+        data: {
+          status: 'draft',
+          title: page.Title || page.title || draft.title,
+          slug: page.slug || page.Slug || draft.slug || null,
+          response: {
+            ...currentResponse,
+            htmlContent: htmlContent,
+            title: page.Title || page.title || draft.title,
+            metaDescription: page['Meta Description'] || page.metaDescription || currentResponse?.metaDescription,
+            slug: page.slug || page.Slug || draft.slug || null,
+            featuredImage: page['Featured Image'] || page.featuredImage || currentResponse?.featuredImage,
+            status: 'completed',
+            completedAt: new Date().toISOString()
+          }
+        }
+      });
+      
+      // Update GenerationJobPage and aggregate job status
+      await prisma.generationJobPage.updateMany({
+        where: { jobId, pageId },
+        data: {
+          status: 'completed',
+          draftId: updatedDraft.id,
+          hasHtml: true,
+          progress: 100
+        }
+      });
+
+      const jobPages = await prisma.generationJobPage.findMany({ where: { jobId } });
+      await prisma.generationJob.update({
+        where: { jobId },
+        data: { status: computeJobStatus(jobPages) }
+      });
+
+      // Lookup topic for SSE broadcast
+      const pageRecord = await prisma.campaignPage.findUnique({
+        where: { id: pageId },
+        select: { topicId: true, pageType: true }
+      });
+      
+      if (pageRecord?.topicId) {
+        broadcastToUser(draft.userId, {
+          type: 'drafts',
+          jobId,
+          topicId: pageRecord.topicId,
+          pages: [{
+            pageId,
+            pageType: pageRecord.pageType.toLowerCase(),
+            status: 'completed',
+            draftId: updatedDraft.id,
+            primaryKeyword,
+            hasHtml: true,
+            progress: 100
+          }]
+        });
+      }
+      
+      processedPages.push(primaryKeyword);
+      console.log(`[generation-webhook] ✅ Updated draft ${draft.id} for pageId ${pageId}, keyword "${primaryKeyword}"`);
+      console.log(`[generation-webhook] Page details for "${primaryKeyword}":`, {
+        hasTitle: !!page.Title,
+        hasHtmlContent: !!htmlContent,
+        htmlContentLength: htmlContent?.length || 0,
+        hasSlug: !!page.slug,
+        hasMetaDescription: !!page['Meta Description'],
+        hasFeaturedImage: !!page['Featured Image'],
+      });
     }
     
-    res.json({ success: true, message: `Processed ${pages.length} pages` });
+    // If nothing processed, mark drafts and job pages as failed
+    if (processedPages.length === 0 && allDrafts.length > 0) {
+      await prisma.wordpressPublishLog.updateMany({
+        where: { id: { in: allDrafts.map((d) => d.id) } },
+        data: {
+          status: 'draft',
+          response: {
+            ...((allDrafts[0].response as any) || {}),
+            jobId,
+            status: 'failed',
+            error: 'No pages processed in webhook response'
+          }
+        }
+      });
+      await prisma.generationJobPage.updateMany({
+        where: { jobId },
+        data: {
+          status: 'failed',
+          error: 'No pages processed in webhook response',
+          hasHtml: false,
+          progress: 0
+        }
+      });
+      await prisma.generationJob.update({
+        where: { jobId },
+        data: { status: 'failed' }
+      });
+    } else {
+      // Update job aggregate status
+      const jobPages = await prisma.generationJobPage.findMany({ where: { jobId } });
+      await prisma.generationJob.update({
+        where: { jobId },
+        data: { status: computeJobStatus(jobPages) }
+      });
+    }
+
+    // Log final processing summary
+    console.log('[generation-webhook] ===== PROCESSING SUMMARY =====');
+    console.log('[generation-webhook] Job ID:', jobId);
+    console.log('[generation-webhook] Total pages received:', pages.length);
+    console.log('[generation-webhook] Successfully processed:', processedPages.length, processedPages);
+    console.log('[generation-webhook] Skipped:', skippedPages.length, skippedPages.length > 0 ? skippedPages : 'none');
+    console.log('[generation-webhook] ==============================');
+
+    const result = {
+      success: true,
+      message: `Processed ${processedPages.length} pages`,
+      processed: processedPages,
+      skipped: skippedPages.length > 0 ? skippedPages : undefined
+    };
+    
+    if (skippedPages.length > 0) {
+      console.warn(`[generation-webhook] ⚠️ Skipped ${skippedPages.length} pages:`, skippedPages);
+    }
+    
+    res.json(result);
   } catch (error: any) {
-    console.error('[generation-webhook] Error processing webhook:', error);
+    console.error('[generation-webhook] ===== ERROR PROCESSING N8N RESPONSE =====');
+    console.error('[generation-webhook] Error details:', {
+      message: error.message,
+      stack: error.stack,
+      name: error.name,
+    });
+    console.error('[generation-webhook] Request body that caused error:', JSON.stringify(req.body, null, 2));
+    console.error('[generation-webhook] ===========================================');
     res.status(500).json({ success: false, error: error.message });
   }
+}));
+
+/**
+ * GET /api/campaigns/topics/:topicId/drafts-status
+ * Returns draft status for all pages in a topic so the frontend can show View Page after reload.
+ */
+router.get('/topics/:topicId/drafts-status', authenticateToken, asyncHandler(async (req: Request, res: Response) => {
+  const authReq = req as AuthenticatedRequest;
+  const userId = authReq.user.userId;
+  const topicId = parseInt(req.params.topicId, 10);
+
+  if (isNaN(topicId)) {
+    return res.status(400).json({ success: false, error: 'Invalid topic ID' });
+  }
+
+  const topic = await prisma.campaignTopic.findFirst({
+    where: {
+      id: topicId,
+      campaign: {
+        domain: {
+          userId,
+          isCompanyDomain: true
+        }
+      }
+    },
+    include: {
+      pages: {
+        select: {
+          id: true,
+          pageType: true,
+          order: true
+        }
+      }
+    }
+  });
+
+  if (!topic) {
+    return res.status(404).json({ success: false, error: 'Topic not found' });
+  }
+
+  const pageIds = (topic.pages || []).map((p) => p.id);
+  if (pageIds.length === 0) {
+    return res.json({ success: true, pages: [] });
+  }
+
+  // Fetch latest job for this topic
+  const latestJob = await prisma.generationJob.findFirst({
+    where: { topicId, userId },
+    orderBy: { startedAt: 'desc' },
+    include: { pages: true }
+  });
+
+  if (!latestJob) {
+    // No job yet, return pending for all pages
+    return res.json({
+      success: true,
+      pages: pageIds.map((pageId) => ({
+        pageId,
+        pageType: topic.pages.find(p => p.id === pageId)?.pageType || 'pillar',
+        status: 'pending' as const,
+        draftId: null,
+        jobId: null,
+        primaryKeyword: null,
+        progress: 0,
+        hasHtml: false,
+        updatedAt: null,
+      }))
+    });
+  }
+
+  // Map job pages - use Promise.all for async draft fetching
+  const pages = await Promise.all(
+    pageIds.map(async (pageId) => {
+      const pageStatus = latestJob.pages.find(p => p.pageId === pageId);
+      if (!pageStatus) {
+        return {
+          pageId,
+          pageType: topic.pages.find(p => p.id === pageId)?.pageType || 'pillar',
+          status: 'pending' as const,
+          draftId: null,
+          jobId: latestJob.jobId,
+          primaryKeyword: null,
+          progress: 0,
+          hasHtml: false,
+          updatedAt: null,
+          wordpressUrl: null,
+        };
+      }
+
+      // Pull latest draft if available
+      const draftId = pageStatus.draftId || null;
+      const hasHtml = !!pageStatus.hasHtml;
+      
+      // Fetch draft to check published status and URL
+      let draftStatus = pageStatus.status as 'pending' | 'generating' | 'completed' | 'failed' | 'published';
+      let wordpressUrl: string | null = null;
+      
+      if (draftId) {
+        try {
+          const draft = await prisma.wordpressPublishLog.findFirst({
+            where: { id: draftId, userId },
+            select: { status: true, wordpressUrl: true },
+          });
+          if (draft) {
+            draftStatus = draft.status as 'pending' | 'generating' | 'completed' | 'failed' | 'published';
+            wordpressUrl = draft.wordpressUrl;
+          }
+        } catch (err) {
+          // Silently fail - use pageStatus
+        }
+      }
+      
+      // If page has HTML content, it must be completed regardless of stored status (unless published)
+      const finalStatus = hasHtml && draftStatus !== 'published'
+        ? ('completed' as const)
+        : draftStatus;
+
+      return {
+        pageId,
+        pageType: pageStatus.pageType === 'subpage' ? 'subpage' : 'pillar',
+        status: finalStatus,
+        draftId,
+        jobId: latestJob.jobId,
+        primaryKeyword: pageStatus.primaryKeyword,
+        progress: pageStatus.progress || (hasHtml ? 100 : 0),
+        hasHtml,
+        updatedAt: pageStatus.updatedAt.toISOString(),
+        error: pageStatus.error || null,
+        wordpressUrl: wordpressUrl || null,
+      };
+    })
+  );
+
+  res.json({ success: true, pages, job: { jobId: latestJob.jobId, status: latestJob.status } });
 }));
 
 /**
@@ -1774,7 +2253,8 @@ router.get('/drafts/:draftId', authenticateToken, asyncHandler(async (req: Reque
       metaDescription: response.metaDescription || response['Meta Description'] || '',
       slug: response.slug || response.Slug || draft.slug,
       featuredImage: response.featuredImage || response['Featured Image'] || '',
-      primaryKeyword: draft.primaryKeyword
+      primaryKeyword: draft.primaryKeyword,
+      longtailKeywords: response.longtailKeywords || response['longtail keywords'] || ''
     }
   });
 }));

@@ -28,7 +28,18 @@ export const authenticateToken = async (req: Request, res: Response, next: NextF
     req.user = decoded;
     next();
   } catch (error) {
-    return res.status(403).json({ error: 'Invalid or expired token' });
+    // Return 401 for expired/invalid tokens (not 403)
+    // This allows frontend to distinguish between auth errors and permission errors
+    if (error instanceof Error && error.message.includes('expired')) {
+      return res.status(401).json({ 
+        error: 'Token expired',
+        code: 'TOKEN_EXPIRED'
+      });
+    }
+    return res.status(401).json({ 
+      error: 'Invalid or expired token',
+      code: 'INVALID_TOKEN'
+    });
   }
 };
 

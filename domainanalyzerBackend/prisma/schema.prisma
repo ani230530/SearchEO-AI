@@ -13,12 +13,15 @@ model User {
   email     String   @unique
   password  String
   name      String?
+  refreshToken String?
+  refreshTokenExpiry DateTime?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   domains   Domain[]
   googleSearchConsole GoogleSearchConsoleConnection?
   wordpressIntegration WordpressIntegration?
   publishLogs WordpressPublishLog[]
+  generationJobs GenerationJob[]
 }
 
 model Domain {
@@ -425,6 +428,43 @@ model WordpressPublishLog {
   @@index([userId])
 }
 
+model GenerationJob {
+  id        Int      @id @default(autoincrement())
+  jobId     String   @unique
+  topicId   Int
+  userId    Int
+  status    String   @default("pending") // pending | generating | completed | failed
+  startedAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  topic     CampaignTopic @relation(fields: [topicId], references: [id])
+  user      User          @relation(fields: [userId], references: [id])
+  pages     GenerationJobPage[]
+
+  @@index([topicId])
+  @@index([userId])
+}
+
+model GenerationJobPage {
+  id          Int      @id @default(autoincrement())
+  jobId       String
+  pageId      Int
+  pageType    String   // pillar | subpage
+  status      String   @default("pending") // pending | generating | completed | failed
+  draftId     Int?
+  primaryKeyword String?
+  progress    Int?     @default(0)
+  error       String?
+  hasHtml     Boolean  @default(false)
+  updatedAt   DateTime @updatedAt
+  createdAt   DateTime @default(now())
+
+  job         GenerationJob @relation(fields: [jobId], references: [jobId], onDelete: Cascade)
+
+  @@index([jobId])
+  @@index([pageId])
+}
+
 model PhraseScore {
   id        Int      @id @default(autoincrement())
   phraseId  Int
@@ -609,6 +649,7 @@ model CampaignTopic {
   updatedAt   DateTime           @updatedAt
   pages       CampaignPage[]
   keywords    CampaignKeyword[]
+  generationJobs GenerationJob[]
 
   @@index([campaignId])
 }
