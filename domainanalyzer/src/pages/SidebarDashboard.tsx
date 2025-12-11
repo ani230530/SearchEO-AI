@@ -76,6 +76,43 @@ interface CampaignStructure {
   topics: Topic[];
 }
 
+type GenerationPageStatus = {
+  jobId: string;
+  pageId: number;
+  pageType: 'pillar' | 'subpage';
+  status: 'pending' | 'generating' | 'completed' | 'failed' | 'published';
+  draftId?: number;
+  progress?: number;
+  primaryKeyword?: string;
+  hasHtml?: boolean;
+  updatedAt?: string;
+  error?: string | null;
+  wordpressUrl?: string | null;
+};
+
+type DraftPreview = {
+  htmlContent: string;
+  title?: string;
+  metaDescription?: string;
+  slug?: string;
+  featuredImage?: string;
+  primaryKeyword?: string;
+};
+
+type DraftStatusRecord = {
+  pageId: number;
+  pageType: string;
+  status: string;
+  draftId?: number;
+  progress?: number;
+  primaryKeyword?: string;
+  jobId?: string;
+  hasHtml?: boolean;
+  updatedAt?: string;
+  error?: string | null;
+  wordpressUrl?: string | null;
+};
+
 const summarizeDomainContext = (input: string, maxLines = 6, maxChars = 800) => {
   if (!input) return '';
   const normalized = input.replace(/\r\n/g, '\n');
@@ -191,6 +228,7 @@ const SidebarDashboard = () => {
   const [wpForm, setWpForm] = useState({ siteUrl: '', username: '', password: '' });
   const [campaigns, setCampaigns] = useState<Array<{ id: number; title: string; description: string | null; createdAt: string; updatedAt: string }>>([]);
   const [campaignsLoading, setCampaignsLoading] = useState(false);
+  const [campaignTabDataLoading, setCampaignTabDataLoading] = useState(false);
   const [showCreateCampaign, setShowCreateCampaign] = useState(false);
   const [newCampaignTitle, setNewCampaignTitle] = useState('');
   const [newCampaignDescription, setNewCampaignDescription] = useState('');
@@ -305,6 +343,71 @@ const SidebarDashboard = () => {
       setCompanyDomainLoading(false);
     }
   }, []);
+
+  // Fetch all campaign tab data in parallel when campaign tab is active
+  const fetchCampaignTabData = useCallback(async () => {
+    if (activeTab !== 'campaign') return;
+    
+    setCampaignTabDataLoading(true);
+    try {
+      // Fetch all required data in parallel
+      const [domainResponse, wpResponse] = await Promise.all([
+        fetch(`${import.meta.env.VITE_API_URL}/api/user/company-domain`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+            'Content-Type': 'application/json',
+          },
+        }),
+        fetch(`${import.meta.env.VITE_API_URL}/api/publish/wordpress`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+            'Content-Type': 'application/json',
+          },
+        }),
+      ]);
+
+      // Process company domain data
+      if (domainResponse.ok) {
+        const domainData = await domainResponse.json();
+        if (domainData.success && domainData.domain) {
+          setCompanyDomain(domainData.domain.url);
+          setDomainContext(domainData.domain.context || '');
+          setKeywords(domainData.keywords || []);
+          setCreatedDomainId(domainData.domain.id);
+        } else {
+          setCompanyDomain('');
+          setDomainContext('');
+          setKeywords([]);
+          setCreatedDomainId(null);
+        }
+      }
+
+      // Process WordPress integration data
+      if (wpResponse.ok) {
+        const wpData = await wpResponse.json();
+        if (wpData.success) {
+          setWpIntegration(wpData.integration || null);
+          setWpForm((prev) => ({
+            ...prev,
+            siteUrl: wpData.integration?.siteUrl || '',
+            username: wpData.integration?.username || '',
+            password: '',
+          }));
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching campaign tab data:', error);
+      // Don't show toast for campaign tab - it's background loading
+    } finally {
+      setCampaignTabDataLoading(false);
+    }
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (activeTab === 'campaign') {
+      fetchCampaignTabData();
+    }
+  }, [activeTab, fetchCampaignTabData]);
 
   useEffect(() => {
     if (activeTab === 'analytics' || activeTab === 'publish') {
@@ -778,15 +881,18 @@ const SidebarDashboard = () => {
       }
     } catch (error) {
       console.error('Error fetching WordPress integration:', error);
-      toast({
-        title: "WordPress",
-        description: "Unable to load WordPress integration details",
-        variant: "destructive"
-      });
+      // Only show toast if we're on publish tab, not for background loading in campaign tab
+      if (activeTab === 'publish') {
+        toast({
+          title: "WordPress",
+          description: "Unable to load WordPress integration details",
+          variant: "destructive"
+        });
+      }
     } finally {
       setWpIntegrationLoading(false);
     }
-  }, [toast]);
+  }, [toast, activeTab]);
 
   const handleSaveWordpressIntegration = async () => {
     if (!wpForm.siteUrl.trim() || !wpForm.username.trim()) {
@@ -896,7 +1002,11 @@ const SidebarDashboard = () => {
       fetchGscStatus();
       fetchWordpressIntegration();
     }
-  }, [activeTab, activeCompanySubTab, fetchGscStatus, fetchWordpressIntegration]);
+    // Also refresh campaign tab data if we're on campaign tab and WordPress integration might have changed
+    if (activeTab === 'campaign' && activeCompanySubTab === 'integration') {
+      fetchCampaignTabData();
+    }
+  }, [activeTab, activeCompanySubTab, fetchGscStatus, fetchWordpressIntegration, fetchCampaignTabData]);
 
   useEffect(() => {
     if (activeTab === 'publish') {
@@ -3005,11 +3115,13 @@ const SidebarDashboard = () => {
 
               {/* Campaigns List */}
               {(() => {
-                if (campaignsLoading) {
+                if (campaignsLoading || campaignTabDataLoading) {
                   return (
                     <div className="text-center py-12">
                       <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-                      <p className="text-sm font-light text-gray-600 mt-4">Loading campaigns...</p>
+                      <p className="text-sm font-light text-gray-600 mt-4">
+                        {campaignsLoading ? 'Loading campaigns...' : 'Loading campaign data...'}
+                      </p>
                     </div>
                   );
                 }
@@ -3035,6 +3147,18 @@ const SidebarDashboard = () => {
                     <CampaignStructureView
                       campaign={selectedCampaign}
                       onBack={() => setSelectedCampaignId(null)}
+                      companyDomain={companyDomain}
+                      domainContext={domainContext}
+                      keywordsTableData={keywordsTableData}
+                      hasWordpressIntegration={hasWordpressIntegration}
+                      wpIntegration={wpIntegration}
+                      onConfigureWordpress={handleConfigureWordpress}
+                      onRefreshWordpressIntegration={async () => {
+                        await fetchWordpressIntegration();
+                        if (activeTab === 'campaign') {
+                          await fetchCampaignTabData();
+                        }
+                      }}
                     />
                   );
                 }
@@ -3131,7 +3255,12 @@ const SidebarDashboard = () => {
                   hasWordpressIntegration={hasWordpressIntegration}
                   wpIntegration={wpIntegration}
                   onConfigureWordpress={handleConfigureWordpress}
-                  onRefreshWordpressIntegration={fetchWordpressIntegration}
+                  onRefreshWordpressIntegration={async () => {
+                    await fetchWordpressIntegration();
+                    if (activeTab === 'campaign') {
+                      await fetchCampaignTabData();
+                    }
+                  }}
                   isActive={activeTab === 'publish'}
                 />
                                     </div>
@@ -3167,9 +3296,26 @@ const SidebarDashboard = () => {
 interface CampaignStructureViewProps {
   campaign: { id: number; title: string; description: string | null; createdAt: string; updatedAt: string };
   onBack: () => void;
+  companyDomain: string;
+  domainContext: string;
+  keywordsTableData: KeywordTableItem[];
+  hasWordpressIntegration: boolean;
+  wpIntegration: WordpressIntegration | null;
+  onConfigureWordpress: () => void;
+  onRefreshWordpressIntegration: () => void;
 }
 
-const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({ campaign, onBack }) => {
+const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({ 
+  campaign, 
+  onBack, 
+  companyDomain, 
+  domainContext,
+  keywordsTableData,
+  hasWordpressIntegration,
+  wpIntegration,
+  onConfigureWordpress,
+  onRefreshWordpressIntegration
+}) => {
   const CAMPAIGN_API_BASE = `${API_BASE_URL}/api/campaigns`;
   const [campaignStructure, setCampaignStructure] = useState<CampaignStructure>({ topics: [] });
   const [structureLoading, setStructureLoading] = useState(true);
@@ -3204,10 +3350,8 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({ campaign,
   const [targetTopicId, setTargetTopicId] = useState<number | null>(null);
   const { toast } = useToast();
 
-  // Topic-level content generation states
+  // Pillar page generation states
   const [generationDrawerOpen, setGenerationDrawerOpen] = useState(false);
-  const [generationDrawerStep, setGenerationDrawerStep] = useState(1);
-  const [selectedTopicForGeneration, setSelectedTopicForGeneration] = useState<number | null>(null);
   const [generationForm, setGenerationForm] = useState({
     wordCount: 800,
     images: 2,
@@ -3215,36 +3359,26 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({ campaign,
     brandName: '',
     brandDescription: '',
   });
-  const [wpIntegrationForGeneration, setWpIntegrationForGeneration] = useState<WordpressIntegration | null>(null);
-  const [wpIntegrationLoadingForDrawer, setWpIntegrationLoadingForDrawer] = useState(false);
-  const [companyDomainForGeneration, setCompanyDomainForGeneration] = useState<{ url: string; context: string } | null>(null);
-  
-  // Generation jobs tracking (one job per topic, tracks all pages)
-  const [generationJobs, setGenerationJobs] = useState<Map<number, {
-    jobId: string;
-    topicId: number;
-    status: 'pending' | 'generating' | 'completed' | 'failed';
-    pages: {
-      pageId: number;
-      pageType: 'pillar' | 'subpage';
-      status: 'pending' | 'generating' | 'completed' | 'failed';
-      draftId?: number;
-      progress?: number;
-      primaryKeyword?: string;
-    }[];
-    startedAt: Date;
-    estimatedCompletion?: Date;
-  }>>(new Map());
-  
-  const [pollingIntervals, setPollingIntervals] = useState<Map<number, NodeJS.Timeout>>(new Map());
+  // Auto-fill brand fields using company domain/context (mirrors publish tab)
+  const derivedBrandName = React.useMemo(() => {
+    if (companyDomain) {
+      return companyDomain.replace(/^https?:\/\//i, '').replace(/^www\./i, '').split('/')[0];
+    }
+    return '';
+  }, [companyDomain]);
+  const derivedBrandDescription = React.useMemo(
+    () => summarizeDomainContext(domainContext || ''),
+    [domainContext]
+  );
+  const [generationJobs, setGenerationJobs] = useState<Map<number, GenerationPageStatus>>(new Map());
+  const [generateTopicLoading, setGenerateTopicLoading] = useState<number | null>(null);
+  const [pollingInterval, setPollingInterval] = useState<NodeJS.Timeout | null>(null);
   const [previewPageId, setPreviewPageId] = useState<number | null>(null);
-  const [previewDraft, setPreviewDraft] = useState<{
-    htmlContent: string;
-    title: string;
-    metaDescription?: string;
-    slug?: string;
-    featuredImage?: string;
-  } | null>(null);
+  const [previewDraft, setPreviewDraft] = useState<DraftPreview | null>(null);
+  const [currentGenerationTopicId, setCurrentGenerationTopicId] = useState<number | null>(null);
+  const [viewLoadingPageId, setViewLoadingPageId] = useState<number | null>(null);
+  const [closePreviewLoading, setClosePreviewLoading] = useState(false);
+  const [publishLoadingPageId, setPublishLoadingPageId] = useState<number | null>(null);
 
   const getAuthHeaders = useCallback((): HeadersInit => {
     const token = localStorage.getItem('authToken');
@@ -3258,6 +3392,132 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({ campaign,
     localStorage.removeItem('authToken');
     window.location.href = '/auth';
   }, []);
+
+  // Subscribe to server-sent events for generation status (replaces polling)
+  useEffect(() => {
+    const token = localStorage.getItem('authToken');
+    if (!token) return;
+
+    const eventSource = new EventSource(
+      `${API_BASE_URL}/api/campaigns/events?token=${encodeURIComponent(token)}`
+    );
+
+    eventSource.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data) as {
+          type?: string;
+          jobId?: string;
+          pages?: Partial<GenerationPageStatus & { pageType: string; hasHtml?: boolean; error?: string | null }>[];
+        };
+        if (data?.type !== 'drafts' || !data.pages) return;
+
+        setGenerationJobs((prev) => {
+          const updated = new Map(prev);
+          data.pages!.forEach((p) => {
+            const pageId = p.pageId;
+            if (!pageId) return;
+            const existing = updated.get(pageId);
+            updated.set(pageId, {
+              jobId: data.jobId || existing?.jobId || '',
+              pageId,
+              pageType: p.pageType === 'subpage' ? 'subpage' : 'pillar',
+              status: (p.status || existing?.status || 'generating') as GenerationPageStatus['status'],
+              draftId: p.draftId ?? existing?.draftId,
+              progress: typeof p.progress === 'number' ? p.progress : p.hasHtml ? 100 : existing?.progress,
+              primaryKeyword: p.primaryKeyword ?? existing?.primaryKeyword,
+              hasHtml: p.hasHtml ?? existing?.hasHtml,
+              updatedAt: new Date().toISOString(),
+              error: p.error ?? existing?.error ?? null,
+            });
+          });
+          return updated;
+        });
+      } catch (err) {
+        console.error('Failed to parse SSE payload', err);
+      }
+    };
+
+    eventSource.onerror = (err) => {
+      console.error('SSE connection error', err);
+      eventSource.close();
+    };
+
+    return () => {
+      eventSource.close();
+    };
+  }, []);
+
+  // Rehydrate generation state on load so generate buttons stay disabled after reload
+  useEffect(() => {
+    const rehydrate = async () => {
+      if (!campaignStructure.topics || campaignStructure.topics.length === 0) return;
+      const newMap = new Map<number, GenerationPageStatus>();
+
+      for (const topic of campaignStructure.topics) {
+        try {
+          const response = await fetch(
+            `${API_BASE_URL}/api/campaigns/topics/${topic.id}/drafts-status`,
+            { headers: getAuthHeaders() }
+          );
+
+          if (response.status === 401 || response.status === 403) {
+            handleUnauthorized();
+            return;
+          }
+
+          const data = await response.json();
+          if (!response.ok || !data.success || !data.pages) continue;
+
+          const now = Date.now();
+          const isStale = (p: DraftStatusRecord) => {
+            if (!p.updatedAt) return false;
+            const updated = new Date(p.updatedAt).getTime();
+            return !isNaN(updated) && now - updated > 5 * 60 * 1000; // 5 minutes
+          };
+
+          data.pages.forEach((p: DraftStatusRecord) => {
+            // Skip empty/no-job entries so new topics don't show as pending
+            if (!p.draftId && !p.jobId && !p.hasHtml) {
+              return;
+            }
+            
+            // Determine status: only mark as failed if stale AND not completed (no HTML content)
+            // Completed pages should remain completed even if their timestamp is old
+            let finalStatus = (p.status || 'pending') as GenerationPageStatus['status'];
+            if (isStale(p) && !p.hasHtml && finalStatus !== 'completed') {
+              finalStatus = 'failed';
+            }
+            // If page has HTML content, it's completed regardless of what the backend says (unless published)
+            if (p.hasHtml && finalStatus !== 'published') {
+              finalStatus = 'completed';
+            }
+            
+            newMap.set(p.pageId, {
+              jobId: p.jobId || '',
+              pageId: p.pageId,
+              pageType: p.pageType === 'subpage' ? 'subpage' : 'pillar',
+              status: finalStatus,
+              draftId: p.draftId,
+              progress: typeof p.progress === 'number' ? p.progress : p.hasHtml ? 100 : 0,
+              primaryKeyword: p.primaryKeyword,
+              hasHtml: p.hasHtml,
+              updatedAt: p.updatedAt,
+              error: p.error || null,
+              wordpressUrl: p.wordpressUrl || null,
+            });
+          });
+        } catch (err) {
+          console.error('Failed to rehydrate drafts-status', err);
+        }
+      }
+
+      if (newMap.size > 0) {
+        setGenerationJobs(newMap);
+      }
+    };
+
+    rehydrate();
+  }, [campaignStructure.topics, getAuthHeaders, handleUnauthorized]);
 
   const mutateStructure = useCallback(async (endpoint: string, init: RequestInit = {}, opts: { successMessage?: string; silent?: boolean } = {}) => {
     if (!opts.silent) {
@@ -3331,6 +3591,15 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({ campaign,
   useEffect(() => {
     fetchStructure(campaign.id);
   }, [campaign.id, fetchStructure]);
+
+  // Auto-fill brand fields similar to publish tab
+  useEffect(() => {
+    setGenerationForm((prev) => ({
+      ...prev,
+      brandName: derivedBrandName || prev.brandName || '',
+      brandDescription: derivedBrandDescription || prev.brandDescription || '',
+    }));
+  }, [derivedBrandName, derivedBrandDescription]);
 
   const topicsSnapshot = campaignStructure.topics;
   useEffect(() => {
@@ -3526,6 +3795,331 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({ campaign,
     setShowAddSubPageModal(true);
   };
 
+  const canGenerateTopic = (topic: Topic) => {
+    const pillar = topic.pillarPage;
+    if (!pillar) return false;
+    const allPages = [pillar, ...(topic.subPages || [])];
+    return allPages.every((p) => (p.keywords?.length || 0) > 0);
+  };
+
+  const isTopicGenerating = (topic: Topic) => {
+    const pageIds = [
+      topic.pillarPage?.id,
+      ...(topic.subPages || []).map((sp) => sp.id),
+    ].filter(Boolean) as number[];
+    return pageIds.some((id) => {
+      const job = generationJobs.get(id);
+      return job && job.status === 'generating';
+    });
+  };
+
+  const viewDraft = async (draftId?: number, pageId?: number) => {
+    if (!draftId) return;
+    if (pageId) {
+      setViewLoadingPageId(pageId);
+    }
+    try {
+      // Always fetch from DB - single source of truth
+      const response = await fetch(`${API_BASE_URL}/api/campaigns/drafts/${draftId}`, {
+        headers: getAuthHeaders(),
+      });
+      if (response.status === 401 || response.status === 403) {
+        handleUnauthorized();
+        return;
+      }
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || 'Failed to load draft');
+      }
+      // Set draft data and ID - PublishExperience will fetch from DB using initialDraftId
+      setPreviewDraft(data.draft);
+      setPreviewPageId(draftId); // This will trigger PublishExperience to fetch from DB
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to load draft',
+        variant: 'destructive',
+      });
+    } finally {
+      if (pageId) {
+        setViewLoadingPageId(null);
+      }
+    }
+  };
+
+  const publishDraft = async (draftId?: number, pageId?: number) => {
+    if (!draftId) return;
+    
+    if (!hasWordpressIntegration) {
+      toast({
+        title: 'Connect WordPress',
+        description: 'Add your WordPress credentials in the Integration tab',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (pageId) {
+      setPublishLoadingPageId(pageId);
+    }
+
+    try {
+      // First fetch the draft to get all the data
+      const draftResponse = await fetch(`${API_BASE_URL}/api/campaigns/drafts/${draftId}`, {
+        headers: getAuthHeaders(),
+      });
+      
+      if (draftResponse.status === 401 || draftResponse.status === 403) {
+        handleUnauthorized();
+        return;
+      }
+
+      const draftData = await draftResponse.json();
+      if (!draftResponse.ok || !draftData.success) {
+        throw new Error(draftData.error || 'Failed to load draft');
+      }
+
+      const draft = draftData.draft;
+      if (!draft.htmlContent || !draft.title) {
+        toast({
+          title: 'Invalid Draft',
+          description: 'Draft is missing required content',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      // Publish to WordPress (pass draftId to update existing draft)
+      const publishResponse = await fetch(`${API_BASE_URL}/api/publish/publish`, {
+        method: 'POST',
+        headers: {
+          ...getAuthHeaders(),
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          draftId: draftId, // Pass draftId to update existing draft instead of creating new one
+          primaryKeyword: draft.primaryKeyword,
+          htmlContent: draft.htmlContent,
+          featuredImage: draft.featuredImage,
+          title: draft.title,
+          metaDescription: draft.metaDescription,
+          slug: draft.slug,
+        }),
+      });
+
+      const publishData = await publishResponse.json();
+      if (!publishResponse.ok || !publishData.success) {
+        throw new Error(publishData.error || 'Publish request failed');
+      }
+
+      // Show appropriate toast based on publish status
+      if (publishData.status === 'published' && publishData.publishedUrl) {
+        toast({
+          title: 'Published',
+          description: `Content published successfully. View it here: ${publishData.publishedUrl}`,
+        });
+      } else if (publishData.status === 'failed') {
+        toast({
+          title: 'Publish Failed',
+          description: 'WordPress did not return a valid URL. The publish may have failed.',
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: 'Published',
+          description: 'Content sent to WordPress successfully',
+        });
+      }
+
+      // Refresh draft status to show updated state
+      if (campaignStructure.topics && campaignStructure.topics.length > 0) {
+        try {
+          const rehydrateMap = new Map<number, GenerationPageStatus>();
+          for (const topic of campaignStructure.topics) {
+            try {
+              const statusResponse = await fetch(
+                `${API_BASE_URL}/api/campaigns/topics/${topic.id}/drafts-status`,
+                { headers: getAuthHeaders() }
+              );
+              if (statusResponse.ok) {
+                const statusData = await statusResponse.json();
+                if (statusData.success && statusData.pages) {
+                  statusData.pages.forEach((p: DraftStatusRecord) => {
+                    if (p.draftId || p.jobId || p.hasHtml) {
+                      rehydrateMap.set(p.pageId, {
+                        jobId: p.jobId || '',
+                        pageId: p.pageId,
+                        pageType: p.pageType === 'subpage' ? 'subpage' : 'pillar',
+                        status: (p.status || 'pending') as GenerationPageStatus['status'],
+                        draftId: p.draftId,
+                        progress: typeof p.progress === 'number' ? p.progress : p.hasHtml ? 100 : 0,
+                        primaryKeyword: p.primaryKeyword,
+                        hasHtml: p.hasHtml,
+                        updatedAt: p.updatedAt,
+                        error: p.error || null,
+                        wordpressUrl: p.wordpressUrl || null,
+                      });
+                    }
+                  });
+                }
+              }
+            } catch (err) {
+              // Silently fail for individual topics
+            }
+          }
+          if (rehydrateMap.size > 0) {
+            setGenerationJobs(rehydrateMap);
+          }
+        } catch (err) {
+          // Silently fail refresh
+        }
+      }
+    } catch (error) {
+      console.error('Error publishing draft:', error);
+      toast({
+        title: 'Publish Failed',
+        description: error instanceof Error ? error.message : 'Unable to publish content',
+        variant: 'destructive',
+      });
+    } finally {
+      if (pageId) {
+        setPublishLoadingPageId(null);
+      }
+    }
+  };
+
+  const renderStatusPill = (pageId?: number) => {
+    if (!pageId) return null;
+    const job = generationJobs.get(pageId);
+    if (!job) return null;
+    const updatedAtMs = job.updatedAt ? new Date(job.updatedAt).getTime() : undefined;
+    const staleClient = updatedAtMs ? (Date.now() - updatedAtMs > 5 * 60 * 1000) : false;
+    const status = staleClient && !job.hasHtml ? 'failed' : job.status;
+    if (status === 'pending') return null;
+    const label =
+      status === 'published' ? 'Published' :
+      status === 'completed' ? 'Completed' :
+      status === 'failed' ? 'Failed' :
+      'Generating';
+    const color =
+      status === 'published' ? 'bg-purple-100 text-purple-700' :
+      status === 'completed' ? 'bg-green-100 text-green-700' :
+      status === 'failed' ? 'bg-red-100 text-red-700' :
+      'bg-blue-100 text-blue-700';
+    const progress = job.progress ?? (status === 'completed' || status === 'published' ? 100 : undefined);
+
+    return (
+      <span className={`px-2 py-1 text-[11px] rounded-full ${color}`}>
+        {label}{typeof progress === 'number' ? ` • ${progress}%` : ''}
+      </span>
+    );
+  };
+
+  const currentTopic = currentGenerationTopicId
+    ? campaignStructure.topics.find((t) => t.id === currentGenerationTopicId)
+    : null;
+
+  // Generation drawer stepper (simplified to 3 steps similar to publish flow)
+  const generationSteps = [
+    { id: 1, title: 'Word Count', description: 'Dial in the depth' },
+    { id: 2, title: 'Imagery', description: 'Inline images & featured banner' },
+    { id: 3, title: 'Brand', description: 'Tone & voice alignment' },
+  ];
+  const [generationStep, setGenerationStep] = useState(1);
+
+  const handleGenerateTopic = async (topic: Topic, options?: { wordCount: number; images: number; featuredImage: boolean; brandName?: string; brandDescription?: string; }) => {
+    if (!canGenerateTopic(topic)) {
+      toast({
+        title: 'Add keywords first',
+        description: 'Pillar and sub-pages need at least one keyword each before generating.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    setGenerateTopicLoading(topic.id);
+    try {
+      // Build payload from current topic data
+      const pillar = topic.pillarPage!;
+      const payload = {
+        user_id: 'user', // backend uses authenticated user
+        campaign_name: campaign.title,
+        pillar_page: {
+          primary_keyword: pillar.keywords[0]?.term || pillar.title,
+          longtail_keywords: pillar.keywords.slice(1).map((k) => k.term).filter(Boolean),
+          options: {
+            image: options?.images ?? 2,
+            word_count: options?.wordCount ?? 800,
+            featured_image: options?.featuredImage ? 'yes' : 'no',
+          },
+        },
+        sub_pillar_pages: topic.subPages.map((sp) => ({
+          primary_keyword: sp.keywords[0]?.term || sp.title,
+          longtail_keywords: sp.keywords.slice(1).map((k) => k.term).filter(Boolean),
+          options: {
+            image: options?.images ?? 2,
+            word_count: options?.wordCount ?? 800,
+            featured_image: options?.featuredImage ? 'yes' : 'no',
+          },
+        })),
+        brand: {
+          brand_name: options?.brandName || campaign.title || 'Brand',
+          brand_description: options?.brandDescription || campaign.description || '',
+        },
+      };
+
+      const response = await fetch(`${API_BASE_URL}/api/campaigns/topics/${topic.id}/generate-content`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(payload),
+      });
+
+      if (response.status === 401 || response.status === 403) {
+        handleUnauthorized();
+        return;
+      }
+
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || 'Failed to start generation');
+      }
+
+      const { jobId, pages } = data as { jobId: string; pages: { pageId: number; pageType: string; draftId?: number; primaryKeyword?: string; }[] };
+
+      setGenerationJobs((prev) => {
+        const updated = new Map(prev);
+        pages.forEach((p) => {
+          updated.set(p.pageId, {
+            jobId,
+            pageId: p.pageId,
+            pageType: p.pageType === 'subpage' ? 'subpage' : 'pillar',
+            status: 'generating',
+            draftId: p.draftId,
+            progress: 0,
+            primaryKeyword: p.primaryKeyword,
+            hasHtml: false,
+            updatedAt: new Date().toISOString(),
+            error: null,
+          });
+        });
+        return updated;
+      });
+
+      toast({
+        title: 'Generation started',
+        description: `Job ${jobId} is generating ${pages.length} page(s).`,
+      });
+    } catch (error) {
+      toast({
+        title: 'Generation failed',
+        description: error instanceof Error ? error.message : 'Unable to start generation',
+        variant: 'destructive',
+      });
+    } finally {
+      setGenerateTopicLoading(null);
+      setGenerationDrawerOpen(false);
+    }
+  };
+
   const handleSubmitSubPage = async () => {
     if (!newSubPageTitle.trim() || !targetTopicId) {
       toast({
@@ -3681,338 +4275,6 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({ campaign,
     });
   };
 
-  // Topic-level content generation handlers
-  const handleGenerateTopicContent = (topicId: number) => {
-    const topic = campaignStructure.topics.find(t => t.id === topicId);
-    
-    if (!topic) return;
-    
-    // Validate topic has required pages
-    if (!topic.pillarPage) {
-      toast({
-        title: 'Pillar Page Required',
-        description: 'Add a pillar page before generating content',
-        variant: 'destructive',
-      });
-      return;
-    }
-    
-    if (topic.subPages.length === 0) {
-      toast({
-        title: 'Sub Pages Required',
-        description: 'Add at least one sub-page before generating content',
-        variant: 'destructive',
-      });
-      return;
-    }
-    
-    // Fetch WordPress integration and company domain for drawer
-    const fetchDataForDrawer = async () => {
-      try {
-        setWpIntegrationLoadingForDrawer(true);
-        
-        // Fetch WordPress integration - use same endpoint as publish tab
-        const wpResponse = await fetch(`${API_BASE_URL}/api/publish/wordpress`, {
-          headers: getAuthHeaders(),
-        });
-        
-        if (!wpResponse.ok) {
-          console.warn('WordPress integration fetch failed:', wpResponse.status);
-          setWpIntegrationForGeneration(null);
-        } else {
-          const wpData = await wpResponse.json();
-          if (wpData.success) {
-            // Set integration if it exists, otherwise null
-            setWpIntegrationForGeneration(wpData.integration || null);
-          } else {
-            setWpIntegrationForGeneration(null);
-          }
-        }
-        
-        // Fetch company domain
-        const domainResponse = await fetch(`${API_BASE_URL}/api/user/company-domain`, {
-          headers: getAuthHeaders(),
-        });
-        
-        if (domainResponse.ok) {
-          const domainData = await domainResponse.json();
-          if (domainData.success && domainData.domain) {
-            setCompanyDomainForGeneration({
-              url: domainData.domain.url,
-              context: domainData.domain.context || '',
-            });
-            
-            // Auto-fill brand name from domain
-            const sanitizedDomainName = domainData.domain.url
-              ?.replace(/^https?:\/\//i, '')
-              ?.replace(/^www\./i, '')
-              ?.split('/')[0] || 'Brand';
-            
-            setGenerationForm({
-              wordCount: 800,
-              images: 2,
-              featuredImage: true,
-              brandName: sanitizedDomainName,
-              brandDescription: summarizeDomainContext(domainData.domain.context || ''),
-            });
-          }
-        }
-      } catch (error) {
-        console.error('Error fetching data for drawer:', error);
-        setWpIntegrationForGeneration(null);
-      } finally {
-        setWpIntegrationLoadingForDrawer(false);
-      }
-    };
-    
-    fetchDataForDrawer();
-    
-    setSelectedTopicForGeneration(topicId);
-    setGenerationDrawerOpen(true);
-    setGenerationDrawerStep(1);
-  };
-
-  const handleGenerationDrawerNext = () => {
-    if (generationDrawerStep === 3 && !generationForm.brandName.trim()) {
-      toast({
-        title: 'Brand name required',
-        description: 'Enter a brand name before continuing.',
-        variant: 'destructive',
-      });
-      return;
-    }
-    setGenerationDrawerStep((prev) => Math.min(4, prev + 1));
-  };
-
-  const handleGenerationDrawerBack = () => {
-    setGenerationDrawerStep((prev) => Math.max(1, prev - 1));
-  };
-
-  const startPolling = useCallback((topicId: number, jobId: string) => {
-    // Clear existing polling for this topic
-    const existingInterval = pollingIntervals.get(topicId);
-    if (existingInterval) {
-      clearInterval(existingInterval);
-    }
-    
-    // Poll every 15 seconds
-    const interval = setInterval(async () => {
-      try {
-        const response = await fetch(
-          `${API_BASE_URL}/api/campaigns/generation-status/${jobId}`,
-          {
-            headers: getAuthHeaders(),
-          }
-        );
-        
-        if (response.status === 401 || response.status === 403) {
-          handleUnauthorized();
-          return;
-        }
-        
-        const data = await response.json();
-        if (!response.ok || !data.success) {
-          console.error('Error polling generation status:', data.error);
-          return;
-        }
-        
-        const { status, pages } = data;
-        
-        // Update job status
-        setGenerationJobs(prev => {
-          const updated = new Map(prev);
-          const job = updated.get(topicId);
-          
-          if (job) {
-            updated.set(topicId, {
-              ...job,
-              status: status.status as 'pending' | 'generating' | 'completed' | 'failed',
-              pages: job.pages.map(page => {
-                const pageStatus = pages.find((p: { pageId: number; status: string; progress?: number; draftId?: number }) => p.pageId === page.pageId);
-                return {
-                  ...page,
-                  status: (pageStatus?.status || page.status) as 'pending' | 'generating' | 'completed' | 'failed',
-                  progress: pageStatus?.progress || page.progress,
-                  draftId: pageStatus?.draftId || page.draftId,
-                };
-              }),
-            });
-          }
-          
-          return updated;
-        });
-        
-        // Check if all pages complete
-        const allComplete = pages.every((p: { status: string }) => 
-          p.status === 'completed' || p.status === 'failed'
-        );
-        
-        if (allComplete) {
-          clearInterval(interval);
-          setPollingIntervals(prev => {
-            const updated = new Map(prev);
-            updated.delete(topicId);
-            return updated;
-          });
-          
-          const completedCount = pages.filter((p: { status: string }) => p.status === 'completed').length;
-          toast({
-            title: 'Generation Complete',
-            description: `${completedCount} of ${pages.length} pages generated successfully`,
-          });
-        }
-      } catch (error) {
-        console.error('Error polling generation status:', error);
-      }
-    }, 15000); // Poll every 15 seconds
-    
-    setPollingIntervals(prev => {
-      const updated = new Map(prev);
-      updated.set(topicId, interval);
-      return updated;
-    });
-  }, [pollingIntervals, getAuthHeaders, handleUnauthorized, toast]);
-
-  const handleGenerateAndSubmit = async () => {
-    if (!selectedTopicForGeneration) return;
-    
-    const topic = campaignStructure.topics.find(t => t.id === selectedTopicForGeneration);
-    if (!topic || !topic.pillarPage) return;
-    
-    // Validate WordPress integration
-    if (!wpIntegrationForGeneration) {
-      toast({
-        title: 'WordPress Required',
-        description: 'Configure WordPress integration first',
-        variant: 'destructive',
-      });
-      return;
-    }
-    
-    // Close drawer
-    setGenerationDrawerOpen(false);
-    
-    try {
-      // Build payload structure
-      // Keywords are already selected in the campaign page, so we use them directly
-      const payload = {
-        user_id: 'user_123', // Backend will use authenticated user ID
-        campaign_name: campaign.title,
-        
-        // Pillar page config - use keywords already selected in campaign page
-        pillar_page: {
-          primary_keyword: topic.pillarPage.keywords[0]?.term || topic.pillarPage.title,
-          longtail_keywords: topic.pillarPage.keywords.slice(1).map(k => k.term).filter(Boolean),
-          options: {
-            image: generationForm.images,
-            word_count: generationForm.wordCount,
-            featured_image: generationForm.featuredImage ? 'yes' : 'no',
-          },
-        },
-        
-        // Sub-pillar pages config - use keywords already selected in campaign page
-        sub_pillar_pages: topic.subPages.map(subPage => ({
-          primary_keyword: subPage.keywords[0]?.term || subPage.title,
-          longtail_keywords: subPage.keywords.slice(1).map(k => k.term).filter(Boolean),
-          options: {
-            image: generationForm.images,
-            word_count: generationForm.wordCount,
-            featured_image: generationForm.featuredImage ? 'yes' : 'no',
-          },
-        })),
-        
-        // Brand info - from drawer form
-        brand: {
-          brand_name: generationForm.brandName || 'Brand',
-          brand_description: generationForm.brandDescription || '',
-        },
-        
-        // WordPress credentials - from fetched integration
-        // Password is encrypted, backend will decrypt it
-        wordpress: {
-          username: wpIntegrationForGeneration.username,
-          password: '', // Backend will use stored encrypted password
-          url: wpIntegrationForGeneration.siteUrl,
-        },
-      };
-      
-      // Call backend to start generation
-      const response = await fetch(`${API_BASE_URL}/api/campaigns/topics/${selectedTopicForGeneration}/generate-content`, {
-        method: 'POST',
-        headers: getAuthHeaders(),
-        body: JSON.stringify(payload),
-      });
-      
-      if (response.status === 401 || response.status === 403) {
-        handleUnauthorized();
-        return;
-      }
-      
-      const data = await response.json();
-      if (!response.ok || !data.success) {
-        throw new Error(data.error || 'Failed to start generation');
-      }
-      
-      const { jobId, pages } = data;
-      
-      // Initialize job tracking
-      const totalPages = 1 + topic.subPages.length; // 1 pillar + N sub-pages
-      const estimatedMinutes = totalPages * 3; // 3 min per page
-      
-      setGenerationJobs(prev => {
-        const updated = new Map(prev);
-        updated.set(selectedTopicForGeneration, {
-          jobId,
-          topicId: selectedTopicForGeneration,
-          status: 'pending',
-          pages: [
-            {
-              pageId: topic.pillarPage!.id,
-              pageType: 'pillar',
-              status: 'pending',
-              primaryKeyword: topic.pillarPage.keywords[0]?.term,
-            },
-            ...topic.subPages.map(sp => ({
-              pageId: sp.id,
-              pageType: 'subpage' as const,
-              status: 'pending' as const,
-              primaryKeyword: sp.keywords[0]?.term || sp.title,
-            })),
-          ],
-          startedAt: new Date(),
-          estimatedCompletion: new Date(Date.now() + estimatedMinutes * 60 * 1000),
-        });
-        return updated;
-      });
-      
-      // Start polling
-      startPolling(selectedTopicForGeneration, jobId);
-      
-      toast({
-        title: 'Generation Started',
-        description: `Generating ${totalPages} pages (estimated ${estimatedMinutes} minutes)`,
-      });
-    } catch (error) {
-      toast({
-        title: 'Generation Failed',
-        description: error instanceof Error ? error.message : 'Failed to start generation',
-        variant: 'destructive',
-      });
-    }
-  };
-
-  const isGeneratingTopic = (topicId: number) => {
-    const job = generationJobs.get(topicId);
-    return job && (job.status === 'pending' || job.status === 'generating');
-  };
-
-  // Cleanup polling on unmount
-  useEffect(() => {
-    return () => {
-      pollingIntervals.forEach(interval => clearInterval(interval));
-    };
-  }, [pollingIntervals]);
-
   if (structureLoading) {
     return (
       <div className="w-full flex items-center justify-center py-32">
@@ -4113,32 +4375,6 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({ campaign,
             {/* Topic Header */}
             <div className="flex items-center justify-between p-6 hover:bg-gray-50 transition-colors">
               <div className="flex items-center gap-3 flex-1">
-                {/* Apple-like Checkbox */}
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    toggleTopicSelection(topic.id);
-                  }}
-                  className="flex-shrink-0 w-5 h-5 rounded border-2 border-gray-300 flex items-center justify-center transition-all duration-200 hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-black/10"
-                  style={{
-                    backgroundColor: selectedTopics.has(topic.id) ? '#000' : 'transparent',
-                    borderColor: selectedTopics.has(topic.id) ? '#000' : '#d1d5db'
-                  }}
-                >
-                  {selectedTopics.has(topic.id) && (
-                    <svg
-                      className="w-3 h-3 text-white"
-                      fill="none"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth="2.5"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path d="M5 13l4 4L19 7" />
-                    </svg>
-                  )}
-                </button>
                 <button
                   onClick={() => toggleTopic(topic.id)}
                   className="p-1 hover:bg-gray-200 rounded transition-colors"
@@ -4162,60 +4398,34 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({ campaign,
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                {/* Generation Status Badge */}
-                {generationJobs.has(topic.id) && (() => {
-                  const job = generationJobs.get(topic.id)!;
-                  const completedPages = job.pages.filter(p => p.status === 'completed').length;
-                  const totalPages = job.pages.length;
-                  
-                  return (
-                    <div className="flex items-center gap-2 text-xs">
-                      {job.status === 'generating' && (
-                        <>
-                          <Loader2 className="h-3 w-3 animate-spin text-blue-600" />
-                          <span className="text-blue-600">
-                            {completedPages}/{totalPages} ready
-                          </span>
-                        </>
-                      )}
-                      {job.status === 'completed' && (
-                        <>
-                          <CheckCircle className="h-3 w-3 text-green-600" />
-                          <span className="text-green-600">All ready</span>
-                        </>
-                      )}
-                      {job.status === 'failed' && (
-                        <>
-                          <AlertCircle className="h-3 w-3 text-red-600" />
-                          <span className="text-red-600">Failed</span>
-                        </>
-                      )}
-                    </div>
-                  );
-                })()}
-                
-                {/* Generate Content Button */}
-                {topic.pillarPage && topic.subPages.length > 0 && (
                   <button
-                    onClick={() => handleGenerateTopicContent(topic.id)}
-                    disabled={isGeneratingTopic(topic.id) || syncing}
-                    className="px-4 py-2 bg-black text-white rounded-full hover:bg-black/90 disabled:opacity-60 disabled:cursor-not-allowed text-sm font-medium flex items-center gap-2 transition-all"
-                  >
-                    {isGeneratingTopic(topic.id) ? (
-                      <>
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        Generating...
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles className="h-4 w-4" />
-                        Generate Content
-                      </>
-                    )}
+                  onClick={() => {
+                    setCurrentGenerationTopicId(topic.id);
+                    setGenerationForm((prev) => ({
+                      ...prev,
+                      wordCount: prev.wordCount || 800,
+                      images: prev.images || 2,
+                      featuredImage: prev.featuredImage ?? true,
+                      brandName: derivedBrandName || prev.brandName || '',
+                      brandDescription: derivedBrandDescription || prev.brandDescription || '',
+                    }));
+                    setGenerationDrawerOpen(true);
+                  }}
+                  disabled={
+                    !canGenerateTopic(topic) ||
+                    generateTopicLoading === topic.id ||
+                    isTopicGenerating(topic)
+                  }
+                  className="inline-flex items-center gap-2 px-3 py-2 text-xs font-semibold rounded-full bg-gradient-to-r from-black to-gray-800 text-white shadow-sm hover:opacity-90 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                  title={
+                    canGenerateTopic(topic)
+                      ? 'Generate content for this topic'
+                      : 'Add a pillar page and at least one keyword per page to enable generation'
+                  }
+                >
+                  {generateTopicLoading === topic.id || isTopicGenerating(topic) ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                  {generateTopicLoading === topic.id || isTopicGenerating(topic) ? 'Generating…' : 'Generate'}
                   </button>
-                )}
-                
-                {/* Delete button */}
                 <button
                   onClick={() => handleDeleteTopic(topic.id)}
                   disabled={syncing}
@@ -4275,10 +4485,83 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({ campaign,
                               <FileText className="h-4 w-4 text-green-600" />
                             </div>
                             <div className="flex-1">
-                              <h5 className="text-sm font-light text-black">{topic.pillarPage.title}</h5>
+                              <div className="flex items-center gap-3">
+                                <h5 className="text-sm font-light text-black">{topic.pillarPage.title}</h5>
+                                {(() => {
+                                  const job = generationJobs.get(topic.pillarPage.id);
+                                  const updatedAtMs = job?.updatedAt ? new Date(job.updatedAt).getTime() : undefined;
+                                  const staleClient = updatedAtMs ? (Date.now() - updatedAtMs > 5 * 60 * 1000) : false;
+                                  const status = staleClient && !job?.hasHtml ? 'failed' : job?.status;
+                                  const isLoading = viewLoadingPageId === topic.pillarPage.id;
+                                  const isPublishing = publishLoadingPageId === topic.pillarPage.id;
+                                  const isPublished = status === 'published' && job?.wordpressUrl;
+                                  const canView = (status === 'completed' || status === 'published') && job?.draftId;
+                                  
+                                  if (canView) {
+                                    return (
+                                      <div className="flex items-center gap-2">
+                                        <button
+                                          onClick={(e) => {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            viewDraft(job.draftId, topic.pillarPage.id);
+                                          }}
+                                          disabled={isLoading || isPublishing}
+                                          className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-black text-white text-xs font-medium hover:bg-gray-800 transition-all disabled:opacity-60 disabled:cursor-not-allowed shadow-sm"
+                                        >
+                                          {isLoading ? (
+                                            <>
+                                              <Loader2 className="h-3 w-3 animate-spin" />
+                                              Opening...
+                                            </>
+                                          ) : (
+                                            'View'
+                                          )}
+                                        </button>
+                                        {isPublished && job.wordpressUrl && (
+                                          <a
+                                            href={job.wordpressUrl}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            onClick={(e) => e.stopPropagation()}
+                                            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple-600 text-white text-xs font-medium hover:bg-purple-700 transition-all shadow-sm"
+                                          >
+                                            View Live
+                                          </a>
+                                        )}
+                                        {!isPublished && (
+                                          <button
+                                            onClick={(e) => {
+                                              e.preventDefault();
+                                              e.stopPropagation();
+                                              publishDraft(job.draftId, topic.pillarPage.id);
+                                            }}
+                                            disabled={isLoading || isPublishing || !hasWordpressIntegration}
+                                            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-600 text-white text-xs font-medium hover:bg-blue-700 transition-all disabled:opacity-60 disabled:cursor-not-allowed shadow-sm"
+                                            title={!hasWordpressIntegration ? 'WordPress integration required' : ''}
+                                          >
+                                            {isPublishing ? (
+                                              <>
+                                                <Loader2 className="h-3 w-3 animate-spin" />
+                                                Publishing...
+                                              </>
+                                            ) : (
+                                              'Publish'
+                                            )}
+                                          </button>
+                                        )}
+                                      </div>
+                                    );
+                                  }
+                                  return null;
+                                })()}
+                              </div>
                               <p className="text-xs font-light text-gray-500 mt-0.5">
                                 {topic.pillarPage.keywords.length} keyword{topic.pillarPage.keywords.length !== 1 ? 's' : ''}
                               </p>
+                              <div className="mt-1">
+                                {renderStatusPill(topic.pillarPage.id)}
+                              </div>
                             </div>
                           </div>
                           <div className="flex items-center gap-2">
@@ -4310,74 +4593,6 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({ campaign,
                             </button>
                           </div>
                         </div>
-
-                        {/* Generation Status for Pillar Page */}
-                        {generationJobs.has(topic.id) && (() => {
-                          const job = generationJobs.get(topic.id)!;
-                          const pillarPageStatus = job.pages.find(p => 
-                            p.pageId === topic.pillarPage!.id && p.pageType === 'pillar'
-                          );
-                          
-                          if (!pillarPageStatus) return null;
-                          
-                          return (
-                            <div className="mt-3 flex items-center justify-between p-2 bg-white rounded-lg border border-gray-200">
-                              <div className="flex items-center gap-2">
-                                {pillarPageStatus.status === 'pending' && (
-                                  <>
-                                    <Loader2 className="h-3 w-3 animate-spin text-gray-400" />
-                                    <span className="text-xs text-gray-500">Queued...</span>
-                                  </>
-                                )}
-                                {pillarPageStatus.status === 'generating' && (
-                                  <>
-                                    <Loader2 className="h-3 w-3 animate-spin text-blue-600" />
-                                    <span className="text-xs text-blue-600">
-                                      Generating... ({pillarPageStatus.progress || 0}%)
-                                    </span>
-                                  </>
-                                )}
-                                {pillarPageStatus.status === 'completed' && (
-                                  <>
-                                    <CheckCircle className="h-4 w-4 text-green-600" />
-                                    <button
-                                      onClick={async () => {
-                                        if (pillarPageStatus.draftId) {
-                                          try {
-                                            const response = await fetch(
-                                              `${API_BASE_URL}/api/campaigns/drafts/${pillarPageStatus.draftId}`,
-                                              { headers: getAuthHeaders() }
-                                            );
-                                            const data = await response.json();
-                                            if (data.success) {
-                                              setPreviewDraft(data.draft);
-                                              setPreviewPageId(topic.pillarPage!.id);
-                                            }
-                                          } catch (error) {
-                                            toast({
-                                              title: 'Error',
-                                              description: 'Failed to load draft',
-                                              variant: 'destructive',
-                                            });
-                                          }
-                                        }
-                                      }}
-                                      className="text-xs font-medium text-blue-600 hover:text-blue-700"
-                                    >
-                                      View Page
-                                    </button>
-                                  </>
-                                )}
-                                {pillarPageStatus.status === 'failed' && (
-                                  <>
-                                    <AlertCircle className="h-3 w-3 text-red-600" />
-                                    <span className="text-xs text-red-600">Generation failed</span>
-                                  </>
-                                )}
-                              </div>
-                            </div>
-                          );
-                        })()}
 
                         {/* Pillar Page Keywords */}
                         {expandedPillarPages.has(topic.pillarPage.id) && (
@@ -4464,10 +4679,83 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({ campaign,
                                   <FileText className="h-4 w-4 text-orange-600" />
                                 </div>
                                 <div className="flex-1">
-                                  <h5 className="text-sm font-light text-black">{subPage.title}</h5>
+                                  <div className="flex items-center gap-3">
+                                    <h5 className="text-sm font-light text-black">{subPage.title}</h5>
+                                    {(() => {
+                                      const job = generationJobs.get(subPage.id);
+                                      const updatedAtMs = job?.updatedAt ? new Date(job.updatedAt).getTime() : undefined;
+                                      const staleClient = updatedAtMs ? (Date.now() - updatedAtMs > 5 * 60 * 1000) : false;
+                                      const status = staleClient && !job?.hasHtml ? 'failed' : job?.status;
+                                      const isLoading = viewLoadingPageId === subPage.id;
+                                      const isPublishing = publishLoadingPageId === subPage.id;
+                                      const isPublished = status === 'published' && job?.wordpressUrl;
+                                      const canView = (status === 'completed' || status === 'published') && job?.draftId;
+                                      
+                                      if (canView) {
+                                        return (
+                                          <div className="flex items-center gap-2">
+                                            <button
+                                              onClick={(e) => {
+                                                e.preventDefault();
+                                                e.stopPropagation();
+                                                viewDraft(job.draftId, subPage.id);
+                                              }}
+                                              disabled={isLoading || isPublishing}
+                                              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-black text-white text-xs font-medium hover:bg-gray-800 transition-all disabled:opacity-60 disabled:cursor-not-allowed shadow-sm"
+                                            >
+                                              {isLoading ? (
+                                                <>
+                                                  <Loader2 className="h-3 w-3 animate-spin" />
+                                                  Opening...
+                                                </>
+                                              ) : (
+                                                'View'
+                                              )}
+                                            </button>
+                                            {isPublished && job.wordpressUrl && (
+                                              <a
+                                                href={job.wordpressUrl}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                onClick={(e) => e.stopPropagation()}
+                                                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple-600 text-white text-xs font-medium hover:bg-purple-700 transition-all shadow-sm"
+                                              >
+                                                View Live
+                                              </a>
+                                            )}
+                                            {!isPublished && (
+                                              <button
+                                                onClick={(e) => {
+                                                  e.preventDefault();
+                                                  e.stopPropagation();
+                                                  publishDraft(job.draftId, subPage.id);
+                                                }}
+                                                disabled={isLoading || isPublishing || !hasWordpressIntegration}
+                                                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-600 text-white text-xs font-medium hover:bg-blue-700 transition-all disabled:opacity-60 disabled:cursor-not-allowed shadow-sm"
+                                                title={!hasWordpressIntegration ? 'WordPress integration required' : ''}
+                                              >
+                                                {isPublishing ? (
+                                                  <>
+                                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                                    Publishing...
+                                                  </>
+                                                ) : (
+                                                  'Publish'
+                                                )}
+                                              </button>
+                                            )}
+                                          </div>
+                                        );
+                                      }
+                                      return null;
+                                    })()}
+                                  </div>
                                   <p className="text-xs font-light text-gray-500 mt-0.5">
                                     {subPage.keywords.length} keyword{subPage.keywords.length !== 1 ? 's' : ''}
                                   </p>
+                                  <div className="mt-1">
+                                    {renderStatusPill(subPage.id)}
+                                  </div>
                                 </div>
                               </div>
                               <div className="flex items-center gap-2">
@@ -4499,74 +4787,6 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({ campaign,
                             </button>
                           </div>
                         </div>
-
-                        {/* Generation Status for Sub Page */}
-                        {generationJobs.has(topic.id) && (() => {
-                          const job = generationJobs.get(topic.id)!;
-                          const subPageStatus = job.pages.find(p => 
-                            p.pageId === subPage.id && p.pageType === 'subpage'
-                          );
-                          
-                          if (!subPageStatus) return null;
-                          
-                          return (
-                            <div className="mt-3 flex items-center justify-between p-2 bg-white rounded-lg border border-gray-200">
-                              <div className="flex items-center gap-2">
-                                {subPageStatus.status === 'pending' && (
-                                  <>
-                                    <Loader2 className="h-3 w-3 animate-spin text-gray-400" />
-                                    <span className="text-xs text-gray-500">Queued...</span>
-                                  </>
-                                )}
-                                {subPageStatus.status === 'generating' && (
-                                  <>
-                                    <Loader2 className="h-3 w-3 animate-spin text-blue-600" />
-                                    <span className="text-xs text-blue-600">
-                                      Generating... ({subPageStatus.progress || 0}%)
-                                    </span>
-                                  </>
-                                )}
-                                {subPageStatus.status === 'completed' && (
-                                  <>
-                                    <CheckCircle className="h-4 w-4 text-green-600" />
-                                    <button
-                                      onClick={async () => {
-                                        if (subPageStatus.draftId) {
-                                          try {
-                                            const response = await fetch(
-                                              `${API_BASE_URL}/api/campaigns/drafts/${subPageStatus.draftId}`,
-                                              { headers: getAuthHeaders() }
-                                            );
-                                            const data = await response.json();
-                                            if (data.success) {
-                                              setPreviewDraft(data.draft);
-                                              setPreviewPageId(subPage.id);
-                                            }
-                                          } catch (error) {
-                                            toast({
-                                              title: 'Error',
-                                              description: 'Failed to load draft',
-                                              variant: 'destructive',
-                                            });
-                                          }
-                                        }
-                                      }}
-                                      className="text-xs font-medium text-blue-600 hover:text-blue-700"
-                                    >
-                                      View Page
-                                    </button>
-                                  </>
-                                )}
-                                {subPageStatus.status === 'failed' && (
-                                  <>
-                                    <AlertCircle className="h-3 w-3 text-red-600" />
-                                    <span className="text-xs text-red-600">Generation failed</span>
-                                  </>
-                                )}
-                              </div>
-                            </div>
-                          );
-                        })()}
 
                         {/* Sub Page Keywords */}
                         {expandedSubPages.has(subPage.id) && (
@@ -4935,85 +5155,68 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({ campaign,
           </div>
         </div>
       )}
-
       {/* Generation Drawer */}
       <Sheet
         open={generationDrawerOpen}
         onOpenChange={(open) => {
           setGenerationDrawerOpen(open);
           if (!open) {
-            setGenerationDrawerStep(1);
-            setSelectedTopicForGeneration(null);
+            setCurrentGenerationTopicId(null);
+            setGenerationStep(1);
           }
         }}
       >
         <SheetContent
           side="right"
-          className="w-full sm:max-w-3xl border-l border-[#e2e4ea] bg-[#f5f6fa] px-10 py-12 overflow-y-auto font-light"
+          className="w-full sm:max-w-3xl border-l border-[#e2e4ea] bg-[#f5f6fa] px-8 py-10 overflow-y-auto font-light"
         >
-          <div className="space-y-10">
-            <div className="rounded-[32px] border border-white/80 bg-white/90 px-6 py-6 shadow-[0_30px_80px_rgba(15,23,42,0.10)] backdrop-blur">
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                <div className="space-y-3">
+          <div className="space-y-8">
+            <div className="rounded-[32px] border border-white/80 bg-white/90 px-6 py-6 shadow-[0_30px_80px_rgba(15,23,42,0.10)] backdrop-blur flex flex-col gap-3">
                   <div className="inline-flex items-center gap-2 rounded-full border border-black/10 px-4 py-1 text-[10px] tracking-[0.35em] uppercase text-gray-500">
-                    Content Generation
+                Generation setup
                   </div>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
-                    <h3 className="text-[28px] font-light text-gray-900 tracking-tight">
-                      Step {generationDrawerStep} of 4
-                    </h3>
+                  <h3 className="text-[26px] font-light text-gray-900 tracking-tight">Configure content</h3>
+                  <p className="text-sm text-gray-500">Length, imagery, and brand—keywords are already chosen.</p>
                   </div>
-                </div>
-                <div className="flex flex-col items-end gap-2">
-                  <div className="flex items-center gap-1">
-                    {[1, 2, 3, 4].map((step) => (
-                      <span
-                        key={`progress-${step}`}
-                        className={`h-1.5 w-12 rounded-full transition-all ${
-                          step <= generationDrawerStep ? 'bg-black/80' : 'bg-black/10'
-                        }`}
-                      />
-                    ))}
-                  </div>
-                  <p className="text-xs uppercase tracking-[0.3em] text-gray-400">
-                    Generation flow
-                  </p>
+                <div className="px-3 py-1.5 rounded-full bg-emerald-50 text-emerald-700 text-xs font-semibold border border-emerald-100">
+                  WordPress Connected
                 </div>
               </div>
-              <div className="mt-6">
-                <p className="text-xs text-gray-500">
-                  Keywords are already configured in your campaign pages. This flow sets content preferences.
-                </p>
+              <div className="flex items-center gap-2">
+                {generationSteps.map((step) => (
+                  <div key={step.id} className="flex items-center gap-2">
+                    <div
+                      className={`h-2 w-2 rounded-full ${
+                        generationStep >= step.id ? 'bg-black' : 'bg-gray-300'
+                        }`}
+                      />
+                    <span className={`text-xs font-medium ${generationStep >= step.id ? 'text-gray-900' : 'text-gray-400'}`}>
+                      {step.title}
+                    </span>
+                    {step.id !== generationSteps.length && (
+                      <div className="h-px w-6 bg-gray-200" />
+                    )}
+                  </div>
+                ))}
               </div>
             </div>
 
-            {generationDrawerStep === 1 && (
-              <section className="rounded-[36px] border border-white/70 bg-white p-8 shadow-[0_30px_80px_rgba(15,23,42,0.08)] space-y-8">
-                <div className="space-y-2">
-                  <span className="text-[11px] uppercase tracking-[0.35em] text-gray-400">Word cadence</span>
-                  <h4 className="text-2xl font-light text-gray-900">Dial in the depth and pace.</h4>
-                  <p className="text-sm text-gray-500 max-w-2xl">
-                    Glide between quick reads and flagship editorials. Every notch subtly changes paragraph
-                    length, transitions, and how immersive the narration should feel.
-                  </p>
-                </div>
-                <div className="rounded-[28px] border border-gray-100 bg-gray-50/70 p-5 space-y-4">
+            {generationStep === 1 && (
+              <section className="rounded-[32px] border border-white/80 bg-white/90 px-6 py-6 shadow-[0_30px_80px_rgba(15,23,42,0.10)] backdrop-blur flex flex-col gap-5">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm font-semibold text-gray-800">Projected read time</p>
-                      <p className="text-xs text-gray-500">A calm slider tuned for editorial pacing.</p>
+                    <div className="text-xs uppercase tracking-[0.35em] text-gray-500">Word cadence</div>
+                    <h3 className="text-[24px] font-light text-gray-900">Dial in the depth</h3>
+                    <p className="text-sm text-gray-500">Tune the total word count for the generated pages.</p>
                     </div>
-                    <div className="inline-flex items-baseline gap-2 rounded-full bg-white px-5 py-1.5 shadow-inner">
-                      <span className="text-2xl font-light">{generationForm.wordCount}</span>
-                      <span className="text-xs uppercase tracking-[0.25em] text-gray-500">words</span>
+                  <div className="inline-flex items-baseline gap-1 rounded-full bg-gray-50 px-4 py-1 shadow-inner border border-gray-100">
+                    <span className="text-xl font-light">{generationForm.wordCount}</span>
+                    <span className="text-[11px] uppercase tracking-[0.25em] text-gray-500">words</span>
                     </div>
                   </div>
-                  <div>
-                    <div className="flex justify-between text-[10px] uppercase tracking-[0.3em] text-gray-400 mb-2">
-                      <span>Brief</span>
-                      <span>Feature</span>
-                      <span>Chronicle</span>
-                    </div>
+                <div className="rounded-2xl border border-gray-100 bg-gray-50/70 p-4 space-y-3">
                     <input
                       type="range"
                       min={500}
@@ -5021,68 +5224,86 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({ campaign,
                       step={50}
                       value={generationForm.wordCount}
                       onChange={(e) =>
-                        setGenerationForm((prev) => ({ ...prev, wordCount: Number(e.target.value) }))
+                      setGenerationForm((prev) => ({ ...prev, wordCount: Number(e.target.value) || 800 }))
                       }
                       className="w-full h-2 rounded-full bg-gradient-to-r from-gray-200 via-gray-300 to-gray-400 accent-black"
                     />
-                    <div className="mt-2 flex justify-between text-xs text-gray-500">
-                      <span>Snackable insight</span>
-                      <span>Premium editorial</span>
-                      <span>Marquee deep dive</span>
+                  <div className="flex justify-between text-[11px] uppercase tracking-[0.3em] text-gray-400">
+                    <span>Brief</span>
+                    <span>Feature</span>
+                    <span>Chronicle</span>
                     </div>
                   </div>
+                <div className="flex items-center justify-between">
+                  <button
+                    onClick={() => {
+                      setGenerationDrawerOpen(false);
+                      setCurrentGenerationTopicId(null);
+                    }}
+                    className="px-4 py-2 rounded-full border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => setGenerationStep(2)}
+                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-gray-900 text-white text-sm font-semibold hover:bg-black/90"
+                  >
+                    Next
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
                 </div>
               </section>
             )}
 
-            {generationDrawerStep === 2 && (
-              <section className="rounded-[36px] border border-white/70 bg-white p-8 shadow-[0_30px_80px_rgba(15,23,42,0.08)] space-y-8">
-                <div className="space-y-2">
-                  <span className="text-[11px] uppercase tracking-[0.35em] text-gray-400">Imagery</span>
-                  <h4 className="text-2xl font-light text-gray-900">Compose a modern visual cadence.</h4>
-                  <p className="text-sm text-gray-500 max-w-2xl">
-                    Control how often imagery appears and whether a cinematic banner crowns the experience.
-                  </p>
-                </div>
-                <div className="grid gap-6 md:grid-cols-2">
-                  <div className="rounded-3xl border border-gray-100 bg-gray-50/80 p-5">
-                    <div className="flex items-center justify-between mb-4">
+            {generationStep === 2 && (
+              <section className="rounded-[32px] border border-white/80 bg-white/90 px-6 py-6 shadow-[0_30px_80px_rgba(15,23,42,0.10)] backdrop-blur space-y-5">
+                <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-sm font-semibold text-gray-800">Inline images</p>
-                        <p className="text-xs text-gray-500">Slide to fine-tune the visual tempo.</p>
+                    <div className="text-xs uppercase tracking-[0.35em] text-gray-500">Imagery</div>
+                    <h3 className="text-[24px] font-light text-gray-900">Compose the visuals</h3>
+                    <p className="text-sm text-gray-500">Control inline images and the featured banner.</p>
                       </div>
-                      <span className="text-lg font-semibold text-gray-900">{generationForm.images}</span>
+                  <div className="px-3 py-1.5 rounded-full bg-emerald-50 text-emerald-700 text-xs font-semibold border border-emerald-100">
+                    WordPress Connected
+                  </div>
+                </div>
+                <div className="rounded-2xl border border-gray-100 bg-gray-50/70 p-4 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="text-sm font-semibold text-gray-800">Inline images</div>
+                    <span className="text-sm text-gray-700">{generationForm.images}</span>
                     </div>
                     <div className="flex items-center gap-3">
                       <button
                         onClick={() =>
                           setGenerationForm((prev) => ({ ...prev, images: Math.max(0, prev.images - 1) }))
                         }
-                        className="w-12 h-12 rounded-full border border-gray-200 text-2xl leading-none flex items-center justify-center hover:border-gray-300"
+                      className="w-10 h-10 rounded-full border border-gray-200 text-lg leading-none flex items-center justify-center hover:border-gray-300 bg-white"
                       >
                         −
                       </button>
                       <div className="flex-1 h-2 rounded-full bg-gray-100">
                         <div
                           className="h-full rounded-full bg-gray-900 transition-all"
-                          style={{ width: `${(generationForm.images / 4) * 100}%` }}
+                        style={{ width: `${Math.min(4, Math.max(0, generationForm.images)) / 4 * 100}%` }}
                         />
                       </div>
                       <button
                         onClick={() =>
                           setGenerationForm((prev) => ({ ...prev, images: Math.min(4, prev.images + 1) }))
                         }
-                        className="w-12 h-12 rounded-full border border-gray-200 text-2xl leading-none flex items-center justify-center hover:border-gray-300"
+                      className="w-10 h-10 rounded-full border border-gray-200 text-lg leading-none flex items-center justify-center hover:border-gray-300 bg-white"
                       >
                         +
                       </button>
                     </div>
+                  <div className="rounded-2xl border border-gray-100 bg-white shadow-sm p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-0.5">
+                        <p className="text-sm font-semibold text-gray-900">Hero banner</p>
+                        <p className="text-xs text-gray-500">Ideal for previews and social sharing.</p>
                   </div>
-                  <div className="rounded-3xl border border-gray-100 bg-gray-50/80 p-5 space-y-3">
-                    <p className="text-sm font-semibold text-gray-800">Hero banner</p>
-                    <p className="text-xs text-gray-500">
-                      Perfect for featured cards, WordPress previews, and shareable link thumbnails.
-                    </p>
+                      <span className="text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-700">Optional</span>
+                    </div>
                     <button
                       onClick={() =>
                         setGenerationForm((prev) => ({ ...prev, featuredImage: !prev.featuredImage }))
@@ -5093,142 +5314,182 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({ campaign,
                           : 'border-gray-200 text-gray-700 hover:bg-gray-100'
                       }`}
                     >
-                      {generationForm.featuredImage ? 'Use banner imagery' : 'Skip banner imagery'}
+                      {generationForm.featuredImage ? 'Use featured banner' : 'Skip featured banner'}
                     </button>
                   </div>
                 </div>
-              </section>
-            )}
-
-            {generationDrawerStep === 3 && (
-              <section className="rounded-[36px] bg-white border border-white/70 shadow-[0_30px_80px_rgba(15,23,42,0.08)] p-8 space-y-6">
-                <div className="space-y-2">
-                  <span className="text-[11px] uppercase tracking-[0.35em] text-gray-400">Brand Identity</span>
-                  <h4 className="text-2xl font-light text-gray-900">Define your brand voice.</h4>
-                  <p className="text-sm text-gray-500 max-w-2xl">
-                    Set the brand name and description that will be used across all generated content.
-                  </p>
-                </div>
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Brand Name</label>
-                    <input
-                      type="text"
-                      value={generationForm.brandName}
-                      onChange={(e) =>
-                        setGenerationForm((prev) => ({ ...prev, brandName: e.target.value }))
-                      }
-                      placeholder="Your brand name"
-                      className="w-full px-5 py-4 rounded-[28px] border border-gray-200 bg-gradient-to-br from-white via-white to-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent text-base shadow-inner"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Brand Description</label>
-                    <textarea
-                      value={generationForm.brandDescription}
-                      onChange={(e) =>
-                        setGenerationForm((prev) => ({ ...prev, brandDescription: e.target.value }))
-                      }
-                      placeholder="Describe your brand, values, and tone..."
-                      rows={6}
-                      className="w-full px-5 py-4 rounded-[28px] border border-gray-200 bg-gradient-to-br from-white via-white to-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent text-base shadow-inner resize-none"
-                    />
-                    <p className="text-xs text-gray-500 mt-2">
-                      This context helps shape the content's voice and messaging.
-                    </p>
-                  </div>
-                </div>
-              </section>
-            )}
-
-            {generationDrawerStep === 4 && (
-              <section className="rounded-[36px] bg-white border border-white/70 shadow-[0_30px_80px_rgba(15,23,42,0.08)] p-8 space-y-6">
-                <div className="space-y-2">
-                  <span className="text-[11px] uppercase tracking-[0.35em] text-gray-400">WordPress Integration</span>
-                  <h4 className="text-2xl font-light text-gray-900">Publishing destination.</h4>
-                  <p className="text-sm text-gray-500 max-w-2xl">
-                    Verify your WordPress connection. Generated content will be saved as drafts.
-                  </p>
-                </div>
-                {wpIntegrationLoadingForDrawer ? (
-                  <div className="rounded-[28px] border border-gray-100 bg-gray-50/70 p-6">
-                    <div className="flex items-center gap-3">
-                      <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
-                      <p className="text-sm text-gray-600">Checking WordPress connection...</p>
-                    </div>
-                  </div>
-                ) : wpIntegrationForGeneration ? (
-                  <div className="rounded-[28px] border border-gray-100 bg-gray-50/70 p-6 space-y-4">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm font-semibold text-gray-800">WordPress Site</p>
-                        <p className="text-xs text-gray-500 mt-1">
-                          {wpIntegrationForGeneration.siteUrl?.replace(/^https?:\/\//, '') || 'Not configured'}
-                        </p>
-                      </div>
-                      <div className="px-4 py-2 rounded-full bg-green-50 text-green-700 text-sm font-medium">
-                        <CheckCircle className="h-4 w-4 inline mr-2" />
-                        Connected
-                      </div>
-                    </div>
-                    <div className="pt-4 border-t border-gray-200">
-                      <p className="text-xs text-gray-500">
-                        Username: <span className="font-medium text-gray-700">{wpIntegrationForGeneration.username}</span>
-                      </p>
-                      <p className="text-xs text-gray-500 mt-1">
-                        Content will be saved as drafts and can be published later.
-                      </p>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="rounded-[28px] border border-red-100 bg-red-50/70 p-6">
-                    <div className="flex items-center gap-3">
-                      <AlertCircle className="h-5 w-5 text-red-600" />
-                      <div>
-                        <p className="text-sm font-semibold text-red-800">WordPress Not Connected</p>
-                        <p className="text-xs text-red-600 mt-1">
-                          Please configure WordPress integration in the Settings tab before generating content.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </section>
-            )}
-
-            <div className="flex items-center justify-between pt-4 border-t border-gray-200">
-              <button
-                onClick={handleGenerationDrawerBack}
-                disabled={generationDrawerStep === 1}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-40"
-              >
-                <ChevronLeft className="h-4 w-4" />
-                Back
-              </button>
-              <div className="flex items-center gap-3">
-                {generationDrawerStep < 4 && (
+                <div className="flex items-center justify-between">
                   <button
-                    onClick={handleGenerationDrawerNext}
+                    onClick={() => setGenerationStep(1)}
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                    Back
+                  </button>
+                  <button
+                    onClick={() => setGenerationStep(3)}
                     className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-gray-900 text-white text-sm font-semibold hover:bg-black/90"
                   >
                     Next
                     <ChevronRight className="h-4 w-4" />
                   </button>
-                )}
-                {generationDrawerStep === 4 && (
+                </div>
+              </section>
+            )}
+
+            {generationStep === 3 && (
+              <section className="rounded-[32px] border border-white/80 bg-white/90 px-6 py-6 shadow-[0_30px_80px_rgba(15,23,42,0.10)] backdrop-blur space-y-5">
+                <div className="space-y-1">
+                  <div className="text-xs uppercase tracking-[0.35em] text-gray-500">Brand</div>
+                  <h3 className="text-[24px] font-light text-gray-900">Align tone & voice</h3>
+                  <p className="text-sm text-gray-500">We’ll weave this into the generated pages.</p>
+                </div>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <label className="block text-xs uppercase tracking-[0.35em] text-gray-500">Brand name</label>
+                    <input
+                      type="text"
+                      value={generationForm.brandName}
+                      onChange={(e) => setGenerationForm((f) => ({ ...f, brandName: e.target.value }))}
+                      className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm shadow-inner focus:ring-2 focus:ring-black/10"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="block text-xs uppercase tracking-[0.35em] text-gray-500">Brand description</label>
+                    <textarea
+                      value={generationForm.brandDescription}
+                      onChange={(e) => setGenerationForm((f) => ({ ...f, brandDescription: e.target.value }))}
+                      className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm shadow-inner focus:ring-2 focus:ring-black/10"
+                      rows={3}
+                    />
+                  </div>
+                </div>
+                    <div className="flex items-center justify-between">
+              <button
+                    onClick={() => setGenerationStep(2)}
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                <ChevronLeft className="h-4 w-4" />
+                Back
+              </button>
                   <button
-                    onClick={handleGenerateAndSubmit}
-                    disabled={!generationForm.brandName.trim() || !wpIntegrationForGeneration}
-                    className="px-6 py-2.5 rounded-full bg-black text-white text-sm font-semibold shadow-lg hover:bg-black/90 disabled:opacity-60 transition-colors"
+                    disabled={!currentTopic || generateTopicLoading === currentTopic?.id}
+                    onClick={() => currentTopic && handleGenerateTopic(currentTopic, generationForm)}
+                    className="px-6 py-2.5 rounded-full bg-black text-white text-sm font-semibold shadow-[0_20px_40px_rgba(0,0,0,0.12)] hover:bg-black/90 disabled:opacity-60 disabled:cursor-not-allowed"
                   >
-                    Generate & Preview
+                    {generateTopicLoading === currentTopic?.id ? 'Starting…' : 'Start generation'}
                   </button>
-                )}
-              </div>
-            </div>
+                </div>
+              </section>
+            )}
           </div>
         </SheetContent>
       </Sheet>
+
+      {/* Draft Preview Overlay (publish-style) */}
+      {previewDraft && (
+        <div 
+          className="fixed inset-0 z-50 bg-white"
+          style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}
+          onClick={(e) => {
+            // Prevent clicks from propagating to parent elements that might cause tab navigation
+            e.stopPropagation();
+          }}
+          onMouseDown={(e) => {
+            // Prevent mousedown from propagating
+            e.stopPropagation();
+          }}
+        >
+          <PublishExperience
+            companyDomain={companyDomain}
+            domainContext={domainContext}
+            keywordsTableData={keywordsTableData}
+            hasWordpressIntegration={hasWordpressIntegration}
+            wpIntegration={wpIntegration}
+            onConfigureWordpress={onConfigureWordpress}
+            onRefreshWordpressIntegration={onRefreshWordpressIntegration}
+            isActive={true}
+            disablePreviewOverlay={true}
+            initialDraft={{
+              primaryKeyword: previewDraft?.primaryKeyword || '',
+              htmlContent: previewDraft?.htmlContent || '',
+              featuredImage: previewDraft?.featuredImage,
+              title: previewDraft?.title,
+              metaDescription: previewDraft?.metaDescription,
+              slug: previewDraft?.slug,
+              longtailKeywords: '', // not provided by API yet
+              wordpressUrl: undefined,
+            }}
+            initialDraftId={previewPageId}
+          />
+          <button
+            onClick={async () => {
+              setClosePreviewLoading(true);
+              try {
+                // Refresh draft status when closing to show any updates
+                if (campaignStructure.topics && campaignStructure.topics.length > 0) {
+                  try {
+                    // Rehydrate draft status to pick up any changes
+                    const rehydrateMap = new Map<number, GenerationPageStatus>();
+                    for (const topic of campaignStructure.topics) {
+                      try {
+                        const response = await fetch(
+                          `${API_BASE_URL}/api/campaigns/topics/${topic.id}/drafts-status`,
+                          { headers: getAuthHeaders() }
+                        );
+                        if (response.ok) {
+                          const data = await response.json();
+                          if (data.success && data.pages) {
+                            data.pages.forEach((p: DraftStatusRecord) => {
+                              if (p.draftId || p.jobId || p.hasHtml) {
+                                rehydrateMap.set(p.pageId, {
+                                  jobId: p.jobId || '',
+                                  pageId: p.pageId,
+                                  pageType: p.pageType === 'subpage' ? 'subpage' : 'pillar',
+                                  status: (p.status || 'pending') as GenerationPageStatus['status'],
+                                  draftId: p.draftId,
+                                  progress: typeof p.progress === 'number' ? p.progress : p.hasHtml ? 100 : 0,
+                                  primaryKeyword: p.primaryKeyword,
+                                  hasHtml: p.hasHtml,
+                                  updatedAt: p.updatedAt,
+                                  error: p.error || null,
+                                  wordpressUrl: p.wordpressUrl || null,
+                                });
+                              }
+                            });
+                          }
+                        }
+                      } catch (err) {
+                        // Silently fail for individual topics
+                      }
+                    }
+                    if (rehydrateMap.size > 0) {
+                      setGenerationJobs(rehydrateMap);
+                    }
+                  } catch (err) {
+                    // Silently fail refresh
+                  }
+                }
+              } finally {
+                setPreviewDraft(null);
+                setPreviewPageId(null);
+                setClosePreviewLoading(false);
+              }
+            }}
+            disabled={closePreviewLoading}
+            className="fixed top-4 right-4 z-[60] inline-flex items-center gap-2 px-4 py-2.5 rounded-full border border-gray-200 bg-white text-sm font-medium text-gray-900 hover:bg-gray-50 shadow-sm disabled:opacity-60 disabled:cursor-not-allowed transition-all"
+          >
+            {closePreviewLoading ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Closing...
+              </>
+            ) : (
+              'Close'
+            )}
+          </button>
+        </div>
+      )}
     </div>
   );
 };

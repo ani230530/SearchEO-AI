@@ -22,6 +22,9 @@ const PublishHistoryTable: React.FC<PublishHistoryTableProps> = ({
       const statusLabel = (entry.status || 'queued').toLowerCase();
       const isDraft = statusLabel === 'draft';
       const isGenerating = statusLabel === 'generating';
+      const isPublished = statusLabel === 'published';
+      const isFailed = statusLabel === 'failed';
+      const hasValidUrl = entry.wordpressUrl && !entry.wordpressUrl.startsWith('draft://');
       const canResume =
         isDraft &&
         entry.response &&
@@ -45,6 +48,10 @@ const PublishHistoryTable: React.FC<PublishHistoryTableProps> = ({
               className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${
                 isGenerating
                   ? 'bg-blue-100 text-blue-800'
+                  : isPublished
+                  ? 'bg-purple-100 text-purple-800'
+                  : isFailed
+                  ? 'bg-red-100 text-red-800'
                   : isDraft
                   ? 'bg-amber-100 text-amber-800'
                   : 'bg-emerald-100 text-emerald-800'
@@ -63,6 +70,15 @@ const PublishHistoryTable: React.FC<PublishHistoryTableProps> = ({
           <td className="py-4 text-right">
             {isGenerating ? (
               <span className="text-xs text-gray-400">Generating...</span>
+            ) : isPublished && hasValidUrl && entry.wordpressUrl ? (
+              <a
+                href={entry.wordpressUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="px-4 py-2 text-xs font-semibold rounded-full bg-purple-600 text-white hover:bg-purple-700"
+              >
+                View Live
+              </a>
             ) : canResume ? (
               <button
                 onClick={() => onResumeDraft(entry)}
@@ -70,15 +86,6 @@ const PublishHistoryTable: React.FC<PublishHistoryTableProps> = ({
               >
                 Resume draft
               </button>
-            ) : fullUrl ? (
-              <a
-                href={fullUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="px-4 py-2 text-xs font-semibold rounded-full bg-gray-900 text-white hover:bg-black"
-              >
-                View live
-              </a>
             ) : (
               <span className="text-xs text-gray-400">—</span>
             )}

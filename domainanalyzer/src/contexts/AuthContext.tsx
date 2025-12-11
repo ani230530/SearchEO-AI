@@ -1,4 +1,6 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
+import { isTokenExpired, getTimeUntilExpiration } from '@/services/tokenService';
+import { tokenManager, apiRequest } from '@/services/apiClient';
 
 export interface User {
   id: number;
@@ -37,10 +39,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const refreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Check for existing token on app load
   useEffect(() => {
-    const storedToken = localStorage.getItem('authToken');
+    const storedToken = tokenManager.getAuthToken();
     if (storedToken) {
       verifyToken(storedToken);
     } else {
@@ -48,14 +51,93 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   }, []);
 
-  // Handle 403 Forbidden responses (access denied)
-  const handleAccessDenied = () => {
-    console.warn('Access denied - user may be trying to access unauthorized resources');
-    logout();
+  // Set up automatic token refresh
+  useEffect(() => {
+    if (token && !isTokenExpired(token)) {
+      const timeUntilExpiration = getTimeUntilExpiration(token);
+      if (timeUntilExpiration && timeUntilExpiration > 0) {
+        // Refresh 5 minutes before expiration
+        const refreshTime = Math.max(timeUntilExpiration - 5 * 60 * 1000, 60000); // At least 1 minute
+        
+        refreshIntervalRef.current = setTimeout(async () => {
+          try {
+            await refreshToken();
+          } catch (error) {
+            console.error('Automatic token refresh failed:', error);
+          }
+        }, refreshTime);
+      }
+    }
+
+    return () => {
+      if (refreshIntervalRef.current) {
+        clearTimeout(refreshIntervalRef.current);
+      }
+    };
+  }, [token]);
+
+  const refreshToken = async (): Promise<void> => {
+    const refreshTokenValue = tokenManager.getRefreshToken();
+    if (!refreshTokenValue) {
+      throw new Error('No refresh token available');
+    }
+
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/auth/refresh`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ refreshToken: refreshTokenValue }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Token refresh failed');
+      }
+
+      tokenManager.setTokens(data.token, data.refreshToken);
+      setToken(data.token);
+    } catch (error) {
+      console.error('Token refresh failed:', error);
+      tokenManager.clearTokens();
+      setToken(null);
+      setUser(null);
+      throw error;
+    }
   };
 
   const verifyToken = async (tokenToVerify: string) => {
     try {
+      // If token is expired, try to refresh first
+      if (isTokenExpired(tokenToVerify)) {
+        const refreshTokenValue = tokenManager.getRefreshToken();
+        if (refreshTokenValue) {
+          try {
+            await refreshToken();
+            const newToken = tokenManager.getAuthToken();
+            if (newToken) {
+              tokenToVerify = newToken;
+            }
+          } catch (error) {
+            // Refresh failed, clear tokens
+            tokenManager.clearTokens();
+            setToken(null);
+            setUser(null);
+            setLoading(false);
+            return;
+          }
+        } else {
+          // No refresh token, clear and exit
+          tokenManager.clearTokens();
+          setToken(null);
+          setUser(null);
+          setLoading(false);
+          return;
+        }
+      }
+
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/auth/verify`, {
         method: 'POST',
         headers: {
@@ -69,16 +151,44 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       if (data.valid && data.user) {
         setUser(data.user);
         setToken(tokenToVerify);
-        localStorage.setItem('authToken', tokenToVerify);
+        tokenManager.setTokens(tokenToVerify);
       } else {
-        // Token is invalid, clear it
-        localStorage.removeItem('authToken');
+        // Token is invalid, try refresh token
+        const refreshTokenValue = tokenManager.getRefreshToken();
+        if (refreshTokenValue) {
+          try {
+            await refreshToken();
+            const newToken = tokenManager.getAuthToken();
+            if (newToken) {
+              // Retry verification with new token
+              const retryResponse = await fetch(`${import.meta.env.VITE_API_URL}/api/auth/verify`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ token: newToken }),
+              });
+              const retryData = await retryResponse.json();
+              if (retryData.valid && retryData.user) {
+                setUser(retryData.user);
+                setToken(newToken);
+                tokenManager.setTokens(newToken);
+                setLoading(false);
+                return;
+              }
+            }
+          } catch (error) {
+            // Refresh failed
+          }
+        }
+        // Clear tokens if verification failed
+        tokenManager.clearTokens();
         setToken(null);
         setUser(null);
       }
     } catch (error) {
       console.error('Token verification failed:', error);
-      localStorage.removeItem('authToken');
+      tokenManager.clearTokens();
       setToken(null);
       setUser(null);
     } finally {
@@ -107,7 +217,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       setUser(data.user);
       setToken(data.token);
-      localStorage.setItem('authToken', data.token);
+      tokenManager.setTokens(data.token, data.refreshToken);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Login failed';
       setError(errorMessage);
@@ -138,7 +248,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       setUser(data.user);
       setToken(data.token);
-      localStorage.setItem('authToken', data.token);
+      tokenManager.setTokens(data.token, data.refreshToken);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Registration failed';
       setError(errorMessage);
@@ -148,31 +258,44 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-  const logout = () => {
-    setUser(null);
-    setToken(null);
-    localStorage.removeItem('authToken');
+  const logout = async () => {
+    try {
+      // Call backend logout to invalidate refresh token
+      const currentToken = tokenManager.getAuthToken();
+      if (currentToken) {
+        try {
+          await fetch(`${import.meta.env.VITE_API_URL}/api/auth/logout`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${currentToken}`,
+            },
+          });
+        } catch (error) {
+          // Ignore logout errors, still clear local state
+          console.error('Logout API call failed:', error);
+        }
+      }
+    } catch (error) {
+      // Ignore errors
+    } finally {
+      setUser(null);
+      setToken(null);
+      tokenManager.clearTokens();
+      if (refreshIntervalRef.current) {
+        clearTimeout(refreshIntervalRef.current);
+      }
+    }
   };
 
   const updateProfile = async (name: string) => {
     if (!token) throw new Error('Not authenticated');
 
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/auth/profile`, {
+      await apiRequest('/auth/profile', {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
         body: JSON.stringify({ name }),
       });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Profile update failed');
-      }
-
       setUser(prev => prev ? { ...prev, name } : null);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Profile update failed';
@@ -185,20 +308,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     if (!token) throw new Error('Not authenticated');
 
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/auth/password`, {
+      await apiRequest('/auth/password', {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
         body: JSON.stringify({ currentPassword, newPassword }),
       });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Password change failed');
-      }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Password change failed';
       setError(errorMessage);

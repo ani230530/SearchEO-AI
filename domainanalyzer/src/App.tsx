@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { ProtectedRoute } from "@/components/ProtectedRoute";
 import Index from "./pages/Index";
 import MainDashboard from "./pages/MainDashboard";
 import DomainDashboard from "./pages/DomainDashboard";
@@ -23,14 +24,42 @@ const App = () => (
         <Sonner />
         <BrowserRouter>
           <Routes>
+            {/* Public routes */}
             <Route path="/" element={<LandingPage />} />
-            <Route path="/dashboard" element={<SidebarDashboard />} />
-            <Route path="/ai-checker" element={<MainDashboard />} />
             <Route path="/auth" element={<Auth />} />
-            <Route path="/analyze" element={<Index />} />
-            <Route path="/dashboard/:domain" element={<DomainDashboard />} />
-            <Route path="/profile" element={<Profile />} />
-            <Route path="/newdashboard" element={<SidebarDashboard />} />
+            
+            {/* Protected routes */}
+            <Route path="/dashboard" element={
+              <ProtectedRoute>
+                <SidebarDashboard />
+              </ProtectedRoute>
+            } />
+            <Route path="/ai-checker" element={
+              <ProtectedRoute>
+                <MainDashboard />
+              </ProtectedRoute>
+            } />
+            <Route path="/analyze" element={
+              <ProtectedRoute>
+                <Index />
+              </ProtectedRoute>
+            } />
+            <Route path="/dashboard/:domain" element={
+              <ProtectedRoute>
+                <DomainDashboard />
+              </ProtectedRoute>
+            } />
+            <Route path="/profile" element={
+              <ProtectedRoute>
+                <Profile />
+              </ProtectedRoute>
+            } />
+            <Route path="/newdashboard" element={
+              <ProtectedRoute>
+                <SidebarDashboard />
+              </ProtectedRoute>
+            } />
+            
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

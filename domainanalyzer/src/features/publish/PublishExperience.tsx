@@ -11,7 +11,13 @@ import {
   Plus,
   X,
   ArrowUpDown,
+  Edit,
+  Eye,
+  Trash2,
+  Image as ImageIcon,
 } from 'lucide-react';
+import ReactQuill from 'react-quill';
+import 'react-quill/dist/quill.snow.css';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
 import { useToast } from '@/components/ui/use-toast';
 import PublishOverviewCard from './PublishOverviewCard';
@@ -38,6 +44,9 @@ interface PublishExperienceProps {
   onConfigureWordpress: () => void;
   onRefreshWordpressIntegration: () => void;
   isActive: boolean;
+  initialDraft?: GeneratedArticleContent | null;
+  initialDraftId?: number | null;
+  disablePreviewOverlay?: boolean; // When true, don't render the preview overlay wrapper (for embedded use)
 }
 
 interface PublishFormState {
@@ -71,6 +80,21 @@ const ButtonSpinner = () => (
   </svg>
 );
 
+// Calculate word count from HTML content
+const calculateWordCount = (html: string): number => {
+  if (!html) return 0;
+  try {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, 'text/html');
+    const text = doc.body.textContent || '';
+    const words = text.trim().split(/\s+/).filter(word => word.length > 0);
+    return words.length;
+  } catch (error) {
+    console.error('Error calculating word count:', error);
+    return 0;
+  }
+};
+
 const PublishExperience: React.FC<PublishExperienceProps> = ({
   companyDomain,
   domainContext,
@@ -80,6 +104,9 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
   onConfigureWordpress,
   onRefreshWordpressIntegration,
   isActive,
+  initialDraft,
+  initialDraftId,
+  disablePreviewOverlay = false,
 }) => {
   const { toast } = useToast();
   const [publishForm, setPublishForm] = useState<PublishFormState>({
@@ -98,7 +125,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
   const [publishDrawerOpen, setPublishDrawerOpen] = useState(false);
   const [drawerStep, setDrawerStep] = useState(1);
   const totalDrawerSteps = 4;
-  const [savingDraft, setSavingDraft] = useState(false);
+  // savingDraft removed - using 'saving' state instead
   const [currentDraftId, setCurrentDraftId] = useState<number | null>(null);
   const [selectedText, setSelectedText] = useState('');
   const [textEditNote, setTextEditNote] = useState('');
@@ -123,17 +150,68 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
   const textSelectionIntervalRef = useRef<number | null>(null);
   const tooltipAnchorRef = useRef<HTMLSpanElement | null>(null);
   const previewRef = useRef<HTMLDivElement | null>(null);
+  
+  // Edit mode state
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editedHtmlContent, setEditedHtmlContent] = useState('');
+  const [newImageUrl, setNewImageUrl] = useState('');
+  const [newImageAlt, setNewImageAlt] = useState('');
+  const [showAddImageModal, setShowAddImageModal] = useState(false);
+  const [originalHtmlContent, setOriginalHtmlContent] = useState('');
+  const quillRef = useRef<ReactQuill>(null);
+  
+  // Track if content has unsaved changes (dirty state)
+  const [isDirty, setIsDirty] = useState(false);
+  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
+  const [saving, setSaving] = useState(false);
 
   const showPreviewStage = publishStage === 'preview';
 
+  // SINGLE SOURCE OF TRUTH for HTML content in preview
+  // Always prioritize editedHtmlContent - if it's empty, use publishResult (but never reset editedHtmlContent automatically)
+  const currentHtmlContent = useMemo(() => {
+    // If editedHtmlContent has content, use it (even if it's different from publishResult)
+    // This ensures regenerated content persists
+    if (editedHtmlContent && editedHtmlContent.trim().length > 0) {
+      return editedHtmlContent;
+    }
+    // Only use publishResult if editedHtmlContent is truly empty (initial state)
+    return publishResult?.htmlContent || '';
+  }, [editedHtmlContent, publishResult?.htmlContent]);
+
+  const wordCount = useMemo(() => {
+    return calculateWordCount(currentHtmlContent);
+  }, [currentHtmlContent]);
+
+  const hasUnsavedChanges = useMemo(() => {
+    // Check if current content differs from what was last saved (originalHtmlContent)
+    if (!publishResult) return false;
+    const currentContent = currentHtmlContent;
+    return currentContent !== originalHtmlContent;
+  }, [currentHtmlContent, originalHtmlContent, publishResult]);
+  
+  // Sync dirty state
+  useEffect(() => {
+    setIsDirty(hasUnsavedChanges);
+  }, [hasUnsavedChanges]);
+
+  const secondaryKeywords = useMemo(() => {
+    const longtails = publishForm.longtailKeywords || publishResult?.longtailKeywords;
+    if (!longtails) return [];
+    return longtails
+      .split(',')
+      .map((k) => k.trim())
+      .filter(Boolean);
+  }, [publishResult?.longtailKeywords, publishForm.longtailKeywords]);
+
   const publishImages = useMemo(() => {
-    if (typeof window === 'undefined' || !publishResult?.htmlContent) {
+    if (typeof window === 'undefined' || !currentHtmlContent) {
       return [];
     }
 
     try {
       const parser = new DOMParser();
-      const doc = parser.parseFromString(publishResult.htmlContent, 'text/html');
+      const doc = parser.parseFromString(currentHtmlContent, 'text/html');
       return Array.from(doc.querySelectorAll('img'))
         .map((img, index) => ({
           src: img.getAttribute('src') || '',
@@ -144,7 +222,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
       console.error('Failed to parse images from generated HTML:', error);
       return [];
     }
-  }, [publishResult?.htmlContent]);
+  }, [currentHtmlContent]);
 
   const filteredPublishKeywords = useMemo(() => {
     if (!publishKeywordQuery) {
@@ -193,10 +271,12 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
   }, []);
 
   useEffect(() => {
-    if (isActive) {
+    // Only fetch history when actually in publish tab (not when viewing from campaign overlay)
+    // If initialDraft is provided, we're in campaign preview mode, so don't fetch history
+    if (isActive && !initialDraft) {
       fetchPublishHistory();
     }
-  }, [isActive, fetchPublishHistory]);
+  }, [isActive, initialDraft, fetchPublishHistory]);
 
   useEffect(() => {
     if (!publishResult && !publishLoading && publishStage !== 'compose') {
@@ -231,14 +311,138 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
     };
   }, []);
 
+  // Fetch draft from DB - SINGLE SOURCE OF TRUTH
+  const fetchDraftFromDb = useCallback(async (draftId: number) => {
+    try {
+      // Try campaign endpoint first (for campaign drafts)
+      let response = await fetch(`${API_BASE_URL}/api/campaigns/drafts/${draftId}`, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('authToken')}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      // If that fails, try publish drafts endpoint
+      if (!response.ok) {
+        response = await fetch(`${API_BASE_URL}/api/publish/drafts/${draftId}`, {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem('authToken')}`,
+            'Content-Type': 'application/json',
+          },
+        });
+      }
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch draft');
+      }
+      
+      const data = await response.json();
+      if (!data.success || !data.draft) {
+        throw new Error('Invalid draft data');
+      }
+      
+      const draft = data.draft;
+      const draftContent: GeneratedArticleContent = {
+        primaryKeyword: draft.primaryKeyword || '',
+        htmlContent: draft.htmlContent || '',
+        featuredImage: draft.featuredImage,
+        title: draft.title,
+        metaDescription: draft.metaDescription,
+        slug: draft.slug,
+        longtailKeywords: draft.longtailKeywords || '',
+        wordpressUrl: draft.wordpressUrl,
+      };
+      
+      // Set as source of truth
+      setPublishResult(draftContent);
+      setEditedHtmlContent(draftContent.htmlContent || '');
+      setOriginalHtmlContent(draftContent.htmlContent || ''); // This is what we'll compare against for dirty state
+      setCurrentDraftId(draftId);
+      setPublishStage('preview');
+      setIsEditMode(false);
+      setIsDirty(false);
+      setLastSavedAt(new Date());
+      
+      // Update form
+      setPublishForm((prev) => ({
+        ...prev,
+        primaryKeyword: draftContent.primaryKeyword || prev.primaryKeyword,
+        longtailKeywords: draftContent.longtailKeywords || prev.longtailKeywords,
+      }));
+      setSelectedLongtailKeywords(
+        (draftContent.longtailKeywords || '')
+          .split(',')
+          .map((k) => k.trim())
+          .filter(Boolean)
+      );
+      
+      return draftContent;
+    } catch (error) {
+      console.error('Error fetching draft from DB:', error);
+      toast({
+        title: 'Failed to Load Draft',
+        description: error instanceof Error ? error.message : 'Could not load draft from database',
+        variant: 'destructive',
+      });
+      return null;
+    }
+  }, [toast]);
+
+  // Track if we've already initialized to prevent resets
+  const hasInitializedRef = useRef(false);
+  const lastInitialDraftIdRef = useRef<number | null | undefined>(null);
+  
+  // Seed publishResult when an initial draft is provided OR fetch from DB if draftId provided
+  // ONLY runs once on mount or when initialDraftId actually changes (not on every render)
   useEffect(() => {
-    if (publishResult) {
+    // Only initialize if:
+    // 1. We haven't initialized yet AND we have a draftId/initialDraft, OR
+    // 2. The initialDraftId actually changed (not just a ref recreation)
+    const shouldInitialize = 
+      (!hasInitializedRef.current && (initialDraftId !== null && initialDraftId !== undefined || initialDraft)) ||
+      (initialDraftId !== null && initialDraftId !== undefined && initialDraftId !== lastInitialDraftIdRef.current);
+    
+    if (!shouldInitialize) return;
+    
+    // Mark as initialized
+    hasInitializedRef.current = true;
+    if (initialDraftId !== null && initialDraftId !== undefined) {
+      lastInitialDraftIdRef.current = initialDraftId;
+      // Always fetch from DB when draftId is provided - DB is single source of truth
+      fetchDraftFromDb(initialDraftId);
+    } else if (initialDraft) {
+      // Fallback to initialDraft if no draftId (for backward compatibility)
+      setPublishResult(initialDraft);
+      setPublishStage('preview');
+      setPublishForm((prev) => ({
+        ...prev,
+        primaryKeyword: initialDraft.primaryKeyword || prev.primaryKeyword,
+        longtailKeywords: initialDraft.longtailKeywords || prev.longtailKeywords,
+      }));
+      setSelectedLongtailKeywords(
+        (initialDraft.longtailKeywords || '')
+          .split(',')
+          .map((k) => k.trim())
+          .filter(Boolean)
+      );
+      const initialHtml = initialDraft.htmlContent || '';
+      setEditedHtmlContent(initialHtml);
+      setOriginalHtmlContent(initialHtml);
+      setIsEditMode(false);
+      setIsDirty(false);
+      // Clear edit UI state
       setSelectedText('');
       setTextEditNote('');
       setSelectedImage('');
       setImageEditNote('');
     }
-  }, [publishResult]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialDraftId]); // Only depend on initialDraftId - don't depend on fetchDraftFromDb or initialDraft object reference
+
+  // REMOVED: This was resetting editedHtmlContent when publishResult changed
+  // Now we only update editedHtmlContent explicitly in handleTextEdit, handleImageEdit, etc.
+
+  // Cleanup removed - no auto-save timeout to clean up
 
   useEffect(() => {
     setPublishForm((prev) => {
@@ -428,12 +632,24 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
     setPublishStage('compose');
   }, []);
 
-  const saveDraftToDatabase = useCallback(async (result: GeneratedArticleContent, silent = false) => {
-    if (!result) {
+  // SIMPLE SAVE FUNCTION - Only called by Save button
+  const saveDraftToDatabase = useCallback(async (silent = false) => {
+    if (!publishResult) {
+      if (!silent) {
+        toast({
+          title: 'Nothing to Save',
+          description: 'No content to save',
+          variant: 'destructive',
+        });
+      }
       return false;
     }
 
+    setSaving(true);
     try {
+      // SIMPLE: Use currentHtmlContent - this includes all edits and regenerations
+      const latestHtml = currentHtmlContent;
+      
       const response = await fetch(`${API_BASE_URL}/api/publish/drafts`, {
         method: 'POST',
         headers: {
@@ -441,15 +657,15 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          draftId: currentDraftId || undefined,
-          primaryKeyword: result.primaryKeyword,
-          htmlContent: result.htmlContent,
-          featuredImage: result.featuredImage,
-          title: result.title,
-          metaDescription: result.metaDescription,
-          slug: result.slug,
-          longtailKeywords: result.longtailKeywords,
-          wordpressUrl: result.wordpressUrl,
+          draftId: currentDraftId || undefined, // Updates existing draft if we have ID
+          primaryKeyword: publishResult.primaryKeyword || publishForm.primaryKeyword,
+          htmlContent: latestHtml, // The actual content to save
+          featuredImage: publishResult.featuredImage,
+          title: publishResult.title,
+          metaDescription: publishResult.metaDescription,
+          slug: publishResult.slug,
+          longtailKeywords: publishResult.longtailKeywords ?? publishForm.longtailKeywords,
+          wordpressUrl: publishResult.wordpressUrl,
         }),
       });
       const data = await response.json();
@@ -457,49 +673,67 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
         throw new Error(data.error || 'Failed to save draft');
       }
       
-      // Update the current draft ID if we got one back
-      if (data.draftId && !currentDraftId) {
+      // Update draft ID if we got one back
+      if (data.draftId) {
         setCurrentDraftId(data.draftId);
       }
+      
+      // SIMPLE: After saving, update state to reflect what was saved
+      setOriginalHtmlContent(latestHtml); // This is what we compare against for dirty state
+      setIsDirty(false);
+      setLastSavedAt(new Date());
+      
+      // Update publishResult with saved HTML (for metadata consistency)
+      setPublishResult({
+        ...publishResult,
+        htmlContent: latestHtml,
+      });
+      // editedHtmlContent already has latestHtml, so preview stays correct
       
       if (!silent) {
         toast({
           title: 'Draft Saved',
-          description: 'You can resume it anytime from the drafts table.',
+          description: 'Changes saved to database.',
         });
       }
+      
+      // Refresh history in publish tab only
+      if (!initialDraft) {
       fetchPublishHistory();
+      }
+      
       return true;
     } catch (error) {
       console.error('Error saving draft:', error);
       if (!silent) {
         toast({
-          title: 'Unable to Save Draft',
-          description: error instanceof Error ? error.message : 'Please try again.',
+          title: 'Save Failed',
+          description: error instanceof Error ? error.message : 'Failed to save draft',
           variant: 'destructive',
         });
       }
       return false;
-    }
-  }, [toast, fetchPublishHistory, currentDraftId]);
-
-  const handleSaveDraft = useCallback(async () => {
-    if (!publishResult) {
-      toast({
-        title: 'No Draft',
-        description: 'Generate content before saving a draft.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    setSavingDraft(true);
-    try {
-      await saveDraftToDatabase(publishResult, false);
     } finally {
-      setSavingDraft(false);
+      setSaving(false);
     }
-  }, [publishResult, toast, saveDraftToDatabase]);
+  }, [toast, fetchPublishHistory, currentDraftId, publishForm, publishResult, currentHtmlContent, initialDraft]);
+
+  // Keep publishResult in sync with updated long-tail selections (for preview only)
+  // User must click Save to persist to DB
+  useEffect(() => {
+    if (!publishResult) return;
+    const joined = selectedLongtailKeywords.join(', ');
+    if (joined && joined !== publishResult.longtailKeywords) {
+      const updated = { ...publishResult, longtailKeywords: joined };
+      setPublishResult(updated);
+      // Don't auto-save - user clicks Save button
+    }
+  }, [selectedLongtailKeywords, publishResult]);
+
+  // SIMPLE: Save button handler
+  const handleSaveDraft = useCallback(async () => {
+    await saveDraftToDatabase(false);
+  }, [saveDraftToDatabase]);
 
   const handleResumeDraft = useCallback(
     (entry: PublishHistoryEntry) => {
@@ -553,8 +787,12 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
             .filter(Boolean)
         : [];
 
+      // Initialize all state from the draft
       setPublishResult(nextResult);
       setCurrentDraftId(entry.id);
+      const initialHtml = nextResult.htmlContent || '';
+      setEditedHtmlContent(initialHtml);
+      setOriginalHtmlContent(initialHtml);
       setPublishForm((prev) => ({
         ...prev,
         primaryKeyword: nextResult.primaryKeyword || prev.primaryKeyword,
@@ -562,9 +800,14 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
       }));
       setSelectedLongtailKeywords(normalizedLongtail);
       setPublishStage('preview');
+      setIsEditMode(false);
+      setIsDirty(false);
       setPublishDrawerOpen(false);
       setSelectedText('');
       setSelectedRange(null);
+      setSelectedImage('');
+      setTextEditNote('');
+      setImageEditNote('');
       toast({
         title: 'Draft Loaded',
         description: `${nextResult.title || 'Draft'} is ready for review.`,
@@ -662,17 +905,28 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
         metaDescription: data.content?.metaDescription,
         slug: data.content?.slug,
         wordpressUrl: data.content?.wordpressUrl,
-        longtailKeywords: data.content?.longtailKeywords,
+        longtailKeywords: data.content?.longtailKeywords || publishForm.longtailKeywords,
       };
 
       if (!normalized.htmlContent) {
         throw new Error('Automation service did not return HTML content');
       }
 
+      // Initialize all state from generated content
       setPublishResult(normalized);
+      const initialHtml = normalized.htmlContent || '';
+      setEditedHtmlContent(initialHtml);
+      setOriginalHtmlContent(initialHtml);
       setPublishStage('preview');
+      setIsEditMode(false);
+      setIsDirty(false);
       // Close drawer when generation completes successfully
       setPublishDrawerOpen(false);
+      // Clear edit UI state
+      setSelectedText('');
+      setSelectedImage('');
+      setTextEditNote('');
+      setImageEditNote('');
       
       // Update the generating draft to completed draft
       if (generatingDraftId) {
@@ -739,6 +993,42 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
     }
   };
 
+  const highlightEditedText = useCallback((quill: { root: HTMLElement; getText: () => string }) => {
+    if (!quill || !originalHtmlContent) return;
+    
+    try {
+      const editorElement = quill.root;
+      if (!editorElement) return;
+      
+      // Get plain text from both versions
+      const currentText = quill.getText();
+      const originalText = new DOMParser().parseFromString(originalHtmlContent, 'text/html').body.textContent || '';
+      
+      // Simple approach: if content changed, add a visual indicator
+      // We'll add a class to the editor container to show it's been edited
+      if (currentText.trim() !== originalText.trim()) {
+        editorElement.classList.add('has-edits');
+      } else {
+        editorElement.classList.remove('has-edits');
+      }
+    } catch (error) {
+      console.error('Error highlighting edited text:', error);
+    }
+  }, [originalHtmlContent]);
+
+  const handleHtmlEditorChange = useCallback((value: string) => {
+    setEditedHtmlContent(value);
+    
+    // Highlight edited text
+    if (quillRef.current) {
+      const quill = quillRef.current.getEditor();
+      setTimeout(() => highlightEditedText(quill), 100);
+    }
+    
+    // No auto-save - user must click Save button (DB is single source of truth)
+    // Content changes will be tracked by hasUnsavedChanges
+  }, [highlightEditedText]);
+
   const handleTextEdit = useCallback(async () => {
     if (!publishResult || !selectedText || !textEditNote.trim()) {
       toast({
@@ -775,8 +1065,12 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
         throw new Error('No edited text returned by automation service');
       }
 
-      let updatedHtml = publishResult.htmlContent;
-      if (selectedRange && previewRef.current) {
+      // Use currentHtmlContent as source of truth - includes all previous edits
+      const currentHtml = currentHtmlContent;
+      let updatedHtml = currentHtml;
+      
+      // Try DOM replacement for preview mode (more accurate)
+      if (!isEditMode && selectedRange && previewRef.current) {
         try {
           const workingRange = selectedRange.cloneRange();
           workingRange.deleteContents();
@@ -785,14 +1079,21 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
           updatedHtml = previewRef.current.innerHTML;
         } catch (error) {
           console.warn('DOM range replacement failed, falling back to string replace:', error);
-          updatedHtml = publishResult.htmlContent.replace(selectedText, updatedText);
+          updatedHtml = currentHtml.replace(selectedText, updatedText);
         }
       } else {
-        updatedHtml = publishResult.htmlContent.replace(selectedText, updatedText);
+        // String replacement (works in both modes)
+        updatedHtml = currentHtml.replace(selectedText, updatedText);
       }
 
-      const updatedResult = publishResult ? { ...publishResult, htmlContent: updatedHtml } : null;
-      setPublishResult(updatedResult);
+      // SIMPLE: Just update editedHtmlContent - this is what preview and save use
+        setEditedHtmlContent(updatedHtml);
+      
+      // If in edit mode, update editor
+      if (isEditMode) {
+        handleHtmlEditorChange(updatedHtml);
+      }
+      
       setSelectedText(updatedText);
       setTextEditNote('');
       setSelectedRange(null);
@@ -812,11 +1113,6 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
         title: 'Text Updated',
         description: 'Your selection has been rewritten',
       });
-
-      // Auto-save the draft after successful edit
-      if (updatedResult) {
-        saveDraftToDatabase(updatedResult, true);
-      }
     } catch (error) {
       console.error('Error editing text:', error);
       toast({
@@ -827,7 +1123,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
     } finally {
       setTextEditing(false);
     }
-  }, [publishResult, selectedText, textEditNote, toast, selectedRange, extractEditedText, saveDraftToDatabase]);
+  }, [publishResult, selectedText, textEditNote, toast, selectedRange, extractEditedText, isEditMode, currentHtmlContent, handleHtmlEditorChange]);
 
   const handleImageEdit = useCallback(async () => {
     if (!publishResult || !selectedImage || !imageEditNote.trim()) {
@@ -862,19 +1158,44 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
 
       const updatedImage = extractEditedImage(data.result);
       if (!updatedImage) {
+        console.error('Failed to extract image from response:', data.result);
         throw new Error('Automation service did not return an updated image');
       }
 
-      const updatedHtml = publishResult.htmlContent.replace(selectedImage, updatedImage);
-      const updatedResult = publishResult
-        ? {
-            ...publishResult,
-            htmlContent: updatedHtml,
-            featuredImage: publishResult.featuredImage === selectedImage ? updatedImage : publishResult.featuredImage,
-          }
-        : null;
+      console.log('Image regeneration - Old:', selectedImage, 'New:', updatedImage);
+
+      // Use currentHtmlContent as source of truth - includes all previous edits
+      const currentHtml = currentHtmlContent;
       
-      setPublishResult(updatedResult);
+      // Replace image URL in HTML - handle both src attributes and plain URLs
+      // Escape special regex characters in both URLs
+      const escapedSelectedImage = selectedImage.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const escapedUpdatedImage = updatedImage.replace(/\$/g, '$$$$'); // Escape $ for replacement string
+      
+      // Replace in img src attributes first (most common case)
+      let updatedHtml = currentHtml.replace(
+        new RegExp(`(<img[^>]*src=["'])${escapedSelectedImage}(["'][^>]*>)`, 'gi'),
+        `$1${escapedUpdatedImage}$2`
+      );
+      
+      // If the URL also appears outside of img tags, replace those too
+      updatedHtml = updatedHtml.replace(new RegExp(escapedSelectedImage, 'g'), escapedUpdatedImage);
+
+      // Fallback: if nothing changed, append the new image
+      if (updatedHtml === currentHtml) {
+        updatedHtml = `${currentHtml}\n<img src="${updatedImage}" alt="Updated image" />`;
+      }
+      
+      console.log('Image regeneration - HTML updated:', updatedHtml !== currentHtml ? 'Yes' : 'No');
+      
+      // SIMPLE: Just update editedHtmlContent - this is what preview and save use
+        setEditedHtmlContent(updatedHtml);
+      
+      // If in edit mode, update editor
+      if (isEditMode) {
+        handleHtmlEditorChange(updatedHtml);
+      }
+      
       setSelectedImage(updatedImage);
       setImageEditNote('');
       imageTooltipInstanceRef.current?.hide();
@@ -882,11 +1203,6 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
         title: 'Image Updated',
         description: 'Image updated successfully',
       });
-
-      // Auto-save the draft after successful edit
-      if (updatedResult) {
-        saveDraftToDatabase(updatedResult, true);
-      }
     } catch (error) {
       console.error('Error editing image:', error);
       toast({
@@ -897,10 +1213,10 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
     } finally {
       setImageEditing(false);
     }
-  }, [publishResult, selectedImage, imageEditNote, toast, extractEditedImage, saveDraftToDatabase]);
+  }, [publishResult, selectedImage, imageEditNote, toast, extractEditedImage, isEditMode, currentHtmlContent, handleHtmlEditorChange]);
 
   const handlePublishToWordpress = async () => {
-    if (!publishResult || !publishResult.htmlContent) {
+    if (!publishResult || !currentHtmlContent) {
       toast({
         title: 'No Draft',
         description: 'Generate or edit content before publishing',
@@ -920,13 +1236,8 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
 
     setPublishLoading(true);
     try {
-      // Get the latest HTML content from the DOM if available (includes any edits)
-      // This ensures we publish the most up-to-date content, including any DOM changes
-      let latestHtmlContent = publishResult.htmlContent;
-      if (previewRef.current) {
-        // Use the current DOM content which includes all edits
-        latestHtmlContent = previewRef.current.innerHTML;
-      }
+      // SIMPLE: Just use currentHtmlContent - user should save manually before publishing
+      const latestHtmlContent = currentHtmlContent;
 
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/publish/publish`, {
         method: 'POST',
@@ -935,8 +1246,9 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
+          draftId: currentDraftId, // Pass draftId to update existing draft instead of creating new one
           primaryKeyword: publishResult.primaryKeyword || publishForm.primaryKeyword,
-          htmlContent: latestHtmlContent,
+          htmlContent: latestHtmlContent, // This is now synced with DB
           featuredImage: publishResult.featuredImage,
           title: publishResult.title,
           metaDescription: publishResult.metaDescription,
@@ -949,10 +1261,33 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
         throw new Error(data.error || 'Publish request failed');
       }
 
-      toast({
-        title: 'Published',
-        description: 'Content sent to WordPress',
-      });
+      // Update publishResult with published status and URL
+      if (data.status === 'published' && data.publishedUrl) {
+        setPublishResult((prev) => prev ? {
+          ...prev,
+          wordpressUrl: data.publishedUrl,
+        } : null);
+        toast({
+          title: 'Published',
+          description: data.publishedUrl ? `Content published successfully. View it here: ${data.publishedUrl}` : 'Content sent to WordPress',
+        });
+      } else if (data.status === 'failed') {
+        toast({
+          title: 'Publish Failed',
+          description: 'WordPress did not return a valid URL. The publish may have failed.',
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: 'Published',
+          description: 'Content sent to WordPress',
+        });
+      }
+
+      // Refresh draft from DB to get updated status
+      if (currentDraftId) {
+        fetchDraftFromDb(currentDraftId);
+      }
       fetchPublishHistory();
       onRefreshWordpressIntegration();
     } catch (error) {
@@ -1036,6 +1371,8 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
     setTextEditNote('');
     setImageEditNote('');
     setPublishStage('compose');
+    setIsEditMode(false);
+    setEditedHtmlContent('');
     textTooltipInstanceRef.current?.hide();
     imageTooltipInstanceRef.current?.hide();
     if (tooltipAnchorRef.current) {
@@ -1043,6 +1380,85 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
     }
     setSelectedRange(null);
   }, []);
+
+  const handleToggleEditMode = useCallback(() => {
+    if (!publishResult) return;
+    
+    if (!isEditMode) {
+      // Entering edit mode - load current content
+      const htmlToEdit = currentHtmlContent;
+      setEditedHtmlContent(htmlToEdit);
+      setIsEditMode(true);
+    } else {
+      // Exiting edit mode - just switch modes, don't auto-save (user clicks Save button)
+      setIsEditMode(false);
+    }
+  }, [isEditMode, publishResult, currentHtmlContent]);
+
+  // Prevent background scroll when preview overlay is open (only if not in embedded overlay mode)
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    const originalOverflow = document.body.style.overflow;
+    if (showPreviewStage && !disablePreviewOverlay) {
+      document.body.style.overflow = 'hidden';
+    }
+    return () => {
+      document.body.style.overflow = originalOverflow;
+    };
+  }, [showPreviewStage, disablePreviewOverlay]);
+
+  const handleRemoveImage = useCallback((imageSrc: string) => {
+    if (!publishResult) return;
+    
+    const currentHtml = currentHtmlContent;
+    const updatedHtml = currentHtml.replace(
+      new RegExp(`<img[^>]*src=["']${imageSrc.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}["'][^>]*>`, 'gi'),
+      ''
+    );
+    
+    // SIMPLE: Just update editedHtmlContent
+      setEditedHtmlContent(updatedHtml);
+    if (isEditMode) {
+      handleHtmlEditorChange(updatedHtml);
+    }
+    
+    toast({
+      title: 'Image Removed',
+        description: 'The image has been removed. Click Save to persist changes.',
+    });
+  }, [publishResult, isEditMode, currentHtmlContent, handleHtmlEditorChange, toast]);
+
+  const handleAddImage = useCallback(() => {
+    if (!newImageUrl.trim()) {
+      toast({
+        title: 'URL Required',
+        description: 'Please enter an image URL',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (!publishResult) return;
+
+    const currentHtml = currentHtmlContent;
+    const imgTag = `<img src="${newImageUrl.trim()}" alt="${newImageAlt.trim() || 'Article image'}" />`;
+    const updatedHtml = currentHtml + '\n' + imgTag;
+
+    // SIMPLE: Just update editedHtmlContent
+      setEditedHtmlContent(updatedHtml);
+    if (isEditMode) {
+      handleHtmlEditorChange(updatedHtml);
+    }
+
+    setNewImageUrl('');
+    setNewImageAlt('');
+    setShowAddImageModal(false);
+    
+    toast({
+      title: 'Image Added',
+      description: 'The image has been added. Click Save to persist changes.',
+    });
+  }, [newImageUrl, newImageAlt, publishResult, isEditMode, currentHtmlContent, handleHtmlEditorChange, toast]);
 
   const closeTextTooltip = useCallback(() => {
     if (textSelectionIntervalRef.current) {
@@ -1099,7 +1515,15 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
     handleImageEdit,
   ]);
 
+  // In embedded mode (disablePreviewOverlay), never show compose UI (even during initial load)
+  // This prevents the compose UI from flashing briefly before the preview loads
+  const shouldShowComposeUI = !disablePreviewOverlay && isActive;
+
   return (
+    <>
+      {/* When in embedded mode, skip compose UI entirely */}
+      {/* Only render compose UI when NOT in embedded mode AND when active (for publish tab) */}
+      {shouldShowComposeUI && (
     <div className="space-y-8">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
@@ -1611,21 +2035,30 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
         </SheetContent>
       </Sheet>
 
+          <PublishHistoryTable
+            entries={publishHistory}
+            onRefresh={fetchPublishHistory}
+            onNewDraft={handleOpenComposeDrawer}
+            onResumeDraft={handleResumeDraft}
+          />
+        </div>
+      )}
+
       {showPreviewStage && (
-        <div className="fixed inset-0 z-50 bg-white">
+        disablePreviewOverlay ? (
+          // Render preview content directly without overlay wrapper (for embedded use)
+          // Parent overlay already provides fixed inset-0, so we just fill it
+          <div className="absolute inset-0 overflow-y-auto bg-white">
           <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-xl border-b border-gray-100 shadow-sm">
             <div className="max-w-7xl mx-auto px-6 py-4">
               <div className="flex items-center justify-between gap-4">
                 <div className="flex items-center gap-3 min-w-0">
-                  <button
-                    onClick={handleOpenComposeDrawer}
-                    className="inline-flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors"
-                  >
-                    <ArrowLeft className="h-4 w-4" />
-                  </button>
+                    {/* No back button in embedded mode - parent overlay handles closing */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      <p className="text-xs uppercase tracking-[0.3em] text-gray-500">Draft Preview</p>
+                      <p className="text-xs uppercase tracking-[0.3em] text-gray-500">
+                        {isEditMode ? 'Edit Mode' : 'Draft Preview'}
+                      </p>
                       {publishLoading && !publishResult && (
                         <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-blue-50 border border-blue-200 text-[10px] font-medium text-blue-700 uppercase tracking-[0.2em]">
                           <svg className="h-3 w-3 animate-spin" fill="none" viewBox="0 0 24 24">
@@ -1648,6 +2081,28 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
                   </div>
                 </div>
                 <div className="flex flex-wrap items-center gap-3 justify-end flex-shrink-0">
+                  {publishResult && (
+                    <button
+                      onClick={handleToggleEditMode}
+                      className={`px-5 py-2.5 rounded-full border text-sm font-medium transition-colors ${
+                        isEditMode
+                          ? 'border-gray-900 bg-gray-900 text-white hover:bg-gray-800'
+                          : 'border-gray-200 bg-white text-gray-900 hover:bg-gray-50'
+                      }`}
+                    >
+                      {isEditMode ? (
+                        <span className="flex items-center gap-2">
+                          <Eye className="h-4 w-4" />
+                          Preview
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-2">
+                          <Edit className="h-4 w-4" />
+                          Edit Mode
+                        </span>
+                      )}
+                    </button>
+                  )}
                   <button
                     onClick={handlePublishToWordpress}
                     disabled={publishLoading || !publishResult}
@@ -1657,10 +2112,14 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
                   </button>
                   <button
                     onClick={handleSaveDraft}
-                    disabled={savingDraft || !publishResult}
-                    className="px-5 py-2.5 rounded-full border border-gray-200 bg-white text-sm font-medium text-gray-900 hover:bg-gray-50 disabled:opacity-50 transition-colors"
+                    disabled={saving || !publishResult || !hasUnsavedChanges}
+                    className={`px-5 py-2.5 rounded-full border text-sm font-medium transition-colors ${
+                      hasUnsavedChanges 
+                        ? 'border-orange-300 bg-orange-50 text-orange-700 hover:bg-orange-100' 
+                        : 'border-gray-200 bg-white text-gray-900 hover:bg-gray-50'
+                    } disabled:opacity-50 disabled:cursor-not-allowed`}
                   >
-                    {savingDraft ? 'Saving…' : 'Save Draft'}
+                    {saving ? 'Saving…' : hasUnsavedChanges ? 'Save Draft • Unsaved' : 'Save Draft'}
                   </button>
                   <button
                     onClick={handleGenerateContent}
@@ -1680,8 +2139,117 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
             </div>
           </div>
 
-          <div className="h-[calc(100vh-80px)] overflow-y-auto">
-            <div className="max-w-4xl mx-auto px-6 py-8">
+          <div className="flex overflow-hidden" style={{ height: 'calc(100vh - 80px)' }}>
+            {/* Left Sidebar - Article Stats */}
+            {publishResult && (
+              <div className="w-80 border-r border-gray-200 bg-gray-50/50 overflow-y-auto">
+                <div className="p-6 space-y-6">
+                  <div>
+                    <h4 className="text-xs uppercase tracking-[0.3em] text-gray-500 mb-3">Article Stats</h4>
+                    <div className="space-y-4">
+                      <div className="rounded-2xl border border-gray-200 bg-white p-4">
+                        <div className="flex items-center justify-between mb-1">
+                          <p className="text-xs text-gray-500">Total Words</p>
+                          {hasUnsavedChanges && (
+                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-medium">
+                              Unsaved
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-2xl font-light text-gray-900">{wordCount.toLocaleString()}</p>
+                        {isEditMode && (
+                          <p className="text-[10px] text-gray-400 mt-1">Updates as you type</p>
+                        )}
+                      </div>
+                      
+                      <div className="rounded-2xl border border-gray-200 bg-white p-4">
+                        <p className="text-xs text-gray-500 mb-2">Primary Keyword</p>
+                        <p className="text-sm font-medium text-gray-900">
+                          {publishResult.primaryKeyword || publishForm.primaryKeyword || 'Not set'}
+                        </p>
+                      </div>
+                      
+                      <div className="rounded-2xl border border-gray-200 bg-white p-4">
+                        <p className="text-xs text-gray-500 mb-2">Secondary Keywords</p>
+                        {secondaryKeywords.length > 0 ? (
+                          <div className="flex flex-wrap gap-2">
+                            {secondaryKeywords.map((keyword, index) => (
+                              <span
+                                key={index}
+                                className="inline-flex items-center px-2.5 py-1 rounded-full bg-gray-100 text-gray-700 text-xs font-medium"
+                              >
+                                {keyword}
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-xs text-gray-400 italic">No secondary keywords set</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Image Management Panel - Below Article Stats */}
+                  {isEditMode && (
+                    <div>
+                      <h4 className="text-xs uppercase tracking-[0.3em] text-gray-500 mb-3">Image Management</h4>
+                      <div className="rounded-2xl border border-gray-200 bg-white overflow-hidden flex flex-col max-h-[calc(100vh-400px)]">
+                        <div className="border-b border-gray-200 bg-gray-50 px-4 py-3 flex items-center justify-between flex-shrink-0">
+                          <p className="text-xs text-gray-500">Manage images in your article</p>
+                          <button
+                            onClick={() => setShowAddImageModal(true)}
+                            className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-gray-900 text-white text-xs font-medium hover:bg-gray-800"
+                          >
+                            <Plus className="h-3.5 w-3.5" />
+                            Add
+                          </button>
+                        </div>
+                        <div className="p-4 overflow-y-auto flex-1">
+                          {publishImages.length === 0 ? (
+                            <div className="text-center py-8 text-sm text-gray-500">
+                              <ImageIcon className="h-8 w-8 mx-auto mb-2 text-gray-400" />
+                              <p>No images in this article</p>
+                            </div>
+                          ) : (
+                            <div className="grid grid-cols-1 gap-4">
+                              {publishImages.map((image, index) => (
+                                <div key={index} className="relative group rounded-xl border border-gray-200 overflow-hidden bg-gray-50">
+                                  <img
+                                    src={image.src}
+                                    alt={image.alt}
+                                    className="w-full h-32 object-cover"
+                                  />
+                                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100">
+                                    <button
+                                      onClick={() => handleImageSelect(image.src)}
+                                      className="px-3 py-1.5 rounded-full bg-white text-gray-900 text-xs font-medium hover:bg-gray-100"
+                                    >
+                                      <Edit className="h-3 w-3 inline mr-1" />
+                                      Edit
+                                    </button>
+                                    <button
+                                      onClick={() => handleRemoveImage(image.src)}
+                                      className="px-3 py-1.5 rounded-full bg-red-600 text-white text-xs font-medium hover:bg-red-700"
+                                    >
+                                      <Trash2 className="h-3 w-3 inline mr-1" />
+                                      Remove
+                                    </button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+            
+            {/* Main Content Area */}
+            <div className="flex-1 overflow-y-auto">
+              <div className="max-w-4xl mx-auto px-6 py-8">
               {publishLoading && !publishResult ? (
                 <div className="space-y-8">
                   {/* Hero section skeleton */}
@@ -1725,91 +2293,771 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
                 </div>
               ) : publishResult ? (
                 <>
-                  <style>{`
-                    ::selection {
-                      background-color: rgba(59, 130, 246, 0.4) !important;
-                      color: inherit;
-                    }
-                    .prose ::selection {
-                      background-color: rgba(59, 130, 246, 0.45) !important;
-                    }
-                    .prose *::selection {
-                      background-color: rgba(59, 130, 246, 0.45) !important;
-                    }
-                    [data-selection-active="true"] ::selection {
-                      background-color: rgba(59, 130, 246, 0.5) !important;
-                    }
-                    .selection-highlight {
-                      background-color: rgba(59, 130, 246, 0.2) !important;
-                      border-radius: 2px;
-                      padding: 0 2px;
-                      position: relative;
-                    }
-                    .selection-highlight::before {
-                      content: '';
-                      position: absolute;
-                      inset: -2px;
-                      border: 2px solid rgba(59, 130, 246, 0.4);
-                      border-radius: 4px;
-                      pointer-events: none;
-                    }
-                  `}</style>
-                  <div
-                    ref={previewRef}
-                    data-selection-active={selectedText ? 'true' : 'false'}
-                    onMouseUp={(e) => {
-                      handlePreviewMouseUp(e.nativeEvent);
-                    }}
-                    onDoubleClick={(e) => {
-                      const target = e.target as HTMLElement;
-                      if (target.tagName === 'P' || target.closest('p')) {
-                        const paragraph = target.tagName === 'P' ? target : target.closest('p');
-                        if (paragraph) {
-                          const range = document.createRange();
-                          range.selectNodeContents(paragraph);
-                          const selection = window.getSelection();
-                          if (selection) {
-                            selection.removeAllRanges();
-                            selection.addRange(range);
-                            setSelectedRange(range.cloneRange());
-                            setSelectedText(selection.toString().trim());
-                            setTimeout(() => {
-                              handlePreviewMouseUp(e.nativeEvent);
-                            }, 10);
-                          }
+                  {isEditMode ? (
+                    <div className="rounded-2xl border border-gray-200 bg-white">
+                      <div className="bg-white">
+                        <style>{`
+                            /* ReactQuill wrapper styles */
+                            .ql-snow {
+                              border: none;
+                            }
+                            .ql-container {
+                              font-family: inherit;
+                              font-size: 16px;
+                              min-height: calc(100vh - 450px);
+                              height: auto;
+                              border: none;
+                            }
+                            .ql-editor {
+                              min-height: calc(100vh - 450px);
+                              padding: 24px;
+                            }
+                            .ql-editor.ql-blank::before {
+                              font-style: normal;
+                              color: #9ca3af;
+                            }
+                            /* Make toolbar sticky at the very top */
+                            .ql-toolbar,
+                            .ql-toolbar.ql-snow,
+                            .ql-snow .ql-toolbar,
+                            div.ql-toolbar,
+                            [class*="ql-toolbar"] {
+                              position: sticky !important;
+                              top: 0 !important;
+                              z-index: 30 !important;
+                              background: white !important;
+                              backdrop-filter: blur(10px);
+                              -webkit-backdrop-filter: blur(10px);
+                              border-top: none !important;
+                              border-left: none !important;
+                              border-right: none !important;
+                              border-bottom: 1px solid #e5e7eb !important;
+                              padding: 12px !important;
+                              box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08) !important;
+                              margin: 0 !important;
+                            }
+                            .ql-editor.has-edits {
+                              position: relative;
+                            }
+                            .ql-editor.has-edits::before {
+                              content: '';
+                              position: absolute;
+                              top: 0;
+                              left: 0;
+                              right: 0;
+                              bottom: 0;
+                              background: linear-gradient(90deg, 
+                                transparent 0%, 
+                                rgba(59, 130, 246, 0.03) 50%, 
+                                transparent 100%);
+                              pointer-events: none;
+                              z-index: 0;
+                            }
+                            .ql-editor.has-edits {
+                              background-color: rgba(59, 130, 246, 0.02);
+                            }
+                            .ql-editor.has-edits p,
+                            .ql-editor.has-edits h1,
+                            .ql-editor.has-edits h2,
+                            .ql-editor.has-edits h3,
+                            .ql-editor.has-edits h4,
+                            .ql-editor.has-edits h5,
+                            .ql-editor.has-edits h6 {
+                              position: relative;
+                              z-index: 1;
+                            }
+                          `}</style>
+                        <ReactQuill
+                          ref={quillRef}
+                          theme="snow"
+                          value={editedHtmlContent}
+                          onChange={(content) => {
+                            handleHtmlEditorChange(content);
+                          }}
+                          modules={{
+                            toolbar: [
+                              [{ 'header': [1, 2, 3, 4, 5, 6, false] }],
+                              ['bold', 'italic', 'underline', 'strike'],
+                              [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+                              [{ 'script': 'sub'}, { 'script': 'super' }],
+                              [{ 'indent': '-1'}, { 'indent': '+1' }],
+                              [{ 'direction': 'rtl' }],
+                              [{ 'size': ['small', false, 'large', 'huge'] }],
+                              [{ 'color': [] }, { 'background': [] }],
+                              [{ 'font': [] }],
+                              [{ 'align': [] }],
+                              ['clean'],
+                              ['link', 'image', 'video'],
+                              ['code-block']
+                            ],
+                          }}
+                          formats={[
+                            'header', 'font', 'size',
+                            'bold', 'italic', 'underline', 'strike',
+                            'list', 'bullet', 'indent',
+                            'script', 'direction',
+                            'color', 'background',
+                            'align', 'link', 'image', 'video', 'code-block'
+                          ]}
+                        />
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <style>{`
+                        ::selection {
+                          background-color: rgba(59, 130, 246, 0.4) !important;
+                          color: inherit;
                         }
-                      }
-                    }}
-                    onMouseDown={(e) => {
-                      const target = e.target as HTMLElement;
-                      if (target.closest('.tippy-box') || target.closest('[data-tippy-root]')) {
-                        e.preventDefault();
-                        return;
-                      }
-                      if (previewRef.current?.contains(target)) {
-                        return;
-                      }
-                    }}
-                    className="prose prose-lg prose-gray max-w-none prose-headings:font-semibold prose-img:rounded-2xl prose-img:shadow-sm selection:bg-blue-100 selection:text-gray-900"
-                    style={{
-                      userSelect: 'text',
-                      WebkitUserSelect: 'text',
-                    }}
-                    dangerouslySetInnerHTML={{ __html: publishResult.htmlContent }}
-                  />
-                  <p className="text-xs text-gray-500 text-center mt-8 pt-6 border-t border-gray-100">
-                    Highlight text or tap any image to open the inline AI palette.
-                  </p>
+                        .prose ::selection {
+                          background-color: rgba(59, 130, 246, 0.45) !important;
+                        }
+                        .prose *::selection {
+                          background-color: rgba(59, 130, 246, 0.45) !important;
+                        }
+                        [data-selection-active="true"] ::selection {
+                          background-color: rgba(59, 130, 246, 0.5) !important;
+                        }
+                        .selection-highlight {
+                          background-color: rgba(59, 130, 246, 0.2) !important;
+                          border-radius: 2px;
+                          padding: 0 2px;
+                          position: relative;
+                        }
+                        .selection-highlight::before {
+                          content: '';
+                          position: absolute;
+                          inset: -2px;
+                          border: 2px solid rgba(59, 130, 246, 0.4);
+                          border-radius: 4px;
+                          pointer-events: none;
+                        }
+                        /* Quill size classes so preview matches editor */
+                        .ql-size-small { font-size: 0.75em; }
+                        .ql-size-large { font-size: 1.5em; }
+                        .ql-size-huge { font-size: 2.5em; }
+                      `}</style>
+                      <div
+                        ref={previewRef}
+                        data-selection-active={selectedText ? 'true' : 'false'}
+                        onMouseUp={(e) => {
+                          handlePreviewMouseUp(e.nativeEvent);
+                        }}
+                        onDoubleClick={(e) => {
+                          const target = e.target as HTMLElement;
+                          if (target.tagName === 'P' || target.closest('p')) {
+                            const paragraph = target.tagName === 'P' ? target : target.closest('p');
+                            if (paragraph) {
+                              const range = document.createRange();
+                              range.selectNodeContents(paragraph);
+                              const selection = window.getSelection();
+                              if (selection) {
+                                selection.removeAllRanges();
+                                selection.addRange(range);
+                                setSelectedRange(range.cloneRange());
+                                setSelectedText(selection.toString().trim());
+                                setTimeout(() => {
+                                  handlePreviewMouseUp(e.nativeEvent);
+                                }, 10);
+                              }
+                            }
+                          }
+                        }}
+                        onMouseDown={(e) => {
+                          const target = e.target as HTMLElement;
+                          if (target.closest('.tippy-box') || target.closest('[data-tippy-root]')) {
+                            e.preventDefault();
+                            return;
+                          }
+                          if (previewRef.current?.contains(target)) {
+                            return;
+                          }
+                        }}
+                        className="prose prose-lg prose-gray max-w-none prose-headings:font-semibold prose-img:rounded-2xl prose-img:shadow-sm selection:bg-blue-100 selection:text-gray-900"
+                        style={{
+                          userSelect: 'text',
+                          WebkitUserSelect: 'text',
+                        }}
+                        dangerouslySetInnerHTML={{ __html: currentHtmlContent }}
+                      />
+                      <p className="text-xs text-gray-500 text-center mt-8 pt-6 border-t border-gray-100">
+                        Highlight text or tap any image to open the inline AI palette.
+                      </p>
+                    </>
+                  )}
                 </>
               ) : (
                 <div className="py-16 text-center text-sm text-gray-500">
                   <p>Generate a draft to see the immersive preview.</p>
                 </div>
               )}
+              </div>
             </div>
           </div>
 
-          {publishResult && publishImages.length > 0 && (
+          {!isEditMode && publishResult && publishImages.length > 0 && (
+            <div className="fixed bottom-6 right-6 z-40">
+              <div className="bg-white/95 backdrop-blur-xl rounded-2xl border border-gray-200 shadow-2xl p-4 max-w-xs">
+                <h4 className="text-sm font-medium text-gray-900 mb-3">Images</h4>
+                <div className="grid grid-cols-2 gap-2">
+                  {publishImages.map((image) => (
+                    <Tippy
+                      key={image.src}
+                      onCreate={(instance) => {
+                        if (selectedImage === image.src) {
+                          imageTooltipInstanceRef.current = instance;
+                        }
+                      }}
+                      content={
+                        selectedImage === image.src ? (
+                          <div className="w-[360px] rounded-[24px] border border-gray-200/70 bg-white/98 p-5 shadow-2xl backdrop-blur-2xl space-y-3">
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <p className="text-xs uppercase tracking-[0.3em] text-gray-500 font-medium">
+                                  Image direction
+                                </p>
+                                <p className="text-[10px] text-gray-400 mt-0.5">
+                                  ⌘+Enter to submit • Esc to close
+                                </p>
+                              </div>
+                              <button
+                                onClick={closeImageTooltip}
+                                className="text-xs text-gray-400 hover:text-gray-900 transition-colors p-1 rounded-full hover:bg-gray-100"
+                                aria-label="Close tooltip"
+                              >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                          </button>
+                        </div>
+                            <div className="relative rounded-xl overflow-hidden border border-gray-200/50">
+                              <img src={selectedImage} alt="Selected for editing" className="w-full h-24 object-cover" />
+                              <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
+                            </div>
+                            <textarea
+                              ref={imageEditTextareaRef}
+                              value={imageEditNote}
+                              onChange={(e) => setImageEditNote(e.target.value)}
+                              onKeyDown={(e) => {
+                                if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+                                  e.preventDefault();
+                                  if (selectedImage && imageEditNote.trim() && !imageEditing) {
+                                    handleImageEdit();
+                                  }
+                                }
+                              }}
+                              placeholder="Describe how this image should feel, what mood, style, or elements to include..."
+                              rows={3}
+                              className="w-full px-3 py-2.5 text-sm rounded-2xl border border-gray-200/80 bg-white focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent transition-all resize-none"
+                            />
+                            <button
+                              onClick={handleImageEdit}
+                              disabled={!selectedImage || !imageEditNote.trim() || imageEditing}
+                              className="w-full px-4 py-2.5 rounded-full border-2 border-gray-200 bg-white text-sm font-semibold hover:bg-gray-50 hover:border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm hover:shadow-md"
+                            >
+                              {imageEditing ? (
+                                <span className="flex items-center justify-center gap-2">
+                                  <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+                                  </svg>
+                                  Regenerating…
+                                </span>
+                              ) : (
+                                'Regenerate Image'
+                              )}
+                            </button>
+                          </div>
+                        ) : null
+                      }
+                      visible={selectedImage === image.src}
+                      interactive
+                      placement="left"
+                      theme="light"
+                      animation="fade"
+                      duration={200}
+                      offset={[0, 12]}
+                      hideOnClick={false}
+                      trigger="manual"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => handleImageSelect(image.src)}
+                        className={`relative rounded-xl border-2 overflow-hidden transition-all aspect-square ${
+                          selectedImage === image.src
+                            ? 'border-black shadow-lg ring-2 ring-black/20'
+                            : 'border-gray-200 hover:border-gray-300'
+                        }`}
+                      >
+                        <img src={image.src} alt={image.alt} className="w-full h-full object-cover" />
+                        {selectedImage === image.src && (
+                          <div className="absolute inset-0 bg-black/10 border-2 border-white rounded-xl" />
+                        )}
+                      </button>
+                    </Tippy>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+          </div>
+        ) : (
+          // Render with full-screen overlay wrapper (for standalone use in publish tab)
+          // Only render if active (to prevent showing when viewing from campaign)
+          isActive ? (
+            <div className="fixed inset-0 z-50 bg-white overflow-y-auto">
+            <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-xl border-b border-gray-100 shadow-sm">
+              <div className="max-w-7xl mx-auto px-6 py-4">
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <button
+                      onClick={handleOpenComposeDrawer}
+                      className="inline-flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors"
+                    >
+                      <ArrowLeft className="h-4 w-4" />
+                    </button>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <p className="text-xs uppercase tracking-[0.3em] text-gray-500">
+                          {isEditMode ? 'Edit Mode' : 'Draft Preview'}
+                        </p>
+                        {publishLoading && !publishResult && (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-blue-50 border border-blue-200 text-[10px] font-medium text-blue-700 uppercase tracking-[0.2em]">
+                            <svg className="h-3 w-3 animate-spin" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4l3-3-3-3v4A8 8 0 104 12z" />
+                            </svg>
+                            Generating
+                          </span>
+                        )}
+                      </div>
+                      <h3 className="text-2xl font-light text-gray-900 tracking-tight truncate">
+                        {publishResult?.title || publishForm.primaryKeyword || 'Untitled article'}
+                      </h3>
+                      {publishResult?.metaDescription && (
+                        <p className="text-sm text-gray-600 mt-1 truncate">{publishResult.metaDescription}</p>
+                      )}
+                      {publishLoading && !publishResult && (
+                        <p className="text-sm text-gray-500 mt-1">Creating your content...</p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-3 justify-end flex-shrink-0">
+                    {publishResult && (
+                      <button
+                        onClick={handleToggleEditMode}
+                        className={`px-5 py-2.5 rounded-full border text-sm font-medium transition-colors ${
+                          isEditMode
+                            ? 'border-gray-900 bg-gray-900 text-white hover:bg-gray-800'
+                            : 'border-gray-200 bg-white text-gray-900 hover:bg-gray-50'
+                        }`}
+                      >
+                        {isEditMode ? (
+                          <span className="flex items-center gap-2">
+                            <Eye className="h-4 w-4" />
+                            Preview
+                          </span>
+                        ) : (
+                          <span className="flex items-center gap-2">
+                            <Edit className="h-4 w-4" />
+                            Edit Mode
+                          </span>
+                        )}
+                      </button>
+                    )}
+                    <button
+                      onClick={handlePublishToWordpress}
+                      disabled={publishLoading || !publishResult}
+                      className="px-6 py-2.5 rounded-full bg-black text-white text-sm font-semibold shadow-lg hover:bg-black/90 disabled:opacity-60 transition-colors"
+                    >
+                      {publishLoading ? 'Working…' : 'Publish to WordPress'}
+                    </button>
+                    <button
+                      onClick={handleSaveDraft}
+                      disabled={saving || !publishResult || !hasUnsavedChanges}
+                      className={`px-5 py-2.5 rounded-full border text-sm font-medium transition-colors ${
+                        hasUnsavedChanges 
+                          ? 'border-orange-300 bg-orange-50 text-orange-700 hover:bg-orange-100' 
+                          : 'border-gray-200 bg-white text-gray-900 hover:bg-gray-50'
+                      } disabled:opacity-50 disabled:cursor-not-allowed`}
+                    >
+                      {saving ? 'Saving…' : hasUnsavedChanges ? 'Save Draft • Unsaved' : 'Save Draft'}
+                    </button>
+                    <button
+                      onClick={handleGenerateContent}
+                      disabled={publishLoading}
+                      className="px-5 py-2.5 rounded-full border border-gray-200 bg-white text-sm font-medium text-gray-900 hover:bg-gray-50 disabled:opacity-60 transition-colors"
+                    >
+                      {publishLoading ? 'Generating…' : publishResult ? 'Regenerate' : 'Generate'}
+                    </button>
+                    <button
+                      onClick={handleResetDraft}
+                      className="px-4 py-2 rounded-full text-sm font-medium text-gray-500 hover:text-gray-900 transition-colors"
+                    >
+                      Reset Draft
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="h-[calc(100vh-80px)] flex overflow-hidden">
+              {/* Left Sidebar - Article Stats */}
+              {publishResult && (
+                <div className="w-80 border-r border-gray-200 bg-gray-50/50 overflow-y-auto">
+                  <div className="p-6 space-y-6">
+                    <div>
+                      <h4 className="text-xs uppercase tracking-[0.3em] text-gray-500 mb-3">Article Stats</h4>
+                      <div className="space-y-4">
+                        <div className="rounded-2xl border border-gray-200 bg-white p-4">
+                          <div className="flex items-center justify-between mb-1">
+                            <p className="text-xs text-gray-500">Total Words</p>
+                            {hasUnsavedChanges && (
+                              <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-medium">
+                                Unsaved
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-2xl font-light text-gray-900">{wordCount.toLocaleString()}</p>
+                          {isEditMode && (
+                            <p className="text-[10px] text-gray-400 mt-1">Updates as you type</p>
+                          )}
+                        </div>
+                        
+                        <div className="rounded-2xl border border-gray-200 bg-white p-4">
+                          <p className="text-xs text-gray-500 mb-2">Primary Keyword</p>
+                          <p className="text-sm font-medium text-gray-900">
+                            {publishResult.primaryKeyword || publishForm.primaryKeyword || 'Not set'}
+                          </p>
+                        </div>
+                        
+                        <div className="rounded-2xl border border-gray-200 bg-white p-4">
+                          <p className="text-xs text-gray-500 mb-2">Secondary Keywords</p>
+                          {secondaryKeywords.length > 0 ? (
+                            <div className="flex flex-wrap gap-2">
+                              {secondaryKeywords.map((keyword, index) => (
+                                <span
+                                  key={index}
+                                  className="inline-flex items-center px-2.5 py-1 rounded-full bg-gray-100 text-gray-700 text-xs font-medium"
+                                >
+                                  {keyword}
+                                </span>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="text-xs text-gray-400 italic">No secondary keywords set</p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Image Management Panel - Below Article Stats */}
+                  {isEditMode && (
+                    <div>
+                      <h4 className="text-xs uppercase tracking-[0.3em] text-gray-500 mb-3">Image Management</h4>
+                      <div className="rounded-2xl border border-gray-200 bg-white overflow-hidden flex flex-col max-h-[calc(100vh-400px)]">
+                        <div className="border-b border-gray-200 bg-gray-50 px-4 py-3 flex items-center justify-between flex-shrink-0">
+                          <p className="text-xs text-gray-500">Manage images in your article</p>
+                          <button
+                            onClick={() => setShowAddImageModal(true)}
+                            className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-gray-900 text-white text-xs font-medium hover:bg-gray-800"
+                          >
+                            <Plus className="h-3.5 w-3.5" />
+                            Add
+                          </button>
+                        </div>
+                        <div className="p-4 overflow-y-auto flex-1">
+                          {publishImages.length === 0 ? (
+                            <div className="text-center py-8 text-sm text-gray-500">
+                              <ImageIcon className="h-8 w-8 mx-auto mb-2 text-gray-400" />
+                              <p>No images in this article</p>
+                            </div>
+                          ) : (
+                            <div className="grid grid-cols-1 gap-4">
+                              {publishImages.map((image, index) => (
+                                <div key={index} className="relative group rounded-xl border border-gray-200 overflow-hidden bg-gray-50">
+                                  <img
+                                    src={image.src}
+                                    alt={image.alt}
+                                    className="w-full h-32 object-cover"
+                                  />
+                                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100">
+                                    <button
+                                      onClick={() => handleImageSelect(image.src)}
+                                      className="px-3 py-1.5 rounded-full bg-white text-gray-900 text-xs font-medium hover:bg-gray-100"
+                                    >
+                                      <Edit className="h-3 w-3 inline mr-1" />
+                                      Edit
+                                    </button>
+                                    <button
+                                      onClick={() => handleRemoveImage(image.src)}
+                                      className="px-3 py-1.5 rounded-full bg-red-600 text-white text-xs font-medium hover:bg-red-700"
+                                    >
+                                      <Trash2 className="h-3 w-3 inline mr-1" />
+                                      Remove
+                                    </button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+              
+              {/* Main Content Area */}
+              <div className="flex-1 overflow-y-auto">
+                <div className="max-w-4xl mx-auto px-6 py-8">
+                {publishLoading && !publishResult ? (
+                  <div className="space-y-8">
+                    {/* Hero section skeleton */}
+                    <div className="space-y-4">
+                      <div className="h-12 bg-gradient-to-r from-gray-100 via-gray-50 to-gray-100 rounded-2xl w-3/4 animate-pulse" />
+                      <div className="space-y-2">
+                        <div className="h-4 bg-gray-100 rounded-full w-full animate-pulse" />
+                        <div className="h-4 bg-gray-100 rounded-full w-11/12 animate-pulse" />
+                        <div className="h-4 bg-gray-100 rounded-full w-5/6 animate-pulse" />
+                      </div>
+                    </div>
+                    
+                    {/* Image skeleton */}
+                    <div className="h-64 bg-gradient-to-br from-gray-100 to-gray-50 rounded-2xl animate-pulse" />
+                    
+                    {/* Content skeleton */}
+                    <div className="space-y-6">
+                      {[1, 2, 3, 4].map((i) => (
+                        <div key={i} className="space-y-3">
+                          <div className="h-8 bg-gray-100 rounded-xl w-1/2 animate-pulse" />
+                          <div className="space-y-2">
+                            <div className="h-4 bg-gray-50 rounded-full w-full animate-pulse" />
+                            <div className="h-4 bg-gray-50 rounded-full w-11/12 animate-pulse" />
+                            <div className="h-4 bg-gray-50 rounded-full w-10/12 animate-pulse" />
+                            <div className="h-4 bg-gray-50 rounded-full w-full animate-pulse" />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    
+                    {/* Loading indicator */}
+                    <div className="flex items-center justify-center py-8">
+                      <div className="flex flex-col items-center gap-3">
+                        <svg className="h-8 w-8 animate-spin text-gray-400" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4l3-3-3-3v4A8 8 0 104 12z" />
+                        </svg>
+                        <p className="text-sm font-light text-gray-500">Crafting your content...</p>
+                      </div>
+                    </div>
+                  </div>
+                ) : publishResult ? (
+                  <>
+                    {isEditMode ? (
+                      <div className="rounded-2xl border border-gray-200 bg-white">
+                        <div className="bg-white">
+                          <style>{`
+                            /* ReactQuill wrapper styles */
+                            .ql-snow {
+                              border: none;
+                            }
+                            .ql-container {
+                              font-family: inherit;
+                              font-size: 16px;
+                              min-height: calc(100vh - 450px);
+                              height: auto;
+                              border: none;
+                            }
+                            .ql-editor {
+                              min-height: calc(100vh - 450px);
+                              padding: 24px;
+                            }
+                            .ql-editor.ql-blank::before {
+                              font-style: normal;
+                              color: #9ca3af;
+                            }
+                            /* Make toolbar sticky at the very top */
+                            .ql-toolbar,
+                            .ql-toolbar.ql-snow,
+                            .ql-snow .ql-toolbar,
+                            div.ql-toolbar,
+                            [class*="ql-toolbar"] {
+                              position: sticky !important;
+                              top: 0 !important;
+                              z-index: 30 !important;
+                              background: white !important;
+                              backdrop-filter: blur(10px);
+                              -webkit-backdrop-filter: blur(10px);
+                              border-top: none !important;
+                              border-left: none !important;
+                              border-right: none !important;
+                              border-bottom: 1px solid #e5e7eb !important;
+                              padding: 12px !important;
+                              box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08) !important;
+                              margin: 0 !important;
+                            }
+                            .ql-editor.has-edits {
+                              position: relative;
+                            }
+                            .ql-editor.has-edits::before {
+                              content: '';
+                              position: absolute;
+                              top: 0;
+                              left: 0;
+                              right: 0;
+                              bottom: 0;
+                              background: linear-gradient(90deg, 
+                                transparent 0%, 
+                                rgba(59, 130, 246, 0.03) 50%, 
+                                transparent 100%);
+                              pointer-events: none;
+                              z-index: 0;
+                            }
+                            .ql-editor.has-edits {
+                              background-color: rgba(59, 130, 246, 0.02);
+                            }
+                            .ql-editor.has-edits p,
+                            .ql-editor.has-edits h1,
+                            .ql-editor.has-edits h2,
+                            .ql-editor.has-edits h3,
+                            .ql-editor.has-edits h4,
+                            .ql-editor.has-edits h5,
+                            .ql-editor.has-edits h6 {
+                              position: relative;
+                              z-index: 1;
+                            }
+                          `}</style>
+                          <ReactQuill
+                            ref={quillRef}
+                            theme="snow"
+                            value={editedHtmlContent}
+                            onChange={(content) => {
+                              handleHtmlEditorChange(content);
+                            }}
+                            modules={{
+                              toolbar: [
+                                [{ 'header': [1, 2, 3, 4, 5, 6, false] }],
+                                ['bold', 'italic', 'underline', 'strike'],
+                                [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+                                [{ 'script': 'sub'}, { 'script': 'super' }],
+                                [{ 'indent': '-1'}, { 'indent': '+1' }],
+                                [{ 'direction': 'rtl' }],
+                                [{ 'size': ['small', false, 'large', 'huge'] }],
+                                [{ 'color': [] }, { 'background': [] }],
+                                [{ 'font': [] }],
+                                [{ 'align': [] }],
+                                ['clean'],
+                                ['link', 'image', 'video'],
+                                ['code-block']
+                              ],
+                            }}
+                            formats={[
+                              'header', 'font', 'size',
+                              'bold', 'italic', 'underline', 'strike',
+                              'list', 'bullet', 'indent',
+                              'script', 'direction',
+                              'color', 'background',
+                              'align', 'link', 'image', 'video', 'code-block'
+                            ]}
+                          />
+                        </div>
+                      </div>
+                    ) : (
+                    <>
+                      <style>{`
+                        ::selection {
+                          background-color: rgba(59, 130, 246, 0.4) !important;
+                          color: inherit;
+                        }
+                        .prose ::selection {
+                          background-color: rgba(59, 130, 246, 0.45) !important;
+                        }
+                        .prose *::selection {
+                          background-color: rgba(59, 130, 246, 0.45) !important;
+                        }
+                        [data-selection-active="true"] ::selection {
+                          background-color: rgba(59, 130, 246, 0.5) !important;
+                        }
+                        .selection-highlight {
+                          background-color: rgba(59, 130, 246, 0.2) !important;
+                          border-radius: 2px;
+                          padding: 0 2px;
+                          position: relative;
+                        }
+                        .selection-highlight::before {
+                          content: '';
+                          position: absolute;
+                          inset: -2px;
+                          border: 2px solid rgba(59, 130, 246, 0.4);
+                          border-radius: 4px;
+                          pointer-events: none;
+                        }
+                        /* Quill size classes so preview matches editor */
+                        .ql-size-small { font-size: 0.75em; }
+                        .ql-size-large { font-size: 1.5em; }
+                        .ql-size-huge { font-size: 2.5em; }
+                      `}</style>
+                      <div
+                        ref={previewRef}
+                        data-selection-active={selectedText ? 'true' : 'false'}
+                        onMouseUp={(e) => {
+                          handlePreviewMouseUp(e.nativeEvent);
+                        }}
+                        onDoubleClick={(e) => {
+                          const target = e.target as HTMLElement;
+                          if (target.tagName === 'P' || target.closest('p')) {
+                            const paragraph = target.tagName === 'P' ? target : target.closest('p');
+                            if (paragraph) {
+                              const range = document.createRange();
+                              range.selectNodeContents(paragraph);
+                              const selection = window.getSelection();
+                              if (selection) {
+                                selection.removeAllRanges();
+                                selection.addRange(range);
+                                setSelectedRange(range.cloneRange());
+                                setSelectedText(selection.toString().trim());
+                                setTimeout(() => {
+                                  handlePreviewMouseUp(e.nativeEvent);
+                                }, 10);
+                              }
+                            }
+                          }
+                        }}
+                        onMouseDown={(e) => {
+                          const target = e.target as HTMLElement;
+                          if (target.closest('.tippy-box') || target.closest('[data-tippy-root]')) {
+                            e.preventDefault();
+                            return;
+                          }
+                          if (previewRef.current?.contains(target)) {
+                            return;
+                          }
+                        }}
+                        className="prose prose-lg prose-gray max-w-none prose-headings:font-semibold prose-img:rounded-2xl prose-img:shadow-sm selection:bg-blue-100 selection:text-gray-900"
+                        style={{
+                          userSelect: 'text',
+                          WebkitUserSelect: 'text',
+                        }}
+                        dangerouslySetInnerHTML={{ __html: currentHtmlContent }}
+                      />
+                      <p className="text-xs text-gray-500 text-center mt-8 pt-6 border-t border-gray-100">
+                        Highlight text or tap any image to open the inline AI palette.
+                      </p>
+                    </>
+                  )}
+                </>
+              ) : (
+                <div className="py-16 text-center text-sm text-gray-500">
+                  <p>Generate a draft to see the immersive preview.</p>
+                </div>
+              )}
+              </div>
+            </div>
+          </div>
+
+          {!isEditMode && publishResult && publishImages.length > 0 && (
             <div className="fixed bottom-6 right-6 z-40">
               <div className="bg-white/95 backdrop-blur-xl rounded-2xl border border-gray-200 shadow-2xl p-4 max-w-xs">
                 <h4 className="text-sm font-medium text-gray-900 mb-3">Images</h4>
@@ -1915,14 +3163,76 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
             </div>
           )}
         </div>
+          ) : null
+        )
       )}
 
-      <PublishHistoryTable
-        entries={publishHistory}
-        onRefresh={fetchPublishHistory}
-        onNewDraft={handleOpenComposeDrawer}
-        onResumeDraft={handleResumeDraft}
-      />
+      {/* Add Image Modal - rendered outside preview overlay */}
+      {showAddImageModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-2xl w-full max-w-md mx-4">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-gray-900">Add Image</h3>
+                <button
+                  onClick={() => {
+                    setShowAddImageModal(false);
+                    setNewImageUrl('');
+                    setNewImageAlt('');
+                  }}
+                  className="text-gray-400 hover:text-gray-900 transition-colors"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Image URL *
+                  </label>
+                  <input
+                    type="url"
+                    value={newImageUrl}
+                    onChange={(e) => setNewImageUrl(e.target.value)}
+                    placeholder="https://example.com/image.jpg"
+                    className="w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Alt Text
+                  </label>
+                  <input
+                    type="text"
+                    value={newImageAlt}
+                    onChange={(e) => setNewImageAlt(e.target.value)}
+                    placeholder="Description of the image"
+                    className="w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                  />
+                </div>
+                <div className="flex gap-3 pt-2">
+                  <button
+                    onClick={() => {
+                      setShowAddImageModal(false);
+                      setNewImageUrl('');
+                      setNewImageAlt('');
+                    }}
+                    className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 bg-white text-gray-900 text-sm font-medium hover:bg-gray-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleAddImage}
+                    className="flex-1 px-4 py-2.5 rounded-xl bg-gray-900 text-white text-sm font-medium hover:bg-gray-800"
+                  >
+                    Add Image
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showPreviewStage && selectedText && (
         <Tippy
@@ -2131,7 +3441,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
           />
         </Tippy>
       )}
-    </div>
+    </>
   );
 };
 
