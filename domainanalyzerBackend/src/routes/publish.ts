@@ -298,7 +298,17 @@ router.post(
       (typeof brandDescription === 'string' && brandDescription.trim()) ||
       defaultBrandDescription;
 
-    const decryptedPassword = decryptToken(integration.password);
+    let decryptedPassword: string;
+    try {
+      decryptedPassword = decryptToken(integration.password);
+    } catch (error) {
+      console.error('Failed to decrypt WordPress password:', error);
+      return res.status(400).json({
+        success: false,
+        error: 'WordPress integration password cannot be decrypted. Please reconfigure your WordPress integration in settings.'
+      });
+    }
+    
   const payload = {
     'Primary Keyword': primaryKeyword,
     'longtail keywords':
@@ -454,7 +464,17 @@ router.post(
       }
     }
 
-    const decryptedPassword = decryptToken(integration.password);
+    let decryptedPassword: string;
+    try {
+      decryptedPassword = decryptToken(integration.password);
+    } catch (error) {
+      console.error('Failed to decrypt WordPress password:', error);
+      return res.status(400).json({
+        success: false,
+        error: 'WordPress integration password cannot be decrypted. Please reconfigure your WordPress integration in settings.'
+      });
+    }
+    
     const payload = [
       {
         username: integration.username,

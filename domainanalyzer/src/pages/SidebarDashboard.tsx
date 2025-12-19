@@ -43,6 +43,7 @@ interface Keyword {
   difficulty: string;
   intent?: string | null;
   cpc?: number;
+  aiMetadata?: any; // For storing isPrimary/isLongtail flags
 }
 
 interface SubPage {
@@ -883,11 +884,11 @@ const SidebarDashboard = () => {
       console.error('Error fetching WordPress integration:', error);
       // Only show toast if we're on publish tab, not for background loading in campaign tab
       if (activeTab === 'publish') {
-        toast({
-          title: "WordPress",
-          description: "Unable to load WordPress integration details",
-          variant: "destructive"
-        });
+      toast({
+        title: "WordPress",
+        description: "Unable to load WordPress integration details",
+        variant: "destructive"
+      });
       }
     } finally {
       setWpIntegrationLoading(false);
@@ -3342,6 +3343,7 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
   const [newKeywordTerm, setNewKeywordTerm] = useState('');
   const [newKeywordVolume, setNewKeywordVolume] = useState('');
   const [newKeywordDifficulty, setNewKeywordDifficulty] = useState('Medium');
+  const [newKeywordType, setNewKeywordType] = useState<'primary' | 'longtail'>('primary');
   const [availableKeywords, setAvailableKeywords] = useState<Keyword[]>([]);
   const [keywordSearchOpen, setKeywordSearchOpen] = useState(false);
   const [keywordSearchValue, setKeywordSearchValue] = useState('');
@@ -4009,9 +4011,9 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
     const progress = job.progress ?? (status === 'completed' || status === 'published' ? 100 : undefined);
 
     return (
-      <span className={`px-2 py-1 text-[11px] rounded-full ${color}`}>
-        {label}{typeof progress === 'number' ? ` • ${progress}%` : ''}
-      </span>
+        <span className={`px-2 py-1 text-[11px] rounded-full ${color}`}>
+          {label}{typeof progress === 'number' ? ` • ${progress}%` : ''}
+        </span>
     );
   };
 
@@ -4038,29 +4040,61 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
     }
     setGenerateTopicLoading(topic.id);
     try {
+      // Helper function to get primary and longtail keywords from a page's keywords
+      const getKeywordSelections = (pageKeywords: Array<{ id: number; term: string; aiMetadata?: any }>) => {
+        // Find primary keyword (marked with isPrimary: true in aiMetadata)
+        const primaryKeyword = pageKeywords.find(kw => {
+          const metadata = kw.aiMetadata as any;
+          return metadata?.isPrimary === true;
+        });
+        
+        // Find longtail keywords (marked with isLongtail: true in aiMetadata)
+        const longtailKeywords = pageKeywords.filter(kw => {
+          const metadata = kw.aiMetadata as any;
+          return metadata?.isLongtail === true;
+        });
+        
+        // Fallback: if no primary selected, use first keyword
+        // If no longtail selected, use remaining keywords
+        const fallbackPrimary = primaryKeyword || pageKeywords[0];
+        const fallbackLongtail = longtailKeywords.length > 0 
+          ? longtailKeywords 
+          : pageKeywords.filter((_, idx) => idx > 0);
+        
+        return {
+          primary: fallbackPrimary?.term || '',
+          longtail: fallbackLongtail.map(k => k.term).filter(Boolean)
+        };
+      };
+
       // Build payload from current topic data
       const pillar = topic.pillarPage!;
+      const pillarKeywords = getKeywordSelections(pillar.keywords);
+      
       const payload = {
         user_id: 'user', // backend uses authenticated user
         campaign_name: campaign.title,
         pillar_page: {
-          primary_keyword: pillar.keywords[0]?.term || pillar.title,
-          longtail_keywords: pillar.keywords.slice(1).map((k) => k.term).filter(Boolean),
+          primary_keyword: pillarKeywords.primary || pillar.title,
+          longtail_keywords: pillarKeywords.longtail,
           options: {
             image: options?.images ?? 2,
             word_count: options?.wordCount ?? 800,
             featured_image: options?.featuredImage ? 'yes' : 'no',
           },
         },
-        sub_pillar_pages: topic.subPages.map((sp) => ({
-          primary_keyword: sp.keywords[0]?.term || sp.title,
-          longtail_keywords: sp.keywords.slice(1).map((k) => k.term).filter(Boolean),
+        sub_pillar_pages: topic.subPages.map((sp) => {
+          const subPageKeywords = getKeywordSelections(sp.keywords);
+          return {
+            primary_keyword: subPageKeywords.primary || sp.title,
+            longtail_keywords: subPageKeywords.longtail,
           options: {
             image: options?.images ?? 2,
             word_count: options?.wordCount ?? 800,
             featured_image: options?.featuredImage ? 'yes' : 'no',
           },
-        })),
+          };
+        }),
         brand: {
           brand_name: options?.brandName || campaign.title || 'Brand',
           brand_description: options?.brandDescription || campaign.description || '',
@@ -4193,7 +4227,7 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
     });
   }, [availableKeywords]);
 
-  const handleAddKeyword = (type: 'pillar' | 'subpage', topicId: number, pageId: number, isAI: boolean) => {
+  const handleAddKeyword = (type: 'pillar' | 'subpage', topicId: number, pageId: number, isAI: boolean, keywordSection?: 'primary' | 'longtail') => {
     if (isAI) {
       if (aiLoading === `keyword-${pageId}`) return;
       triggerAiKeywords(pageId);
@@ -4204,6 +4238,7 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
     setNewKeywordTerm('');
     setNewKeywordVolume('');
     setNewKeywordDifficulty('Medium');
+    setNewKeywordType(keywordSection || 'primary');
     setKeywordSearchValue('');
     setKeywordSearchOpen(false);
     // Fetch keywords for the campaign's domain
@@ -4221,21 +4256,41 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
       return;
     }
     try {
-      await mutateStructure(`${CAMPAIGN_API_BASE}/pages/${addKeywordContext.pageId}/keywords`, {
+      const response = await fetch(`${CAMPAIGN_API_BASE}/pages/${addKeywordContext.pageId}/keywords`, {
         method: 'POST',
+        headers: getAuthHeaders(),
         body: JSON.stringify({
           term: newKeywordTerm.trim(),
           volume: newKeywordVolume ? parseInt(newKeywordVolume, 10) : undefined,
-          difficulty: newKeywordDifficulty
+          difficulty: newKeywordDifficulty,
+          keywordType: newKeywordType // Send keyword type to backend
         })
-      }, { successMessage: "Keyword added" });
+      });
+      
+      if (!response.ok) throw new Error('Failed to add keyword');
+      const data = await response.json();
+      
+      if (data.success) {
+        fetchStructure(campaign.id);
+      }
+      
       setShowAddKeywordModal(false);
       setNewKeywordTerm('');
       setNewKeywordVolume('');
       setNewKeywordDifficulty('Medium');
+      setNewKeywordType('primary');
       setAddKeywordContext(null);
-    } catch {
-      // handled upstream
+      
+      toast({
+        title: "Keyword Added",
+        description: `Keyword added as ${newKeywordType === 'primary' ? 'primary' : 'longtail'}`,
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to add keyword",
+        variant: "destructive"
+      });
     }
   };
 
@@ -4273,6 +4328,36 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
     }, { successMessage: "Keyword deleted" }).catch(() => {
       /* handled upstream */
     });
+  };
+
+  const handleSelectPrimaryKeyword = async (keywordId: number) => {
+    try {
+      await mutateStructure(`${CAMPAIGN_API_BASE}/keywords/${keywordId}/select-primary`, {
+        method: 'POST'
+      }, { successMessage: "Primary keyword selected" });
+    } catch {
+      // handled upstream
+    }
+  };
+
+  const handleSelectLongtailKeyword = async (keywordId: number) => {
+    try {
+      await mutateStructure(`${CAMPAIGN_API_BASE}/keywords/${keywordId}/select-longtail`, {
+        method: 'POST'
+      }, { successMessage: "Longtail keyword selected" });
+    } catch {
+      // handled upstream
+    }
+  };
+
+  const handleDeselectKeyword = async (keywordId: number) => {
+    try {
+      await mutateStructure(`${CAMPAIGN_API_BASE}/keywords/${keywordId}/deselect`, {
+        method: 'POST'
+      }, { successMessage: "Keyword deselected" });
+    } catch {
+      // handled upstream
+    }
   };
 
   if (structureLoading) {
@@ -4486,7 +4571,7 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
                             </div>
                             <div className="flex-1">
                               <div className="flex items-center gap-3">
-                                <h5 className="text-sm font-light text-black">{topic.pillarPage.title}</h5>
+                              <h5 className="text-sm font-light text-black">{topic.pillarPage.title}</h5>
                                 {(() => {
                                   const job = generationJobs.get(topic.pillarPage.id);
                                   const updatedAtMs = job?.updatedAt ? new Date(job.updatedAt).getTime() : undefined;
@@ -4559,30 +4644,12 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
                               <p className="text-xs font-light text-gray-500 mt-0.5">
                                 {topic.pillarPage.keywords.length} keyword{topic.pillarPage.keywords.length !== 1 ? 's' : ''}
                               </p>
-                              <div className="mt-1">
-                                {renderStatusPill(topic.pillarPage.id)}
-                              </div>
+                                  <div className="mt-1">
+                                    {renderStatusPill(topic.pillarPage.id)}
+                                  </div>
                             </div>
                           </div>
                           <div className="flex items-center gap-2">
-                            <div className="flex items-center gap-1">
-                              <button
-                                onClick={() => handleAddKeyword('pillar', topic.id, topic.pillarPage!.id, false)}
-                                  disabled={syncing}
-                                  className="px-2 py-1 text-xs font-light text-gray-600 hover:text-black hover:bg-gray-100 rounded-full transition-all flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
-                                title="Add keyword manually"
-                              >
-                                <Plus className="h-3 w-3" />
-                              </button>
-                              <button
-                                onClick={() => handleAddKeyword('pillar', topic.id, topic.pillarPage!.id, true)}
-                                  disabled={syncing || aiLoading === `keyword-${topic.pillarPage!.id}`}
-                                  className="px-2 py-1 text-xs font-light text-white bg-black hover:bg-black/90 rounded-full transition-all flex items-center gap-1 disabled:opacity-60 disabled:cursor-not-allowed"
-                                title="AI generate keywords"
-                              >
-                                  {aiLoading === `keyword-${topic.pillarPage!.id}` ? <ButtonSpinner /> : <Sparkles className="h-3 w-3" />}
-                              </button>
-                            </div>
                             <button
                               onClick={() => handleDeletePillarPage(topic.id)}
                               disabled={syncing}
@@ -4596,16 +4663,175 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
 
                         {/* Pillar Page Keywords */}
                         {expandedPillarPages.has(topic.pillarPage.id) && (
-                          <div className="ml-11 mt-3 space-y-2">
-                            {topic.pillarPage.keywords.length > 0 ? (
-                              topic.pillarPage.keywords.map((keyword) => (
+                          <div className="ml-11 mt-3 space-y-4">
+                            {/* Primary Keywords Section */}
+                            <div>
+                              <div className="flex items-center justify-between mb-2">
+                                <label className="text-xs font-medium text-gray-700">
+                                  Primary Keywords <span className="text-red-500">*</span>
+                                </label>
+                            <div className="flex items-center gap-1">
+                              <button
+                                onClick={() => handleAddKeyword('pillar', topic.id, topic.pillarPage!.id, false)}
+                                  disabled={syncing}
+                                  className="px-2 py-1 text-xs font-light text-gray-600 hover:text-black hover:bg-gray-100 rounded-full transition-all flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    title="Add primary keyword manually"
+                              >
+                                <Plus className="h-3 w-3" />
+                              </button>
+                              <button
+                                    onClick={async () => {
+                                      if (aiLoading === `primary-keyword-${topic.pillarPage!.id}`) return;
+                                      setAiLoading(`primary-keyword-${topic.pillarPage!.id}`);
+                                      try {
+                                        const response = await fetch(`${CAMPAIGN_API_BASE}/pages/${topic.pillarPage!.id}/keywords/ai`, {
+                                          method: 'POST',
+                                          headers: getAuthHeaders(),
+                                          body: JSON.stringify({ count: 1, keywordType: 'primary' })
+                                        });
+                                        if (!response.ok) throw new Error('Failed to generate');
+                                        const data = await response.json();
+                                        if (data.success) {
+                                          fetchStructure(campaign.id);
+                                          toast({
+                                            title: 'Keyword generated',
+                                            description: 'Primary keyword generated successfully',
+                                          });
+                                        }
+                                      } catch (error) {
+                                        console.error('Error generating primary keyword:', error);
+                                        toast({
+                                          title: 'Generation failed',
+                                          description: 'Unable to generate primary keyword',
+                                          variant: 'destructive'
+                                        });
+                                      } finally {
+                                        setAiLoading(null);
+                                      }
+                                    }}
+                                    disabled={syncing || aiLoading === `primary-keyword-${topic.pillarPage!.id}`}
+                                  className="px-2 py-1 text-xs font-light text-white bg-black hover:bg-black/90 rounded-full transition-all flex items-center gap-1 disabled:opacity-60 disabled:cursor-not-allowed"
+                                    title="AI generate primary keyword"
+                              >
+                                    {aiLoading === `primary-keyword-${topic.pillarPage!.id}` ? <ButtonSpinner /> : <Sparkles className="h-3 w-3" />}
+                              </button>
+                                </div>
+                              </div>
+                              <div className="space-y-2">
+                                {(() => {
+                                  // Only show keywords that are actually marked as primary
+                                  const primaryKeywords = topic.pillarPage.keywords.filter(kw => {
+                                    const metadata = kw.aiMetadata as any;
+                                    return metadata && metadata.isPrimary === true;
+                                  });
+                                  
+                                  return primaryKeywords.length > 0 ? (
+                                    primaryKeywords.map((keyword) => (
+                                      <div
+                                        key={keyword.id}
+                                        className="flex items-center justify-between p-2 bg-white rounded-lg border border-gray-200 hover:border-gray-300 transition-colors"
+                                      >
+                                        <div className="flex items-center gap-3">
+                                          <div className="w-6 h-6 rounded bg-purple-50 flex items-center justify-center">
+                                            <span className="text-[10px] font-medium text-purple-600">P</span>
+                                          </div>
+                                          <div>
+                                            <p className="text-sm font-light text-black">{keyword.term}</p>
+                                            <p className="text-xs font-light text-gray-500">
+                                              Vol: {keyword.volume.toLocaleString()} • KD: {keyword.difficulty}
+                                            </p>
+                                          </div>
+                            </div>
+                            <button
+                                          onClick={() => handleDeleteKeyword({ type: 'pillar', topicId: topic.id, pageId: topic.pillarPage!.id }, keyword.id)}
+                              disabled={syncing}
+                                          className="p-1 text-gray-400 hover:text-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                          title="Delete keyword"
+                            >
+                                          <X className="h-3.5 w-3.5" />
+                            </button>
+                                      </div>
+                                    ))
+                                  ) : (
+                                    <p className="text-xs font-light text-gray-500 italic py-2">No primary keywords yet</p>
+                                  );
+                                })()}
+                          </div>
+                        </div>
+
+                            {/* Longtail Keywords Section */}
+                            <div>
+                              <div className="flex items-center justify-between mb-2">
+                                <label className="text-xs font-medium text-gray-700">
+                                  Longtail Keywords
+                                </label>
+                                <div className="flex items-center gap-1">
+                                  <button
+                                    onClick={() => handleAddKeyword('pillar', topic.id, topic.pillarPage!.id, false, 'longtail')}
+                                    disabled={syncing}
+                                    className="px-2 py-1 text-xs font-light text-gray-600 hover:text-black hover:bg-gray-100 rounded-full transition-all flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    title="Add longtail keyword manually"
+                                  >
+                                    <Plus className="h-3 w-3" />
+                                  </button>
+                                  <button
+                                    onClick={async () => {
+                                      if (aiLoading === `longtail-keyword-${topic.pillarPage!.id}`) return;
+                                      setAiLoading(`longtail-keyword-${topic.pillarPage!.id}`);
+                                      try {
+                                        const response = await fetch(`${CAMPAIGN_API_BASE}/pages/${topic.pillarPage!.id}/keywords/ai`, {
+                                          method: 'POST',
+                                          headers: getAuthHeaders(),
+                                          body: JSON.stringify({ count: 3, keywordType: 'longtail' })
+                                        });
+                                        if (!response.ok) throw new Error('Failed to generate');
+                                        const data = await response.json();
+                                        if (data.success) {
+                                          fetchStructure(campaign.id);
+                                          toast({
+                                            title: 'Keywords generated',
+                                            description: 'Longtail keywords generated successfully',
+                                          });
+                                        }
+                                      } catch (error) {
+                                        console.error('Error generating longtail keywords:', error);
+                                        toast({
+                                          title: 'Generation failed',
+                                          description: 'Unable to generate longtail keywords',
+                                          variant: 'destructive'
+                                        });
+                                      } finally {
+                                        setAiLoading(null);
+                                      }
+                                    }}
+                                    disabled={syncing || aiLoading === `longtail-keyword-${topic.pillarPage!.id}`}
+                                    className="px-2 py-1 text-xs font-light text-white bg-black hover:bg-black/90 rounded-full transition-all flex items-center gap-1 disabled:opacity-60 disabled:cursor-not-allowed"
+                                    title="AI generate longtail keywords"
+                                  >
+                                    {aiLoading === `longtail-keyword-${topic.pillarPage!.id}` ? <ButtonSpinner /> : <Sparkles className="h-3 w-3" />}
+                                  </button>
+                                </div>
+                              </div>
+                              <div className="space-y-2">
+                                {(() => {
+                                  // Filter keywords marked as longtail (and exclude primary)
+                                  const longtailKeywords = topic.pillarPage.keywords.filter(kw => {
+                                    const metadata = kw.aiMetadata as any;
+                                    const isPrimary = metadata && metadata.isPrimary === true;
+                                    const isLongtail = metadata && metadata.isLongtail === true;
+                                    // Only show if marked as longtail and not primary
+                                    return isLongtail && !isPrimary;
+                                  });
+                                  
+                                  return longtailKeywords.length > 0 ? (
+                                    longtailKeywords.map((keyword) => (
                                 <div
                                   key={keyword.id}
                                   className="flex items-center justify-between p-2 bg-white rounded-lg border border-gray-200 hover:border-gray-300 transition-colors"
                                 >
                                   <div className="flex items-center gap-3">
-                                    <div className="w-6 h-6 rounded bg-blue-50 flex items-center justify-center">
-                                      <span className="text-[10px] font-medium text-blue-600">K</span>
+                                          <div className="w-6 h-6 rounded bg-green-50 flex items-center justify-center">
+                                            <span className="text-[10px] font-medium text-green-600">L</span>
                                     </div>
                                     <div>
                                       <p className="text-sm font-light text-black">{keyword.term}</p>
@@ -4625,8 +4851,11 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
                                 </div>
                               ))
                             ) : (
-                              <p className="text-xs font-light text-gray-500 italic">No keywords yet</p>
-                            )}
+                                    <p className="text-xs font-light text-gray-500 italic py-2">No longtail keywords yet</p>
+                                  );
+                                })()}
+                              </div>
+                            </div>
                           </div>
                         )}
                       </div>
@@ -4680,7 +4909,7 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
                                 </div>
                                 <div className="flex-1">
                                   <div className="flex items-center gap-3">
-                                    <h5 className="text-sm font-light text-black">{subPage.title}</h5>
+                                  <h5 className="text-sm font-light text-black">{subPage.title}</h5>
                                     {(() => {
                                       const job = generationJobs.get(subPage.id);
                                       const updatedAtMs = job?.updatedAt ? new Date(job.updatedAt).getTime() : undefined;
@@ -4790,16 +5019,77 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
 
                         {/* Sub Page Keywords */}
                         {expandedSubPages.has(subPage.id) && (
-                              <div className="ml-11 mt-3 space-y-2">
-                                {subPage.keywords.length > 0 ? (
-                                  subPage.keywords.map((keyword) => (
+                          <div className="ml-11 mt-3 space-y-4">
+                            {/* Primary Keywords Section */}
+                            <div>
+                              <div className="flex items-center justify-between mb-2">
+                                <label className="text-xs font-medium text-gray-700">
+                                  Primary Keywords <span className="text-red-500">*</span>
+                                </label>
+                                <div className="flex items-center gap-1">
+                                  <button
+                                    onClick={() => handleAddKeyword('subpage', topic.id, subPage.id, false, 'primary')}
+                                    disabled={syncing}
+                                    className="px-2 py-1 text-xs font-light text-gray-600 hover:text-black hover:bg-gray-100 rounded-full transition-all flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    title="Add primary keyword manually"
+                                  >
+                                    <Plus className="h-3 w-3" />
+                                  </button>
+                                  <button
+                                    onClick={async () => {
+                                      if (aiLoading === `primary-keyword-${subPage.id}`) return;
+                                      setAiLoading(`primary-keyword-${subPage.id}`);
+                                      try {
+                                        const response = await fetch(`${CAMPAIGN_API_BASE}/pages/${subPage.id}/keywords/ai`, {
+                                          method: 'POST',
+                                          headers: getAuthHeaders(),
+                                          body: JSON.stringify({ count: 1, keywordType: 'primary' })
+                                        });
+                                        if (!response.ok) throw new Error('Failed to generate');
+                                        const data = await response.json();
+                                        if (data.success) {
+                                          fetchStructure(campaign.id);
+                                          toast({
+                                            title: 'Keyword generated',
+                                            description: 'Primary keyword generated successfully',
+                                          });
+                                        }
+                                      } catch (error) {
+                                        console.error('Error generating primary keyword:', error);
+                                        toast({
+                                          title: 'Generation failed',
+                                          description: 'Unable to generate primary keyword',
+                                          variant: 'destructive'
+                                        });
+                                      } finally {
+                                        setAiLoading(null);
+                                      }
+                                    }}
+                                    disabled={syncing || aiLoading === `primary-keyword-${subPage.id}`}
+                                    className="px-2 py-1 text-xs font-light text-white bg-black hover:bg-black/90 rounded-full transition-all flex items-center gap-1 disabled:opacity-60 disabled:cursor-not-allowed"
+                                    title="AI generate primary keyword"
+                                  >
+                                    {aiLoading === `primary-keyword-${subPage.id}` ? <ButtonSpinner /> : <Sparkles className="h-3 w-3" />}
+                                  </button>
+                                </div>
+                              </div>
+                              <div className="space-y-2">
+                                {(() => {
+                                  // Only show keywords that are actually marked as primary
+                                  const primaryKeywords = subPage.keywords.filter(kw => {
+                                    const metadata = kw.aiMetadata as any;
+                                    return metadata && metadata.isPrimary === true;
+                                  });
+                                  
+                                  return primaryKeywords.length > 0 ? (
+                                    primaryKeywords.map((keyword) => (
                                     <div
                                       key={keyword.id}
                                       className="flex items-center justify-between p-2 bg-white rounded-lg border border-gray-200 hover:border-gray-300 transition-colors"
                                     >
                                       <div className="flex items-center gap-3">
-                                        <div className="w-6 h-6 rounded bg-blue-50 flex items-center justify-center">
-                                          <span className="text-[10px] font-medium text-blue-600">K</span>
+                                          <div className="w-6 h-6 rounded bg-purple-50 flex items-center justify-center">
+                                            <span className="text-[10px] font-medium text-purple-600">P</span>
                                         </div>
                                         <div>
                                           <p className="text-sm font-light text-black">{keyword.term}</p>
@@ -4819,8 +5109,109 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
                                     </div>
                                   ))
                                 ) : (
-                                  <p className="text-xs font-light text-gray-500 italic">No keywords yet</p>
-                                )}
+                                    <p className="text-xs font-light text-gray-500 italic py-2">No primary keywords yet</p>
+                                  );
+                                })()}
+                              </div>
+                            </div>
+
+                            {/* Longtail Keywords Section */}
+                            <div>
+                              <div className="flex items-center justify-between mb-2">
+                                <label className="text-xs font-medium text-gray-700">
+                                  Longtail Keywords
+                                </label>
+                                <div className="flex items-center gap-1">
+                                  <button
+                                    onClick={() => handleAddKeyword('subpage', topic.id, subPage.id, false, 'longtail')}
+                                    disabled={syncing}
+                                    className="px-2 py-1 text-xs font-light text-gray-600 hover:text-black hover:bg-gray-100 rounded-full transition-all flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    title="Add longtail keyword manually"
+                                  >
+                                    <Plus className="h-3 w-3" />
+                                  </button>
+                                  <button
+                                    onClick={async () => {
+                                      if (aiLoading === `longtail-keyword-${subPage.id}`) return;
+                                      setAiLoading(`longtail-keyword-${subPage.id}`);
+                                      try {
+                                        const response = await fetch(`${CAMPAIGN_API_BASE}/pages/${subPage.id}/keywords/ai`, {
+                                          method: 'POST',
+                                          headers: getAuthHeaders(),
+                                          body: JSON.stringify({ count: 3, keywordType: 'longtail' })
+                                        });
+                                        if (!response.ok) throw new Error('Failed to generate');
+                                        const data = await response.json();
+                                        if (data.success) {
+                                          fetchStructure(campaign.id);
+                                          toast({
+                                            title: 'Keywords generated',
+                                            description: 'Longtail keywords generated successfully',
+                                          });
+                                        }
+                                      } catch (error) {
+                                        console.error('Error generating longtail keywords:', error);
+                                        toast({
+                                          title: 'Generation failed',
+                                          description: 'Unable to generate longtail keywords',
+                                          variant: 'destructive'
+                                        });
+                                      } finally {
+                                        setAiLoading(null);
+                                      }
+                                    }}
+                                    disabled={syncing || aiLoading === `longtail-keyword-${subPage.id}`}
+                                    className="px-2 py-1 text-xs font-light text-white bg-black hover:bg-black/90 rounded-full transition-all flex items-center gap-1 disabled:opacity-60 disabled:cursor-not-allowed"
+                                    title="AI generate longtail keywords"
+                                  >
+                                    {aiLoading === `longtail-keyword-${subPage.id}` ? <ButtonSpinner /> : <Sparkles className="h-3 w-3" />}
+                                  </button>
+                                </div>
+                              </div>
+                              <div className="space-y-2">
+                                {(() => {
+                                  // Filter keywords marked as longtail (and exclude primary)
+                                  const longtailKeywords = subPage.keywords.filter(kw => {
+                                    const metadata = kw.aiMetadata as any;
+                                    const isPrimary = metadata && metadata.isPrimary === true;
+                                    const isLongtail = metadata && metadata.isLongtail === true;
+                                    // Only show if marked as longtail and not primary
+                                    return isLongtail && !isPrimary;
+                                  });
+                                  
+                                  return longtailKeywords.length > 0 ? (
+                                    longtailKeywords.map((keyword) => (
+                                      <div
+                                        key={keyword.id}
+                                        className="flex items-center justify-between p-2 bg-white rounded-lg border border-gray-200 hover:border-gray-300 transition-colors"
+                                      >
+                                        <div className="flex items-center gap-3">
+                                          <div className="w-6 h-6 rounded bg-green-50 flex items-center justify-center">
+                                            <span className="text-[10px] font-medium text-green-600">L</span>
+                                          </div>
+                                          <div>
+                                            <p className="text-sm font-light text-black">{keyword.term}</p>
+                                            <p className="text-xs font-light text-gray-500">
+                                              Vol: {keyword.volume.toLocaleString()} • KD: {keyword.difficulty}
+                                            </p>
+                                          </div>
+                                        </div>
+                                        <button
+                                          onClick={() => handleDeleteKeyword({ type: 'subpage', topicId: topic.id, pageId: subPage.id }, keyword.id)}
+                                          disabled={syncing}
+                                          className="p-1 text-gray-400 hover:text-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                          title="Delete keyword"
+                                        >
+                                          <X className="h-3.5 w-3.5" />
+                                        </button>
+                                      </div>
+                                    ))
+                                  ) : (
+                                    <p className="text-xs font-light text-gray-500 italic py-2">No longtail keywords yet</p>
+                                  );
+                                })()}
+                              </div>
+                            </div>
                               </div>
                             )}
                           </div>
@@ -5104,6 +5495,33 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
                   placeholder="Or type a new keyword"
                   className="w-full mt-2 px-4 py-3 text-base font-light rounded-2xl border border-gray-200 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all"
                 />
+              </div>
+              <div>
+                <label className="block text-sm font-light text-gray-900 mb-2">Keyword Type</label>
+                <div className="flex gap-4">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="keywordType"
+                      value="primary"
+                      checked={newKeywordType === 'primary'}
+                      onChange={(e) => setNewKeywordType(e.target.value as 'primary' | 'longtail')}
+                      className="w-4 h-4 text-purple-600 focus:ring-purple-500"
+                    />
+                    <span className="text-sm font-light text-gray-900">Primary Keyword</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="keywordType"
+                      value="longtail"
+                      checked={newKeywordType === 'longtail'}
+                      onChange={(e) => setNewKeywordType(e.target.value as 'primary' | 'longtail')}
+                      className="w-4 h-4 text-green-600 focus:ring-green-500"
+                    />
+                    <span className="text-sm font-light text-gray-900">Longtail Keyword</span>
+                  </label>
+                </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -5471,8 +5889,8 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
                   }
                 }
               } finally {
-                setPreviewDraft(null);
-                setPreviewPageId(null);
+              setPreviewDraft(null);
+              setPreviewPageId(null);
                 setClosePreviewLoading(false);
               }
             }}

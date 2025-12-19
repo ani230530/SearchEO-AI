@@ -391,7 +391,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
   // Track if we've already initialized to prevent resets
   const hasInitializedRef = useRef(false);
   const lastInitialDraftIdRef = useRef<number | null | undefined>(null);
-  
+
   // Seed publishResult when an initial draft is provided OR fetch from DB if draftId provided
   // ONLY runs once on mount or when initialDraftId actually changes (not on every render)
   useEffect(() => {
@@ -1278,10 +1278,10 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
           variant: 'destructive',
         });
       } else {
-        toast({
-          title: 'Published',
-          description: 'Content sent to WordPress',
-        });
+      toast({
+        title: 'Published',
+        description: 'Content sent to WordPress',
+      });
       }
 
       // Refresh draft from DB to get updated status
@@ -2295,8 +2295,8 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
                 <>
                   {isEditMode ? (
                     <div className="rounded-2xl border border-gray-200 bg-white">
-                      <div className="bg-white">
-                        <style>{`
+                        <div className="bg-white">
+                          <style>{`
                             /* ReactQuill wrapper styles */
                             .ql-snow {
                               border: none;
@@ -2367,39 +2367,39 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
                               z-index: 1;
                             }
                           `}</style>
-                        <ReactQuill
-                          ref={quillRef}
-                          theme="snow"
-                          value={editedHtmlContent}
-                          onChange={(content) => {
-                            handleHtmlEditorChange(content);
-                          }}
-                          modules={{
-                            toolbar: [
-                              [{ 'header': [1, 2, 3, 4, 5, 6, false] }],
-                              ['bold', 'italic', 'underline', 'strike'],
-                              [{ 'list': 'ordered'}, { 'list': 'bullet' }],
-                              [{ 'script': 'sub'}, { 'script': 'super' }],
-                              [{ 'indent': '-1'}, { 'indent': '+1' }],
-                              [{ 'direction': 'rtl' }],
-                              [{ 'size': ['small', false, 'large', 'huge'] }],
-                              [{ 'color': [] }, { 'background': [] }],
-                              [{ 'font': [] }],
-                              [{ 'align': [] }],
-                              ['clean'],
-                              ['link', 'image', 'video'],
-                              ['code-block']
-                            ],
-                          }}
-                          formats={[
-                            'header', 'font', 'size',
-                            'bold', 'italic', 'underline', 'strike',
-                            'list', 'bullet', 'indent',
-                            'script', 'direction',
-                            'color', 'background',
-                            'align', 'link', 'image', 'video', 'code-block'
-                          ]}
-                        />
+                          <ReactQuill
+                            ref={quillRef}
+                            theme="snow"
+                            value={editedHtmlContent}
+                            onChange={(content) => {
+                              handleHtmlEditorChange(content);
+                            }}
+                            modules={{
+                              toolbar: [
+                                [{ 'header': [1, 2, 3, 4, 5, 6, false] }],
+                                ['bold', 'italic', 'underline', 'strike'],
+                                [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+                                [{ 'script': 'sub'}, { 'script': 'super' }],
+                                [{ 'indent': '-1'}, { 'indent': '+1' }],
+                                [{ 'direction': 'rtl' }],
+                                [{ 'size': ['small', false, 'large', 'huge'] }],
+                                [{ 'color': [] }, { 'background': [] }],
+                                [{ 'font': [] }],
+                                [{ 'align': [] }],
+                                ['clean'],
+                                ['link', 'image', 'video'],
+                                ['code-block']
+                              ],
+                            }}
+                            formats={[
+                              'header', 'font', 'size',
+                              'bold', 'italic', 'underline', 'strike',
+                              'list', 'bullet', 'indent',
+                              'script', 'direction',
+                              'color', 'background',
+                              'align', 'link', 'image', 'video', 'code-block'
+                            ]}
+                          />
                       </div>
                     </div>
                   ) : (
@@ -2492,8 +2492,8 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
                 </div>
               )}
               </div>
-            </div>
-          </div>
+                        </div>
+                      </div>
 
           {!isEditMode && publishResult && publishImages.length > 0 && (
             <div className="fixed bottom-6 right-6 z-40">
@@ -2512,14 +2512,14 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
                         selectedImage === image.src ? (
                           <div className="w-[360px] rounded-[24px] border border-gray-200/70 bg-white/98 p-5 shadow-2xl backdrop-blur-2xl space-y-3">
                             <div className="flex items-center justify-between">
-                              <div>
+                          <div>
                                 <p className="text-xs uppercase tracking-[0.3em] text-gray-500 font-medium">
                                   Image direction
                                 </p>
                                 <p className="text-[10px] text-gray-400 mt-0.5">
                                   ⌘+Enter to submit • Esc to close
                                 </p>
-                              </div>
+                          </div>
                               <button
                                 onClick={closeImageTooltip}
                                 className="text-xs text-gray-400 hover:text-gray-900 transition-colors p-1 rounded-full hover:bg-gray-100"
@@ -2962,9 +2962,9 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
                               'align', 'link', 'image', 'video', 'code-block'
                             ]}
                           />
-                        </div>
                       </div>
-                    ) : (
+                    </div>
+                  ) : (
                     <>
                       <style>{`
                         ::selection {

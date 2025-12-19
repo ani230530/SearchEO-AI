@@ -1012,7 +1012,7 @@ router.post('/pages/:pageId/keywords', authenticateToken, asyncHandler(async (re
   const authReq = req as AuthenticatedRequest;
   const userId = authReq.user.userId;
   const pageId = parseInt(req.params.pageId, 10);
-  const { term, volume, difficulty, intent } = req.body || {};
+  const { term, volume, difficulty, intent, keywordType } = req.body || {}; // keywordType: 'primary' | 'longtail'
 
   if (isNaN(pageId)) {
     return res.status(400).json({ success: false, error: 'Invalid page ID' });
@@ -1026,6 +1026,37 @@ router.post('/pages/:pageId/keywords', authenticateToken, asyncHandler(async (re
     return res.status(404).json({ success: false, error: 'Page not found' });
   }
 
+  // Prepare aiMetadata based on keywordType
+  let aiMetadata: any = {};
+  if (keywordType === 'primary') {
+    // If setting as primary, clear existing primary first
+    const existingPrimaries = await prisma.campaignKeyword.findMany({
+      where: {
+        pageId,
+        topicId: page.topicId
+      }
+    });
+    
+    for (const existingPrimary of existingPrimaries) {
+      const existingMetadata = (existingPrimary.aiMetadata as any) || {};
+      if (existingMetadata.isPrimary) {
+        await prisma.campaignKeyword.update({
+          where: { id: existingPrimary.id },
+          data: {
+            aiMetadata: {
+              ...existingMetadata,
+              isPrimary: false
+            }
+          }
+        });
+      }
+    }
+    
+    aiMetadata = { isPrimary: true, isLongtail: false };
+  } else if (keywordType === 'longtail') {
+    aiMetadata = { isPrimary: false, isLongtail: true };
+  }
+
   await prisma.campaignKeyword.create({
     data: {
       term: term.trim(),
@@ -1034,7 +1065,8 @@ router.post('/pages/:pageId/keywords', authenticateToken, asyncHandler(async (re
       intent: intent || null,
       topicId: page.topicId,
       pageId,
-      source: CampaignNodeSource.MANUAL
+      source: CampaignNodeSource.MANUAL,
+      aiMetadata: Object.keys(aiMetadata).length > 0 ? aiMetadata : undefined
     }
   });
 
@@ -1049,7 +1081,7 @@ router.post('/pages/:pageId/keywords/ai', authenticateToken, asyncHandler(async 
   const authReq = req as AuthenticatedRequest;
   const userId = authReq.user.userId;
   const pageId = parseInt(req.params.pageId, 10);
-  const { count = 5 } = req.body || {};
+  const { count = 5, keywordType } = req.body || {}; // keywordType: 'primary' | 'longtail' | undefined
 
   if (isNaN(pageId)) {
     return res.status(400).json({ success: false, error: 'Invalid page ID' });
@@ -1067,17 +1099,41 @@ router.post('/pages/:pageId/keywords/ai', authenticateToken, asyncHandler(async 
     return res.status(400).json({ success: false, error: 'Company domain missing for this page' });
   }
 
+  // Determine count and metadata based on keywordType
+  let generateCount = count;
+  let shouldMarkAsPrimary = false;
+  let shouldMarkAsLongtail = false;
+
+  if (keywordType === 'primary') {
+    generateCount = 1; // Only generate 1 keyword for primary
+    shouldMarkAsPrimary = true;
+  } else if (keywordType === 'longtail') {
+    generateCount = count || 3; // Generate multiple for longtail
+    shouldMarkAsLongtail = true;
+  }
+
   const suggestions = await generateKeywordsSuggestion({
     domainUrl: domain.url,
     domainContext: domain.context,
     keywords: extractDomainKeywords(domain),
     topicTitle: topic?.title,
     pageTitle: page.title,
-    count
+    count: generateCount
   });
 
-  await prisma.campaignKeyword.createMany({
-    data: suggestions.map((kw) => ({
+  // Prepare metadata for each keyword based on type
+  const keywordsToCreate = suggestions.map((kw, index) => {
+    let aiMetadata: any = { generatedAt: new Date().toISOString(), origin: 'keyword_ai' };
+    
+    if (shouldMarkAsPrimary) {
+      aiMetadata.isPrimary = true;
+      aiMetadata.isLongtail = false;
+    } else if (shouldMarkAsLongtail) {
+      aiMetadata.isPrimary = false;
+      aiMetadata.isLongtail = true;
+    }
+
+    return {
       term: kw.term,
       volume: kw.volume ?? null,
       difficulty: kw.difficulty || DEFAULT_KEYWORD_DIFFICULTY,
@@ -1085,12 +1141,216 @@ router.post('/pages/:pageId/keywords/ai', authenticateToken, asyncHandler(async 
       topicId: page.topicId,
       pageId,
       source: CampaignNodeSource.AI,
-      aiMetadata: { generatedAt: new Date().toISOString(), origin: 'keyword_ai' }
-    })),
+      aiMetadata
+    };
+  });
+
+  await prisma.campaignKeyword.createMany({
+    data: keywordsToCreate,
     skipDuplicates: true
   });
 
+  // If marking as primary, clear existing primary keywords for this page
+  if (shouldMarkAsPrimary && keywordsToCreate.length > 0) {
+    const createdKeywords = await prisma.campaignKeyword.findMany({
+      where: { 
+        pageId, 
+        topicId: page.topicId,
+        term: { in: suggestions.map(s => s.term) }
+      },
+      orderBy: { createdAt: 'desc' },
+      take: suggestions.length
+    });
+
+    if (createdKeywords.length > 0) {
+      const newPrimaryKeyword = createdKeywords[0];
+      
+      // Clear all other primary keywords for this page
+      const existingPrimaries = await prisma.campaignKeyword.findMany({
+        where: {
+          pageId,
+          topicId: page.topicId,
+          id: { not: newPrimaryKeyword.id }
+        }
+      });
+
+      for (const existingPrimary of existingPrimaries) {
+        const existingMetadata = (existingPrimary.aiMetadata as any) || {};
+        if (existingMetadata.isPrimary) {
+          await prisma.campaignKeyword.update({
+            where: { id: existingPrimary.id },
+            data: {
+              aiMetadata: {
+                ...existingMetadata,
+                isPrimary: false
+              }
+            }
+          });
+        }
+      }
+    }
+  }
+
   return respondWithStructure(res, page.topic.campaignId, userId, 201);
+}));
+
+/**
+ * POST /api/campaigns/keywords/:keywordId/select-primary
+ * Mark a keyword as primary (automatically clears other primary selections for the same page)
+ */
+router.post('/keywords/:keywordId/select-primary', authenticateToken, asyncHandler(async (req: Request, res: Response) => {
+  const authReq = req as AuthenticatedRequest;
+  const userId = authReq.user.userId;
+  const keywordId = parseInt(req.params.keywordId, 10);
+
+  if (isNaN(keywordId)) {
+    return res.status(400).json({ success: false, error: 'Invalid keyword ID' });
+  }
+
+  const keyword = await ensureKeywordOwnership(keywordId, userId);
+  if (!keyword) {
+    return res.status(404).json({ success: false, error: 'Keyword not found' });
+  }
+
+  if (!keyword.pageId) {
+    return res.status(400).json({ success: false, error: 'Keyword must be associated with a page' });
+  }
+
+  // Clear ALL existing primary keywords for this page (ensure only one primary per page)
+  const existingPrimaries = await prisma.campaignKeyword.findMany({
+    where: {
+      pageId: keyword.pageId,
+      topicId: keyword.topicId,
+      id: { not: keywordId }
+    }
+  });
+
+  // Update all existing primary keywords to remove primary flag
+  for (const existingPrimary of existingPrimaries) {
+    const existingMetadata = (existingPrimary.aiMetadata as any) || {};
+    if (existingMetadata.isPrimary) {
+      await prisma.campaignKeyword.update({
+        where: { id: existingPrimary.id },
+        data: {
+          aiMetadata: {
+            ...existingMetadata,
+            isPrimary: false
+          }
+        }
+      });
+    }
+  }
+
+  // Set this keyword as primary
+  const metadata = (keyword.aiMetadata as any) || {};
+  await prisma.campaignKeyword.update({
+    where: { id: keywordId },
+    data: {
+      aiMetadata: {
+        ...metadata,
+        isPrimary: true,
+        isLongtail: false
+      }
+    }
+  });
+
+  const campaignId = keyword.topic
+    ? keyword.topic.campaignId
+    : keyword.page?.topic.campaignId;
+
+  if (!campaignId) {
+    return res.json({ success: true });
+  }
+
+  return respondWithStructure(res, campaignId, userId);
+}));
+
+/**
+ * POST /api/campaigns/keywords/:keywordId/select-longtail
+ * Mark a keyword as longtail
+ */
+router.post('/keywords/:keywordId/select-longtail', authenticateToken, asyncHandler(async (req: Request, res: Response) => {
+  const authReq = req as AuthenticatedRequest;
+  const userId = authReq.user.userId;
+  const keywordId = parseInt(req.params.keywordId, 10);
+
+  if (isNaN(keywordId)) {
+    return res.status(400).json({ success: false, error: 'Invalid keyword ID' });
+  }
+
+  const keyword = await ensureKeywordOwnership(keywordId, userId);
+  if (!keyword) {
+    return res.status(404).json({ success: false, error: 'Keyword not found' });
+  }
+
+  if (!keyword.pageId) {
+    return res.status(400).json({ success: false, error: 'Keyword must be associated with a page' });
+  }
+
+  // Set this keyword as longtail (and clear primary if it was primary)
+  const metadata = (keyword.aiMetadata as any) || {};
+  await prisma.campaignKeyword.update({
+    where: { id: keywordId },
+    data: {
+      aiMetadata: {
+        ...metadata,
+        isPrimary: false,
+        isLongtail: true
+      }
+    }
+  });
+
+  const campaignId = keyword.topic
+    ? keyword.topic.campaignId
+    : keyword.page?.topic.campaignId;
+
+  if (!campaignId) {
+    return res.json({ success: true });
+  }
+
+  return respondWithStructure(res, campaignId, userId);
+}));
+
+/**
+ * POST /api/campaigns/keywords/:keywordId/deselect
+ * Remove primary/longtail selection from a keyword
+ */
+router.post('/keywords/:keywordId/deselect', authenticateToken, asyncHandler(async (req: Request, res: Response) => {
+  const authReq = req as AuthenticatedRequest;
+  const userId = authReq.user.userId;
+  const keywordId = parseInt(req.params.keywordId, 10);
+
+  if (isNaN(keywordId)) {
+    return res.status(400).json({ success: false, error: 'Invalid keyword ID' });
+  }
+
+  const keyword = await ensureKeywordOwnership(keywordId, userId);
+  if (!keyword) {
+    return res.status(404).json({ success: false, error: 'Keyword not found' });
+  }
+
+  // Clear selection flags
+  const metadata = (keyword.aiMetadata as any) || {};
+  await prisma.campaignKeyword.update({
+    where: { id: keywordId },
+    data: {
+      aiMetadata: {
+        ...metadata,
+        isPrimary: false,
+        isLongtail: false
+      }
+    }
+  });
+
+  const campaignId = keyword.topic
+    ? keyword.topic.campaignId
+    : keyword.page?.topic.campaignId;
+
+  if (!campaignId) {
+    return res.json({ success: true });
+  }
+
+  return respondWithStructure(res, campaignId, userId);
 }));
 
 /**
@@ -1246,12 +1506,22 @@ router.post('/topics/:topicId/generate-content', authenticateToken, asyncHandler
     });
   };
 
+  // Helper function to get primary keyword from keywords array
+  const getPrimaryKeyword = (keywords: any[]) => {
+    const primary = keywords.find((kw: any) => {
+      const metadata = kw.aiMetadata as any;
+      return metadata?.isPrimary === true;
+    });
+    return primary?.term || keywords[0]?.term || '';
+  };
+
   const draftPromises = [
     (async () => {
       const existingDraft = findDraftByPageId(pillarPage.id);
+      const primaryKeyword = getPrimaryKeyword(pillarPage.keywords);
       const draftData = {
         userId,
-        primaryKeyword: pillarPage.keywords[0]?.term || pillarPage.title,
+        primaryKeyword: primaryKeyword || pillarPage.title,
         title: `${pillarPage.title} - Generating...`,
         wordpressUrl: integration.siteUrl,
         status: 'generating',
@@ -1280,9 +1550,10 @@ router.post('/topics/:topicId/generate-content', authenticateToken, asyncHandler
     ...subPages.map(subPage =>
       (async () => {
         const existingDraft = findDraftByPageId(subPage.id);
+        const primaryKeyword = getPrimaryKeyword(subPage.keywords);
         const draftData = {
           userId,
-          primaryKeyword: subPage.keywords[0]?.term || subPage.title,
+          primaryKeyword: primaryKeyword || subPage.title,
           title: `${subPage.title} - Generating...`,
           wordpressUrl: integration.siteUrl,
           status: 'generating',
@@ -1327,14 +1598,14 @@ router.post('/topics/:topicId/generate-content', authenticateToken, asyncHandler
             pageType: 'pillar',
             status: 'pending',
             draftId: drafts[0].id,
-            primaryKeyword: pillarPage.keywords[0]?.term || pillarPage.title,
+            primaryKeyword: getPrimaryKeyword(pillarPage.keywords) || pillarPage.title,
           },
           ...subPages.map((sp, idx) => ({
             pageId: sp.id,
             pageType: 'subpage',
             status: 'pending',
             draftId: drafts[idx + 1].id,
-            primaryKeyword: sp.keywords[0]?.term || sp.title,
+            primaryKeyword: getPrimaryKeyword(sp.keywords) || sp.title,
           }))
         ]
       }
@@ -1352,7 +1623,7 @@ router.post('/topics/:topicId/generate-content', authenticateToken, asyncHandler
         pageType: 'pillar',
         status: 'pending',
         draftId: drafts[0].id,
-        primaryKeyword: pillarPage.keywords[0]?.term || pillarPage.title,
+        primaryKeyword: getPrimaryKeyword(pillarPage.keywords) || pillarPage.title,
         hasHtml: false,
         progress: 0
       },
@@ -1361,7 +1632,7 @@ router.post('/topics/:topicId/generate-content', authenticateToken, asyncHandler
         pageType: 'subpage',
         status: 'pending',
         draftId: drafts[idx + 1].id,
-        primaryKeyword: sp.keywords[0]?.term || sp.title,
+        primaryKeyword: getPrimaryKeyword(sp.keywords) || sp.title,
         hasHtml: false,
         progress: 0
       }))
@@ -1369,7 +1640,17 @@ router.post('/topics/:topicId/generate-content', authenticateToken, asyncHandler
   });
 
   // Call n8n webhook asynchronously (don't wait for response)
-  const decryptedPassword = decryptToken(integration.password);
+  let decryptedPassword: string;
+  try {
+    decryptedPassword = decryptToken(integration.password);
+  } catch (error) {
+    console.error('Failed to decrypt WordPress password:', error);
+    return res.status(400).json({
+      success: false,
+      error: 'WordPress integration password cannot be decrypted. Please reconfigure your WordPress integration in settings.'
+    });
+  }
+  
   const sanitizedDomainName = topic.campaign.domain.url
     ?.replace(/^https?:\/\//i, '')
     ?.replace(/^www\./i, '')
@@ -1399,7 +1680,7 @@ router.post('/topics/:topicId/generate-content', authenticateToken, asyncHandler
     jobId,
     topicId,
     campaignId: topic.campaignId,
-    pillarKeyword: pillarPage.keywords[0]?.term || pillarPage.title,
+    pillarKeyword: getPrimaryKeyword(pillarPage.keywords) || pillarPage.title,
     subPageCount: subPages.length,
     callbackUrl: payload.callback_url,
     callbackBaseUrl: callbackBaseUrl, // Log the base URL used
