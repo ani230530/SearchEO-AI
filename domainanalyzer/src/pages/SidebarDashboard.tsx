@@ -4403,6 +4403,9 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
   const [showAddPillarModal, setShowAddPillarModal] = useState(false);
   const [showAddSubPageModal, setShowAddSubPageModal] = useState(false);
   const [showAddKeywordModal, setShowAddKeywordModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteLabel, setDeleteLabel] = useState<string>('');
+  const [deleteAction, setDeleteAction] = useState<(() => void) | null>(null);
   const [addKeywordContext, setAddKeywordContext] = useState<{
     type: "pillar" | "subpage";
     topicId: number;
@@ -4638,11 +4641,12 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
     },
     [getAuthHeaders, handleUnauthorized, toast]
   );
-const confirmDelete = (label: string, action: () => void) => {
-  setDeleteLabel(label);
-  setDeleteAction(() => action);
-  setShowDeleteModal(true);
-};
+
+  const confirmDelete = (label: string, action: () => void) => {
+    setDeleteLabel(label);
+    setDeleteAction(() => action);
+    setShowDeleteModal(true);
+  };
 
   const fetchStructure = useCallback(
     async (targetCampaignId: number) => {
@@ -5554,37 +5558,34 @@ const confirmDelete = (label: string, action: () => void) => {
           </div>
         )}
       </div>
-{showDeleteModal && (
-  <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50">
-    <div className="bg-white p-6 rounded-xl shadow-xl w-[90%] max-w-sm">
-      <h2 className="text-lg font-medium text-gray-800">Delete {deleteLabel}?</h2>
 
-      <p className="text-sm text-gray-500 mt-2">
-        Are you sure you want to delete this {deleteLabel}? 
-      </p>
-
-      <div className="flex justify-end gap-3 mt-6">
-        <button
-          onClick={() => setShowDeleteModal(false)}
-          className="px-4 py-2 rounded-lg text-sm bg-gray-100 hover:bg-gray-200"
-        >
-          Cancel
-        </button>
-
-        <button
-          onClick={() => {
-            if (deleteAction) deleteAction();
-            setShowDeleteModal(false);
-          }}
-          className="px-4 py-2 rounded-lg text-sm bg-black text-white hover:bg-red-700"
-        >
-          Delete
-        </button>
-      </div>
-    </div>
-  </div>
-)}
-
+      {showDeleteModal && (
+        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-xl shadow-xl w-[90%] max-w-sm">
+            <h2 className="text-lg font-medium text-gray-800">Delete {deleteLabel}?</h2>
+            <p className="text-sm text-gray-500 mt-2">
+              Are you sure you want to delete this {deleteLabel}?
+            </p>
+            <div className="flex justify-end gap-3 mt-6">
+              <button
+                onClick={() => setShowDeleteModal(false)}
+                className="px-4 py-2 rounded-lg text-sm bg-gray-100 hover:bg-gray-200"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  if (deleteAction) deleteAction();
+                  setShowDeleteModal(false);
+                }}
+                className="px-4 py-2 rounded-lg text-sm bg-black text-white hover:bg-red-700"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Graph Overview */}
       <div className="w-full h-[700px] mb-10">

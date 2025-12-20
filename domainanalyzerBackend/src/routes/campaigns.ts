@@ -1662,12 +1662,19 @@ router.post('/topics/:topicId/generate-content', authenticateToken, asyncHandler
   const callbackBaseUrl = process.env.CALLBACK_BASE_URL || `${req.protocol}://${req.get('host')}`;
   const callbackUrl = `${callbackBaseUrl}/api/campaigns/generation-webhook`;
 
+  // Construct streaming URL from environment variable (for deployment/prod) or fallback to callback base URL
+  // Set STREAMING_BASE_URL env var in deployment/production (e.g., https://your-domain.com)
+  // Falls back to CALLBACK_BASE_URL if not set, then to request host for local development
+  const streamingBaseUrl = process.env.STREAMING_BASE_URL || callbackBaseUrl;
+  const streamingUrl = `${streamingBaseUrl}/api/campaigns/streaming-webhook`;
+
   const payload = {
     ...req.body,
     // Include job_id so n8n can return it in the callback
     // job_id is unique and sufficient to identify the request
     job_id: jobId,
     callback_url: callbackUrl, // Environment-based callback URL for n8n to call back
+    streaming_url: streamingUrl, // Environment-based streaming URL for n8n to send progress updates
     wordpress: {
       username: integration.username,
       password: decryptedPassword,
@@ -1684,8 +1691,11 @@ router.post('/topics/:topicId/generate-content', authenticateToken, asyncHandler
     subPageCount: subPages.length,
     callbackUrl: payload.callback_url,
     callbackBaseUrl: callbackBaseUrl, // Log the base URL used
+    streamingUrl: payload.streaming_url,
+    streamingBaseUrl: streamingBaseUrl, // Log the streaming base URL used
     wordpressUrl: payload.wordpress?.url,
     usingEnvCallbackUrl: !!process.env.CALLBACK_BASE_URL, // Indicate if env var is set
+    usingEnvStreamingUrl: !!process.env.STREAMING_BASE_URL, // Indicate if streaming env var is set
   });
 
   // Fire and forget - process in background
@@ -1967,7 +1977,8 @@ router.get('/generation-status/:jobId', authenticateToken, asyncHandler(async (r
  *   "user_id": "user_123",
  *   "campaign_name": "Expert Witness Cluster",
  *   "job_id": "job_11_1765126226932",  // REQUIRED: Unique identifier for this generation job
- *   "callback_url": "http://your-backend-url/api/campaigns/generation-webhook",  // URL for n8n to call back
+ *   "callback_url": "http://your-backend-url/api/campaigns/generation-webhook",  // URL for n8n to call back with final results
+ *   "streaming_url": "http://your-backend-url/api/campaigns/streaming-webhook",  // URL for n8n to send progress updates during generation
  *   "pillar_page": {
  *     "primary_keyword": "expert witness",
  *     "longtail_keywords": ["analysis expert witness"],
@@ -2363,6 +2374,127 @@ router.post('/generation-webhook', asyncHandler(async (req: Request, res: Respon
     console.error('[generation-webhook] Request body that caused error:', JSON.stringify(req.body, null, 2));
     console.error('[generation-webhook] ===========================================');
     res.status(500).json({ success: false, error: error.message });
+  }
+}));
+
+/**
+ * ============================================================================
+ * STREAMING WEBHOOK ENDPOINT FOR PROGRESS UPDATES
+ * ============================================================================
+ * 
+ * Endpoint: POST /api/campaigns/streaming-webhook
+ * URL: http://your-backend-url/api/campaigns/streaming-webhook
+ * Authentication: NONE (n8n calls it directly)
+ * 
+ * ============================================================================
+ * WHAT N8N SHOULD SEND (Input)
+ * ============================================================================
+ * 
+ * POST to: http://your-backend-url/api/campaigns/streaming-webhook
+ * Headers: 
+ *   - Content-Type: application/json
+ * 
+ * Payload (minimal - only job_id and message):
+ * {
+ *   "job_id": "job_11_1765126226932",  // REQUIRED: Must match the job_id sent
+ *   "message": "Generating pillar page content..."  // REQUIRED: Progress message
+ * }
+ * 
+ * ============================================================================
+ * RESPONSE FROM STREAMING WEBHOOK
+ * ============================================================================
+ * 
+ * Success Response (200):
+ * {
+ *   "success": true,
+ *   "message": "Progress update broadcasted"
+ * }
+ * 
+ * Error Response (400/404):
+ * {
+ *   "success": false,
+ *   "error": "Error message"
+ * }
+ * 
+ * ============================================================================
+ * NOTES
+ * ============================================================================
+ * - job_id is REQUIRED and must match the job_id sent in the original request
+ * - message is REQUIRED and will be broadcasted to the user via SSE
+ * - The webhook will look up the user by querying drafts with the job_id
+ * - Progress updates are broadcasted to connected SSE clients in real-time
+ */
+router.post('/streaming-webhook', asyncHandler(async (req: Request, res: Response) => {
+  try {
+    const { job_id, message } = req.body;
+
+    // Validate required fields
+    if (!job_id) {
+      console.error('[streaming-webhook] REJECTED: Missing job_id in payload');
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Invalid payload: job_id is required' 
+      });
+    }
+
+    if (!message) {
+      console.error('[streaming-webhook] REJECTED: Missing message in payload');
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Invalid payload: message is required' 
+      });
+    }
+
+    console.log(`[streaming-webhook] Received progress update for job_id: ${job_id}`, {
+      message: message.substring(0, 100), // Log first 100 chars
+      messageLength: message.length
+    });
+
+    // Find user by querying drafts with this job_id
+    // Drafts store jobId in their response JSON
+    const allUserDrafts = await prisma.wordpressPublishLog.findMany({
+      where: {
+        status: { in: ['generating', 'draft'] }
+      }
+    });
+
+    const matchingDraft = allUserDrafts.find(draft => {
+      const resp = draft.response as any;
+      return resp?.jobId === job_id;
+    });
+
+    if (!matchingDraft) {
+      console.warn(`[streaming-webhook] No draft found with job_id: ${job_id}`);
+      // Return 200 to avoid n8n retries, but log the issue
+      return res.status(200).json({ 
+        success: false, 
+        message: 'Job not found (may have completed or not started yet)' 
+      });
+    }
+
+    const userId = matchingDraft.userId;
+
+    // Broadcast streaming update to user via SSE
+    broadcastToUser(userId, {
+      type: 'streaming',
+      jobId: job_id,
+      message: message,
+      timestamp: new Date().toISOString()
+    });
+
+    console.log(`[streaming-webhook] ✅ Broadcasted progress update to user ${userId} for job ${job_id}`);
+
+    res.json({
+      success: true,
+      message: 'Progress update broadcasted'
+    });
+  } catch (error: any) {
+    console.error('[streaming-webhook] Error processing streaming webhook:', error);
+    // Return 200 to avoid n8n retries, but log the error
+    res.status(200).json({ 
+      success: false, 
+      error: 'Internal server error (logged)' 
+    });
   }
 }));
 
