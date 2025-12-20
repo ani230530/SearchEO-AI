@@ -17,7 +17,7 @@ import publishRouter from './routes/publish';
 import campaignsRouter from './routes/campaigns';
 import { PrismaClient } from '../generated/prisma';
 import { authenticateToken, AuthenticatedRequest } from './middleware/auth';
-
+import auditRoutes from './routes/auditRoutes';
 const app = express();
 const prisma = new PrismaClient();
 
@@ -117,6 +117,7 @@ app.use('/api/enhanced-phrases', enhancedPhrasesRouter);
 app.use('/api/ai-queries', aiQueriesRouter);
 app.use('/api/competitor', competitorRouter);
 app.use('/api/dashboard', dashboardRouter);
+app.use('/api/audit', auditRoutes);
 // Onboarding routes removed
 
 // Health check endpoint

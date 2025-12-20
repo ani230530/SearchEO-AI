@@ -214,3 +214,165 @@
     color: #1d4ed8;
   }
 }
+/* ROOT WRAPPER */
+.seo-root {
+  width: 100%;
+  padding: 40px 0;
+}
+
+.seo-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+/* HEADER */
+.seo-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.seo-title {
+  font-size: 32px;
+  font-weight: 700;
+  color: #0f172a; /* slate-900 */
+}
+
+.seo-sub {
+  font-size: 15px;
+  color: #475569; /* slate-600 */
+  margin-top: 4px;
+}
+
+/* MAIN CARD */
+.card {
+  background: rgba(255, 255, 255, 0.55);
+  backdrop-filter: blur(18px);
+  border: 1px solid rgba(203, 213, 225, 0.6); /* gray-300 */
+  padding: 36px;
+  border-radius: 24px;
+  box-shadow: 0 8px 24px -2px rgba(0, 0, 0, 0.1);
+}
+
+.card-title {
+  font-size: 20px;
+  font-weight: 600;
+  margin-bottom: 28px;
+  color: #1e293b; /* slate-800 */
+}
+
+/* FLOATING INPUT GROUP */
+/* Container */
+.floating {
+  position: relative;
+  margin-bottom: 1.8rem;
+}
+
+/* Input + Select Styling */
+.floating-input {
+  width: 100%;
+  padding: 12px 12px 10px;
+  border: 1px solid #ccc;
+  background-color: #fff;
+  font-size: 15px;
+  border-radius: 6px;
+  outline: none;
+  transition: all 0.2s ease;
+  color: #111; /* ensure text is visible */
+}
+
+/* Fix for SELECT having same look */
+.floating-input select,
+select.floating-input {
+  appearance: none;
+  background-color: #fff;
+}
+
+/* Highlight on focus */
+.floating-input:focus {
+  border-color: #0066ff;
+}
+
+/* Label */
+.floating-label {
+  position: absolute;
+  top: 50%;
+  left: 12px;
+  transform: translateY(-50%);
+  color: #666;
+  font-size: 15px;
+  pointer-events: none;
+  transition: all 0.2s ease;
+  background: #fff;
+  padding: 0 4px;
+}
+
+/* Move label UP when filled or focused */
+.floating-input:focus + .floating-label,
+.floating-label.filled {
+  top: -8px;
+  font-size: 12px;
+  color: #0066ff;
+}
+
+/* Prevent overlap on SELECT (forces label up when value exists) */
+select.floating-input:not([value=""]) + .floating-label {
+  top: -8px;
+  font-size: 12px;
+}
+
+
+/* BUTTON */
+.btn.primary {
+  background: #000000; /* blue-900 */
+  color: white;
+  font-weight: 600;
+  border-radius: 14px;
+  transition: all 0.25s ease;
+}
+
+.btn.primary:hover {
+  transform: scale(1.03);
+  box-shadow: 0 8px 22px -6px rgba(0, 0, 0, 0.6);
+}
+
+/* DISABLED BUTTON */
+.btn.primary:disabled {
+  background: #101010; /* darker */
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* TOAST NOTIFICATIONS */
+.toast {
+  position: fixed;
+  top: 28px;
+  right: 28px;
+  padding: 14px 22px;
+  border-radius: 12px;
+  font-weight: 600;
+  color: #fff;
+  box-shadow: 0 0 18px rgba(0, 0, 0, 0.25);
+  animation: slideIn 0.25s ease-out forwards;
+  z-index: 9999;
+}
+
+.toast-success {
+  background: #16a34a; /* green-600 */
+}
+
+.toast-error {
+  background: #dc2626; /* red-600 */
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(40px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0px);
+    opacity: 1;
+  }
+}

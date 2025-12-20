@@ -61,7 +61,7 @@ const CampaignGraph: React.FC<CampaignGraphProps> = ({ campaignStructure, select
   const [hoveredNode, setHoveredNode] = useState<TreeNode | null>(null);
   const [collapsedTopics, setCollapsedTopics] = useState<Set<number>>(new Set());
   const [dimensions, setDimensions] = useState<{ width: number; height: number }>({ width: 960, height: 640 });
-
+const [clickedNode, setClickedNode] = useState<TreeNode | null>(null);
   const colors = COLOR_PALETTE;
 
   const legendItems = [
@@ -136,8 +136,9 @@ const CampaignGraph: React.FC<CampaignGraphProps> = ({ campaignStructure, select
     gradient.append('stop').attr('offset', '100%').attr('stop-color', '#eceef2');
 
     const zoomGroup = svg.append('g');
-    const g = zoomGroup.append('g')
-      .attr('transform', `translate(${width / 2},${height / 2})`);
+    const g = zoomGroup.append("g");
+g.attr("transform", `translate(${width / 2},${height / 2})`);
+
 
     // Zoom/pan behaviour
     const zoomBehaviour = d3.zoom<SVGSVGElement, unknown>()
@@ -195,6 +196,7 @@ const CampaignGraph: React.FC<CampaignGraphProps> = ({ campaignStructure, select
       .duration(800)
       .style('opacity', 1);
 
+
     // Create nodes
     const node = g.append('g')
       .selectAll('g')
@@ -208,6 +210,46 @@ const CampaignGraph: React.FC<CampaignGraphProps> = ({ campaignStructure, select
       .duration(600)
       .delay((d: any, i: number) => i * 50)
       .style('opacity', 1);
+node.on('mouseenter', function(event, d: any) {
+  setHoveredNode(d.data);
+
+
+  d3.select(this)
+    .transition()
+    .duration(200)
+    .attr('r', (d: any) => {
+      if (d.data.type === 'campaign') return 24;
+      if (d.data.type === 'topic') return 20;
+      if (d.data.type === 'pillar') return 15;
+      if (d.data.type === 'subpage') return 12;
+      if (d.data.type === 'keyword') return 10;
+      return 10;
+    })
+    .style('filter', 'drop-shadow(0 6px 16px rgba(0,0,0,0.15))');
+})
+
+node.on("mousemove", function (event) {
+  const bounds = containerRef.current!.getBoundingClientRect();
+});
+
+
+node.on('mouseleave', function(event, d: any) {
+ setHoveredNode(null);
+
+
+  d3.select(this)
+    .transition()
+    .duration(200)
+    .attr('r', (d: any) => {
+      if (d.data.type === 'campaign') return 20;
+      if (d.data.type === 'topic') return 16;
+      if (d.data.type === 'pillar') return 12;
+      if (d.data.type === 'subpage') return 10;
+      if (d.data.type === 'keyword') return 8;
+      return 8;
+    })
+    .style('filter', 'drop-shadow(0 2px 4px rgba(0,0,0,0.08))');
+});
 
     // Add circles for nodes
     node.append('circle')
@@ -244,92 +286,102 @@ const CampaignGraph: React.FC<CampaignGraphProps> = ({ campaignStructure, select
       .style('cursor', 'pointer')
       .style('filter', 'drop-shadow(0 2px 4px rgba(0,0,0,0.08))')
       .style('cursor', (d: any) => d.data.type === 'topic' ? 'pointer' : 'default')
-      .on('click', function(event, d: any) {
-        event.stopPropagation();
-        if (d.data.type === 'topic') {
-          setCollapsedTopics(prev => {
+     .on('click', function(event, d: any) {
+    event.stopPropagation();
+
+    // Save clicked node in state
+    setClickedNode(d);
+
+    // Collapse/expand for topics
+    if (d.data.type === 'topic') {
+        setCollapsedTopics(prev => {
             const next = new Set(prev);
             if (next.has(d.data.id)) next.delete(d.data.id);
             else next.add(d.data.id);
             return next;
-          });
-        }
-      })
-      .on('mouseenter', function(event, d: any) {
-        setHoveredNode(d.data);
+        });
+    }
 
-        d3.select(this)
-          .transition()
-          .duration(200)
-          .attr('r', (d: any) => {
-            if (d.data.type === 'campaign') return 24;
-            if (d.data.type === 'topic') return 20;
-            if (d.data.type === 'pillar') return 15;
-            if (d.data.type === 'subpage') return 12;
-            return 10;
-          })
-          .style('filter', 'drop-shadow(0 6px 16px rgba(0,0,0,0.15))');
-      })
-      .on('mouseleave', function(event, d: any) {
-        setHoveredNode(null);
+    // Reset previous highlights first
+    g.selectAll('path')
+        .attr('stroke-width', 2)
+        .attr('stroke-opacity', 0.4)
+        .attr('stroke', '#d1d5db'); // light gray for unselected paths
 
-        d3.select(this)
-          .transition()
-          .duration(200)
-          .attr('r', (d: any) => {
-            if (d.data.type === 'campaign') return 20;
-            if (d.data.type === 'topic') return 16;
-            if (d.data.type === 'pillar') return 12;
-            if (d.data.type === 'subpage') return 10;
-            return 8;
-          })
-          .style('filter', 'drop-shadow(0 2px 4px rgba(0,0,0,0.08))');
-      });
+    let current = d;
+    while (current.parent) {
+        g.selectAll('path')
+            .filter((linkD: any) => linkD.target === current)
+            .attr('stroke-width', 4)
+            .attr('stroke-opacity', 1)
+            .attr('stroke', () => {
+                const type = current.data.type;
+                if (type === 'topic') return colors.topic[current.data.id % colors.topic.length];
+                if (type === 'pillar') return colors.pillar[current.data.id % colors.pillar.length];
+                if (type === 'subpage') return colors.subpage[current.data.id % colors.subpage.length];
+                if (type === 'keyword') return colors.keyword[current.data.id % colors.keyword.length];
+                return colors.campaign;
+            });
+        current = current.parent;
+    }
+}).on('mouseenter', function(event, d: any) {
+  // Only for info card, skip keywords if you want
+  if (d.data.type !== 'keyword') {
+    setHoveredNode(d.data);
+  }
+
+  d3.select(this)
+    .transition()
+    .duration(200)
+    .attr('r', (d: any) => {
+      if (d.data.type === 'campaign') return 24;
+      if (d.data.type === 'topic') return 20;
+      if (d.data.type === 'pillar') return 15;
+      if (d.data.type === 'subpage') return 12;
+      if (d.data.type === 'keyword') return 10;
+      return 10;
+    })
+    .style('filter', 'drop-shadow(0 6px 16px rgba(0,0,0,0.15))');
+})
+.on('mousemove', function(event) {
+  const bounds = containerRef.current!.getBoundingClientRect();
+})
+.on('mouseleave', function(event, d: any) {
+  // Only clear info card if not keyword
+  if (d.data.type !== 'keyword') {
+    setHoveredNode(null);
+  }
+
+  d3.select(this)
+    .transition()
+    .duration(200)
+    .attr('r', (d: any) => {
+      if (d.data.type === 'campaign') return 20;
+      if (d.data.type === 'topic') return 16;
+      if (d.data.type === 'pillar') return 12;
+      if (d.data.type === 'subpage') return 10;
+      if (d.data.type === 'keyword') return 8;
+      return 8;
+    })
+    .style('filter', 'drop-shadow(0 2px 4px rgba(0,0,0,0.08))');
+});
+
 
     // Add labels
-    node.append('text')
-      .attr('dy', (d: any) => {
-        if (d.data.type === 'campaign') return 5;
-        if (d.data.type === 'topic') return 4;
-        return 3;
-      })
-      .attr('x', (d: any) => {
-        if (d.data.type === 'campaign') return 0;
-        const angleDeg = (d.x * 180 / Math.PI) - 90;
-        const flipped = angleDeg > 90 && angleDeg < 270;
-        return flipped ? -12 : 12;
-      })
-      .attr('text-anchor', (d: any) => {
-        if (d.data.type === 'campaign') return 'middle';
-        const angleDeg = (d.x * 180 / Math.PI) - 90;
-        const flipped = angleDeg > 90 && angleDeg < 270;
-        return flipped ? 'end' : 'start';
-      })
-      .attr('transform', (d: any) => {
-        if (d.data.type === 'campaign') return 'rotate(0)';
-        const angleDeg = (d.x * 180 / Math.PI) - 90;
-        const flipped = angleDeg > 90 && angleDeg < 270;
-        return `rotate(${flipped ? 180 : 0})`;
-      })
-      .attr('font-size', (d: any) => {
-        if (d.data.type === 'campaign') return '14px';
-        if (d.data.type === 'topic') return '12px';
-        if (d.data.type === 'pillar' || d.data.type === 'subpage') return '10px';
-        return '9px';
-      })
-      .attr('font-weight', (d: any) => {
-        if (d.data.type === 'campaign' || d.data.type === 'topic') return '500';
-        return '400';
-      })
-      .attr('fill', '#1F2937')
-      .text((d: any) => {
-        const name = d.data.name;
-        if (name.length > 15 && d.data.type !== 'campaign') {
-          return name.substring(0, 12) + '...';
-        }
-        return name;
-      })
-      .style('pointer-events', 'none');
+    const labels = node.append("text")
+  .attr("dy", 22)
+  .attr("text-anchor", "middle")
+  .attr("font-size", (d: any) => d.data.type === "campaign" ? "14px" : d.data.type === "topic" ? "12px" : "10px")
+  .attr("transform", (d: any) => (d.x > Math.PI ? "rotate(280)" : "rotate(270)"))
+  .text((d: any) => {
+    const name = d.data.name;
+    if (d.data.type === "keyword") return name.substring(0, 2).toUpperCase();
+    if (name.length > 15 && d.data.type !== "campaign") return name.substring(0, 12) + "...";
+    return name;
+  });
+
+
+
 
     // Add animated particles for selected topics
     if (selectedTopics.size > 0) {

@@ -198,6 +198,22 @@ const PageQueriesTable = ({
     );
   };
 
+  // Sort data - MUST be called before any early returns to maintain hook order
+  const sortedData = useMemo(() => {
+    if (sorting.length === 0) return data;
+    const sorted = [...data];
+    const sort = sorting[0];
+    sorted.sort((a, b) => {
+      const aVal = a[sort.id as keyof QueryData];
+      const bVal = b[sort.id as keyof QueryData];
+      if (typeof aVal === 'number' && typeof bVal === 'number') {
+        return sort.desc ? bVal - aVal : aVal - bVal;
+      }
+      return String(aVal).localeCompare(String(bVal)) * (sort.desc ? -1 : 1);
+    });
+    return sorted;
+  }, [data, sorting]);
+
   // Render date range info
   const renderDateRangeInfo = () => {
     if (!dateRange || !dateRange.startDate || !dateRange.endDate) {
@@ -264,21 +280,6 @@ const PageQueriesTable = ({
       </div>
     );
   }
-
-  const sortedData = useMemo(() => {
-    if (sorting.length === 0) return data;
-    const sorted = [...data];
-    const sort = sorting[0];
-    sorted.sort((a, b) => {
-      const aVal = a[sort.id as keyof QueryData];
-      const bVal = b[sort.id as keyof QueryData];
-      if (typeof aVal === 'number' && typeof bVal === 'number') {
-        return sort.desc ? bVal - aVal : aVal - bVal;
-      }
-      return String(aVal).localeCompare(String(bVal)) * (sort.desc ? -1 : 1);
-    });
-    return sorted;
-  }, [data, sorting]);
 
   const currentQueries = sortedData.slice(startIndex, endIndex);
 
