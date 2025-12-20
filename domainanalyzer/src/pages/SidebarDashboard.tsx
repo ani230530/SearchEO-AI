@@ -4457,6 +4457,13 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
   const [viewLoadingPageId, setViewLoadingPageId] = useState<number | null>(null);
   const [closePreviewLoading, setClosePreviewLoading] = useState(false);
   const [publishLoadingPageId, setPublishLoadingPageId] = useState<number | null>(null);
+  
+  // Streaming progress state
+  const [streamingMessages, setStreamingMessages] = useState<Map<string, Array<{
+    message: string;
+    timestamp: string;
+  }>>>(new Map());
+  const [jobIdToTopicId, setJobIdToTopicId] = useState<Map<string, number>>(new Map());
 
   const getAuthHeaders = useCallback((): HeadersInit => {
     const token = localStorage.getItem("authToken");
@@ -4470,6 +4477,41 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
     localStorage.removeItem("authToken");
     window.location.href = "/auth";
   }, []);
+
+  // Helper function to extract topicId from jobId pattern
+  const extractTopicIdFromJobId = useCallback((jobId: string): number | null => {
+    // JobId format: job_{topicId}_{timestamp}
+    const match = jobId.match(/^job_(\d+)_/);
+    return match ? parseInt(match[1], 10) : null;
+  }, []);
+
+  // Handle streaming progress updates
+  const handleStreamingUpdate = useCallback((jobId: string | undefined, message: string | undefined, timestamp: string | undefined) => {
+    if (!jobId || !message) return;
+    
+    const topicId = extractTopicIdFromJobId(jobId);
+    if (!topicId) return;
+    
+    // Store jobId -> topicId mapping
+    setJobIdToTopicId(prev => {
+      const updated = new Map(prev);
+      updated.set(jobId, topicId);
+      return updated;
+    });
+    
+    // Add message to streaming messages
+    setStreamingMessages(prev => {
+      const updated = new Map(prev);
+      const messages = updated.get(jobId) || [];
+      const newMessages = [
+        ...messages,
+        { message, timestamp: timestamp || new Date().toISOString() }
+      ];
+      // Keep last 10 messages per job
+      updated.set(jobId, newMessages.slice(-10));
+      return updated;
+    });
+  }, [extractTopicIdFromJobId]);
 
   // Subscribe to server-sent events for generation status (replaces polling)
   useEffect(() => {
@@ -4485,31 +4527,52 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
         const data = JSON.parse(event.data) as {
           type?: string;
           jobId?: string;
+          message?: string;
+          timestamp?: string;
           pages?: Partial<GenerationPageStatus & { pageType: string; hasHtml?: boolean; error?: string | null }>[];
         };
-        if (data?.type !== 'drafts' || !data.pages) return;
-
-        setGenerationJobs((prev) => {
-          const updated = new Map(prev);
-          data.pages!.forEach((p) => {
-            const pageId = p.pageId;
-            if (!pageId) return;
-            const existing = updated.get(pageId);
-            updated.set(pageId, {
-              jobId: data.jobId || existing?.jobId || '',
-              pageId,
-              pageType: p.pageType === 'subpage' ? 'subpage' : 'pillar',
-              status: (p.status || existing?.status || 'generating') as GenerationPageStatus['status'],
-              draftId: p.draftId ?? existing?.draftId,
-              progress: typeof p.progress === 'number' ? p.progress : p.hasHtml ? 100 : existing?.progress,
-              primaryKeyword: p.primaryKeyword ?? existing?.primaryKeyword,
-              hasHtml: p.hasHtml ?? existing?.hasHtml,
-              updatedAt: new Date().toISOString(),
-              error: p.error ?? existing?.error ?? null,
+        
+        // Handle streaming progress updates
+        if (data.type === 'streaming') {
+          handleStreamingUpdate(data.jobId, data.message, data.timestamp);
+          return;
+        }
+        
+        // Handle draft updates
+        if (data.type === 'drafts' && data.pages) {
+          setGenerationJobs((prev) => {
+            const updated = new Map(prev);
+            data.pages!.forEach((p) => {
+              const pageId = p.pageId;
+              if (!pageId) return;
+              const existing = updated.get(pageId);
+              const jobId = data.jobId || existing?.jobId || '';
+              
+              // Clear streaming messages when generation completes
+              if (p.status === 'completed' && jobId) {
+                setStreamingMessages(prevMsgs => {
+                  const updatedMsgs = new Map(prevMsgs);
+                  updatedMsgs.delete(jobId);
+                  return updatedMsgs;
+                });
+              }
+              
+              updated.set(pageId, {
+                jobId,
+                pageId,
+                pageType: p.pageType === 'subpage' ? 'subpage' : 'pillar',
+                status: (p.status || existing?.status || 'generating') as GenerationPageStatus['status'],
+                draftId: p.draftId ?? existing?.draftId,
+                progress: typeof p.progress === 'number' ? p.progress : p.hasHtml ? 100 : existing?.progress,
+                primaryKeyword: p.primaryKeyword ?? existing?.primaryKeyword,
+                hasHtml: p.hasHtml ?? existing?.hasHtml,
+                updatedAt: new Date().toISOString(),
+                error: p.error ?? existing?.error ?? null,
+              });
             });
+            return updated;
           });
-          return updated;
-        });
+        }
       } catch (err) {
         console.error('Failed to parse SSE payload', err);
       }
@@ -4523,7 +4586,7 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
     return () => {
       eventSource.close();
     };
-  }, []);
+  }, [handleStreamingUpdate]);
 
   // Rehydrate generation state on load so generate buttons stay disabled after reload
   useEffect(() => {
@@ -5249,6 +5312,13 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
 
       const { jobId, pages } = data as { jobId: string; pages: { pageId: number; pageType: string; draftId?: number; primaryKeyword?: string; }[] };
 
+      // Store jobId -> topicId mapping for streaming updates
+      setJobIdToTopicId(prev => {
+        const updated = new Map(prev);
+        updated.set(jobId, topic.id);
+        return updated;
+      });
+
       setGenerationJobs((prev) => {
         const updated = new Map(prev);
         pages.forEach((p) => {
@@ -5528,6 +5598,54 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
     );
   }
 
+  // Streaming Progress Indicator Component
+  const StreamingProgressIndicator: React.FC<{
+    topicId: number;
+    jobId: string | null;
+    messages: Array<{ message: string; timestamp: string }>;
+  }> = ({ topicId, jobId, messages }) => {
+    const [isVisible, setIsVisible] = React.useState(false);
+    
+    React.useEffect(() => {
+      if (!jobId || messages.length === 0) {
+        setIsVisible(false);
+        return;
+      }
+      
+      const latestMessage = messages[messages.length - 1];
+      const messageAge = new Date().getTime() - new Date(latestMessage.timestamp).getTime();
+      const isRecent = messageAge < 10000; // Show for 10 seconds after last message
+      
+      setIsVisible(isRecent);
+      
+      // Auto-hide after 10 seconds of inactivity
+      if (isRecent) {
+        const timer = setTimeout(() => {
+          setIsVisible(false);
+        }, 10000 - messageAge);
+        return () => clearTimeout(timer);
+      }
+    }, [jobId, messages]);
+    
+    if (!jobId || messages.length === 0 || !isVisible) return null;
+    
+    const latestMessage = messages[messages.length - 1];
+    
+    return (
+      <div className="absolute top-3 right-3 z-10">
+        <div 
+          className="bg-black/85 backdrop-blur-md text-white px-3 py-1.5 rounded-full text-xs font-light flex items-center gap-2 shadow-xl border border-white/10 transition-opacity duration-300"
+          style={{ letterSpacing: '0.011em' }}
+        >
+          <div className="w-1.5 h-1.5 bg-white rounded-full animate-pulse flex-shrink-0" />
+          <span className="max-w-[220px] truncate">
+            {latestMessage.message}
+          </span>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="w-full mx-auto">
       {/* Header */}
@@ -5630,13 +5748,26 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
 
       {/* Topics List */}
       <div className="space-y-4">
-        {campaignStructure.topics.map((topic) => (
-          <div
-            key={topic.id}
-            className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden"
-          >
-            {/* Topic Header */}
-            <div className="flex items-center justify-between p-6 hover:bg-gray-50 transition-colors">
+        {campaignStructure.topics.map((topic) => {
+          // Find jobId for this topic
+          const topicJobId = Array.from(jobIdToTopicId.entries())
+            .find(([_, tid]) => tid === topic.id)?.[0] || null;
+          const topicMessages = topicJobId ? streamingMessages.get(topicJobId) || [] : [];
+          
+          return (
+            <div
+              key={topic.id}
+              className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden relative"
+            >
+              {/* Streaming Progress Indicator */}
+              <StreamingProgressIndicator 
+                topicId={topic.id}
+                jobId={topicJobId}
+                messages={topicMessages}
+              />
+              
+              {/* Topic Header */}
+              <div className="flex items-center justify-between p-6 hover:bg-gray-50 transition-colors">
               <div className="flex items-center gap-3 flex-1">
                 <button
                   onClick={() => toggleTopic(topic.id)}
@@ -6472,7 +6603,8 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
               </div>
             )}
           </div>
-        ))}
+          );
+        })}
 
         {campaignStructure.topics.length === 0 && (
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-12 text-center">
