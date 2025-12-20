@@ -613,6 +613,20 @@ exports.Prisma.CampaignKeywordScalarFieldEnum = {
   updatedAt: 'updatedAt'
 };
 
+exports.Prisma.AuditResultScalarFieldEnum = {
+  id: 'id',
+  domainId: 'domainId',
+  performance: 'performance',
+  seo: 'seo',
+  accessibility: 'accessibility',
+  bestPractices: 'bestPractices',
+  pwa: 'pwa',
+  audits: 'audits',
+  screenshotUrl: 'screenshotUrl',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
 exports.Prisma.SortOrder = {
   asc: 'asc',
   desc: 'desc'
@@ -689,7 +703,8 @@ exports.Prisma.ModelName = {
   Campaign: 'Campaign',
   CampaignTopic: 'CampaignTopic',
   CampaignPage: 'CampaignPage',
-  CampaignKeyword: 'CampaignKeyword'
+  CampaignKeyword: 'CampaignKeyword',
+  AuditResult: 'AuditResult'
 };
 
 /**

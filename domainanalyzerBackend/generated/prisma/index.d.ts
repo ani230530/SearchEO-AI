@@ -198,6 +198,11 @@ export type CampaignPage = $Result.DefaultSelection<Prisma.$CampaignPagePayload>
  * 
  */
 export type CampaignKeyword = $Result.DefaultSelection<Prisma.$CampaignKeywordPayload>
+/**
+ * Model AuditResult
+ * 
+ */
+export type AuditResult = $Result.DefaultSelection<Prisma.$AuditResultPayload>
 
 /**
  * Enums
@@ -722,6 +727,16 @@ export class PrismaClient<
     * ```
     */
   get campaignKeyword(): Prisma.CampaignKeywordDelegate<ExtArgs, ClientOptions>;
+
+  /**
+   * `prisma.auditResult`: Exposes CRUD operations for the **AuditResult** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more AuditResults
+    * const auditResults = await prisma.auditResult.findMany()
+    * ```
+    */
+  get auditResult(): Prisma.AuditResultDelegate<ExtArgs, ClientOptions>;
 }
 
 export namespace Prisma {
@@ -1198,7 +1213,8 @@ export namespace Prisma {
     Campaign: 'Campaign',
     CampaignTopic: 'CampaignTopic',
     CampaignPage: 'CampaignPage',
-    CampaignKeyword: 'CampaignKeyword'
+    CampaignKeyword: 'CampaignKeyword',
+    AuditResult: 'AuditResult'
   };
 
   export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -1217,7 +1233,7 @@ export namespace Prisma {
       omit: GlobalOmitOptions
     }
     meta: {
-      modelProps: "user" | "domain" | "crawlResult" | "keyword" | "phrase" | "aIQueryResult" | "analysisReport" | "modelPerformance" | "competitorTracking" | "performanceInsight" | "dashboardAnalysis" | "competitorAnalysis" | "suggestedCompetitor" | "analysisPhase" | "semanticAnalysis" | "keywordAnalysis" | "searchVolumeClassification" | "intentClassification" | "communityInsight" | "searchPattern" | "phraseIntentClassification" | "wordpressIntegration" | "wordpressPublishLog" | "generationJob" | "generationJobPage" | "phraseScore" | "intentPhraseGeneration" | "communityMiningResult" | "searchPatternResult" | "intentClassificationResult" | "generatedIntentPhrase" | "relevanceScoreResult" | "googleSearchConsoleConnection" | "campaign" | "campaignTopic" | "campaignPage" | "campaignKeyword"
+      modelProps: "user" | "domain" | "crawlResult" | "keyword" | "phrase" | "aIQueryResult" | "analysisReport" | "modelPerformance" | "competitorTracking" | "performanceInsight" | "dashboardAnalysis" | "competitorAnalysis" | "suggestedCompetitor" | "analysisPhase" | "semanticAnalysis" | "keywordAnalysis" | "searchVolumeClassification" | "intentClassification" | "communityInsight" | "searchPattern" | "phraseIntentClassification" | "wordpressIntegration" | "wordpressPublishLog" | "generationJob" | "generationJobPage" | "phraseScore" | "intentPhraseGeneration" | "communityMiningResult" | "searchPatternResult" | "intentClassificationResult" | "generatedIntentPhrase" | "relevanceScoreResult" | "googleSearchConsoleConnection" | "campaign" | "campaignTopic" | "campaignPage" | "campaignKeyword" | "auditResult"
       txIsolationLevel: Prisma.TransactionIsolationLevel
     }
     model: {
@@ -3811,6 +3827,76 @@ export namespace Prisma {
           }
         }
       }
+      AuditResult: {
+        payload: Prisma.$AuditResultPayload<ExtArgs>
+        fields: Prisma.AuditResultFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.AuditResultFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$AuditResultPayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.AuditResultFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$AuditResultPayload>
+          }
+          findFirst: {
+            args: Prisma.AuditResultFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$AuditResultPayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.AuditResultFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$AuditResultPayload>
+          }
+          findMany: {
+            args: Prisma.AuditResultFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$AuditResultPayload>[]
+          }
+          create: {
+            args: Prisma.AuditResultCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$AuditResultPayload>
+          }
+          createMany: {
+            args: Prisma.AuditResultCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.AuditResultCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$AuditResultPayload>[]
+          }
+          delete: {
+            args: Prisma.AuditResultDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$AuditResultPayload>
+          }
+          update: {
+            args: Prisma.AuditResultUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$AuditResultPayload>
+          }
+          deleteMany: {
+            args: Prisma.AuditResultDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.AuditResultUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          upsert: {
+            args: Prisma.AuditResultUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$AuditResultPayload>
+          }
+          aggregate: {
+            args: Prisma.AuditResultAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateAuditResult>
+          }
+          groupBy: {
+            args: Prisma.AuditResultGroupByArgs<ExtArgs>
+            result: $Utils.Optional<AuditResultGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.AuditResultCountArgs<ExtArgs>
+            result: $Utils.Optional<AuditResultCountAggregateOutputType> | number
+          }
+        }
+      }
     }
   } & {
     other: {
@@ -3932,6 +4018,7 @@ export namespace Prisma {
     campaignTopic?: CampaignTopicOmit
     campaignPage?: CampaignPageOmit
     campaignKeyword?: CampaignKeywordOmit
+    auditResult?: AuditResultOmit
   }
 
   /* Types for Logging */
@@ -4098,6 +4185,7 @@ export namespace Prisma {
     semanticAnalyses: number
     suggestedCompetitors: number
     campaigns: number
+    auditResults: number
   }
 
   export type DomainCountOutputTypeSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
@@ -4124,6 +4212,7 @@ export namespace Prisma {
     semanticAnalyses?: boolean | DomainCountOutputTypeCountSemanticAnalysesArgs
     suggestedCompetitors?: boolean | DomainCountOutputTypeCountSuggestedCompetitorsArgs
     campaigns?: boolean | DomainCountOutputTypeCountCampaignsArgs
+    auditResults?: boolean | DomainCountOutputTypeCountAuditResultsArgs
   }
 
   // Custom InputTypes
@@ -4296,6 +4385,13 @@ export namespace Prisma {
    */
   export type DomainCountOutputTypeCountCampaignsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     where?: CampaignWhereInput
+  }
+
+  /**
+   * DomainCountOutputType without action
+   */
+  export type DomainCountOutputTypeCountAuditResultsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: AuditResultWhereInput
   }
 
 
@@ -6113,6 +6209,7 @@ export namespace Prisma {
     semanticAnalyses?: boolean | Domain$semanticAnalysesArgs<ExtArgs>
     suggestedCompetitors?: boolean | Domain$suggestedCompetitorsArgs<ExtArgs>
     campaigns?: boolean | Domain$campaignsArgs<ExtArgs>
+    auditResults?: boolean | Domain$auditResultsArgs<ExtArgs>
     _count?: boolean | DomainCountOutputTypeDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["domain"]>
 
@@ -6178,6 +6275,7 @@ export namespace Prisma {
     semanticAnalyses?: boolean | Domain$semanticAnalysesArgs<ExtArgs>
     suggestedCompetitors?: boolean | Domain$suggestedCompetitorsArgs<ExtArgs>
     campaigns?: boolean | Domain$campaignsArgs<ExtArgs>
+    auditResults?: boolean | Domain$auditResultsArgs<ExtArgs>
     _count?: boolean | DomainCountOutputTypeDefaultArgs<ExtArgs>
   }
   export type DomainIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
@@ -6211,6 +6309,7 @@ export namespace Prisma {
       semanticAnalyses: Prisma.$SemanticAnalysisPayload<ExtArgs>[]
       suggestedCompetitors: Prisma.$SuggestedCompetitorPayload<ExtArgs>[]
       campaigns: Prisma.$CampaignPayload<ExtArgs>[]
+      auditResults: Prisma.$AuditResultPayload<ExtArgs>[]
     }
     scalars: $Extensions.GetPayloadResult<{
       id: number
@@ -6615,6 +6714,7 @@ export namespace Prisma {
     semanticAnalyses<T extends Domain$semanticAnalysesArgs<ExtArgs> = {}>(args?: Subset<T, Domain$semanticAnalysesArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$SemanticAnalysisPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     suggestedCompetitors<T extends Domain$suggestedCompetitorsArgs<ExtArgs> = {}>(args?: Subset<T, Domain$suggestedCompetitorsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$SuggestedCompetitorPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     campaigns<T extends Domain$campaignsArgs<ExtArgs> = {}>(args?: Subset<T, Domain$campaignsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$CampaignPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+    auditResults<T extends Domain$auditResultsArgs<ExtArgs> = {}>(args?: Subset<T, Domain$auditResultsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$AuditResultPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     /**
      * Attaches callbacks for the resolution and/or rejection of the Promise.
      * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -7584,6 +7684,30 @@ export namespace Prisma {
     take?: number
     skip?: number
     distinct?: CampaignScalarFieldEnum | CampaignScalarFieldEnum[]
+  }
+
+  /**
+   * Domain.auditResults
+   */
+  export type Domain$auditResultsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AuditResult
+     */
+    select?: AuditResultSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the AuditResult
+     */
+    omit?: AuditResultOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: AuditResultInclude<ExtArgs> | null
+    where?: AuditResultWhereInput
+    orderBy?: AuditResultOrderByWithRelationInput | AuditResultOrderByWithRelationInput[]
+    cursor?: AuditResultWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: AuditResultScalarFieldEnum | AuditResultScalarFieldEnum[]
   }
 
   /**
@@ -46575,6 +46699,1111 @@ export namespace Prisma {
 
 
   /**
+   * Model AuditResult
+   */
+
+  export type AggregateAuditResult = {
+    _count: AuditResultCountAggregateOutputType | null
+    _avg: AuditResultAvgAggregateOutputType | null
+    _sum: AuditResultSumAggregateOutputType | null
+    _min: AuditResultMinAggregateOutputType | null
+    _max: AuditResultMaxAggregateOutputType | null
+  }
+
+  export type AuditResultAvgAggregateOutputType = {
+    id: number | null
+    domainId: number | null
+    performance: number | null
+    seo: number | null
+    accessibility: number | null
+    bestPractices: number | null
+    pwa: number | null
+  }
+
+  export type AuditResultSumAggregateOutputType = {
+    id: number | null
+    domainId: number | null
+    performance: number | null
+    seo: number | null
+    accessibility: number | null
+    bestPractices: number | null
+    pwa: number | null
+  }
+
+  export type AuditResultMinAggregateOutputType = {
+    id: number | null
+    domainId: number | null
+    performance: number | null
+    seo: number | null
+    accessibility: number | null
+    bestPractices: number | null
+    pwa: number | null
+    screenshotUrl: string | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type AuditResultMaxAggregateOutputType = {
+    id: number | null
+    domainId: number | null
+    performance: number | null
+    seo: number | null
+    accessibility: number | null
+    bestPractices: number | null
+    pwa: number | null
+    screenshotUrl: string | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type AuditResultCountAggregateOutputType = {
+    id: number
+    domainId: number
+    performance: number
+    seo: number
+    accessibility: number
+    bestPractices: number
+    pwa: number
+    audits: number
+    screenshotUrl: number
+    createdAt: number
+    updatedAt: number
+    _all: number
+  }
+
+
+  export type AuditResultAvgAggregateInputType = {
+    id?: true
+    domainId?: true
+    performance?: true
+    seo?: true
+    accessibility?: true
+    bestPractices?: true
+    pwa?: true
+  }
+
+  export type AuditResultSumAggregateInputType = {
+    id?: true
+    domainId?: true
+    performance?: true
+    seo?: true
+    accessibility?: true
+    bestPractices?: true
+    pwa?: true
+  }
+
+  export type AuditResultMinAggregateInputType = {
+    id?: true
+    domainId?: true
+    performance?: true
+    seo?: true
+    accessibility?: true
+    bestPractices?: true
+    pwa?: true
+    screenshotUrl?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type AuditResultMaxAggregateInputType = {
+    id?: true
+    domainId?: true
+    performance?: true
+    seo?: true
+    accessibility?: true
+    bestPractices?: true
+    pwa?: true
+    screenshotUrl?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type AuditResultCountAggregateInputType = {
+    id?: true
+    domainId?: true
+    performance?: true
+    seo?: true
+    accessibility?: true
+    bestPractices?: true
+    pwa?: true
+    audits?: true
+    screenshotUrl?: true
+    createdAt?: true
+    updatedAt?: true
+    _all?: true
+  }
+
+  export type AuditResultAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which AuditResult to aggregate.
+     */
+    where?: AuditResultWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of AuditResults to fetch.
+     */
+    orderBy?: AuditResultOrderByWithRelationInput | AuditResultOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: AuditResultWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` AuditResults from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` AuditResults.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned AuditResults
+    **/
+    _count?: true | AuditResultCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to average
+    **/
+    _avg?: AuditResultAvgAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to sum
+    **/
+    _sum?: AuditResultSumAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: AuditResultMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: AuditResultMaxAggregateInputType
+  }
+
+  export type GetAuditResultAggregateType<T extends AuditResultAggregateArgs> = {
+        [P in keyof T & keyof AggregateAuditResult]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateAuditResult[P]>
+      : GetScalarType<T[P], AggregateAuditResult[P]>
+  }
+
+
+
+
+  export type AuditResultGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: AuditResultWhereInput
+    orderBy?: AuditResultOrderByWithAggregationInput | AuditResultOrderByWithAggregationInput[]
+    by: AuditResultScalarFieldEnum[] | AuditResultScalarFieldEnum
+    having?: AuditResultScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: AuditResultCountAggregateInputType | true
+    _avg?: AuditResultAvgAggregateInputType
+    _sum?: AuditResultSumAggregateInputType
+    _min?: AuditResultMinAggregateInputType
+    _max?: AuditResultMaxAggregateInputType
+  }
+
+  export type AuditResultGroupByOutputType = {
+    id: number
+    domainId: number
+    performance: number
+    seo: number
+    accessibility: number
+    bestPractices: number
+    pwa: number
+    audits: JsonValue
+    screenshotUrl: string | null
+    createdAt: Date
+    updatedAt: Date
+    _count: AuditResultCountAggregateOutputType | null
+    _avg: AuditResultAvgAggregateOutputType | null
+    _sum: AuditResultSumAggregateOutputType | null
+    _min: AuditResultMinAggregateOutputType | null
+    _max: AuditResultMaxAggregateOutputType | null
+  }
+
+  type GetAuditResultGroupByPayload<T extends AuditResultGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<AuditResultGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof AuditResultGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], AuditResultGroupByOutputType[P]>
+            : GetScalarType<T[P], AuditResultGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type AuditResultSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    domainId?: boolean
+    performance?: boolean
+    seo?: boolean
+    accessibility?: boolean
+    bestPractices?: boolean
+    pwa?: boolean
+    audits?: boolean
+    screenshotUrl?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    domain?: boolean | DomainDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["auditResult"]>
+
+  export type AuditResultSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    domainId?: boolean
+    performance?: boolean
+    seo?: boolean
+    accessibility?: boolean
+    bestPractices?: boolean
+    pwa?: boolean
+    audits?: boolean
+    screenshotUrl?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    domain?: boolean | DomainDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["auditResult"]>
+
+
+  export type AuditResultSelectScalar = {
+    id?: boolean
+    domainId?: boolean
+    performance?: boolean
+    seo?: boolean
+    accessibility?: boolean
+    bestPractices?: boolean
+    pwa?: boolean
+    audits?: boolean
+    screenshotUrl?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+  }
+
+  export type AuditResultOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "domainId" | "performance" | "seo" | "accessibility" | "bestPractices" | "pwa" | "audits" | "screenshotUrl" | "createdAt" | "updatedAt", ExtArgs["result"]["auditResult"]>
+  export type AuditResultInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    domain?: boolean | DomainDefaultArgs<ExtArgs>
+  }
+  export type AuditResultIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    domain?: boolean | DomainDefaultArgs<ExtArgs>
+  }
+
+  export type $AuditResultPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "AuditResult"
+    objects: {
+      domain: Prisma.$DomainPayload<ExtArgs>
+    }
+    scalars: $Extensions.GetPayloadResult<{
+      id: number
+      domainId: number
+      performance: number
+      seo: number
+      accessibility: number
+      bestPractices: number
+      pwa: number
+      audits: Prisma.JsonValue
+      screenshotUrl: string | null
+      createdAt: Date
+      updatedAt: Date
+    }, ExtArgs["result"]["auditResult"]>
+    composites: {}
+  }
+
+  type AuditResultGetPayload<S extends boolean | null | undefined | AuditResultDefaultArgs> = $Result.GetResult<Prisma.$AuditResultPayload, S>
+
+  type AuditResultCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> =
+    Omit<AuditResultFindManyArgs, 'select' | 'include' | 'distinct' | 'omit'> & {
+      select?: AuditResultCountAggregateInputType | true
+    }
+
+  export interface AuditResultDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['AuditResult'], meta: { name: 'AuditResult' } }
+    /**
+     * Find zero or one AuditResult that matches the filter.
+     * @param {AuditResultFindUniqueArgs} args - Arguments to find a AuditResult
+     * @example
+     * // Get one AuditResult
+     * const auditResult = await prisma.auditResult.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends AuditResultFindUniqueArgs>(args: SelectSubset<T, AuditResultFindUniqueArgs<ExtArgs>>): Prisma__AuditResultClient<$Result.GetResult<Prisma.$AuditResultPayload<ExtArgs>, T, "findUnique", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find one AuditResult that matches the filter or throw an error with `error.code='P2025'`
+     * if no matches were found.
+     * @param {AuditResultFindUniqueOrThrowArgs} args - Arguments to find a AuditResult
+     * @example
+     * // Get one AuditResult
+     * const auditResult = await prisma.auditResult.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends AuditResultFindUniqueOrThrowArgs>(args: SelectSubset<T, AuditResultFindUniqueOrThrowArgs<ExtArgs>>): Prisma__AuditResultClient<$Result.GetResult<Prisma.$AuditResultPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first AuditResult that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {AuditResultFindFirstArgs} args - Arguments to find a AuditResult
+     * @example
+     * // Get one AuditResult
+     * const auditResult = await prisma.auditResult.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends AuditResultFindFirstArgs>(args?: SelectSubset<T, AuditResultFindFirstArgs<ExtArgs>>): Prisma__AuditResultClient<$Result.GetResult<Prisma.$AuditResultPayload<ExtArgs>, T, "findFirst", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first AuditResult that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {AuditResultFindFirstOrThrowArgs} args - Arguments to find a AuditResult
+     * @example
+     * // Get one AuditResult
+     * const auditResult = await prisma.auditResult.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends AuditResultFindFirstOrThrowArgs>(args?: SelectSubset<T, AuditResultFindFirstOrThrowArgs<ExtArgs>>): Prisma__AuditResultClient<$Result.GetResult<Prisma.$AuditResultPayload<ExtArgs>, T, "findFirstOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find zero or more AuditResults that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {AuditResultFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all AuditResults
+     * const auditResults = await prisma.auditResult.findMany()
+     * 
+     * // Get first 10 AuditResults
+     * const auditResults = await prisma.auditResult.findMany({ take: 10 })
+     * 
+     * // Only select the `id`
+     * const auditResultWithIdOnly = await prisma.auditResult.findMany({ select: { id: true } })
+     * 
+     */
+    findMany<T extends AuditResultFindManyArgs>(args?: SelectSubset<T, AuditResultFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$AuditResultPayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
+
+    /**
+     * Create a AuditResult.
+     * @param {AuditResultCreateArgs} args - Arguments to create a AuditResult.
+     * @example
+     * // Create one AuditResult
+     * const AuditResult = await prisma.auditResult.create({
+     *   data: {
+     *     // ... data to create a AuditResult
+     *   }
+     * })
+     * 
+     */
+    create<T extends AuditResultCreateArgs>(args: SelectSubset<T, AuditResultCreateArgs<ExtArgs>>): Prisma__AuditResultClient<$Result.GetResult<Prisma.$AuditResultPayload<ExtArgs>, T, "create", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Create many AuditResults.
+     * @param {AuditResultCreateManyArgs} args - Arguments to create many AuditResults.
+     * @example
+     * // Create many AuditResults
+     * const auditResult = await prisma.auditResult.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends AuditResultCreateManyArgs>(args?: SelectSubset<T, AuditResultCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many AuditResults and returns the data saved in the database.
+     * @param {AuditResultCreateManyAndReturnArgs} args - Arguments to create many AuditResults.
+     * @example
+     * // Create many AuditResults
+     * const auditResult = await prisma.auditResult.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many AuditResults and only return the `id`
+     * const auditResultWithIdOnly = await prisma.auditResult.createManyAndReturn({
+     *   select: { id: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends AuditResultCreateManyAndReturnArgs>(args?: SelectSubset<T, AuditResultCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$AuditResultPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Delete a AuditResult.
+     * @param {AuditResultDeleteArgs} args - Arguments to delete one AuditResult.
+     * @example
+     * // Delete one AuditResult
+     * const AuditResult = await prisma.auditResult.delete({
+     *   where: {
+     *     // ... filter to delete one AuditResult
+     *   }
+     * })
+     * 
+     */
+    delete<T extends AuditResultDeleteArgs>(args: SelectSubset<T, AuditResultDeleteArgs<ExtArgs>>): Prisma__AuditResultClient<$Result.GetResult<Prisma.$AuditResultPayload<ExtArgs>, T, "delete", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Update one AuditResult.
+     * @param {AuditResultUpdateArgs} args - Arguments to update one AuditResult.
+     * @example
+     * // Update one AuditResult
+     * const auditResult = await prisma.auditResult.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends AuditResultUpdateArgs>(args: SelectSubset<T, AuditResultUpdateArgs<ExtArgs>>): Prisma__AuditResultClient<$Result.GetResult<Prisma.$AuditResultPayload<ExtArgs>, T, "update", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Delete zero or more AuditResults.
+     * @param {AuditResultDeleteManyArgs} args - Arguments to filter AuditResults to delete.
+     * @example
+     * // Delete a few AuditResults
+     * const { count } = await prisma.auditResult.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends AuditResultDeleteManyArgs>(args?: SelectSubset<T, AuditResultDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more AuditResults.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {AuditResultUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many AuditResults
+     * const auditResult = await prisma.auditResult.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends AuditResultUpdateManyArgs>(args: SelectSubset<T, AuditResultUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create or update one AuditResult.
+     * @param {AuditResultUpsertArgs} args - Arguments to update or create a AuditResult.
+     * @example
+     * // Update or create a AuditResult
+     * const auditResult = await prisma.auditResult.upsert({
+     *   create: {
+     *     // ... data to create a AuditResult
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the AuditResult we want to update
+     *   }
+     * })
+     */
+    upsert<T extends AuditResultUpsertArgs>(args: SelectSubset<T, AuditResultUpsertArgs<ExtArgs>>): Prisma__AuditResultClient<$Result.GetResult<Prisma.$AuditResultPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+
+    /**
+     * Count the number of AuditResults.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {AuditResultCountArgs} args - Arguments to filter AuditResults to count.
+     * @example
+     * // Count the number of AuditResults
+     * const count = await prisma.auditResult.count({
+     *   where: {
+     *     // ... the filter for the AuditResults we want to count
+     *   }
+     * })
+    **/
+    count<T extends AuditResultCountArgs>(
+      args?: Subset<T, AuditResultCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], AuditResultCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a AuditResult.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {AuditResultAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends AuditResultAggregateArgs>(args: Subset<T, AuditResultAggregateArgs>): Prisma.PrismaPromise<GetAuditResultAggregateType<T>>
+
+    /**
+     * Group by AuditResult.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {AuditResultGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends AuditResultGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: AuditResultGroupByArgs['orderBy'] }
+        : { orderBy?: AuditResultGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, AuditResultGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetAuditResultGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the AuditResult model
+   */
+  readonly fields: AuditResultFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for AuditResult.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__AuditResultClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    domain<T extends DomainDefaultArgs<ExtArgs> = {}>(args?: Subset<T, DomainDefaultArgs<ExtArgs>>): Prisma__DomainClient<$Result.GetResult<Prisma.$DomainPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the AuditResult model
+   */
+  interface AuditResultFieldRefs {
+    readonly id: FieldRef<"AuditResult", 'Int'>
+    readonly domainId: FieldRef<"AuditResult", 'Int'>
+    readonly performance: FieldRef<"AuditResult", 'Float'>
+    readonly seo: FieldRef<"AuditResult", 'Float'>
+    readonly accessibility: FieldRef<"AuditResult", 'Float'>
+    readonly bestPractices: FieldRef<"AuditResult", 'Float'>
+    readonly pwa: FieldRef<"AuditResult", 'Float'>
+    readonly audits: FieldRef<"AuditResult", 'Json'>
+    readonly screenshotUrl: FieldRef<"AuditResult", 'String'>
+    readonly createdAt: FieldRef<"AuditResult", 'DateTime'>
+    readonly updatedAt: FieldRef<"AuditResult", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * AuditResult findUnique
+   */
+  export type AuditResultFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AuditResult
+     */
+    select?: AuditResultSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the AuditResult
+     */
+    omit?: AuditResultOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: AuditResultInclude<ExtArgs> | null
+    /**
+     * Filter, which AuditResult to fetch.
+     */
+    where: AuditResultWhereUniqueInput
+  }
+
+  /**
+   * AuditResult findUniqueOrThrow
+   */
+  export type AuditResultFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AuditResult
+     */
+    select?: AuditResultSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the AuditResult
+     */
+    omit?: AuditResultOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: AuditResultInclude<ExtArgs> | null
+    /**
+     * Filter, which AuditResult to fetch.
+     */
+    where: AuditResultWhereUniqueInput
+  }
+
+  /**
+   * AuditResult findFirst
+   */
+  export type AuditResultFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AuditResult
+     */
+    select?: AuditResultSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the AuditResult
+     */
+    omit?: AuditResultOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: AuditResultInclude<ExtArgs> | null
+    /**
+     * Filter, which AuditResult to fetch.
+     */
+    where?: AuditResultWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of AuditResults to fetch.
+     */
+    orderBy?: AuditResultOrderByWithRelationInput | AuditResultOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for AuditResults.
+     */
+    cursor?: AuditResultWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` AuditResults from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` AuditResults.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of AuditResults.
+     */
+    distinct?: AuditResultScalarFieldEnum | AuditResultScalarFieldEnum[]
+  }
+
+  /**
+   * AuditResult findFirstOrThrow
+   */
+  export type AuditResultFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AuditResult
+     */
+    select?: AuditResultSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the AuditResult
+     */
+    omit?: AuditResultOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: AuditResultInclude<ExtArgs> | null
+    /**
+     * Filter, which AuditResult to fetch.
+     */
+    where?: AuditResultWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of AuditResults to fetch.
+     */
+    orderBy?: AuditResultOrderByWithRelationInput | AuditResultOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for AuditResults.
+     */
+    cursor?: AuditResultWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` AuditResults from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` AuditResults.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of AuditResults.
+     */
+    distinct?: AuditResultScalarFieldEnum | AuditResultScalarFieldEnum[]
+  }
+
+  /**
+   * AuditResult findMany
+   */
+  export type AuditResultFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AuditResult
+     */
+    select?: AuditResultSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the AuditResult
+     */
+    omit?: AuditResultOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: AuditResultInclude<ExtArgs> | null
+    /**
+     * Filter, which AuditResults to fetch.
+     */
+    where?: AuditResultWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of AuditResults to fetch.
+     */
+    orderBy?: AuditResultOrderByWithRelationInput | AuditResultOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing AuditResults.
+     */
+    cursor?: AuditResultWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` AuditResults from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` AuditResults.
+     */
+    skip?: number
+    distinct?: AuditResultScalarFieldEnum | AuditResultScalarFieldEnum[]
+  }
+
+  /**
+   * AuditResult create
+   */
+  export type AuditResultCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AuditResult
+     */
+    select?: AuditResultSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the AuditResult
+     */
+    omit?: AuditResultOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: AuditResultInclude<ExtArgs> | null
+    /**
+     * The data needed to create a AuditResult.
+     */
+    data: XOR<AuditResultCreateInput, AuditResultUncheckedCreateInput>
+  }
+
+  /**
+   * AuditResult createMany
+   */
+  export type AuditResultCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many AuditResults.
+     */
+    data: AuditResultCreateManyInput | AuditResultCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * AuditResult createManyAndReturn
+   */
+  export type AuditResultCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AuditResult
+     */
+    select?: AuditResultSelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the AuditResult
+     */
+    omit?: AuditResultOmit<ExtArgs> | null
+    /**
+     * The data used to create many AuditResults.
+     */
+    data: AuditResultCreateManyInput | AuditResultCreateManyInput[]
+    skipDuplicates?: boolean
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: AuditResultIncludeCreateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * AuditResult update
+   */
+  export type AuditResultUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AuditResult
+     */
+    select?: AuditResultSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the AuditResult
+     */
+    omit?: AuditResultOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: AuditResultInclude<ExtArgs> | null
+    /**
+     * The data needed to update a AuditResult.
+     */
+    data: XOR<AuditResultUpdateInput, AuditResultUncheckedUpdateInput>
+    /**
+     * Choose, which AuditResult to update.
+     */
+    where: AuditResultWhereUniqueInput
+  }
+
+  /**
+   * AuditResult updateMany
+   */
+  export type AuditResultUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update AuditResults.
+     */
+    data: XOR<AuditResultUpdateManyMutationInput, AuditResultUncheckedUpdateManyInput>
+    /**
+     * Filter which AuditResults to update
+     */
+    where?: AuditResultWhereInput
+  }
+
+  /**
+   * AuditResult upsert
+   */
+  export type AuditResultUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AuditResult
+     */
+    select?: AuditResultSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the AuditResult
+     */
+    omit?: AuditResultOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: AuditResultInclude<ExtArgs> | null
+    /**
+     * The filter to search for the AuditResult to update in case it exists.
+     */
+    where: AuditResultWhereUniqueInput
+    /**
+     * In case the AuditResult found by the `where` argument doesn't exist, create a new AuditResult with this data.
+     */
+    create: XOR<AuditResultCreateInput, AuditResultUncheckedCreateInput>
+    /**
+     * In case the AuditResult was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<AuditResultUpdateInput, AuditResultUncheckedUpdateInput>
+  }
+
+  /**
+   * AuditResult delete
+   */
+  export type AuditResultDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AuditResult
+     */
+    select?: AuditResultSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the AuditResult
+     */
+    omit?: AuditResultOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: AuditResultInclude<ExtArgs> | null
+    /**
+     * Filter which AuditResult to delete.
+     */
+    where: AuditResultWhereUniqueInput
+  }
+
+  /**
+   * AuditResult deleteMany
+   */
+  export type AuditResultDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which AuditResults to delete
+     */
+    where?: AuditResultWhereInput
+  }
+
+  /**
+   * AuditResult without action
+   */
+  export type AuditResultDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AuditResult
+     */
+    select?: AuditResultSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the AuditResult
+     */
+    omit?: AuditResultOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: AuditResultInclude<ExtArgs> | null
+  }
+
+
+  /**
    * Enums
    */
 
@@ -47192,6 +48421,23 @@ export namespace Prisma {
   export type CampaignKeywordScalarFieldEnum = (typeof CampaignKeywordScalarFieldEnum)[keyof typeof CampaignKeywordScalarFieldEnum]
 
 
+  export const AuditResultScalarFieldEnum: {
+    id: 'id',
+    domainId: 'domainId',
+    performance: 'performance',
+    seo: 'seo',
+    accessibility: 'accessibility',
+    bestPractices: 'bestPractices',
+    pwa: 'pwa',
+    audits: 'audits',
+    screenshotUrl: 'screenshotUrl',
+    createdAt: 'createdAt',
+    updatedAt: 'updatedAt'
+  };
+
+  export type AuditResultScalarFieldEnum = (typeof AuditResultScalarFieldEnum)[keyof typeof AuditResultScalarFieldEnum]
+
+
   export const SortOrder: {
     asc: 'asc',
     desc: 'desc'
@@ -47472,6 +48718,7 @@ export namespace Prisma {
     semanticAnalyses?: SemanticAnalysisListRelationFilter
     suggestedCompetitors?: SuggestedCompetitorListRelationFilter
     campaigns?: CampaignListRelationFilter
+    auditResults?: AuditResultListRelationFilter
   }
 
   export type DomainOrderByWithRelationInput = {
@@ -47513,6 +48760,7 @@ export namespace Prisma {
     semanticAnalyses?: SemanticAnalysisOrderByRelationAggregateInput
     suggestedCompetitors?: SuggestedCompetitorOrderByRelationAggregateInput
     campaigns?: CampaignOrderByRelationAggregateInput
+    auditResults?: AuditResultOrderByRelationAggregateInput
   }
 
   export type DomainWhereUniqueInput = Prisma.AtLeast<{
@@ -47558,6 +48806,7 @@ export namespace Prisma {
     semanticAnalyses?: SemanticAnalysisListRelationFilter
     suggestedCompetitors?: SuggestedCompetitorListRelationFilter
     campaigns?: CampaignListRelationFilter
+    auditResults?: AuditResultListRelationFilter
   }, "id" | "url_userId">
 
   export type DomainOrderByWithAggregationInput = {
@@ -50611,6 +51860,93 @@ export namespace Prisma {
     updatedAt?: DateTimeWithAggregatesFilter<"CampaignKeyword"> | Date | string
   }
 
+  export type AuditResultWhereInput = {
+    AND?: AuditResultWhereInput | AuditResultWhereInput[]
+    OR?: AuditResultWhereInput[]
+    NOT?: AuditResultWhereInput | AuditResultWhereInput[]
+    id?: IntFilter<"AuditResult"> | number
+    domainId?: IntFilter<"AuditResult"> | number
+    performance?: FloatFilter<"AuditResult"> | number
+    seo?: FloatFilter<"AuditResult"> | number
+    accessibility?: FloatFilter<"AuditResult"> | number
+    bestPractices?: FloatFilter<"AuditResult"> | number
+    pwa?: FloatFilter<"AuditResult"> | number
+    audits?: JsonFilter<"AuditResult">
+    screenshotUrl?: StringNullableFilter<"AuditResult"> | string | null
+    createdAt?: DateTimeFilter<"AuditResult"> | Date | string
+    updatedAt?: DateTimeFilter<"AuditResult"> | Date | string
+    domain?: XOR<DomainRelationFilter, DomainWhereInput>
+  }
+
+  export type AuditResultOrderByWithRelationInput = {
+    id?: SortOrder
+    domainId?: SortOrder
+    performance?: SortOrder
+    seo?: SortOrder
+    accessibility?: SortOrder
+    bestPractices?: SortOrder
+    pwa?: SortOrder
+    audits?: SortOrder
+    screenshotUrl?: SortOrderInput | SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    domain?: DomainOrderByWithRelationInput
+  }
+
+  export type AuditResultWhereUniqueInput = Prisma.AtLeast<{
+    id?: number
+    domainId?: number
+    AND?: AuditResultWhereInput | AuditResultWhereInput[]
+    OR?: AuditResultWhereInput[]
+    NOT?: AuditResultWhereInput | AuditResultWhereInput[]
+    performance?: FloatFilter<"AuditResult"> | number
+    seo?: FloatFilter<"AuditResult"> | number
+    accessibility?: FloatFilter<"AuditResult"> | number
+    bestPractices?: FloatFilter<"AuditResult"> | number
+    pwa?: FloatFilter<"AuditResult"> | number
+    audits?: JsonFilter<"AuditResult">
+    screenshotUrl?: StringNullableFilter<"AuditResult"> | string | null
+    createdAt?: DateTimeFilter<"AuditResult"> | Date | string
+    updatedAt?: DateTimeFilter<"AuditResult"> | Date | string
+    domain?: XOR<DomainRelationFilter, DomainWhereInput>
+  }, "id" | "domainId">
+
+  export type AuditResultOrderByWithAggregationInput = {
+    id?: SortOrder
+    domainId?: SortOrder
+    performance?: SortOrder
+    seo?: SortOrder
+    accessibility?: SortOrder
+    bestPractices?: SortOrder
+    pwa?: SortOrder
+    audits?: SortOrder
+    screenshotUrl?: SortOrderInput | SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    _count?: AuditResultCountOrderByAggregateInput
+    _avg?: AuditResultAvgOrderByAggregateInput
+    _max?: AuditResultMaxOrderByAggregateInput
+    _min?: AuditResultMinOrderByAggregateInput
+    _sum?: AuditResultSumOrderByAggregateInput
+  }
+
+  export type AuditResultScalarWhereWithAggregatesInput = {
+    AND?: AuditResultScalarWhereWithAggregatesInput | AuditResultScalarWhereWithAggregatesInput[]
+    OR?: AuditResultScalarWhereWithAggregatesInput[]
+    NOT?: AuditResultScalarWhereWithAggregatesInput | AuditResultScalarWhereWithAggregatesInput[]
+    id?: IntWithAggregatesFilter<"AuditResult"> | number
+    domainId?: IntWithAggregatesFilter<"AuditResult"> | number
+    performance?: FloatWithAggregatesFilter<"AuditResult"> | number
+    seo?: FloatWithAggregatesFilter<"AuditResult"> | number
+    accessibility?: FloatWithAggregatesFilter<"AuditResult"> | number
+    bestPractices?: FloatWithAggregatesFilter<"AuditResult"> | number
+    pwa?: FloatWithAggregatesFilter<"AuditResult"> | number
+    audits?: JsonWithAggregatesFilter<"AuditResult">
+    screenshotUrl?: StringNullableWithAggregatesFilter<"AuditResult"> | string | null
+    createdAt?: DateTimeWithAggregatesFilter<"AuditResult"> | Date | string
+    updatedAt?: DateTimeWithAggregatesFilter<"AuditResult"> | Date | string
+  }
+
   export type UserCreateInput = {
     email: string
     password: string
@@ -50742,6 +52078,7 @@ export namespace Prisma {
     semanticAnalyses?: SemanticAnalysisCreateNestedManyWithoutDomainInput
     suggestedCompetitors?: SuggestedCompetitorCreateNestedManyWithoutDomainInput
     campaigns?: CampaignCreateNestedManyWithoutDomainInput
+    auditResults?: AuditResultCreateNestedManyWithoutDomainInput
   }
 
   export type DomainUncheckedCreateInput = {
@@ -50782,6 +52119,7 @@ export namespace Prisma {
     semanticAnalyses?: SemanticAnalysisUncheckedCreateNestedManyWithoutDomainInput
     suggestedCompetitors?: SuggestedCompetitorUncheckedCreateNestedManyWithoutDomainInput
     campaigns?: CampaignUncheckedCreateNestedManyWithoutDomainInput
+    auditResults?: AuditResultUncheckedCreateNestedManyWithoutDomainInput
   }
 
   export type DomainUpdateInput = {
@@ -50821,6 +52159,7 @@ export namespace Prisma {
     semanticAnalyses?: SemanticAnalysisUpdateManyWithoutDomainNestedInput
     suggestedCompetitors?: SuggestedCompetitorUpdateManyWithoutDomainNestedInput
     campaigns?: CampaignUpdateManyWithoutDomainNestedInput
+    auditResults?: AuditResultUpdateManyWithoutDomainNestedInput
   }
 
   export type DomainUncheckedUpdateInput = {
@@ -50861,6 +52200,7 @@ export namespace Prisma {
     semanticAnalyses?: SemanticAnalysisUncheckedUpdateManyWithoutDomainNestedInput
     suggestedCompetitors?: SuggestedCompetitorUncheckedUpdateManyWithoutDomainNestedInput
     campaigns?: CampaignUncheckedUpdateManyWithoutDomainNestedInput
+    auditResults?: AuditResultUncheckedUpdateManyWithoutDomainNestedInput
   }
 
   export type DomainCreateManyInput = {
@@ -54089,6 +55429,100 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
+  export type AuditResultCreateInput = {
+    performance: number
+    seo: number
+    accessibility: number
+    bestPractices: number
+    pwa: number
+    audits: JsonNullValueInput | InputJsonValue
+    screenshotUrl?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    domain: DomainCreateNestedOneWithoutAuditResultsInput
+  }
+
+  export type AuditResultUncheckedCreateInput = {
+    id?: number
+    domainId: number
+    performance: number
+    seo: number
+    accessibility: number
+    bestPractices: number
+    pwa: number
+    audits: JsonNullValueInput | InputJsonValue
+    screenshotUrl?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type AuditResultUpdateInput = {
+    performance?: FloatFieldUpdateOperationsInput | number
+    seo?: FloatFieldUpdateOperationsInput | number
+    accessibility?: FloatFieldUpdateOperationsInput | number
+    bestPractices?: FloatFieldUpdateOperationsInput | number
+    pwa?: FloatFieldUpdateOperationsInput | number
+    audits?: JsonNullValueInput | InputJsonValue
+    screenshotUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    domain?: DomainUpdateOneRequiredWithoutAuditResultsNestedInput
+  }
+
+  export type AuditResultUncheckedUpdateInput = {
+    id?: IntFieldUpdateOperationsInput | number
+    domainId?: IntFieldUpdateOperationsInput | number
+    performance?: FloatFieldUpdateOperationsInput | number
+    seo?: FloatFieldUpdateOperationsInput | number
+    accessibility?: FloatFieldUpdateOperationsInput | number
+    bestPractices?: FloatFieldUpdateOperationsInput | number
+    pwa?: FloatFieldUpdateOperationsInput | number
+    audits?: JsonNullValueInput | InputJsonValue
+    screenshotUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type AuditResultCreateManyInput = {
+    id?: number
+    domainId: number
+    performance: number
+    seo: number
+    accessibility: number
+    bestPractices: number
+    pwa: number
+    audits: JsonNullValueInput | InputJsonValue
+    screenshotUrl?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type AuditResultUpdateManyMutationInput = {
+    performance?: FloatFieldUpdateOperationsInput | number
+    seo?: FloatFieldUpdateOperationsInput | number
+    accessibility?: FloatFieldUpdateOperationsInput | number
+    bestPractices?: FloatFieldUpdateOperationsInput | number
+    pwa?: FloatFieldUpdateOperationsInput | number
+    audits?: JsonNullValueInput | InputJsonValue
+    screenshotUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type AuditResultUncheckedUpdateManyInput = {
+    id?: IntFieldUpdateOperationsInput | number
+    domainId?: IntFieldUpdateOperationsInput | number
+    performance?: FloatFieldUpdateOperationsInput | number
+    seo?: FloatFieldUpdateOperationsInput | number
+    accessibility?: FloatFieldUpdateOperationsInput | number
+    bestPractices?: FloatFieldUpdateOperationsInput | number
+    pwa?: FloatFieldUpdateOperationsInput | number
+    audits?: JsonNullValueInput | InputJsonValue
+    screenshotUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
   export type IntFilter<$PrismaModel = never> = {
     equals?: number | IntFieldRefInput<$PrismaModel>
     in?: number[] | ListIntFieldRefInput<$PrismaModel>
@@ -54477,6 +55911,12 @@ export namespace Prisma {
     none?: CampaignWhereInput
   }
 
+  export type AuditResultListRelationFilter = {
+    every?: AuditResultWhereInput
+    some?: AuditResultWhereInput
+    none?: AuditResultWhereInput
+  }
+
   export type AnalysisPhaseOrderByRelationAggregateInput = {
     _count?: SortOrder
   }
@@ -54566,6 +56006,10 @@ export namespace Prisma {
   }
 
   export type CampaignOrderByRelationAggregateInput = {
+    _count?: SortOrder
+  }
+
+  export type AuditResultOrderByRelationAggregateInput = {
     _count?: SortOrder
   }
 
@@ -56799,6 +58243,66 @@ export namespace Prisma {
     volume?: SortOrder
   }
 
+  export type AuditResultCountOrderByAggregateInput = {
+    id?: SortOrder
+    domainId?: SortOrder
+    performance?: SortOrder
+    seo?: SortOrder
+    accessibility?: SortOrder
+    bestPractices?: SortOrder
+    pwa?: SortOrder
+    audits?: SortOrder
+    screenshotUrl?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type AuditResultAvgOrderByAggregateInput = {
+    id?: SortOrder
+    domainId?: SortOrder
+    performance?: SortOrder
+    seo?: SortOrder
+    accessibility?: SortOrder
+    bestPractices?: SortOrder
+    pwa?: SortOrder
+  }
+
+  export type AuditResultMaxOrderByAggregateInput = {
+    id?: SortOrder
+    domainId?: SortOrder
+    performance?: SortOrder
+    seo?: SortOrder
+    accessibility?: SortOrder
+    bestPractices?: SortOrder
+    pwa?: SortOrder
+    screenshotUrl?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type AuditResultMinOrderByAggregateInput = {
+    id?: SortOrder
+    domainId?: SortOrder
+    performance?: SortOrder
+    seo?: SortOrder
+    accessibility?: SortOrder
+    bestPractices?: SortOrder
+    pwa?: SortOrder
+    screenshotUrl?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type AuditResultSumOrderByAggregateInput = {
+    id?: SortOrder
+    domainId?: SortOrder
+    performance?: SortOrder
+    seo?: SortOrder
+    accessibility?: SortOrder
+    bestPractices?: SortOrder
+    pwa?: SortOrder
+  }
+
   export type DomainCreateNestedManyWithoutUserInput = {
     create?: XOR<DomainCreateWithoutUserInput, DomainUncheckedCreateWithoutUserInput> | DomainCreateWithoutUserInput[] | DomainUncheckedCreateWithoutUserInput[]
     connectOrCreate?: DomainCreateOrConnectWithoutUserInput | DomainCreateOrConnectWithoutUserInput[]
@@ -57180,6 +58684,13 @@ export namespace Prisma {
     connect?: CampaignWhereUniqueInput | CampaignWhereUniqueInput[]
   }
 
+  export type AuditResultCreateNestedManyWithoutDomainInput = {
+    create?: XOR<AuditResultCreateWithoutDomainInput, AuditResultUncheckedCreateWithoutDomainInput> | AuditResultCreateWithoutDomainInput[] | AuditResultUncheckedCreateWithoutDomainInput[]
+    connectOrCreate?: AuditResultCreateOrConnectWithoutDomainInput | AuditResultCreateOrConnectWithoutDomainInput[]
+    createMany?: AuditResultCreateManyDomainInputEnvelope
+    connect?: AuditResultWhereUniqueInput | AuditResultWhereUniqueInput[]
+  }
+
   export type AnalysisPhaseUncheckedCreateNestedManyWithoutDomainInput = {
     create?: XOR<AnalysisPhaseCreateWithoutDomainInput, AnalysisPhaseUncheckedCreateWithoutDomainInput> | AnalysisPhaseCreateWithoutDomainInput[] | AnalysisPhaseUncheckedCreateWithoutDomainInput[]
     connectOrCreate?: AnalysisPhaseCreateOrConnectWithoutDomainInput | AnalysisPhaseCreateOrConnectWithoutDomainInput[]
@@ -57339,6 +58850,13 @@ export namespace Prisma {
     connectOrCreate?: CampaignCreateOrConnectWithoutDomainInput | CampaignCreateOrConnectWithoutDomainInput[]
     createMany?: CampaignCreateManyDomainInputEnvelope
     connect?: CampaignWhereUniqueInput | CampaignWhereUniqueInput[]
+  }
+
+  export type AuditResultUncheckedCreateNestedManyWithoutDomainInput = {
+    create?: XOR<AuditResultCreateWithoutDomainInput, AuditResultUncheckedCreateWithoutDomainInput> | AuditResultCreateWithoutDomainInput[] | AuditResultUncheckedCreateWithoutDomainInput[]
+    connectOrCreate?: AuditResultCreateOrConnectWithoutDomainInput | AuditResultCreateOrConnectWithoutDomainInput[]
+    createMany?: AuditResultCreateManyDomainInputEnvelope
+    connect?: AuditResultWhereUniqueInput | AuditResultWhereUniqueInput[]
   }
 
   export type BoolFieldUpdateOperationsInput = {
@@ -57677,6 +59195,20 @@ export namespace Prisma {
     deleteMany?: CampaignScalarWhereInput | CampaignScalarWhereInput[]
   }
 
+  export type AuditResultUpdateManyWithoutDomainNestedInput = {
+    create?: XOR<AuditResultCreateWithoutDomainInput, AuditResultUncheckedCreateWithoutDomainInput> | AuditResultCreateWithoutDomainInput[] | AuditResultUncheckedCreateWithoutDomainInput[]
+    connectOrCreate?: AuditResultCreateOrConnectWithoutDomainInput | AuditResultCreateOrConnectWithoutDomainInput[]
+    upsert?: AuditResultUpsertWithWhereUniqueWithoutDomainInput | AuditResultUpsertWithWhereUniqueWithoutDomainInput[]
+    createMany?: AuditResultCreateManyDomainInputEnvelope
+    set?: AuditResultWhereUniqueInput | AuditResultWhereUniqueInput[]
+    disconnect?: AuditResultWhereUniqueInput | AuditResultWhereUniqueInput[]
+    delete?: AuditResultWhereUniqueInput | AuditResultWhereUniqueInput[]
+    connect?: AuditResultWhereUniqueInput | AuditResultWhereUniqueInput[]
+    update?: AuditResultUpdateWithWhereUniqueWithoutDomainInput | AuditResultUpdateWithWhereUniqueWithoutDomainInput[]
+    updateMany?: AuditResultUpdateManyWithWhereWithoutDomainInput | AuditResultUpdateManyWithWhereWithoutDomainInput[]
+    deleteMany?: AuditResultScalarWhereInput | AuditResultScalarWhereInput[]
+  }
+
   export type NullableIntFieldUpdateOperationsInput = {
     set?: number | null
     increment?: number
@@ -58005,6 +59537,20 @@ export namespace Prisma {
     update?: CampaignUpdateWithWhereUniqueWithoutDomainInput | CampaignUpdateWithWhereUniqueWithoutDomainInput[]
     updateMany?: CampaignUpdateManyWithWhereWithoutDomainInput | CampaignUpdateManyWithWhereWithoutDomainInput[]
     deleteMany?: CampaignScalarWhereInput | CampaignScalarWhereInput[]
+  }
+
+  export type AuditResultUncheckedUpdateManyWithoutDomainNestedInput = {
+    create?: XOR<AuditResultCreateWithoutDomainInput, AuditResultUncheckedCreateWithoutDomainInput> | AuditResultCreateWithoutDomainInput[] | AuditResultUncheckedCreateWithoutDomainInput[]
+    connectOrCreate?: AuditResultCreateOrConnectWithoutDomainInput | AuditResultCreateOrConnectWithoutDomainInput[]
+    upsert?: AuditResultUpsertWithWhereUniqueWithoutDomainInput | AuditResultUpsertWithWhereUniqueWithoutDomainInput[]
+    createMany?: AuditResultCreateManyDomainInputEnvelope
+    set?: AuditResultWhereUniqueInput | AuditResultWhereUniqueInput[]
+    disconnect?: AuditResultWhereUniqueInput | AuditResultWhereUniqueInput[]
+    delete?: AuditResultWhereUniqueInput | AuditResultWhereUniqueInput[]
+    connect?: AuditResultWhereUniqueInput | AuditResultWhereUniqueInput[]
+    update?: AuditResultUpdateWithWhereUniqueWithoutDomainInput | AuditResultUpdateWithWhereUniqueWithoutDomainInput[]
+    updateMany?: AuditResultUpdateManyWithWhereWithoutDomainInput | AuditResultUpdateManyWithWhereWithoutDomainInput[]
+    deleteMany?: AuditResultScalarWhereInput | AuditResultScalarWhereInput[]
   }
 
   export type DomainCreateNestedOneWithoutCrawlResultsInput = {
@@ -59469,6 +61015,20 @@ export namespace Prisma {
     update?: XOR<XOR<CampaignPageUpdateToOneWithWhereWithoutKeywordsInput, CampaignPageUpdateWithoutKeywordsInput>, CampaignPageUncheckedUpdateWithoutKeywordsInput>
   }
 
+  export type DomainCreateNestedOneWithoutAuditResultsInput = {
+    create?: XOR<DomainCreateWithoutAuditResultsInput, DomainUncheckedCreateWithoutAuditResultsInput>
+    connectOrCreate?: DomainCreateOrConnectWithoutAuditResultsInput
+    connect?: DomainWhereUniqueInput
+  }
+
+  export type DomainUpdateOneRequiredWithoutAuditResultsNestedInput = {
+    create?: XOR<DomainCreateWithoutAuditResultsInput, DomainUncheckedCreateWithoutAuditResultsInput>
+    connectOrCreate?: DomainCreateOrConnectWithoutAuditResultsInput
+    upsert?: DomainUpsertWithoutAuditResultsInput
+    connect?: DomainWhereUniqueInput
+    update?: XOR<XOR<DomainUpdateToOneWithWhereWithoutAuditResultsInput, DomainUpdateWithoutAuditResultsInput>, DomainUncheckedUpdateWithoutAuditResultsInput>
+  }
+
   export type NestedIntFilter<$PrismaModel = never> = {
     equals?: number | IntFieldRefInput<$PrismaModel>
     in?: number[] | ListIntFieldRefInput<$PrismaModel>
@@ -59816,6 +61376,7 @@ export namespace Prisma {
     semanticAnalyses?: SemanticAnalysisCreateNestedManyWithoutDomainInput
     suggestedCompetitors?: SuggestedCompetitorCreateNestedManyWithoutDomainInput
     campaigns?: CampaignCreateNestedManyWithoutDomainInput
+    auditResults?: AuditResultCreateNestedManyWithoutDomainInput
   }
 
   export type DomainUncheckedCreateWithoutUserInput = {
@@ -59855,6 +61416,7 @@ export namespace Prisma {
     semanticAnalyses?: SemanticAnalysisUncheckedCreateNestedManyWithoutDomainInput
     suggestedCompetitors?: SuggestedCompetitorUncheckedCreateNestedManyWithoutDomainInput
     campaigns?: CampaignUncheckedCreateNestedManyWithoutDomainInput
+    auditResults?: AuditResultUncheckedCreateNestedManyWithoutDomainInput
   }
 
   export type DomainCreateOrConnectWithoutUserInput = {
@@ -60947,6 +62509,41 @@ export namespace Prisma {
     skipDuplicates?: boolean
   }
 
+  export type AuditResultCreateWithoutDomainInput = {
+    performance: number
+    seo: number
+    accessibility: number
+    bestPractices: number
+    pwa: number
+    audits: JsonNullValueInput | InputJsonValue
+    screenshotUrl?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type AuditResultUncheckedCreateWithoutDomainInput = {
+    id?: number
+    performance: number
+    seo: number
+    accessibility: number
+    bestPractices: number
+    pwa: number
+    audits: JsonNullValueInput | InputJsonValue
+    screenshotUrl?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type AuditResultCreateOrConnectWithoutDomainInput = {
+    where: AuditResultWhereUniqueInput
+    create: XOR<AuditResultCreateWithoutDomainInput, AuditResultUncheckedCreateWithoutDomainInput>
+  }
+
+  export type AuditResultCreateManyDomainInputEnvelope = {
+    data: AuditResultCreateManyDomainInput | AuditResultCreateManyDomainInput[]
+    skipDuplicates?: boolean
+  }
+
   export type AnalysisPhaseUpsertWithWhereUniqueWithoutDomainInput = {
     where: AnalysisPhaseWhereUniqueInput
     update: XOR<AnalysisPhaseUpdateWithoutDomainInput, AnalysisPhaseUncheckedUpdateWithoutDomainInput>
@@ -61713,6 +63310,39 @@ export namespace Prisma {
     updatedAt?: DateTimeFilter<"Campaign"> | Date | string
   }
 
+  export type AuditResultUpsertWithWhereUniqueWithoutDomainInput = {
+    where: AuditResultWhereUniqueInput
+    update: XOR<AuditResultUpdateWithoutDomainInput, AuditResultUncheckedUpdateWithoutDomainInput>
+    create: XOR<AuditResultCreateWithoutDomainInput, AuditResultUncheckedCreateWithoutDomainInput>
+  }
+
+  export type AuditResultUpdateWithWhereUniqueWithoutDomainInput = {
+    where: AuditResultWhereUniqueInput
+    data: XOR<AuditResultUpdateWithoutDomainInput, AuditResultUncheckedUpdateWithoutDomainInput>
+  }
+
+  export type AuditResultUpdateManyWithWhereWithoutDomainInput = {
+    where: AuditResultScalarWhereInput
+    data: XOR<AuditResultUpdateManyMutationInput, AuditResultUncheckedUpdateManyWithoutDomainInput>
+  }
+
+  export type AuditResultScalarWhereInput = {
+    AND?: AuditResultScalarWhereInput | AuditResultScalarWhereInput[]
+    OR?: AuditResultScalarWhereInput[]
+    NOT?: AuditResultScalarWhereInput | AuditResultScalarWhereInput[]
+    id?: IntFilter<"AuditResult"> | number
+    domainId?: IntFilter<"AuditResult"> | number
+    performance?: FloatFilter<"AuditResult"> | number
+    seo?: FloatFilter<"AuditResult"> | number
+    accessibility?: FloatFilter<"AuditResult"> | number
+    bestPractices?: FloatFilter<"AuditResult"> | number
+    pwa?: FloatFilter<"AuditResult"> | number
+    audits?: JsonFilter<"AuditResult">
+    screenshotUrl?: StringNullableFilter<"AuditResult"> | string | null
+    createdAt?: DateTimeFilter<"AuditResult"> | Date | string
+    updatedAt?: DateTimeFilter<"AuditResult"> | Date | string
+  }
+
   export type DomainCreateWithoutCrawlResultsInput = {
     url: string
     context?: string | null
@@ -61749,6 +63379,7 @@ export namespace Prisma {
     semanticAnalyses?: SemanticAnalysisCreateNestedManyWithoutDomainInput
     suggestedCompetitors?: SuggestedCompetitorCreateNestedManyWithoutDomainInput
     campaigns?: CampaignCreateNestedManyWithoutDomainInput
+    auditResults?: AuditResultCreateNestedManyWithoutDomainInput
   }
 
   export type DomainUncheckedCreateWithoutCrawlResultsInput = {
@@ -61788,6 +63419,7 @@ export namespace Prisma {
     semanticAnalyses?: SemanticAnalysisUncheckedCreateNestedManyWithoutDomainInput
     suggestedCompetitors?: SuggestedCompetitorUncheckedCreateNestedManyWithoutDomainInput
     campaigns?: CampaignUncheckedCreateNestedManyWithoutDomainInput
+    auditResults?: AuditResultUncheckedCreateNestedManyWithoutDomainInput
   }
 
   export type DomainCreateOrConnectWithoutCrawlResultsInput = {
@@ -61842,6 +63474,7 @@ export namespace Prisma {
     semanticAnalyses?: SemanticAnalysisUpdateManyWithoutDomainNestedInput
     suggestedCompetitors?: SuggestedCompetitorUpdateManyWithoutDomainNestedInput
     campaigns?: CampaignUpdateManyWithoutDomainNestedInput
+    auditResults?: AuditResultUpdateManyWithoutDomainNestedInput
   }
 
   export type DomainUncheckedUpdateWithoutCrawlResultsInput = {
@@ -61881,6 +63514,7 @@ export namespace Prisma {
     semanticAnalyses?: SemanticAnalysisUncheckedUpdateManyWithoutDomainNestedInput
     suggestedCompetitors?: SuggestedCompetitorUncheckedUpdateManyWithoutDomainNestedInput
     campaigns?: CampaignUncheckedUpdateManyWithoutDomainNestedInput
+    auditResults?: AuditResultUncheckedUpdateManyWithoutDomainNestedInput
   }
 
   export type CommunityInsightCreateWithoutKeywordInput = {
@@ -62053,6 +63687,7 @@ export namespace Prisma {
     semanticAnalyses?: SemanticAnalysisCreateNestedManyWithoutDomainInput
     suggestedCompetitors?: SuggestedCompetitorCreateNestedManyWithoutDomainInput
     campaigns?: CampaignCreateNestedManyWithoutDomainInput
+    auditResults?: AuditResultCreateNestedManyWithoutDomainInput
   }
 
   export type DomainUncheckedCreateWithoutKeywordsInput = {
@@ -62092,6 +63727,7 @@ export namespace Prisma {
     semanticAnalyses?: SemanticAnalysisUncheckedCreateNestedManyWithoutDomainInput
     suggestedCompetitors?: SuggestedCompetitorUncheckedCreateNestedManyWithoutDomainInput
     campaigns?: CampaignUncheckedCreateNestedManyWithoutDomainInput
+    auditResults?: AuditResultUncheckedCreateNestedManyWithoutDomainInput
   }
 
   export type DomainCreateOrConnectWithoutKeywordsInput = {
@@ -62307,6 +63943,7 @@ export namespace Prisma {
     semanticAnalyses?: SemanticAnalysisUpdateManyWithoutDomainNestedInput
     suggestedCompetitors?: SuggestedCompetitorUpdateManyWithoutDomainNestedInput
     campaigns?: CampaignUpdateManyWithoutDomainNestedInput
+    auditResults?: AuditResultUpdateManyWithoutDomainNestedInput
   }
 
   export type DomainUncheckedUpdateWithoutKeywordsInput = {
@@ -62346,6 +63983,7 @@ export namespace Prisma {
     semanticAnalyses?: SemanticAnalysisUncheckedUpdateManyWithoutDomainNestedInput
     suggestedCompetitors?: SuggestedCompetitorUncheckedUpdateManyWithoutDomainNestedInput
     campaigns?: CampaignUncheckedUpdateManyWithoutDomainNestedInput
+    auditResults?: AuditResultUncheckedUpdateManyWithoutDomainNestedInput
   }
 
   export type PhraseUpsertWithWhereUniqueWithoutKeywordInput = {
@@ -62733,6 +64371,7 @@ export namespace Prisma {
     semanticAnalyses?: SemanticAnalysisCreateNestedManyWithoutDomainInput
     suggestedCompetitors?: SuggestedCompetitorCreateNestedManyWithoutDomainInput
     campaigns?: CampaignCreateNestedManyWithoutDomainInput
+    auditResults?: AuditResultCreateNestedManyWithoutDomainInput
   }
 
   export type DomainUncheckedCreateWithoutAnalysisReportsInput = {
@@ -62772,6 +64411,7 @@ export namespace Prisma {
     semanticAnalyses?: SemanticAnalysisUncheckedCreateNestedManyWithoutDomainInput
     suggestedCompetitors?: SuggestedCompetitorUncheckedCreateNestedManyWithoutDomainInput
     campaigns?: CampaignUncheckedCreateNestedManyWithoutDomainInput
+    auditResults?: AuditResultUncheckedCreateNestedManyWithoutDomainInput
   }
 
   export type DomainCreateOrConnectWithoutAnalysisReportsInput = {
@@ -62826,6 +64466,7 @@ export namespace Prisma {
     semanticAnalyses?: SemanticAnalysisUpdateManyWithoutDomainNestedInput
     suggestedCompetitors?: SuggestedCompetitorUpdateManyWithoutDomainNestedInput
     campaigns?: CampaignUpdateManyWithoutDomainNestedInput
+    auditResults?: AuditResultUpdateManyWithoutDomainNestedInput
   }
 
   export type DomainUncheckedUpdateWithoutAnalysisReportsInput = {
@@ -62865,6 +64506,7 @@ export namespace Prisma {
     semanticAnalyses?: SemanticAnalysisUncheckedUpdateManyWithoutDomainNestedInput
     suggestedCompetitors?: SuggestedCompetitorUncheckedUpdateManyWithoutDomainNestedInput
     campaigns?: CampaignUncheckedUpdateManyWithoutDomainNestedInput
+    auditResults?: AuditResultUncheckedUpdateManyWithoutDomainNestedInput
   }
 
   export type DomainCreateWithoutModelPerformancesInput = {
@@ -62903,6 +64545,7 @@ export namespace Prisma {
     semanticAnalyses?: SemanticAnalysisCreateNestedManyWithoutDomainInput
     suggestedCompetitors?: SuggestedCompetitorCreateNestedManyWithoutDomainInput
     campaigns?: CampaignCreateNestedManyWithoutDomainInput
+    auditResults?: AuditResultCreateNestedManyWithoutDomainInput
   }
 
   export type DomainUncheckedCreateWithoutModelPerformancesInput = {
@@ -62942,6 +64585,7 @@ export namespace Prisma {
     semanticAnalyses?: SemanticAnalysisUncheckedCreateNestedManyWithoutDomainInput
     suggestedCompetitors?: SuggestedCompetitorUncheckedCreateNestedManyWithoutDomainInput
     campaigns?: CampaignUncheckedCreateNestedManyWithoutDomainInput
+    auditResults?: AuditResultUncheckedCreateNestedManyWithoutDomainInput
   }
 
   export type DomainCreateOrConnectWithoutModelPerformancesInput = {
@@ -62996,6 +64640,7 @@ export namespace Prisma {
     semanticAnalyses?: SemanticAnalysisUpdateManyWithoutDomainNestedInput
     suggestedCompetitors?: SuggestedCompetitorUpdateManyWithoutDomainNestedInput
     campaigns?: CampaignUpdateManyWithoutDomainNestedInput
+    auditResults?: AuditResultUpdateManyWithoutDomainNestedInput
   }
 
   export type DomainUncheckedUpdateWithoutModelPerformancesInput = {
@@ -63035,6 +64680,7 @@ export namespace Prisma {
     semanticAnalyses?: SemanticAnalysisUncheckedUpdateManyWithoutDomainNestedInput
     suggestedCompetitors?: SuggestedCompetitorUncheckedUpdateManyWithoutDomainNestedInput
     campaigns?: CampaignUncheckedUpdateManyWithoutDomainNestedInput
+    auditResults?: AuditResultUncheckedUpdateManyWithoutDomainNestedInput
   }
 
   export type DomainCreateWithoutCompetitorTrackingsInput = {
@@ -63073,6 +64719,7 @@ export namespace Prisma {
     semanticAnalyses?: SemanticAnalysisCreateNestedManyWithoutDomainInput
     suggestedCompetitors?: SuggestedCompetitorCreateNestedManyWithoutDomainInput
     campaigns?: CampaignCreateNestedManyWithoutDomainInput
+    auditResults?: AuditResultCreateNestedManyWithoutDomainInput
   }
 
   export type DomainUncheckedCreateWithoutCompetitorTrackingsInput = {
@@ -63112,6 +64759,7 @@ export namespace Prisma {
     semanticAnalyses?: SemanticAnalysisUncheckedCreateNestedManyWithoutDomainInput
     suggestedCompetitors?: SuggestedCompetitorUncheckedCreateNestedManyWithoutDomainInput
     campaigns?: CampaignUncheckedCreateNestedManyWithoutDomainInput
+    auditResults?: AuditResultUncheckedCreateNestedManyWithoutDomainInput
   }
 
   export type DomainCreateOrConnectWithoutCompetitorTrackingsInput = {
@@ -63166,6 +64814,7 @@ export namespace Prisma {
     semanticAnalyses?: SemanticAnalysisUpdateManyWithoutDomainNestedInput
     suggestedCompetitors?: SuggestedCompetitorUpdateManyWithoutDomainNestedInput
     campaigns?: CampaignUpdateManyWithoutDomainNestedInput
+    auditResults?: AuditResultUpdateManyWithoutDomainNestedInput
   }
 
   export type DomainUncheckedUpdateWithoutCompetitorTrackingsInput = {
@@ -63205,6 +64854,7 @@ export namespace Prisma {
     semanticAnalyses?: SemanticAnalysisUncheckedUpdateManyWithoutDomainNestedInput
     suggestedCompetitors?: SuggestedCompetitorUncheckedUpdateManyWithoutDomainNestedInput
     campaigns?: CampaignUncheckedUpdateManyWithoutDomainNestedInput
+    auditResults?: AuditResultUncheckedUpdateManyWithoutDomainNestedInput
   }
 
   export type DomainCreateWithoutPerformanceInsightsInput = {
@@ -63243,6 +64893,7 @@ export namespace Prisma {
     semanticAnalyses?: SemanticAnalysisCreateNestedManyWithoutDomainInput
     suggestedCompetitors?: SuggestedCompetitorCreateNestedManyWithoutDomainInput
     campaigns?: CampaignCreateNestedManyWithoutDomainInput
+    auditResults?: AuditResultCreateNestedManyWithoutDomainInput
   }
 
   export type DomainUncheckedCreateWithoutPerformanceInsightsInput = {
@@ -63282,6 +64933,7 @@ export namespace Prisma {
     semanticAnalyses?: SemanticAnalysisUncheckedCreateNestedManyWithoutDomainInput
     suggestedCompetitors?: SuggestedCompetitorUncheckedCreateNestedManyWithoutDomainInput
     campaigns?: CampaignUncheckedCreateNestedManyWithoutDomainInput
+    auditResults?: AuditResultUncheckedCreateNestedManyWithoutDomainInput
   }
 
   export type DomainCreateOrConnectWithoutPerformanceInsightsInput = {
@@ -63336,6 +64988,7 @@ export namespace Prisma {
     semanticAnalyses?: SemanticAnalysisUpdateManyWithoutDomainNestedInput
     suggestedCompetitors?: SuggestedCompetitorUpdateManyWithoutDomainNestedInput
     campaigns?: CampaignUpdateManyWithoutDomainNestedInput
+    auditResults?: AuditResultUpdateManyWithoutDomainNestedInput
   }
 
   export type DomainUncheckedUpdateWithoutPerformanceInsightsInput = {
@@ -63375,6 +65028,7 @@ export namespace Prisma {
     semanticAnalyses?: SemanticAnalysisUncheckedUpdateManyWithoutDomainNestedInput
     suggestedCompetitors?: SuggestedCompetitorUncheckedUpdateManyWithoutDomainNestedInput
     campaigns?: CampaignUncheckedUpdateManyWithoutDomainNestedInput
+    auditResults?: AuditResultUncheckedUpdateManyWithoutDomainNestedInput
   }
 
   export type DomainCreateWithoutDashboardAnalysesInput = {
@@ -63413,6 +65067,7 @@ export namespace Prisma {
     semanticAnalyses?: SemanticAnalysisCreateNestedManyWithoutDomainInput
     suggestedCompetitors?: SuggestedCompetitorCreateNestedManyWithoutDomainInput
     campaigns?: CampaignCreateNestedManyWithoutDomainInput
+    auditResults?: AuditResultCreateNestedManyWithoutDomainInput
   }
 
   export type DomainUncheckedCreateWithoutDashboardAnalysesInput = {
@@ -63452,6 +65107,7 @@ export namespace Prisma {
     semanticAnalyses?: SemanticAnalysisUncheckedCreateNestedManyWithoutDomainInput
     suggestedCompetitors?: SuggestedCompetitorUncheckedCreateNestedManyWithoutDomainInput
     campaigns?: CampaignUncheckedCreateNestedManyWithoutDomainInput
+    auditResults?: AuditResultUncheckedCreateNestedManyWithoutDomainInput
   }
 
   export type DomainCreateOrConnectWithoutDashboardAnalysesInput = {
@@ -63506,6 +65162,7 @@ export namespace Prisma {
     semanticAnalyses?: SemanticAnalysisUpdateManyWithoutDomainNestedInput
     suggestedCompetitors?: SuggestedCompetitorUpdateManyWithoutDomainNestedInput
     campaigns?: CampaignUpdateManyWithoutDomainNestedInput
+    auditResults?: AuditResultUpdateManyWithoutDomainNestedInput
   }
 
   export type DomainUncheckedUpdateWithoutDashboardAnalysesInput = {
@@ -63545,6 +65202,7 @@ export namespace Prisma {
     semanticAnalyses?: SemanticAnalysisUncheckedUpdateManyWithoutDomainNestedInput
     suggestedCompetitors?: SuggestedCompetitorUncheckedUpdateManyWithoutDomainNestedInput
     campaigns?: CampaignUncheckedUpdateManyWithoutDomainNestedInput
+    auditResults?: AuditResultUncheckedUpdateManyWithoutDomainNestedInput
   }
 
   export type DomainCreateWithoutCompetitorAnalysesInput = {
@@ -63583,6 +65241,7 @@ export namespace Prisma {
     semanticAnalyses?: SemanticAnalysisCreateNestedManyWithoutDomainInput
     suggestedCompetitors?: SuggestedCompetitorCreateNestedManyWithoutDomainInput
     campaigns?: CampaignCreateNestedManyWithoutDomainInput
+    auditResults?: AuditResultCreateNestedManyWithoutDomainInput
   }
 
   export type DomainUncheckedCreateWithoutCompetitorAnalysesInput = {
@@ -63622,6 +65281,7 @@ export namespace Prisma {
     semanticAnalyses?: SemanticAnalysisUncheckedCreateNestedManyWithoutDomainInput
     suggestedCompetitors?: SuggestedCompetitorUncheckedCreateNestedManyWithoutDomainInput
     campaigns?: CampaignUncheckedCreateNestedManyWithoutDomainInput
+    auditResults?: AuditResultUncheckedCreateNestedManyWithoutDomainInput
   }
 
   export type DomainCreateOrConnectWithoutCompetitorAnalysesInput = {
@@ -63676,6 +65336,7 @@ export namespace Prisma {
     semanticAnalyses?: SemanticAnalysisUpdateManyWithoutDomainNestedInput
     suggestedCompetitors?: SuggestedCompetitorUpdateManyWithoutDomainNestedInput
     campaigns?: CampaignUpdateManyWithoutDomainNestedInput
+    auditResults?: AuditResultUpdateManyWithoutDomainNestedInput
   }
 
   export type DomainUncheckedUpdateWithoutCompetitorAnalysesInput = {
@@ -63715,6 +65376,7 @@ export namespace Prisma {
     semanticAnalyses?: SemanticAnalysisUncheckedUpdateManyWithoutDomainNestedInput
     suggestedCompetitors?: SuggestedCompetitorUncheckedUpdateManyWithoutDomainNestedInput
     campaigns?: CampaignUncheckedUpdateManyWithoutDomainNestedInput
+    auditResults?: AuditResultUncheckedUpdateManyWithoutDomainNestedInput
   }
 
   export type DomainCreateWithoutSuggestedCompetitorsInput = {
@@ -63753,6 +65415,7 @@ export namespace Prisma {
     searchVolumeClassifications?: SearchVolumeClassificationCreateNestedManyWithoutDomainInput
     semanticAnalyses?: SemanticAnalysisCreateNestedManyWithoutDomainInput
     campaigns?: CampaignCreateNestedManyWithoutDomainInput
+    auditResults?: AuditResultCreateNestedManyWithoutDomainInput
   }
 
   export type DomainUncheckedCreateWithoutSuggestedCompetitorsInput = {
@@ -63792,6 +65455,7 @@ export namespace Prisma {
     searchVolumeClassifications?: SearchVolumeClassificationUncheckedCreateNestedManyWithoutDomainInput
     semanticAnalyses?: SemanticAnalysisUncheckedCreateNestedManyWithoutDomainInput
     campaigns?: CampaignUncheckedCreateNestedManyWithoutDomainInput
+    auditResults?: AuditResultUncheckedCreateNestedManyWithoutDomainInput
   }
 
   export type DomainCreateOrConnectWithoutSuggestedCompetitorsInput = {
@@ -63846,6 +65510,7 @@ export namespace Prisma {
     searchVolumeClassifications?: SearchVolumeClassificationUpdateManyWithoutDomainNestedInput
     semanticAnalyses?: SemanticAnalysisUpdateManyWithoutDomainNestedInput
     campaigns?: CampaignUpdateManyWithoutDomainNestedInput
+    auditResults?: AuditResultUpdateManyWithoutDomainNestedInput
   }
 
   export type DomainUncheckedUpdateWithoutSuggestedCompetitorsInput = {
@@ -63885,6 +65550,7 @@ export namespace Prisma {
     searchVolumeClassifications?: SearchVolumeClassificationUncheckedUpdateManyWithoutDomainNestedInput
     semanticAnalyses?: SemanticAnalysisUncheckedUpdateManyWithoutDomainNestedInput
     campaigns?: CampaignUncheckedUpdateManyWithoutDomainNestedInput
+    auditResults?: AuditResultUncheckedUpdateManyWithoutDomainNestedInput
   }
 
   export type DomainCreateWithoutAnalysisPhasesInput = {
@@ -63923,6 +65589,7 @@ export namespace Prisma {
     semanticAnalyses?: SemanticAnalysisCreateNestedManyWithoutDomainInput
     suggestedCompetitors?: SuggestedCompetitorCreateNestedManyWithoutDomainInput
     campaigns?: CampaignCreateNestedManyWithoutDomainInput
+    auditResults?: AuditResultCreateNestedManyWithoutDomainInput
   }
 
   export type DomainUncheckedCreateWithoutAnalysisPhasesInput = {
@@ -63962,6 +65629,7 @@ export namespace Prisma {
     semanticAnalyses?: SemanticAnalysisUncheckedCreateNestedManyWithoutDomainInput
     suggestedCompetitors?: SuggestedCompetitorUncheckedCreateNestedManyWithoutDomainInput
     campaigns?: CampaignUncheckedCreateNestedManyWithoutDomainInput
+    auditResults?: AuditResultUncheckedCreateNestedManyWithoutDomainInput
   }
 
   export type DomainCreateOrConnectWithoutAnalysisPhasesInput = {
@@ -64016,6 +65684,7 @@ export namespace Prisma {
     semanticAnalyses?: SemanticAnalysisUpdateManyWithoutDomainNestedInput
     suggestedCompetitors?: SuggestedCompetitorUpdateManyWithoutDomainNestedInput
     campaigns?: CampaignUpdateManyWithoutDomainNestedInput
+    auditResults?: AuditResultUpdateManyWithoutDomainNestedInput
   }
 
   export type DomainUncheckedUpdateWithoutAnalysisPhasesInput = {
@@ -64055,6 +65724,7 @@ export namespace Prisma {
     semanticAnalyses?: SemanticAnalysisUncheckedUpdateManyWithoutDomainNestedInput
     suggestedCompetitors?: SuggestedCompetitorUncheckedUpdateManyWithoutDomainNestedInput
     campaigns?: CampaignUncheckedUpdateManyWithoutDomainNestedInput
+    auditResults?: AuditResultUncheckedUpdateManyWithoutDomainNestedInput
   }
 
   export type DomainCreateWithoutSemanticAnalysesInput = {
@@ -64093,6 +65763,7 @@ export namespace Prisma {
     searchVolumeClassifications?: SearchVolumeClassificationCreateNestedManyWithoutDomainInput
     suggestedCompetitors?: SuggestedCompetitorCreateNestedManyWithoutDomainInput
     campaigns?: CampaignCreateNestedManyWithoutDomainInput
+    auditResults?: AuditResultCreateNestedManyWithoutDomainInput
   }
 
   export type DomainUncheckedCreateWithoutSemanticAnalysesInput = {
@@ -64132,6 +65803,7 @@ export namespace Prisma {
     searchVolumeClassifications?: SearchVolumeClassificationUncheckedCreateNestedManyWithoutDomainInput
     suggestedCompetitors?: SuggestedCompetitorUncheckedCreateNestedManyWithoutDomainInput
     campaigns?: CampaignUncheckedCreateNestedManyWithoutDomainInput
+    auditResults?: AuditResultUncheckedCreateNestedManyWithoutDomainInput
   }
 
   export type DomainCreateOrConnectWithoutSemanticAnalysesInput = {
@@ -64186,6 +65858,7 @@ export namespace Prisma {
     searchVolumeClassifications?: SearchVolumeClassificationUpdateManyWithoutDomainNestedInput
     suggestedCompetitors?: SuggestedCompetitorUpdateManyWithoutDomainNestedInput
     campaigns?: CampaignUpdateManyWithoutDomainNestedInput
+    auditResults?: AuditResultUpdateManyWithoutDomainNestedInput
   }
 
   export type DomainUncheckedUpdateWithoutSemanticAnalysesInput = {
@@ -64225,6 +65898,7 @@ export namespace Prisma {
     searchVolumeClassifications?: SearchVolumeClassificationUncheckedUpdateManyWithoutDomainNestedInput
     suggestedCompetitors?: SuggestedCompetitorUncheckedUpdateManyWithoutDomainNestedInput
     campaigns?: CampaignUncheckedUpdateManyWithoutDomainNestedInput
+    auditResults?: AuditResultUncheckedUpdateManyWithoutDomainNestedInput
   }
 
   export type DomainCreateWithoutKeywordAnalysesInput = {
@@ -64263,6 +65937,7 @@ export namespace Prisma {
     semanticAnalyses?: SemanticAnalysisCreateNestedManyWithoutDomainInput
     suggestedCompetitors?: SuggestedCompetitorCreateNestedManyWithoutDomainInput
     campaigns?: CampaignCreateNestedManyWithoutDomainInput
+    auditResults?: AuditResultCreateNestedManyWithoutDomainInput
   }
 
   export type DomainUncheckedCreateWithoutKeywordAnalysesInput = {
@@ -64302,6 +65977,7 @@ export namespace Prisma {
     semanticAnalyses?: SemanticAnalysisUncheckedCreateNestedManyWithoutDomainInput
     suggestedCompetitors?: SuggestedCompetitorUncheckedCreateNestedManyWithoutDomainInput
     campaigns?: CampaignUncheckedCreateNestedManyWithoutDomainInput
+    auditResults?: AuditResultUncheckedCreateNestedManyWithoutDomainInput
   }
 
   export type DomainCreateOrConnectWithoutKeywordAnalysesInput = {
@@ -64356,6 +66032,7 @@ export namespace Prisma {
     semanticAnalyses?: SemanticAnalysisUpdateManyWithoutDomainNestedInput
     suggestedCompetitors?: SuggestedCompetitorUpdateManyWithoutDomainNestedInput
     campaigns?: CampaignUpdateManyWithoutDomainNestedInput
+    auditResults?: AuditResultUpdateManyWithoutDomainNestedInput
   }
 
   export type DomainUncheckedUpdateWithoutKeywordAnalysesInput = {
@@ -64395,6 +66072,7 @@ export namespace Prisma {
     semanticAnalyses?: SemanticAnalysisUncheckedUpdateManyWithoutDomainNestedInput
     suggestedCompetitors?: SuggestedCompetitorUncheckedUpdateManyWithoutDomainNestedInput
     campaigns?: CampaignUncheckedUpdateManyWithoutDomainNestedInput
+    auditResults?: AuditResultUncheckedUpdateManyWithoutDomainNestedInput
   }
 
   export type DomainCreateWithoutSearchVolumeClassificationsInput = {
@@ -64433,6 +66111,7 @@ export namespace Prisma {
     semanticAnalyses?: SemanticAnalysisCreateNestedManyWithoutDomainInput
     suggestedCompetitors?: SuggestedCompetitorCreateNestedManyWithoutDomainInput
     campaigns?: CampaignCreateNestedManyWithoutDomainInput
+    auditResults?: AuditResultCreateNestedManyWithoutDomainInput
   }
 
   export type DomainUncheckedCreateWithoutSearchVolumeClassificationsInput = {
@@ -64472,6 +66151,7 @@ export namespace Prisma {
     semanticAnalyses?: SemanticAnalysisUncheckedCreateNestedManyWithoutDomainInput
     suggestedCompetitors?: SuggestedCompetitorUncheckedCreateNestedManyWithoutDomainInput
     campaigns?: CampaignUncheckedCreateNestedManyWithoutDomainInput
+    auditResults?: AuditResultUncheckedCreateNestedManyWithoutDomainInput
   }
 
   export type DomainCreateOrConnectWithoutSearchVolumeClassificationsInput = {
@@ -64526,6 +66206,7 @@ export namespace Prisma {
     semanticAnalyses?: SemanticAnalysisUpdateManyWithoutDomainNestedInput
     suggestedCompetitors?: SuggestedCompetitorUpdateManyWithoutDomainNestedInput
     campaigns?: CampaignUpdateManyWithoutDomainNestedInput
+    auditResults?: AuditResultUpdateManyWithoutDomainNestedInput
   }
 
   export type DomainUncheckedUpdateWithoutSearchVolumeClassificationsInput = {
@@ -64565,6 +66246,7 @@ export namespace Prisma {
     semanticAnalyses?: SemanticAnalysisUncheckedUpdateManyWithoutDomainNestedInput
     suggestedCompetitors?: SuggestedCompetitorUncheckedUpdateManyWithoutDomainNestedInput
     campaigns?: CampaignUncheckedUpdateManyWithoutDomainNestedInput
+    auditResults?: AuditResultUncheckedUpdateManyWithoutDomainNestedInput
   }
 
   export type DomainCreateWithoutIntentClassificationsInput = {
@@ -64603,6 +66285,7 @@ export namespace Prisma {
     semanticAnalyses?: SemanticAnalysisCreateNestedManyWithoutDomainInput
     suggestedCompetitors?: SuggestedCompetitorCreateNestedManyWithoutDomainInput
     campaigns?: CampaignCreateNestedManyWithoutDomainInput
+    auditResults?: AuditResultCreateNestedManyWithoutDomainInput
   }
 
   export type DomainUncheckedCreateWithoutIntentClassificationsInput = {
@@ -64642,6 +66325,7 @@ export namespace Prisma {
     semanticAnalyses?: SemanticAnalysisUncheckedCreateNestedManyWithoutDomainInput
     suggestedCompetitors?: SuggestedCompetitorUncheckedCreateNestedManyWithoutDomainInput
     campaigns?: CampaignUncheckedCreateNestedManyWithoutDomainInput
+    auditResults?: AuditResultUncheckedCreateNestedManyWithoutDomainInput
   }
 
   export type DomainCreateOrConnectWithoutIntentClassificationsInput = {
@@ -64696,6 +66380,7 @@ export namespace Prisma {
     semanticAnalyses?: SemanticAnalysisUpdateManyWithoutDomainNestedInput
     suggestedCompetitors?: SuggestedCompetitorUpdateManyWithoutDomainNestedInput
     campaigns?: CampaignUpdateManyWithoutDomainNestedInput
+    auditResults?: AuditResultUpdateManyWithoutDomainNestedInput
   }
 
   export type DomainUncheckedUpdateWithoutIntentClassificationsInput = {
@@ -64735,6 +66420,7 @@ export namespace Prisma {
     semanticAnalyses?: SemanticAnalysisUncheckedUpdateManyWithoutDomainNestedInput
     suggestedCompetitors?: SuggestedCompetitorUncheckedUpdateManyWithoutDomainNestedInput
     campaigns?: CampaignUncheckedUpdateManyWithoutDomainNestedInput
+    auditResults?: AuditResultUncheckedUpdateManyWithoutDomainNestedInput
   }
 
   export type DomainCreateWithoutCommunityInsightsInput = {
@@ -64773,6 +66459,7 @@ export namespace Prisma {
     semanticAnalyses?: SemanticAnalysisCreateNestedManyWithoutDomainInput
     suggestedCompetitors?: SuggestedCompetitorCreateNestedManyWithoutDomainInput
     campaigns?: CampaignCreateNestedManyWithoutDomainInput
+    auditResults?: AuditResultCreateNestedManyWithoutDomainInput
   }
 
   export type DomainUncheckedCreateWithoutCommunityInsightsInput = {
@@ -64812,6 +66499,7 @@ export namespace Prisma {
     semanticAnalyses?: SemanticAnalysisUncheckedCreateNestedManyWithoutDomainInput
     suggestedCompetitors?: SuggestedCompetitorUncheckedCreateNestedManyWithoutDomainInput
     campaigns?: CampaignUncheckedCreateNestedManyWithoutDomainInput
+    auditResults?: AuditResultUncheckedCreateNestedManyWithoutDomainInput
   }
 
   export type DomainCreateOrConnectWithoutCommunityInsightsInput = {
@@ -64910,6 +66598,7 @@ export namespace Prisma {
     semanticAnalyses?: SemanticAnalysisUpdateManyWithoutDomainNestedInput
     suggestedCompetitors?: SuggestedCompetitorUpdateManyWithoutDomainNestedInput
     campaigns?: CampaignUpdateManyWithoutDomainNestedInput
+    auditResults?: AuditResultUpdateManyWithoutDomainNestedInput
   }
 
   export type DomainUncheckedUpdateWithoutCommunityInsightsInput = {
@@ -64949,6 +66638,7 @@ export namespace Prisma {
     semanticAnalyses?: SemanticAnalysisUncheckedUpdateManyWithoutDomainNestedInput
     suggestedCompetitors?: SuggestedCompetitorUncheckedUpdateManyWithoutDomainNestedInput
     campaigns?: CampaignUncheckedUpdateManyWithoutDomainNestedInput
+    auditResults?: AuditResultUncheckedUpdateManyWithoutDomainNestedInput
   }
 
   export type KeywordUpsertWithoutCommunityInsightsInput = {
@@ -65037,6 +66727,7 @@ export namespace Prisma {
     semanticAnalyses?: SemanticAnalysisCreateNestedManyWithoutDomainInput
     suggestedCompetitors?: SuggestedCompetitorCreateNestedManyWithoutDomainInput
     campaigns?: CampaignCreateNestedManyWithoutDomainInput
+    auditResults?: AuditResultCreateNestedManyWithoutDomainInput
   }
 
   export type DomainUncheckedCreateWithoutSearchPatternsInput = {
@@ -65076,6 +66767,7 @@ export namespace Prisma {
     semanticAnalyses?: SemanticAnalysisUncheckedCreateNestedManyWithoutDomainInput
     suggestedCompetitors?: SuggestedCompetitorUncheckedCreateNestedManyWithoutDomainInput
     campaigns?: CampaignUncheckedCreateNestedManyWithoutDomainInput
+    auditResults?: AuditResultUncheckedCreateNestedManyWithoutDomainInput
   }
 
   export type DomainCreateOrConnectWithoutSearchPatternsInput = {
@@ -65174,6 +66866,7 @@ export namespace Prisma {
     semanticAnalyses?: SemanticAnalysisUpdateManyWithoutDomainNestedInput
     suggestedCompetitors?: SuggestedCompetitorUpdateManyWithoutDomainNestedInput
     campaigns?: CampaignUpdateManyWithoutDomainNestedInput
+    auditResults?: AuditResultUpdateManyWithoutDomainNestedInput
   }
 
   export type DomainUncheckedUpdateWithoutSearchPatternsInput = {
@@ -65213,6 +66906,7 @@ export namespace Prisma {
     semanticAnalyses?: SemanticAnalysisUncheckedUpdateManyWithoutDomainNestedInput
     suggestedCompetitors?: SuggestedCompetitorUncheckedUpdateManyWithoutDomainNestedInput
     campaigns?: CampaignUncheckedUpdateManyWithoutDomainNestedInput
+    auditResults?: AuditResultUncheckedUpdateManyWithoutDomainNestedInput
   }
 
   export type KeywordUpsertWithoutSearchPatternsInput = {
@@ -65977,6 +67671,7 @@ export namespace Prisma {
     semanticAnalyses?: SemanticAnalysisCreateNestedManyWithoutDomainInput
     suggestedCompetitors?: SuggestedCompetitorCreateNestedManyWithoutDomainInput
     campaigns?: CampaignCreateNestedManyWithoutDomainInput
+    auditResults?: AuditResultCreateNestedManyWithoutDomainInput
   }
 
   export type DomainUncheckedCreateWithoutIntentPhraseGenerationsInput = {
@@ -66016,6 +67711,7 @@ export namespace Prisma {
     semanticAnalyses?: SemanticAnalysisUncheckedCreateNestedManyWithoutDomainInput
     suggestedCompetitors?: SuggestedCompetitorUncheckedCreateNestedManyWithoutDomainInput
     campaigns?: CampaignUncheckedCreateNestedManyWithoutDomainInput
+    auditResults?: AuditResultUncheckedCreateNestedManyWithoutDomainInput
   }
 
   export type DomainCreateOrConnectWithoutIntentPhraseGenerationsInput = {
@@ -66070,6 +67766,7 @@ export namespace Prisma {
     semanticAnalyses?: SemanticAnalysisUpdateManyWithoutDomainNestedInput
     suggestedCompetitors?: SuggestedCompetitorUpdateManyWithoutDomainNestedInput
     campaigns?: CampaignUpdateManyWithoutDomainNestedInput
+    auditResults?: AuditResultUpdateManyWithoutDomainNestedInput
   }
 
   export type DomainUncheckedUpdateWithoutIntentPhraseGenerationsInput = {
@@ -66109,6 +67806,7 @@ export namespace Prisma {
     semanticAnalyses?: SemanticAnalysisUncheckedUpdateManyWithoutDomainNestedInput
     suggestedCompetitors?: SuggestedCompetitorUncheckedUpdateManyWithoutDomainNestedInput
     campaigns?: CampaignUncheckedUpdateManyWithoutDomainNestedInput
+    auditResults?: AuditResultUncheckedUpdateManyWithoutDomainNestedInput
   }
 
   export type DomainCreateWithoutCommunityMiningResultsInput = {
@@ -66147,6 +67845,7 @@ export namespace Prisma {
     semanticAnalyses?: SemanticAnalysisCreateNestedManyWithoutDomainInput
     suggestedCompetitors?: SuggestedCompetitorCreateNestedManyWithoutDomainInput
     campaigns?: CampaignCreateNestedManyWithoutDomainInput
+    auditResults?: AuditResultCreateNestedManyWithoutDomainInput
   }
 
   export type DomainUncheckedCreateWithoutCommunityMiningResultsInput = {
@@ -66186,6 +67885,7 @@ export namespace Prisma {
     semanticAnalyses?: SemanticAnalysisUncheckedCreateNestedManyWithoutDomainInput
     suggestedCompetitors?: SuggestedCompetitorUncheckedCreateNestedManyWithoutDomainInput
     campaigns?: CampaignUncheckedCreateNestedManyWithoutDomainInput
+    auditResults?: AuditResultUncheckedCreateNestedManyWithoutDomainInput
   }
 
   export type DomainCreateOrConnectWithoutCommunityMiningResultsInput = {
@@ -66284,6 +67984,7 @@ export namespace Prisma {
     semanticAnalyses?: SemanticAnalysisUpdateManyWithoutDomainNestedInput
     suggestedCompetitors?: SuggestedCompetitorUpdateManyWithoutDomainNestedInput
     campaigns?: CampaignUpdateManyWithoutDomainNestedInput
+    auditResults?: AuditResultUpdateManyWithoutDomainNestedInput
   }
 
   export type DomainUncheckedUpdateWithoutCommunityMiningResultsInput = {
@@ -66323,6 +68024,7 @@ export namespace Prisma {
     semanticAnalyses?: SemanticAnalysisUncheckedUpdateManyWithoutDomainNestedInput
     suggestedCompetitors?: SuggestedCompetitorUncheckedUpdateManyWithoutDomainNestedInput
     campaigns?: CampaignUncheckedUpdateManyWithoutDomainNestedInput
+    auditResults?: AuditResultUncheckedUpdateManyWithoutDomainNestedInput
   }
 
   export type KeywordUpsertWithoutCommunityMiningResultsInput = {
@@ -66411,6 +68113,7 @@ export namespace Prisma {
     semanticAnalyses?: SemanticAnalysisCreateNestedManyWithoutDomainInput
     suggestedCompetitors?: SuggestedCompetitorCreateNestedManyWithoutDomainInput
     campaigns?: CampaignCreateNestedManyWithoutDomainInput
+    auditResults?: AuditResultCreateNestedManyWithoutDomainInput
   }
 
   export type DomainUncheckedCreateWithoutSearchPatternResultsInput = {
@@ -66450,6 +68153,7 @@ export namespace Prisma {
     semanticAnalyses?: SemanticAnalysisUncheckedCreateNestedManyWithoutDomainInput
     suggestedCompetitors?: SuggestedCompetitorUncheckedCreateNestedManyWithoutDomainInput
     campaigns?: CampaignUncheckedCreateNestedManyWithoutDomainInput
+    auditResults?: AuditResultUncheckedCreateNestedManyWithoutDomainInput
   }
 
   export type DomainCreateOrConnectWithoutSearchPatternResultsInput = {
@@ -66548,6 +68252,7 @@ export namespace Prisma {
     semanticAnalyses?: SemanticAnalysisUpdateManyWithoutDomainNestedInput
     suggestedCompetitors?: SuggestedCompetitorUpdateManyWithoutDomainNestedInput
     campaigns?: CampaignUpdateManyWithoutDomainNestedInput
+    auditResults?: AuditResultUpdateManyWithoutDomainNestedInput
   }
 
   export type DomainUncheckedUpdateWithoutSearchPatternResultsInput = {
@@ -66587,6 +68292,7 @@ export namespace Prisma {
     semanticAnalyses?: SemanticAnalysisUncheckedUpdateManyWithoutDomainNestedInput
     suggestedCompetitors?: SuggestedCompetitorUncheckedUpdateManyWithoutDomainNestedInput
     campaigns?: CampaignUncheckedUpdateManyWithoutDomainNestedInput
+    auditResults?: AuditResultUncheckedUpdateManyWithoutDomainNestedInput
   }
 
   export type KeywordUpsertWithoutSearchPatternResultsInput = {
@@ -66675,6 +68381,7 @@ export namespace Prisma {
     semanticAnalyses?: SemanticAnalysisCreateNestedManyWithoutDomainInput
     suggestedCompetitors?: SuggestedCompetitorCreateNestedManyWithoutDomainInput
     campaigns?: CampaignCreateNestedManyWithoutDomainInput
+    auditResults?: AuditResultCreateNestedManyWithoutDomainInput
   }
 
   export type DomainUncheckedCreateWithoutIntentClassificationResultsInput = {
@@ -66714,6 +68421,7 @@ export namespace Prisma {
     semanticAnalyses?: SemanticAnalysisUncheckedCreateNestedManyWithoutDomainInput
     suggestedCompetitors?: SuggestedCompetitorUncheckedCreateNestedManyWithoutDomainInput
     campaigns?: CampaignUncheckedCreateNestedManyWithoutDomainInput
+    auditResults?: AuditResultUncheckedCreateNestedManyWithoutDomainInput
   }
 
   export type DomainCreateOrConnectWithoutIntentClassificationResultsInput = {
@@ -66812,6 +68520,7 @@ export namespace Prisma {
     semanticAnalyses?: SemanticAnalysisUpdateManyWithoutDomainNestedInput
     suggestedCompetitors?: SuggestedCompetitorUpdateManyWithoutDomainNestedInput
     campaigns?: CampaignUpdateManyWithoutDomainNestedInput
+    auditResults?: AuditResultUpdateManyWithoutDomainNestedInput
   }
 
   export type DomainUncheckedUpdateWithoutIntentClassificationResultsInput = {
@@ -66851,6 +68560,7 @@ export namespace Prisma {
     semanticAnalyses?: SemanticAnalysisUncheckedUpdateManyWithoutDomainNestedInput
     suggestedCompetitors?: SuggestedCompetitorUncheckedUpdateManyWithoutDomainNestedInput
     campaigns?: CampaignUncheckedUpdateManyWithoutDomainNestedInput
+    auditResults?: AuditResultUncheckedUpdateManyWithoutDomainNestedInput
   }
 
   export type KeywordUpsertWithoutIntentClassificationResultsInput = {
@@ -67022,6 +68732,7 @@ export namespace Prisma {
     semanticAnalyses?: SemanticAnalysisCreateNestedManyWithoutDomainInput
     suggestedCompetitors?: SuggestedCompetitorCreateNestedManyWithoutDomainInput
     campaigns?: CampaignCreateNestedManyWithoutDomainInput
+    auditResults?: AuditResultCreateNestedManyWithoutDomainInput
   }
 
   export type DomainUncheckedCreateWithoutGeneratedIntentPhrasesInput = {
@@ -67061,6 +68772,7 @@ export namespace Prisma {
     semanticAnalyses?: SemanticAnalysisUncheckedCreateNestedManyWithoutDomainInput
     suggestedCompetitors?: SuggestedCompetitorUncheckedCreateNestedManyWithoutDomainInput
     campaigns?: CampaignUncheckedCreateNestedManyWithoutDomainInput
+    auditResults?: AuditResultUncheckedCreateNestedManyWithoutDomainInput
   }
 
   export type DomainCreateOrConnectWithoutGeneratedIntentPhrasesInput = {
@@ -67245,6 +68957,7 @@ export namespace Prisma {
     semanticAnalyses?: SemanticAnalysisUpdateManyWithoutDomainNestedInput
     suggestedCompetitors?: SuggestedCompetitorUpdateManyWithoutDomainNestedInput
     campaigns?: CampaignUpdateManyWithoutDomainNestedInput
+    auditResults?: AuditResultUpdateManyWithoutDomainNestedInput
   }
 
   export type DomainUncheckedUpdateWithoutGeneratedIntentPhrasesInput = {
@@ -67284,6 +68997,7 @@ export namespace Prisma {
     semanticAnalyses?: SemanticAnalysisUncheckedUpdateManyWithoutDomainNestedInput
     suggestedCompetitors?: SuggestedCompetitorUncheckedUpdateManyWithoutDomainNestedInput
     campaigns?: CampaignUncheckedUpdateManyWithoutDomainNestedInput
+    auditResults?: AuditResultUncheckedUpdateManyWithoutDomainNestedInput
   }
 
   export type KeywordUpsertWithoutGeneratedIntentPhrasesInput = {
@@ -67388,6 +69102,7 @@ export namespace Prisma {
     semanticAnalyses?: SemanticAnalysisCreateNestedManyWithoutDomainInput
     suggestedCompetitors?: SuggestedCompetitorCreateNestedManyWithoutDomainInput
     campaigns?: CampaignCreateNestedManyWithoutDomainInput
+    auditResults?: AuditResultCreateNestedManyWithoutDomainInput
   }
 
   export type DomainUncheckedCreateWithoutRelevanceScoreResultsInput = {
@@ -67427,6 +69142,7 @@ export namespace Prisma {
     semanticAnalyses?: SemanticAnalysisUncheckedCreateNestedManyWithoutDomainInput
     suggestedCompetitors?: SuggestedCompetitorUncheckedCreateNestedManyWithoutDomainInput
     campaigns?: CampaignUncheckedCreateNestedManyWithoutDomainInput
+    auditResults?: AuditResultUncheckedCreateNestedManyWithoutDomainInput
   }
 
   export type DomainCreateOrConnectWithoutRelevanceScoreResultsInput = {
@@ -67523,6 +69239,7 @@ export namespace Prisma {
     semanticAnalyses?: SemanticAnalysisUpdateManyWithoutDomainNestedInput
     suggestedCompetitors?: SuggestedCompetitorUpdateManyWithoutDomainNestedInput
     campaigns?: CampaignUpdateManyWithoutDomainNestedInput
+    auditResults?: AuditResultUpdateManyWithoutDomainNestedInput
   }
 
   export type DomainUncheckedUpdateWithoutRelevanceScoreResultsInput = {
@@ -67562,6 +69279,7 @@ export namespace Prisma {
     semanticAnalyses?: SemanticAnalysisUncheckedUpdateManyWithoutDomainNestedInput
     suggestedCompetitors?: SuggestedCompetitorUncheckedUpdateManyWithoutDomainNestedInput
     campaigns?: CampaignUncheckedUpdateManyWithoutDomainNestedInput
+    auditResults?: AuditResultUncheckedUpdateManyWithoutDomainNestedInput
   }
 
   export type GeneratedIntentPhraseUpsertWithoutRelevanceScoreResultsInput = {
@@ -67722,6 +69440,7 @@ export namespace Prisma {
     searchVolumeClassifications?: SearchVolumeClassificationCreateNestedManyWithoutDomainInput
     semanticAnalyses?: SemanticAnalysisCreateNestedManyWithoutDomainInput
     suggestedCompetitors?: SuggestedCompetitorCreateNestedManyWithoutDomainInput
+    auditResults?: AuditResultCreateNestedManyWithoutDomainInput
   }
 
   export type DomainUncheckedCreateWithoutCampaignsInput = {
@@ -67761,6 +69480,7 @@ export namespace Prisma {
     searchVolumeClassifications?: SearchVolumeClassificationUncheckedCreateNestedManyWithoutDomainInput
     semanticAnalyses?: SemanticAnalysisUncheckedCreateNestedManyWithoutDomainInput
     suggestedCompetitors?: SuggestedCompetitorUncheckedCreateNestedManyWithoutDomainInput
+    auditResults?: AuditResultUncheckedCreateNestedManyWithoutDomainInput
   }
 
   export type DomainCreateOrConnectWithoutCampaignsInput = {
@@ -67854,6 +69574,7 @@ export namespace Prisma {
     searchVolumeClassifications?: SearchVolumeClassificationUpdateManyWithoutDomainNestedInput
     semanticAnalyses?: SemanticAnalysisUpdateManyWithoutDomainNestedInput
     suggestedCompetitors?: SuggestedCompetitorUpdateManyWithoutDomainNestedInput
+    auditResults?: AuditResultUpdateManyWithoutDomainNestedInput
   }
 
   export type DomainUncheckedUpdateWithoutCampaignsInput = {
@@ -67893,6 +69614,7 @@ export namespace Prisma {
     searchVolumeClassifications?: SearchVolumeClassificationUncheckedUpdateManyWithoutDomainNestedInput
     semanticAnalyses?: SemanticAnalysisUncheckedUpdateManyWithoutDomainNestedInput
     suggestedCompetitors?: SuggestedCompetitorUncheckedUpdateManyWithoutDomainNestedInput
+    auditResults?: AuditResultUncheckedUpdateManyWithoutDomainNestedInput
   }
 
   export type CampaignTopicUpsertWithWhereUniqueWithoutCampaignInput = {
@@ -68448,6 +70170,180 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
+  export type DomainCreateWithoutAuditResultsInput = {
+    url: string
+    context?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    location?: string | null
+    chatModel?: string | null
+    customKeywords?: string | null
+    intentPhrases?: string | null
+    runAllModels?: boolean
+    locationContext?: string | null
+    currentStep?: number
+    isCompanyDomain?: boolean
+    analysisPhases?: AnalysisPhaseCreateNestedManyWithoutDomainInput
+    analysisReports?: AnalysisReportCreateNestedManyWithoutDomainInput
+    communityInsights?: CommunityInsightCreateNestedManyWithoutDomainInput
+    communityMiningResults?: CommunityMiningResultCreateNestedManyWithoutDomainInput
+    competitorAnalyses?: CompetitorAnalysisCreateNestedManyWithoutDomainInput
+    competitorTrackings?: CompetitorTrackingCreateNestedManyWithoutDomainInput
+    crawlResults?: CrawlResultCreateNestedManyWithoutDomainInput
+    dashboardAnalyses?: DashboardAnalysisCreateNestedManyWithoutDomainInput
+    user?: UserCreateNestedOneWithoutDomainsInput
+    generatedIntentPhrases?: GeneratedIntentPhraseCreateNestedManyWithoutDomainInput
+    intentClassifications?: IntentClassificationCreateNestedManyWithoutDomainInput
+    intentClassificationResults?: IntentClassificationResultCreateNestedManyWithoutDomainInput
+    intentPhraseGenerations?: IntentPhraseGenerationCreateNestedManyWithoutDomainInput
+    keywords?: KeywordCreateNestedManyWithoutDomainInput
+    keywordAnalyses?: KeywordAnalysisCreateNestedManyWithoutDomainInput
+    modelPerformances?: ModelPerformanceCreateNestedManyWithoutDomainInput
+    performanceInsights?: PerformanceInsightCreateNestedManyWithoutDomainInput
+    relevanceScoreResults?: RelevanceScoreResultCreateNestedManyWithoutDomainInput
+    searchPatterns?: SearchPatternCreateNestedManyWithoutDomainInput
+    searchPatternResults?: SearchPatternResultCreateNestedManyWithoutDomainInput
+    searchVolumeClassifications?: SearchVolumeClassificationCreateNestedManyWithoutDomainInput
+    semanticAnalyses?: SemanticAnalysisCreateNestedManyWithoutDomainInput
+    suggestedCompetitors?: SuggestedCompetitorCreateNestedManyWithoutDomainInput
+    campaigns?: CampaignCreateNestedManyWithoutDomainInput
+  }
+
+  export type DomainUncheckedCreateWithoutAuditResultsInput = {
+    id?: number
+    url: string
+    context?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    userId?: number | null
+    location?: string | null
+    chatModel?: string | null
+    customKeywords?: string | null
+    intentPhrases?: string | null
+    runAllModels?: boolean
+    locationContext?: string | null
+    currentStep?: number
+    isCompanyDomain?: boolean
+    analysisPhases?: AnalysisPhaseUncheckedCreateNestedManyWithoutDomainInput
+    analysisReports?: AnalysisReportUncheckedCreateNestedManyWithoutDomainInput
+    communityInsights?: CommunityInsightUncheckedCreateNestedManyWithoutDomainInput
+    communityMiningResults?: CommunityMiningResultUncheckedCreateNestedManyWithoutDomainInput
+    competitorAnalyses?: CompetitorAnalysisUncheckedCreateNestedManyWithoutDomainInput
+    competitorTrackings?: CompetitorTrackingUncheckedCreateNestedManyWithoutDomainInput
+    crawlResults?: CrawlResultUncheckedCreateNestedManyWithoutDomainInput
+    dashboardAnalyses?: DashboardAnalysisUncheckedCreateNestedManyWithoutDomainInput
+    generatedIntentPhrases?: GeneratedIntentPhraseUncheckedCreateNestedManyWithoutDomainInput
+    intentClassifications?: IntentClassificationUncheckedCreateNestedManyWithoutDomainInput
+    intentClassificationResults?: IntentClassificationResultUncheckedCreateNestedManyWithoutDomainInput
+    intentPhraseGenerations?: IntentPhraseGenerationUncheckedCreateNestedManyWithoutDomainInput
+    keywords?: KeywordUncheckedCreateNestedManyWithoutDomainInput
+    keywordAnalyses?: KeywordAnalysisUncheckedCreateNestedManyWithoutDomainInput
+    modelPerformances?: ModelPerformanceUncheckedCreateNestedManyWithoutDomainInput
+    performanceInsights?: PerformanceInsightUncheckedCreateNestedManyWithoutDomainInput
+    relevanceScoreResults?: RelevanceScoreResultUncheckedCreateNestedManyWithoutDomainInput
+    searchPatterns?: SearchPatternUncheckedCreateNestedManyWithoutDomainInput
+    searchPatternResults?: SearchPatternResultUncheckedCreateNestedManyWithoutDomainInput
+    searchVolumeClassifications?: SearchVolumeClassificationUncheckedCreateNestedManyWithoutDomainInput
+    semanticAnalyses?: SemanticAnalysisUncheckedCreateNestedManyWithoutDomainInput
+    suggestedCompetitors?: SuggestedCompetitorUncheckedCreateNestedManyWithoutDomainInput
+    campaigns?: CampaignUncheckedCreateNestedManyWithoutDomainInput
+  }
+
+  export type DomainCreateOrConnectWithoutAuditResultsInput = {
+    where: DomainWhereUniqueInput
+    create: XOR<DomainCreateWithoutAuditResultsInput, DomainUncheckedCreateWithoutAuditResultsInput>
+  }
+
+  export type DomainUpsertWithoutAuditResultsInput = {
+    update: XOR<DomainUpdateWithoutAuditResultsInput, DomainUncheckedUpdateWithoutAuditResultsInput>
+    create: XOR<DomainCreateWithoutAuditResultsInput, DomainUncheckedCreateWithoutAuditResultsInput>
+    where?: DomainWhereInput
+  }
+
+  export type DomainUpdateToOneWithWhereWithoutAuditResultsInput = {
+    where?: DomainWhereInput
+    data: XOR<DomainUpdateWithoutAuditResultsInput, DomainUncheckedUpdateWithoutAuditResultsInput>
+  }
+
+  export type DomainUpdateWithoutAuditResultsInput = {
+    url?: StringFieldUpdateOperationsInput | string
+    context?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    location?: NullableStringFieldUpdateOperationsInput | string | null
+    chatModel?: NullableStringFieldUpdateOperationsInput | string | null
+    customKeywords?: NullableStringFieldUpdateOperationsInput | string | null
+    intentPhrases?: NullableStringFieldUpdateOperationsInput | string | null
+    runAllModels?: BoolFieldUpdateOperationsInput | boolean
+    locationContext?: NullableStringFieldUpdateOperationsInput | string | null
+    currentStep?: IntFieldUpdateOperationsInput | number
+    isCompanyDomain?: BoolFieldUpdateOperationsInput | boolean
+    analysisPhases?: AnalysisPhaseUpdateManyWithoutDomainNestedInput
+    analysisReports?: AnalysisReportUpdateManyWithoutDomainNestedInput
+    communityInsights?: CommunityInsightUpdateManyWithoutDomainNestedInput
+    communityMiningResults?: CommunityMiningResultUpdateManyWithoutDomainNestedInput
+    competitorAnalyses?: CompetitorAnalysisUpdateManyWithoutDomainNestedInput
+    competitorTrackings?: CompetitorTrackingUpdateManyWithoutDomainNestedInput
+    crawlResults?: CrawlResultUpdateManyWithoutDomainNestedInput
+    dashboardAnalyses?: DashboardAnalysisUpdateManyWithoutDomainNestedInput
+    user?: UserUpdateOneWithoutDomainsNestedInput
+    generatedIntentPhrases?: GeneratedIntentPhraseUpdateManyWithoutDomainNestedInput
+    intentClassifications?: IntentClassificationUpdateManyWithoutDomainNestedInput
+    intentClassificationResults?: IntentClassificationResultUpdateManyWithoutDomainNestedInput
+    intentPhraseGenerations?: IntentPhraseGenerationUpdateManyWithoutDomainNestedInput
+    keywords?: KeywordUpdateManyWithoutDomainNestedInput
+    keywordAnalyses?: KeywordAnalysisUpdateManyWithoutDomainNestedInput
+    modelPerformances?: ModelPerformanceUpdateManyWithoutDomainNestedInput
+    performanceInsights?: PerformanceInsightUpdateManyWithoutDomainNestedInput
+    relevanceScoreResults?: RelevanceScoreResultUpdateManyWithoutDomainNestedInput
+    searchPatterns?: SearchPatternUpdateManyWithoutDomainNestedInput
+    searchPatternResults?: SearchPatternResultUpdateManyWithoutDomainNestedInput
+    searchVolumeClassifications?: SearchVolumeClassificationUpdateManyWithoutDomainNestedInput
+    semanticAnalyses?: SemanticAnalysisUpdateManyWithoutDomainNestedInput
+    suggestedCompetitors?: SuggestedCompetitorUpdateManyWithoutDomainNestedInput
+    campaigns?: CampaignUpdateManyWithoutDomainNestedInput
+  }
+
+  export type DomainUncheckedUpdateWithoutAuditResultsInput = {
+    id?: IntFieldUpdateOperationsInput | number
+    url?: StringFieldUpdateOperationsInput | string
+    context?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    userId?: NullableIntFieldUpdateOperationsInput | number | null
+    location?: NullableStringFieldUpdateOperationsInput | string | null
+    chatModel?: NullableStringFieldUpdateOperationsInput | string | null
+    customKeywords?: NullableStringFieldUpdateOperationsInput | string | null
+    intentPhrases?: NullableStringFieldUpdateOperationsInput | string | null
+    runAllModels?: BoolFieldUpdateOperationsInput | boolean
+    locationContext?: NullableStringFieldUpdateOperationsInput | string | null
+    currentStep?: IntFieldUpdateOperationsInput | number
+    isCompanyDomain?: BoolFieldUpdateOperationsInput | boolean
+    analysisPhases?: AnalysisPhaseUncheckedUpdateManyWithoutDomainNestedInput
+    analysisReports?: AnalysisReportUncheckedUpdateManyWithoutDomainNestedInput
+    communityInsights?: CommunityInsightUncheckedUpdateManyWithoutDomainNestedInput
+    communityMiningResults?: CommunityMiningResultUncheckedUpdateManyWithoutDomainNestedInput
+    competitorAnalyses?: CompetitorAnalysisUncheckedUpdateManyWithoutDomainNestedInput
+    competitorTrackings?: CompetitorTrackingUncheckedUpdateManyWithoutDomainNestedInput
+    crawlResults?: CrawlResultUncheckedUpdateManyWithoutDomainNestedInput
+    dashboardAnalyses?: DashboardAnalysisUncheckedUpdateManyWithoutDomainNestedInput
+    generatedIntentPhrases?: GeneratedIntentPhraseUncheckedUpdateManyWithoutDomainNestedInput
+    intentClassifications?: IntentClassificationUncheckedUpdateManyWithoutDomainNestedInput
+    intentClassificationResults?: IntentClassificationResultUncheckedUpdateManyWithoutDomainNestedInput
+    intentPhraseGenerations?: IntentPhraseGenerationUncheckedUpdateManyWithoutDomainNestedInput
+    keywords?: KeywordUncheckedUpdateManyWithoutDomainNestedInput
+    keywordAnalyses?: KeywordAnalysisUncheckedUpdateManyWithoutDomainNestedInput
+    modelPerformances?: ModelPerformanceUncheckedUpdateManyWithoutDomainNestedInput
+    performanceInsights?: PerformanceInsightUncheckedUpdateManyWithoutDomainNestedInput
+    relevanceScoreResults?: RelevanceScoreResultUncheckedUpdateManyWithoutDomainNestedInput
+    searchPatterns?: SearchPatternUncheckedUpdateManyWithoutDomainNestedInput
+    searchPatternResults?: SearchPatternResultUncheckedUpdateManyWithoutDomainNestedInput
+    searchVolumeClassifications?: SearchVolumeClassificationUncheckedUpdateManyWithoutDomainNestedInput
+    semanticAnalyses?: SemanticAnalysisUncheckedUpdateManyWithoutDomainNestedInput
+    suggestedCompetitors?: SuggestedCompetitorUncheckedUpdateManyWithoutDomainNestedInput
+    campaigns?: CampaignUncheckedUpdateManyWithoutDomainNestedInput
+  }
+
   export type DomainCreateManyUserInput = {
     id?: number
     url: string
@@ -68521,6 +70417,7 @@ export namespace Prisma {
     semanticAnalyses?: SemanticAnalysisUpdateManyWithoutDomainNestedInput
     suggestedCompetitors?: SuggestedCompetitorUpdateManyWithoutDomainNestedInput
     campaigns?: CampaignUpdateManyWithoutDomainNestedInput
+    auditResults?: AuditResultUpdateManyWithoutDomainNestedInput
   }
 
   export type DomainUncheckedUpdateWithoutUserInput = {
@@ -68560,6 +70457,7 @@ export namespace Prisma {
     semanticAnalyses?: SemanticAnalysisUncheckedUpdateManyWithoutDomainNestedInput
     suggestedCompetitors?: SuggestedCompetitorUncheckedUpdateManyWithoutDomainNestedInput
     campaigns?: CampaignUncheckedUpdateManyWithoutDomainNestedInput
+    auditResults?: AuditResultUncheckedUpdateManyWithoutDomainNestedInput
   }
 
   export type DomainUncheckedUpdateManyWithoutUserInput = {
@@ -68903,6 +70801,19 @@ export namespace Prisma {
     id?: number
     title: string
     description?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type AuditResultCreateManyDomainInput = {
+    id?: number
+    performance: number
+    seo: number
+    accessibility: number
+    bestPractices: number
+    pwa: number
+    audits: JsonNullValueInput | InputJsonValue
+    screenshotUrl?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
   }
@@ -69698,6 +71609,44 @@ export namespace Prisma {
     id?: IntFieldUpdateOperationsInput | number
     title?: StringFieldUpdateOperationsInput | string
     description?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type AuditResultUpdateWithoutDomainInput = {
+    performance?: FloatFieldUpdateOperationsInput | number
+    seo?: FloatFieldUpdateOperationsInput | number
+    accessibility?: FloatFieldUpdateOperationsInput | number
+    bestPractices?: FloatFieldUpdateOperationsInput | number
+    pwa?: FloatFieldUpdateOperationsInput | number
+    audits?: JsonNullValueInput | InputJsonValue
+    screenshotUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type AuditResultUncheckedUpdateWithoutDomainInput = {
+    id?: IntFieldUpdateOperationsInput | number
+    performance?: FloatFieldUpdateOperationsInput | number
+    seo?: FloatFieldUpdateOperationsInput | number
+    accessibility?: FloatFieldUpdateOperationsInput | number
+    bestPractices?: FloatFieldUpdateOperationsInput | number
+    pwa?: FloatFieldUpdateOperationsInput | number
+    audits?: JsonNullValueInput | InputJsonValue
+    screenshotUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type AuditResultUncheckedUpdateManyWithoutDomainInput = {
+    id?: IntFieldUpdateOperationsInput | number
+    performance?: FloatFieldUpdateOperationsInput | number
+    seo?: FloatFieldUpdateOperationsInput | number
+    accessibility?: FloatFieldUpdateOperationsInput | number
+    bestPractices?: FloatFieldUpdateOperationsInput | number
+    pwa?: FloatFieldUpdateOperationsInput | number
+    audits?: JsonNullValueInput | InputJsonValue
+    screenshotUrl?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }

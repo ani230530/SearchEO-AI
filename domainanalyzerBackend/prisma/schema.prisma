@@ -63,6 +63,7 @@ model Domain {
   semanticAnalyses            SemanticAnalysis[]
   suggestedCompetitors        SuggestedCompetitor[]
   campaigns                   Campaign[]
+  auditResults                AuditResult[]
 
   @@unique([url, userId])
   @@index([userId])
@@ -693,5 +694,22 @@ model CampaignKeyword {
   @@unique([term, topicId, pageId])
   @@index([topicId])
   @@index([pageId])
+}
+
+model AuditResult {
+  id             Int      @id @default(autoincrement())
+  domainId       Int      @unique
+  performance    Float
+  seo            Float
+  accessibility  Float
+  bestPractices  Float
+  pwa            Float
+  audits         Json
+  screenshotUrl  String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  domain         Domain   @relation(fields: [domainId], references: [id], onDelete: Cascade)
+
+  @@index([domainId])
 }
 
