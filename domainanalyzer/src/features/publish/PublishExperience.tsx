@@ -32,8 +32,7 @@ import {
   PublishHistoryEntry,
 } from '@/types/publish';
 import type { Instance } from 'tippy.js';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
+import parse from 'html-react-parser';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3002';
 
@@ -180,32 +179,6 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
     // Only use publishResult if editedHtmlContent is truly empty (initial state)
     return publishResult?.htmlContent || '';
   }, [editedHtmlContent, publishResult?.htmlContent]);
-
-  // Helper to detect if content is markdown (contains markdown syntax)
-  const isMarkdown = useCallback((content: string): boolean => {
-    if (!content || content.trim().length === 0) return false;
-    
-    // Check for common markdown patterns
-    const markdownPatterns = [
-      /^#{1,6}\s+.+$/m,           // Headers (# ## ###)
-      /^\*\s+.+$/m,                // Unordered lists (*)
-      /^-\s+.+$/m,                 // Unordered lists (-)
-      /^\d+\.\s+.+$/m,              // Ordered lists
-      /\[.+\]\(.+\)/m,             // Links [text](url)
-      /!\[.+\]\(.+\)/m,            // Images ![alt](url)
-      /^\s*```/m,                   // Code blocks
-      /\*\*.+\*\*/m,                // Bold **text**
-      /^>\s+.+$/m,                  // Blockquotes
-      /^\|.+\|$/m,                  // Tables
-    ];
-    
-    return markdownPatterns.some(pattern => pattern.test(content));
-  }, []);
-
-  // Determine if current content is markdown
-  const contentIsMarkdown = useMemo(() => {
-    return isMarkdown(currentHtmlContent);
-  }, [currentHtmlContent, isMarkdown]);
 
   const wordCount = useMemo(() => {
     return calculateWordCount(currentHtmlContent);
@@ -2507,40 +2480,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
                           WebkitUserSelect: 'text',
                         }}
                       >
-                        {contentIsMarkdown ? (
-                          <ReactMarkdown
-                            remarkPlugins={[remarkGfm]}
-                            components={{
-                              code: ({ className, children, ...props }) => {
-                                const match = /language-(\w+)/.exec(className || '');
-                                const isInline = !match;
-                                return isInline ? (
-                                  <code className={className} {...props}>
-                                    {children}
-                                  </code>
-                                ) : (
-                                  <code className={`${className} block`} {...props}>
-                                    {children}
-                                  </code>
-                                );
-                              },
-                              a: ({ children, ...props }) => (
-                                <a
-                                  {...props}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="text-blue-600 hover:text-blue-700 transition-colors"
-                                >
-                                  {children}
-                                </a>
-                              ),
-                            }}
-                          >
-                            {currentHtmlContent}
-                          </ReactMarkdown>
-                        ) : (
-                          <div dangerouslySetInnerHTML={{ __html: currentHtmlContent }} />
-                        )}
+                        {parse(currentHtmlContent || '')}
                       </div>
                       <p className="text-xs text-gray-500 text-center mt-8 pt-6 border-t border-gray-100">
                         Highlight text or tap any image to open the inline AI palette.
@@ -3103,40 +3043,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
                           WebkitUserSelect: 'text',
                         }}
                       >
-                        {contentIsMarkdown ? (
-                          <ReactMarkdown
-                            remarkPlugins={[remarkGfm]}
-                            components={{
-                              code: ({ className, children, ...props }) => {
-                                const match = /language-(\w+)/.exec(className || '');
-                                const isInline = !match;
-                                return isInline ? (
-                                  <code className={className} {...props}>
-                                    {children}
-                                  </code>
-                                ) : (
-                                  <code className={`${className} block`} {...props}>
-                                    {children}
-                                  </code>
-                                );
-                              },
-                              a: ({ children, ...props }) => (
-                                <a
-                                  {...props}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="text-blue-600 hover:text-blue-700 transition-colors"
-                                >
-                                  {children}
-                                </a>
-                              ),
-                            }}
-                          >
-                            {currentHtmlContent}
-                          </ReactMarkdown>
-                        ) : (
-                          <div dangerouslySetInnerHTML={{ __html: currentHtmlContent }} />
-                        )}
+                        {parse(currentHtmlContent || '')}
                       </div>
                       <p className="text-xs text-gray-500 text-center mt-8 pt-6 border-t border-gray-100">
                         Highlight text or tap any image to open the inline AI palette.
