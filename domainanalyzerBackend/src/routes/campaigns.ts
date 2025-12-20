@@ -1959,6 +1959,84 @@ router.get('/generation-status/:jobId', authenticateToken, asyncHandler(async (r
 }));
 
 /**
+ * GET /api/campaigns/active-jobs
+ * Get all active generation jobs for the authenticated user
+ */
+router.get('/active-jobs', authenticateToken, asyncHandler(async (req: Request, res: Response) => {
+  const authReq = req as AuthenticatedRequest;
+  const userId = authReq.user.userId;
+
+  // Find all active generation jobs
+  const activeJobs = await prisma.generationJob.findMany({
+    where: {
+      userId,
+      status: { in: ['generating', 'pending'] }
+    },
+    include: {
+      pages: true
+    },
+    orderBy: {
+      startedAt: 'desc'
+    }
+  });
+
+  // Get job details with page statuses
+  const jobsWithStatus = await Promise.all(
+    activeJobs.map(async (job) => {
+      // Get drafts for this job
+      const allDrafts = await prisma.wordpressPublishLog.findMany({
+        where: {
+          userId,
+          status: { in: ['generating', 'draft'] }
+        }
+      });
+
+      const drafts = allDrafts.filter(draft => {
+        const response = draft.response as any;
+        return response?.jobId === job.jobId;
+      });
+
+      const pages = drafts.map(draft => {
+        const response = draft.response as any;
+        const hasContent = response?.htmlContent || response?.['Html Content'];
+        const statusFromResponse = response?.status;
+        
+        let status = 'generating';
+        if (hasContent || statusFromResponse === 'completed') {
+          status = 'completed';
+        } else if (statusFromResponse === 'failed') {
+          status = 'failed';
+        } else if (statusFromResponse === 'pending') {
+          status = 'pending';
+        } else if (draft.status === 'generating') {
+          status = 'generating';
+        }
+        
+        return {
+          pageId: response.pageId,
+          pageType: response.pageType,
+          status,
+          progress: hasContent ? 100 : (response.progress || 0),
+          draftId: draft.id
+        };
+      });
+
+      return {
+        jobId: job.jobId,
+        topicId: job.topicId,
+        status: job.status,
+        pages
+      };
+    })
+  );
+
+  res.json({
+    success: true,
+    jobs: jobsWithStatus
+  });
+}));
+
+/**
  * ============================================================================
  * API ENDPOINT FOR N8N CALLBACK
  * ============================================================================
