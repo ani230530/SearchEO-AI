@@ -4457,6 +4457,30 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
   const [viewLoadingPageId, setViewLoadingPageId] = useState<number | null>(null);
   const [closePreviewLoading, setClosePreviewLoading] = useState(false);
   const [publishLoadingPageId, setPublishLoadingPageId] = useState<number | null>(null);
+  
+  // Streaming progress state
+  const [streamingMessages, setStreamingMessages] = useState<Map<string, Array<{
+    message: string;
+    timestamp: string;
+  }>>>(new Map());
+  const [jobIdToTopicId, setJobIdToTopicId] = useState<Map<string, number>>(new Map());
+  
+  // Active generation tracking - track last streaming timestamp per jobId
+  const [lastStreamingTimestamp, setLastStreamingTimestamp] = useState<Map<string, number>>(new Map());
+  
+  // Backend job status tracking - stores backend's view of job status
+  const [backendJobStatus, setBackendJobStatus] = useState<Map<string, {
+    status: 'pending' | 'generating' | 'completed' | 'failed';
+    pages: Array<{ pageId: number; status: string; progress: number }>;
+  }>>(new Map());
+  
+  // Helper to check if generation is active (streaming received within last 10 minutes)
+  const isGenerationActive = useCallback((jobId: string): boolean => {
+    const lastTimestamp = lastStreamingTimestamp.get(jobId);
+    if (!lastTimestamp) return false;
+    const now = Date.now();
+    return (now - lastTimestamp) < 10 * 60 * 1000; // 10 minutes
+  }, [lastStreamingTimestamp]);
 
   const getAuthHeaders = useCallback((): HeadersInit => {
     const token = localStorage.getItem("authToken");
@@ -4470,6 +4494,49 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
     localStorage.removeItem("authToken");
     window.location.href = "/auth";
   }, []);
+
+  // Helper function to extract topicId from jobId pattern
+  const extractTopicIdFromJobId = useCallback((jobId: string): number | null => {
+    // JobId format: job_{topicId}_{timestamp}
+    const match = jobId.match(/^job_(\d+)_/);
+    return match ? parseInt(match[1], 10) : null;
+  }, []);
+
+  // Handle streaming progress updates
+  const handleStreamingUpdate = useCallback((jobId: string | undefined, message: string | undefined, timestamp: string | undefined) => {
+    if (!jobId || !message) return;
+    
+    const topicId = extractTopicIdFromJobId(jobId);
+    if (!topicId) return;
+    
+    // Store jobId -> topicId mapping
+    setJobIdToTopicId(prev => {
+      const updated = new Map(prev);
+      updated.set(jobId, topicId);
+      return updated;
+    });
+    
+    // Update last streaming timestamp (marks generation as active)
+    const now = Date.now();
+    setLastStreamingTimestamp(prev => {
+      const updated = new Map(prev);
+      updated.set(jobId, now);
+      return updated;
+    });
+    
+    // Add message to streaming messages
+    setStreamingMessages(prev => {
+      const updated = new Map(prev);
+      const messages = updated.get(jobId) || [];
+      const newMessages = [
+        ...messages,
+        { message, timestamp: timestamp || new Date().toISOString() }
+      ];
+      // Keep last 10 messages per job
+      updated.set(jobId, newMessages.slice(-10));
+      return updated;
+    });
+  }, [extractTopicIdFromJobId]);
 
   // Subscribe to server-sent events for generation status (replaces polling)
   useEffect(() => {
@@ -4485,31 +4552,57 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
         const data = JSON.parse(event.data) as {
           type?: string;
           jobId?: string;
+          message?: string;
+          timestamp?: string;
           pages?: Partial<GenerationPageStatus & { pageType: string; hasHtml?: boolean; error?: string | null }>[];
         };
-        if (data?.type !== 'drafts' || !data.pages) return;
-
-        setGenerationJobs((prev) => {
-          const updated = new Map(prev);
-          data.pages!.forEach((p) => {
-            const pageId = p.pageId;
-            if (!pageId) return;
-            const existing = updated.get(pageId);
-            updated.set(pageId, {
-              jobId: data.jobId || existing?.jobId || '',
-              pageId,
-              pageType: p.pageType === 'subpage' ? 'subpage' : 'pillar',
-              status: (p.status || existing?.status || 'generating') as GenerationPageStatus['status'],
-              draftId: p.draftId ?? existing?.draftId,
-              progress: typeof p.progress === 'number' ? p.progress : p.hasHtml ? 100 : existing?.progress,
-              primaryKeyword: p.primaryKeyword ?? existing?.primaryKeyword,
-              hasHtml: p.hasHtml ?? existing?.hasHtml,
-              updatedAt: new Date().toISOString(),
-              error: p.error ?? existing?.error ?? null,
+        
+        // Handle streaming progress updates
+        if (data.type === 'streaming') {
+          handleStreamingUpdate(data.jobId, data.message, data.timestamp);
+          return;
+        }
+        
+        // Handle draft updates
+        if (data.type === 'drafts' && data.pages) {
+          setGenerationJobs((prev) => {
+            const updated = new Map(prev);
+            data.pages!.forEach((p) => {
+              const pageId = p.pageId;
+              if (!pageId) return;
+              const existing = updated.get(pageId);
+              const jobId = data.jobId || existing?.jobId || '';
+              
+              // Clear streaming messages and timestamps when generation completes
+              if (p.status === 'completed' && jobId) {
+                setStreamingMessages(prevMsgs => {
+                  const updatedMsgs = new Map(prevMsgs);
+                  updatedMsgs.delete(jobId);
+                  return updatedMsgs;
+                });
+                setLastStreamingTimestamp(prev => {
+                  const updated = new Map(prev);
+                  updated.delete(jobId);
+                  return updated;
+                });
+              }
+              
+              updated.set(pageId, {
+                jobId,
+                pageId,
+                pageType: p.pageType === 'subpage' ? 'subpage' : 'pillar',
+                status: (p.status || existing?.status || 'generating') as GenerationPageStatus['status'],
+                draftId: p.draftId ?? existing?.draftId,
+                progress: typeof p.progress === 'number' ? p.progress : p.hasHtml ? 100 : existing?.progress,
+                primaryKeyword: p.primaryKeyword ?? existing?.primaryKeyword,
+                hasHtml: p.hasHtml ?? existing?.hasHtml,
+                updatedAt: new Date().toISOString(),
+                error: p.error ?? existing?.error ?? null,
+              });
             });
+            return updated;
           });
-          return updated;
-        });
+        }
       } catch (err) {
         console.error('Failed to parse SSE payload', err);
       }
@@ -4523,7 +4616,98 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
     return () => {
       eventSource.close();
     };
-  }, []);
+  }, [handleStreamingUpdate]);
+
+  // Periodic polling for active generation jobs
+  useEffect(() => {
+    const pollJobStatus = async (jobId: string) => {
+      try {
+        const response = await fetch(
+          `${API_BASE_URL}/api/campaigns/generation-status/${jobId}`,
+          { headers: getAuthHeaders() }
+        );
+
+        if (response.status === 401 || response.status === 403) {
+          handleUnauthorized();
+          return;
+        }
+
+        if (!response.ok) return;
+
+        const data = await response.json();
+        if (!data.success || !data.status) return;
+
+        // Update backend job status
+        setBackendJobStatus(prev => {
+          const updated = new Map(prev);
+          updated.set(jobId, {
+            status: data.status.status,
+            pages: data.pages || []
+          });
+          return updated;
+        });
+
+        // Update generationJobs with backend status for each page
+        if (data.pages && Array.isArray(data.pages)) {
+          setGenerationJobs(prev => {
+            const updated = new Map(prev);
+            data.pages.forEach((page: { pageId: number; status: string; progress: number }) => {
+              const existing = updated.get(page.pageId);
+              if (existing) {
+                // Only update status if backend says it's different and more authoritative
+                // Don't override 'completed' with 'generating' if page has HTML
+                if (!existing.hasHtml || page.status === 'completed') {
+                  updated.set(page.pageId, {
+                    ...existing,
+                    status: page.status as GenerationPageStatus['status'],
+                    progress: page.progress
+                  });
+                }
+              }
+            });
+            return updated;
+          });
+        }
+      } catch (err) {
+        console.error(`Failed to poll job status for ${jobId}:`, err);
+      }
+    };
+
+    // Get all active jobIds (those with recent streaming or in generating state)
+    const activeJobIds = new Set<string>();
+    
+    // Add jobIds from streaming messages
+    streamingMessages.forEach((_, jobId) => {
+      if (isGenerationActive(jobId)) {
+        activeJobIds.add(jobId);
+      }
+    });
+    
+    // Add jobIds from generationJobs that are still generating
+    generationJobs.forEach((job) => {
+      if (job.jobId && (job.status === 'generating' || job.status === 'pending')) {
+        activeJobIds.add(job.jobId);
+      }
+    });
+
+    if (activeJobIds.size === 0) return;
+
+    // Poll each active job
+    activeJobIds.forEach(jobId => {
+      pollJobStatus(jobId);
+    });
+
+    // Set up interval to poll every 30 seconds
+    const interval = setInterval(() => {
+      activeJobIds.forEach(jobId => {
+        pollJobStatus(jobId);
+      });
+    }, 30000);
+
+    return () => {
+      clearInterval(interval);
+    };
+  }, [streamingMessages, generationJobs, isGenerationActive, getAuthHeaders, handleUnauthorized]);
 
   // Rehydrate generation state on load so generate buttons stay disabled after reload
   useEffect(() => {
@@ -4550,7 +4734,7 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
           const isStale = (p: DraftStatusRecord) => {
             if (!p.updatedAt) return false;
             const updated = new Date(p.updatedAt).getTime();
-            return !isNaN(updated) && now - updated > 5 * 60 * 1000; // 5 minutes
+            return !isNaN(updated) && now - updated > 10 * 60 * 1000; // 10 minutes (increased from 5)
           };
 
           data.pages.forEach((p: DraftStatusRecord) => {
@@ -4559,15 +4743,48 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
               return;
             }
             
-            // Determine status: only mark as failed if stale AND not completed (no HTML content)
-            // Completed pages should remain completed even if their timestamp is old
+            // Determine status: use robust logic that checks if generation is active
             let finalStatus = (p.status || 'pending') as GenerationPageStatus['status'];
-            if (isStale(p) && !p.hasHtml && finalStatus !== 'completed') {
-              finalStatus = 'failed';
-            }
+            
             // If page has HTML content, it's completed regardless of what the backend says (unless published)
             if (p.hasHtml && finalStatus !== 'published') {
               finalStatus = 'completed';
+            } else {
+              // Check if generation is still active for this job
+              const jobId = p.jobId || '';
+              const generationActive = jobId ? isGenerationActive(jobId) : false;
+              
+              // Get backend job status if available
+              const backendStatus = jobId ? backendJobStatus.get(jobId) : null;
+              
+              // Only mark as failed if:
+              // - Stale (no update for 10+ minutes)
+              // - AND generation is not active (no streaming messages)
+              // - AND backend confirms failed (or no backend status available and truly stale)
+              if (isStale(p) && !p.hasHtml && finalStatus !== 'completed') {
+                if (!generationActive) {
+                  // Generation not active - check backend status
+                  if (backendStatus?.status === 'failed') {
+                    finalStatus = 'failed';
+                  } else if (!backendStatus && now - new Date(p.updatedAt || 0).getTime() > 15 * 60 * 1000) {
+                    // No backend status and very stale (15+ minutes) - mark as failed
+                    finalStatus = 'failed';
+                  } else {
+                    // Keep as generating if backend says generating or no backend status yet
+                    finalStatus = backendStatus?.status === 'generating' ? 'generating' : finalStatus;
+                  }
+                } else {
+                  // Generation is active - keep as generating
+                  finalStatus = 'generating';
+                }
+              } else if (!p.hasHtml && backendStatus) {
+                // Use backend status if available and page doesn't have HTML
+                if (backendStatus.status === 'completed' || backendStatus.status === 'failed') {
+                  finalStatus = backendStatus.status as GenerationPageStatus['status'];
+                } else if (backendStatus.status === 'generating' && finalStatus !== 'completed') {
+                  finalStatus = 'generating';
+                }
+              }
             }
             
             newMap.set(p.pageId, {
@@ -4595,7 +4812,7 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
     };
 
     rehydrate();
-  }, [campaignStructure.topics, getAuthHeaders, handleUnauthorized]);
+  }, [campaignStructure.topics, getAuthHeaders, handleUnauthorized, isGenerationActive, backendJobStatus]);
 
   const mutateStructure = useCallback(async (endpoint: string, init: RequestInit = {}, opts: { successMessage?: string; silent?: boolean } = {}) => {
     if (!opts.silent) {
@@ -4934,16 +5151,37 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
     return allPages.every((p) => (p.keywords?.length || 0) > 0);
   };
 
-  const isTopicGenerating = (topic: Topic) => {
+  // Stable check for topic generation status - prevents flickering
+  const isTopicGenerating = useCallback((topic: Topic) => {
     const pageIds = [
       topic.pillarPage?.id,
       ...(topic.subPages || []).map((sp) => sp.id),
     ].filter(Boolean) as number[];
+    
     return pageIds.some((id) => {
       const job = generationJobs.get(id);
-      return job && job.status === 'generating';
+      if (!job) return false;
+      
+      // If page has HTML, it's completed (not generating)
+      if (job.hasHtml) return false;
+      
+      // Check if generation is active via streaming
+      if (job.jobId && isGenerationActive(job.jobId)) {
+        return true;
+      }
+      
+      // Check backend status
+      if (job.jobId) {
+        const backendStatus = backendJobStatus.get(job.jobId);
+        if (backendStatus?.status === 'generating' || backendStatus?.status === 'pending') {
+          return true;
+        }
+      }
+      
+      // Check job status (but prefer streaming/backend status)
+      return job.status === 'generating' || job.status === 'pending';
     });
-  };
+  }, [generationJobs, isGenerationActive, backendJobStatus]);
 
   const viewDraft = async (draftId?: number, pageId?: number) => {
     if (!draftId) return;
@@ -5124,9 +5362,28 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
     if (!pageId) return null;
     const job = generationJobs.get(pageId);
     if (!job) return null;
-    const updatedAtMs = job.updatedAt ? new Date(job.updatedAt).getTime() : undefined;
-    const staleClient = updatedAtMs ? (Date.now() - updatedAtMs > 5 * 60 * 1000) : false;
-    const status = staleClient && !job.hasHtml ? 'failed' : job.status;
+    
+    // Use robust status determination
+    let status = job.status;
+    const jobId = job.jobId;
+    
+    // If has HTML, always completed
+    if (job.hasHtml && status !== 'published') {
+      status = 'completed';
+    } else if (status !== 'completed' && status !== 'published' && jobId) {
+      // Check if generation is active
+      const generationActive = isGenerationActive(jobId);
+      const backendStatus = backendJobStatus.get(jobId);
+      
+      // Only mark as failed if generation is not active AND backend confirms failed
+      if (status === 'failed' || (status !== 'completed' && !generationActive && backendStatus?.status === 'failed')) {
+        status = 'failed';
+      } else if (generationActive || backendStatus?.status === 'generating') {
+        // Keep as generating if active or backend says generating
+        status = 'generating';
+      }
+    }
+    
     if (status === 'pending') return null;
     const label =
       status === 'published' ? 'Published' :
@@ -5248,6 +5505,13 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
       }
 
       const { jobId, pages } = data as { jobId: string; pages: { pageId: number; pageType: string; draftId?: number; primaryKeyword?: string; }[] };
+
+      // Store jobId -> topicId mapping for streaming updates
+      setJobIdToTopicId(prev => {
+        const updated = new Map(prev);
+        updated.set(jobId, topic.id);
+        return updated;
+      });
 
       setGenerationJobs((prev) => {
         const updated = new Map(prev);
@@ -5528,6 +5792,54 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
     );
   }
 
+  // Streaming Progress Indicator Component
+  const StreamingProgressIndicator: React.FC<{
+    topicId: number;
+    jobId: string | null;
+    messages: Array<{ message: string; timestamp: string }>;
+  }> = ({ topicId, jobId, messages }) => {
+    const [isVisible, setIsVisible] = React.useState(false);
+    
+    React.useEffect(() => {
+      if (!jobId || messages.length === 0) {
+        setIsVisible(false);
+        return;
+      }
+      
+      const latestMessage = messages[messages.length - 1];
+      const messageAge = new Date().getTime() - new Date(latestMessage.timestamp).getTime();
+      const isRecent = messageAge < 10000; // Show for 10 seconds after last message
+      
+      setIsVisible(isRecent);
+      
+      // Auto-hide after 10 seconds of inactivity
+      if (isRecent) {
+        const timer = setTimeout(() => {
+          setIsVisible(false);
+        }, 10000 - messageAge);
+        return () => clearTimeout(timer);
+      }
+    }, [jobId, messages]);
+    
+    if (!jobId || messages.length === 0 || !isVisible) return null;
+    
+    const latestMessage = messages[messages.length - 1];
+    
+    return (
+      <div className="absolute top-3 right-3 z-10">
+        <div 
+          className="bg-black/85 backdrop-blur-md text-white px-3 py-1.5 rounded-full text-xs font-light flex items-center gap-2 shadow-xl border border-white/10 transition-opacity duration-300"
+          style={{ letterSpacing: '0.011em' }}
+        >
+          <div className="w-1.5 h-1.5 bg-white rounded-full animate-pulse flex-shrink-0" />
+          <span className="max-w-[220px] truncate">
+            {latestMessage.message}
+          </span>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="w-full mx-auto">
       {/* Header */}
@@ -5628,15 +5940,130 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
         </div>
       </div>
 
+      {/* Active Generation Progress Section */}
+      {(() => {
+        // Collect all active generations
+        const activeGenerations: Array<{
+          topicId: number;
+          topicTitle: string;
+          jobId: string;
+          messages: Array<{ message: string; timestamp: string }>;
+          pages: Array<{ pageId: number; status: string; progress: number }>;
+        }> = [];
+
+        campaignStructure.topics.forEach(topic => {
+          const topicJobId = Array.from(jobIdToTopicId.entries())
+            .find(([_, tid]) => tid === topic.id)?.[0];
+          
+          if (topicJobId && isGenerationActive(topicJobId)) {
+            const messages = streamingMessages.get(topicJobId) || [];
+            const backendStatus = backendJobStatus.get(topicJobId);
+            
+            // Count completed pages
+            const topicPages = Array.from(generationJobs.values())
+              .filter(job => job.jobId === topicJobId);
+            const completedCount = topicPages.filter(p => p.hasHtml || p.status === 'completed').length;
+            const totalCount = topicPages.length || (topic.pillarPage ? 1 : 0) + topic.subPages.length;
+
+            activeGenerations.push({
+              topicId: topic.id,
+              topicTitle: topic.title,
+              jobId: topicJobId,
+              messages,
+              pages: backendStatus?.pages || []
+            });
+          }
+        });
+
+        if (activeGenerations.length === 0) return null;
+
+        return (
+          <div className="mb-8 space-y-4">
+            {activeGenerations.map(({ topicId, topicTitle, jobId, messages, pages }) => {
+              const latestMessage = messages[messages.length - 1];
+              
+              // Count pages from generationJobs if backend pages not available
+              const topicPages = Array.from(generationJobs.values())
+                .filter(job => job.jobId === jobId);
+              
+              const completedCount = pages.length > 0 
+                ? pages.filter(p => p.status === 'completed').length
+                : topicPages.filter(p => p.hasHtml || p.status === 'completed').length;
+              
+              const totalCount = pages.length > 0 
+                ? pages.length 
+                : topicPages.length || 3; // Default to 3 if no pages info
+              
+              const progressPercent = totalCount > 0 ? (completedCount / totalCount) * 100 : 0;
+              
+              return (
+                <div
+                  key={jobId}
+                  className="bg-white/80 backdrop-blur-xl border border-gray-200/60 rounded-3xl p-5 shadow-sm transition-all duration-300 hover:shadow-md"
+                  style={{
+                    boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.05)'
+                  }}
+                >
+                  <div className="flex items-start justify-between gap-5">
+                    <div className="flex-1 min-w-0 space-y-2">
+                      <div className="flex items-center gap-3">
+                        <div className="relative flex-shrink-0">
+                          <div className="w-2 h-2 bg-gray-900 rounded-full" />
+                          <div className="absolute inset-0 w-2 h-2 bg-gray-900 rounded-full animate-ping opacity-75" />
+                        </div>
+                        <h4 className="text-sm font-light text-gray-900 tracking-tight truncate" style={{ letterSpacing: '0.01em' }}>
+                          {topicTitle}
+                        </h4>
+                      </div>
+                      
+                      {latestMessage && (
+                        <p className="text-xs text-gray-500 font-extralight ml-5 leading-relaxed" style={{ letterSpacing: '0.005em' }}>
+                          {latestMessage.message}
+                        </p>
+                      )}
+                      
+                      <div className="ml-5 flex items-center gap-3">
+                        <div className="flex-1 h-0.5 bg-gray-100 rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-gray-900 transition-all duration-500 ease-out"
+                            style={{ width: `${progressPercent}%` }}
+                          />
+                        </div>
+                        <span className="text-[10px] text-gray-400 font-extralight tabular-nums" style={{ letterSpacing: '0.02em' }}>
+                          {completedCount}/{totalCount}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        );
+      })()}
+
       {/* Topics List */}
       <div className="space-y-4">
-        {campaignStructure.topics.map((topic) => (
-          <div
-            key={topic.id}
-            className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden"
-          >
-            {/* Topic Header */}
-            <div className="flex items-center justify-between p-6 hover:bg-gray-50 transition-colors">
+        {campaignStructure.topics.map((topic) => {
+          // Find jobId for this topic
+          const topicJobId = Array.from(jobIdToTopicId.entries())
+            .find(([_, tid]) => tid === topic.id)?.[0] || null;
+          const topicMessages = topicJobId ? streamingMessages.get(topicJobId) || [] : [];
+          
+          return (
+            <div
+              key={topic.id}
+              className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden relative"
+            >
+              {/* Streaming Progress Indicator */}
+              <StreamingProgressIndicator 
+                topicId={topic.id}
+                jobId={topicJobId}
+                messages={topicMessages}
+              />
+              
+              {/* Topic Header */}
+              <div className="flex items-center justify-between p-6 hover:bg-gray-50 transition-colors">
               <div className="flex items-center gap-3 flex-1">
                 <button
                   onClick={() => toggleTopic(topic.id)}
@@ -5688,8 +6115,17 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
                       : 'Add a pillar page and at least one keyword per page to enable generation'
                   }
                 >
-                  {generateTopicLoading === topic.id || isTopicGenerating(topic) ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
-                  {generateTopicLoading === topic.id || isTopicGenerating(topic) ? 'Generating…' : 'Generate'}
+                  {generateTopicLoading === topic.id || isTopicGenerating(topic) ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      <span>Generating…</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="h-3.5 w-3.5" />
+                      <span>Generate</span>
+                    </>
+                  )}
                   </button>
                 <button
                   onClick={() => handleDeleteTopic(topic.id)}
@@ -6472,7 +6908,8 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
               </div>
             )}
           </div>
-        ))}
+          );
+        })}
 
         {campaignStructure.topics.length === 0 && (
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-12 text-center">

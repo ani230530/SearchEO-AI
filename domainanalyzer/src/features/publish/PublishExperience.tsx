@@ -32,6 +32,7 @@ import {
   PublishHistoryEntry,
 } from '@/types/publish';
 import type { Instance } from 'tippy.js';
+import parse from 'html-react-parser';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3002';
 
@@ -2478,8 +2479,9 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
                           userSelect: 'text',
                           WebkitUserSelect: 'text',
                         }}
-                        dangerouslySetInnerHTML={{ __html: currentHtmlContent }}
-                      />
+                      >
+                        {parse(currentHtmlContent || '')}
+                      </div>
                       <p className="text-xs text-gray-500 text-center mt-8 pt-6 border-t border-gray-100">
                         Highlight text or tap any image to open the inline AI palette.
                       </p>
@@ -3040,8 +3042,9 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
                           userSelect: 'text',
                           WebkitUserSelect: 'text',
                         }}
-                        dangerouslySetInnerHTML={{ __html: currentHtmlContent }}
-                      />
+                      >
+                        {parse(currentHtmlContent || '')}
+                      </div>
                       <p className="text-xs text-gray-500 text-center mt-8 pt-6 border-t border-gray-100">
                         Highlight text or tap any image to open the inline AI palette.
                       </p>

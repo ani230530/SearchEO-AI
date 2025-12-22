@@ -15,10 +15,14 @@ const router = Router();
 const prisma = new PrismaClient();
 
 // Helper to compute aggregate job status
+// Job stays 'generating' until ALL pages are completed
+// Only mark as 'failed' if truly failed (not just incomplete)
 const computeJobStatus = (pages: { status: string }[]) => {
+  if (pages.length === 0) return 'pending';
   if (pages.every(p => p.status === 'completed')) return 'completed';
   if (pages.some(p => p.status === 'failed')) return 'failed';
-  if (pages.some(p => p.status === 'generating')) return 'generating';
+  // If any page is generating or pending, job is still generating
+  if (pages.some(p => p.status === 'generating' || p.status === 'pending')) return 'generating';
   return 'pending';
 };
 
