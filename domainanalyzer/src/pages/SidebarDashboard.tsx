@@ -3046,7 +3046,7 @@ const handleRunAudit = async (url?: string) => {
                                               : "text-gray-700 hover:text-gray-900 hover:bg-gray-100"
                                           }`}
                                         >
-                                          <ChevronUp className="w-4 h-4 rotate-90" />
+                                          <ChevronDown className="w-4 h-4 rotate-90" />
                                           <span>Previous</span>
                                         </button>
 
@@ -3093,7 +3093,7 @@ const handleRunAudit = async (url?: string) => {
                                           }`}
                                         >
                                           <span>Next</span>
-                                          <ChevronUp className="w-4 h-4 -rotate-90" />
+                                          <ChevronDown className="w-4 h-4 -rotate-90" />
                                         </button>
                                       </div>
                                     </div>
@@ -4061,7 +4061,7 @@ const handleRunAudit = async (url?: string) => {
                     className="text-5xl sm:text-6xl md:text-7xl font-extralight mb-6 text-gray-900"
                     style={{ letterSpacing: '-0.003em', lineHeight: 1.05 }}
                   >
-                    Analyze Your Domain
+                    Audit Your Domain
                   </h1>
                   <p
                     className="text-lg sm:text-xl md:text-2xl font-light text-gray-500 max-w-2xl mx-auto mb-12"

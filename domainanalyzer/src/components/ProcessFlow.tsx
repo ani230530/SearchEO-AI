@@ -1,4 +1,6 @@
 import React from 'react';
+import { useNavigate } from "react-router-dom";
+
 
 const ProcessFlow = () => {
   const steps = [
@@ -70,7 +72,7 @@ const ProcessFlow = () => {
       )
     }
   ];
-
+const navigate = useNavigate();
   return (
     <section className="py-24 md:py-40" style={{ 
       fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Inter", "Helvetica Neue", Helvetica, Arial, sans-serif',
@@ -195,7 +197,8 @@ const ProcessFlow = () => {
         </div>
 
         <div className="text-center mt-20">
-          <button style={{
+          <button  onClick={() => navigate('/dashboard')}
+          style={{
             height: '48px',
             padding: '0 32px',
             borderRadius: '980px',
