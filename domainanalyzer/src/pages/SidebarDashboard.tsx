@@ -4424,6 +4424,116 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
   const [keywordSearchOpen, setKeywordSearchOpen] = useState(false);
   const [keywordSearchValue, setKeywordSearchValue] = useState('');
   const [loadingKeywords, setLoadingKeywords] = useState(false);
+  const [keywordPickerDrawerOpen, setKeywordPickerDrawerOpen] = useState(false);
+  const [drawerSearchTerm, setDrawerSearchTerm] = useState('');
+  const [drawerCompetition, setDrawerCompetition] = useState('');
+  const [drawerIntent, setDrawerIntent] = useState('');
+  const [drawerViewMode, setDrawerViewMode] = useState<"table" | "cards">("table");
+  const [drawerSortConfig, setDrawerSortConfig] = useState<{ key: keyof KeywordTableItem; direction: "asc" | "desc" } | null>(null);
+  const [drawerCurrentPage, setDrawerCurrentPage] = useState(1);
+  const [drawerItemsPerPage, setDrawerItemsPerPage] = useState(10);
+  const drawerFilteredKeywords = React.useMemo(() => {
+    return keywordsTableData.filter((keyword) => {
+      const matchesSearch = keyword.keyword.toLowerCase().includes(drawerSearchTerm.toLowerCase());
+      const matchesCompetition = !drawerCompetition || keyword.competition === drawerCompetition;
+      const matchesIntent = !drawerIntent || keyword.intent === drawerIntent;
+      return matchesSearch && matchesCompetition && matchesIntent;
+    });
+  }, [keywordsTableData, drawerSearchTerm, drawerCompetition, drawerIntent]);
+  const drawerSortedKeywords = React.useMemo(() => {
+    const sortableKeywords = [...drawerFilteredKeywords];
+    if (drawerSortConfig !== null) {
+      sortableKeywords.sort((a, b) => {
+        const aValue = a[drawerSortConfig.key];
+        const bValue = b[drawerSortConfig.key];
+        if (typeof aValue === "number" && typeof bValue === "number") {
+          return drawerSortConfig.direction === "asc" ? aValue - bValue : bValue - aValue;
+        }
+        const aStr = String(aValue).toLowerCase();
+        const bStr = String(bValue).toLowerCase();
+        if (aStr < bStr) {
+          return drawerSortConfig.direction === "asc" ? -1 : 1;
+        }
+        if (aStr > bStr) {
+          return drawerSortConfig.direction === "asc" ? 1 : -1;
+        }
+        return 0;
+      });
+    }
+    return sortableKeywords;
+  }, [drawerFilteredKeywords, drawerSortConfig]);
+  const drawerTotalPages = Math.max(1, Math.ceil(drawerSortedKeywords.length / drawerItemsPerPage));
+  const drawerStartIndex = (drawerCurrentPage - 1) * drawerItemsPerPage;
+  const drawerEndIndex = drawerStartIndex + drawerItemsPerPage;
+  const drawerCurrentKeywords = drawerSortedKeywords.slice(drawerStartIndex, drawerEndIndex);
+  const drawerHandleSort = useCallback((key: keyof KeywordTableItem) => {
+    let direction: "asc" | "desc" = "asc";
+    if (drawerSortConfig && drawerSortConfig.key === key && drawerSortConfig.direction === "asc") {
+      direction = "desc";
+    }
+    setDrawerSortConfig({ key, direction });
+  }, [drawerSortConfig]);
+  const drawerGetSortIcon = useCallback((key: keyof KeywordTableItem) => {
+    if (!drawerSortConfig || drawerSortConfig.key !== key) {
+      return <ArrowUpDown className="w-4 h-4 text-gray-400" />;
+    }
+    return drawerSortConfig.direction === "asc" ? (
+      <ChevronUp className="w-4 h-4 text-gray-700" />
+    ) : (
+      <ChevronDown className="w-4 h-4 text-gray-700" />
+    );
+  }, [drawerSortConfig]);
+  const drawerHandlePageChange = useCallback((page: number) => {
+    const totalPagesCalc = Math.max(1, Math.ceil(drawerSortedKeywords.length / drawerItemsPerPage));
+    if (page >= 1 && page <= totalPagesCalc) {
+      setDrawerCurrentPage(page);
+    }
+  }, [drawerSortedKeywords.length, drawerItemsPerPage]);
+  const drawerGetPageNumbers = useCallback(() => {
+    const pages: Array<number | string> = [];
+    const maxVisiblePages = 5;
+    if (drawerTotalPages <= maxVisiblePages) {
+      for (let i = 1; i <= drawerTotalPages; i++) {
+        pages.push(i);
+      }
+    } else {
+      if (drawerCurrentPage <= 3) {
+        for (let i = 1; i <= 4; i++) {
+          pages.push(i);
+        }
+        pages.push("...");
+        pages.push(drawerTotalPages);
+      } else if (drawerCurrentPage >= drawerTotalPages - 2) {
+        pages.push(1);
+        pages.push("...");
+        for (let i = drawerTotalPages - 3; i <= drawerTotalPages; i++) {
+          pages.push(i);
+        }
+      } else {
+        pages.push(1);
+        pages.push("...");
+        for (let i = drawerCurrentPage - 1; i <= drawerCurrentPage + 1; i++) {
+          pages.push(i);
+        }
+        pages.push("...");
+        pages.push(drawerTotalPages);
+      }
+    }
+    return pages;
+  }, [drawerTotalPages, drawerCurrentPage]);
+  const drawerCompetitionBadge = useCallback((competition: string) => {
+    const baseClasses = "px-2.5 py-1 rounded-full text-xs font-semibold";
+    switch (competition) {
+      case "High":
+        return `${baseClasses} bg-red-100 text-red-800`;
+      case "Medium":
+        return `${baseClasses} bg-yellow-100 text-yellow-800`;
+      case "Low":
+        return `${baseClasses} bg-green-100 text-green-800`;
+      default:
+        return `${baseClasses} bg-gray-100 text-gray-800`;
+    }
+  }, []);
 
   const [targetTopicId, setTargetTopicId] = useState<number | null>(null);
   const { toast } = useToast();
@@ -5923,7 +6033,7 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
             className="px-4 py-2 bg-gray-100 text-gray-900 rounded-full hover:bg-gray-200 transition-all text-sm font-light flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
           >
             <Plus className="h-4 w-4" />
-            Manual
+            Add topic manually
           </button>
           <button
             onClick={() => handleAddTopic(true)}
@@ -6156,7 +6266,7 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
                             className="px-3 py-1.5 text-xs font-light text-gray-600 hover:text-black hover:bg-gray-100 rounded-full transition-all flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             <Plus className="h-3.5 w-3.5" />
-                            Manual
+                            Add pillar page manually
                           </button>
                           <button
                             onClick={() => handleAddPillarPage(topic.id, true)}
@@ -6172,7 +6282,7 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
                             )}
                             {aiLoading === `pillar-${topic.id}`
                               ? "Generating"
-                              : "AI"}
+                              : "Generate pillar page"}
                           </button>
                         </div>
                       )}
@@ -6347,6 +6457,7 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
                                     title="AI generate primary keyword"
                               >
                                     {aiLoading === `primary-keyword-${topic.pillarPage!.id}` ? <ButtonSpinner /> : <Sparkles className="h-3 w-3" />}
+                                    Generate primary keywords
                               </button>
                                 </div>
                               </div>
@@ -6442,6 +6553,7 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
                                     title="AI generate longtail keywords"
                                   >
                                     {aiLoading === `longtail-keyword-${topic.pillarPage!.id}` ? <ButtonSpinner /> : <Sparkles className="h-3 w-3" />}
+                                    Generate longtail keywords
                                   </button>
                                 </div>
                               </div>
@@ -6515,7 +6627,7 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
                           className="px-3 py-1.5 text-xs font-light text-gray-600 hover:text-black hover:bg-gray-100 rounded-full transition-all flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           <Plus className="h-3.5 w-3.5" />
-                          Manual
+                          Add sub page manually
                         </button>
                         <button
                           onClick={() => handleAddSubPage(topic.id, true)}
@@ -6531,7 +6643,7 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
                           )}
                           {aiLoading === `subpage-${topic.id}`
                             ? "Generating"
-                            : "AI"}
+                            : "Generate sub page"}
                         </button>
                       </div>
                     </div>
@@ -6657,6 +6769,7 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
                                     title="Add keyword manually"
                                   >
                                     <Plus className="h-3 w-3" />
+                                    Add keyword manually
                                   </button>
                                   <button
                                     onClick={() =>
@@ -6679,6 +6792,7 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
                                     ) : (
                                       <Sparkles className="h-3 w-3" />
                                     )}
+                                    Generate keywords
                                   </button>
                                 </div>
                                 <button
@@ -6703,14 +6817,14 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
                                   Primary Keywords <span className="text-red-500">*</span>
                                 </label>
                                 <div className="flex items-center gap-1">
-                                  <button
+                                  {/* <button
                                     onClick={() => handleAddKeyword('subpage', topic.id, subPage.id, false, 'primary')}
                                     disabled={syncing}
                                     className="px-2 py-1 text-xs font-light text-gray-600 hover:text-black hover:bg-gray-100 rounded-full transition-all flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
                                     title="Add primary keyword manually"
                                   >
                                     <Plus className="h-3 w-3" />
-                                  </button>
+                                  </button> */}
                                   <button
                                     onClick={async () => {
                                       if (aiLoading === `primary-keyword-${subPage.id}`) return;
@@ -6746,6 +6860,7 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
                                     title="AI generate primary keyword"
                                   >
                                     {aiLoading === `primary-keyword-${subPage.id}` ? <ButtonSpinner /> : <Sparkles className="h-3 w-3" />}
+                                    Generate primary keywords
                                   </button>
                                 </div>
                               </div>
@@ -6803,14 +6918,14 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
                                   Longtail Keywords
                                 </label>
                                 <div className="flex items-center gap-1">
-                                  <button
+                                  {/* <button
                                     onClick={() => handleAddKeyword('subpage', topic.id, subPage.id, false, 'longtail')}
                                     disabled={syncing}
                                     className="px-2 py-1 text-xs font-light text-gray-600 hover:text-black hover:bg-gray-100 rounded-full transition-all flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
                                     title="Add longtail keyword manually"
                                   >
                                     <Plus className="h-3 w-3" />
-                                  </button>
+                                  </button> */}
                                   <button
                                     onClick={async () => {
                                       if (aiLoading === `longtail-keyword-${subPage.id}`) return;
@@ -6846,6 +6961,7 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
                                     title="AI generate longtail keywords"
                                   >
                                     {aiLoading === `longtail-keyword-${subPage.id}` ? <ButtonSpinner /> : <Sparkles className="h-3 w-3" />}
+                                    Generate longtail keywords
                                   </button>
                                 </div>
                               </div>
@@ -6928,7 +7044,7 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
                 className="px-4 py-2 bg-gray-100 text-gray-900 rounded-full hover:bg-gray-200 transition-all text-sm font-light flex items-center gap-2"
               >
                 <Plus className="h-4 w-4" />
-                Add Manual
+                Add topic manually
               </button>
               <button
                 onClick={() => handleAddTopic(true)}
@@ -7181,6 +7297,15 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
                     </Command>
                   </PopoverContent>
                 </Popover>
+                <div className="mt-2 flex items-center justify-between">
+                  <button
+                    type="button"
+                    onClick={() => setKeywordPickerDrawerOpen(true)}
+                    className="px-3 py-2 border border-gray-200 text-gray-900 rounded-full hover:bg-gray-50 transition-all text-sm font-medium"
+                  >
+                    Browse keyword table
+                  </button>
+                </div>
                 <input
                   type="text"
                   value={newKeywordTerm}
@@ -7281,6 +7406,330 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
           </div>
         </div>
       )}
+      <Sheet
+        open={keywordPickerDrawerOpen}
+        onOpenChange={(open) => {
+          setKeywordPickerDrawerOpen(open);
+        }}
+      >
+        <SheetContent
+          side="right"
+          className="w-full sm:max-w-6xl border-l border-[#e2e4ea] bg-[#f5f6fa] px-8 py-10 overflow-y-auto font-light"
+        >
+          <div className="space-y-8">
+            <div className="rounded-[32px] border border-white/80 bg-white/90 px-6 py-6 shadow-[0_30px_80px_rgba(15,23,42,0.10)] backdrop-blur flex flex-col gap-3">
+              <div className="inline-flex items-center gap-2 rounded-full border border-black/10 px-4 py-1 text-[10px] tracking-[0.35em] uppercase text-gray-500">
+                Keyword picker
+              </div>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h3 className="text-[26px] font-light text-gray-900 tracking-tight">Choose from table</h3>
+                  <p className="text-sm text-gray-500">Search, filter, and select a keyword to fill the form.</p>
+                </div>
+                <div>
+                  <button
+                    onClick={() => setKeywordPickerDrawerOpen(false)}
+                    className="px-3 py-1.5 rounded-full bg-gray-100 text-gray-800 text-xs font-semibold border border-gray-200 hover:bg-gray-200"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div className="rounded-[32px] border border-white/80 bg-white/90 px-6 py-6 shadow-[0_30px_80px_rgba(15,23,42,0.10)] backdrop-blur">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6">
+                <div className="flex items-center space-x-4">
+                  <div className="relative">
+                    <Search className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                    <input
+                      type="text"
+                      placeholder="Search keywords..."
+                      value={drawerSearchTerm}
+                      onChange={(e) => setDrawerSearchTerm(e.target.value)}
+                      className="pl-10 pr-3 py-2.5 border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent text-sm bg-gray-50/50 transition-all duration-200 w-72"
+                    />
+                  </div>
+                  <select
+                    value={drawerCompetition}
+                    onChange={(e) => setDrawerCompetition(e.target.value)}
+                    className="px-3 py-2.5 border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent text-sm bg-gray-50/50 transition-all duration-200 appearance-none cursor-pointer"
+                  >
+                    <option value="">All Competition</option>
+                    <option value="Low">Low</option>
+                    <option value="Medium">Medium</option>
+                    <option value="High">High</option>
+                  </select>
+                  <select
+                    value={drawerIntent}
+                    onChange={(e) => setDrawerIntent(e.target.value)}
+                    className="px-3 py-2.5 border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent text-sm bg-gray-50/50 transition-all duration-200 appearance-none cursor-pointer"
+                  >
+                    <option value="">All Intent</option>
+                    <option value="Informational">Informational</option>
+                    <option value="Commercial">Commercial</option>
+                    <option value="Transactional">Transactional</option>
+                  </select>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center bg-gray-100 rounded-2xl p-1">
+                    <button
+                      onClick={() => setDrawerViewMode("cards")}
+                      className={`flex items-center space-x-2 px-4 py-2 rounded-xl transition-all duration-200 text-sm font-medium ${
+                        drawerViewMode === "cards" ? "bg-white text-gray-900 shadow-sm" : "text-gray-600 hover:text-gray-900"
+                      }`}
+                    >
+                      <Grid3X3 className="w-4 h-4" />
+                      <span>Cards</span>
+                    </button>
+                    <button
+                      onClick={() => setDrawerViewMode("table")}
+                      className={`flex items-center space-x-2 px-4 py-2 rounded-xl transition-all duration-200 text-sm font-medium ${
+                        drawerViewMode === "table" ? "bg-white text-gray-900 shadow-sm" : "text-gray-600 hover:text-gray-900"
+                      }`}
+                    >
+                      <List className="w-4 h-4" />
+                      <span>Table</span>
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-gray-600">Rows</span>
+                    <div className="flex items-center bg-white border border-gray-200 rounded-2xl px-1 shadow-sm">
+                      <button
+                        onClick={() => {
+                          const next = Math.max(5, drawerItemsPerPage - 5);
+                          setDrawerItemsPerPage(next);
+                          setDrawerCurrentPage(1);
+                        }}
+                        className="px-2 py-1 text-gray-700 hover:text-gray-900 disabled:text-gray-300"
+                        disabled={drawerItemsPerPage <= 5}
+                        aria-label="Decrease rows"
+                      >
+                        −
+                      </button>
+                      <input
+                        type="number"
+                        min={5}
+                        max={200}
+                        step={5}
+                        value={drawerItemsPerPage}
+                        onChange={(e) => {
+                          const raw = parseInt(e.target.value, 10);
+                          if (Number.isNaN(raw)) return;
+                          const clamped = Math.max(5, Math.min(200, raw));
+                          setDrawerItemsPerPage(clamped);
+                          setDrawerCurrentPage(1);
+                        }}
+                        className="w-16 text-center px-2 py-1.5 text-sm border-0 focus:outline-none focus:ring-0 bg-transparent"
+                      />
+                      <button
+                        onClick={() => {
+                          const next = Math.min(200, drawerItemsPerPage + 5);
+                          setDrawerItemsPerPage(next);
+                          setDrawerCurrentPage(1);
+                        }}
+                        className="px-2 py-1 text-gray-700 hover:text-gray-900 disabled:text-gray-300"
+                        disabled={drawerItemsPerPage >= 200}
+                        aria-label="Increase rows"
+                      >
+                        +
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-white rounded-3xl border border-gray-200 overflow-hidden shadow-sm">
+                <div className="bg-gray-50/80 border-b border-gray-200">
+                  <div className="grid grid-cols-10 gap-4 px-6 py-4 text-sm font-semibold text-gray-700">
+                    <div
+                      className="col-span-3 flex items-center space-x-2 cursor-pointer hover:text-gray-900 transition-colors"
+                      onClick={() => drawerHandleSort("keyword")}
+                    >
+                      <span>Keyword</span>
+                      {drawerGetSortIcon("keyword")}
+                    </div>
+                    <div
+                      className="col-span-1 flex items-center space-x-2 cursor-pointer hover:text-gray-900 transition-colors justify-center"
+                      onClick={() => drawerHandleSort("volume")}
+                    >
+                      <span>Volume</span>
+                      {drawerGetSortIcon("volume")}
+                    </div>
+                    <div
+                      className="col-span-1 flex items-center space-x-2 cursor-pointer hover:text-gray-900 transition-colors justify-center"
+                      onClick={() => drawerHandleSort("competition")}
+                    >
+                      <span>Competition</span>
+                      {drawerGetSortIcon("competition")}
+                    </div>
+                    <div
+                      className="col-span-1 flex items-center space-x-2 cursor-pointer hover:text-gray-900 transition-colors justify-center"
+                      onClick={() => drawerHandleSort("cpc")}
+                    >
+                      <span>CPC</span>
+                      {drawerGetSortIcon("cpc")}
+                    </div>
+                    <div
+                      className="col-span-1 flex items-center space-x-2 cursor-pointer hover:text-gray-900 transition-colors justify-center"
+                      onClick={() => drawerHandleSort("organic")}
+                    >
+                      <span>Organic</span>
+                      {drawerGetSortIcon("organic")}
+                    </div>
+                    <div
+                      className="col-span-1 flex items-center space-x-2 cursor-pointer hover:text-gray-900 transition-colors justify-center"
+                      onClick={() => drawerHandleSort("intent")}
+                    >
+                      <span>Intent</span>
+                      {drawerGetSortIcon("intent")}
+                    </div>
+                    <div
+                      className="col-span-2 flex items-center space-x-2 cursor-pointer hover:text-gray-900 transition-colors justify-center"
+                      onClick={() => drawerHandleSort("trend")}
+                    >
+                      <span>Trend</span>
+                      {drawerGetSortIcon("trend")}
+                    </div>
+                  </div>
+                </div>
+                <div className="divide-y divide-gray-100">
+                  {drawerCurrentKeywords.map((keyword) => (
+                    <div
+                      key={keyword.id}
+                      className="grid grid-cols-10 gap-4 px-6 py-4 hover:bg-gray-50/80 transition-all duration-200 cursor-pointer"
+                      onClick={() => {
+                        setNewKeywordTerm(keyword.keyword);
+                        setNewKeywordVolume(String(keyword.volume));
+                        setNewKeywordDifficulty(keyword.competition || "Medium");
+                        setKeywordPickerDrawerOpen(false);
+                        setKeywordSearchOpen(false);
+                      }}
+                    >
+                      <div className="col-span-3 flex items-center space-x-3">
+                        <div>
+                          <div className="font-semibold text-gray-900 text-sm flex items-center space-x-2">
+                            <span>{keyword.keyword}</span>
+                            {keyword.isCustom && (
+                              <span className="bg-purple-100 text-purple-800 px-2 py-0.5 rounded-full text-xs font-semibold">
+                                Custom
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-xs text-gray-500 mt-0.5 truncate max-w-xs">
+                            {keyword.url}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="col-span-1 flex items-center justify-center">
+                        <span className="font-semibold text-gray-900 text-sm">
+                          {keyword.volume >= 1000 ? `${(keyword.volume / 1000).toFixed(1)}K` : keyword.volume.toLocaleString()}
+                        </span>
+                      </div>
+                      <div className="col-span-1 flex items-center justify-center">
+                        <span className={drawerCompetitionBadge(keyword.competition)}>
+                          {keyword.competition}
+                        </span>
+                      </div>
+                      <div className="col-span-1 flex items-center justify-center">
+                        <span className="font-semibold text-gray-900 text-sm">
+                          ${keyword.cpc.toFixed(2)}
+                        </span>
+                      </div>
+                      <div className="col-span-1 flex items-center justify-center">
+                        <span className="text-gray-700 text-sm">
+                          {keyword.organic.toLocaleString()}
+                        </span>
+                      </div>
+                      <div className="col-span-1 flex items-center justify-center">
+                        <span
+                          className={`px-2 py-1 rounded-full text-xs font-medium ${
+                            keyword.intent === "Commercial"
+                              ? "bg-blue-100 text-blue-800"
+                              : keyword.intent === "Transactional"
+                              ? "bg-green-100 text-green-800"
+                              : "bg-gray-100 text-gray-800"
+                          }`}
+                        >
+                          {keyword.intent}
+                        </span>
+                      </div>
+                      <div className="col-span-2 flex items-center justify-center">
+                        <div className="flex items-center space-x-1">
+                          <TrendingUp
+                            className={`w-4 h-4 ${
+                              keyword.trend === "Rising"
+                                ? "text-green-500"
+                                : keyword.trend === "Falling"
+                                ? "text-red-500"
+                                : "text-gray-500"
+                            }`}
+                          />
+                          <span className="text-sm text-gray-700">
+                            {keyword.trend}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                {drawerTotalPages > 1 && (
+                  <div className="bg-gray-50/50 border-t border-gray-200 px-6 py-4">
+                    <div className="flex items-center justify-between">
+                      <div className="text-sm text-gray-600">
+                        Showing {drawerStartIndex + 1} to {Math.min(drawerEndIndex, drawerSortedKeywords.length)} of {drawerSortedKeywords.length} keywords
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <button
+                          onClick={() => drawerHandlePageChange(drawerCurrentPage - 1)}
+                          disabled={drawerCurrentPage === 1}
+                          className={`flex items-center space-x-1 px-3 py-2 rounded-xl text-sm font-medium transition-all duration-200 ${
+                            drawerCurrentPage === 1 ? "text-gray-400 cursor-not-allowed" : "text-gray-700 hover:text-gray-900 hover:bg-gray-100"
+                          }`}
+                        >
+                          <ChevronUp className="w-4 h-4 rotate-90" />
+                          <span>Previous</span>
+                        </button>
+                        <div className="flex items-center space-x-1">
+                          {drawerGetPageNumbers().map((page, index) => (
+                            <React.Fragment key={index}>
+                              {page === "..." ? (
+                                <span className="px-2 py-2 text-gray-400">...</span>
+                              ) : (
+                                <button
+                                  onClick={() => drawerHandlePageChange(page as number)}
+                                  className={`w-8 h-8 rounded-xl text-sm font-medium transition-all duration-200 flex items-center justify-center ${
+                                    drawerCurrentPage === page ? "bg-gray-900 text-white shadow-sm" : "text-gray-700 hover:text-gray-900 hover:bg-gray-100"
+                                  }`}
+                                >
+                                  {page}
+                                </button>
+                              )}
+                            </React.Fragment>
+                          ))}
+                        </div>
+                        <button
+                          onClick={() => drawerHandlePageChange(drawerCurrentPage + 1)}
+                          disabled={drawerCurrentPage >= drawerTotalPages}
+                          className={`flex items-center space-x-1 px-3 py-2 rounded-xl text-sm font-medium transition-all duration-200 ${
+                            drawerCurrentPage >= drawerTotalPages ? "text-gray-400 cursor-not-allowed" : "text-gray-700 hover:text-gray-900 hover:bg-gray-100"
+                          }`}
+                        >
+                          <span>Next</span>
+                          <ChevronUp className="w-4 h-4 -rotate-90" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                {drawerSortedKeywords.length === 0 && (
+                  <div className="py-12 text-center">
+                    <p className="text-gray-500">No keywords match your current filters.</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </SheetContent>
+      </Sheet>
       {/* Generation Drawer */}
       <Sheet
         open={generationDrawerOpen}
@@ -7621,5 +8070,3 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
 };
 
 export default SidebarDashboard;
-
-
