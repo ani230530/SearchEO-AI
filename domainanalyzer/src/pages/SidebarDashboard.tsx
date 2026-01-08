@@ -2380,8 +2380,9 @@ const handleRunAudit = async (url?: string) => {
                           let current: string | null = null;
                           for (const line of lines) {
                             const n = normalize(line);
-                            if (target.includes(n)) {
-                              current = n;
+                            const matched = target.find((t) => n.startsWith(t) || n.includes(t));
+                            if (matched) {
+                              current = matched;
                               continue;
                             }
                             if (current) {
