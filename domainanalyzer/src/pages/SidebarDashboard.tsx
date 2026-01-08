@@ -275,6 +275,8 @@ const [activeChartTab, setActiveChartTab] = useState<'overview' | 'comparison' |
   const [showAddKeyword, setShowAddKeyword] = useState(false);
   const [newKeyword, setNewKeyword] = useState("");
   const [isAddingKeyword, setIsAddingKeyword] = useState(false);
+  const [confirmUpdateOpen, setConfirmUpdateOpen] = useState(false);
+  const [updateLoading, setUpdateLoading] = useState(false);
   const [showCountByCompetition, setShowCountByCompetition] = useState<
     Record<string, number>
   >({
@@ -2315,8 +2317,16 @@ const handleRunAudit = async (url?: string) => {
                   <div className="inline-flex items-center gap-3 bg-blue-50 border border-blue-200 text-blue-700 px-5 py-3 rounded-2xl shadow-sm">
                     <img
                       src={`https://www.google.com/s2/favicons?domain=${companyDomain}&sz=64`}
+                      srcSet={`https://www.google.com/s2/favicons?domain=${companyDomain}&sz=64 1x, https://www.google.com/s2/favicons?domain=${companyDomain}&sz=128 2x, https://www.google.com/s2/favicons?domain=${companyDomain}&sz=256 4x`}
+                      sizes="32px"
                       alt="favicon"
+                      width={32}
+                      height={32}
                       className="w-8 h-8 rounded-md"
+                      onError={(e) => {
+                        e.currentTarget.src = `https://logo.clearbit.com/${companyDomain}`;
+                        e.currentTarget.srcset = '';
+                      }}
                     />
                     <span className="font-medium text-lg tracking-tight">
                       {" "}
@@ -2344,91 +2354,142 @@ const handleRunAudit = async (url?: string) => {
                     {/* Domain Context - Centered and Wide */}
                     {domainContext && (
                       <div className="mb-16">
-                        <div
-                          className="relative bg-white rounded-3xl p-8 sm:p-12 border border-gray-100 shadow-sm prose prose-lg prose-gray max-w-none mx-auto
-                          prose-headings:font-light prose-headings:text-gray-900 prose-headings:tracking-tight prose-headings:text-center
-                          prose-h1:text-3xl prose-h1:mb-6 prose-h1:mt-0
-                          prose-h2:text-2xl prose-h2:mb-5 prose-h2:mt-10
-                          prose-h3:text-xl prose-h3:mb-4 prose-h3:mt-8
-                          prose-p:text-gray-700 prose-p:leading-relaxed prose-p:mb-5 prose-p:text-center
-                          prose-strong:text-gray-900 prose-strong:font-medium
-                          prose-ul:my-6 prose-ul:pl-8 prose-ul:list-disc
-                          prose-ol:my-6 prose-ol:pl-8 prose-ol:list-decimal
-                          prose-li:text-gray-700 prose-li:my-3
-                          prose-a:text-blue-600 prose-a:no-underline hover:prose-a:underline
-                          prose-code:text-sm prose-code:bg-gray-100 prose-code:px-2 prose-code:py-1 prose-code:rounded prose-code:font-mono
-                          prose-pre:bg-gray-900 prose-pre:text-gray-100 prose-pre:rounded-2xl prose-pre:p-6 prose-pre:overflow-x-auto prose-pre:my-8
-                          prose-blockquote:border-l-4 prose-blockquote:border-gray-300 prose-blockquote:pl-6 prose-blockquote:italic prose-blockquote:text-gray-600 prose-blockquote:my-8
-                          prose-hr:border-gray-200 prose-hr:my-10
-                          prose-table:w-full prose-table:border-collapse prose-table:my-8
-                          prose-th:border prose-th:border-gray-300 prose-th:bg-gray-50 prose-th:px-5 prose-th:py-3 prose-th:text-left prose-th:font-medium prose-th:text-gray-900
-                          prose-td:border prose-td:border-gray-200 prose-td:px-5 prose-td:py-3 prose-td:text-gray-700
-                          prose-img:rounded-2xl prose-img:shadow-md prose-img:my-8 prose-img:mx-auto"
-                        >
-                          <ReactMarkdown
-                            remarkPlugins={[remarkGfm]}
-                            components={{
-                              // Custom styling for code blocks
-                              code: ({ className, children, ...props }) => {
-                                const match = /language-(\w+)/.exec(
-                                  className || ""
-                                );
-                                const isInline = !match;
-                                return isInline ? (
-                                  <code className={className} {...props}>
-                                    {children}
-                                  </code>
-                                ) : (
-                                  <code
-                                    className={`${className} block`}
-                                    {...props}
+                        {(() => {
+                          const full = domainContext;
+                          const headers = [
+                            "BUSINESS MODEL ANALYSIS",
+                            "TARGET AUDIENCE PROFILING",
+                            "VALUE PROPOSITION & POSITIONING",
+                            "SEO & CONTENT STRATEGY INSIGHTS",
+                            "COMPETITIVE INTELLIGENCE",
+                            "MARKET DYNAMICS",
+                            "LOCATION-BASED SEO ANALYSIS",
+                            "SEO OPPORTUNITY ANALYSIS",
+                          ];
+                          const normalize = (s: string) =>
+                            s
+                              .replace(/\*\*/g, "")
+                              .replace(/^\s*\d+\.\s*/, "")
+                              .replace(/[:]+$/, "")
+                              .trim()
+                              .toUpperCase();
+                          const target = headers.map((h) => normalize(h));
+                          const lines = full.split(/\r?\n/);
+                          const contentMap: Record<string, string[]> = {};
+                          target.forEach((t) => (contentMap[t] = []));
+                          let current: string | null = null;
+                          for (const line of lines) {
+                            const n = normalize(line);
+                            if (target.includes(n)) {
+                              current = n;
+                              continue;
+                            }
+                            if (current) {
+                              contentMap[current].push(line);
+                            }
+                          }
+                          const sections = headers.map((h) => {
+                            const key = normalize(h);
+                            return {
+                              title: h,
+                              content: (contentMap[key] || []).join("\n").trim(),
+                            };
+                          });
+                          if (sections.some((s) => s.content.length > 0)) {
+                            let carouselEl: HTMLDivElement | null = null;
+                            return (
+                              <div className="relative">
+                                <div className="absolute left-0 top-1/2 -translate-y-1/2 z-10">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      if (carouselEl) {
+                                        const w = carouselEl.clientWidth;
+                                        carouselEl.scrollBy({ left: -w, behavior: "smooth" });
+                                      }
+                                    }}
+                                    className="px-3 py-2 rounded-full bg-white/70 hover:bg-white border border-gray-200 shadow-sm text-gray-700"
+                                    aria-label="Previous"
                                   >
-                                    {children}
-                                  </code>
-                                );
-                              },
-                              // Custom styling for links
-                              a: ({ children, ...props }) => (
-                                <a
-                                  {...props}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="text-blue-600 hover:text-blue-700 transition-colors"
+                                    ←
+                                  </button>
+                                </div>
+                                <div className="absolute right-0 top-1/2 -translate-y-1/2 z-10">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      if (carouselEl) {
+                                        const w = carouselEl.clientWidth;
+                                        carouselEl.scrollBy({ left: w, behavior: "smooth" });
+                                      }
+                                    }}
+                                    className="px-3 py-2 rounded-full bg-white/70 hover:bg-white border border-gray-200 shadow-sm text-gray-700"
+                                    aria-label="Next"
+                                  >
+                                    →
+                                  </button>
+                                </div>
+                                <div
+                                  className="mx-auto w-full max-w-[900px] px-6"
                                 >
-                                  {children}
-                                </a>
-                              ),
-                            }}
-                          >
-                            {displayedDomainContext}
-                          </ReactMarkdown>
-                          {!isContextExpanded && hasAdditionalContext && (
-                            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-white via-white/85 to-transparent" />
-                          )}
-                        </div>
-
-                        {hasAdditionalContext && (
-                          <div className="flex justify-center mt-4">
-                            <button
-                              onClick={() =>
-                                setIsContextExpanded((prev) => !prev)
-                              }
-                              aria-expanded={isContextExpanded}
-                              className="inline-flex items-center space-x-2 px-5 py-2.5 rounded-full bg-gray-900 text-white text-sm font-medium shadow-lg shadow-gray-900/20 hover:bg-gray-800 transition-all duration-200"
+                                  <div
+                                    ref={(el) => {
+                                      carouselEl = el;
+                                    }}
+                                    className="flex gap-0 overflow-x-hidden snap-x snap-mandatory scroll-smooth pb-2"
+                                  >
+                                    {sections.map((sec, idx) => (
+                                      <div
+                                        key={sec.title}
+                                        className="min-w-full snap-start rounded-3xl border border-gray-100 bg-white p-8 shadow-sm"
+                                      >
+                                        <h3 className="text-xl sm:text-2xl font-light tracking-tight text-gray-900 mb-4 text-center">
+                                          {sec.title}
+                                        </h3>
+                                        <div className="prose prose-sm prose-gray max-w-none">
+                                          {sec.content ? (
+                                            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                              {sec.content}
+                                            </ReactMarkdown>
+                                          ) : (
+                                            <p className="text-gray-500 text-sm text-center">No content</p>
+                                          )}
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          }
+                          return (
+                            <div
+                              className="relative bg-white rounded-3xl p-8 sm:p-12 border border-gray-100 shadow-sm prose prose-lg prose-gray max-w-none mx-auto
+                              prose-headings:font-light prose-headings:text-gray-900 prose-headings:tracking-tight prose-headings:text-center
+                              prose-h1:text-3xl prose-h1:mb-6 prose-h1:mt-0
+                              prose-h2:text-2xl prose-h2:mb-5 prose-h2:mt-10
+                              prose-h3:text-xl prose-h3:mb-4 prose-h3:mt-8
+                              prose-p:text-gray-700 prose-p:leading-relaxed prose-p:mb-5 prose-p:text-center
+                              prose-strong:text-gray-900 prose-strong:font-medium
+                              prose-ul:my-6 prose-ul:pl-8 prose-ul:list-disc
+                              prose-ol:my-6 prose-ol:pl-8 prose-ol:list-decimal
+                              prose-li:text-gray-700 prose-li:my-3
+                              prose-a:text-blue-600 prose-a:no-underline hover:prose-a:underline
+                              prose-code:text-sm prose-code:bg-gray-100 prose-code:px-2 prose-code:py-1 prose-code:rounded prose-code:font-mono
+                              prose-pre:bg-gray-900 prose-pre:text-gray-100 prose-pre:rounded-2xl prose-pre:p-6 prose-pre:overflow-x-auto prose-pre:my-8
+                              prose-blockquote:border-l-4 prose-blockquote:border-gray-300 prose-blockquote:pl-6 prose-blockquote:italic prose-blockquote:text-gray-600 prose-blockquote:my-8
+                              prose-hr:border-gray-200 prose-hr:my-10
+                              prose-table:w-full prose-table:border-collapse prose-table:my-8
+                              prose-th:border prose-th:border-gray-300 prose-th:bg-gray-50 prose-th:px-5 prose-th:py-3 prose-th:text-left prose-th:font-medium prose-th:text-gray-900
+                              prose-td:border prose-td:border-gray-200 prose-td:px-5 prose-td:py-3 prose-td:text-gray-700
+                              prose-img:rounded-2xl prose-img:shadow-md prose-img:my-8 prose-img:mx-auto"
                             >
-                              <span>
-                                {isContextExpanded
-                                  ? "Show Less"
-                                  : "Read Full Analysis"}
-                              </span>
-                              <ChevronDown
-                                className={`w-4 h-4 transition-transform duration-200 ${
-                                  isContextExpanded ? "rotate-180" : ""
-                                }`}
-                              />
-                            </button>
-                          </div>
-                        )}
+                              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                {displayedDomainContext}
+                              </ReactMarkdown>
+                            </div>
+                          );
+                        })()}
                       </div>
                     )}
 
@@ -2633,9 +2694,7 @@ const handleRunAudit = async (url?: string) => {
                                               ),
                                               trend: "Stable",
                                               position: 0,
-                                              url: `https://${companyDomain}/${saveResult.keyword.term
-                                                .toLowerCase()
-                                                .replace(/\s+/g, "-")}`,
+                                              url: '',
                                               updated: new Date()
                                                 .toISOString()
                                                 .split("T")[0],
@@ -2939,9 +2998,6 @@ const handleRunAudit = async (url?: string) => {
                                               </span>
                                             )}
                                           </div>
-                                          <div className="text-xs text-gray-500 mt-0.5 truncate max-w-xs">
-                                            {keyword.url}
-                                          </div>
                                         </div>
                                       </div>
 
@@ -3046,7 +3102,7 @@ const handleRunAudit = async (url?: string) => {
                                               : "text-gray-700 hover:text-gray-900 hover:bg-gray-100"
                                           }`}
                                         >
-                                          <ChevronUp className="w-4 h-4 rotate-90" />
+                                          <ChevronDown className="w-4 h-4 rotate-90" />
                                           <span>Previous</span>
                                         </button>
 
@@ -3093,7 +3149,7 @@ const handleRunAudit = async (url?: string) => {
                                           }`}
                                         >
                                           <span>Next</span>
-                                          <ChevronUp className="w-4 h-4 -rotate-90" />
+                                          <ChevronDown className="w-4 h-4 -rotate-90" />
                                         </button>
                                       </div>
                                     </div>
@@ -3262,41 +3318,6 @@ const handleRunAudit = async (url?: string) => {
 
                     {/* Action Buttons */}
                     <div className="flex items-center justify-center gap-4 mt-12">
-                      <button
-                        onClick={() => {
-                          setShowResults(false);
-                          setCompanyDomain("");
-                          setDomainError("");
-                          setDomainContext("");
-                          setKeywords([]);
-                          setCreatedDomainId(null);
-                          setLoadingSteps([
-                            {
-                              name: "Domain Validation",
-                              status: "pending",
-                              progress: 0,
-                            },
-                            {
-                              name: "SSL Certificate Check",
-                              status: "pending",
-                              progress: 0,
-                            },
-                            {
-                              name: "Server Response Analysis",
-                              status: "pending",
-                              progress: 0,
-                            },
-                            {
-                              name: "Domain Extraction & Keyword Generation",
-                              status: "pending",
-                              progress: 0,
-                            },
-                          ]);
-                        }}
-                        className="px-6 py-3 bg-gray-100 text-gray-900 rounded-full hover:bg-gray-200 transition-all duration-200 text-base font-light"
-                      >
-                        Update Company Domain
-                      </button>
                       {createdDomainId && (
                         <button
                           onClick={() => {
@@ -4322,6 +4343,111 @@ const handleRunAudit = async (url?: string) => {
           ) : activeTab === 'profile' ? (
             <div className="max-w-8xl mx-auto px-4 sm:px-6 py-12 sm:py-16 space-y-12">
               <Profile />
+            </div>
+          ) : activeTab === 'settings' ? (
+            <div className="max-w-6xl mx-auto px-4 sm:px-6 py-12 sm:py-16">
+              <div className="bg-white rounded-3xl p-12 border border-gray-100 shadow-sm text-center">
+                <h2 className="text-2xl font-light text-black tracking-tight mb-3">
+                  Domain Settings
+                </h2>
+                <p className="text-base font-light text-gray-600 mb-8">
+                  Update your company domain
+                </p>
+                <div className="flex items-center justify-center gap-4">
+                  <button
+                    onClick={() => setConfirmUpdateOpen(true)}
+                    className="px-6 py-3 bg-gray-100 text-gray-900 rounded-full hover:bg-gray-200 transition-all duration-200 text-base font-light"
+                  >
+                    Update Company Domain
+                  </button>
+                </div>
+                {confirmUpdateOpen && (
+                  <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50">
+                    <div className="bg-white p-6 rounded-xl shadow-xl w-[90%] max-w-sm">
+                      <h2 className="text-lg font-medium text-gray-800">Remove Company Domain?</h2>
+                      <p className="text-sm text-gray-500 mt-2">
+                        This will remove your current company domain and take you to re-enter a new one.
+                      </p>
+                      <div className="flex justify-end gap-3 mt-6">
+                        <button
+                          onClick={() => { if (!updateLoading) setConfirmUpdateOpen(false); }}
+                          disabled={updateLoading}
+                          className="px-4 py-2 rounded-lg text-sm bg-gray-100 hover:bg-gray-200 disabled:opacity-60 disabled:cursor-not-allowed"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={async () => {
+                            if (updateLoading) return;
+                            setUpdateLoading(true);
+                            try {
+                              const resp = await fetch(`${import.meta.env.VITE_API_URL}/api/user/company-domain`, {
+                                headers: {
+                                  Authorization: `Bearer ${localStorage.getItem("authToken")}`,
+                                  "Content-Type": "application/json",
+                                },
+                              });
+                              if (resp.ok) {
+                                const data = await resp.json();
+                                const id = data?.domain?.id;
+                                if (id) {
+                                  await fetch(`${import.meta.env.VITE_API_URL}/api/domain/${id}`, {
+                                    method: "DELETE",
+                                    headers: {
+                                      Authorization: `Bearer ${localStorage.getItem("authToken")}`,
+                                      "Content-Type": "application/json",
+                                    },
+                                  });
+                                }
+                              }
+                            } catch (_) {
+                              // ignore
+                            } finally {
+                              setUpdateLoading(false);
+                              setConfirmUpdateOpen(false);
+                            }
+                            setActiveTab('analytics');
+                            setActiveCompanySubTab('company-info');
+                            setShowResults(false);
+                            setCompanyDomain("");
+                            setDomainError("");
+                            setDomainContext("");
+                            setKeywords([]);
+                            setKeywordsTableData([]);
+                            setCreatedDomainId(null);
+                            setLoadingSteps([
+                              {
+                                name: "Domain Validation",
+                                status: "pending",
+                                progress: 0,
+                              },
+                              {
+                                name: "SSL Certificate Check",
+                                status: "pending",
+                                progress: 0,
+                              },
+                              {
+                                name: "Server Response Analysis",
+                                status: "pending",
+                                progress: 0,
+                              },
+                              {
+                                name: "Domain Extraction & Keyword Generation",
+                                status: "pending",
+                                progress: 0,
+                              },
+                            ]);
+                          }}
+                          className="px-4 py-2 rounded-lg text-sm bg-black text-white hover:bg-black/90 disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2"
+                        >
+                          {updateLoading ? <ButtonSpinner /> : null}
+                          {updateLoading ? 'Updating…' : 'Confirm'}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           ) : (
             <div style={{

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,10 +14,15 @@ interface LoginProps {
 
 const Login: React.FC<LoginProps> = ({ onSwitchToRegister }) => {
   const { login, loading, error } = useAuth();
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(() => localStorage.getItem('lastLoginEmail') || '');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [verifiedMessage, setVerifiedMessage] = useState<string | null>(null);
+  const [lastAttemptEmail, setLastAttemptEmail] = useState<string>('');
+  const [resendLoading, setResendLoading] = useState(false);
+  const [resendSent, setResendSent] = useState(false);
+  const emailInputRef = useRef<HTMLInputElement>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,6 +34,10 @@ const Login: React.FC<LoginProps> = ({ onSwitchToRegister }) => {
     }
 
     try {
+      setLastAttemptEmail(email);
+      try {
+        localStorage.setItem('lastLoginEmail', email);
+      } catch {}
       await login(email, password);
     } catch (error) {
       setFormError(error instanceof Error ? error.message : 'Login failed');
@@ -36,6 +45,52 @@ const Login: React.FC<LoginProps> = ({ onSwitchToRegister }) => {
   };
 
   const displayError = formError || error;
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const verified = params.get('verified');
+    const registered = params.get('registered');
+    const registeredEmail = params.get('email');
+    if (verified === '1') {
+      setVerifiedMessage('Your email has been verified. You can now sign in.');
+    } else if (verified === 'expired') {
+      setVerifiedMessage('Verification link has expired. Please sign up again.');
+    } else if (verified === 'invalid') {
+      setVerifiedMessage('Invalid verification link.');
+    } else if (registered === '1') {
+      const msg = registeredEmail ? `Verification email sent to ${registeredEmail}. Please check your inbox.` : 'Verification email sent. Please check your inbox.';
+      setVerifiedMessage(msg);
+      if (registeredEmail) {
+        try {
+          localStorage.setItem('lastLoginEmail', registeredEmail);
+        } catch {}
+        setEmail(registeredEmail);
+      }
+    }
+  }, []);
+
+  const resendVerification = async () => {
+    const targetEmail = (email || lastAttemptEmail || '').trim();
+    if (!targetEmail) return;
+    setResendLoading(true);
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/auth/resend-verification`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: targetEmail })
+      });
+      if (!response.ok) {
+        throw new Error('Failed to resend email');
+      }
+      setVerifiedMessage('Verification email sent. Please check your inbox.');
+      setFormError(null);
+      setResendSent(true);
+    } catch (e) {
+      setFormError('Failed to resend email. Try again later.');
+    } finally {
+      setResendLoading(false);
+    }
+  };
 
   return (
     <div className="w-full px-6">
@@ -59,9 +114,29 @@ const Login: React.FC<LoginProps> = ({ onSwitchToRegister }) => {
 
         {/* Apple-style form */}
         <form onSubmit={handleSubmit} className="space-y-4">
+          {verifiedMessage && (
+            <div className="bg-green-50 border border-green-200 rounded-xl p-4">
+              <p className="text-sm text-green-700">{verifiedMessage}</p>
+            </div>
+          )}
           {displayError && (
             <div className="bg-red-50 border border-red-200 rounded-xl p-4">
               <p className="text-sm text-red-600">{displayError}</p>
+              {String(displayError).includes('verify your email') && !resendSent && (
+                <div className="mt-3 space-y-2">
+                  <div className="text-sm text-gray-700">
+                    {`Send verification to ${(email || lastAttemptEmail || localStorage.getItem('lastLoginEmail') || '').trim() || 'your email'}`}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={resendVerification}
+                    className="text-blue-600 hover:text-blue-800 font-medium text-sm"
+                    disabled={loading || resendLoading || !(email || lastAttemptEmail)}
+                  >
+                    {resendLoading ? 'Sending…' : 'Resend verification email'}
+                  </button>
+                </div>
+              )}
             </div>
           )}
           
@@ -75,6 +150,7 @@ const Login: React.FC<LoginProps> = ({ onSwitchToRegister }) => {
               onChange={(e) => setEmail(e.target.value)}
               className="peer w-full h-14 px-4 pt-6 pb-2 text-base border border-gray-300 rounded-xl focus:border-blue-500 focus:ring-0 focus:outline-none bg-white transition-colors"
               disabled={loading}
+              ref={emailInputRef}
             />
             <Label 
               htmlFor="email" 

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,6 +15,7 @@ interface RegisterProps {
 
 const Register: React.FC<RegisterProps> = ({ onSwitchToLogin }) => {
   const { register, loading, error } = useAuth();
+  const navigate = useNavigate();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -21,6 +23,8 @@ const Register: React.FC<RegisterProps> = ({ onSwitchToLogin }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
+  const [resendSent, setResendSent] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -46,8 +50,12 @@ const Register: React.FC<RegisterProps> = ({ onSwitchToLogin }) => {
       return;
     }
 
-    try {
+  try {
       await register(email, password, name || undefined);
+      localStorage.setItem('lastLoginEmail', email);
+      onSwitchToLogin();
+      navigate(`/auth?registered=1&email=${encodeURIComponent(email)}`);
+      setSuccess(true);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Registration failed';
       
@@ -61,6 +69,62 @@ const Register: React.FC<RegisterProps> = ({ onSwitchToLogin }) => {
   };
 
   const displayError = formError || error;
+
+  if (success) {
+    return (
+      <div className="w-full px-6">
+        <div className="w-full max-w-sm mx-auto rounded-2xl border border-gray-200 bg-white/80 supports-[backdrop-filter]:bg-white/60 backdrop-blur p-6 sm:p-8 shadow-sm">
+          <div className="text-center mb-6">
+            <div className="w-16 h-16 mx-auto bg-black rounded-2xl flex items-center justify-center mb-4">
+              <User className="h-8 w-8 text-white" />
+            </div>
+            <h1 className="text-2xl font-semibold text-gray-900 mb-2">
+              Check your email
+            </h1>
+            <p className="text-base text-gray-600">
+              We sent a verification link to {email}. Please confirm your email to continue.
+            </p>
+          </div>
+          <div className="space-y-3">
+            <Button
+              onClick={onSwitchToLogin}
+              className="w-full h-12 bg-black hover:bg-gray-800 text-white font-medium text-base rounded-xl transition-colors duration-200 shadow-sm"
+            >
+              Go to Sign In
+            </Button>
+            {!resendSent && (
+              <Button
+                onClick={async () => {
+                  try {
+                    const response = await fetch(`${import.meta.env.VITE_API_URL}/api/auth/resend-verification`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ email })
+                    });
+                    if (response.ok) {
+                      setFormError(null);
+                      setResendSent(true);
+                    } else {
+                      setFormError('Failed to resend email. Try again later.');
+                    }
+                  } catch {
+                    setFormError('Failed to resend email. Try again later.');
+                  }
+                }}
+                variant="outline"
+                className="w-full h-12"
+              >
+                Resend verification email
+              </Button>
+            )}
+            <p className="text-xs text-gray-500 text-center">
+              Didn’t receive the email? Check your spam folder or try again later.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full px-6">

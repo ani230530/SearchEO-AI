@@ -64,6 +64,10 @@ router.post('/login', asyncHandler(async (req: Request, res: Response) => {
         res.status(401).json({ error: error.message });
         return;
       }
+      if (error.message.includes('Please verify your email')) {
+        res.status(403).json({ error: error.message });
+        return;
+      }
     }
     throw error;
   }
@@ -165,6 +169,48 @@ router.post('/refresh', asyncHandler(async (req: Request, res: Response) => {
 router.post('/logout', authenticateToken, asyncHandler(async (req: Request, res: Response) => {
   await authService.invalidateRefreshToken(req.user!.userId);
   res.json({ message: 'Logged out successfully' });
+}));
+
+// POST /api/auth/resend-verification - Resend verification email
+router.post('/resend-verification', asyncHandler(async (req: Request, res: Response) => {
+  const { email } = req.body as { email?: string };
+  if (!email) {
+    res.status(400).json({ error: 'Email is required' });
+    return;
+  }
+  try {
+    await authService.resendVerificationEmail(email);
+    res.json({ message: 'If your account exists, a verification email has been sent.' });
+  } catch (error) {
+    res.json({ message: 'If your account exists, a verification email has been sent.' });
+  }
+}));
+
+// GET /api/auth/verify-email - Verify email with token
+router.get('/verify-email', asyncHandler(async (req: Request, res: Response) => {
+  const token = req.query.token as string | undefined;
+  if (!token) {
+    res.status(400).json({ error: 'Verification token is required' });
+    return;
+  }
+  try {
+    await authService.verifyEmailToken(token);
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    const redirectUrl = `${frontendUrl}/auth?verified=1`;
+    res.redirect(302, redirectUrl);
+  } catch (error) {
+    if (error instanceof Error) {
+      if (error.message.includes('expired')) {
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+        return res.redirect(302, `${frontendUrl}/auth?verified=expired`);
+      }
+      if (error.message.includes('Invalid verification token')) {
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+        return res.redirect(302, `${frontendUrl}/auth?verified=invalid`);
+      }
+    }
+    throw error;
+  }
 }));
 
 export default router; 
