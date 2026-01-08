@@ -15,10 +15,14 @@ const router = Router();
 const prisma = new PrismaClient();
 
 // Helper to compute aggregate job status
+// Job stays 'generating' until ALL pages are completed
+// Only mark as 'failed' if truly failed (not just incomplete)
 const computeJobStatus = (pages: { status: string }[]) => {
+  if (pages.length === 0) return 'pending';
   if (pages.every(p => p.status === 'completed')) return 'completed';
   if (pages.some(p => p.status === 'failed')) return 'failed';
-  if (pages.some(p => p.status === 'generating')) return 'generating';
+  // If any page is generating or pending, job is still generating
+  if (pages.some(p => p.status === 'generating' || p.status === 'pending')) return 'generating';
   return 'pending';
 };
 
@@ -116,6 +120,7 @@ interface SerializedKeyword {
   volume: number;
   difficulty: string;
   intent?: string | null;
+  aiMetadata?: any;
 }
 
 interface SerializedPage {
@@ -145,17 +150,45 @@ const serializeKeyword = (keyword: SerializedKeyword | PageWithRelations['keywor
   term: keyword.term,
   volume: keyword.volume ?? 0,
   difficulty: keyword.difficulty || DEFAULT_KEYWORD_DIFFICULTY,
-  intent: keyword.intent ?? null
+  intent: keyword.intent ?? null,
+  aiMetadata: (keyword as any).aiMetadata
 });
 
-const serializePage = (page: PageWithRelations): SerializedPage => ({
-  id: page.id,
-  title: page.title,
-  description: page.description || null,
-  summary: page.summary || page.aiSummary || null,
-  pageType: page.pageType,
-  keywords: page.keywords.map(serializeKeyword)
-});
+const serializePage = (page: PageWithRelations): SerializedPage => {
+  const serializedKeywords = page.keywords.map(serializeKeyword);
+
+  // Check if any keyword is explicitly marked as primary
+  const hasExplicitPrimary = serializedKeywords.some(k => k.aiMetadata?.isPrimary === true);
+
+  if (!hasExplicitPrimary && serializedKeywords.length > 0) {
+    // Mark first as primary
+    serializedKeywords[0].aiMetadata = {
+      ...(serializedKeywords[0].aiMetadata || {}),
+      isPrimary: true,
+      isLongtail: false
+    };
+
+    // Mark rest as longtail if not already set
+    for (let i = 1; i < serializedKeywords.length; i++) {
+      if (!serializedKeywords[i].aiMetadata?.isLongtail && !serializedKeywords[i].aiMetadata?.isPrimary) {
+        serializedKeywords[i].aiMetadata = {
+          ...(serializedKeywords[i].aiMetadata || {}),
+          isPrimary: false,
+          isLongtail: true
+        };
+      }
+    }
+  }
+
+  return {
+    id: page.id,
+    title: page.title,
+    description: page.description || null,
+    summary: page.summary || page.aiSummary || null,
+    pageType: page.pageType,
+    keywords: serializedKeywords
+  };
+};
 
 const serializeTopic = (topic: TopicWithRelations): SerializedTopic => {
   const pillar = topic.pages.find((page) => page.pageType === CampaignPageType.PILLAR) || null;

@@ -9,19 +9,22 @@ datasource db {
 }
 
 model User {
-  id                   Int                            @id @default(autoincrement())
-  email                String                         @unique
-  password             String
-  name                 String?
-  refreshToken         String?
-  refreshTokenExpiry   DateTime?
-  createdAt            DateTime                       @default(now())
-  updatedAt            DateTime                       @updatedAt
-  domains              Domain[]
-  googleSearchConsole  GoogleSearchConsoleConnection?
-  wordpressIntegration WordpressIntegration?
-  publishLogs          WordpressPublishLog[]
-  generationJobs       GenerationJob[]
+  id                           Int                            @id @default(autoincrement())
+  email                        String                         @unique
+  password                     String
+  name                         String?
+  refreshToken                 String?
+  refreshTokenExpiry           DateTime?
+  emailVerified                Boolean                        @default(false)
+  emailVerificationToken       String?
+  emailVerificationTokenExpiry DateTime?
+  createdAt                    DateTime                       @default(now())
+  updatedAt                    DateTime                       @updatedAt
+  domains                      Domain[]
+  googleSearchConsole          GoogleSearchConsoleConnection?
+  wordpressIntegration         WordpressIntegration?
+  publishLogs                  WordpressPublishLog[]
+  generationJobs               GenerationJob[]
 }
 
 model Domain {

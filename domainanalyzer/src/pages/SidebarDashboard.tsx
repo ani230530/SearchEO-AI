@@ -275,6 +275,8 @@ const [activeChartTab, setActiveChartTab] = useState<'overview' | 'comparison' |
   const [showAddKeyword, setShowAddKeyword] = useState(false);
   const [newKeyword, setNewKeyword] = useState("");
   const [isAddingKeyword, setIsAddingKeyword] = useState(false);
+  const [confirmUpdateOpen, setConfirmUpdateOpen] = useState(false);
+  const [updateLoading, setUpdateLoading] = useState(false);
   const [showCountByCompetition, setShowCountByCompetition] = useState<
     Record<string, number>
   >({
@@ -2315,8 +2317,16 @@ const handleRunAudit = async (url?: string) => {
                   <div className="inline-flex items-center gap-3 bg-blue-50 border border-blue-200 text-blue-700 px-5 py-3 rounded-2xl shadow-sm">
                     <img
                       src={`https://www.google.com/s2/favicons?domain=${companyDomain}&sz=64`}
+                      srcSet={`https://www.google.com/s2/favicons?domain=${companyDomain}&sz=64 1x, https://www.google.com/s2/favicons?domain=${companyDomain}&sz=128 2x, https://www.google.com/s2/favicons?domain=${companyDomain}&sz=256 4x`}
+                      sizes="32px"
                       alt="favicon"
+                      width={32}
+                      height={32}
                       className="w-8 h-8 rounded-md"
+                      onError={(e) => {
+                        e.currentTarget.src = `https://logo.clearbit.com/${companyDomain}`;
+                        e.currentTarget.srcset = '';
+                      }}
                     />
                     <span className="font-medium text-lg tracking-tight">
                       {" "}
@@ -2344,91 +2354,143 @@ const handleRunAudit = async (url?: string) => {
                     {/* Domain Context - Centered and Wide */}
                     {domainContext && (
                       <div className="mb-16">
-                        <div
-                          className="relative bg-white rounded-3xl p-8 sm:p-12 border border-gray-100 shadow-sm prose prose-lg prose-gray max-w-none mx-auto
-                          prose-headings:font-light prose-headings:text-gray-900 prose-headings:tracking-tight prose-headings:text-center
-                          prose-h1:text-3xl prose-h1:mb-6 prose-h1:mt-0
-                          prose-h2:text-2xl prose-h2:mb-5 prose-h2:mt-10
-                          prose-h3:text-xl prose-h3:mb-4 prose-h3:mt-8
-                          prose-p:text-gray-700 prose-p:leading-relaxed prose-p:mb-5 prose-p:text-center
-                          prose-strong:text-gray-900 prose-strong:font-medium
-                          prose-ul:my-6 prose-ul:pl-8 prose-ul:list-disc
-                          prose-ol:my-6 prose-ol:pl-8 prose-ol:list-decimal
-                          prose-li:text-gray-700 prose-li:my-3
-                          prose-a:text-blue-600 prose-a:no-underline hover:prose-a:underline
-                          prose-code:text-sm prose-code:bg-gray-100 prose-code:px-2 prose-code:py-1 prose-code:rounded prose-code:font-mono
-                          prose-pre:bg-gray-900 prose-pre:text-gray-100 prose-pre:rounded-2xl prose-pre:p-6 prose-pre:overflow-x-auto prose-pre:my-8
-                          prose-blockquote:border-l-4 prose-blockquote:border-gray-300 prose-blockquote:pl-6 prose-blockquote:italic prose-blockquote:text-gray-600 prose-blockquote:my-8
-                          prose-hr:border-gray-200 prose-hr:my-10
-                          prose-table:w-full prose-table:border-collapse prose-table:my-8
-                          prose-th:border prose-th:border-gray-300 prose-th:bg-gray-50 prose-th:px-5 prose-th:py-3 prose-th:text-left prose-th:font-medium prose-th:text-gray-900
-                          prose-td:border prose-td:border-gray-200 prose-td:px-5 prose-td:py-3 prose-td:text-gray-700
-                          prose-img:rounded-2xl prose-img:shadow-md prose-img:my-8 prose-img:mx-auto"
-                        >
-                          <ReactMarkdown
-                            remarkPlugins={[remarkGfm]}
-                            components={{
-                              // Custom styling for code blocks
-                              code: ({ className, children, ...props }) => {
-                                const match = /language-(\w+)/.exec(
-                                  className || ""
-                                );
-                                const isInline = !match;
-                                return isInline ? (
-                                  <code className={className} {...props}>
-                                    {children}
-                                  </code>
-                                ) : (
-                                  <code
-                                    className={`${className} block`}
-                                    {...props}
+                        {(() => {
+                          const full = domainContext;
+                          const headers = [
+                            "BUSINESS MODEL ANALYSIS",
+                            "TARGET AUDIENCE PROFILING",
+                            "VALUE PROPOSITION & POSITIONING",
+                            "SEO & CONTENT STRATEGY INSIGHTS",
+                            "COMPETITIVE INTELLIGENCE",
+                            "MARKET DYNAMICS",
+                            "LOCATION-BASED SEO ANALYSIS",
+                            "SEO OPPORTUNITY ANALYSIS",
+                          ];
+                          const normalize = (s: string) =>
+                            s
+                              .replace(/\*\*/g, "")
+                              .replace(/^\s*\d+\.\s*/, "")
+                              .replace(/[:]+$/, "")
+                              .trim()
+                              .toUpperCase();
+                          const target = headers.map((h) => normalize(h));
+                          const lines = full.split(/\r?\n/);
+                          const contentMap: Record<string, string[]> = {};
+                          target.forEach((t) => (contentMap[t] = []));
+                          let current: string | null = null;
+                          for (const line of lines) {
+                            const n = normalize(line);
+                            const matched = target.find((t) => n.startsWith(t) || n.includes(t));
+                            if (matched) {
+                              current = matched;
+                              continue;
+                            }
+                            if (current) {
+                              contentMap[current].push(line);
+                            }
+                          }
+                          const sections = headers.map((h) => {
+                            const key = normalize(h);
+                            return {
+                              title: h,
+                              content: (contentMap[key] || []).join("\n").trim(),
+                            };
+                          });
+                          if (sections.some((s) => s.content.length > 0)) {
+                            let carouselEl: HTMLDivElement | null = null;
+                            return (
+                              <div className="relative">
+                                <div className="absolute left-0 top-1/2 -translate-y-1/2 z-10">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      if (carouselEl) {
+                                        const w = carouselEl.clientWidth;
+                                        carouselEl.scrollBy({ left: -w, behavior: "smooth" });
+                                      }
+                                    }}
+                                    className="px-3 py-2 rounded-full bg-white/70 hover:bg-white border border-gray-200 shadow-sm text-gray-700"
+                                    aria-label="Previous"
                                   >
-                                    {children}
-                                  </code>
-                                );
-                              },
-                              // Custom styling for links
-                              a: ({ children, ...props }) => (
-                                <a
-                                  {...props}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="text-blue-600 hover:text-blue-700 transition-colors"
+                                    ←
+                                  </button>
+                                </div>
+                                <div className="absolute right-0 top-1/2 -translate-y-1/2 z-10">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      if (carouselEl) {
+                                        const w = carouselEl.clientWidth;
+                                        carouselEl.scrollBy({ left: w, behavior: "smooth" });
+                                      }
+                                    }}
+                                    className="px-3 py-2 rounded-full bg-white/70 hover:bg-white border border-gray-200 shadow-sm text-gray-700"
+                                    aria-label="Next"
+                                  >
+                                    →
+                                  </button>
+                                </div>
+                                <div
+                                  className="mx-auto w-full max-w-[900px] px-6"
                                 >
-                                  {children}
-                                </a>
-                              ),
-                            }}
-                          >
-                            {displayedDomainContext}
-                          </ReactMarkdown>
-                          {!isContextExpanded && hasAdditionalContext && (
-                            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-white via-white/85 to-transparent" />
-                          )}
-                        </div>
-
-                        {hasAdditionalContext && (
-                          <div className="flex justify-center mt-4">
-                            <button
-                              onClick={() =>
-                                setIsContextExpanded((prev) => !prev)
-                              }
-                              aria-expanded={isContextExpanded}
-                              className="inline-flex items-center space-x-2 px-5 py-2.5 rounded-full bg-gray-900 text-white text-sm font-medium shadow-lg shadow-gray-900/20 hover:bg-gray-800 transition-all duration-200"
+                                  <div
+                                    ref={(el) => {
+                                      carouselEl = el;
+                                    }}
+                                    className="flex gap-0 overflow-x-hidden snap-x snap-mandatory scroll-smooth pb-2"
+                                  >
+                                    {sections.map((sec, idx) => (
+                                      <div
+                                        key={sec.title}
+                                        className="min-w-full snap-start rounded-3xl border border-gray-100 bg-white p-8 shadow-sm"
+                                      >
+                                        <h3 className="text-xl sm:text-2xl font-light tracking-tight text-gray-900 mb-4 text-center">
+                                          {sec.title}
+                                        </h3>
+                                        <div className="prose prose-sm prose-gray max-w-none">
+                                          {sec.content ? (
+                                            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                              {sec.content}
+                                            </ReactMarkdown>
+                                          ) : (
+                                            <p className="text-gray-500 text-sm text-center">No content</p>
+                                          )}
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          }
+                          return (
+                            <div
+                              className="relative bg-white rounded-3xl p-8 sm:p-12 border border-gray-100 shadow-sm prose prose-lg prose-gray max-w-none mx-auto
+                              prose-headings:font-light prose-headings:text-gray-900 prose-headings:tracking-tight prose-headings:text-center
+                              prose-h1:text-3xl prose-h1:mb-6 prose-h1:mt-0
+                              prose-h2:text-2xl prose-h2:mb-5 prose-h2:mt-10
+                              prose-h3:text-xl prose-h3:mb-4 prose-h3:mt-8
+                              prose-p:text-gray-700 prose-p:leading-relaxed prose-p:mb-5 prose-p:text-center
+                              prose-strong:text-gray-900 prose-strong:font-medium
+                              prose-ul:my-6 prose-ul:pl-8 prose-ul:list-disc
+                              prose-ol:my-6 prose-ol:pl-8 prose-ol:list-decimal
+                              prose-li:text-gray-700 prose-li:my-3
+                              prose-a:text-blue-600 prose-a:no-underline hover:prose-a:underline
+                              prose-code:text-sm prose-code:bg-gray-100 prose-code:px-2 prose-code:py-1 prose-code:rounded prose-code:font-mono
+                              prose-pre:bg-gray-900 prose-pre:text-gray-100 prose-pre:rounded-2xl prose-pre:p-6 prose-pre:overflow-x-auto prose-pre:my-8
+                              prose-blockquote:border-l-4 prose-blockquote:border-gray-300 prose-blockquote:pl-6 prose-blockquote:italic prose-blockquote:text-gray-600 prose-blockquote:my-8
+                              prose-hr:border-gray-200 prose-hr:my-10
+                              prose-table:w-full prose-table:border-collapse prose-table:my-8
+                              prose-th:border prose-th:border-gray-300 prose-th:bg-gray-50 prose-th:px-5 prose-th:py-3 prose-th:text-left prose-th:font-medium prose-th:text-gray-900
+                              prose-td:border prose-td:border-gray-200 prose-td:px-5 prose-td:py-3 prose-td:text-gray-700
+                              prose-img:rounded-2xl prose-img:shadow-md prose-img:my-8 prose-img:mx-auto"
                             >
-                              <span>
-                                {isContextExpanded
-                                  ? "Show Less"
-                                  : "Read Full Analysis"}
-                              </span>
-                              <ChevronDown
-                                className={`w-4 h-4 transition-transform duration-200 ${
-                                  isContextExpanded ? "rotate-180" : ""
-                                }`}
-                              />
-                            </button>
-                          </div>
-                        )}
+                              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                {displayedDomainContext}
+                              </ReactMarkdown>
+                            </div>
+                          );
+                        })()}
                       </div>
                     )}
 
@@ -2633,9 +2695,7 @@ const handleRunAudit = async (url?: string) => {
                                               ),
                                               trend: "Stable",
                                               position: 0,
-                                              url: `https://${companyDomain}/${saveResult.keyword.term
-                                                .toLowerCase()
-                                                .replace(/\s+/g, "-")}`,
+                                              url: '',
                                               updated: new Date()
                                                 .toISOString()
                                                 .split("T")[0],
@@ -2938,9 +2998,6 @@ const handleRunAudit = async (url?: string) => {
                                                 Custom
                                               </span>
                                             )}
-                                          </div>
-                                          <div className="text-xs text-gray-500 mt-0.5 truncate max-w-xs">
-                                            {keyword.url}
                                           </div>
                                         </div>
                                       </div>
@@ -3262,41 +3319,6 @@ const handleRunAudit = async (url?: string) => {
 
                     {/* Action Buttons */}
                     <div className="flex items-center justify-center gap-4 mt-12">
-                      <button
-                        onClick={() => {
-                          setShowResults(false);
-                          setCompanyDomain("");
-                          setDomainError("");
-                          setDomainContext("");
-                          setKeywords([]);
-                          setCreatedDomainId(null);
-                          setLoadingSteps([
-                            {
-                              name: "Domain Validation",
-                              status: "pending",
-                              progress: 0,
-                            },
-                            {
-                              name: "SSL Certificate Check",
-                              status: "pending",
-                              progress: 0,
-                            },
-                            {
-                              name: "Server Response Analysis",
-                              status: "pending",
-                              progress: 0,
-                            },
-                            {
-                              name: "Domain Extraction & Keyword Generation",
-                              status: "pending",
-                              progress: 0,
-                            },
-                          ]);
-                        }}
-                        className="px-6 py-3 bg-gray-100 text-gray-900 rounded-full hover:bg-gray-200 transition-all duration-200 text-base font-light"
-                      >
-                        Update Company Domain
-                      </button>
                       {createdDomainId && (
                         <button
                           onClick={() => {
@@ -4323,6 +4345,111 @@ const handleRunAudit = async (url?: string) => {
             <div className="max-w-8xl mx-auto px-4 sm:px-6 py-12 sm:py-16 space-y-12">
               <Profile />
             </div>
+          ) : activeTab === 'settings' ? (
+            <div className="max-w-6xl mx-auto px-4 sm:px-6 py-12 sm:py-16">
+              <div className="bg-white rounded-3xl p-12 border border-gray-100 shadow-sm text-center">
+                <h2 className="text-2xl font-light text-black tracking-tight mb-3">
+                  Domain Settings
+                </h2>
+                <p className="text-base font-light text-gray-600 mb-8">
+                  Update your company domain
+                </p>
+                <div className="flex items-center justify-center gap-4">
+                  <button
+                    onClick={() => setConfirmUpdateOpen(true)}
+                    className="px-6 py-3 bg-gray-100 text-gray-900 rounded-full hover:bg-gray-200 transition-all duration-200 text-base font-light"
+                  >
+                    Update Company Domain
+                  </button>
+                </div>
+                {confirmUpdateOpen && (
+                  <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50">
+                    <div className="bg-white p-6 rounded-xl shadow-xl w-[90%] max-w-sm">
+                      <h2 className="text-lg font-medium text-gray-800">Remove Company Domain?</h2>
+                      <p className="text-sm text-gray-500 mt-2">
+                        This will remove your current company domain and take you to re-enter a new one.
+                      </p>
+                      <div className="flex justify-end gap-3 mt-6">
+                        <button
+                          onClick={() => { if (!updateLoading) setConfirmUpdateOpen(false); }}
+                          disabled={updateLoading}
+                          className="px-4 py-2 rounded-lg text-sm bg-gray-100 hover:bg-gray-200 disabled:opacity-60 disabled:cursor-not-allowed"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={async () => {
+                            if (updateLoading) return;
+                            setUpdateLoading(true);
+                            try {
+                              const resp = await fetch(`${import.meta.env.VITE_API_URL}/api/user/company-domain`, {
+                                headers: {
+                                  Authorization: `Bearer ${localStorage.getItem("authToken")}`,
+                                  "Content-Type": "application/json",
+                                },
+                              });
+                              if (resp.ok) {
+                                const data = await resp.json();
+                                const id = data?.domain?.id;
+                                if (id) {
+                                  await fetch(`${import.meta.env.VITE_API_URL}/api/domain/${id}`, {
+                                    method: "DELETE",
+                                    headers: {
+                                      Authorization: `Bearer ${localStorage.getItem("authToken")}`,
+                                      "Content-Type": "application/json",
+                                    },
+                                  });
+                                }
+                              }
+                            } catch (_) {
+                              // ignore
+                            } finally {
+                              setUpdateLoading(false);
+                              setConfirmUpdateOpen(false);
+                            }
+                            setActiveTab('analytics');
+                            setActiveCompanySubTab('company-info');
+                            setShowResults(false);
+                            setCompanyDomain("");
+                            setDomainError("");
+                            setDomainContext("");
+                            setKeywords([]);
+                            setKeywordsTableData([]);
+                            setCreatedDomainId(null);
+                            setLoadingSteps([
+                              {
+                                name: "Domain Validation",
+                                status: "pending",
+                                progress: 0,
+                              },
+                              {
+                                name: "SSL Certificate Check",
+                                status: "pending",
+                                progress: 0,
+                              },
+                              {
+                                name: "Server Response Analysis",
+                                status: "pending",
+                                progress: 0,
+                              },
+                              {
+                                name: "Domain Extraction & Keyword Generation",
+                                status: "pending",
+                                progress: 0,
+                              },
+                            ]);
+                          }}
+                          className="px-4 py-2 rounded-lg text-sm bg-black text-white hover:bg-black/90 disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2"
+                        >
+                          {updateLoading ? <ButtonSpinner /> : null}
+                          {updateLoading ? 'Updating…' : 'Confirm'}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
           ) : (
             <div style={{
               background: 'rgba(255, 255, 255, 0.8)',
@@ -4424,6 +4551,116 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
   const [keywordSearchOpen, setKeywordSearchOpen] = useState(false);
   const [keywordSearchValue, setKeywordSearchValue] = useState('');
   const [loadingKeywords, setLoadingKeywords] = useState(false);
+  const [keywordPickerDrawerOpen, setKeywordPickerDrawerOpen] = useState(false);
+  const [drawerSearchTerm, setDrawerSearchTerm] = useState('');
+  const [drawerCompetition, setDrawerCompetition] = useState('');
+  const [drawerIntent, setDrawerIntent] = useState('');
+  const [drawerViewMode, setDrawerViewMode] = useState<"table" | "cards">("table");
+  const [drawerSortConfig, setDrawerSortConfig] = useState<{ key: keyof KeywordTableItem; direction: "asc" | "desc" } | null>(null);
+  const [drawerCurrentPage, setDrawerCurrentPage] = useState(1);
+  const [drawerItemsPerPage, setDrawerItemsPerPage] = useState(10);
+  const drawerFilteredKeywords = React.useMemo(() => {
+    return keywordsTableData.filter((keyword) => {
+      const matchesSearch = keyword.keyword.toLowerCase().includes(drawerSearchTerm.toLowerCase());
+      const matchesCompetition = !drawerCompetition || keyword.competition === drawerCompetition;
+      const matchesIntent = !drawerIntent || keyword.intent === drawerIntent;
+      return matchesSearch && matchesCompetition && matchesIntent;
+    });
+  }, [keywordsTableData, drawerSearchTerm, drawerCompetition, drawerIntent]);
+  const drawerSortedKeywords = React.useMemo(() => {
+    const sortableKeywords = [...drawerFilteredKeywords];
+    if (drawerSortConfig !== null) {
+      sortableKeywords.sort((a, b) => {
+        const aValue = a[drawerSortConfig.key];
+        const bValue = b[drawerSortConfig.key];
+        if (typeof aValue === "number" && typeof bValue === "number") {
+          return drawerSortConfig.direction === "asc" ? aValue - bValue : bValue - aValue;
+        }
+        const aStr = String(aValue).toLowerCase();
+        const bStr = String(bValue).toLowerCase();
+        if (aStr < bStr) {
+          return drawerSortConfig.direction === "asc" ? -1 : 1;
+        }
+        if (aStr > bStr) {
+          return drawerSortConfig.direction === "asc" ? 1 : -1;
+        }
+        return 0;
+      });
+    }
+    return sortableKeywords;
+  }, [drawerFilteredKeywords, drawerSortConfig]);
+  const drawerTotalPages = Math.max(1, Math.ceil(drawerSortedKeywords.length / drawerItemsPerPage));
+  const drawerStartIndex = (drawerCurrentPage - 1) * drawerItemsPerPage;
+  const drawerEndIndex = drawerStartIndex + drawerItemsPerPage;
+  const drawerCurrentKeywords = drawerSortedKeywords.slice(drawerStartIndex, drawerEndIndex);
+  const drawerHandleSort = useCallback((key: keyof KeywordTableItem) => {
+    let direction: "asc" | "desc" = "asc";
+    if (drawerSortConfig && drawerSortConfig.key === key && drawerSortConfig.direction === "asc") {
+      direction = "desc";
+    }
+    setDrawerSortConfig({ key, direction });
+  }, [drawerSortConfig]);
+  const drawerGetSortIcon = useCallback((key: keyof KeywordTableItem) => {
+    if (!drawerSortConfig || drawerSortConfig.key !== key) {
+      return <ArrowUpDown className="w-4 h-4 text-gray-400" />;
+    }
+    return drawerSortConfig.direction === "asc" ? (
+      <ChevronUp className="w-4 h-4 text-gray-700" />
+    ) : (
+      <ChevronDown className="w-4 h-4 text-gray-700" />
+    );
+  }, [drawerSortConfig]);
+  const drawerHandlePageChange = useCallback((page: number) => {
+    const totalPagesCalc = Math.max(1, Math.ceil(drawerSortedKeywords.length / drawerItemsPerPage));
+    if (page >= 1 && page <= totalPagesCalc) {
+      setDrawerCurrentPage(page);
+    }
+  }, [drawerSortedKeywords.length, drawerItemsPerPage]);
+  const drawerGetPageNumbers = useCallback(() => {
+    const pages: Array<number | string> = [];
+    const maxVisiblePages = 5;
+    if (drawerTotalPages <= maxVisiblePages) {
+      for (let i = 1; i <= drawerTotalPages; i++) {
+        pages.push(i);
+      }
+    } else {
+      if (drawerCurrentPage <= 3) {
+        for (let i = 1; i <= 4; i++) {
+          pages.push(i);
+        }
+        pages.push("...");
+        pages.push(drawerTotalPages);
+      } else if (drawerCurrentPage >= drawerTotalPages - 2) {
+        pages.push(1);
+        pages.push("...");
+        for (let i = drawerTotalPages - 3; i <= drawerTotalPages; i++) {
+          pages.push(i);
+        }
+      } else {
+        pages.push(1);
+        pages.push("...");
+        for (let i = drawerCurrentPage - 1; i <= drawerCurrentPage + 1; i++) {
+          pages.push(i);
+        }
+        pages.push("...");
+        pages.push(drawerTotalPages);
+      }
+    }
+    return pages;
+  }, [drawerTotalPages, drawerCurrentPage]);
+  const drawerCompetitionBadge = useCallback((competition: string) => {
+    const baseClasses = "px-2.5 py-1 rounded-full text-xs font-semibold";
+    switch (competition) {
+      case "High":
+        return `${baseClasses} bg-red-100 text-red-800`;
+      case "Medium":
+        return `${baseClasses} bg-yellow-100 text-yellow-800`;
+      case "Low":
+        return `${baseClasses} bg-green-100 text-green-800`;
+      default:
+        return `${baseClasses} bg-gray-100 text-gray-800`;
+    }
+  }, []);
 
   const [targetTopicId, setTargetTopicId] = useState<number | null>(null);
   const { toast } = useToast();
@@ -4457,6 +4694,30 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
   const [viewLoadingPageId, setViewLoadingPageId] = useState<number | null>(null);
   const [closePreviewLoading, setClosePreviewLoading] = useState(false);
   const [publishLoadingPageId, setPublishLoadingPageId] = useState<number | null>(null);
+  
+  // Streaming progress state
+  const [streamingMessages, setStreamingMessages] = useState<Map<string, Array<{
+    message: string;
+    timestamp: string;
+  }>>>(new Map());
+  const [jobIdToTopicId, setJobIdToTopicId] = useState<Map<string, number>>(new Map());
+  
+  // Active generation tracking - track last streaming timestamp per jobId
+  const [lastStreamingTimestamp, setLastStreamingTimestamp] = useState<Map<string, number>>(new Map());
+  
+  // Backend job status tracking - stores backend's view of job status
+  const [backendJobStatus, setBackendJobStatus] = useState<Map<string, {
+    status: 'pending' | 'generating' | 'completed' | 'failed';
+    pages: Array<{ pageId: number; status: string; progress: number }>;
+  }>>(new Map());
+  
+  // Helper to check if generation is active (streaming received within last 10 minutes)
+  const isGenerationActive = useCallback((jobId: string): boolean => {
+    const lastTimestamp = lastStreamingTimestamp.get(jobId);
+    if (!lastTimestamp) return false;
+    const now = Date.now();
+    return (now - lastTimestamp) < 10 * 60 * 1000; // 10 minutes
+  }, [lastStreamingTimestamp]);
 
   const getAuthHeaders = useCallback((): HeadersInit => {
     const token = localStorage.getItem("authToken");
@@ -4470,6 +4731,49 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
     localStorage.removeItem("authToken");
     window.location.href = "/auth";
   }, []);
+
+  // Helper function to extract topicId from jobId pattern
+  const extractTopicIdFromJobId = useCallback((jobId: string): number | null => {
+    // JobId format: job_{topicId}_{timestamp}
+    const match = jobId.match(/^job_(\d+)_/);
+    return match ? parseInt(match[1], 10) : null;
+  }, []);
+
+  // Handle streaming progress updates
+  const handleStreamingUpdate = useCallback((jobId: string | undefined, message: string | undefined, timestamp: string | undefined) => {
+    if (!jobId || !message) return;
+    
+    const topicId = extractTopicIdFromJobId(jobId);
+    if (!topicId) return;
+    
+    // Store jobId -> topicId mapping
+    setJobIdToTopicId(prev => {
+      const updated = new Map(prev);
+      updated.set(jobId, topicId);
+      return updated;
+    });
+    
+    // Update last streaming timestamp (marks generation as active)
+    const now = Date.now();
+    setLastStreamingTimestamp(prev => {
+      const updated = new Map(prev);
+      updated.set(jobId, now);
+      return updated;
+    });
+    
+    // Add message to streaming messages
+    setStreamingMessages(prev => {
+      const updated = new Map(prev);
+      const messages = updated.get(jobId) || [];
+      const newMessages = [
+        ...messages,
+        { message, timestamp: timestamp || new Date().toISOString() }
+      ];
+      // Keep last 10 messages per job
+      updated.set(jobId, newMessages.slice(-10));
+      return updated;
+    });
+  }, [extractTopicIdFromJobId]);
 
   // Subscribe to server-sent events for generation status (replaces polling)
   useEffect(() => {
@@ -4485,31 +4789,57 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
         const data = JSON.parse(event.data) as {
           type?: string;
           jobId?: string;
+          message?: string;
+          timestamp?: string;
           pages?: Partial<GenerationPageStatus & { pageType: string; hasHtml?: boolean; error?: string | null }>[];
         };
-        if (data?.type !== 'drafts' || !data.pages) return;
-
-        setGenerationJobs((prev) => {
-          const updated = new Map(prev);
-          data.pages!.forEach((p) => {
-            const pageId = p.pageId;
-            if (!pageId) return;
-            const existing = updated.get(pageId);
-            updated.set(pageId, {
-              jobId: data.jobId || existing?.jobId || '',
-              pageId,
-              pageType: p.pageType === 'subpage' ? 'subpage' : 'pillar',
-              status: (p.status || existing?.status || 'generating') as GenerationPageStatus['status'],
-              draftId: p.draftId ?? existing?.draftId,
-              progress: typeof p.progress === 'number' ? p.progress : p.hasHtml ? 100 : existing?.progress,
-              primaryKeyword: p.primaryKeyword ?? existing?.primaryKeyword,
-              hasHtml: p.hasHtml ?? existing?.hasHtml,
-              updatedAt: new Date().toISOString(),
-              error: p.error ?? existing?.error ?? null,
+        
+        // Handle streaming progress updates
+        if (data.type === 'streaming') {
+          handleStreamingUpdate(data.jobId, data.message, data.timestamp);
+          return;
+        }
+        
+        // Handle draft updates
+        if (data.type === 'drafts' && data.pages) {
+          setGenerationJobs((prev) => {
+            const updated = new Map(prev);
+            data.pages!.forEach((p) => {
+              const pageId = p.pageId;
+              if (!pageId) return;
+              const existing = updated.get(pageId);
+              const jobId = data.jobId || existing?.jobId || '';
+              
+              // Clear streaming messages and timestamps when generation completes
+              if (p.status === 'completed' && jobId) {
+                setStreamingMessages(prevMsgs => {
+                  const updatedMsgs = new Map(prevMsgs);
+                  updatedMsgs.delete(jobId);
+                  return updatedMsgs;
+                });
+                setLastStreamingTimestamp(prev => {
+                  const updated = new Map(prev);
+                  updated.delete(jobId);
+                  return updated;
+                });
+              }
+              
+              updated.set(pageId, {
+                jobId,
+                pageId,
+                pageType: p.pageType === 'subpage' ? 'subpage' : 'pillar',
+                status: (p.status || existing?.status || 'generating') as GenerationPageStatus['status'],
+                draftId: p.draftId ?? existing?.draftId,
+                progress: typeof p.progress === 'number' ? p.progress : p.hasHtml ? 100 : existing?.progress,
+                primaryKeyword: p.primaryKeyword ?? existing?.primaryKeyword,
+                hasHtml: p.hasHtml ?? existing?.hasHtml,
+                updatedAt: new Date().toISOString(),
+                error: p.error ?? existing?.error ?? null,
+              });
             });
+            return updated;
           });
-          return updated;
-        });
+        }
       } catch (err) {
         console.error('Failed to parse SSE payload', err);
       }
@@ -4523,7 +4853,98 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
     return () => {
       eventSource.close();
     };
-  }, []);
+  }, [handleStreamingUpdate]);
+
+  // Periodic polling for active generation jobs
+  useEffect(() => {
+    const pollJobStatus = async (jobId: string) => {
+      try {
+        const response = await fetch(
+          `${API_BASE_URL}/api/campaigns/generation-status/${jobId}`,
+          { headers: getAuthHeaders() }
+        );
+
+        if (response.status === 401 || response.status === 403) {
+          handleUnauthorized();
+          return;
+        }
+
+        if (!response.ok) return;
+
+        const data = await response.json();
+        if (!data.success || !data.status) return;
+
+        // Update backend job status
+        setBackendJobStatus(prev => {
+          const updated = new Map(prev);
+          updated.set(jobId, {
+            status: data.status.status,
+            pages: data.pages || []
+          });
+          return updated;
+        });
+
+        // Update generationJobs with backend status for each page
+        if (data.pages && Array.isArray(data.pages)) {
+          setGenerationJobs(prev => {
+            const updated = new Map(prev);
+            data.pages.forEach((page: { pageId: number; status: string; progress: number }) => {
+              const existing = updated.get(page.pageId);
+              if (existing) {
+                // Only update status if backend says it's different and more authoritative
+                // Don't override 'completed' with 'generating' if page has HTML
+                if (!existing.hasHtml || page.status === 'completed') {
+                  updated.set(page.pageId, {
+                    ...existing,
+                    status: page.status as GenerationPageStatus['status'],
+                    progress: page.progress
+                  });
+                }
+              }
+            });
+            return updated;
+          });
+        }
+      } catch (err) {
+        console.error(`Failed to poll job status for ${jobId}:`, err);
+      }
+    };
+
+    // Get all active jobIds (those with recent streaming or in generating state)
+    const activeJobIds = new Set<string>();
+    
+    // Add jobIds from streaming messages
+    streamingMessages.forEach((_, jobId) => {
+      if (isGenerationActive(jobId)) {
+        activeJobIds.add(jobId);
+      }
+    });
+    
+    // Add jobIds from generationJobs that are still generating
+    generationJobs.forEach((job) => {
+      if (job.jobId && (job.status === 'generating' || job.status === 'pending')) {
+        activeJobIds.add(job.jobId);
+      }
+    });
+
+    if (activeJobIds.size === 0) return;
+
+    // Poll each active job
+    activeJobIds.forEach(jobId => {
+      pollJobStatus(jobId);
+    });
+
+    // Set up interval to poll every 30 seconds
+    const interval = setInterval(() => {
+      activeJobIds.forEach(jobId => {
+        pollJobStatus(jobId);
+      });
+    }, 30000);
+
+    return () => {
+      clearInterval(interval);
+    };
+  }, [streamingMessages, generationJobs, isGenerationActive, getAuthHeaders, handleUnauthorized]);
 
   // Rehydrate generation state on load so generate buttons stay disabled after reload
   useEffect(() => {
@@ -4550,7 +4971,7 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
           const isStale = (p: DraftStatusRecord) => {
             if (!p.updatedAt) return false;
             const updated = new Date(p.updatedAt).getTime();
-            return !isNaN(updated) && now - updated > 5 * 60 * 1000; // 5 minutes
+            return !isNaN(updated) && now - updated > 10 * 60 * 1000; // 10 minutes (increased from 5)
           };
 
           data.pages.forEach((p: DraftStatusRecord) => {
@@ -4559,15 +4980,48 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
               return;
             }
             
-            // Determine status: only mark as failed if stale AND not completed (no HTML content)
-            // Completed pages should remain completed even if their timestamp is old
+            // Determine status: use robust logic that checks if generation is active
             let finalStatus = (p.status || 'pending') as GenerationPageStatus['status'];
-            if (isStale(p) && !p.hasHtml && finalStatus !== 'completed') {
-              finalStatus = 'failed';
-            }
+            
             // If page has HTML content, it's completed regardless of what the backend says (unless published)
             if (p.hasHtml && finalStatus !== 'published') {
               finalStatus = 'completed';
+            } else {
+              // Check if generation is still active for this job
+              const jobId = p.jobId || '';
+              const generationActive = jobId ? isGenerationActive(jobId) : false;
+              
+              // Get backend job status if available
+              const backendStatus = jobId ? backendJobStatus.get(jobId) : null;
+              
+              // Only mark as failed if:
+              // - Stale (no update for 10+ minutes)
+              // - AND generation is not active (no streaming messages)
+              // - AND backend confirms failed (or no backend status available and truly stale)
+              if (isStale(p) && !p.hasHtml && finalStatus !== 'completed') {
+                if (!generationActive) {
+                  // Generation not active - check backend status
+                  if (backendStatus?.status === 'failed') {
+                    finalStatus = 'failed';
+                  } else if (!backendStatus && now - new Date(p.updatedAt || 0).getTime() > 15 * 60 * 1000) {
+                    // No backend status and very stale (15+ minutes) - mark as failed
+                    finalStatus = 'failed';
+                  } else {
+                    // Keep as generating if backend says generating or no backend status yet
+                    finalStatus = backendStatus?.status === 'generating' ? 'generating' : finalStatus;
+                  }
+                } else {
+                  // Generation is active - keep as generating
+                  finalStatus = 'generating';
+                }
+              } else if (!p.hasHtml && backendStatus) {
+                // Use backend status if available and page doesn't have HTML
+                if (backendStatus.status === 'completed' || backendStatus.status === 'failed') {
+                  finalStatus = backendStatus.status as GenerationPageStatus['status'];
+                } else if (backendStatus.status === 'generating' && finalStatus !== 'completed') {
+                  finalStatus = 'generating';
+                }
+              }
             }
             
             newMap.set(p.pageId, {
@@ -4595,7 +5049,7 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
     };
 
     rehydrate();
-  }, [campaignStructure.topics, getAuthHeaders, handleUnauthorized]);
+  }, [campaignStructure.topics, getAuthHeaders, handleUnauthorized, isGenerationActive, backendJobStatus]);
 
   const mutateStructure = useCallback(async (endpoint: string, init: RequestInit = {}, opts: { successMessage?: string; silent?: boolean } = {}) => {
     if (!opts.silent) {
@@ -4934,16 +5388,37 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
     return allPages.every((p) => (p.keywords?.length || 0) > 0);
   };
 
-  const isTopicGenerating = (topic: Topic) => {
+  // Stable check for topic generation status - prevents flickering
+  const isTopicGenerating = useCallback((topic: Topic) => {
     const pageIds = [
       topic.pillarPage?.id,
       ...(topic.subPages || []).map((sp) => sp.id),
     ].filter(Boolean) as number[];
+    
     return pageIds.some((id) => {
       const job = generationJobs.get(id);
-      return job && job.status === 'generating';
+      if (!job) return false;
+      
+      // If page has HTML, it's completed (not generating)
+      if (job.hasHtml) return false;
+      
+      // Check if generation is active via streaming
+      if (job.jobId && isGenerationActive(job.jobId)) {
+        return true;
+      }
+      
+      // Check backend status
+      if (job.jobId) {
+        const backendStatus = backendJobStatus.get(job.jobId);
+        if (backendStatus?.status === 'generating' || backendStatus?.status === 'pending') {
+          return true;
+        }
+      }
+      
+      // Check job status (but prefer streaming/backend status)
+      return job.status === 'generating' || job.status === 'pending';
     });
-  };
+  }, [generationJobs, isGenerationActive, backendJobStatus]);
 
   const viewDraft = async (draftId?: number, pageId?: number) => {
     if (!draftId) return;
@@ -5124,9 +5599,28 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
     if (!pageId) return null;
     const job = generationJobs.get(pageId);
     if (!job) return null;
-    const updatedAtMs = job.updatedAt ? new Date(job.updatedAt).getTime() : undefined;
-    const staleClient = updatedAtMs ? (Date.now() - updatedAtMs > 5 * 60 * 1000) : false;
-    const status = staleClient && !job.hasHtml ? 'failed' : job.status;
+    
+    // Use robust status determination
+    let status = job.status;
+    const jobId = job.jobId;
+    
+    // If has HTML, always completed
+    if (job.hasHtml && status !== 'published') {
+      status = 'completed';
+    } else if (status !== 'completed' && status !== 'published' && jobId) {
+      // Check if generation is active
+      const generationActive = isGenerationActive(jobId);
+      const backendStatus = backendJobStatus.get(jobId);
+      
+      // Only mark as failed if generation is not active AND backend confirms failed
+      if (status === 'failed' || (status !== 'completed' && !generationActive && backendStatus?.status === 'failed')) {
+        status = 'failed';
+      } else if (generationActive || backendStatus?.status === 'generating') {
+        // Keep as generating if active or backend says generating
+        status = 'generating';
+      }
+    }
+    
     if (status === 'pending') return null;
     const label =
       status === 'published' ? 'Published' :
@@ -5248,6 +5742,13 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
       }
 
       const { jobId, pages } = data as { jobId: string; pages: { pageId: number; pageType: string; draftId?: number; primaryKeyword?: string; }[] };
+
+      // Store jobId -> topicId mapping for streaming updates
+      setJobIdToTopicId(prev => {
+        const updated = new Map(prev);
+        updated.set(jobId, topic.id);
+        return updated;
+      });
 
       setGenerationJobs((prev) => {
         const updated = new Map(prev);
@@ -5528,6 +6029,54 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
     );
   }
 
+  // Streaming Progress Indicator Component
+  const StreamingProgressIndicator: React.FC<{
+    topicId: number;
+    jobId: string | null;
+    messages: Array<{ message: string; timestamp: string }>;
+  }> = ({ topicId, jobId, messages }) => {
+    const [isVisible, setIsVisible] = React.useState(false);
+    
+    React.useEffect(() => {
+      if (!jobId || messages.length === 0) {
+        setIsVisible(false);
+        return;
+      }
+      
+      const latestMessage = messages[messages.length - 1];
+      const messageAge = new Date().getTime() - new Date(latestMessage.timestamp).getTime();
+      const isRecent = messageAge < 10000; // Show for 10 seconds after last message
+      
+      setIsVisible(isRecent);
+      
+      // Auto-hide after 10 seconds of inactivity
+      if (isRecent) {
+        const timer = setTimeout(() => {
+          setIsVisible(false);
+        }, 10000 - messageAge);
+        return () => clearTimeout(timer);
+      }
+    }, [jobId, messages]);
+    
+    if (!jobId || messages.length === 0 || !isVisible) return null;
+    
+    const latestMessage = messages[messages.length - 1];
+    
+    return (
+      <div className="absolute top-3 right-3 z-10">
+        <div 
+          className="bg-black/85 backdrop-blur-md text-white px-3 py-1.5 rounded-full text-xs font-light flex items-center gap-2 shadow-xl border border-white/10 transition-opacity duration-300"
+          style={{ letterSpacing: '0.011em' }}
+        >
+          <div className="w-1.5 h-1.5 bg-white rounded-full animate-pulse flex-shrink-0" />
+          <span className="max-w-[220px] truncate">
+            {latestMessage.message}
+          </span>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="w-full mx-auto">
       {/* Header */}
@@ -5611,7 +6160,7 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
             className="px-4 py-2 bg-gray-100 text-gray-900 rounded-full hover:bg-gray-200 transition-all text-sm font-light flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
           >
             <Plus className="h-4 w-4" />
-            Manual
+            Add topic manually
           </button>
           <button
             onClick={() => handleAddTopic(true)}
@@ -5628,15 +6177,130 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
         </div>
       </div>
 
+      {/* Active Generation Progress Section */}
+      {(() => {
+        // Collect all active generations
+        const activeGenerations: Array<{
+          topicId: number;
+          topicTitle: string;
+          jobId: string;
+          messages: Array<{ message: string; timestamp: string }>;
+          pages: Array<{ pageId: number; status: string; progress: number }>;
+        }> = [];
+
+        campaignStructure.topics.forEach(topic => {
+          const topicJobId = Array.from(jobIdToTopicId.entries())
+            .find(([_, tid]) => tid === topic.id)?.[0];
+          
+          if (topicJobId && isGenerationActive(topicJobId)) {
+            const messages = streamingMessages.get(topicJobId) || [];
+            const backendStatus = backendJobStatus.get(topicJobId);
+            
+            // Count completed pages
+            const topicPages = Array.from(generationJobs.values())
+              .filter(job => job.jobId === topicJobId);
+            const completedCount = topicPages.filter(p => p.hasHtml || p.status === 'completed').length;
+            const totalCount = topicPages.length || (topic.pillarPage ? 1 : 0) + topic.subPages.length;
+
+            activeGenerations.push({
+              topicId: topic.id,
+              topicTitle: topic.title,
+              jobId: topicJobId,
+              messages,
+              pages: backendStatus?.pages || []
+            });
+          }
+        });
+
+        if (activeGenerations.length === 0) return null;
+
+        return (
+          <div className="mb-8 space-y-4">
+            {activeGenerations.map(({ topicId, topicTitle, jobId, messages, pages }) => {
+              const latestMessage = messages[messages.length - 1];
+              
+              // Count pages from generationJobs if backend pages not available
+              const topicPages = Array.from(generationJobs.values())
+                .filter(job => job.jobId === jobId);
+              
+              const completedCount = pages.length > 0 
+                ? pages.filter(p => p.status === 'completed').length
+                : topicPages.filter(p => p.hasHtml || p.status === 'completed').length;
+              
+              const totalCount = pages.length > 0 
+                ? pages.length 
+                : topicPages.length || 3; // Default to 3 if no pages info
+              
+              const progressPercent = totalCount > 0 ? (completedCount / totalCount) * 100 : 0;
+              
+              return (
+                <div
+                  key={jobId}
+                  className="bg-white/80 backdrop-blur-xl border border-gray-200/60 rounded-3xl p-5 shadow-sm transition-all duration-300 hover:shadow-md"
+                  style={{
+                    boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.05)'
+                  }}
+                >
+                  <div className="flex items-start justify-between gap-5">
+                    <div className="flex-1 min-w-0 space-y-2">
+                      <div className="flex items-center gap-3">
+                        <div className="relative flex-shrink-0">
+                          <div className="w-2 h-2 bg-gray-900 rounded-full" />
+                          <div className="absolute inset-0 w-2 h-2 bg-gray-900 rounded-full animate-ping opacity-75" />
+                        </div>
+                        <h4 className="text-sm font-light text-gray-900 tracking-tight truncate" style={{ letterSpacing: '0.01em' }}>
+                          {topicTitle}
+                        </h4>
+                      </div>
+                      
+                      {latestMessage && (
+                        <p className="text-xs text-gray-500 font-extralight ml-5 leading-relaxed" style={{ letterSpacing: '0.005em' }}>
+                          {latestMessage.message}
+                        </p>
+                      )}
+                      
+                      <div className="ml-5 flex items-center gap-3">
+                        <div className="flex-1 h-0.5 bg-gray-100 rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-gray-900 transition-all duration-500 ease-out"
+                            style={{ width: `${progressPercent}%` }}
+                          />
+                        </div>
+                        <span className="text-[10px] text-gray-400 font-extralight tabular-nums" style={{ letterSpacing: '0.02em' }}>
+                          {completedCount}/{totalCount}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        );
+      })()}
+
       {/* Topics List */}
       <div className="space-y-4">
-        {campaignStructure.topics.map((topic) => (
-          <div
-            key={topic.id}
-            className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden"
-          >
-            {/* Topic Header */}
-            <div className="flex items-center justify-between p-6 hover:bg-gray-50 transition-colors">
+        {campaignStructure.topics.map((topic) => {
+          // Find jobId for this topic
+          const topicJobId = Array.from(jobIdToTopicId.entries())
+            .find(([_, tid]) => tid === topic.id)?.[0] || null;
+          const topicMessages = topicJobId ? streamingMessages.get(topicJobId) || [] : [];
+          
+          return (
+            <div
+              key={topic.id}
+              className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden relative"
+            >
+              {/* Streaming Progress Indicator */}
+              <StreamingProgressIndicator 
+                topicId={topic.id}
+                jobId={topicJobId}
+                messages={topicMessages}
+              />
+              
+              {/* Topic Header */}
+              <div className="flex items-center justify-between p-6 hover:bg-gray-50 transition-colors">
               <div className="flex items-center gap-3 flex-1">
                 <button
                   onClick={() => toggleTopic(topic.id)}
@@ -5688,8 +6352,17 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
                       : 'Add a pillar page and at least one keyword per page to enable generation'
                   }
                 >
-                  {generateTopicLoading === topic.id || isTopicGenerating(topic) ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
-                  {generateTopicLoading === topic.id || isTopicGenerating(topic) ? 'Generating…' : 'Generate'}
+                  {generateTopicLoading === topic.id || isTopicGenerating(topic) ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      <span>Generating…</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="h-3.5 w-3.5" />
+                      <span>Generate</span>
+                    </>
+                  )}
                   </button>
                 <button
                   onClick={() => handleDeleteTopic(topic.id)}
@@ -5720,7 +6393,7 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
                             className="px-3 py-1.5 text-xs font-light text-gray-600 hover:text-black hover:bg-gray-100 rounded-full transition-all flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             <Plus className="h-3.5 w-3.5" />
-                            Manual
+                            Add pillar page manually
                           </button>
                           <button
                             onClick={() => handleAddPillarPage(topic.id, true)}
@@ -5736,7 +6409,7 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
                             )}
                             {aiLoading === `pillar-${topic.id}`
                               ? "Generating"
-                              : "AI"}
+                              : "Generate pillar page"}
                           </button>
                         </div>
                       )}
@@ -5911,6 +6584,7 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
                                     title="AI generate primary keyword"
                               >
                                     {aiLoading === `primary-keyword-${topic.pillarPage!.id}` ? <ButtonSpinner /> : <Sparkles className="h-3 w-3" />}
+                                    Generate primary keywords
                               </button>
                                 </div>
                               </div>
@@ -6006,6 +6680,7 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
                                     title="AI generate longtail keywords"
                                   >
                                     {aiLoading === `longtail-keyword-${topic.pillarPage!.id}` ? <ButtonSpinner /> : <Sparkles className="h-3 w-3" />}
+                                    Generate longtail keywords
                                   </button>
                                 </div>
                               </div>
@@ -6079,7 +6754,7 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
                           className="px-3 py-1.5 text-xs font-light text-gray-600 hover:text-black hover:bg-gray-100 rounded-full transition-all flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           <Plus className="h-3.5 w-3.5" />
-                          Manual
+                          Add sub page manually
                         </button>
                         <button
                           onClick={() => handleAddSubPage(topic.id, true)}
@@ -6095,7 +6770,7 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
                           )}
                           {aiLoading === `subpage-${topic.id}`
                             ? "Generating"
-                            : "AI"}
+                            : "Generate sub page"}
                         </button>
                       </div>
                     </div>
@@ -6221,6 +6896,7 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
                                     title="Add keyword manually"
                                   >
                                     <Plus className="h-3 w-3" />
+                                    Add keyword manually
                                   </button>
                                   <button
                                     onClick={() =>
@@ -6243,6 +6919,7 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
                                     ) : (
                                       <Sparkles className="h-3 w-3" />
                                     )}
+                                    Generate keywords
                                   </button>
                                 </div>
                                 <button
@@ -6267,14 +6944,14 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
                                   Primary Keywords <span className="text-red-500">*</span>
                                 </label>
                                 <div className="flex items-center gap-1">
-                                  <button
+                                  {/* <button
                                     onClick={() => handleAddKeyword('subpage', topic.id, subPage.id, false, 'primary')}
                                     disabled={syncing}
                                     className="px-2 py-1 text-xs font-light text-gray-600 hover:text-black hover:bg-gray-100 rounded-full transition-all flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
                                     title="Add primary keyword manually"
                                   >
                                     <Plus className="h-3 w-3" />
-                                  </button>
+                                  </button> */}
                                   <button
                                     onClick={async () => {
                                       if (aiLoading === `primary-keyword-${subPage.id}`) return;
@@ -6310,6 +6987,7 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
                                     title="AI generate primary keyword"
                                   >
                                     {aiLoading === `primary-keyword-${subPage.id}` ? <ButtonSpinner /> : <Sparkles className="h-3 w-3" />}
+                                    Generate primary keywords
                                   </button>
                                 </div>
                               </div>
@@ -6367,14 +7045,14 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
                                   Longtail Keywords
                                 </label>
                                 <div className="flex items-center gap-1">
-                                  <button
+                                  {/* <button
                                     onClick={() => handleAddKeyword('subpage', topic.id, subPage.id, false, 'longtail')}
                                     disabled={syncing}
                                     className="px-2 py-1 text-xs font-light text-gray-600 hover:text-black hover:bg-gray-100 rounded-full transition-all flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
                                     title="Add longtail keyword manually"
                                   >
                                     <Plus className="h-3 w-3" />
-                                  </button>
+                                  </button> */}
                                   <button
                                     onClick={async () => {
                                       if (aiLoading === `longtail-keyword-${subPage.id}`) return;
@@ -6410,6 +7088,7 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
                                     title="AI generate longtail keywords"
                                   >
                                     {aiLoading === `longtail-keyword-${subPage.id}` ? <ButtonSpinner /> : <Sparkles className="h-3 w-3" />}
+                                    Generate longtail keywords
                                   </button>
                                 </div>
                               </div>
@@ -6472,7 +7151,8 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
               </div>
             )}
           </div>
-        ))}
+          );
+        })}
 
         {campaignStructure.topics.length === 0 && (
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-12 text-center">
@@ -6491,7 +7171,7 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
                 className="px-4 py-2 bg-gray-100 text-gray-900 rounded-full hover:bg-gray-200 transition-all text-sm font-light flex items-center gap-2"
               >
                 <Plus className="h-4 w-4" />
-                Add Manual
+                Add topic manually
               </button>
               <button
                 onClick={() => handleAddTopic(true)}
@@ -6744,6 +7424,15 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
                     </Command>
                   </PopoverContent>
                 </Popover>
+                <div className="mt-2 flex items-center justify-between">
+                  <button
+                    type="button"
+                    onClick={() => setKeywordPickerDrawerOpen(true)}
+                    className="px-3 py-2 border border-gray-200 text-gray-900 rounded-full hover:bg-gray-50 transition-all text-sm font-medium"
+                  >
+                    Browse keyword table
+                  </button>
+                </div>
                 <input
                   type="text"
                   value={newKeywordTerm}
@@ -6844,6 +7533,330 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
           </div>
         </div>
       )}
+      <Sheet
+        open={keywordPickerDrawerOpen}
+        onOpenChange={(open) => {
+          setKeywordPickerDrawerOpen(open);
+        }}
+      >
+        <SheetContent
+          side="right"
+          className="w-full sm:max-w-6xl border-l border-[#e2e4ea] bg-[#f5f6fa] px-8 py-10 overflow-y-auto font-light"
+        >
+          <div className="space-y-8">
+            <div className="rounded-[32px] border border-white/80 bg-white/90 px-6 py-6 shadow-[0_30px_80px_rgba(15,23,42,0.10)] backdrop-blur flex flex-col gap-3">
+              <div className="inline-flex items-center gap-2 rounded-full border border-black/10 px-4 py-1 text-[10px] tracking-[0.35em] uppercase text-gray-500">
+                Keyword picker
+              </div>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h3 className="text-[26px] font-light text-gray-900 tracking-tight">Choose from table</h3>
+                  <p className="text-sm text-gray-500">Search, filter, and select a keyword to fill the form.</p>
+                </div>
+                <div>
+                  <button
+                    onClick={() => setKeywordPickerDrawerOpen(false)}
+                    className="px-3 py-1.5 rounded-full bg-gray-100 text-gray-800 text-xs font-semibold border border-gray-200 hover:bg-gray-200"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div className="rounded-[32px] border border-white/80 bg-white/90 px-6 py-6 shadow-[0_30px_80px_rgba(15,23,42,0.10)] backdrop-blur">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6">
+                <div className="flex items-center space-x-4">
+                  <div className="relative">
+                    <Search className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                    <input
+                      type="text"
+                      placeholder="Search keywords..."
+                      value={drawerSearchTerm}
+                      onChange={(e) => setDrawerSearchTerm(e.target.value)}
+                      className="pl-10 pr-3 py-2.5 border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent text-sm bg-gray-50/50 transition-all duration-200 w-72"
+                    />
+                  </div>
+                  <select
+                    value={drawerCompetition}
+                    onChange={(e) => setDrawerCompetition(e.target.value)}
+                    className="px-3 py-2.5 border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent text-sm bg-gray-50/50 transition-all duration-200 appearance-none cursor-pointer"
+                  >
+                    <option value="">All Competition</option>
+                    <option value="Low">Low</option>
+                    <option value="Medium">Medium</option>
+                    <option value="High">High</option>
+                  </select>
+                  <select
+                    value={drawerIntent}
+                    onChange={(e) => setDrawerIntent(e.target.value)}
+                    className="px-3 py-2.5 border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent text-sm bg-gray-50/50 transition-all duration-200 appearance-none cursor-pointer"
+                  >
+                    <option value="">All Intent</option>
+                    <option value="Informational">Informational</option>
+                    <option value="Commercial">Commercial</option>
+                    <option value="Transactional">Transactional</option>
+                  </select>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center bg-gray-100 rounded-2xl p-1">
+                    <button
+                      onClick={() => setDrawerViewMode("cards")}
+                      className={`flex items-center space-x-2 px-4 py-2 rounded-xl transition-all duration-200 text-sm font-medium ${
+                        drawerViewMode === "cards" ? "bg-white text-gray-900 shadow-sm" : "text-gray-600 hover:text-gray-900"
+                      }`}
+                    >
+                      <Grid3X3 className="w-4 h-4" />
+                      <span>Cards</span>
+                    </button>
+                    <button
+                      onClick={() => setDrawerViewMode("table")}
+                      className={`flex items-center space-x-2 px-4 py-2 rounded-xl transition-all duration-200 text-sm font-medium ${
+                        drawerViewMode === "table" ? "bg-white text-gray-900 shadow-sm" : "text-gray-600 hover:text-gray-900"
+                      }`}
+                    >
+                      <List className="w-4 h-4" />
+                      <span>Table</span>
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-gray-600">Rows</span>
+                    <div className="flex items-center bg-white border border-gray-200 rounded-2xl px-1 shadow-sm">
+                      <button
+                        onClick={() => {
+                          const next = Math.max(5, drawerItemsPerPage - 5);
+                          setDrawerItemsPerPage(next);
+                          setDrawerCurrentPage(1);
+                        }}
+                        className="px-2 py-1 text-gray-700 hover:text-gray-900 disabled:text-gray-300"
+                        disabled={drawerItemsPerPage <= 5}
+                        aria-label="Decrease rows"
+                      >
+                        −
+                      </button>
+                      <input
+                        type="number"
+                        min={5}
+                        max={200}
+                        step={5}
+                        value={drawerItemsPerPage}
+                        onChange={(e) => {
+                          const raw = parseInt(e.target.value, 10);
+                          if (Number.isNaN(raw)) return;
+                          const clamped = Math.max(5, Math.min(200, raw));
+                          setDrawerItemsPerPage(clamped);
+                          setDrawerCurrentPage(1);
+                        }}
+                        className="w-16 text-center px-2 py-1.5 text-sm border-0 focus:outline-none focus:ring-0 bg-transparent"
+                      />
+                      <button
+                        onClick={() => {
+                          const next = Math.min(200, drawerItemsPerPage + 5);
+                          setDrawerItemsPerPage(next);
+                          setDrawerCurrentPage(1);
+                        }}
+                        className="px-2 py-1 text-gray-700 hover:text-gray-900 disabled:text-gray-300"
+                        disabled={drawerItemsPerPage >= 200}
+                        aria-label="Increase rows"
+                      >
+                        +
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-white rounded-3xl border border-gray-200 overflow-hidden shadow-sm">
+                <div className="bg-gray-50/80 border-b border-gray-200">
+                  <div className="grid grid-cols-10 gap-4 px-6 py-4 text-sm font-semibold text-gray-700">
+                    <div
+                      className="col-span-3 flex items-center space-x-2 cursor-pointer hover:text-gray-900 transition-colors"
+                      onClick={() => drawerHandleSort("keyword")}
+                    >
+                      <span>Keyword</span>
+                      {drawerGetSortIcon("keyword")}
+                    </div>
+                    <div
+                      className="col-span-1 flex items-center space-x-2 cursor-pointer hover:text-gray-900 transition-colors justify-center"
+                      onClick={() => drawerHandleSort("volume")}
+                    >
+                      <span>Volume</span>
+                      {drawerGetSortIcon("volume")}
+                    </div>
+                    <div
+                      className="col-span-1 flex items-center space-x-2 cursor-pointer hover:text-gray-900 transition-colors justify-center"
+                      onClick={() => drawerHandleSort("competition")}
+                    >
+                      <span>Competition</span>
+                      {drawerGetSortIcon("competition")}
+                    </div>
+                    <div
+                      className="col-span-1 flex items-center space-x-2 cursor-pointer hover:text-gray-900 transition-colors justify-center"
+                      onClick={() => drawerHandleSort("cpc")}
+                    >
+                      <span>CPC</span>
+                      {drawerGetSortIcon("cpc")}
+                    </div>
+                    <div
+                      className="col-span-1 flex items-center space-x-2 cursor-pointer hover:text-gray-900 transition-colors justify-center"
+                      onClick={() => drawerHandleSort("organic")}
+                    >
+                      <span>Organic</span>
+                      {drawerGetSortIcon("organic")}
+                    </div>
+                    <div
+                      className="col-span-1 flex items-center space-x-2 cursor-pointer hover:text-gray-900 transition-colors justify-center"
+                      onClick={() => drawerHandleSort("intent")}
+                    >
+                      <span>Intent</span>
+                      {drawerGetSortIcon("intent")}
+                    </div>
+                    <div
+                      className="col-span-2 flex items-center space-x-2 cursor-pointer hover:text-gray-900 transition-colors justify-center"
+                      onClick={() => drawerHandleSort("trend")}
+                    >
+                      <span>Trend</span>
+                      {drawerGetSortIcon("trend")}
+                    </div>
+                  </div>
+                </div>
+                <div className="divide-y divide-gray-100">
+                  {drawerCurrentKeywords.map((keyword) => (
+                    <div
+                      key={keyword.id}
+                      className="grid grid-cols-10 gap-4 px-6 py-4 hover:bg-gray-50/80 transition-all duration-200 cursor-pointer"
+                      onClick={() => {
+                        setNewKeywordTerm(keyword.keyword);
+                        setNewKeywordVolume(String(keyword.volume));
+                        setNewKeywordDifficulty(keyword.competition || "Medium");
+                        setKeywordPickerDrawerOpen(false);
+                        setKeywordSearchOpen(false);
+                      }}
+                    >
+                      <div className="col-span-3 flex items-center space-x-3">
+                        <div>
+                          <div className="font-semibold text-gray-900 text-sm flex items-center space-x-2">
+                            <span>{keyword.keyword}</span>
+                            {keyword.isCustom && (
+                              <span className="bg-purple-100 text-purple-800 px-2 py-0.5 rounded-full text-xs font-semibold">
+                                Custom
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-xs text-gray-500 mt-0.5 truncate max-w-xs">
+                            {keyword.url}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="col-span-1 flex items-center justify-center">
+                        <span className="font-semibold text-gray-900 text-sm">
+                          {keyword.volume >= 1000 ? `${(keyword.volume / 1000).toFixed(1)}K` : keyword.volume.toLocaleString()}
+                        </span>
+                      </div>
+                      <div className="col-span-1 flex items-center justify-center">
+                        <span className={drawerCompetitionBadge(keyword.competition)}>
+                          {keyword.competition}
+                        </span>
+                      </div>
+                      <div className="col-span-1 flex items-center justify-center">
+                        <span className="font-semibold text-gray-900 text-sm">
+                          ${keyword.cpc.toFixed(2)}
+                        </span>
+                      </div>
+                      <div className="col-span-1 flex items-center justify-center">
+                        <span className="text-gray-700 text-sm">
+                          {keyword.organic.toLocaleString()}
+                        </span>
+                      </div>
+                      <div className="col-span-1 flex items-center justify-center">
+                        <span
+                          className={`px-2 py-1 rounded-full text-xs font-medium ${
+                            keyword.intent === "Commercial"
+                              ? "bg-blue-100 text-blue-800"
+                              : keyword.intent === "Transactional"
+                              ? "bg-green-100 text-green-800"
+                              : "bg-gray-100 text-gray-800"
+                          }`}
+                        >
+                          {keyword.intent}
+                        </span>
+                      </div>
+                      <div className="col-span-2 flex items-center justify-center">
+                        <div className="flex items-center space-x-1">
+                          <TrendingUp
+                            className={`w-4 h-4 ${
+                              keyword.trend === "Rising"
+                                ? "text-green-500"
+                                : keyword.trend === "Falling"
+                                ? "text-red-500"
+                                : "text-gray-500"
+                            }`}
+                          />
+                          <span className="text-sm text-gray-700">
+                            {keyword.trend}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                {drawerTotalPages > 1 && (
+                  <div className="bg-gray-50/50 border-t border-gray-200 px-6 py-4">
+                    <div className="flex items-center justify-between">
+                      <div className="text-sm text-gray-600">
+                        Showing {drawerStartIndex + 1} to {Math.min(drawerEndIndex, drawerSortedKeywords.length)} of {drawerSortedKeywords.length} keywords
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <button
+                          onClick={() => drawerHandlePageChange(drawerCurrentPage - 1)}
+                          disabled={drawerCurrentPage === 1}
+                          className={`flex items-center space-x-1 px-3 py-2 rounded-xl text-sm font-medium transition-all duration-200 ${
+                            drawerCurrentPage === 1 ? "text-gray-400 cursor-not-allowed" : "text-gray-700 hover:text-gray-900 hover:bg-gray-100"
+                          }`}
+                        >
+                          <ChevronUp className="w-4 h-4 rotate-90" />
+                          <span>Previous</span>
+                        </button>
+                        <div className="flex items-center space-x-1">
+                          {drawerGetPageNumbers().map((page, index) => (
+                            <React.Fragment key={index}>
+                              {page === "..." ? (
+                                <span className="px-2 py-2 text-gray-400">...</span>
+                              ) : (
+                                <button
+                                  onClick={() => drawerHandlePageChange(page as number)}
+                                  className={`w-8 h-8 rounded-xl text-sm font-medium transition-all duration-200 flex items-center justify-center ${
+                                    drawerCurrentPage === page ? "bg-gray-900 text-white shadow-sm" : "text-gray-700 hover:text-gray-900 hover:bg-gray-100"
+                                  }`}
+                                >
+                                  {page}
+                                </button>
+                              )}
+                            </React.Fragment>
+                          ))}
+                        </div>
+                        <button
+                          onClick={() => drawerHandlePageChange(drawerCurrentPage + 1)}
+                          disabled={drawerCurrentPage >= drawerTotalPages}
+                          className={`flex items-center space-x-1 px-3 py-2 rounded-xl text-sm font-medium transition-all duration-200 ${
+                            drawerCurrentPage >= drawerTotalPages ? "text-gray-400 cursor-not-allowed" : "text-gray-700 hover:text-gray-900 hover:bg-gray-100"
+                          }`}
+                        >
+                          <span>Next</span>
+                          <ChevronUp className="w-4 h-4 -rotate-90" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                {drawerSortedKeywords.length === 0 && (
+                  <div className="py-12 text-center">
+                    <p className="text-gray-500">No keywords match your current filters.</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </SheetContent>
+      </Sheet>
       {/* Generation Drawer */}
       <Sheet
         open={generationDrawerOpen}
@@ -7184,5 +8197,3 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
 };
 
 export default SidebarDashboard;
-
-
