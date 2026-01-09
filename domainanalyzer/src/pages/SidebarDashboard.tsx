@@ -6295,14 +6295,21 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
   );
 };
 
-  const handleDeleteKeyword = (_context: { type: 'pillar' | 'subpage'; topicId: number; pageId: number }, keywordId: number) => {
-    if (!confirm('Are you sure you want to delete this keyword?')) return;
-    mutateStructure(`${CAMPAIGN_API_BASE}/keywords/${keywordId}`, {
-      method: 'DELETE'
-    }, { successMessage: "Keyword deleted" }).catch(() => {
-      /* handled upstream */
-    });
-  };
+  const handleDeleteKeyword = (
+  _context: { type: 'pillar' | 'subpage'; topicId: number; pageId: number },
+  keywordId: number
+) => {
+  setDeleteLabel('keyword')
+  setDeleteAction(() => () =>
+    mutateStructure(
+      `${CAMPAIGN_API_BASE}/keywords/${keywordId}`,
+      { method: 'DELETE' },
+      { successMessage: 'Keyword deleted' }
+    )
+  )
+  setShowDeleteModal(true)
+}
+
 
   const handleSelectPrimaryKeyword = async (keywordId: number) => {
     try {
