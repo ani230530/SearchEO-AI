@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LayoutDashboard, BarChart3, Settings, User, LogOut, Menu, X, Building, Globe, CheckCircle, Info, Plug, FileText, ChevronDown, ChevronRight, ChevronLeft, Megaphone, Plus, ChevronUp, Trash2, Sparkles, ArrowLeft, Search, TrendingUp, Grid3X3, List, ArrowUpDown, Loader2, AlertCircle, Check, Send, RefreshCw, ClipboardList } from 'lucide-react';
 import GSCAnalyticsView from '@/components/gsc/GSCAnalyticsView';
@@ -10,6 +10,15 @@ import remarkGfm from 'remark-gfm';
 import CampaignGraph from '@/components/CampaignGraph';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogAction,
+  AlertDialogCancel,
+} from '@/components/ui/alert-dialog';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
 import PublishExperience from '@/features/publish/PublishExperience';
@@ -182,6 +191,7 @@ const IntegrationSkeleton = () => (
                 <div className="h-4 w-48 bg-gray-200 rounded-full" />
                 <div className="h-3 w-32 bg-gray-100 rounded-full" />
               </div>
+              
               <div className="w-8 h-8 bg-gray-100 rounded-full" />
             </div>
           </div>
@@ -210,11 +220,22 @@ const SidebarDashboard = () => {
   const [domainError, setDomainError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [deleteId, setDeleteId] = useState<number | null>(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteLabel, setDeleteLabel] = useState<string>('');
+  const [deleteAction, setDeleteAction] = useState<(() => void) | null>(null);
+
+  function confirmDelete(label: string, action: () => void) {
+    setDeleteLabel(label);
+    setDeleteAction(() => action);
+    setShowDeleteModal(true);
+  }
   const [auditData, setAuditData] = useState<any>(null);
 const [auditLoading, setAuditLoading] = useState(false);
 const [auditError, setAuditError] = useState<string | null>(null);
 const [auditResult, setAuditResult] = useState<any>(null);
 const [auditComplete, setAuditComplete] = useState(false);
+const [showAuditModal, setShowAuditModal] = useState(false);
+const resultsRef = useRef<HTMLDivElement | null>(null);
 const [activeChartTab, setActiveChartTab] = useState<'overview' | 'comparison' | 'distribution'>('overview');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loadingSteps, setLoadingSteps] = useState([
@@ -312,6 +333,36 @@ const [improvedContent, setImprovedContent] = useState("");
   const [selectedCampaignId, setSelectedCampaignId] = useState<number | null>(
     null
   );
+  // Company info carousel: track index and count to show arrows conditionally
+  const companyCarouselRef = useRef<HTMLDivElement | null>(null);
+  const [companyCurrentIndex, setCompanyCurrentIndex] = useState(0);
+  const [companySectionsCount, setCompanySectionsCount] = useState(0);
+  const companyCarouselCleanupRef = useRef<(() => void) | null>(null);
+  const setCompanyCarouselRef = useCallback((el: HTMLDivElement | null) => {
+    if (companyCarouselCleanupRef.current) {
+      companyCarouselCleanupRef.current();
+      companyCarouselCleanupRef.current = null;
+    }
+    companyCarouselRef.current = el;
+    if (!el) {
+      setCompanySectionsCount(0);
+      setCompanyCurrentIndex(0);
+      return;
+    }
+    const update = () => {
+      const count = Math.max(0, el.children.length);
+      setCompanySectionsCount(count);
+      const idx = Math.round(el.scrollLeft / Math.max(1, el.clientWidth));
+      setCompanyCurrentIndex(Math.min(Math.max(0, idx), Math.max(0, count - 1)));
+    };
+    update();
+    el.addEventListener('scroll', update);
+    window.addEventListener('resize', update);
+    companyCarouselCleanupRef.current = () => {
+      el.removeEventListener('scroll', update);
+      window.removeEventListener('resize', update);
+    };
+  }, []);
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -405,7 +456,7 @@ const handleAnalyze = async () => {
 
 
 // Fetch existing audit for company domain
-const fetchAudit = async () => {
+const fetchAudit = useCallback(async () => {
   const token = localStorage.getItem("authToken");
   if (!token) return;
 
@@ -437,7 +488,7 @@ const fetchAudit = async () => {
   } catch (err) {
     console.error('Error fetching audit:', err);
   }
-};
+}, []);
 
 //Handle Run Audit
 const handleRunAudit = async (url?: string) => {
@@ -471,6 +522,7 @@ const handleRunAudit = async (url?: string) => {
       setAuditResult(data.normalized);
       setAuditData(data.audit);
       setAuditComplete(true);
+      setShowAuditModal(true);
       setTimeout(() => setAuditComplete(false), 3500);
     }
   } catch (err) {
@@ -491,6 +543,14 @@ const handleRunAudit = async (url?: string) => {
     setCompanyDomain(value);
     if (value) validateDomain(value);
   };
+
+  const handleViewReport = () => {
+    setShowAuditModal(false);
+    setTimeout(() => {
+      resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 220);
+  };
+
 
   // Handle URL query parameters for tab navigation (e.g., from OAuth callback)
   useEffect(() => {
@@ -633,11 +693,7 @@ const handleRunAudit = async (url?: string) => {
   }, [activeTab, fetchCampaignTabData]);
 
   useEffect(() => {
-    if (activeTab === 'analytics' || activeTab === 'publish') {
       fetchCompanyDomain();
-    } else {
-      setCompanyDomainLoading(false);
-    }
   }, [activeTab, fetchCompanyDomain]);
 
   // Fetch audit when audit tab is active
@@ -646,6 +702,12 @@ const handleRunAudit = async (url?: string) => {
       fetchAudit();
     }
   }, [activeTab]);
+
+  // On mount: load company domain and any existing audit so Overview reflects latest data on reload
+  useEffect(() => {
+    fetchCompanyDomain();
+    fetchAudit();
+  }, [fetchCompanyDomain, fetchAudit]);
 
   // Helper function to determine intent based on keyword content
   const determineIntent = (keyword: string): string => {
@@ -1249,12 +1311,7 @@ const handleRunAudit = async (url?: string) => {
     }
   };
 
-  const handleDisconnectWordpress = async () => {
-    if (!wpIntegration || wpIntegrationDeleting) return;
-    if (!confirm('Disconnect WordPress publishing? Stored credentials will be removed.')) {
-      return;
-    }
-
+  const doDisconnectWordpress = async () => {
     try {
       setWpIntegrationDeleting(true);
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/publish/wordpress`, {
@@ -1288,6 +1345,11 @@ const handleRunAudit = async (url?: string) => {
     }
   };
 
+  const handleDisconnectWordpress = () => {
+    if (!wpIntegration || wpIntegrationDeleting) return;
+    confirmDelete("WordPress connection", doDisconnectWordpress);
+  };
+
   const handleConfigureWordpress = useCallback(() => {
     setActiveTab('analytics');
     setActiveCompanySubTab('integration');
@@ -1296,10 +1358,9 @@ const handleRunAudit = async (url?: string) => {
 
 
   useEffect(() => {
-    if (activeTab === 'analytics' && activeCompanySubTab === 'integration') {
       fetchGscStatus();
       fetchWordpressIntegration();
-    }
+    
     // Also refresh campaign tab data if we're on campaign tab and WordPress integration might have changed
     if (activeTab === 'campaign' && activeCompanySubTab === 'integration') {
       fetchCampaignTabData();
@@ -1344,7 +1405,9 @@ const handleRunAudit = async (url?: string) => {
   }, [toast]);
 
   useEffect(() => {
-    if (activeTab === 'campaign') {
+    if (activeTab === 'campaign' || activeTab === 'overview') {
+      // Fetch campaigns for both the Campaign tab and the Overview
+      // so Overview can show recent campaigns/quick access.
       fetchCampaigns();
     }
   }, [activeTab, fetchCampaigns]);
@@ -2307,7 +2370,221 @@ const handleRunAudit = async (url?: string) => {
 
         {/* Content Body */}
         <div className="content-body">
-          {activeTab === "analytics" ? (
+          {activeTab === "overview" ? (
+           <div className="max-w-7xl mx-auto px-4 sm:px-6 py-10 space-y-12">
+
+    {/* ===================== HERO ===================== */}
+    <div className="relative overflow-hidden rounded-3xl border border-gray-100 bg-gradient-to-br from-white via-slate-50 to-white shadow-sm">
+      {/* soft glow */}
+      <div className="absolute -top-24 -left-24 w-96 h-96 bg-blue-50 rounded-full blur-3xl opacity-60" />
+
+      <div className="relative p-8 sm:p-10 flex flex-col lg:flex-row gap-10 justify-between">
+        {/* Left */}
+        <div className="max-w-xl">
+          <h1 className="text-4xl sm:text-5xl font-light text-gray-900 leading-tight">
+            Overview
+          </h1>
+          <p className="mt-3 text-base text-gray-600">
+            A real-time snapshot of your domain’s SEO health, performance,
+            and growth potential.
+          </p>
+
+          <div className="mt-6 flex flex-wrap items-center gap-3">
+            <button
+              onClick={() => handleRunAudit(companyDomain)}
+              disabled={!companyDomain || auditLoading}
+              className="inline-flex items-center gap-2 px-6 py-3 bg-black text-white rounded-full text-sm font-medium hover:bg-black/90 disabled:opacity-60 transition"
+            >
+              {auditLoading ? "Running audit…" : "Run audit"}
+            </button>
+
+            <button
+              onClick={() => {
+                setActiveTab("analytics");
+                setActiveCompanySubTab("company-info");
+              }}
+              className="px-5 py-3 rounded-full border border-gray-200 bg-white text-sm hover:bg-gray-50 transition"
+            >
+              Analytics
+            </button>
+
+            {companyDomain && (
+              <a
+                href={
+                  companyDomain.startsWith("http")
+                    ? companyDomain
+                    : `https://${companyDomain}`
+                }
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm text-blue-600 hover:underline"
+              >
+                Visit site →
+              </a>
+            )}
+          </div>
+        </div>
+
+        {/* Right */}
+        <div className="flex items-center gap-10">
+          <div className="text-center">
+            <div className="text-xs text-gray-500 mb-2">Overall health</div>
+            <OverallScoreGauge
+              size={120}
+              score={
+                ((auditResult?.performance || 0) +
+                  (auditResult?.seo || 0) +
+                  (auditResult?.accessibility || 0) +
+                  (auditResult?.bestPractices || 0) +
+                  (auditResult?.pwa || 0)) / 5 || 0
+              }
+            />
+          </div>
+
+          <div className="hidden lg:block w-px h-24 bg-gray-100" />
+
+          <div className="space-y-4 text-sm">
+            <div>
+              <div className="text-xs text-gray-500">Last scanned</div>
+              <div className="font-medium text-gray-900">
+                {auditData?.updatedAt
+                  ? new Date(auditData.updatedAt).toLocaleString()
+                  : "Never"}
+              </div>
+            </div>
+            <div>
+              <div className="text-xs text-gray-500">Keywords tracked</div>
+              <div className="font-medium text-gray-900">
+                {keywordsTableData.length}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {/* ===================== KPI GRID ===================== */}
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+      {/* Opportunities Card */}
+<div className="rounded-3xl bg-white border border-gray-100 p-6 shadow-sm hover:shadow-md transition">
+  <div className="text-xs uppercase tracking-wide text-gray-500">
+    Top opportunities
+  </div>
+
+  <div className="mt-4 space-y-4">
+    {keywordsTableData.slice(0, 5).map((item, idx) => (
+      <div key={idx} className="flex items-center justify-between">
+        <div>
+          <div className="text-lg font-medium text-gray-900">
+            {item?.keyword || "No keywords yet"}
+          </div>
+          <div className="text-xs text-gray-400 mt-1">
+            High potential growth keyword
+          </div>
+        </div>
+        <div className="p-3 rounded-2xl bg-blue-50">
+          <TrendingUp className="h-5 w-5 text-blue-600" />
+        </div>
+      </div>
+    ))}
+  </div>
+</div>
+
+      {/* Audit Summary */}
+      <div className="lg:col-span-2 rounded-3xl bg-white border border-gray-100 p-6 shadow-sm">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h3 className="text-sm font-medium text-gray-900">
+              Audit summary
+            </h3>
+            <p className="text-xs text-gray-400">
+              Lighthouse performance breakdown
+            </p>
+          </div>
+
+          <button
+            onClick={() => {
+              setActiveTab("audit");
+              setTimeout(() => setShowAuditModal(true), 120);
+            }}
+            className="text-sm text-blue-600 hover:underline"
+          >
+            View details
+          </button>
+        </div>
+
+        {!auditResult ? (
+          <p className="text-sm text-gray-500">
+            Run an audit to view performance metrics.
+          </p>
+        ) : (
+          <div className="flex flex-col sm:flex-row gap-8 items-center">
+            <OverallScoreGauge
+              size={96}
+              score={
+                ((auditResult.performance || 0) +
+                  (auditResult.seo || 0) +
+                  (auditResult.accessibility || 0) +
+                  (auditResult.bestPractices || 0) +
+                  (auditResult.pwa || 0)) / 5
+              }
+            />
+
+            <div className="grid grid-cols-2 gap-4 flex-1 text-sm">
+              {[
+                ["Performance", auditResult.performance],
+                ["SEO", auditResult.seo],
+                ["Accessibility", auditResult.accessibility],
+                ["Best Practices", auditResult.bestPractices],
+                ["PWA", auditResult.pwa],
+              ].map(([label, value]) => {
+                const pct = Math.round((value || 0) * 100);
+                return (
+                  <div
+                    key={label}
+                    className="flex items-center justify-between bg-gray-50 rounded-xl px-4 py-2"
+                  >
+                    <span className="text-gray-600">{label}</span>
+                    <span className="font-semibold text-gray-900">
+                      {pct}%
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+
+    {/* ===================== SNAPSHOT ===================== */}
+    <div className="rounded-3xl bg-white border border-gray-100 p-6 shadow-sm">
+      <h4 className="text-sm font-medium text-gray-900 mb-6">
+        Snapshot
+      </h4>
+
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-6 text-center">
+        {[
+          ["Keywords", keywordsTableData.length],
+          ["Campaigns", campaigns.length],
+          ["WordPress", hasWordpressIntegration ? "Connected" : "—"],
+          ["Integrations", hasWordpressIntegration ? "WordPress" : "—"],
+        ].map(([label, value]) => (
+          <div
+            key={label}
+            className="rounded-2xl bg-gradient-to-br from-gray-50 to-white p-4"
+          >
+            <div className="text-xs text-gray-500">{label}</div>
+            <div className="mt-2 text-2xl font-semibold text-gray-900">
+              {value}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  </div>
+          ) : activeTab === "analytics" ? (
             companyDomainLoading ? (
               <CompanyInfoSkeleton />
             ) : showResults ? (
@@ -2397,46 +2674,49 @@ const handleRunAudit = async (url?: string) => {
                             };
                           });
                           if (sections.some((s) => s.content.length > 0)) {
-                            let carouselEl: HTMLDivElement | null = null;
                             return (
                               <div className="relative">
-                                <div className="absolute left-0 top-1/2 -translate-y-1/2 z-10">
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      if (carouselEl) {
-                                        const w = carouselEl.clientWidth;
-                                        carouselEl.scrollBy({ left: -w, behavior: "smooth" });
-                                      }
-                                    }}
-                                    className="px-3 py-2 rounded-full bg-white/70 hover:bg-white border border-gray-200 shadow-sm text-gray-700"
-                                    aria-label="Previous"
-                                  >
-                                    ←
-                                  </button>
-                                </div>
-                                <div className="absolute right-0 top-1/2 -translate-y-1/2 z-10">
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      if (carouselEl) {
-                                        const w = carouselEl.clientWidth;
-                                        carouselEl.scrollBy({ left: w, behavior: "smooth" });
-                                      }
-                                    }}
-                                    className="px-3 py-2 rounded-full bg-white/70 hover:bg-white border border-gray-200 shadow-sm text-gray-700"
-                                    aria-label="Next"
-                                  >
-                                    →
-                                  </button>
-                                </div>
+                                {companyCurrentIndex > 0 && (
+                                  <div className="absolute left-0 top-1/2 -translate-y-1/2 z-10">
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const el = companyCarouselRef.current;
+                                        if (el) {
+                                          const w = el.clientWidth;
+                                          el.scrollBy({ left: -w, behavior: "smooth" });
+                                        }
+                                      }}
+                                      className="px-3 py-2 rounded-full bg-white/70 hover:bg-white border border-gray-200 shadow-sm text-gray-700"
+                                      aria-label="Previous"
+                                    >
+                                      ←
+                                    </button>
+                                  </div>
+                                )}
+                                {companyCurrentIndex < companySectionsCount - 1 && (
+                                  <div className="absolute right-0 top-1/2 -translate-y-1/2 z-10">
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const el = companyCarouselRef.current;
+                                        if (el) {
+                                          const w = el.clientWidth;
+                                          el.scrollBy({ left: w, behavior: "smooth" });
+                                        }
+                                      }}
+                                      className="px-3 py-2 rounded-full bg-white/70 hover:bg-white border border-gray-200 shadow-sm text-gray-700"
+                                      aria-label="Next"
+                                    >
+                                      →
+                                    </button>
+                                  </div>
+                                )}
                                 <div
                                   className="mx-auto w-full max-w-[900px] px-6"
                                 >
                                   <div
-                                    ref={(el) => {
-                                      carouselEl = el;
-                                    }}
+                                    ref={setCompanyCarouselRef}
                                     className="flex gap-0 overflow-x-hidden snap-x snap-mandatory scroll-smooth pb-2"
                                   >
                                     {sections.map((sec, idx) => (
@@ -4051,28 +4331,56 @@ const handleRunAudit = async (url?: string) => {
 
               {/* Content Layer */}
               <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 py-16 sm:py-24">
-                {/* Audit Completed Toast */}
-                {auditComplete && (
-                  <div className="fixed bottom-6 right-6 z-50">
-                    <div className="bg-black text-white px-6 py-3 rounded-full shadow-xl flex items-center gap-3 border border-white/20 backdrop-blur-sm" style={{ letterSpacing: '0.011em' }}>
-                      <svg
-                        className="h-4 w-4 flex-shrink-0"
-                        xmlns="http://www.w3.org/2000/svg"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={3}
-                          d="M5 13l4 4L19 7"
-                        />
-                      </svg>
-                      <span className="font-light text-sm">Audit Completed!</span>
+                {/* Audit Completed Modal */}
+                <AlertDialog open={showAuditModal} onOpenChange={setShowAuditModal}>
+                  <AlertDialogContent className="max-w-md">
+                    <div className="p-4 rounded-lg bg-gradient-to-r from-white/80 to-gray-50 border border-gray-100">
+                      <AlertDialogHeader>
+                        <AlertDialogTitle className="text-2xl font-medium">Audit Completed</AlertDialogTitle>
+                        <AlertDialogDescription className="text-sm text-muted-foreground">
+                          Your domain audit has finished. Here's a quick summary — you can view the full report or download it.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+
+                      <div className="mt-4 flex items-center gap-4">
+                        <div className="flex-shrink-0">
+                          <OverallScoreGauge score={Math.round(((auditResult?.performance||0)+(auditResult?.seo||0)+(auditResult?.accessibility||0)+(auditResult?.bestPractices||0)+(auditResult?.pwa||0))/5*100)/100 || 0} />
+                        </div>
+                        <div className="flex-1">
+                          <div className="text-sm text-gray-600 mb-2">Top category</div>
+                          <div className="text-base font-medium text-gray-900">
+                            {auditResult ? (
+                              (() => {
+                                const cats = [
+                                  { k: 'Performance', v: auditResult.performance },
+                                  { k: 'SEO', v: auditResult.seo },
+                                  { k: 'Accessibility', v: auditResult.accessibility },
+                                  { k: 'Best Practices', v: auditResult.bestPractices },
+                                  { k: 'PWA', v: auditResult.pwa },
+                                ];
+                                const scored = cats.map(c => ({ ...c, s: Math.round((c.v||0)*100) }));
+                                const best = scored.reduce((a,b)=> b.s > a.s ? b : a, scored[0]);
+                                return `${best.k} — ${best.s}%`;
+                              })()
+                            ) : '—'}
+                          </div>
+                          <div className="text-xs text-gray-500 mt-2">Click below to view the full interactive report.</div>
+                        </div>
+                      </div>
+
+                      <div className="mt-6 flex items-center justify-end gap-2">
+                        <button
+                          onClick={() => window.print()}
+                          className="px-4 py-2 rounded-full border border-gray-200 text-sm font-light bg-white hover:bg-gray-50"
+                        >
+                          Download / Print
+                        </button>
+                        <AlertDialogAction onClick={handleViewReport} className="px-4 py-2 rounded-full bg-black text-white text-sm">View Full Report</AlertDialogAction>
+                        <AlertDialogCancel className="px-4 py-2 rounded-full border border-gray-200 text-sm">Close</AlertDialogCancel>
+                      </div>
                     </div>
-                  </div>
-                )}
+                  </AlertDialogContent>
+                </AlertDialog>
 
                 {/* Hero Section */}
                 <div className="text-center mb-20">
@@ -4147,7 +4455,7 @@ const handleRunAudit = async (url?: string) => {
                   const worst = scored.reduce((a, b) => (b.score < a.score ? b : a));
 
                   return (
-                    <div className="space-y-16">
+                    <div ref={resultsRef} className="space-y-16">
                       {/* Overall Score Section */}
                       <div className="flex flex-col items-center justify-center py-12">
                         <div className="mb-8">
@@ -4471,6 +4779,33 @@ const handleRunAudit = async (url?: string) => {
               </p>
             </div>
           )}
+        {showDeleteModal && (
+          <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50">
+            <div className="bg-white p-6 rounded-xl shadow-xl w-[90%] max-w-sm">
+              <h2 className="text-lg font-medium text-gray-800">Delete {deleteLabel}?</h2>
+              <p className="text-sm text-gray-500 mt-2">
+                Are you sure you want to delete this {deleteLabel}?
+              </p>
+              <div className="flex justify-end gap-3 mt-6">
+                <button
+                  onClick={() => setShowDeleteModal(false)}
+                  className="px-4 py-2 rounded-lg text-sm bg-gray-100 hover:bg-gray-200"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    if (deleteAction) deleteAction();
+                    setShowDeleteModal(false);
+                  }}
+                  className="px-4 py-2 rounded-lg text-sm bg-black text-white hover:bg-red-700"
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
         </div>
       </main>
     </div>
@@ -5096,11 +5431,11 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
     [getAuthHeaders, handleUnauthorized, toast]
   );
 
-  const confirmDelete = (label: string, action: () => void) => {
+  function confirmDelete(label: string, action: () => void) {
     setDeleteLabel(label);
     setDeleteAction(() => action);
     setShowDeleteModal(true);
-  };
+  }
 
   const fetchStructure = useCallback(
     async (targetCampaignId: number) => {
@@ -7882,9 +8217,15 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
                   <h3 className="text-[26px] font-light text-gray-900 tracking-tight">Configure content</h3>
                   <p className="text-sm text-gray-500">Length, imagery, and brand—keywords are already chosen.</p>
                   </div>
-                <div className="px-3 py-1.5 rounded-full bg-emerald-50 text-emerald-700 text-xs font-semibold border border-emerald-100">
-                  WordPress Connected
-                </div>
+                {hasWordpressIntegration ? (
+  <div className="px-3 py-1.5 rounded-full bg-emerald-50 text-emerald-700 text-xs font-semibold border border-emerald-100">
+    WordPress Connected
+  </div>
+) : (
+  <div className="px-3 py-1.5 rounded-full bg-red-50 text-red-700 text-xs font-semibold border border-red-100">
+    WordPress Not Connected
+  </div>
+)}
               </div>
               <div className="flex items-center gap-2">
                 {generationSteps.map((step) => (
