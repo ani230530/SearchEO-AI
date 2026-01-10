@@ -36,8 +36,8 @@ interface NormalizedContent {
 
 const asyncHandler =
   (fn: (req: Request, res: Response, next: any) => Promise<any>) =>
-  (req: Request, res: Response, next: any) =>
-    Promise.resolve(fn(req, res, next)).catch(next);
+    (req: Request, res: Response, next: any) =>
+      Promise.resolve(fn(req, res, next)).catch(next);
 
 const callWebhook = async (url: string, payload: any) => {
   if (process.env.NODE_ENV !== 'production') {
@@ -74,7 +74,7 @@ const callWebhook = async (url: string, payload: any) => {
       status: response.status,
       statusText: response.statusText,
       data: response.data,
-  });
+    });
   }
 
   return response.data;
@@ -308,22 +308,22 @@ router.post(
         error: 'WordPress integration password cannot be decrypted. Please reconfigure your WordPress integration in settings.'
       });
     }
-    
-  const payload = {
-    'Primary Keyword': primaryKeyword,
-    'longtail keywords':
-      Array.isArray(longtailKeywords) && longtailKeywords.length
-        ? longtailKeywords.join(', ')
-        : longtailKeywords || '',
-    'Brand Name': normalizedBrandName,
-    'Brand description': normalizedBrandDescription,
-    Image: Number(images) || 0,
-    'Word Count': Number(wordCount) || 800,
-    'Featured Image': featuredImage ? 'yes' : 'no',
-    Username: integration.username,
-    Password: decryptedPassword,
-    'wordpress url': integration.siteUrl,
-  };
+
+    const payload = {
+      'Primary Keyword': primaryKeyword,
+      'longtail keywords':
+        Array.isArray(longtailKeywords) && longtailKeywords.length
+          ? longtailKeywords.join(', ')
+          : longtailKeywords || '',
+      'Brand Name': normalizedBrandName,
+      'Brand description': normalizedBrandDescription,
+      Image: Number(images) || 0,
+      'Word Count': Number(wordCount) || 800,
+      'Featured Image': featuredImage ? 'yes' : 'no',
+      Username: integration.username,
+      Password: decryptedPassword,
+      'wordpress url': integration.siteUrl,
+    };
 
     try {
       const response = await callWebhook(REVIEW_WEBHOOK_URL, payload);
@@ -474,7 +474,7 @@ router.post(
         error: 'WordPress integration password cannot be decrypted. Please reconfigure your WordPress integration in settings.'
       });
     }
-    
+
     const payload = [
       {
         username: integration.username,
@@ -491,14 +491,14 @@ router.post(
 
     try {
       const response = await callWebhook(PUBLISH_WEBHOOK_URL, payload);
-      
+
       // Check if response is empty or invalid
-      const isResponseEmpty = 
-        !response || 
-        response === '' || 
+      const isResponseEmpty =
+        !response ||
+        response === '' ||
         (Array.isArray(response) && response.length === 0) ||
         (typeof response === 'object' && Object.keys(response).length === 0);
-      
+
       if (isResponseEmpty) {
         // Empty response means publishing failed
         const updateData = {
@@ -533,7 +533,7 @@ router.post(
           });
         }
       }
-      
+
       const entry = Array.isArray(response) ? response[0] : response;
 
       // Extract the published post URL - prioritize Link (actual post URL) over base WordPress URL
@@ -553,7 +553,7 @@ router.post(
       // Determine status: published if we have a URL that's different from base siteUrl, otherwise keep as draft (failed)
       const baseSiteUrl = typeof integration.siteUrl === 'string' ? integration.siteUrl.trim() : '';
       const hasValidUrl = publishedUrl && publishedUrl !== baseSiteUrl && !publishedUrl.startsWith('draft://');
-      
+
       // Only mark as published if we have a valid URL, otherwise treat as failed and keep as draft
       // This ensures we only mark as published when publishing is truly successful
       // Only mark as published if we have a valid URL - otherwise treat as failed
@@ -653,7 +653,7 @@ router.post(
       }
     } catch (error: any) {
       console.error('Error publishing content:', error?.response?.data || error);
-      
+
       // If we have a draftId, keep it as draft (not failed) so View button still works
       if (existingDraft) {
         try {
@@ -667,7 +667,7 @@ router.post(
           console.error('Error updating draft status:', updateError);
         }
       }
-      
+
       res.status(500).json({
         success: false,
         error: 'Failed to publish content to WordPress',
@@ -966,7 +966,7 @@ router.get(
     }
 
     const response = draft.response as any;
-    
+
     res.json({
       success: true,
       draft: {

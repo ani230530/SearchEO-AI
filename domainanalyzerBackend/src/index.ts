@@ -61,7 +61,7 @@ app.get('/api/debug/domains', authenticateToken, async (req: Request, res: Respo
     if (process.env.NODE_ENV === 'production') {
       return res.status(403).json({ error: 'Debug endpoint not available in production' });
     }
-    
+
     const domains = await prisma.domain.findMany({
       select: {
         id: true,
@@ -88,7 +88,7 @@ app.get('/api/debug/domains', authenticateToken, async (req: Request, res: Respo
         createdAt: 'desc'
       }
     });
-    
+
     res.json({
       total: domains.length,
       domains: domains
@@ -99,6 +99,8 @@ app.get('/api/debug/domains', authenticateToken, async (req: Request, res: Respo
   }
 });
 
+import n8nErrorRouter from './routes/n8nError';
+
 // Routes
 app.use('/api/auth', authRouter);
 app.use('/api/user', userRouter);
@@ -106,6 +108,7 @@ app.use('/api/domain', domainRouter);
 app.use('/api/gsc', googleSearchConsoleRouter);
 app.use('/api/campaigns', campaignsRouter);
 app.use('/api/publish', publishRouter);
+app.use('/api/webhooks/n8n', n8nErrorRouter);
 
 // OAuth callback route (must be at /api/auth/google/callback for Google redirect)
 app.get('/api/auth/google/callback', handleOAuthCallback);

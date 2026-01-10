@@ -4799,6 +4799,17 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
           handleStreamingUpdate(data.jobId, data.message, data.timestamp);
           return;
         }
+
+        // Handle n8n critical errors
+        if (data.type === 'n8n_error') {
+          console.error('Received n8n error:', data);
+          toast({
+            title: 'Generation Failed',
+            description: data.error || 'An external error occurred during processing',
+            variant: 'destructive',
+          });
+          // We don't return here, allowing the 'drafts' update (if triggered) to also process
+        }
         
         // Handle draft updates
         if (data.type === 'drafts' && data.pages) {

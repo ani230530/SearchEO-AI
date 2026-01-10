@@ -67,34 +67,7 @@ router.get('/events', async (req: Request, res: Response) => {
   }
 });
 
-// --- SSE support for generation updates (per-user) ---
-type SSEClient = { res: Response };
-const sseClients = new Map<number, Set<SSEClient>>();
-
-const addSSEClient = (userId: number, client: SSEClient) => {
-  if (!sseClients.has(userId)) sseClients.set(userId, new Set());
-  sseClients.get(userId)!.add(client);
-};
-
-const removeSSEClient = (userId: number, client: SSEClient) => {
-  const set = sseClients.get(userId);
-  if (!set) return;
-  set.delete(client);
-  if (set.size === 0) sseClients.delete(userId);
-};
-
-const broadcastToUser = (userId: number, event: any) => {
-  const set = sseClients.get(userId);
-  if (!set) return;
-  const payload = `data: ${JSON.stringify(event)}\n\n`;
-  for (const client of set) {
-    try {
-      client.res.write(payload);
-    } catch (err) {
-      console.error('SSE write error', err);
-    }
-  }
-};
+import { addSSEClient, removeSSEClient, broadcastToUser, SSEClient } from '../services/sseService';
 
 type CampaignWithStructure = Prisma.CampaignGetPayload<{
   include: {
@@ -1069,7 +1042,7 @@ router.post('/pages/:pageId/keywords', authenticateToken, asyncHandler(async (re
         topicId: page.topicId
       }
     });
-    
+
     for (const existingPrimary of existingPrimaries) {
       const existingMetadata = (existingPrimary.aiMetadata as any) || {};
       if (existingMetadata.isPrimary) {
@@ -1084,7 +1057,7 @@ router.post('/pages/:pageId/keywords', authenticateToken, asyncHandler(async (re
         });
       }
     }
-    
+
     aiMetadata = { isPrimary: true, isLongtail: false };
   } else if (keywordType === 'longtail') {
     aiMetadata = { isPrimary: false, isLongtail: true };
@@ -1157,7 +1130,7 @@ router.post('/pages/:pageId/keywords/ai', authenticateToken, asyncHandler(async 
   // Prepare metadata for each keyword based on type
   const keywordsToCreate = suggestions.map((kw, index) => {
     let aiMetadata: any = { generatedAt: new Date().toISOString(), origin: 'keyword_ai' };
-    
+
     if (shouldMarkAsPrimary) {
       aiMetadata.isPrimary = true;
       aiMetadata.isLongtail = false;
@@ -1186,8 +1159,8 @@ router.post('/pages/:pageId/keywords/ai', authenticateToken, asyncHandler(async 
   // If marking as primary, clear existing primary keywords for this page
   if (shouldMarkAsPrimary && keywordsToCreate.length > 0) {
     const createdKeywords = await prisma.campaignKeyword.findMany({
-      where: { 
-        pageId, 
+      where: {
+        pageId,
         topicId: page.topicId,
         term: { in: suggestions.map(s => s.term) }
       },
@@ -1197,7 +1170,7 @@ router.post('/pages/:pageId/keywords/ai', authenticateToken, asyncHandler(async 
 
     if (createdKeywords.length > 0) {
       const newPrimaryKeyword = createdKeywords[0];
-      
+
       // Clear all other primary keywords for this page
       const existingPrimaries = await prisma.campaignKeyword.findMany({
         where: {
@@ -1524,7 +1497,7 @@ router.post('/topics/:topicId/generate-content', authenticateToken, asyncHandler
 
   // Create generation job
   const jobId = `job_${topicId}_${Date.now()}`;
-  
+
   // Upsert draft entries for each page (update if exists, create if not)
   // Each page has only one draft - we update it on regenerate
   // Since pageId is stored in JSON, fetch all user drafts and match by pageId
@@ -1683,7 +1656,7 @@ router.post('/topics/:topicId/generate-content', authenticateToken, asyncHandler
       error: 'WordPress integration password cannot be decrypted. Please reconfigure your WordPress integration in settings.'
     });
   }
-  
+
   const sanitizedDomainName = topic.campaign.domain.url
     ?.replace(/^https?:\/\//i, '')
     ?.replace(/^www\./i, '')
@@ -1735,7 +1708,7 @@ router.post('/topics/:topicId/generate-content', authenticateToken, asyncHandler
   const PILLAR_WEBHOOK_URL = process.env.N8N_PILLAR_WEBHOOK_URL || 'https://n8n.srv891599.hstgr.cloud/webhook/d235dd55-3392-4093-b3dd-095baf5c337b';
   const N8N_API_KEY = process.env.N8N_API_KEY || '1234';
   const N8N_API_KEY_HEADER = process.env.N8N_API_KEY_HEADER || 'key';
-  
+
   // Process webhook asynchronously (fire and forget)
   // n8n will process this in background and call back via webhook when done
   // We don't wait for response since it takes ~3min per page (9min for 3 pages)
@@ -1761,7 +1734,7 @@ router.post('/topics/:topicId/generate-content', authenticateToken, asyncHandler
           bodyType: Array.isArray(response.data) ? 'array' : typeof response.data,
           pages: Array.isArray(response.data) ? response.data.length : 1,
         });
-        
+
         // Process the response immediately
         const pages = Array.isArray(response.data) ? response.data : [response.data];
         processN8nResponse(pages, drafts, jobId);
@@ -1778,18 +1751,18 @@ router.post('/topics/:topicId/generate-content', authenticateToken, asyncHandler
           await processN8nResponse(pages, drafts, jobId);
           return;
         }
-        
+
         // Timeout/connection reset is EXPECTED for long-running processes
-        const isExpectedError = 
-          error.code === 'ECONNRESET' || 
-          error.code === 'ETIMEDOUT' || 
+        const isExpectedError =
+          error.code === 'ECONNRESET' ||
+          error.code === 'ETIMEDOUT' ||
           error.message?.includes('timeout') ||
           error.message?.includes('socket hang up') ||
           error.message?.includes('exceeded');
-        
+
         if (isExpectedError) {
           console.log(`[n8n request] Request sent for job ${jobId}. Timeout expected - will check drafts periodically.`);
-          
+
           // Start background job to check if drafts were updated
           // This will poll the drafts to see if n8n updated them directly
           startDraftPolling(jobId, drafts, userId);
@@ -1813,26 +1786,26 @@ router.post('/topics/:topicId/generate-content', authenticateToken, asyncHandler
           console.warn(`[n8n request] Unexpected error for job ${jobId}: ${error.message}`);
         }
       });
-      
+
       // Helper function to process n8n response
       async function processN8nResponse(pages: any[], draftList: any[], jobIdStr: string) {
         console.log(`[n8n response] Processing ${pages.length} pages for job ${jobIdStr}`);
-        
+
         for (const page of pages) {
           const primaryKeyword = page['Primary Keyword'] || page.primaryKeyword || '';
           const html = page['Html Content'] || page.htmlContent || '';
-          
+
           if (!primaryKeyword) {
             console.warn('[n8n response] Page missing primary keyword');
             continue;
           }
-          
+
           // Match by primary keyword and jobId
           const matchingDraft = draftList.find(d => {
             const resp = d.response as any;
             return d.primaryKeyword === primaryKeyword && resp?.jobId === jobIdStr;
           });
-          
+
           if (matchingDraft) {
             const currentResponse = matchingDraft.response as any;
             await prisma.wordpressPublishLog.update({
@@ -1863,16 +1836,16 @@ router.post('/topics/:topicId/generate-content', authenticateToken, asyncHandler
           }
         }
       }
-      
+
       // Background job to periodically check if drafts were updated
       // (in case n8n updates them through some other mechanism)
       function startDraftPolling(jobIdStr: string, draftList: any[], userIdNum: number) {
         let attempts = 0;
         const maxAttempts = 120; // Check for 30 minutes (120 * 15 seconds)
-        
+
         const pollInterval = setInterval(async () => {
           attempts++;
-          
+
           try {
             // Check if any drafts have been updated (maybe n8n updated them directly)
             const updatedDrafts = await prisma.wordpressPublishLog.findMany({
@@ -1881,13 +1854,13 @@ router.post('/topics/:topicId/generate-content', authenticateToken, asyncHandler
                 userId: userIdNum
               }
             });
-            
+
             // Check if any draft now has htmlContent (means it's completed)
             const completed = updatedDrafts.some(draft => {
               const resp = draft.response as any;
               return resp?.htmlContent || resp?.['Html Content'];
             });
-            
+
             if (completed || attempts >= maxAttempts) {
               clearInterval(pollInterval);
               if (completed) {
@@ -1899,7 +1872,7 @@ router.post('/topics/:topicId/generate-content', authenticateToken, asyncHandler
           }
         }, 15000); // Check every 15 seconds
       }
-      
+
       // Don't wait for response - return immediately
       return;
       // Note: Response handling is done in the /generation-webhook endpoint
@@ -1952,7 +1925,7 @@ router.get('/generation-status/:jobId', authenticateToken, asyncHandler(async (r
     // Check if draft has htmlContent in response - that means it's completed
     const hasContent = response?.htmlContent || response?.['Html Content'];
     const statusFromResponse = response?.status;
-    
+
     // Determine status: if has content or status is 'completed', it's done
     let status = 'generating';
     if (hasContent || statusFromResponse === 'completed') {
@@ -1964,7 +1937,7 @@ router.get('/generation-status/:jobId', authenticateToken, asyncHandler(async (r
     } else if (draft.status === 'generating') {
       status = 'generating';
     }
-    
+
     return {
       pageId: response.pageId,
       pageType: response.pageType,
@@ -2153,13 +2126,13 @@ router.post('/generation-webhook', asyncHandler(async (req: Request, res: Respon
       'user-agent': req.headers['user-agent'],
       'x-forwarded-for': req.headers['x-forwarded-for'],
     });
-    
+
     // n8n can send data in different formats:
     // 1. Object with job_id and pages array
     // 2. Direct array of pages (with job_id in each page or first page)
     let pages: any[] = [];
     let jobId: string | null = null;
-    
+
     if (Array.isArray(req.body)) {
       // Format 2: Direct array
       pages = req.body;
@@ -2173,7 +2146,7 @@ router.post('/generation-webhook', asyncHandler(async (req: Request, res: Respon
       pages = [req.body];
       jobId = req.body.job_id || req.body.jobId || req.body['Job Id'] || null;
     }
-  
+
     console.log('[generation-webhook] Parsed payload summary', {
       isArray: Array.isArray(req.body),
       topLevelKeys: typeof req.body === 'object' && req.body ? Object.keys(req.body) : [],
@@ -2181,49 +2154,49 @@ router.post('/generation-webhook', asyncHandler(async (req: Request, res: Respon
       jobId,
       pageKeywords: pages.map((p: any) => p['Primary Keyword'] || p.primaryKeyword || 'N/A').slice(0, 5), // First 5 keywords
     });
-    
+
     // STRICT VALIDATION: Require job_id at top level
     if (!jobId) {
       console.error('[generation-webhook] REJECTED: Missing job_id in payload');
-      return res.status(400).json({ 
-        success: false, 
-        error: 'Invalid payload: job_id is required' 
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid payload: job_id is required'
       });
     }
-    
+
     if (!pages || pages.length === 0) {
       console.error('[generation-webhook] REJECTED: No pages found in payload');
       return res.status(400).json({ success: false, error: 'Invalid payload: no pages found' });
     }
-    
+
     console.log(`[generation-webhook] Processing ${pages.length} pages for job_id: ${jobId}`);
-    
+
     // Find all drafts with this job_id
     const allUserDrafts = await prisma.wordpressPublishLog.findMany({
       where: {
         status: { in: ['generating', 'draft'] }
       }
     });
-    
+
     const allDrafts = allUserDrafts.filter(draft => {
       const resp = draft.response as any;
       return resp?.jobId === jobId;
     });
-    
+
     if (allDrafts.length === 0) {
       console.warn(`[generation-webhook] No drafts found with job_id: ${jobId}`);
     } else {
       console.log(`[generation-webhook] Found ${allDrafts.length} drafts for job_id: ${jobId}`);
     }
-    
+
     const processedPages: string[] = [];
     const skippedPages: string[] = [];
-    
+
     // Match pages to drafts using job_id + Primary Keyword (STRICT VALIDATION)
     for (const page of pages) {
       const primaryKeyword = page['Primary Keyword'] || page.primaryKeyword || '';
       const htmlContent = page['Html Content'] || page.htmlContent || '';
-      
+
       // STRICT VALIDATION: Require Primary Keyword
       if (!primaryKeyword) {
         console.error(`[generation-webhook] REJECTED: Page missing Primary Keyword:`, {
@@ -2238,7 +2211,7 @@ router.post('/generation-webhook', asyncHandler(async (req: Request, res: Respon
         });
         continue;
       }
-      
+
       // STRICT VALIDATION: Require Html Content
       if (!htmlContent || htmlContent.trim() === '') {
         console.error(`[generation-webhook] REJECTED: Page "${primaryKeyword}" missing Html Content`);
@@ -2249,26 +2222,26 @@ router.post('/generation-webhook', asyncHandler(async (req: Request, res: Respon
         });
         continue;
       }
-      
+
       // Find draft by job_id + primary keyword
       const draft = allDrafts.find(d => d.primaryKeyword === primaryKeyword);
-      
+
       if (!draft) {
         console.warn(`[generation-webhook] No draft found for keyword "${primaryKeyword}" with job_id: ${jobId}`);
         skippedPages.push(`${primaryKeyword} (draft not found)`);
         continue;
       }
-      
+
       // UPSERT: Update existing draft (each page has only one draft)
       const currentResponse = draft.response as any;
       const pageId = currentResponse?.pageId;
-      
+
       if (!pageId) {
         console.warn(`[generation-webhook] Draft ${draft.id} missing pageId, skipping update`);
         skippedPages.push(`${primaryKeyword} (missing pageId)`);
         continue;
       }
-      
+
       // Update draft with new HTML content (overwrites existing)
       const updatedDraft = await prisma.wordpressPublishLog.update({
         where: { id: draft.id },
@@ -2288,7 +2261,7 @@ router.post('/generation-webhook', asyncHandler(async (req: Request, res: Respon
           }
         }
       });
-      
+
       // Update GenerationJobPage and aggregate job status
       await prisma.generationJobPage.updateMany({
         where: { jobId, pageId },
@@ -2311,7 +2284,7 @@ router.post('/generation-webhook', asyncHandler(async (req: Request, res: Respon
         where: { id: pageId },
         select: { topicId: true, pageType: true }
       });
-      
+
       if (pageRecord?.topicId) {
         broadcastToUser(draft.userId, {
           type: 'drafts',
@@ -2328,7 +2301,7 @@ router.post('/generation-webhook', asyncHandler(async (req: Request, res: Respon
           }]
         });
       }
-      
+
       processedPages.push(primaryKeyword);
       console.log(`[generation-webhook] ✅ Updated draft ${draft.id} for pageId ${pageId}, keyword "${primaryKeyword}"`);
       console.log(`[generation-webhook] Page details for "${primaryKeyword}":`, {
@@ -2340,7 +2313,7 @@ router.post('/generation-webhook', asyncHandler(async (req: Request, res: Respon
         hasFeaturedImage: !!page['Featured Image'],
       });
     }
-    
+
     // If nothing processed, mark drafts and job pages as failed
     if (processedPages.length === 0 && allDrafts.length > 0) {
       await prisma.wordpressPublishLog.updateMany({
@@ -2391,11 +2364,11 @@ router.post('/generation-webhook', asyncHandler(async (req: Request, res: Respon
       processed: processedPages,
       skipped: skippedPages.length > 0 ? skippedPages : undefined
     };
-    
+
     if (skippedPages.length > 0) {
       console.warn(`[generation-webhook] ⚠️ Skipped ${skippedPages.length} pages:`, skippedPages);
     }
-    
+
     res.json(result);
   } catch (error: any) {
     console.error('[generation-webhook] ===== ERROR PROCESSING N8N RESPONSE =====');
@@ -2464,17 +2437,17 @@ router.post('/streaming-webhook', asyncHandler(async (req: Request, res: Respons
     // Validate required fields
     if (!job_id) {
       console.error('[streaming-webhook] REJECTED: Missing job_id in payload');
-      return res.status(400).json({ 
-        success: false, 
-        error: 'Invalid payload: job_id is required' 
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid payload: job_id is required'
       });
     }
 
     if (!message) {
       console.error('[streaming-webhook] REJECTED: Missing message in payload');
-      return res.status(400).json({ 
-        success: false, 
-        error: 'Invalid payload: message is required' 
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid payload: message is required'
       });
     }
 
@@ -2499,9 +2472,9 @@ router.post('/streaming-webhook', asyncHandler(async (req: Request, res: Respons
     if (!matchingDraft) {
       console.warn(`[streaming-webhook] No draft found with job_id: ${job_id}`);
       // Return 200 to avoid n8n retries, but log the issue
-      return res.status(200).json({ 
-        success: false, 
-        message: 'Job not found (may have completed or not started yet)' 
+      return res.status(200).json({
+        success: false,
+        message: 'Job not found (may have completed or not started yet)'
       });
     }
 
@@ -2524,9 +2497,9 @@ router.post('/streaming-webhook', asyncHandler(async (req: Request, res: Respons
   } catch (error: any) {
     console.error('[streaming-webhook] Error processing streaming webhook:', error);
     // Return 200 to avoid n8n retries, but log the error
-    res.status(200).json({ 
-      success: false, 
-      error: 'Internal server error (logged)' 
+    res.status(200).json({
+      success: false,
+      error: 'Internal server error (logged)'
     });
   }
 }));
@@ -2621,11 +2594,11 @@ router.get('/topics/:topicId/drafts-status', authenticateToken, asyncHandler(asy
       // Pull latest draft if available
       const draftId = pageStatus.draftId || null;
       const hasHtml = !!pageStatus.hasHtml;
-      
+
       // Fetch draft to check published status and URL
       let draftStatus = pageStatus.status as 'pending' | 'generating' | 'completed' | 'failed' | 'published';
       let wordpressUrl: string | null = null;
-      
+
       if (draftId) {
         try {
           const draft = await prisma.wordpressPublishLog.findFirst({
@@ -2640,7 +2613,7 @@ router.get('/topics/:topicId/drafts-status', authenticateToken, asyncHandler(asy
           // Silently fail - use pageStatus
         }
       }
-      
+
       // If page has HTML content, it must be completed regardless of stored status (unless published)
       const finalStatus = hasHtml && draftStatus !== 'published'
         ? ('completed' as const)
@@ -2690,7 +2663,7 @@ router.get('/drafts/:draftId', authenticateToken, asyncHandler(async (req: Reque
   }
 
   const response = draft.response as any;
-  
+
   res.json({
     success: true,
     draft: {
