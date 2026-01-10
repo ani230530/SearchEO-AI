@@ -206,7 +206,6 @@ const tooltipInfo = {
   SEO: "Shows how well your domain is optimized for search engines.",
   Accessibility: "Indicates how usable the site is for all users, including disabilities.",
   "Best Practices": "Checks if your site follows recommended web development standards.",
-  PWA: "Shows how well your domain qualifies as a Progressive Web App.",
 };
 
 const SidebarDashboard = () => {
@@ -478,7 +477,6 @@ const fetchAudit = useCallback(async () => {
           seo: data.audit.seo,
           accessibility: data.audit.accessibility,
           bestPractices: data.audit.bestPractices,
-          pwa: data.audit.pwa,
           audits: data.audit.audits,
           screenshot: data.audit.screenshotUrl || null,
         });
@@ -2435,8 +2433,7 @@ const handleRunAudit = async (url?: string) => {
                 ((auditResult?.performance || 0) +
                   (auditResult?.seo || 0) +
                   (auditResult?.accessibility || 0) +
-                  (auditResult?.bestPractices || 0) +
-                  (auditResult?.pwa || 0)) / 5 || 0
+                  (auditResult?.bestPractices || 0)) / 5 || 0
               }
             />
           </div>
@@ -2526,8 +2523,7 @@ const handleRunAudit = async (url?: string) => {
                 ((auditResult.performance || 0) +
                   (auditResult.seo || 0) +
                   (auditResult.accessibility || 0) +
-                  (auditResult.bestPractices || 0) +
-                  (auditResult.pwa || 0)) / 5
+                  (auditResult.bestPractices || 0)) / 5
               }
             />
 
@@ -2537,7 +2533,6 @@ const handleRunAudit = async (url?: string) => {
                 ["SEO", auditResult.seo],
                 ["Accessibility", auditResult.accessibility],
                 ["Best Practices", auditResult.bestPractices],
-                ["PWA", auditResult.pwa],
               ].map(([label, value]) => {
                 const pct = Math.round((value || 0) * 100);
                 return (
@@ -4344,7 +4339,7 @@ const handleRunAudit = async (url?: string) => {
 
                       <div className="mt-4 flex items-center gap-4">
                         <div className="flex-shrink-0">
-                          <OverallScoreGauge score={Math.round(((auditResult?.performance||0)+(auditResult?.seo||0)+(auditResult?.accessibility||0)+(auditResult?.bestPractices||0)+(auditResult?.pwa||0))/5*100)/100 || 0} />
+                          <OverallScoreGauge score={Math.round(((auditResult?.performance||0)+(auditResult?.seo||0)+(auditResult?.accessibility||0)+(auditResult?.bestPractices||0))/5*100)/100 || 0} />
                         </div>
                         <div className="flex-1">
                           <div className="text-sm text-gray-600 mb-2">Top category</div>
@@ -4356,7 +4351,6 @@ const handleRunAudit = async (url?: string) => {
                                   { k: 'SEO', v: auditResult.seo },
                                   { k: 'Accessibility', v: auditResult.accessibility },
                                   { k: 'Best Practices', v: auditResult.bestPractices },
-                                  { k: 'PWA', v: auditResult.pwa },
                                 ];
                                 const scored = cats.map(c => ({ ...c, s: Math.round((c.v||0)*100) }));
                                 const best = scored.reduce((a,b)=> b.s > a.s ? b : a, scored[0]);
@@ -4446,7 +4440,6 @@ const handleRunAudit = async (url?: string) => {
                     { label: "SEO", value: auditResult.seo },
                     { label: "Accessibility", value: auditResult.accessibility },
                     { label: "Best Practices", value: auditResult.bestPractices },
-                    { label: "PWA", value: auditResult.pwa },
                   ];
 
                   const scored = categories.map(c => ({ ...c, score: Math.round((c.value || 0) * 100) }));
@@ -4568,7 +4561,7 @@ const handleRunAudit = async (url?: string) => {
                         >
                           Individual Metrics
                         </h3>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                           {categories.map(({ label, value }) => (
                             <div
                               key={label}

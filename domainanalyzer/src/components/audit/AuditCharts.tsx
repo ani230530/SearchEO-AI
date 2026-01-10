@@ -25,7 +25,6 @@ interface AuditData {
   seo: number;
   accessibility: number;
   bestPractices: number;
-  pwa: number;
 }
 
 interface AuditChartsProps {
@@ -51,7 +50,6 @@ export const AuditRadarChart: React.FC<AuditChartsProps> = ({ data }) => {
     { metric: 'SEO', score: Math.round(data.seo * 100), fullMark: 100 },
     { metric: 'Accessibility', score: Math.round(data.accessibility * 100), fullMark: 100 },
     { metric: 'Best Practices', score: Math.round(data.bestPractices * 100), fullMark: 100 },
-    { metric: 'PWA', score: Math.round(data.pwa * 100), fullMark: 100 },
   ];
 
   return (
@@ -100,7 +98,6 @@ export const AuditBarChart: React.FC<AuditChartsProps> = ({ data }) => {
     { name: 'SEO', score: Math.round(data.seo * 100) },
     { name: 'Accessibility', score: Math.round(data.accessibility * 100) },
     { name: 'Best Practices', score: Math.round(data.bestPractices * 100) },
-    { name: 'PWA', score: Math.round(data.pwa * 100) },
   ].map((item) => ({
     ...item,
     color: getScoreColor(item.score / 100),
@@ -231,7 +228,6 @@ export const AuditScoreDistribution: React.FC<AuditChartsProps> = ({ data }) => 
     data.seo,
     data.accessibility,
     data.bestPractices,
-    data.pwa,
   ];
 
   scores.forEach((score) => {
