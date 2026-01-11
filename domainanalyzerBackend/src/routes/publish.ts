@@ -477,8 +477,8 @@ router.post(
 
     const payload = [
       {
-        username: integration.username,
-        password: decryptedPassword,
+        Username: integration.username,
+        Password: decryptedPassword,
         'wordpress url': integration.siteUrl,
         'Primary Keyword': primaryKeyword,
         'Html Content': htmlContent,
