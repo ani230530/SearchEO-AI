@@ -32,8 +32,11 @@ import {
   AuditGaugeChart,
   AuditScoreDistribution,
   AuditLineChart,
+
   OverallScoreGauge,
 } from '@/components/audit/AuditCharts';
+import { PDFDownloadLink } from '@react-pdf/renderer';
+import { AuditPDF } from '@/components/audit/AuditPDF';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3002";
 
@@ -4363,12 +4366,15 @@ const handleRunAudit = async (url?: string) => {
                       </div>
 
                       <div className="mt-6 flex items-center justify-end gap-2">
-                        <button
-                          onClick={() => window.print()}
-                          className="px-4 py-2 rounded-full border border-gray-200 text-sm font-light bg-white hover:bg-gray-50"
-                        >
-                          Download / Print
-                        </button>
+                        {auditResult && companyDomain && (
+                          <PDFDownloadLink
+                            document={<AuditPDF data={auditResult} domain={companyDomain} />}
+                            fileName={`audit-${companyDomain}-${new Date().toISOString().split('T')[0]}.pdf`}
+                            className="px-4 py-2 rounded-full border border-gray-200 text-sm font-light bg-white hover:bg-gray-50 flex items-center justify-center"
+                          >
+                            {({ loading }) => (loading ? 'Preparing...' : 'Export PDF')}
+                          </PDFDownloadLink>
+                        )}
                         <AlertDialogAction onClick={handleViewReport} className="px-4 py-2 rounded-full bg-black text-white text-sm">View Full Report</AlertDialogAction>
                         <AlertDialogCancel className="px-4 py-2 rounded-full border border-gray-200 text-sm">Close</AlertDialogCancel>
                       </div>
