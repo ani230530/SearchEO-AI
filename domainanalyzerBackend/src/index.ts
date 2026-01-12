@@ -50,6 +50,7 @@ const corsOptions: cors.CorsOptions = {
 
 // Middleware
 app.use(cors(corsOptions));
+app.options('*', cors(corsOptions)); // Enable pre-flight checks for all routes
 app.use(express.json({ limit: '5mb' }));
 
 // Debug endpoint to list all domains (ADMIN ONLY - REMOVE IN PRODUCTION)
