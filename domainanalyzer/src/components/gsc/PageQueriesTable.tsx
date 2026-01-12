@@ -9,7 +9,7 @@ import {
   SortingState,
   useReactTable,
 } from "@tanstack/react-table";
-import { ArrowDown, ArrowUp, Download, ArrowLeft, ChevronUp, TrendingUp, TrendingDown, Loader2 } from "lucide-react";
+import { ArrowDown, ArrowUp, Download, ArrowLeft, ChevronUp, TrendingUp, TrendingDown, Loader2, ChevronDown } from "lucide-react";
 import { formatDateForDisplay, getDateRangeDescription } from "@/lib/gsc/dateUtils";
 import { toast } from "sonner";
 import TrendsChart, { TrendDataPoint } from "./TrendsChart";
@@ -549,7 +549,7 @@ const PageQueriesTable = ({
                       : 'text-gray-700 hover:bg-gray-100 border border-gray-200'
                   }`}
                 >
-                  <ChevronUp className="w-3.5 h-3.5 rotate-90" />
+                  <ChevronDown className="w-3.5 h-3.5 rotate-90" />
                   <span>Previous</span>
                 </button>
                 
@@ -593,7 +593,7 @@ const PageQueriesTable = ({
                   }`}
                 >
                   <span>Next</span>
-                  <ChevronUp className="w-3.5 h-3.5 -rotate-90" />
+                  <ChevronDown className="w-3.5 h-3.5 -rotate-90" />
                 </button>
               </div>
             </div>

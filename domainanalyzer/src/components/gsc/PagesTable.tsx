@@ -8,7 +8,7 @@ import {
   SortingState,
   useReactTable,
 } from "@tanstack/react-table";
-import { ArrowDown, ArrowUp, ChevronRight, ChevronUp, ExternalLink, Copy, Check, Search, Download, Loader2 } from "lucide-react";
+import { ArrowDown, ArrowUp, ChevronRight, ChevronUp, ExternalLink, Copy, Check, Search, Download, Loader2, ChevronDown } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
 
@@ -401,7 +401,7 @@ const PagesTable = ({ data, onPageSelect, isLoading = false, loadingPageUrl = nu
                       : 'text-gray-700 hover:bg-gray-100 border border-gray-200'
                   }`}
                 >
-                  <ChevronUp className="w-3.5 h-3.5 rotate-90" />
+                  <ChevronDown className="w-3.5 h-3.5 rotate-90" />
                   <span>Previous</span>
                 </button>
                 
@@ -445,7 +445,7 @@ const PagesTable = ({ data, onPageSelect, isLoading = false, loadingPageUrl = nu
                   }`}
                 >
                   <span>Next</span>
-                  <ChevronUp className="w-3.5 h-3.5 -rotate-90" />
+                  <ChevronDown className="w-3.5 h-3.5 -rotate-90" />
                 </button>
               </div>
             </div>
