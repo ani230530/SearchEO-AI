@@ -1,0 +1,115 @@
+src/routes/publish.ts:  '/generating/:id',
+src/routes/publish.ts:  '/generating/:id',
+src/routes/publish.ts:  '/drafts/:draftId',
+src/routes/enhancedPhrasesUnified.ts:// GET /enhanced-phrases/:domainId/step3 - Load Step3Results data
+src/routes/enhancedPhrasesUnified.ts:router.get('/:domainId/step3', authenticateToken, async (req, res) => {
+src/routes/enhancedPhrasesUnified.ts:// POST /enhanced-phrases/:domainId/step3/generate - UNIFIED ENHANCED PHRASES GENERATION
+src/routes/enhancedPhrasesUnified.ts:router.post('/:domainId/step3/generate', authenticateToken, async (req, res) => {
+src/routes/enhancedPhrasesUnified.ts:// POST /enhanced-phrases/:domainId/:keywordId/generate-more - Generate 2 additional phrases for a specific keyword
+src/routes/enhancedPhrasesUnified.ts:router.post('/:domainId/:keywordId/generate-more', authenticateToken, async (req, res) => {
+src/routes/enhancedPhrasesUnified.ts:router.post('/:domainId/custom-phrase', authenticateToken, async (req, res) => {
+src/routes/ai-queries.ts:// GET /api/ai-queries/debug/:domainId - Debug endpoint (no auth) to test database
+src/routes/ai-queries.ts:router.get('/debug/:domainId', asyncHandler(async (req: Request, res: Response) => {
+src/routes/ai-queries.ts:// GET /api/ai-queries/test/:domainId - Test endpoint to check basic functionality
+src/routes/ai-queries.ts:router.get('/test/:domainId', authenticateToken, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+src/routes/ai-queries.ts:// GET /api/ai-queries/results/:domainId - Get AI query results for a domain
+src/routes/ai-queries.ts:router.get('/results/:domainId', authenticateToken, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+src/routes/ai-queries.ts:// DELETE /api/ai-queries/results/:resultId - Delete a specific AI query result
+src/routes/ai-queries.ts:router.delete('/results/:resultId', authenticateToken, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+src/routes/ai-queries.ts:// GET /api/ai-queries/stats/:domainId - Get AI query statistics for a domain
+src/routes/ai-queries.ts:router.get('/stats/:domainId', authenticateToken, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+src/routes/ai-queries.ts:router.post('/:domainId', async (req, res) => {
+src/routes/ai-queries.ts:// GET /api/ai-queries/competitors/:domainId - Get competitor analysis for reports
+src/routes/ai-queries.ts:router.get('/competitors/:domainId', authenticateToken, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+src/routes/dashboard.ts:// GET /api/dashboard/:domainId/test - Test endpoint to check domain existence
+src/routes/dashboard.ts:router.get('/:domainId/test', authenticateToken, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+src/routes/dashboard.ts:// GET /api/dashboard/:domainId - Get comprehensive dashboard data
+src/routes/dashboard.ts:router.get('/:domainId', authenticateToken, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+src/routes/dashboard.ts:// GET /api/dashboard/:domainId/competitors - Get competitor analysis for a domain
+src/routes/dashboard.ts:router.get('/:domainId/competitors', authenticateToken, async (req: any, res: any) => {
+src/routes/dashboard.ts:// POST /api/dashboard/:domainId/competitors - Generate competitor analysis
+src/routes/dashboard.ts:router.post('/:domainId/competitors', authenticateToken, async (req: any, res: any) => {
+src/routes/dashboard.ts:// POST /api/dashboard/:domainId/competitors/analyze-responses - Analyze competitors using existing AI responses
+src/routes/dashboard.ts:router.post('/:domainId/competitors/analyze-responses', authenticateToken, async (req: any, res: any) => {
+src/routes/dashboard.ts:// GET /api/dashboard/:domainId/suggested-competitors - Get suggested competitors
+src/routes/dashboard.ts:router.get('/:domainId/suggested-competitors', authenticateToken, async (req: any, res: any) => {
+src/routes/dashboard.ts:// POST /api/dashboard/:domainId/report - Generate comprehensive analysis report
+src/routes/dashboard.ts:router.post('/:domainId/report', authenticateToken, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+src/routes/campaigns.ts: * GET /api/campaigns/:id/keywords
+src/routes/campaigns.ts:router.get('/:id/keywords', authenticateToken, asyncHandler(async (req: Request, res: Response) => {
+src/routes/campaigns.ts: * GET /api/campaigns/:id/structure
+src/routes/campaigns.ts:router.get('/:id/structure', authenticateToken, asyncHandler(async (req: Request, res: Response) => {
+src/routes/campaigns.ts: * POST /api/campaigns/:id/topics
+src/routes/campaigns.ts:router.post('/:id/topics', authenticateToken, asyncHandler(async (req: Request, res: Response) => {
+src/routes/campaigns.ts: * POST /api/campaigns/:id/topics/ai
+src/routes/campaigns.ts:router.post('/:id/topics/ai', authenticateToken, asyncHandler(async (req: Request, res: Response) => {
+src/routes/campaigns.ts: * DELETE /api/campaigns/topics/:topicId
+src/routes/campaigns.ts:router.delete('/topics/:topicId', authenticateToken, asyncHandler(async (req: Request, res: Response) => {
+src/routes/campaigns.ts: * POST /api/campaigns/topics/:topicId/pillar
+src/routes/campaigns.ts:router.post('/topics/:topicId/pillar', authenticateToken, asyncHandler(async (req: Request, res: Response) => {
+src/routes/campaigns.ts: * POST /api/campaigns/topics/:topicId/pillar/ai
+src/routes/campaigns.ts:router.post('/topics/:topicId/pillar/ai', authenticateToken, asyncHandler(async (req: Request, res: Response) => {
+src/routes/campaigns.ts: * DELETE /api/campaigns/topics/:topicId/pillar
+src/routes/campaigns.ts:router.delete('/topics/:topicId/pillar', authenticateToken, asyncHandler(async (req: Request, res: Response) => {
+src/routes/campaigns.ts: * POST /api/campaigns/topics/:topicId/subpages
+src/routes/campaigns.ts:router.post('/topics/:topicId/subpages', authenticateToken, asyncHandler(async (req: Request, res: Response) => {
+src/routes/campaigns.ts: * POST /api/campaigns/topics/:topicId/subpages/ai
+src/routes/campaigns.ts:router.post('/topics/:topicId/subpages/ai', authenticateToken, asyncHandler(async (req: Request, res: Response) => {
+src/routes/campaigns.ts: * DELETE /api/campaigns/pages/:pageId
+src/routes/campaigns.ts:router.delete('/pages/:pageId', authenticateToken, asyncHandler(async (req: Request, res: Response) => {
+src/routes/campaigns.ts: * POST /api/campaigns/pages/:pageId/keywords
+src/routes/campaigns.ts:router.post('/pages/:pageId/keywords', authenticateToken, asyncHandler(async (req: Request, res: Response) => {
+src/routes/campaigns.ts: * POST /api/campaigns/pages/:pageId/keywords/ai
+src/routes/campaigns.ts:router.post('/pages/:pageId/keywords/ai', authenticateToken, asyncHandler(async (req: Request, res: Response) => {
+src/routes/campaigns.ts: * POST /api/campaigns/keywords/:keywordId/select-primary
+src/routes/campaigns.ts:router.post('/keywords/:keywordId/select-primary', authenticateToken, asyncHandler(async (req: Request, res: Response) => {
+src/routes/campaigns.ts: * POST /api/campaigns/keywords/:keywordId/select-longtail
+src/routes/campaigns.ts:router.post('/keywords/:keywordId/select-longtail', authenticateToken, asyncHandler(async (req: Request, res: Response) => {
+src/routes/campaigns.ts: * POST /api/campaigns/keywords/:keywordId/deselect
+src/routes/campaigns.ts:router.post('/keywords/:keywordId/deselect', authenticateToken, asyncHandler(async (req: Request, res: Response) => {
+src/routes/campaigns.ts: * DELETE /api/campaigns/keywords/:keywordId
+src/routes/campaigns.ts:router.delete('/keywords/:keywordId', authenticateToken, asyncHandler(async (req: Request, res: Response) => {
+src/routes/campaigns.ts: * DELETE /api/campaigns/:id
+src/routes/campaigns.ts:router.delete('/:id', authenticateToken, asyncHandler(async (req: Request, res: Response) => {
+src/routes/campaigns.ts: * POST /api/campaigns/topics/:topicId/generate-content
+src/routes/campaigns.ts:router.post('/topics/:topicId/generate-content', authenticateToken, asyncHandler(async (req: Request, res: Response) => {
+src/routes/campaigns.ts: * GET /api/campaigns/generation-status/:jobId
+src/routes/campaigns.ts:router.get('/generation-status/:jobId', authenticateToken, asyncHandler(async (req: Request, res: Response) => {
+src/routes/campaigns.ts: * GET /api/campaigns/topics/:topicId/drafts-status
+src/routes/campaigns.ts:router.get('/topics/:topicId/drafts-status', authenticateToken, asyncHandler(async (req: Request, res: Response) => {
+src/routes/campaigns.ts: * GET /api/campaigns/drafts/:draftId
+src/routes/campaigns.ts:router.get('/drafts/:draftId', authenticateToken, asyncHandler(async (req: Request, res: Response) => {
+src/routes/competitor.ts:// GET /api/competitor/:domainId - Get competitor analysis for a domain
+src/routes/competitor.ts:router.get('/:domainId', authenticateToken, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+src/routes/competitor.ts:// POST /api/competitor/:domainId - Generate competitor analysis
+src/routes/competitor.ts:router.post('/:domainId', authenticateToken, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+src/routes/keywords.ts:// GET /api/keywords/:domainId - Get keywords for a domain
+src/routes/keywords.ts:router.get('/:domainId', authenticateToken, async (req: Request, res: Response) => {
+src/routes/keywords.ts:// POST /api/keywords/:domainId/select - Select/deselect keywords
+src/routes/keywords.ts:router.post('/:domainId/select', authenticateToken, async (req: Request, res: Response) => {
+src/routes/keywords.ts:// POST /api/keywords/:domainId/custom - Add a custom analyzed keyword to the domain
+src/routes/keywords.ts:router.post('/:domainId/custom', authenticateToken, async (req: Request, res: Response) => {
+src/routes/domain.ts:// GET /domain/check/:url - Check if domain exists
+src/routes/domain.ts:router.get('/check/:url', authenticateToken, asyncHandler(async (req: Request, res: Response) => {
+src/routes/domain.ts:// GET /api/domain/:id - Get domain information
+src/routes/domain.ts:router.get('/:id', authenticateToken, asyncHandler(async (req: Request, res: Response) => {
+src/routes/domain.ts:// PUT /api/domain/:id/current-step - Update domain current step
+src/routes/domain.ts:router.put('/:id/current-step', authenticateToken, asyncHandler(async (req: Request, res: Response) => {
+src/routes/domain.ts:// DELETE /api/domain/:id - Delete a domain and related records
+src/routes/domain.ts:router.delete('/:id', authenticateToken, asyncHandler(async (req: Request, res: Response) => {
+src/routes/googleSearchConsole.ts: * GET /api/gsc/pages/:pageUrl/queries
+src/routes/googleSearchConsole.ts:router.get('/pages/:pageUrl/queries', authenticateToken, asyncHandler(async (req: Request, res: Response) => {
+src/routes/intentPhrases.ts:// POST /api/intent-phrases/:domainId/stream - Stream AI-powered intent phrase generation with selected keywords
+src/routes/intentPhrases.ts:router.post('/:domainId/stream', authenticateToken, async (req: Request, res: Response) => {
+src/routes/intentPhrases.ts:// GET /api/intent-phrases/:domainId - Get generated intent phrases
+src/routes/intentPhrases.ts:router.get('/:domainId', authenticateToken, async (req: Request, res: Response) => {
+src/routes/intentPhrases.ts:// POST /api/intent-phrases/:domainId/select - Select/deselect phrases
+src/routes/intentPhrases.ts:router.post('/:domainId/select', authenticateToken, async (req: Request, res: Response) => {
+src/routes/intentPhrases.ts:// PUT /api/intent-phrases/:phraseId - Update phrase text
+src/routes/intentPhrases.ts:router.put('/:phraseId', authenticateToken, async (req: Request, res: Response) => {
+src/routes/intentPhrases.ts:// GET /api/intent-phrases/:domainId/status - Get generation status
+src/routes/intentPhrases.ts:router.get('/:domainId/status', authenticateToken, async (req: Request, res: Response) => {
+src/routes/intentPhrases.ts:// POST /api/intent-phrases/:domainId/custom - Add custom intent phrase with AI analysis
+src/routes/intentPhrases.ts:router.post('/:domainId/custom', authenticateToken, async (req: Request, res: Response) => {
+src/routes/intentPhrases.ts:// POST /api/intent-phrases/:domainId/analyze-custom - Analyze custom phrase and create keyword if needed
+src/routes/intentPhrases.ts:router.post('/:domainId/analyze-custom', authenticateToken, async (req: Request, res: Response) => {
