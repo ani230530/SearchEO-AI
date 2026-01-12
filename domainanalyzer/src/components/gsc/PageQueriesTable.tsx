@@ -359,7 +359,6 @@ const PageQueriesTable = ({
       </div>
 
       {/* Controls */}
-      {/* Controls */}
       <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center mb-6">
         <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
           <div className="relative w-full sm:w-72">
@@ -520,6 +519,7 @@ const PageQueriesTable = ({
           <Download className="h-4 w-4" />
           Export CSV
         </button>
+      </div>
       </div>
 
       {renderDateRangeInfo()}
