@@ -141,6 +141,8 @@ const AnalyticsReportingSetup = () => {
   });
 
   const [reportId, setReportId] = useState<string | null>(null);
+  const [reportStatus, setReportStatus] = useState<"processing" | "completed" | "failed" | null>(null);
+  const [reportResults, setReportResults] = useState<{sheetsUrl?: string; slidesUrl?: string} | null>(null);
 
 
   const handleChange = (key: keyof typeof form, value: string) => {
@@ -159,34 +161,43 @@ const AnalyticsReportingSetup = () => {
     return;
   }
 
-  // Add your template IDs here (from environment variables or constants)
-  const payload = {
-    ...form,
-    proposalTemplateId: import.meta.env.VITE_PROPOSAL_TEMPLATE_ID || "1queNsZi99R15QaCalavH8TqqvaeGPp1wC8Tqwn7AkhI",
-    sheetsTemplateId: import.meta.env.VITE_SHEETS_TEMPLATE_ID || "1qucJJTUMUCHN0k1yQDTBr6HKF7u0HPMC4NkVJy6kIT0",
-  };
+  const token = localStorage.getItem("authToken");
+  if (!token) {
+    toast({
+      title: "Authentication required",
+      description: "Please log in to generate reports.",
+      variant: "destructive",
+    });
+    return;
+  }
 
   try {
     const response = await fetch(
-      "https://n8n.srv891599.hstgr.cloud/webhook/96e19249-8f7f-407e-b981-3d4e410cb2d7",
+      `${import.meta.env.VITE_API_URL || "http://localhost:3002"}/api/audit/n8n/send`,
       {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json"
+        },
       }
     );
 
     if (!response.ok) {
-      throw new Error("Failed to generate report");
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || "Failed to generate report");
     }
 
     const data = await response.json();
-    setReportId(data.reportId);
+    setReportId(data.requestId);
 
     toast({
-      title: "Automation started",
-      description: "Analytics report generation has been triggered.",
+      title: "Processing",
+      description: "Analytics report generation has been triggered. You'll be notified when it's ready.",
     });
+
+    // Connect to SSE for real-time updates
+    connectSSE(token, data.requestId);
   } catch (error) {
     toast({
       title: "Error",
@@ -197,34 +208,51 @@ const AnalyticsReportingSetup = () => {
 };
 
 
-useEffect(() => {
-  if (!reportId) return;
+// Connect to SSE for real-time n8n updates
+const connectSSE = (token: string, requestId: string) => {
+  const url = `${import.meta.env.VITE_API_URL || "http://localhost:3002"}/api/sse?token=${encodeURIComponent(token)}`;
+  const eventSource = new EventSource(url);
 
-  const interval = setInterval(async () => {
+  eventSource.onmessage = (event) => {
     try {
-      const res = await fetch(
-        `http://localhost:3002/api/analytics-report/${reportId}`
-      );
-      const statusData = await res.json();
+      const data = JSON.parse(event.data);
+      if (data.type === "n8n_update" && data.data?.requestId === requestId) {
+        setReportStatus(data.data.status);
 
-      if (statusData.status === "completed") {
-        clearInterval(interval);
-
-        console.log("Sheets:", statusData.googleSheetsUrl);
-        console.log("Slides:", statusData.googleSlidesUrl);
-
-        toast({
-          title: "Report ready",
-          description: "Your analytics report is ready to view.",
-        });
+        if (data.data.status === "completed") {
+          setReportResults({
+            sheetsUrl: data.data.googleSheetsUrl,
+            slidesUrl: data.data.googleSlidesUrl,
+          });
+          toast({
+            title: "Report ready",
+            description: "Your analytics report is ready to view.",
+          });
+          eventSource.close();
+        } else if (data.data.status === "failed") {
+          toast({
+            title: "Report failed",
+            description: data.data.error || "Failed to generate report",
+            variant: "destructive",
+          });
+          eventSource.close();
+        }
       }
     } catch (err) {
-      console.error("Polling failed", err);
+      console.error("Error parsing SSE:", err);
     }
-  }, 5000);
+  };
 
-  return () => clearInterval(interval);
-}, [reportId]);
+  eventSource.onerror = () => {
+    eventSource.close();
+  };
+};
+
+useEffect(() => {
+  return () => {
+    // Cleanup would go here if we stored eventSource ref
+  };
+}, []);
 
 
   /* ------------------------------------------------------------------------ */
