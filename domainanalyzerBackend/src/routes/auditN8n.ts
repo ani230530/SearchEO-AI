@@ -21,7 +21,7 @@ function getReportMonth(dateStr?: string): string {
 router.post('/send', authenticateToken, async (req: Request, res: Response) => {
     const authReq = req as AuthenticatedRequest;
     const userId = authReq.user.userId;
-    const { reportMonth, analyticsProperty } = req.body;
+    const { reportMonth, analyticsProperty, orgName } = req.body;
 
     try {
         // Find the user's company domain and latest audit
@@ -67,7 +67,7 @@ router.post('/send', authenticateToken, async (req: Request, res: Response) => {
             'analytics property': analyticsProperty || companyDomain.url,
             'sheets template': '1qucJJTUMUCHN0k1yQDTBr6HKF7u0HPMC4NkVJy6kIT0',
             URL: companyDomain.url,
-            'Org Name': companyDomain.url,
+            'Org Name': orgName || companyDomain.url,
         };
 
         // Create n8n request record in database

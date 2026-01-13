@@ -135,6 +135,7 @@ const AnalyticsReportingSetup = () => {
   const [form, setForm] = useState({
     reportMonth: "",
     analyticsPropertyId: "",
+    orgName: "",
   });
 
   const [reportId, setReportId] = useState<string | null>(null);
@@ -181,7 +182,8 @@ const AnalyticsReportingSetup = () => {
           },
           body: JSON.stringify({
             reportMonth: form.reportMonth,
-            analyticsProperty: form.analyticsPropertyId
+            analyticsProperty: form.analyticsPropertyId,
+            orgName: form.orgName
           }),
         }
       );
@@ -317,6 +319,15 @@ const AnalyticsReportingSetup = () => {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <Field
+              label="Organization Name (Optional)"
+              helper="Leave blank to use your domain URL"
+              icon={<Building2 className="h-4 w-4" />}
+              placeholder="e.g. My Company Name"
+              value={form.orgName}
+              onChange={(v) => handleChange("orgName", v)}
+            />
+
+            <Field
               label="Report Month"
               icon={<Calendar className="h-4 w-4" />}
               type="month"
@@ -325,14 +336,16 @@ const AnalyticsReportingSetup = () => {
               required
             />
 
-            <Field
-              label="GSC Property ID (Optional)"
-              helper="Leave blank to use your domain URL"
-              icon={<BarChart3 className="h-4 w-4" />}
-              placeholder="e.g. 485147447"
-              value={form.analyticsPropertyId}
-              onChange={(v) => handleChange("analyticsPropertyId", v)}
-            />
+            <div className="md:col-span-2">
+              <Field
+                label="GSC Property ID (Optional)"
+                helper="Leave blank to use your domain URL"
+                icon={<BarChart3 className="h-4 w-4" />}
+                placeholder="e.g. 485147447"
+                value={form.analyticsPropertyId}
+                onChange={(v) => handleChange("analyticsPropertyId", v)}
+              />
+            </div>
           </div>
 
 
