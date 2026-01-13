@@ -630,6 +630,17 @@ exports.Prisma.AuditResultScalarFieldEnum = {
   updatedAt: 'updatedAt'
 };
 
+exports.Prisma.N8nRequestScalarFieldEnum = {
+  id: 'id',
+  requestId: 'requestId',
+  auditResultId: 'auditResultId',
+  status: 'status',
+  requestPayload: 'requestPayload',
+  responseData: 'responseData',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
 exports.Prisma.SortOrder = {
   asc: 'asc',
   desc: 'desc'
@@ -707,7 +718,8 @@ exports.Prisma.ModelName = {
   CampaignTopic: 'CampaignTopic',
   CampaignPage: 'CampaignPage',
   CampaignKeyword: 'CampaignKeyword',
-  AuditResult: 'AuditResult'
+  AuditResult: 'AuditResult',
+  N8nRequest: 'N8nRequest'
 };
 
 /**

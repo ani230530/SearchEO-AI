@@ -232,7 +232,7 @@ const SidebarDashboard = () => {
     setDeleteAction(() => action);
     setShowDeleteModal(true);
   }
-  const [auditData, setAuditData] = useState<any>(null);
+const [auditData, setAuditData] = useState<any>(null);
 const [auditLoading, setAuditLoading] = useState(false);
 const [auditError, setAuditError] = useState<string | null>(null);
 const [auditResult, setAuditResult] = useState<any>(null);
@@ -240,6 +240,11 @@ const [auditComplete, setAuditComplete] = useState(false);
 const [showAuditModal, setShowAuditModal] = useState(false);
 const resultsRef = useRef<HTMLDivElement | null>(null);
 const [activeChartTab, setActiveChartTab] = useState<'overview' | 'comparison' | 'distribution'>('overview');
+const [n8nSending, setN8nSending] = useState(false);
+const [n8nRequestId, setN8nRequestId] = useState<string | null>(null);
+const [n8nStatus, setN8nStatus] = useState<'processing' | 'completed' | 'failed' | null>(null);
+const [n8nResults, setN8nResults] = useState<{sheetsUrl?: string; slidesUrl?: string} | null>(null);
+const sseRef = useRef<EventSource | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loadingSteps, setLoadingSteps] = useState([
     {
@@ -539,6 +544,116 @@ const handleRunAudit = async (url?: string) => {
     setAuditLoading(false);
   }
 };
+
+// Handle Send to N8n
+const handleSendToN8n = async () => {
+  const token = localStorage.getItem("authToken");
+  if (!token) {
+    console.error("Missing token");
+    return;
+  }
+
+  setN8nSending(true);
+  setN8nStatus(null);
+  setN8nResults(null);
+
+  try {
+    const resp = await fetch(`${import.meta.env.VITE_API_URL}/api/audit/n8n/send`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!resp.ok) {
+      const errorData = await resp.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Failed to send to n8n');
+    }
+
+    const data = await resp.json();
+    if (data.success) {
+      setN8nRequestId(data.requestId);
+      setN8nStatus('processing');
+      toast({
+        title: 'Processing',
+        description: 'N8n is processing your request',
+      });
+      
+      // Connect to SSE for real-time updates
+      connectSSE(token, data.requestId);
+    }
+  } catch (err) {
+    console.error(err);
+    toast({
+      title: 'Failed to Send',
+      description: err instanceof Error ? err.message : 'Failed to send to n8n',
+      variant: 'destructive',
+    });
+    setN8nSending(false);
+  }
+};
+
+// Connect to SSE for n8n updates
+const connectSSE = (token: string, requestId: string) => {
+  if (sseRef.current) {
+    sseRef.current.close();
+  }
+
+  const url = `${import.meta.env.VITE_API_URL}/api/sse?token=${encodeURIComponent(token)}`;
+  const eventSource = new EventSource(url);
+
+  eventSource.onmessage = (event) => {
+    try {
+      const data = JSON.parse(event.data);
+      if (data.type === 'n8n_update' && data.data?.requestId === requestId) {
+        setN8nStatus(data.data.status);
+        
+        if (data.data.status === 'completed') {
+          setN8nResults({
+            sheetsUrl: data.data.googleSheetsUrl,
+            slidesUrl: data.data.googleSlidesUrl
+          });
+          toast({
+            title: 'Success',
+            description: 'N8n processing completed successfully',
+          });
+          eventSource.close();
+          sseRef.current = null;
+          setN8nSending(false);
+        } else if (data.data.status === 'failed') {
+          toast({
+            title: 'Failed',
+            description: data.data.error || 'N8n processing failed',
+            variant: 'destructive',
+          });
+          eventSource.close();
+          sseRef.current = null;
+          setN8nSending(false);
+        }
+      }
+    } catch (err) {
+      console.error('Error parsing SSE:', err);
+    }
+  };
+
+  eventSource.onerror = () => {
+    eventSource.close();
+    sseRef.current = null;
+  };
+
+  sseRef.current = eventSource;
+};
+
+// Cleanup SSE on unmount
+useEffect(() => {
+  return () => {
+    if (sseRef.current) {
+      sseRef.current.close();
+      sseRef.current = null;
+    }
+  };
+}, []);
 
 
 
@@ -4413,26 +4528,116 @@ const handleRunAudit = async (url?: string) => {
                       </span>
                     </div>
 
-                    <button
-                      onClick={() => handleRunAudit(companyDomain)}
-                      disabled={auditLoading || !companyDomain}
-                      className={cn(
-                        "h-12 px-8 rounded-full text-white font-light transition-all duration-200 flex items-center justify-center gap-2",
-                        "bg-black hover:bg-gray-800 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed",
-                        auditLoading && "cursor-not-allowed"
+                    <div className="flex gap-3">
+                      <button
+                        onClick={() => handleRunAudit(companyDomain)}
+                        disabled={auditLoading || !companyDomain}
+                        className={cn(
+                          "h-12 px-8 rounded-full text-white font-light transition-all duration-200 flex items-center justify-center gap-2",
+                          "bg-black hover:bg-gray-800 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed",
+                          auditLoading && "cursor-not-allowed"
+                        )}
+                        style={{ letterSpacing: '-0.022em' }}
+                      >
+                        {auditLoading ? (
+                          <>
+                            <Loader2 className="h-5 w-5 animate-spin" />
+                            <span>Running Audit…</span>
+                          </>
+                        ) : (
+                          "Start Audit"
+                        )}
+                      </button>
+                      
+                      {auditResult && (
+                        <button
+                          onClick={handleSendToN8n}
+                          disabled={n8nSending || !auditResult}
+                          className={cn(
+                            "h-12 px-8 rounded-full font-light transition-all duration-200 flex items-center justify-center gap-2",
+                            "bg-white border border-gray-200 text-gray-900 hover:bg-gray-50 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed",
+                            n8nSending && "cursor-not-allowed"
+                          )}
+                          style={{ letterSpacing: '-0.022em', borderWidth: '0.5px' }}
+                        >
+                          {n8nSending ? (
+                            <>
+                              <Loader2 className="h-5 w-5 animate-spin" />
+                              <span>Sending…</span>
+                            </>
+                          ) : (
+                            <>
+                              <Send className="h-5 w-5" />
+                              <span>Send to N8n</span>
+                            </>
+                          )}
+                        </button>
                       )}
-                      style={{ letterSpacing: '-0.022em' }}
-                    >
-                      {auditLoading ? (
-                        <>
-                          <Loader2 className="h-5 w-5 animate-spin" />
-                          <span>Running Audit…</span>
-                        </>
-                      ) : (
-                        "Start Audit"
-                      )}
-                    </button>
+                    </div>
                   </div>
+
+                  {/* N8n Results Display */}
+                  {(n8nStatus || n8nResults) && (
+                    <div className="mt-6 p-6 bg-white/70 backdrop-blur-md rounded-2xl border border-gray-200 shadow-sm" style={{ borderWidth: '0.5px' }}>
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-lg font-light text-gray-900" style={{ letterSpacing: '-0.003em' }}>
+                          N8n Processing
+                        </h3>
+                        <div className={cn(
+                          "px-3 py-1 rounded-full text-xs font-light",
+                          n8nStatus === 'processing' && "bg-blue-50 text-blue-700",
+                          n8nStatus === 'completed' && "bg-green-50 text-green-700",
+                          n8nStatus === 'failed' && "bg-red-50 text-red-700"
+                        )}>
+                          {n8nStatus === 'processing' && 'Processing...'}
+                          {n8nStatus === 'completed' && 'Completed'}
+                          {n8nStatus === 'failed' && 'Failed'}
+                        </div>
+                      </div>
+
+                      {n8nStatus === 'processing' && (
+                        <div className="flex items-center gap-2 text-sm text-gray-600">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          <span>N8n is generating your reports...</span>
+                        </div>
+                      )}
+
+                      {n8nResults && (
+                        <div className="space-y-3">
+                          {n8nResults.sheetsUrl && (
+                            <a
+                              href={n8nResults.sheetsUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-3 p-4 rounded-xl bg-green-50 hover:bg-green-100 transition-colors border border-green-200"
+                              style={{ borderWidth: '0.5px' }}
+                            >
+                              <FileText className="h-5 w-5 text-green-700" />
+                              <div>
+                                <div className="text-sm font-medium text-green-900">Google Sheets Report</div>
+                                <div className="text-xs text-green-600">Click to open</div>
+                              </div>
+                            </a>
+                          )}
+                          {n8nResults.slidesUrl && (
+                            <a
+                              href={n8nResults.slidesUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-3 p-4 rounded-xl bg-blue-50 hover:bg-blue-100 transition-colors border border-blue-200"
+                              style={{ borderWidth: '0.5px' }}
+                            >
+                              <FileText className="h-5 w-5 text-blue-700" />
+                              <div>
+                                <div className="text-sm font-medium text-blue-900">Google Slides Presentation</div>
+                                <div className="text-xs text-blue-600">Click to open</div>
+                              </div>
+                            </a>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   {auditData && auditData.updatedAt && (
                     <p className="text-sm font-light text-gray-400" style={{ letterSpacing: '0.011em' }}>

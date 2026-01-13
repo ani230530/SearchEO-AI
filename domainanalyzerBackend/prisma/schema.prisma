@@ -712,6 +712,23 @@ model AuditResult {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
   domain         Domain   @relation(fields: [domainId], references: [id], onDelete: Cascade)
+  n8nRequests    N8nRequest[]
 
   @@index([domainId])
 }
+
+model N8nRequest {
+  id             Int      @id @default(autoincrement())
+  requestId      String   @unique @default(uuid())
+  auditResultId  Int
+  auditResult    AuditResult @relation(fields: [auditResultId], references: [id], onDelete: Cascade)
+  status         String   @default("pending")  // pending | processing | completed | failed
+  requestPayload Json
+  responseData   Json?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([auditResultId])
+  @@index([requestId])
+}
+

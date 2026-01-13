@@ -203,6 +203,11 @@ export type CampaignKeyword = $Result.DefaultSelection<Prisma.$CampaignKeywordPa
  * 
  */
 export type AuditResult = $Result.DefaultSelection<Prisma.$AuditResultPayload>
+/**
+ * Model N8nRequest
+ * 
+ */
+export type N8nRequest = $Result.DefaultSelection<Prisma.$N8nRequestPayload>
 
 /**
  * Enums
@@ -737,6 +742,16 @@ export class PrismaClient<
     * ```
     */
   get auditResult(): Prisma.AuditResultDelegate<ExtArgs, ClientOptions>;
+
+  /**
+   * `prisma.n8nRequest`: Exposes CRUD operations for the **N8nRequest** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more N8nRequests
+    * const n8nRequests = await prisma.n8nRequest.findMany()
+    * ```
+    */
+  get n8nRequest(): Prisma.N8nRequestDelegate<ExtArgs, ClientOptions>;
 }
 
 export namespace Prisma {
@@ -1214,7 +1229,8 @@ export namespace Prisma {
     CampaignTopic: 'CampaignTopic',
     CampaignPage: 'CampaignPage',
     CampaignKeyword: 'CampaignKeyword',
-    AuditResult: 'AuditResult'
+    AuditResult: 'AuditResult',
+    N8nRequest: 'N8nRequest'
   };
 
   export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -1233,7 +1249,7 @@ export namespace Prisma {
       omit: GlobalOmitOptions
     }
     meta: {
-      modelProps: "user" | "domain" | "crawlResult" | "keyword" | "phrase" | "aIQueryResult" | "analysisReport" | "modelPerformance" | "competitorTracking" | "performanceInsight" | "dashboardAnalysis" | "competitorAnalysis" | "suggestedCompetitor" | "analysisPhase" | "semanticAnalysis" | "keywordAnalysis" | "searchVolumeClassification" | "intentClassification" | "communityInsight" | "searchPattern" | "phraseIntentClassification" | "wordpressIntegration" | "wordpressPublishLog" | "generationJob" | "generationJobPage" | "phraseScore" | "intentPhraseGeneration" | "communityMiningResult" | "searchPatternResult" | "intentClassificationResult" | "generatedIntentPhrase" | "relevanceScoreResult" | "googleSearchConsoleConnection" | "campaign" | "campaignTopic" | "campaignPage" | "campaignKeyword" | "auditResult"
+      modelProps: "user" | "domain" | "crawlResult" | "keyword" | "phrase" | "aIQueryResult" | "analysisReport" | "modelPerformance" | "competitorTracking" | "performanceInsight" | "dashboardAnalysis" | "competitorAnalysis" | "suggestedCompetitor" | "analysisPhase" | "semanticAnalysis" | "keywordAnalysis" | "searchVolumeClassification" | "intentClassification" | "communityInsight" | "searchPattern" | "phraseIntentClassification" | "wordpressIntegration" | "wordpressPublishLog" | "generationJob" | "generationJobPage" | "phraseScore" | "intentPhraseGeneration" | "communityMiningResult" | "searchPatternResult" | "intentClassificationResult" | "generatedIntentPhrase" | "relevanceScoreResult" | "googleSearchConsoleConnection" | "campaign" | "campaignTopic" | "campaignPage" | "campaignKeyword" | "auditResult" | "n8nRequest"
       txIsolationLevel: Prisma.TransactionIsolationLevel
     }
     model: {
@@ -3897,6 +3913,76 @@ export namespace Prisma {
           }
         }
       }
+      N8nRequest: {
+        payload: Prisma.$N8nRequestPayload<ExtArgs>
+        fields: Prisma.N8nRequestFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.N8nRequestFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$N8nRequestPayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.N8nRequestFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$N8nRequestPayload>
+          }
+          findFirst: {
+            args: Prisma.N8nRequestFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$N8nRequestPayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.N8nRequestFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$N8nRequestPayload>
+          }
+          findMany: {
+            args: Prisma.N8nRequestFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$N8nRequestPayload>[]
+          }
+          create: {
+            args: Prisma.N8nRequestCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$N8nRequestPayload>
+          }
+          createMany: {
+            args: Prisma.N8nRequestCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.N8nRequestCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$N8nRequestPayload>[]
+          }
+          delete: {
+            args: Prisma.N8nRequestDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$N8nRequestPayload>
+          }
+          update: {
+            args: Prisma.N8nRequestUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$N8nRequestPayload>
+          }
+          deleteMany: {
+            args: Prisma.N8nRequestDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.N8nRequestUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          upsert: {
+            args: Prisma.N8nRequestUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$N8nRequestPayload>
+          }
+          aggregate: {
+            args: Prisma.N8nRequestAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateN8nRequest>
+          }
+          groupBy: {
+            args: Prisma.N8nRequestGroupByArgs<ExtArgs>
+            result: $Utils.Optional<N8nRequestGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.N8nRequestCountArgs<ExtArgs>
+            result: $Utils.Optional<N8nRequestCountAggregateOutputType> | number
+          }
+        }
+      }
     }
   } & {
     other: {
@@ -4019,6 +4105,7 @@ export namespace Prisma {
     campaignPage?: CampaignPageOmit
     campaignKeyword?: CampaignKeywordOmit
     auditResult?: AuditResultOmit
+    n8nRequest?: N8nRequestOmit
   }
 
   /* Types for Logging */
@@ -4730,6 +4817,37 @@ export namespace Prisma {
    */
   export type CampaignPageCountOutputTypeCountKeywordsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     where?: CampaignKeywordWhereInput
+  }
+
+
+  /**
+   * Count Type AuditResultCountOutputType
+   */
+
+  export type AuditResultCountOutputType = {
+    n8nRequests: number
+  }
+
+  export type AuditResultCountOutputTypeSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    n8nRequests?: boolean | AuditResultCountOutputTypeCountN8nRequestsArgs
+  }
+
+  // Custom InputTypes
+  /**
+   * AuditResultCountOutputType without action
+   */
+  export type AuditResultCountOutputTypeDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AuditResultCountOutputType
+     */
+    select?: AuditResultCountOutputTypeSelect<ExtArgs> | null
+  }
+
+  /**
+   * AuditResultCountOutputType without action
+   */
+  export type AuditResultCountOutputTypeCountN8nRequestsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: N8nRequestWhereInput
   }
 
 
@@ -47001,6 +47119,8 @@ export namespace Prisma {
     createdAt?: boolean
     updatedAt?: boolean
     domain?: boolean | DomainDefaultArgs<ExtArgs>
+    n8nRequests?: boolean | AuditResult$n8nRequestsArgs<ExtArgs>
+    _count?: boolean | AuditResultCountOutputTypeDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["auditResult"]>
 
   export type AuditResultSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
@@ -47036,6 +47156,8 @@ export namespace Prisma {
   export type AuditResultOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "domainId" | "performance" | "seo" | "accessibility" | "bestPractices" | "pwa" | "audits" | "screenshotUrl" | "createdAt" | "updatedAt", ExtArgs["result"]["auditResult"]>
   export type AuditResultInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     domain?: boolean | DomainDefaultArgs<ExtArgs>
+    n8nRequests?: boolean | AuditResult$n8nRequestsArgs<ExtArgs>
+    _count?: boolean | AuditResultCountOutputTypeDefaultArgs<ExtArgs>
   }
   export type AuditResultIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     domain?: boolean | DomainDefaultArgs<ExtArgs>
@@ -47045,6 +47167,7 @@ export namespace Prisma {
     name: "AuditResult"
     objects: {
       domain: Prisma.$DomainPayload<ExtArgs>
+      n8nRequests: Prisma.$N8nRequestPayload<ExtArgs>[]
     }
     scalars: $Extensions.GetPayloadResult<{
       id: number
@@ -47423,6 +47546,7 @@ export namespace Prisma {
   export interface Prisma__AuditResultClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
     readonly [Symbol.toStringTag]: "PrismaPromise"
     domain<T extends DomainDefaultArgs<ExtArgs> = {}>(args?: Subset<T, DomainDefaultArgs<ExtArgs>>): Prisma__DomainClient<$Result.GetResult<Prisma.$DomainPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+    n8nRequests<T extends AuditResult$n8nRequestsArgs<ExtArgs> = {}>(args?: Subset<T, AuditResult$n8nRequestsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$N8nRequestPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     /**
      * Attaches callbacks for the resolution and/or rejection of the Promise.
      * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -47821,6 +47945,30 @@ export namespace Prisma {
   }
 
   /**
+   * AuditResult.n8nRequests
+   */
+  export type AuditResult$n8nRequestsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the N8nRequest
+     */
+    select?: N8nRequestSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the N8nRequest
+     */
+    omit?: N8nRequestOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: N8nRequestInclude<ExtArgs> | null
+    where?: N8nRequestWhereInput
+    orderBy?: N8nRequestOrderByWithRelationInput | N8nRequestOrderByWithRelationInput[]
+    cursor?: N8nRequestWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: N8nRequestScalarFieldEnum | N8nRequestScalarFieldEnum[]
+  }
+
+  /**
    * AuditResult without action
    */
   export type AuditResultDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
@@ -47836,6 +47984,1051 @@ export namespace Prisma {
      * Choose, which related nodes to fetch as well
      */
     include?: AuditResultInclude<ExtArgs> | null
+  }
+
+
+  /**
+   * Model N8nRequest
+   */
+
+  export type AggregateN8nRequest = {
+    _count: N8nRequestCountAggregateOutputType | null
+    _avg: N8nRequestAvgAggregateOutputType | null
+    _sum: N8nRequestSumAggregateOutputType | null
+    _min: N8nRequestMinAggregateOutputType | null
+    _max: N8nRequestMaxAggregateOutputType | null
+  }
+
+  export type N8nRequestAvgAggregateOutputType = {
+    id: number | null
+    auditResultId: number | null
+  }
+
+  export type N8nRequestSumAggregateOutputType = {
+    id: number | null
+    auditResultId: number | null
+  }
+
+  export type N8nRequestMinAggregateOutputType = {
+    id: number | null
+    requestId: string | null
+    auditResultId: number | null
+    status: string | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type N8nRequestMaxAggregateOutputType = {
+    id: number | null
+    requestId: string | null
+    auditResultId: number | null
+    status: string | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type N8nRequestCountAggregateOutputType = {
+    id: number
+    requestId: number
+    auditResultId: number
+    status: number
+    requestPayload: number
+    responseData: number
+    createdAt: number
+    updatedAt: number
+    _all: number
+  }
+
+
+  export type N8nRequestAvgAggregateInputType = {
+    id?: true
+    auditResultId?: true
+  }
+
+  export type N8nRequestSumAggregateInputType = {
+    id?: true
+    auditResultId?: true
+  }
+
+  export type N8nRequestMinAggregateInputType = {
+    id?: true
+    requestId?: true
+    auditResultId?: true
+    status?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type N8nRequestMaxAggregateInputType = {
+    id?: true
+    requestId?: true
+    auditResultId?: true
+    status?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type N8nRequestCountAggregateInputType = {
+    id?: true
+    requestId?: true
+    auditResultId?: true
+    status?: true
+    requestPayload?: true
+    responseData?: true
+    createdAt?: true
+    updatedAt?: true
+    _all?: true
+  }
+
+  export type N8nRequestAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which N8nRequest to aggregate.
+     */
+    where?: N8nRequestWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of N8nRequests to fetch.
+     */
+    orderBy?: N8nRequestOrderByWithRelationInput | N8nRequestOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: N8nRequestWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` N8nRequests from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` N8nRequests.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned N8nRequests
+    **/
+    _count?: true | N8nRequestCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to average
+    **/
+    _avg?: N8nRequestAvgAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to sum
+    **/
+    _sum?: N8nRequestSumAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: N8nRequestMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: N8nRequestMaxAggregateInputType
+  }
+
+  export type GetN8nRequestAggregateType<T extends N8nRequestAggregateArgs> = {
+        [P in keyof T & keyof AggregateN8nRequest]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateN8nRequest[P]>
+      : GetScalarType<T[P], AggregateN8nRequest[P]>
+  }
+
+
+
+
+  export type N8nRequestGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: N8nRequestWhereInput
+    orderBy?: N8nRequestOrderByWithAggregationInput | N8nRequestOrderByWithAggregationInput[]
+    by: N8nRequestScalarFieldEnum[] | N8nRequestScalarFieldEnum
+    having?: N8nRequestScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: N8nRequestCountAggregateInputType | true
+    _avg?: N8nRequestAvgAggregateInputType
+    _sum?: N8nRequestSumAggregateInputType
+    _min?: N8nRequestMinAggregateInputType
+    _max?: N8nRequestMaxAggregateInputType
+  }
+
+  export type N8nRequestGroupByOutputType = {
+    id: number
+    requestId: string
+    auditResultId: number
+    status: string
+    requestPayload: JsonValue
+    responseData: JsonValue | null
+    createdAt: Date
+    updatedAt: Date
+    _count: N8nRequestCountAggregateOutputType | null
+    _avg: N8nRequestAvgAggregateOutputType | null
+    _sum: N8nRequestSumAggregateOutputType | null
+    _min: N8nRequestMinAggregateOutputType | null
+    _max: N8nRequestMaxAggregateOutputType | null
+  }
+
+  type GetN8nRequestGroupByPayload<T extends N8nRequestGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<N8nRequestGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof N8nRequestGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], N8nRequestGroupByOutputType[P]>
+            : GetScalarType<T[P], N8nRequestGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type N8nRequestSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    requestId?: boolean
+    auditResultId?: boolean
+    status?: boolean
+    requestPayload?: boolean
+    responseData?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    auditResult?: boolean | AuditResultDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["n8nRequest"]>
+
+  export type N8nRequestSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    requestId?: boolean
+    auditResultId?: boolean
+    status?: boolean
+    requestPayload?: boolean
+    responseData?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    auditResult?: boolean | AuditResultDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["n8nRequest"]>
+
+
+  export type N8nRequestSelectScalar = {
+    id?: boolean
+    requestId?: boolean
+    auditResultId?: boolean
+    status?: boolean
+    requestPayload?: boolean
+    responseData?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+  }
+
+  export type N8nRequestOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "requestId" | "auditResultId" | "status" | "requestPayload" | "responseData" | "createdAt" | "updatedAt", ExtArgs["result"]["n8nRequest"]>
+  export type N8nRequestInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    auditResult?: boolean | AuditResultDefaultArgs<ExtArgs>
+  }
+  export type N8nRequestIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    auditResult?: boolean | AuditResultDefaultArgs<ExtArgs>
+  }
+
+  export type $N8nRequestPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "N8nRequest"
+    objects: {
+      auditResult: Prisma.$AuditResultPayload<ExtArgs>
+    }
+    scalars: $Extensions.GetPayloadResult<{
+      id: number
+      requestId: string
+      auditResultId: number
+      status: string
+      requestPayload: Prisma.JsonValue
+      responseData: Prisma.JsonValue | null
+      createdAt: Date
+      updatedAt: Date
+    }, ExtArgs["result"]["n8nRequest"]>
+    composites: {}
+  }
+
+  type N8nRequestGetPayload<S extends boolean | null | undefined | N8nRequestDefaultArgs> = $Result.GetResult<Prisma.$N8nRequestPayload, S>
+
+  type N8nRequestCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> =
+    Omit<N8nRequestFindManyArgs, 'select' | 'include' | 'distinct' | 'omit'> & {
+      select?: N8nRequestCountAggregateInputType | true
+    }
+
+  export interface N8nRequestDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['N8nRequest'], meta: { name: 'N8nRequest' } }
+    /**
+     * Find zero or one N8nRequest that matches the filter.
+     * @param {N8nRequestFindUniqueArgs} args - Arguments to find a N8nRequest
+     * @example
+     * // Get one N8nRequest
+     * const n8nRequest = await prisma.n8nRequest.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends N8nRequestFindUniqueArgs>(args: SelectSubset<T, N8nRequestFindUniqueArgs<ExtArgs>>): Prisma__N8nRequestClient<$Result.GetResult<Prisma.$N8nRequestPayload<ExtArgs>, T, "findUnique", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find one N8nRequest that matches the filter or throw an error with `error.code='P2025'`
+     * if no matches were found.
+     * @param {N8nRequestFindUniqueOrThrowArgs} args - Arguments to find a N8nRequest
+     * @example
+     * // Get one N8nRequest
+     * const n8nRequest = await prisma.n8nRequest.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends N8nRequestFindUniqueOrThrowArgs>(args: SelectSubset<T, N8nRequestFindUniqueOrThrowArgs<ExtArgs>>): Prisma__N8nRequestClient<$Result.GetResult<Prisma.$N8nRequestPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first N8nRequest that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {N8nRequestFindFirstArgs} args - Arguments to find a N8nRequest
+     * @example
+     * // Get one N8nRequest
+     * const n8nRequest = await prisma.n8nRequest.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends N8nRequestFindFirstArgs>(args?: SelectSubset<T, N8nRequestFindFirstArgs<ExtArgs>>): Prisma__N8nRequestClient<$Result.GetResult<Prisma.$N8nRequestPayload<ExtArgs>, T, "findFirst", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first N8nRequest that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {N8nRequestFindFirstOrThrowArgs} args - Arguments to find a N8nRequest
+     * @example
+     * // Get one N8nRequest
+     * const n8nRequest = await prisma.n8nRequest.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends N8nRequestFindFirstOrThrowArgs>(args?: SelectSubset<T, N8nRequestFindFirstOrThrowArgs<ExtArgs>>): Prisma__N8nRequestClient<$Result.GetResult<Prisma.$N8nRequestPayload<ExtArgs>, T, "findFirstOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find zero or more N8nRequests that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {N8nRequestFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all N8nRequests
+     * const n8nRequests = await prisma.n8nRequest.findMany()
+     * 
+     * // Get first 10 N8nRequests
+     * const n8nRequests = await prisma.n8nRequest.findMany({ take: 10 })
+     * 
+     * // Only select the `id`
+     * const n8nRequestWithIdOnly = await prisma.n8nRequest.findMany({ select: { id: true } })
+     * 
+     */
+    findMany<T extends N8nRequestFindManyArgs>(args?: SelectSubset<T, N8nRequestFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$N8nRequestPayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
+
+    /**
+     * Create a N8nRequest.
+     * @param {N8nRequestCreateArgs} args - Arguments to create a N8nRequest.
+     * @example
+     * // Create one N8nRequest
+     * const N8nRequest = await prisma.n8nRequest.create({
+     *   data: {
+     *     // ... data to create a N8nRequest
+     *   }
+     * })
+     * 
+     */
+    create<T extends N8nRequestCreateArgs>(args: SelectSubset<T, N8nRequestCreateArgs<ExtArgs>>): Prisma__N8nRequestClient<$Result.GetResult<Prisma.$N8nRequestPayload<ExtArgs>, T, "create", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Create many N8nRequests.
+     * @param {N8nRequestCreateManyArgs} args - Arguments to create many N8nRequests.
+     * @example
+     * // Create many N8nRequests
+     * const n8nRequest = await prisma.n8nRequest.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends N8nRequestCreateManyArgs>(args?: SelectSubset<T, N8nRequestCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many N8nRequests and returns the data saved in the database.
+     * @param {N8nRequestCreateManyAndReturnArgs} args - Arguments to create many N8nRequests.
+     * @example
+     * // Create many N8nRequests
+     * const n8nRequest = await prisma.n8nRequest.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many N8nRequests and only return the `id`
+     * const n8nRequestWithIdOnly = await prisma.n8nRequest.createManyAndReturn({
+     *   select: { id: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends N8nRequestCreateManyAndReturnArgs>(args?: SelectSubset<T, N8nRequestCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$N8nRequestPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Delete a N8nRequest.
+     * @param {N8nRequestDeleteArgs} args - Arguments to delete one N8nRequest.
+     * @example
+     * // Delete one N8nRequest
+     * const N8nRequest = await prisma.n8nRequest.delete({
+     *   where: {
+     *     // ... filter to delete one N8nRequest
+     *   }
+     * })
+     * 
+     */
+    delete<T extends N8nRequestDeleteArgs>(args: SelectSubset<T, N8nRequestDeleteArgs<ExtArgs>>): Prisma__N8nRequestClient<$Result.GetResult<Prisma.$N8nRequestPayload<ExtArgs>, T, "delete", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Update one N8nRequest.
+     * @param {N8nRequestUpdateArgs} args - Arguments to update one N8nRequest.
+     * @example
+     * // Update one N8nRequest
+     * const n8nRequest = await prisma.n8nRequest.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends N8nRequestUpdateArgs>(args: SelectSubset<T, N8nRequestUpdateArgs<ExtArgs>>): Prisma__N8nRequestClient<$Result.GetResult<Prisma.$N8nRequestPayload<ExtArgs>, T, "update", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Delete zero or more N8nRequests.
+     * @param {N8nRequestDeleteManyArgs} args - Arguments to filter N8nRequests to delete.
+     * @example
+     * // Delete a few N8nRequests
+     * const { count } = await prisma.n8nRequest.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends N8nRequestDeleteManyArgs>(args?: SelectSubset<T, N8nRequestDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more N8nRequests.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {N8nRequestUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many N8nRequests
+     * const n8nRequest = await prisma.n8nRequest.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends N8nRequestUpdateManyArgs>(args: SelectSubset<T, N8nRequestUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create or update one N8nRequest.
+     * @param {N8nRequestUpsertArgs} args - Arguments to update or create a N8nRequest.
+     * @example
+     * // Update or create a N8nRequest
+     * const n8nRequest = await prisma.n8nRequest.upsert({
+     *   create: {
+     *     // ... data to create a N8nRequest
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the N8nRequest we want to update
+     *   }
+     * })
+     */
+    upsert<T extends N8nRequestUpsertArgs>(args: SelectSubset<T, N8nRequestUpsertArgs<ExtArgs>>): Prisma__N8nRequestClient<$Result.GetResult<Prisma.$N8nRequestPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+
+    /**
+     * Count the number of N8nRequests.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {N8nRequestCountArgs} args - Arguments to filter N8nRequests to count.
+     * @example
+     * // Count the number of N8nRequests
+     * const count = await prisma.n8nRequest.count({
+     *   where: {
+     *     // ... the filter for the N8nRequests we want to count
+     *   }
+     * })
+    **/
+    count<T extends N8nRequestCountArgs>(
+      args?: Subset<T, N8nRequestCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], N8nRequestCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a N8nRequest.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {N8nRequestAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends N8nRequestAggregateArgs>(args: Subset<T, N8nRequestAggregateArgs>): Prisma.PrismaPromise<GetN8nRequestAggregateType<T>>
+
+    /**
+     * Group by N8nRequest.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {N8nRequestGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends N8nRequestGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: N8nRequestGroupByArgs['orderBy'] }
+        : { orderBy?: N8nRequestGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, N8nRequestGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetN8nRequestGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the N8nRequest model
+   */
+  readonly fields: N8nRequestFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for N8nRequest.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__N8nRequestClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    auditResult<T extends AuditResultDefaultArgs<ExtArgs> = {}>(args?: Subset<T, AuditResultDefaultArgs<ExtArgs>>): Prisma__AuditResultClient<$Result.GetResult<Prisma.$AuditResultPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the N8nRequest model
+   */
+  interface N8nRequestFieldRefs {
+    readonly id: FieldRef<"N8nRequest", 'Int'>
+    readonly requestId: FieldRef<"N8nRequest", 'String'>
+    readonly auditResultId: FieldRef<"N8nRequest", 'Int'>
+    readonly status: FieldRef<"N8nRequest", 'String'>
+    readonly requestPayload: FieldRef<"N8nRequest", 'Json'>
+    readonly responseData: FieldRef<"N8nRequest", 'Json'>
+    readonly createdAt: FieldRef<"N8nRequest", 'DateTime'>
+    readonly updatedAt: FieldRef<"N8nRequest", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * N8nRequest findUnique
+   */
+  export type N8nRequestFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the N8nRequest
+     */
+    select?: N8nRequestSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the N8nRequest
+     */
+    omit?: N8nRequestOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: N8nRequestInclude<ExtArgs> | null
+    /**
+     * Filter, which N8nRequest to fetch.
+     */
+    where: N8nRequestWhereUniqueInput
+  }
+
+  /**
+   * N8nRequest findUniqueOrThrow
+   */
+  export type N8nRequestFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the N8nRequest
+     */
+    select?: N8nRequestSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the N8nRequest
+     */
+    omit?: N8nRequestOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: N8nRequestInclude<ExtArgs> | null
+    /**
+     * Filter, which N8nRequest to fetch.
+     */
+    where: N8nRequestWhereUniqueInput
+  }
+
+  /**
+   * N8nRequest findFirst
+   */
+  export type N8nRequestFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the N8nRequest
+     */
+    select?: N8nRequestSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the N8nRequest
+     */
+    omit?: N8nRequestOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: N8nRequestInclude<ExtArgs> | null
+    /**
+     * Filter, which N8nRequest to fetch.
+     */
+    where?: N8nRequestWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of N8nRequests to fetch.
+     */
+    orderBy?: N8nRequestOrderByWithRelationInput | N8nRequestOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for N8nRequests.
+     */
+    cursor?: N8nRequestWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` N8nRequests from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` N8nRequests.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of N8nRequests.
+     */
+    distinct?: N8nRequestScalarFieldEnum | N8nRequestScalarFieldEnum[]
+  }
+
+  /**
+   * N8nRequest findFirstOrThrow
+   */
+  export type N8nRequestFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the N8nRequest
+     */
+    select?: N8nRequestSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the N8nRequest
+     */
+    omit?: N8nRequestOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: N8nRequestInclude<ExtArgs> | null
+    /**
+     * Filter, which N8nRequest to fetch.
+     */
+    where?: N8nRequestWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of N8nRequests to fetch.
+     */
+    orderBy?: N8nRequestOrderByWithRelationInput | N8nRequestOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for N8nRequests.
+     */
+    cursor?: N8nRequestWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` N8nRequests from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` N8nRequests.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of N8nRequests.
+     */
+    distinct?: N8nRequestScalarFieldEnum | N8nRequestScalarFieldEnum[]
+  }
+
+  /**
+   * N8nRequest findMany
+   */
+  export type N8nRequestFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the N8nRequest
+     */
+    select?: N8nRequestSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the N8nRequest
+     */
+    omit?: N8nRequestOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: N8nRequestInclude<ExtArgs> | null
+    /**
+     * Filter, which N8nRequests to fetch.
+     */
+    where?: N8nRequestWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of N8nRequests to fetch.
+     */
+    orderBy?: N8nRequestOrderByWithRelationInput | N8nRequestOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing N8nRequests.
+     */
+    cursor?: N8nRequestWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` N8nRequests from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` N8nRequests.
+     */
+    skip?: number
+    distinct?: N8nRequestScalarFieldEnum | N8nRequestScalarFieldEnum[]
+  }
+
+  /**
+   * N8nRequest create
+   */
+  export type N8nRequestCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the N8nRequest
+     */
+    select?: N8nRequestSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the N8nRequest
+     */
+    omit?: N8nRequestOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: N8nRequestInclude<ExtArgs> | null
+    /**
+     * The data needed to create a N8nRequest.
+     */
+    data: XOR<N8nRequestCreateInput, N8nRequestUncheckedCreateInput>
+  }
+
+  /**
+   * N8nRequest createMany
+   */
+  export type N8nRequestCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many N8nRequests.
+     */
+    data: N8nRequestCreateManyInput | N8nRequestCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * N8nRequest createManyAndReturn
+   */
+  export type N8nRequestCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the N8nRequest
+     */
+    select?: N8nRequestSelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the N8nRequest
+     */
+    omit?: N8nRequestOmit<ExtArgs> | null
+    /**
+     * The data used to create many N8nRequests.
+     */
+    data: N8nRequestCreateManyInput | N8nRequestCreateManyInput[]
+    skipDuplicates?: boolean
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: N8nRequestIncludeCreateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * N8nRequest update
+   */
+  export type N8nRequestUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the N8nRequest
+     */
+    select?: N8nRequestSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the N8nRequest
+     */
+    omit?: N8nRequestOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: N8nRequestInclude<ExtArgs> | null
+    /**
+     * The data needed to update a N8nRequest.
+     */
+    data: XOR<N8nRequestUpdateInput, N8nRequestUncheckedUpdateInput>
+    /**
+     * Choose, which N8nRequest to update.
+     */
+    where: N8nRequestWhereUniqueInput
+  }
+
+  /**
+   * N8nRequest updateMany
+   */
+  export type N8nRequestUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update N8nRequests.
+     */
+    data: XOR<N8nRequestUpdateManyMutationInput, N8nRequestUncheckedUpdateManyInput>
+    /**
+     * Filter which N8nRequests to update
+     */
+    where?: N8nRequestWhereInput
+  }
+
+  /**
+   * N8nRequest upsert
+   */
+  export type N8nRequestUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the N8nRequest
+     */
+    select?: N8nRequestSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the N8nRequest
+     */
+    omit?: N8nRequestOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: N8nRequestInclude<ExtArgs> | null
+    /**
+     * The filter to search for the N8nRequest to update in case it exists.
+     */
+    where: N8nRequestWhereUniqueInput
+    /**
+     * In case the N8nRequest found by the `where` argument doesn't exist, create a new N8nRequest with this data.
+     */
+    create: XOR<N8nRequestCreateInput, N8nRequestUncheckedCreateInput>
+    /**
+     * In case the N8nRequest was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<N8nRequestUpdateInput, N8nRequestUncheckedUpdateInput>
+  }
+
+  /**
+   * N8nRequest delete
+   */
+  export type N8nRequestDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the N8nRequest
+     */
+    select?: N8nRequestSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the N8nRequest
+     */
+    omit?: N8nRequestOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: N8nRequestInclude<ExtArgs> | null
+    /**
+     * Filter which N8nRequest to delete.
+     */
+    where: N8nRequestWhereUniqueInput
+  }
+
+  /**
+   * N8nRequest deleteMany
+   */
+  export type N8nRequestDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which N8nRequests to delete
+     */
+    where?: N8nRequestWhereInput
+  }
+
+  /**
+   * N8nRequest without action
+   */
+  export type N8nRequestDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the N8nRequest
+     */
+    select?: N8nRequestSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the N8nRequest
+     */
+    omit?: N8nRequestOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: N8nRequestInclude<ExtArgs> | null
   }
 
 
@@ -48475,6 +49668,20 @@ export namespace Prisma {
   };
 
   export type AuditResultScalarFieldEnum = (typeof AuditResultScalarFieldEnum)[keyof typeof AuditResultScalarFieldEnum]
+
+
+  export const N8nRequestScalarFieldEnum: {
+    id: 'id',
+    requestId: 'requestId',
+    auditResultId: 'auditResultId',
+    status: 'status',
+    requestPayload: 'requestPayload',
+    responseData: 'responseData',
+    createdAt: 'createdAt',
+    updatedAt: 'updatedAt'
+  };
+
+  export type N8nRequestScalarFieldEnum = (typeof N8nRequestScalarFieldEnum)[keyof typeof N8nRequestScalarFieldEnum]
 
 
   export const SortOrder: {
@@ -51930,6 +53137,7 @@ export namespace Prisma {
     createdAt?: DateTimeFilter<"AuditResult"> | Date | string
     updatedAt?: DateTimeFilter<"AuditResult"> | Date | string
     domain?: XOR<DomainRelationFilter, DomainWhereInput>
+    n8nRequests?: N8nRequestListRelationFilter
   }
 
   export type AuditResultOrderByWithRelationInput = {
@@ -51945,6 +53153,7 @@ export namespace Prisma {
     createdAt?: SortOrder
     updatedAt?: SortOrder
     domain?: DomainOrderByWithRelationInput
+    n8nRequests?: N8nRequestOrderByRelationAggregateInput
   }
 
   export type AuditResultWhereUniqueInput = Prisma.AtLeast<{
@@ -51963,6 +53172,7 @@ export namespace Prisma {
     createdAt?: DateTimeFilter<"AuditResult"> | Date | string
     updatedAt?: DateTimeFilter<"AuditResult"> | Date | string
     domain?: XOR<DomainRelationFilter, DomainWhereInput>
+    n8nRequests?: N8nRequestListRelationFilter
   }, "id" | "domainId">
 
   export type AuditResultOrderByWithAggregationInput = {
@@ -51999,6 +53209,78 @@ export namespace Prisma {
     screenshotUrl?: StringNullableWithAggregatesFilter<"AuditResult"> | string | null
     createdAt?: DateTimeWithAggregatesFilter<"AuditResult"> | Date | string
     updatedAt?: DateTimeWithAggregatesFilter<"AuditResult"> | Date | string
+  }
+
+  export type N8nRequestWhereInput = {
+    AND?: N8nRequestWhereInput | N8nRequestWhereInput[]
+    OR?: N8nRequestWhereInput[]
+    NOT?: N8nRequestWhereInput | N8nRequestWhereInput[]
+    id?: IntFilter<"N8nRequest"> | number
+    requestId?: StringFilter<"N8nRequest"> | string
+    auditResultId?: IntFilter<"N8nRequest"> | number
+    status?: StringFilter<"N8nRequest"> | string
+    requestPayload?: JsonFilter<"N8nRequest">
+    responseData?: JsonNullableFilter<"N8nRequest">
+    createdAt?: DateTimeFilter<"N8nRequest"> | Date | string
+    updatedAt?: DateTimeFilter<"N8nRequest"> | Date | string
+    auditResult?: XOR<AuditResultRelationFilter, AuditResultWhereInput>
+  }
+
+  export type N8nRequestOrderByWithRelationInput = {
+    id?: SortOrder
+    requestId?: SortOrder
+    auditResultId?: SortOrder
+    status?: SortOrder
+    requestPayload?: SortOrder
+    responseData?: SortOrderInput | SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    auditResult?: AuditResultOrderByWithRelationInput
+  }
+
+  export type N8nRequestWhereUniqueInput = Prisma.AtLeast<{
+    id?: number
+    requestId?: string
+    AND?: N8nRequestWhereInput | N8nRequestWhereInput[]
+    OR?: N8nRequestWhereInput[]
+    NOT?: N8nRequestWhereInput | N8nRequestWhereInput[]
+    auditResultId?: IntFilter<"N8nRequest"> | number
+    status?: StringFilter<"N8nRequest"> | string
+    requestPayload?: JsonFilter<"N8nRequest">
+    responseData?: JsonNullableFilter<"N8nRequest">
+    createdAt?: DateTimeFilter<"N8nRequest"> | Date | string
+    updatedAt?: DateTimeFilter<"N8nRequest"> | Date | string
+    auditResult?: XOR<AuditResultRelationFilter, AuditResultWhereInput>
+  }, "id" | "requestId">
+
+  export type N8nRequestOrderByWithAggregationInput = {
+    id?: SortOrder
+    requestId?: SortOrder
+    auditResultId?: SortOrder
+    status?: SortOrder
+    requestPayload?: SortOrder
+    responseData?: SortOrderInput | SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    _count?: N8nRequestCountOrderByAggregateInput
+    _avg?: N8nRequestAvgOrderByAggregateInput
+    _max?: N8nRequestMaxOrderByAggregateInput
+    _min?: N8nRequestMinOrderByAggregateInput
+    _sum?: N8nRequestSumOrderByAggregateInput
+  }
+
+  export type N8nRequestScalarWhereWithAggregatesInput = {
+    AND?: N8nRequestScalarWhereWithAggregatesInput | N8nRequestScalarWhereWithAggregatesInput[]
+    OR?: N8nRequestScalarWhereWithAggregatesInput[]
+    NOT?: N8nRequestScalarWhereWithAggregatesInput | N8nRequestScalarWhereWithAggregatesInput[]
+    id?: IntWithAggregatesFilter<"N8nRequest"> | number
+    requestId?: StringWithAggregatesFilter<"N8nRequest"> | string
+    auditResultId?: IntWithAggregatesFilter<"N8nRequest"> | number
+    status?: StringWithAggregatesFilter<"N8nRequest"> | string
+    requestPayload?: JsonWithAggregatesFilter<"N8nRequest">
+    responseData?: JsonNullableWithAggregatesFilter<"N8nRequest">
+    createdAt?: DateTimeWithAggregatesFilter<"N8nRequest"> | Date | string
+    updatedAt?: DateTimeWithAggregatesFilter<"N8nRequest"> | Date | string
   }
 
   export type UserCreateInput = {
@@ -55515,6 +56797,7 @@ export namespace Prisma {
     createdAt?: Date | string
     updatedAt?: Date | string
     domain: DomainCreateNestedOneWithoutAuditResultsInput
+    n8nRequests?: N8nRequestCreateNestedManyWithoutAuditResultInput
   }
 
   export type AuditResultUncheckedCreateInput = {
@@ -55529,6 +56812,7 @@ export namespace Prisma {
     screenshotUrl?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
+    n8nRequests?: N8nRequestUncheckedCreateNestedManyWithoutAuditResultInput
   }
 
   export type AuditResultUpdateInput = {
@@ -55542,6 +56826,7 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     domain?: DomainUpdateOneRequiredWithoutAuditResultsNestedInput
+    n8nRequests?: N8nRequestUpdateManyWithoutAuditResultNestedInput
   }
 
   export type AuditResultUncheckedUpdateInput = {
@@ -55556,6 +56841,7 @@ export namespace Prisma {
     screenshotUrl?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    n8nRequests?: N8nRequestUncheckedUpdateManyWithoutAuditResultNestedInput
   }
 
   export type AuditResultCreateManyInput = {
@@ -55594,6 +56880,79 @@ export namespace Prisma {
     pwa?: FloatFieldUpdateOperationsInput | number
     audits?: JsonNullValueInput | InputJsonValue
     screenshotUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type N8nRequestCreateInput = {
+    requestId?: string
+    status?: string
+    requestPayload: JsonNullValueInput | InputJsonValue
+    responseData?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    auditResult: AuditResultCreateNestedOneWithoutN8nRequestsInput
+  }
+
+  export type N8nRequestUncheckedCreateInput = {
+    id?: number
+    requestId?: string
+    auditResultId: number
+    status?: string
+    requestPayload: JsonNullValueInput | InputJsonValue
+    responseData?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type N8nRequestUpdateInput = {
+    requestId?: StringFieldUpdateOperationsInput | string
+    status?: StringFieldUpdateOperationsInput | string
+    requestPayload?: JsonNullValueInput | InputJsonValue
+    responseData?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    auditResult?: AuditResultUpdateOneRequiredWithoutN8nRequestsNestedInput
+  }
+
+  export type N8nRequestUncheckedUpdateInput = {
+    id?: IntFieldUpdateOperationsInput | number
+    requestId?: StringFieldUpdateOperationsInput | string
+    auditResultId?: IntFieldUpdateOperationsInput | number
+    status?: StringFieldUpdateOperationsInput | string
+    requestPayload?: JsonNullValueInput | InputJsonValue
+    responseData?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type N8nRequestCreateManyInput = {
+    id?: number
+    requestId?: string
+    auditResultId: number
+    status?: string
+    requestPayload: JsonNullValueInput | InputJsonValue
+    responseData?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type N8nRequestUpdateManyMutationInput = {
+    requestId?: StringFieldUpdateOperationsInput | string
+    status?: StringFieldUpdateOperationsInput | string
+    requestPayload?: JsonNullValueInput | InputJsonValue
+    responseData?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type N8nRequestUncheckedUpdateManyInput = {
+    id?: IntFieldUpdateOperationsInput | number
+    requestId?: StringFieldUpdateOperationsInput | string
+    auditResultId?: IntFieldUpdateOperationsInput | number
+    status?: StringFieldUpdateOperationsInput | string
+    requestPayload?: JsonNullValueInput | InputJsonValue
+    responseData?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -58327,6 +59686,16 @@ export namespace Prisma {
     volume?: SortOrder
   }
 
+  export type N8nRequestListRelationFilter = {
+    every?: N8nRequestWhereInput
+    some?: N8nRequestWhereInput
+    none?: N8nRequestWhereInput
+  }
+
+  export type N8nRequestOrderByRelationAggregateInput = {
+    _count?: SortOrder
+  }
+
   export type AuditResultCountOrderByAggregateInput = {
     id?: SortOrder
     domainId?: SortOrder
@@ -58385,6 +59754,50 @@ export namespace Prisma {
     accessibility?: SortOrder
     bestPractices?: SortOrder
     pwa?: SortOrder
+  }
+
+  export type AuditResultRelationFilter = {
+    is?: AuditResultWhereInput
+    isNot?: AuditResultWhereInput
+  }
+
+  export type N8nRequestCountOrderByAggregateInput = {
+    id?: SortOrder
+    requestId?: SortOrder
+    auditResultId?: SortOrder
+    status?: SortOrder
+    requestPayload?: SortOrder
+    responseData?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type N8nRequestAvgOrderByAggregateInput = {
+    id?: SortOrder
+    auditResultId?: SortOrder
+  }
+
+  export type N8nRequestMaxOrderByAggregateInput = {
+    id?: SortOrder
+    requestId?: SortOrder
+    auditResultId?: SortOrder
+    status?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type N8nRequestMinOrderByAggregateInput = {
+    id?: SortOrder
+    requestId?: SortOrder
+    auditResultId?: SortOrder
+    status?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type N8nRequestSumOrderByAggregateInput = {
+    id?: SortOrder
+    auditResultId?: SortOrder
   }
 
   export type DomainCreateNestedManyWithoutUserInput = {
@@ -61105,12 +62518,68 @@ export namespace Prisma {
     connect?: DomainWhereUniqueInput
   }
 
+  export type N8nRequestCreateNestedManyWithoutAuditResultInput = {
+    create?: XOR<N8nRequestCreateWithoutAuditResultInput, N8nRequestUncheckedCreateWithoutAuditResultInput> | N8nRequestCreateWithoutAuditResultInput[] | N8nRequestUncheckedCreateWithoutAuditResultInput[]
+    connectOrCreate?: N8nRequestCreateOrConnectWithoutAuditResultInput | N8nRequestCreateOrConnectWithoutAuditResultInput[]
+    createMany?: N8nRequestCreateManyAuditResultInputEnvelope
+    connect?: N8nRequestWhereUniqueInput | N8nRequestWhereUniqueInput[]
+  }
+
+  export type N8nRequestUncheckedCreateNestedManyWithoutAuditResultInput = {
+    create?: XOR<N8nRequestCreateWithoutAuditResultInput, N8nRequestUncheckedCreateWithoutAuditResultInput> | N8nRequestCreateWithoutAuditResultInput[] | N8nRequestUncheckedCreateWithoutAuditResultInput[]
+    connectOrCreate?: N8nRequestCreateOrConnectWithoutAuditResultInput | N8nRequestCreateOrConnectWithoutAuditResultInput[]
+    createMany?: N8nRequestCreateManyAuditResultInputEnvelope
+    connect?: N8nRequestWhereUniqueInput | N8nRequestWhereUniqueInput[]
+  }
+
   export type DomainUpdateOneRequiredWithoutAuditResultsNestedInput = {
     create?: XOR<DomainCreateWithoutAuditResultsInput, DomainUncheckedCreateWithoutAuditResultsInput>
     connectOrCreate?: DomainCreateOrConnectWithoutAuditResultsInput
     upsert?: DomainUpsertWithoutAuditResultsInput
     connect?: DomainWhereUniqueInput
     update?: XOR<XOR<DomainUpdateToOneWithWhereWithoutAuditResultsInput, DomainUpdateWithoutAuditResultsInput>, DomainUncheckedUpdateWithoutAuditResultsInput>
+  }
+
+  export type N8nRequestUpdateManyWithoutAuditResultNestedInput = {
+    create?: XOR<N8nRequestCreateWithoutAuditResultInput, N8nRequestUncheckedCreateWithoutAuditResultInput> | N8nRequestCreateWithoutAuditResultInput[] | N8nRequestUncheckedCreateWithoutAuditResultInput[]
+    connectOrCreate?: N8nRequestCreateOrConnectWithoutAuditResultInput | N8nRequestCreateOrConnectWithoutAuditResultInput[]
+    upsert?: N8nRequestUpsertWithWhereUniqueWithoutAuditResultInput | N8nRequestUpsertWithWhereUniqueWithoutAuditResultInput[]
+    createMany?: N8nRequestCreateManyAuditResultInputEnvelope
+    set?: N8nRequestWhereUniqueInput | N8nRequestWhereUniqueInput[]
+    disconnect?: N8nRequestWhereUniqueInput | N8nRequestWhereUniqueInput[]
+    delete?: N8nRequestWhereUniqueInput | N8nRequestWhereUniqueInput[]
+    connect?: N8nRequestWhereUniqueInput | N8nRequestWhereUniqueInput[]
+    update?: N8nRequestUpdateWithWhereUniqueWithoutAuditResultInput | N8nRequestUpdateWithWhereUniqueWithoutAuditResultInput[]
+    updateMany?: N8nRequestUpdateManyWithWhereWithoutAuditResultInput | N8nRequestUpdateManyWithWhereWithoutAuditResultInput[]
+    deleteMany?: N8nRequestScalarWhereInput | N8nRequestScalarWhereInput[]
+  }
+
+  export type N8nRequestUncheckedUpdateManyWithoutAuditResultNestedInput = {
+    create?: XOR<N8nRequestCreateWithoutAuditResultInput, N8nRequestUncheckedCreateWithoutAuditResultInput> | N8nRequestCreateWithoutAuditResultInput[] | N8nRequestUncheckedCreateWithoutAuditResultInput[]
+    connectOrCreate?: N8nRequestCreateOrConnectWithoutAuditResultInput | N8nRequestCreateOrConnectWithoutAuditResultInput[]
+    upsert?: N8nRequestUpsertWithWhereUniqueWithoutAuditResultInput | N8nRequestUpsertWithWhereUniqueWithoutAuditResultInput[]
+    createMany?: N8nRequestCreateManyAuditResultInputEnvelope
+    set?: N8nRequestWhereUniqueInput | N8nRequestWhereUniqueInput[]
+    disconnect?: N8nRequestWhereUniqueInput | N8nRequestWhereUniqueInput[]
+    delete?: N8nRequestWhereUniqueInput | N8nRequestWhereUniqueInput[]
+    connect?: N8nRequestWhereUniqueInput | N8nRequestWhereUniqueInput[]
+    update?: N8nRequestUpdateWithWhereUniqueWithoutAuditResultInput | N8nRequestUpdateWithWhereUniqueWithoutAuditResultInput[]
+    updateMany?: N8nRequestUpdateManyWithWhereWithoutAuditResultInput | N8nRequestUpdateManyWithWhereWithoutAuditResultInput[]
+    deleteMany?: N8nRequestScalarWhereInput | N8nRequestScalarWhereInput[]
+  }
+
+  export type AuditResultCreateNestedOneWithoutN8nRequestsInput = {
+    create?: XOR<AuditResultCreateWithoutN8nRequestsInput, AuditResultUncheckedCreateWithoutN8nRequestsInput>
+    connectOrCreate?: AuditResultCreateOrConnectWithoutN8nRequestsInput
+    connect?: AuditResultWhereUniqueInput
+  }
+
+  export type AuditResultUpdateOneRequiredWithoutN8nRequestsNestedInput = {
+    create?: XOR<AuditResultCreateWithoutN8nRequestsInput, AuditResultUncheckedCreateWithoutN8nRequestsInput>
+    connectOrCreate?: AuditResultCreateOrConnectWithoutN8nRequestsInput
+    upsert?: AuditResultUpsertWithoutN8nRequestsInput
+    connect?: AuditResultWhereUniqueInput
+    update?: XOR<XOR<AuditResultUpdateToOneWithWhereWithoutN8nRequestsInput, AuditResultUpdateWithoutN8nRequestsInput>, AuditResultUncheckedUpdateWithoutN8nRequestsInput>
   }
 
   export type NestedIntFilter<$PrismaModel = never> = {
@@ -62609,6 +64078,7 @@ export namespace Prisma {
     screenshotUrl?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
+    n8nRequests?: N8nRequestCreateNestedManyWithoutAuditResultInput
   }
 
   export type AuditResultUncheckedCreateWithoutDomainInput = {
@@ -62622,6 +64092,7 @@ export namespace Prisma {
     screenshotUrl?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
+    n8nRequests?: N8nRequestUncheckedCreateNestedManyWithoutAuditResultInput
   }
 
   export type AuditResultCreateOrConnectWithoutDomainInput = {
@@ -70398,6 +71869,35 @@ export namespace Prisma {
     create: XOR<DomainCreateWithoutAuditResultsInput, DomainUncheckedCreateWithoutAuditResultsInput>
   }
 
+  export type N8nRequestCreateWithoutAuditResultInput = {
+    requestId?: string
+    status?: string
+    requestPayload: JsonNullValueInput | InputJsonValue
+    responseData?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type N8nRequestUncheckedCreateWithoutAuditResultInput = {
+    id?: number
+    requestId?: string
+    status?: string
+    requestPayload: JsonNullValueInput | InputJsonValue
+    responseData?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type N8nRequestCreateOrConnectWithoutAuditResultInput = {
+    where: N8nRequestWhereUniqueInput
+    create: XOR<N8nRequestCreateWithoutAuditResultInput, N8nRequestUncheckedCreateWithoutAuditResultInput>
+  }
+
+  export type N8nRequestCreateManyAuditResultInputEnvelope = {
+    data: N8nRequestCreateManyAuditResultInput | N8nRequestCreateManyAuditResultInput[]
+    skipDuplicates?: boolean
+  }
+
   export type DomainUpsertWithoutAuditResultsInput = {
     update: XOR<DomainUpdateWithoutAuditResultsInput, DomainUncheckedUpdateWithoutAuditResultsInput>
     create: XOR<DomainCreateWithoutAuditResultsInput, DomainUncheckedCreateWithoutAuditResultsInput>
@@ -70486,6 +71986,106 @@ export namespace Prisma {
     semanticAnalyses?: SemanticAnalysisUncheckedUpdateManyWithoutDomainNestedInput
     suggestedCompetitors?: SuggestedCompetitorUncheckedUpdateManyWithoutDomainNestedInput
     campaigns?: CampaignUncheckedUpdateManyWithoutDomainNestedInput
+  }
+
+  export type N8nRequestUpsertWithWhereUniqueWithoutAuditResultInput = {
+    where: N8nRequestWhereUniqueInput
+    update: XOR<N8nRequestUpdateWithoutAuditResultInput, N8nRequestUncheckedUpdateWithoutAuditResultInput>
+    create: XOR<N8nRequestCreateWithoutAuditResultInput, N8nRequestUncheckedCreateWithoutAuditResultInput>
+  }
+
+  export type N8nRequestUpdateWithWhereUniqueWithoutAuditResultInput = {
+    where: N8nRequestWhereUniqueInput
+    data: XOR<N8nRequestUpdateWithoutAuditResultInput, N8nRequestUncheckedUpdateWithoutAuditResultInput>
+  }
+
+  export type N8nRequestUpdateManyWithWhereWithoutAuditResultInput = {
+    where: N8nRequestScalarWhereInput
+    data: XOR<N8nRequestUpdateManyMutationInput, N8nRequestUncheckedUpdateManyWithoutAuditResultInput>
+  }
+
+  export type N8nRequestScalarWhereInput = {
+    AND?: N8nRequestScalarWhereInput | N8nRequestScalarWhereInput[]
+    OR?: N8nRequestScalarWhereInput[]
+    NOT?: N8nRequestScalarWhereInput | N8nRequestScalarWhereInput[]
+    id?: IntFilter<"N8nRequest"> | number
+    requestId?: StringFilter<"N8nRequest"> | string
+    auditResultId?: IntFilter<"N8nRequest"> | number
+    status?: StringFilter<"N8nRequest"> | string
+    requestPayload?: JsonFilter<"N8nRequest">
+    responseData?: JsonNullableFilter<"N8nRequest">
+    createdAt?: DateTimeFilter<"N8nRequest"> | Date | string
+    updatedAt?: DateTimeFilter<"N8nRequest"> | Date | string
+  }
+
+  export type AuditResultCreateWithoutN8nRequestsInput = {
+    performance: number
+    seo: number
+    accessibility: number
+    bestPractices: number
+    pwa: number
+    audits: JsonNullValueInput | InputJsonValue
+    screenshotUrl?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    domain: DomainCreateNestedOneWithoutAuditResultsInput
+  }
+
+  export type AuditResultUncheckedCreateWithoutN8nRequestsInput = {
+    id?: number
+    domainId: number
+    performance: number
+    seo: number
+    accessibility: number
+    bestPractices: number
+    pwa: number
+    audits: JsonNullValueInput | InputJsonValue
+    screenshotUrl?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type AuditResultCreateOrConnectWithoutN8nRequestsInput = {
+    where: AuditResultWhereUniqueInput
+    create: XOR<AuditResultCreateWithoutN8nRequestsInput, AuditResultUncheckedCreateWithoutN8nRequestsInput>
+  }
+
+  export type AuditResultUpsertWithoutN8nRequestsInput = {
+    update: XOR<AuditResultUpdateWithoutN8nRequestsInput, AuditResultUncheckedUpdateWithoutN8nRequestsInput>
+    create: XOR<AuditResultCreateWithoutN8nRequestsInput, AuditResultUncheckedCreateWithoutN8nRequestsInput>
+    where?: AuditResultWhereInput
+  }
+
+  export type AuditResultUpdateToOneWithWhereWithoutN8nRequestsInput = {
+    where?: AuditResultWhereInput
+    data: XOR<AuditResultUpdateWithoutN8nRequestsInput, AuditResultUncheckedUpdateWithoutN8nRequestsInput>
+  }
+
+  export type AuditResultUpdateWithoutN8nRequestsInput = {
+    performance?: FloatFieldUpdateOperationsInput | number
+    seo?: FloatFieldUpdateOperationsInput | number
+    accessibility?: FloatFieldUpdateOperationsInput | number
+    bestPractices?: FloatFieldUpdateOperationsInput | number
+    pwa?: FloatFieldUpdateOperationsInput | number
+    audits?: JsonNullValueInput | InputJsonValue
+    screenshotUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    domain?: DomainUpdateOneRequiredWithoutAuditResultsNestedInput
+  }
+
+  export type AuditResultUncheckedUpdateWithoutN8nRequestsInput = {
+    id?: IntFieldUpdateOperationsInput | number
+    domainId?: IntFieldUpdateOperationsInput | number
+    performance?: FloatFieldUpdateOperationsInput | number
+    seo?: FloatFieldUpdateOperationsInput | number
+    accessibility?: FloatFieldUpdateOperationsInput | number
+    bestPractices?: FloatFieldUpdateOperationsInput | number
+    pwa?: FloatFieldUpdateOperationsInput | number
+    audits?: JsonNullValueInput | InputJsonValue
+    screenshotUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
   export type DomainCreateManyUserInput = {
@@ -71767,6 +73367,7 @@ export namespace Prisma {
     screenshotUrl?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    n8nRequests?: N8nRequestUpdateManyWithoutAuditResultNestedInput
   }
 
   export type AuditResultUncheckedUpdateWithoutDomainInput = {
@@ -71780,6 +73381,7 @@ export namespace Prisma {
     screenshotUrl?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    n8nRequests?: N8nRequestUncheckedUpdateManyWithoutAuditResultNestedInput
   }
 
   export type AuditResultUncheckedUpdateManyWithoutDomainInput = {
@@ -72715,6 +74317,45 @@ export namespace Prisma {
     status?: StringFieldUpdateOperationsInput | string
     source?: EnumCampaignNodeSourceFieldUpdateOperationsInput | $Enums.CampaignNodeSource
     aiMetadata?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type N8nRequestCreateManyAuditResultInput = {
+    id?: number
+    requestId?: string
+    status?: string
+    requestPayload: JsonNullValueInput | InputJsonValue
+    responseData?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type N8nRequestUpdateWithoutAuditResultInput = {
+    requestId?: StringFieldUpdateOperationsInput | string
+    status?: StringFieldUpdateOperationsInput | string
+    requestPayload?: JsonNullValueInput | InputJsonValue
+    responseData?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type N8nRequestUncheckedUpdateWithoutAuditResultInput = {
+    id?: IntFieldUpdateOperationsInput | number
+    requestId?: StringFieldUpdateOperationsInput | string
+    status?: StringFieldUpdateOperationsInput | string
+    requestPayload?: JsonNullValueInput | InputJsonValue
+    responseData?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type N8nRequestUncheckedUpdateManyWithoutAuditResultInput = {
+    id?: IntFieldUpdateOperationsInput | number
+    requestId?: StringFieldUpdateOperationsInput | string
+    status?: StringFieldUpdateOperationsInput | string
+    requestPayload?: JsonNullValueInput | InputJsonValue
+    responseData?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
