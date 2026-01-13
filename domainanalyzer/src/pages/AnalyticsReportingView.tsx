@@ -133,6 +133,7 @@ const AnalyticsReportingSetup = () => {
   const { toast } = useToast();
   
   const [form, setForm] = useState({
+    name: "",
     reportMonth: "",
     analyticsPropertyId: "",
     orgName: "",
@@ -181,6 +182,7 @@ const AnalyticsReportingSetup = () => {
             "Content-Type": "application/json"
           },
           body: JSON.stringify({
+            name: form.name,
             reportMonth: form.reportMonth,
             analyticsProperty: form.analyticsPropertyId,
             orgName: form.orgName
@@ -319,10 +321,19 @@ const AnalyticsReportingSetup = () => {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <Field
-              label="Organization Name (Optional)"
-              helper="Leave blank to use your domain URL"
+              label="Report Name"
+              icon={<FileText className="h-4 w-4" />}
+              placeholder="e.g. BOGT OCT 2025"
+              value={form.name}
+              onChange={(v) => handleChange("name", v)}
+              required
+            />
+
+            <Field
+              label="Organization Name"
+              helper="Leave blank to use your domain"
               icon={<Building2 className="h-4 w-4" />}
-              placeholder="e.g. My Company Name"
+              placeholder="e.g. Blue Ocean Global Tech"
               value={form.orgName}
               onChange={(v) => handleChange("orgName", v)}
             />
@@ -336,16 +347,14 @@ const AnalyticsReportingSetup = () => {
               required
             />
 
-            <div className="md:col-span-2">
-              <Field
-                label="GSC Property ID (Optional)"
-                helper="Leave blank to use your domain URL"
-                icon={<BarChart3 className="h-4 w-4" />}
-                placeholder="e.g. 485147447"
-                value={form.analyticsPropertyId}
-                onChange={(v) => handleChange("analyticsPropertyId", v)}
-              />
-            </div>
+            <Field
+              label="GSC Property ID (Optional)"
+              helper="Leave blank to use your domain"
+              icon={<BarChart3 className="h-4 w-4" />}
+              placeholder="e.g. 485147447"
+              value={form.analyticsPropertyId}
+              onChange={(v) => handleChange("analyticsPropertyId", v)}
+            />
           </div>
 
 

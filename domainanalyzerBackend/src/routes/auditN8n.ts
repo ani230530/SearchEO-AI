@@ -21,7 +21,7 @@ function getReportMonth(dateStr?: string): string {
 router.post('/send', authenticateToken, async (req: Request, res: Response) => {
     const authReq = req as AuthenticatedRequest;
     const userId = authReq.user.userId;
-    const { reportMonth, analyticsProperty, orgName } = req.body;
+    const { reportMonth, analyticsProperty, orgName, name } = req.body;
 
     try {
         // Find the user's company domain and latest audit
@@ -55,19 +55,29 @@ router.post('/send', authenticateToken, async (req: Request, res: Response) => {
             });
         }
 
+        // Format domain to replace protocol with www.
+        let formattedUrl = companyDomain.url;
+        try {
+            const urlObj = new URL(companyDomain.url);
+            formattedUrl = `www.${urlObj.hostname}`;
+        } catch (e) {
+            // Fallback if URL is invalid
+            formattedUrl = formattedUrl.replace(/^(?:https?:\/\/)?(?:www\.)?/i, 'www.');
+        }
+
         // Get backend URL from environment or construct it
         const backendUrl = process.env.BACKEND_URL || `${req.protocol}://${req.get('host')}`;
         const callbackUrl = `${backendUrl}/api/audit/n8n/callback`;
 
         // Prepare the payload for n8n
         const n8nPayload = {
-            name: companyDomain.url,
+            name: name || formattedUrl, // User provided name or formatted domain
             'Report Month': getReportMonth(reportMonth),
             'proposal template': '1queNsZi99R15QaCalavH8TqqvaeGPp1wC8Tqwn7AkhI',
-            'analytics property': analyticsProperty || companyDomain.url,
+            'analytics property': analyticsProperty || formattedUrl,
             'sheets template': '1qucJJTUMUCHN0k1yQDTBr6HKF7u0HPMC4NkVJy6kIT0',
-            URL: companyDomain.url,
-            'Org Name': orgName || companyDomain.url,
+            URL: formattedUrl,
+            'Org Name': orgName || formattedUrl,
         };
 
         // Create n8n request record in database
