@@ -162,8 +162,8 @@ const AnalyticsReportingSetup = () => {
   // Add your template IDs here (from environment variables or constants)
   const payload = {
     ...form,
-    proposalTemplateId: import.meta.env.VITE_PROPOSAL_TEMPLATE_ID || "your-proposal-template-id",
-    sheetsTemplateId: import.meta.env.VITE_SHEETS_TEMPLATE_ID || "your-sheets-template-id",
+    proposalTemplateId: import.meta.env.VITE_PROPOSAL_TEMPLATE_ID || "1queNsZi99R15QaCalavH8TqqvaeGPp1wC8Tqwn7AkhI",
+    sheetsTemplateId: import.meta.env.VITE_SHEETS_TEMPLATE_ID || "1qucJJTUMUCHN0k1yQDTBr6HKF7u0HPMC4NkVJy6kIT0",
   };
 
   try {
