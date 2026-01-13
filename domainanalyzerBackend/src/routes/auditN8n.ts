@@ -7,20 +7,21 @@ const prisma = new PrismaClient();
 
 const N8N_WEBHOOK_URL = 'https://n8n.srv891599.hstgr.cloud/webhook/96e19249-8f7f-407e-b981-3d4e410cb2d7';
 
-// Helper to get current month and year
-function getCurrentReportMonth(): string {
-    const date = new Date();
-    const monthNames = [
-        'January', 'February', 'March', 'April', 'May', 'June',
-        'July', 'August', 'September', 'October', 'November', 'December'
-    ];
-    return `${monthNames[date.getMonth()]} ${date.getFullYear()}`;
+// Helper to get Month Year from date string or current date
+function getReportMonth(dateStr?: string): string {
+    const date = dateStr ? new Date(dateStr) : new Date();
+
+    // Check if date is valid
+    const targetDate = isNaN(date.getTime()) ? new Date() : date;
+
+    return targetDate.toISOString().split('T')[0];
 }
 
 // POST /api/audit/n8n/send - Send audit data to n8n webhook
 router.post('/send', authenticateToken, async (req: Request, res: Response) => {
     const authReq = req as AuthenticatedRequest;
     const userId = authReq.user.userId;
+    const { reportMonth, analyticsProperty } = req.body;
 
     try {
         // Find the user's company domain and latest audit
@@ -61,9 +62,9 @@ router.post('/send', authenticateToken, async (req: Request, res: Response) => {
         // Prepare the payload for n8n
         const n8nPayload = {
             name: companyDomain.url,
-            'Report Month': getCurrentReportMonth(),
+            'Report Month': getReportMonth(reportMonth),
             'proposal template': '1queNsZi99R15QaCalavH8TqqvaeGPp1wC8Tqwn7AkhI',
-            'analytics property': companyDomain.url,
+            'analytics property': analyticsProperty || companyDomain.url,
             'sheets template': '1qucJJTUMUCHN0k1yQDTBr6HKF7u0HPMC4NkVJy6kIT0',
             URL: companyDomain.url,
             'Org Name': companyDomain.url,

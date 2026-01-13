@@ -132,17 +132,35 @@ const Step = ({
 const AnalyticsReportingSetup = () => {
   const { toast } = useToast();
   
+  const [form, setForm] = useState({
+    reportMonth: "",
+    analyticsPropertyId: "",
+  });
+
   const [reportId, setReportId] = useState<string | null>(null);
   const [reportStatus, setReportStatus] = useState<"processing" | "completed" | "failed" | null>(null);
   const [reportResults, setReportResults] = useState<{sheetsUrl?: string; slidesUrl?: string} | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   
+  const handleChange = (key: keyof typeof form, value: string) => {
+    setForm((prev) => ({ ...prev, [key]: value }));
+  };
+
   const handleSubmit = async () => {
     const token = localStorage.getItem("authToken");
     if (!token) {
       toast({
         title: "Authentication required",
         description: "Please log in to generate reports.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!form.reportMonth) {
+      toast({
+        title: "Validation Error",
+        description: "Please select a report month.",
         variant: "destructive",
       });
       return;
@@ -161,6 +179,10 @@ const AnalyticsReportingSetup = () => {
             "Authorization": `Bearer ${token}`,
             "Content-Type": "application/json"
           },
+          body: JSON.stringify({
+            reportMonth: form.reportMonth,
+            analyticsProperty: form.analyticsPropertyId
+          }),
         }
       );
 
@@ -261,7 +283,7 @@ const AnalyticsReportingSetup = () => {
 
           <p className="text-xl font-light text-neutral-500 max-w-3xl mx-auto">
             Generate comprehensive analytics reports automatically from your audit data.
-            Click the button below to create a new report with Google Sheets and Slides.
+            Select your report parameters below.
           </p>
         </header>
 
@@ -287,21 +309,32 @@ const AnalyticsReportingSetup = () => {
         {/* Main Action */}
         <section className="max-w-4xl mx-auto bg-white/80 backdrop-blur-xl rounded-[32px] border border-neutral-200 p-12 space-y-8 shadow-xl">
           <div className="space-y-4">
-            <h2 className="text-2xl font-light tracking-tight">Generate Report</h2>
+            <h2 className="text-2xl font-light tracking-tight">Report Configuration</h2>
             <p className="text-sm font-light text-neutral-500">
-              This will automatically use your company domain and latest audit data to create:
+              Customize your report parameters. Other details will be automatically pulled from your company domain audit data.
             </p>
-            <ul className="space-y-2 text-sm font-light text-neutral-600">
-              <li className="flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 text-green-600" />
-                Google Sheets report with analytics data
-              </li>
-              <li className="flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 text-green-600" />
-                Google Slides presentation with insights
-              </li>
-            </ul>
           </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <Field
+              label="Report Month"
+              icon={<Calendar className="h-4 w-4" />}
+              type="month"
+              value={form.reportMonth}
+              onChange={(v) => handleChange("reportMonth", v)}
+              required
+            />
+
+            <Field
+              label="GSC Property ID (Optional)"
+              helper="Leave blank to use your domain URL"
+              icon={<BarChart3 className="h-4 w-4" />}
+              placeholder="e.g. 485147447"
+              value={form.analyticsPropertyId}
+              onChange={(v) => handleChange("analyticsPropertyId", v)}
+            />
+          </div>
+
 
           {/* CTA */}
           <div className="pt-6 flex justify-center">
