@@ -94,6 +94,8 @@ router.post('/send', authenticateToken, async (req: Request, res: Response) => {
             body: JSON.stringify(finalPayload),
         });
 
+        console.log(finalPayload);
+
         if (!n8nResponse.ok) {
             // Update status to failed
             await prisma.n8nRequest.update({
