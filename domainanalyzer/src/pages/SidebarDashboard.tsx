@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LayoutDashboard, BarChart3, Settings, User, LogOut, Menu, X, Building, Globe, CheckCircle, Info, Plug, FileText, ChevronDown, ChevronRight, ChevronLeft, Megaphone, Plus, ChevronUp, Trash2, Sparkles, ArrowLeft, Search, TrendingUp, Grid3X3, List, ArrowUpDown, Loader2, AlertCircle, Check, Send, RefreshCw, ClipboardList } from 'lucide-react';
+import { LayoutDashboard, BarChart3, Settings, User, LogOut, Menu, X, Building, Globe, CheckCircle, Info, Plug, FileText, ChevronDown, ChevronRight, ChevronLeft, Megaphone, Plus, ChevronUp, Trash2, Sparkles, ArrowLeft, Search, TrendingUp, Grid3X3, List, ArrowUpDown, Loader2, AlertCircle, Check, Send, RefreshCw, ClipboardList, FileChartColumnIncreasing } from 'lucide-react';
 import GSCAnalyticsView from '@/components/gsc/GSCAnalyticsView';
+import AnalyticsReportingView from './AnalyticsReportingView';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/use-toast';
 import { maskDomainId } from '@/lib/domainUtils';
@@ -40,7 +41,7 @@ import { AuditPDF } from '@/components/audit/AuditPDF';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3002";
 
-type TabId = 'overview' | 'analytics' | 'campaign' | 'publish' | 'settings' | 'profile' | 'ai-checker' | 'gsc-analytics' | 'audit';
+type TabId = 'overview' | 'analytics' | 'campaign' | 'publish' | 'settings' | 'profile' | 'ai-checker' | 'gsc-analytics' | 'audit' | 'analytics-report';
 type CompanySubTabId = 'company-info' | 'integration';
 
 interface Tab {
@@ -397,6 +398,7 @@ const [publishError, setPublishError] = useState("");
     { id: 'publish', label: 'Publish', icon: <Send className="h-5 w-5" /> },
     { id: 'gsc-analytics', label: 'GSC Analytics', icon: <BarChart3 className="h-5 w-5" /> },
     { id: 'audit', label: 'Audit', icon: <ClipboardList className="h-5 w-5" /> },
+    { id: 'analytics-report', label: 'Analytics Reporting', icon: <FileChartColumnIncreasing className="h-5 w-5" /> },
     { id: 'settings', label: 'Settings', icon: <Settings className="h-5 w-5" /> },
     { id: 'profile', label: 'Profile', icon: <User className="h-5 w-5" /> },
     { id: 'ai-checker', label: 'AI Checker', icon: <Sparkles className="h-5 w-5" /> },
@@ -4567,7 +4569,7 @@ const handleRunAudit = async (url?: string) => {
                         >
                           Individual Metrics
                         </h3>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-6">
                           {categories.map(({ label, value }) => (
                             <div
                               key={label}
@@ -4646,7 +4648,9 @@ const handleRunAudit = async (url?: string) => {
                 })()}
               </div>
             </div>
-          ) : activeTab === 'gsc-analytics' ? (
+          ) : activeTab === 'analytics-report' ? (
+            <AnalyticsReportingView />
+          ): activeTab === 'gsc-analytics' ? (
             <GSCAnalyticsView />
           ) : activeTab === 'profile' ? (
             <div className="max-w-8xl mx-auto px-4 sm:px-6 py-12 sm:py-16 space-y-12">
