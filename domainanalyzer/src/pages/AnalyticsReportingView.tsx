@@ -330,7 +330,7 @@ const AnalyticsReportingSetup = () => {
             <Field
               label="Report Month"
               icon={<Calendar className="h-4 w-4" />}
-              type="month"
+              type="date"
               value={form.reportMonth}
               onChange={(v) => handleChange("reportMonth", v)}
               required
