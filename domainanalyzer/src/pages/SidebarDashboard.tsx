@@ -498,6 +498,15 @@ const fetchAudit = useCallback(async () => {
   }
 }, []);
 
+const overallScore =
+  auditData
+    ? (auditData.performance +
+        auditData.seo +
+        auditData.accessibility +
+        auditData.bestPractices) / 5
+    : 0;
+
+
 //Handle Run Audit
 const handleRunAudit = async (url?: string) => {
   const token = localStorage.getItem("authToken");   
@@ -527,7 +536,6 @@ const handleRunAudit = async (url?: string) => {
 
     const data = await resp.json();
     if (data.success) {
-      setAuditResult(data.normalized);
       setAuditData(data.audit);
       setAuditComplete(true);
       setShowAuditModal(true);
@@ -4665,7 +4673,7 @@ useEffect(() => {
                       {/* Overall Score Section */}
                       <div className="flex flex-col items-center justify-center py-12">
                         <div className="mb-8">
-                          <OverallScoreGauge score={avg / 100} />
+                          <OverallScoreGauge score={overallScore} />
                         </div>
                         <div className="flex gap-8 text-center">
                           <div>
