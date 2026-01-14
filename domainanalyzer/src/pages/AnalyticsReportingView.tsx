@@ -13,9 +13,21 @@ import {
   Zap,
   Database,
   ChevronRight,
+  Plus,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
+import {
+  Drawer,
+  DrawerClose,
+  DrawerContent,
+  DrawerDescription,
+  DrawerFooter,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerTrigger,
+} from "@/components/ui/drawer";
+import { Button } from "@/components/ui/button";
 
 
 
@@ -145,6 +157,7 @@ const AnalyticsReportingSetup = () => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [reportHistory, setReportHistory] = useState<any[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   
   const handleChange = (key: keyof typeof form, value: string) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -206,9 +219,9 @@ const AnalyticsReportingSetup = () => {
         description: "Analytics report generation has been triggered. You'll be notified when it's ready.",
       });
 
-      // Connect to SSE for real-time updates
       connectSSE(token, data.requestId);
       fetchHistory(); // Refresh history table
+      setIsDrawerOpen(false); // Close drawer on success
     } catch (error) {
       toast({
         title: "Error",
@@ -344,86 +357,108 @@ const AnalyticsReportingSetup = () => {
           />
         </div>
 
-        {/* Main Action */}
-        <section className="max-w-4xl mx-auto bg-white/80 backdrop-blur-xl rounded-[32px] border border-neutral-200 p-12 space-y-8 shadow-xl">
-          <div className="space-y-4">
-            <h2 className="text-2xl font-light tracking-tight">Report Configuration</h2>
-            <p className="text-sm font-light text-neutral-500">
-              Customize your report parameters. Other details will be automatically pulled from your company domain audit data.
-            </p>
-          </div>
+        {/* Main Action Trigger */}
+        <section className="flex flex-col items-center gap-8 py-10">
+          <Drawer open={isDrawerOpen} onOpenChange={setIsDrawerOpen}>
+            <DrawerTrigger asChild>
+              <button
+                className={cn(
+                  "h-20 px-12 rounded-full text-white font-light text-xl flex items-center gap-6 transition-all shadow-2xl hover:scale-105 active:scale-95",
+                  gradients.primary
+                )}
+              >
+                <div className="h-10 w-10 rounded-full bg-white/20 flex items-center justify-center">
+                  <Plus className="h-6 w-6" />
+                </div>
+                Generate New Analytics Report
+                <ChevronRight className="h-6 w-6 opacity-50" />
+              </button>
+            </DrawerTrigger>
+            <DrawerContent className="max-w-4xl mx-auto">
+              <div className="mx-auto w-full max-w-2xl px-6 py-10 space-y-8">
+                <DrawerHeader className="px-0">
+                  <DrawerTitle className="text-3xl font-light tracking-tight">Report Configuration</DrawerTitle>
+                  <DrawerDescription className="text-base font-light text-neutral-500">
+                    Customize your report parameters. Other details will be automatically pulled from your audit data.
+                  </DrawerDescription>
+                </DrawerHeader>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <Field
-              label="Report Name"
-              icon={<FileText className="h-4 w-4" />}
-              placeholder="e.g. BOGT OCT 2025"
-              value={form.name}
-              onChange={(v) => handleChange("name", v)}
-              required
-            />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <Field
+                    label="Report Name"
+                    icon={<FileText className="h-4 w-4" />}
+                    placeholder="e.g. BOGT OCT 2025"
+                    value={form.name}
+                    onChange={(v) => handleChange("name", v)}
+                    required
+                  />
 
-            <Field
-              label="Organization Name"
-              helper="Leave blank to use your domain"
-              icon={<Building2 className="h-4 w-4" />}
-              placeholder="e.g. Blue Ocean Global Tech"
-              value={form.orgName}
-              onChange={(v) => handleChange("orgName", v)}
-            />
+                  <Field
+                    label="Organization Name"
+                    helper="Leave blank to use your domain"
+                    icon={<Building2 className="h-4 w-4" />}
+                    placeholder="e.g. Blue Ocean Global Tech"
+                    value={form.orgName}
+                    onChange={(v) => handleChange("orgName", v)}
+                  />
 
-            <Field
-              label="Report Month"
-              icon={<Calendar className="h-4 w-4" />}
-              type="date"
-              value={form.reportMonth}
-              onChange={(v) => handleChange("reportMonth", v)}
-              required
-            />
+                  <Field
+                    label="Report Month"
+                    icon={<Calendar className="h-4 w-4" />}
+                    type="date"
+                    value={form.reportMonth}
+                    onChange={(v) => handleChange("reportMonth", v)}
+                    required
+                  />
 
-            <Field
-              label="GSC Property ID (Optional)"
-              helper="Leave blank to use your domain"
-              icon={<BarChart3 className="h-4 w-4" />}
-              placeholder="e.g. 485147447"
-              value={form.analyticsPropertyId}
-              onChange={(v) => handleChange("analyticsPropertyId", v)}
-            />
-          </div>
+                  <Field
+                    label="GSC Property ID (Optional)"
+                    helper="Leave blank to use your domain"
+                    icon={<BarChart3 className="h-4 w-4" />}
+                    placeholder="e.g. 485147447"
+                    value={form.analyticsPropertyId}
+                    onChange={(v) => handleChange("analyticsPropertyId", v)}
+                  />
+                </div>
 
+                <DrawerFooter className="px-0 pt-10">
+                  <button
+                    onClick={handleSubmit}
+                    disabled={isGenerating}
+                    className={cn(
+                      "h-16 w-full rounded-full text-white font-light text-lg flex items-center justify-center gap-4 transition-all",
+                      !isGenerating
+                        ? "bg-black hover:bg-neutral-800 active:scale-[0.98]"
+                        : "bg-neutral-400 cursor-not-allowed"
+                    )}
+                  >
+                    {isGenerating ? (
+                      <>
+                        <div className="h-5 w-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        Generating Your Report...
+                      </>
+                    ) : (
+                      <>
+                        <Play className="h-5 w-5" />
+                        Start Generation Process
+                      </>
+                    )}
+                  </button>
+                  <DrawerClose asChild>
+                    <button className="h-12 w-full text-sm font-light text-neutral-500 hover:text-black transition-colors">
+                      Cancel and Return
+                    </button>
+                  </DrawerClose>
+                </DrawerFooter>
+              </div>
+            </DrawerContent>
+          </Drawer>
 
-          {/* CTA */}
-          <div className="pt-6 flex justify-center">
-            <button
-              onClick={handleSubmit}
-              disabled={isGenerating}
-              className={cn(
-                "h-14 px-12 rounded-full text-white font-light flex items-center gap-4 transition-all",
-                !isGenerating
-                  ? "bg-black hover:bg-neutral-800 active:scale-95"
-                  : "bg-neutral-400 cursor-not-allowed"
-              )}
-            >
-              {isGenerating ? (
-                <>
-                  <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  Generating...
-                </>
-              ) : (
-                <>
-                  <Play className="h-4 w-4" />
-                  Generate Analytics Report
-                  <ChevronRight className="h-4 w-4 opacity-70" />
-                </>
-              )}
-            </button>
-          </div>
-
-          {/* Status Display */}
+          {/* Inline Active Status (if any) */}
           {reportStatus && (
-            <div className="mt-8 p-6 bg-neutral-50 rounded-2xl border border-neutral-200">
+            <div className="w-full max-w-2xl p-6 bg-white/50 backdrop-blur rounded-[24px] border border-neutral-200 animate-in fade-in slide-in-from-bottom-4">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-light text-neutral-900">Report Status</h3>
+                <h3 className="text-lg font-light text-neutral-900">Live Status</h3>
                 <div className={cn(
                   "px-3 py-1 rounded-full text-xs font-light",
                   reportStatus === "processing" && "bg-blue-50 text-blue-700",
@@ -439,12 +474,12 @@ const AnalyticsReportingSetup = () => {
               {reportStatus === "processing" && (
                 <div className="flex items-center gap-2 text-sm text-neutral-600">
                   <div className="h-4 w-4 border-2 border-neutral-600 border-t-transparent rounded-full animate-spin" />
-                  <span>N8n is generating your reports...</span>
+                  <span>The n8n engine is currently generating your files. You can follow the progress in the history table below.</span>
                 </div>
               )}
 
               {reportResults && (
-                <div className="space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
                   {reportResults.sheetsUrl && (
                     <a
                       href={reportResults.sheetsUrl}
@@ -454,8 +489,8 @@ const AnalyticsReportingSetup = () => {
                     >
                       <FileText className="h-5 w-5 text-green-700" />
                       <div>
-                        <div className="text-sm font-medium text-green-900">Google Sheets Report</div>
-                        <div className="text-xs text-green-600">Click to open</div>
+                        <div className="text-sm font-medium text-green-900">Open Sheets</div>
+                        <div className="text-xs text-green-600">Report Ready</div>
                       </div>
                     </a>
                   )}
@@ -468,8 +503,8 @@ const AnalyticsReportingSetup = () => {
                     >
                       <FileText className="h-5 w-5 text-blue-700" />
                       <div>
-                        <div className="text-sm font-medium text-blue-900">Google Slides Presentation</div>
-                        <div className="text-xs text-blue-600">Click to open</div>
+                        <div className="text-sm font-medium text-blue-900">Open Slides</div>
+                        <div className="text-xs text-blue-600">Presentation Ready</div>
                       </div>
                     </a>
                   )}
@@ -503,7 +538,6 @@ const AnalyticsReportingSetup = () => {
                 <thead>
                   <tr className="border-b border-neutral-100 text-sm font-light text-neutral-500 bg-neutral-50/50">
                     <th className="px-8 py-5 font-light">Report Name</th>
-                    <th className="px-8 py-5 font-light">Domain</th>
                     <th className="px-8 py-5 font-light">Month</th>
                     <th className="px-8 py-5 font-light">Status</th>
                     <th className="px-8 py-5 font-light">Date Generated</th>
@@ -517,12 +551,6 @@ const AnalyticsReportingSetup = () => {
                         <td className="px-8 py-5">
                           <div className="text-sm font-medium text-neutral-900">
                             {report.payload?.name || "Unnamed Report"}
-                          </div>
-                        </td>
-                        <td className="px-8 py-5">
-                          <div className="text-sm font-light text-neutral-500 flex items-center gap-2">
-                            <Globe className="h-3 w-3" />
-                            {report.domainUrl}
                           </div>
                         </td>
                         <td className="px-8 py-5">
@@ -544,16 +572,16 @@ const AnalyticsReportingSetup = () => {
                           {new Date(report.createdAt).toLocaleDateString()}
                         </td>
                         <td className="px-8 py-5 text-right">
-                          <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <div className="flex items-center justify-end gap-3 transition-opacity">
                             {report.results?.googleSheetsUrl && (
                               <a
                                 href={report.results.googleSheetsUrl}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="p-2 hover:bg-green-50 rounded-lg text-green-700 transition"
-                                title="Google Sheets"
+                                className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-green-600 hover:bg-green-700 text-white text-xs font-light transition shadow-sm hover:shadow-md"
                               >
-                                <FileText className="h-4 w-4" />
+                                <FileText className="h-3 w-3" />
+                                Sheets
                               </a>
                             )}
                             {report.results?.googleSlidesUrl && (
@@ -561,17 +589,12 @@ const AnalyticsReportingSetup = () => {
                                 href={report.results.googleSlidesUrl}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="p-2 hover:bg-blue-50 rounded-lg text-blue-700 transition"
-                                title="Google Slides"
+                                className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-blue-600 hover:bg-blue-700 text-white text-xs font-light transition shadow-sm hover:shadow-md"
                               >
-                                <FileText className="h-4 w-4" />
+                                <FileText className="h-3 w-3" />
+                                Slides
                               </a>
                             )}
-                          </div>
-                          {/* Fallback for mobile or non-hover devices */}
-                          <div className="flex items-center justify-end gap-1 md:hidden">
-                             {report.results?.googleSheetsUrl && <div className="w-1 h-1 rounded-full bg-green-500" />}
-                             {report.results?.googleSlidesUrl && <div className="w-1 h-1 rounded-full bg-blue-500" />}
                           </div>
                         </td>
                       </tr>
