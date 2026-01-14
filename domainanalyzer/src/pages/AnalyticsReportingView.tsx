@@ -143,6 +143,8 @@ const AnalyticsReportingSetup = () => {
   const [reportStatus, setReportStatus] = useState<"processing" | "completed" | "failed" | null>(null);
   const [reportResults, setReportResults] = useState<{sheetsUrl?: string; slidesUrl?: string} | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [reportHistory, setReportHistory] = useState<any[]>([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   
   const handleChange = (key: keyof typeof form, value: string) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -206,6 +208,7 @@ const AnalyticsReportingSetup = () => {
 
       // Connect to SSE for real-time updates
       connectSSE(token, data.requestId);
+      fetchHistory(); // Refresh history table
     } catch (error) {
       toast({
         title: "Error",
@@ -238,6 +241,7 @@ const AnalyticsReportingSetup = () => {
             });
             eventSource.close();
             setIsGenerating(false);
+            fetchHistory(); // Refresh history table
           } else if (data.data.status === "failed") {
             toast({
               title: "Report failed",
@@ -246,6 +250,7 @@ const AnalyticsReportingSetup = () => {
             });
             eventSource.close();
             setIsGenerating(false);
+            fetchHistory(); // Refresh history table
           }
         }
       } catch (err) {
@@ -257,6 +262,35 @@ const AnalyticsReportingSetup = () => {
       eventSource.close();
     };
   };
+
+  const fetchHistory = async () => {
+    const token = localStorage.getItem("authToken");
+    if (!token) return;
+
+    setIsLoadingHistory(true);
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL || "http://localhost:3002"}/api/audit/n8n/history`,
+        {
+          headers: {
+            "Authorization": `Bearer ${token}`
+          }
+        }
+      );
+      if (response.ok) {
+        const data = await response.json();
+        setReportHistory(data.history || []);
+      }
+    } catch (error) {
+      console.error("Error fetching history:", error);
+    } finally {
+      setIsLoadingHistory(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchHistory();
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -443,6 +477,119 @@ const AnalyticsReportingSetup = () => {
               )}
             </div>
           )}
+        </section>
+
+        {/* History Table */}
+        <section className="max-w-6xl mx-auto space-y-8">
+          <div className="flex items-center justify-between">
+            <div className="space-y-1">
+              <h2 className="text-3xl font-light tracking-tight">Recent Reports</h2>
+              <p className="text-sm font-light text-neutral-500">
+                A history of your generated analytics reports and presentations.
+              </p>
+            </div>
+            <button
+              onClick={fetchHistory}
+              className="p-2 hover:bg-neutral-100 rounded-full transition-colors"
+              title="Refresh history"
+            >
+              <Layers className={cn("h-5 w-5", isLoadingHistory && "animate-spin")} />
+            </button>
+          </div>
+
+          <div className="bg-white/80 backdrop-blur-xl rounded-[32px] border border-neutral-200 overflow-hidden shadow-xl">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-neutral-100 text-sm font-light text-neutral-500 bg-neutral-50/50">
+                    <th className="px-8 py-5 font-light">Report Name</th>
+                    <th className="px-8 py-5 font-light">Domain</th>
+                    <th className="px-8 py-5 font-light">Month</th>
+                    <th className="px-8 py-5 font-light">Status</th>
+                    <th className="px-8 py-5 font-light">Date Generated</th>
+                    <th className="px-8 py-5 font-light text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-neutral-50">
+                  {reportHistory.length > 0 ? (
+                    reportHistory.map((report) => (
+                      <tr key={report.id} className="group hover:bg-neutral-50/50 transition-colors">
+                        <td className="px-8 py-5">
+                          <div className="text-sm font-medium text-neutral-900">
+                            {report.payload?.name || "Unnamed Report"}
+                          </div>
+                        </td>
+                        <td className="px-8 py-5">
+                          <div className="text-sm font-light text-neutral-500 flex items-center gap-2">
+                            <Globe className="h-3 w-3" />
+                            {report.domainUrl}
+                          </div>
+                        </td>
+                        <td className="px-8 py-5">
+                          <div className="text-sm font-light text-neutral-500">
+                            {report.payload?.['Report Month'] || "N/A"}
+                          </div>
+                        </td>
+                        <td className="px-8 py-5">
+                          <div className={cn(
+                            "inline-flex px-3 py-1 rounded-full text-[10px] uppercase tracking-wider font-light",
+                            report.status === "completed" && "bg-green-50 text-green-700 border border-green-100",
+                            report.status === "processing" && "bg-blue-50 text-blue-700 border border-blue-100",
+                            report.status === "failed" && "bg-red-50 text-red-700 border border-red-100"
+                          )}>
+                            {report.status}
+                          </div>
+                        </td>
+                        <td className="px-8 py-5 text-sm font-light text-neutral-400">
+                          {new Date(report.createdAt).toLocaleDateString()}
+                        </td>
+                        <td className="px-8 py-5 text-right">
+                          <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            {report.results?.googleSheetsUrl && (
+                              <a
+                                href={report.results.googleSheetsUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="p-2 hover:bg-green-50 rounded-lg text-green-700 transition"
+                                title="Google Sheets"
+                              >
+                                <FileText className="h-4 w-4" />
+                              </a>
+                            )}
+                            {report.results?.googleSlidesUrl && (
+                              <a
+                                href={report.results.googleSlidesUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="p-2 hover:bg-blue-50 rounded-lg text-blue-700 transition"
+                                title="Google Slides"
+                              >
+                                <FileText className="h-4 w-4" />
+                              </a>
+                            )}
+                          </div>
+                          {/* Fallback for mobile or non-hover devices */}
+                          <div className="flex items-center justify-end gap-1 md:hidden">
+                             {report.results?.googleSheetsUrl && <div className="w-1 h-1 rounded-full bg-green-500" />}
+                             {report.results?.googleSlidesUrl && <div className="w-1 h-1 rounded-full bg-blue-500" />}
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={6} className="px-8 py-16 text-center">
+                        <div className="flex flex-col items-center gap-3 text-neutral-400">
+                          <Database className="h-10 w-10 opacity-20" />
+                          <p className="text-sm font-light">No reports generated yet.</p>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </section>
       </div>
     </div>

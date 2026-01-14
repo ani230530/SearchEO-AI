@@ -310,4 +310,59 @@ router.get('/status/:requestId', authenticateToken, async (req: Request, res: Re
     }
 });
 
+// GET /api/audit/n8n/history - Get history of all n8n requests for the user
+router.get('/history', authenticateToken, async (req: Request, res: Response) => {
+    const authReq = req as AuthenticatedRequest;
+    const userId = authReq.user.userId;
+
+    try {
+        const n8nRequests = await prisma.n8nRequest.findMany({
+            where: {
+                auditResult: {
+                    domain: {
+                        userId: userId
+                    }
+                }
+            },
+            include: {
+                auditResult: {
+                    include: {
+                        domain: {
+                            select: {
+                                url: true,
+                            }
+                        }
+                    }
+                }
+            },
+            orderBy: {
+                createdAt: 'desc'
+            },
+            take: 50
+        });
+
+        // Simple mapping to make it cleaner for frontend
+        const history = n8nRequests.map((req: any) => ({
+            id: req.id,
+            requestId: req.requestId,
+            status: req.status,
+            createdAt: req.createdAt,
+            payload: req.requestPayload,
+            results: req.responseData,
+            domainUrl: req.auditResult?.domain?.url
+        }));
+
+        return res.json({
+            success: true,
+            history
+        });
+    } catch (error) {
+        console.error('Error fetching n8n history:', error);
+        return res.status(500).json({
+            success: false,
+            error: 'Failed to fetch history'
+        });
+    }
+});
+
 export default router;
