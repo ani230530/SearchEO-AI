@@ -536,7 +536,8 @@ const handleRunAudit = async (url?: string) => {
 
     const data = await resp.json();
     if (data.success) {
-      setAuditData(data.audit);
+      setAuditResult(data.normalized);
+      // setAuditData(data.audit);
       setAuditComplete(true);
       setShowAuditModal(true);
       setTimeout(() => setAuditComplete(false), 3500);
@@ -4556,31 +4557,6 @@ useEffect(() => {
                           "Start Audit"
                         )}
                       </button>
-                      
-                      {auditResult && (
-                        <button
-                          onClick={handleSendToN8n}
-                          disabled={n8nSending || !auditResult}
-                          className={cn(
-                            "h-12 px-8 rounded-full font-light transition-all duration-200 flex items-center justify-center gap-2",
-                            "bg-white border border-gray-200 text-gray-900 hover:bg-gray-50 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed",
-                            n8nSending && "cursor-not-allowed"
-                          )}
-                          style={{ letterSpacing: '-0.022em', borderWidth: '0.5px' }}
-                        >
-                          {n8nSending ? (
-                            <>
-                              <Loader2 className="h-5 w-5 animate-spin" />
-                              <span>Sending…</span>
-                            </>
-                          ) : (
-                            <>
-                              <Send className="h-5 w-5" />
-                              <span>Send to N8n</span>
-                            </>
-                          )}
-                        </button>
-                      )}
                     </div>
                   </div>
 

@@ -88,8 +88,7 @@ const Field = ({
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
           className={cn(
-            "h-12 w-full rounded-full border border-neutral-200 bg-white/70 backdrop-blur",
-            "focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent",
+            "h-12 w-full rounded-full border border-neutral-200 bg-white/70 ",
             "transition-all duration-200",
             icon ? "pl-12 pr-6" : "px-6"
           )}
