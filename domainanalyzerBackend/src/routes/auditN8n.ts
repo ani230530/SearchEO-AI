@@ -71,13 +71,13 @@ router.post('/send', authenticateToken, async (req: Request, res: Response) => {
 
         // Prepare the payload for n8n
         const n8nPayload = {
-            name: name || formattedUrl, // User provided name or formatted domain
+            name: name, // User provided name or formatted domain
             'Report Month': getReportMonth(reportMonth),
             'proposal template': '1queNsZi99R15QaCalavH8TqqvaeGPp1wC8Tqwn7AkhI',
-            'analytics property': analyticsProperty || formattedUrl,
+            'analytics property': analyticsProperty,
             'sheets template': '1qucJJTUMUCHN0k1yQDTBr6HKF7u0HPMC4NkVJy6kIT0',
             URL: formattedUrl,
-            'Org Name': orgName || formattedUrl,
+            'Org Name': orgName,
         };
 
         // Create n8n request record in database
@@ -177,7 +177,7 @@ router.post('/send', authenticateToken, async (req: Request, res: Response) => {
 router.post('/callback', async (req: Request, res: Response) => {
     try {
         const { id, googleSheetsUrl, googleSlidesUrl, ...otherData } = req.body;
-
+        console.log(req.body);
         if (!id) {
             return res.status(400).json({
                 success: false,
