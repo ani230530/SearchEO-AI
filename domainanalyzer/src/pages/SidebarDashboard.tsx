@@ -36,6 +36,7 @@ import {
 
   OverallScoreGauge,
 } from '@/components/audit/AuditCharts';
+import { motion, AnimatePresence } from "framer-motion";
 import { PDFDownloadLink } from '@react-pdf/renderer';
 import { AuditPDF } from '@/components/audit/AuditPDF';
 
@@ -388,6 +389,7 @@ const [featuredImage, setFeaturedImage] = useState("");
 const [publishLoading, setPublishLoading] = useState(false);
 const [publishSuccess, setPublishSuccess] = useState(false);
 const [publishError, setPublishError] = useState("");
+const [openSections, setOpenSections] = useState<number[]>([]);
 
 
   useEffect(() => {
@@ -2797,76 +2799,105 @@ useEffect(() => {
                               content: (contentMap[key] || []).join("\n").trim(),
                             };
                           });
-                          if (sections.some((s) => s.content.length > 0)) {
-                            return (
-                              <div className="relative">
-                                {companyCurrentIndex > 0 && (
-                                  <div className="absolute left-0 top-1/2 -translate-y-1/2 z-10">
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        const el = companyCarouselRef.current;
-                                        if (el) {
-                                          const w = el.clientWidth;
-                                          el.scrollBy({ left: -w, behavior: "smooth" });
-                                        }
-                                      }}
-                                      className="px-3 py-2 rounded-full bg-white/70 hover:bg-white border border-gray-200 shadow-sm text-gray-700"
-                                      aria-label="Previous"
-                                    >
-                                      ←
-                                    </button>
-                                  </div>
-                                )}
-                                {companyCurrentIndex < companySectionsCount - 1 && (
-                                  <div className="absolute right-0 top-1/2 -translate-y-1/2 z-10">
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        const el = companyCarouselRef.current;
-                                        if (el) {
-                                          const w = el.clientWidth;
-                                          el.scrollBy({ left: w, behavior: "smooth" });
-                                        }
-                                      }}
-                                      className="px-3 py-2 rounded-full bg-white/70 hover:bg-white border border-gray-200 shadow-sm text-gray-700"
-                                      aria-label="Next"
-                                    >
-                                      →
-                                    </button>
-                                  </div>
-                                )}
-                                <div
-                                  className="mx-auto w-full max-w-[900px] px-6"
-                                >
-                                  <div
-                                    ref={setCompanyCarouselRef}
-                                    className="flex gap-0 overflow-x-hidden snap-x snap-mandatory scroll-smooth pb-2"
-                                  >
-                                    {sections.map((sec, idx) => (
-                                      <div
-                                        key={sec.title}
-                                        className="min-w-full snap-start rounded-3xl border border-gray-100 bg-white p-8 shadow-sm"
-                                      >
-                                        <h3 className="text-xl sm:text-2xl font-light tracking-tight text-gray-900 mb-4 text-center">
-                                          {sec.title}
-                                        </h3>
-                                        <div className="prose prose-sm prose-gray max-w-none">
-                                          {sec.content ? (
-                                            <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                                              {sec.content}
-                                            </ReactMarkdown>
-                                          ) : (
-                                            <p className="text-gray-500 text-sm text-center">No content</p>
-                                          )}
-                                        </div>
-                                      </div>
-                                    ))}
-                                  </div>
-                                </div>
-                              </div>
-                            );
-                          }
+                       if (sections.some((s) => s.content.length > 0)) {
+  return (
+    <div className="mx-auto w-full px-4">
+      {/* Master Panel */}
+      <div className="rounded-[3.5rem] border border-gray-200/60 bg-gradient-to-br from-white/80 to-white/40 backdrop-blur-xl shadow-2xl shadow-gray-900/5">
+        
+        {/* Header */}
+        <div className="flex items-center justify-between px-8 py-6 border-b border-gray-200/50">
+          <div>
+            <h2 className="text-2xl font-light tracking-tight text-gray-900">
+              Company Info
+            </h2>
+            <p className="text-sm text-gray-500 mt-1">
+              AI-generated strategic analysis & recommendations
+            </p>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <span className="rounded-full bg-blue-50 px-4 py-1 text-xs font-medium text-blue-600 border border-blue-200">
+              Analysis
+            </span>
+          </div>
+        </div>
+
+        {/* Body */}
+        <div className="px-8 py-8 space-y-5">
+          {sections.map((sec, idx) => {
+            const isOpen = openSections.includes(idx);
+            const toggleSection = (idx: number) => {
+              setOpenSections((prev) =>
+                prev.includes(idx)
+                  ? prev.filter((i) => i !== idx)
+                  : [...prev, idx]
+              );
+            };
+            return (
+              <motion.div
+                key={sec.title}
+                layout
+                className={`
+                  group rounded-2xl border transition-all duration-300
+                  ${
+                    isOpen
+                      ? "border-blue-400/40 bg-white shadow-lg shadow-blue-500/10"
+                      : "border-gray-200 bg-white/80 hover:border-blue-300"
+                  }
+                `}
+              >
+                {/* Section Header */}
+                <button
+                  onClick={() => toggleSection(idx)}
+                  className="flex w-full items-center justify-between px-6 py-4 text-left"
+                >
+                  <div>
+                    <h3 className="text-lg font-light tracking-tight text-gray-900">
+                      {sec.title}
+                    </h3>
+                    {/* <p className="text-xs text-gray-500">
+                      Strategic analysis & recommendations
+                    </p> */}
+                  </div>
+
+                  <motion.div
+                    animate={{ rotate: isOpen ? 180 : 0 }}
+                    transition={{ duration: 0.3 }}
+                    className="text-gray-400"
+                  >
+                    <ChevronDown size={20} />
+                  </motion.div>
+                </button>
+
+                {/* Section Content */}
+                <AnimatePresence initial={false}>
+                  {isOpen && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: "auto", opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.3 }}
+                      className="overflow-hidden"
+                    >
+                      <div className="px-6 pb-6 pt-2">
+                        <div className="prose prose-sm prose-gray max-w-none">
+                          <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                            {sec.content}
+                          </ReactMarkdown>
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </motion.div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
                           return (
                             <div
                               className="relative bg-white rounded-3xl p-8 sm:p-12 border border-gray-100 shadow-sm prose prose-lg prose-gray max-w-none mx-auto
@@ -4557,6 +4588,13 @@ useEffect(() => {
                           "Start Audit"
                         )}
                       </button>
+                       <PDFDownloadLink
+                            document={<AuditPDF data={auditResult} domain={companyDomain} />}
+                            fileName={`audit-${companyDomain}-${new Date().toISOString().split('T')[0]}.pdf`}
+                            className="px-4 py-2 rounded-full border border-gray-200 text-sm font-light bg-white hover:bg-gray-50 flex items-center justify-center"
+                          >
+                            {({ loading }) => (loading ? 'Preparing...' : 'Export PDF')}
+                          </PDFDownloadLink>
                     </div>
                   </div>
 
