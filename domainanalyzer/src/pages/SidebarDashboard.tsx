@@ -25,6 +25,7 @@ import {
   Grid3X3
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/contexts/AuthContext';
 import { ButtonSpinner } from '@/components/ui/ButtonSpinner';
 import { CampaignTopicSidebar } from '@/features/campaign/CampaignTopicSidebar';
 import { CampaignTopicDetail } from '@/features/campaign/CampaignTopicDetail';
