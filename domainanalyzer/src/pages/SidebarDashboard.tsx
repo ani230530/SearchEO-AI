@@ -5438,6 +5438,25 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
           return updated;
         });
 
+        // Hydrate streaming messages history if available
+        if (data.messages && Array.isArray(data.messages) && data.messages.length > 0) {
+            setStreamingMessages(prev => {
+                const updated = new Map(prev);
+                // Only update if we don't have messages or backend has more
+                const current = updated.get(jobId) || [];
+                if (data.messages.length > current.length) {
+                    updated.set(jobId, data.messages);
+                }
+                return updated;
+            });
+            // Also update timestamp to keep drawer open/active if needed
+            setLastStreamingTimestamp(prev => {
+                const updated = new Map(prev);
+                updated.set(jobId, Date.now());
+                return updated;
+            });
+        }
+
         // Update generationJobs with backend status for each page
         if (data.pages && Array.isArray(data.pages)) {
           setGenerationJobs(prev => {
