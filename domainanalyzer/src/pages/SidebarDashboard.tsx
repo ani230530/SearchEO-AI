@@ -22,6 +22,12 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion"
 import PublishExperience from '@/features/publish/PublishExperience';
 import { CompanyInfoSkeleton } from '@/components/dashboard/CompanyInfoSkeleton';
 import { KeywordTableItem } from '@/types/keywords';
@@ -2790,71 +2796,27 @@ useEffect(() => {
                           });
                           if (sections.some((s) => s.content.length > 0)) {
                             return (
-                              <div className="relative">
-                                {companyCurrentIndex > 0 && (
-                                  <div className="absolute left-0 top-1/2 -translate-y-1/2 z-10">
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        const el = companyCarouselRef.current;
-                                        if (el) {
-                                          const w = el.clientWidth;
-                                          el.scrollBy({ left: -w, behavior: "smooth" });
-                                        }
-                                      }}
-                                      className="px-3 py-2 rounded-full bg-white/70 hover:bg-white border border-gray-200 shadow-sm text-gray-700"
-                                      aria-label="Previous"
-                                    >
-                                      ←
-                                    </button>
-                                  </div>
-                                )}
-                                {companyCurrentIndex < companySectionsCount - 1 && (
-                                  <div className="absolute right-0 top-1/2 -translate-y-1/2 z-10">
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        const el = companyCarouselRef.current;
-                                        if (el) {
-                                          const w = el.clientWidth;
-                                          el.scrollBy({ left: w, behavior: "smooth" });
-                                        }
-                                      }}
-                                      className="px-3 py-2 rounded-full bg-white/70 hover:bg-white border border-gray-200 shadow-sm text-gray-700"
-                                      aria-label="Next"
-                                    >
-                                      →
-                                    </button>
-                                  </div>
-                                )}
-                                <div
-                                  className="mx-auto w-full max-w-[900px] px-6"
-                                >
-                                  <div
-                                    ref={setCompanyCarouselRef}
-                                    className="flex gap-0 overflow-x-hidden snap-x snap-mandatory scroll-smooth pb-2"
-                                  >
-                                    {sections.map((sec, idx) => (
-                                      <div
-                                        key={sec.title}
-                                        className="min-w-full snap-start rounded-3xl border border-gray-100 bg-white p-8 shadow-sm"
-                                      >
-                                        <h3 className="text-xl sm:text-2xl font-light tracking-tight text-gray-900 mb-4 text-center">
-                                          {sec.title}
-                                        </h3>
+                              <div className="w-full max-w-[900px] mx-auto bg-white rounded-3xl p-8 border border-gray-100 shadow-sm">
+                                <Accordion type="single" collapsible className="w-full">
+                                  {sections.map((sec, idx) => (
+                                    <AccordionItem key={sec.title} value={`item-${idx}`} className="border-b-gray-100 last:border-0">
+                                      <AccordionTrigger className="text-left text-lg font-medium text-gray-900 hover:text-gray-700 py-4">
+                                        {sec.title}
+                                      </AccordionTrigger>
+                                      <AccordionContent className="text-gray-600 leading-relaxed pb-4">
                                         <div className="prose prose-sm prose-gray max-w-none">
                                           {sec.content ? (
                                             <ReactMarkdown remarkPlugins={[remarkGfm]}>
                                               {sec.content}
                                             </ReactMarkdown>
                                           ) : (
-                                            <p className="text-gray-500 text-sm text-center">No content</p>
+                                            <p className="text-gray-500 text-sm">No content</p>
                                           )}
                                         </div>
-                                      </div>
-                                    ))}
-                                  </div>
-                                </div>
+                                      </AccordionContent>
+                                    </AccordionItem>
+                                  ))}
+                                </Accordion>
                               </div>
                             );
                           }
