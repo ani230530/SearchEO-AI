@@ -5925,6 +5925,9 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
 
   // Stable check for topic generation status - prevents flickering
   const isTopicGenerating = useCallback((topic: Topic) => {
+    // 0. Check explicit loading state first (prevents jitter)
+    if (generateTopicLoading === topic.id) return true;
+
     const pageIds = [
       topic.pillarPage?.id,
       ...(topic.subPages || []).map((sp) => sp.id),
@@ -5948,6 +5951,13 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
         if (backendStatus?.status === 'generating' || backendStatus?.status === 'pending') {
           return true;
         }
+        return true; // Fallback: if in generationJobs map and no HTML, assume generating
+      }
+      
+      // If no jobId but in map and no HTML, assume initial generating state
+      return true; 
+    });
+  }, [generationJobs, backendJobStatus, generateTopicLoading, isGenerationActive]);
       }
       
       // Check job status (but prefer streaming/backend status)
@@ -6197,7 +6207,9 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
       });
       return;
     }
+    }
     setGenerateTopicLoading(topic.id);
+    console.log(`[Campaign] Starting generation for topic ${topic.id}: ${topic.title}`);
     try {
       // Helper function to get primary and longtail keywords from a page's keywords
       const getKeywordSelections = (pageKeywords: Array<{ id: number; term: string; aiMetadata?: any }>) => {
