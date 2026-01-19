@@ -744,7 +744,13 @@ router.delete('/topics/:topicId', authenticateToken, asyncHandler(async (req: Re
     return res.status(404).json({ success: false, error: 'Topic not found' });
   }
 
-  await prisma.campaignTopic.delete({ where: { id: topicId } });
+  await prisma.$transaction(async (tx) => {
+    // Manually delete related GenerationJobs first due to missing Cascade on schema
+    await tx.generationJob.deleteMany({
+      where: { topicId }
+    });
+    await tx.campaignTopic.delete({ where: { id: topicId } });
+  });
   return respondWithStructure(res, topic.campaignId, userId);
 }));
 
