@@ -27,7 +27,8 @@ import {
   ChevronDown,
   Check,
   FileText,
-  X
+  X,
+  LogOut
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
