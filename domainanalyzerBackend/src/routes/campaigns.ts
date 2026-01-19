@@ -10,6 +10,7 @@ import {
 import axios from 'axios';
 import { decryptToken } from '../services/tokenEncryption';
 import { authService } from '../services/authService';
+import { saveStreamingMessage, getStreamingMessages } from '../services/streamingService';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -2345,6 +2346,11 @@ router.post('/streaming-webhook', asyncHandler(async (req: Request, res: Respons
       return resp?.jobId === job_id;
     });
 
+    // 1. Persist the message for reliability (page reloads)
+    // We save it even if we can't find the user immediately, so history is preserved
+    const timestamp = new Date().toISOString();
+    await saveStreamingMessage(job_id, message, timestamp);
+
     if (!matchingDraft) {
       console.warn(`[streaming-webhook] No draft found with job_id: ${job_id}`);
       // Return 200 to avoid n8n retries, but log the issue
@@ -2361,7 +2367,7 @@ router.post('/streaming-webhook', asyncHandler(async (req: Request, res: Respons
       type: 'streaming',
       jobId: job_id,
       message: message,
-      timestamp: new Date().toISOString()
+      timestamp
     });
 
     console.log(`[streaming-webhook] ✅ Broadcasted progress update to user ${userId} for job ${job_id}`);
