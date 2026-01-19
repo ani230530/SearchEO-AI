@@ -879,5 +879,77 @@ router.get(
   })
 );
 
+// Webhook for async publish completion (n8n calls this when done)
+router.post(
+  '/publish-webhook',
+  asyncHandler(async (req: Request, res: Response) => {
+    const { draftId, link, wordpressUrl, error, response } = req.body;
+
+    if (!draftId) {
+      return res.status(400).json({ success: false, error: 'draftId is required' });
+    }
+
+    const draft = await prisma.wordpressPublishLog.findUnique({
+      where: { id: Number(draftId) }
+    });
+
+    if (!draft) {
+      return res.status(404).json({ success: false, error: 'Draft not found' });
+    }
+
+    // Determine success or failure
+    const finalUrl = link || wordpressUrl || (response && (response.link || response.wordpressUrl));
+
+    if (error || !finalUrl) {
+      // Handle Failure
+      await prisma.wordpressPublishLog.update({
+        where: { id: Number(draftId) },
+        data: {
+          status: 'draft',
+          response: { error: error || 'Async publish failed (no link returned)' },
+        }
+      });
+
+      // Broadcast Failure
+      const { broadcastToUser } = await import('../services/sseService');
+      broadcastToUser(draft.userId, {
+        type: 'publish_update',
+        draftId: Number(draftId),
+        status: 'failed',
+        error: error || 'Async publish returned no link'
+      });
+
+      return res.json({ success: true, status: 'marked_failed' });
+    }
+
+    // Handle Success
+    await prisma.$transaction([
+      prisma.wordpressPublishLog.update({
+        where: { id: Number(draftId) },
+        data: {
+          status: 'published',
+          wordpressUrl: finalUrl,
+          response: response || { link: finalUrl },
+        }
+      }),
+      ...(draft.integrationId ? [prisma.wordpressIntegration.update({
+        where: { id: draft.integrationId },
+        data: { lastPublishedAt: new Date() }
+      })] : [])
+    ]);
+
+    // Broadcast Success
+    const { broadcastToUser } = await import('../services/sseService');
+    broadcastToUser(draft.userId, {
+      type: 'publish_update',
+      draftId: Number(draftId),
+      status: 'published',
+      publishedUrl: finalUrl
+    });
+
+    res.json({ success: true, status: 'published' });
+  })
+);
+
 export default router;
 
