@@ -1459,8 +1459,26 @@ router.delete('/:id', authenticateToken, asyncHandler(async (req: Request, res: 
     });
   }
 
-  await prisma.campaign.delete({
-    where: { id: campaignId }
+  await prisma.$transaction(async (tx) => {
+    // 1. Find all topics to get their IDs so we can clean up jobs
+    const topics = await tx.campaignTopic.findMany({
+      where: { campaignId },
+      select: { id: true }
+    });
+    const topicIds = topics.map(t => t.id);
+
+    if (topicIds.length > 0) {
+      // 2. Delete all GenerationJobs for these topics
+      // (This is required because GenerationJob -> CampaignTopic is not cascade delete)
+      await tx.generationJob.deleteMany({
+        where: { topicId: { in: topicIds } }
+      });
+    }
+
+    // 3. Delete the campaign (this will cascade to topics/pages/keywords)
+    await tx.campaign.delete({
+      where: { id: campaignId }
+    });
   });
 
   res.json({
