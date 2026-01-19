@@ -17,13 +17,43 @@ const prisma = new PrismaClient();
 // Helper to compute aggregate job status
 // Job stays 'generating' until ALL pages are completed
 // Only mark as 'failed' if truly failed (not just incomplete)
-const computeJobStatus = (pages: { status: string }[]) => {
+// ZOMBIE CHECK: If a page has been 'generating' for > 15 mins, consider it stuck/failed
+const computeJobStatus = (pages: { status: string; updatedAt: Date }[]) => {
   if (pages.length === 0) return 'pending';
+
+  const now = new Date();
+  const STALE_THRESHOLD_MS = 15 * 60 * 1000; // 15 minutes
+
+  // Check for active generation
+  const isGenerating = pages.some(p => {
+    if (p.status === 'generating' || p.status === 'pending') {
+      const timeSinceUpdate = now.getTime() - new Date(p.updatedAt).getTime();
+      // If it's been generating for < 15 mins, it's still active. 
+      // If > 15 mins, we ignore it here (it will fall through to failed check or completed)
+      return timeSinceUpdate < STALE_THRESHOLD_MS;
+    }
+    return false;
+  });
+
+  if (isGenerating) return 'generating';
+
+  // If we are here, there are no *active* generating pages.
+  // We check if everything is completed.
   if (pages.every(p => p.status === 'completed')) return 'completed';
-  if (pages.some(p => p.status === 'failed')) return 'failed';
-  // If any page is generating or pending, job is still generating
-  if (pages.some(p => p.status === 'generating' || p.status === 'pending')) return 'generating';
-  return 'pending';
+
+  // If there are failed pages OR stale pages (generating > 15m), it's failed
+  const hasFailuresOrStalls = pages.some(p => {
+    if (p.status === 'failed') return true;
+    if (p.status === 'generating' || p.status === 'pending') {
+      const timeSinceUpdate = now.getTime() - new Date(p.updatedAt).getTime();
+      return timeSinceUpdate >= STALE_THRESHOLD_MS;
+    }
+    return false;
+  });
+
+  if (hasFailuresOrStalls) return 'failed';
+
+  return 'completed'; // Fallback
 };
 
 function asyncHandler(fn: (req: Request, res: Response, next: any) => Promise<any>) {
@@ -2397,13 +2427,35 @@ router.get('/topics/:topicId/drafts-status', authenticateToken, asyncHandler(asy
   const latestJob = await prisma.generationJob.findFirst({
     where: { topicId, userId },
     orderBy: { startedAt: 'desc' },
-    include: { pages: true }
+    select: {
+      id: true,
+      jobId: true,
+      status: true,
+      pages: {
+        select: {
+          pageId: true,
+          status: true,
+          progress: true,
+          hasHtml: true,
+          error: true,
+          updatedAt: true,
+          draftId: true,
+          primaryKeyword: true,
+          pageType: true,
+        }
+      }
+    }
   });
 
   if (!latestJob) {
     // No job yet, return pending for all pages
     return res.json({
       success: true,
+      status: {
+        status: 'pending',
+        active: false,
+        progress: 0
+      },
       pages: pageIds.map((pageId) => ({
         pageId,
         pageType: topic.pages.find(p => p.id === pageId)?.pageType || 'pillar',
@@ -2414,9 +2466,16 @@ router.get('/topics/:topicId/drafts-status', authenticateToken, asyncHandler(asy
         progress: 0,
         hasHtml: false,
         updatedAt: null,
-      }))
+        wordpressUrl: null,
+      })),
+      messages: []
     });
   }
+
+  const jobId = latestJob.jobId;
+
+  // Fetch persisted streaming messages
+  const streamingMessages = await getStreamingMessages(jobId);
 
   // Map job pages - use Promise.all for async draft fetching
   const pages = await Promise.all(

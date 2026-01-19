@@ -177,6 +177,11 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
 
       // If this update is for the currently viewed draft, update the UI
       if (currentDraftId && data.draftId === currentDraftId) {
+        // ALWAYS clear loading state on a terminal update
+        if (data.status === 'published' || data.status === 'failed') {
+          setPublishLoading(false);
+        }
+
         if (data.status === 'published' && data.publishedUrl) {
           setPublishResult((prev) => prev ? {
             ...prev,
