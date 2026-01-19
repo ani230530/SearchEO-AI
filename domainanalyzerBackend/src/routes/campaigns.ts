@@ -1043,7 +1043,14 @@ router.delete('/pages/:pageId', authenticateToken, asyncHandler(async (req: Requ
     return res.status(404).json({ success: false, error: 'Page not found' });
   }
 
-  await prisma.campaignPage.delete({ where: { id: pageId } });
+  await prisma.$transaction(async (tx) => {
+    // Cleanup generation job pages that reference this page
+    // (Explicitly doing this to prevent foreign key errors or orphaned data)
+    await tx.generationJobPage.deleteMany({
+      where: { pageId }
+    });
+    await tx.campaignPage.delete({ where: { id: pageId } });
+  });
   return respondWithStructure(res, page.topic.campaignId, userId);
 }));
 
