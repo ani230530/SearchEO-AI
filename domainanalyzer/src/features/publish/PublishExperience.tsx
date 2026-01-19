@@ -1280,6 +1280,10 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
       // SIMPLE: Just use currentHtmlContent - user should save manually before publishing
       const latestHtmlContent = currentHtmlContent;
 
+      // AUTO-SAVE: Ensure DB has latest content before we publish and potentially re-fetch
+      // This prevents stale DB data from overwriting local edits when we fetchDraftFromDb later
+      await saveDraftToDatabase(true);
+
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/publish/publish`, {
         method: 'POST',
         headers: {
@@ -1304,33 +1308,42 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
 
       // Update publishResult with published status and URL
       if (data.status === 'published' && data.publishedUrl) {
+        const publishedUrl = data.publishedUrl;
+        
         setPublishResult((prev) => prev ? {
           ...prev,
-          wordpressUrl: data.publishedUrl,
+          wordpressUrl: publishedUrl,
         } : null);
+        
         toast({
           title: 'Published',
-          description: data.publishedUrl ? `Content published successfully. View it here: ${data.publishedUrl}` : 'Content sent to WordPress',
+          description: `Content published successfully. View it here: ${publishedUrl}`,
         });
-      } else if (data.status === 'failed') {
-        toast({
-          title: 'Publish Failed',
-          description: 'WordPress did not return a valid URL. The publish may have failed.',
-          variant: 'destructive',
-        });
-      } else {
-      toast({
-        title: 'Published',
-        description: 'Content sent to WordPress',
-      });
-      }
 
-      // Refresh draft from DB to get updated status
-      if (currentDraftId) {
-        fetchDraftFromDb(currentDraftId);
+        // IMMMEDIATE UPDATE: Manually update history state so "View Live" appears instantly
+        if (currentDraftId) {
+          setPublishHistory((prev) => prev.map(entry => {
+            if (entry.id === currentDraftId) {
+              return {
+                ...entry,
+                status: 'published',
+                wordpressUrl: publishedUrl,
+                updatedAt: new Date().toISOString()
+              };
+            }
+            return entry;
+          }));
+        }
+        
+        // Also fetch to be sure
+        fetchDraftFromDb(currentDraftId!); // we know currentDraftId exists if we're here
+        fetchPublishHistory();
+        onRefreshWordpressIntegration();
+        
+      } else {
+        // STRICT FAILURE HANDLING: If no URL, treat as failed even if status says published
+        throw new Error('WordPress did not return a valid URL. The publish may have failed.');
       }
-      fetchPublishHistory();
-      onRefreshWordpressIntegration();
     } catch (error) {
       console.error('Error publishing to WordPress:', error);
       toast({
@@ -2131,17 +2144,10 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
                           : 'border-gray-200 bg-white text-gray-900 hover:bg-gray-50'
                       }`}
                     >
-                      {isEditMode ? (
-                        <span className="flex items-center gap-2">
-                          <Eye className="h-4 w-4" />
-                          Preview
-                        </span>
-                      ) : (
-                        <span className="flex items-center gap-2">
-                          <Edit className="h-4 w-4" />
-                          Edit Mode
-                        </span>
-                      )}
+                      <span className="flex items-center gap-2">
+                        {isEditMode ? <Eye className="h-4 w-4" /> : <Edit className="h-4 w-4" />}
+                        {isEditMode ? 'Preview' : 'Edit Mode'}
+                      </span>
                     </button>
                   )}
                   <button
