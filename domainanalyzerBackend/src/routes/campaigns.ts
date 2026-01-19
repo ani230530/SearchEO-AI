@@ -1709,179 +1709,25 @@ router.post('/topics/:topicId/generate-content', authenticateToken, asyncHandler
   const N8N_API_KEY = process.env.N8N_API_KEY || '1234';
   const N8N_API_KEY_HEADER = process.env.N8N_API_KEY_HEADER || 'key';
 
-  // Process webhook asynchronously (fire and forget)
-  // n8n will process this in background and call back via webhook when done
-  // We don't wait for response since it takes ~3min per page (9min for 3 pages)
-  // The connection would timeout, so we handle it as fire-and-forget
-  (async () => {
-    try {
-      // Send request - try to catch response even if timeout occurs
-      // n8n processes for ~9 minutes, so we'll timeout, but we'll also set up
-      // a background job to periodically check if drafts were updated
-      axios.post(PILLAR_WEBHOOK_URL, payload, {
-        headers: {
-          'Content-Type': 'application/json',
-          [N8N_API_KEY_HEADER]: N8N_API_KEY,
-        },
-        timeout: 600000, // 10 minutes - try to wait as long as possible
-        validateStatus: () => true, // Accept any status code
-      }).then((response) => {
-        // Success! n8n returned response (unlikely but possible)
-        console.log(`[n8n request] Received response for job ${jobId}. Status: ${response.status}`);
-        console.log('[n8n request] Response body (truncated)', {
-          jobId,
-          status: response.status,
-          bodyType: Array.isArray(response.data) ? 'array' : typeof response.data,
-          pages: Array.isArray(response.data) ? response.data.length : 1,
-        });
-
-        // Process the response immediately
-        const pages = Array.isArray(response.data) ? response.data : [response.data];
-        processN8nResponse(pages, drafts, jobId);
-      }).catch(async (error: any) => {
-        // Check if response data is available even though we timed out
-        if (error.response?.data) {
-          console.log(`[n8n request] Got response data despite timeout for job ${jobId}`);
-          const pages = Array.isArray(error.response.data) ? error.response.data : [error.response.data];
-          console.log('[n8n request] Timeout body (truncated)', {
-            jobId,
-            pages: pages.length,
-            keys: Object.keys(pages[0] || {}),
-          });
-          await processN8nResponse(pages, drafts, jobId);
-          return;
-        }
-
-        // Timeout/connection reset is EXPECTED for long-running processes
-        const isExpectedError =
-          error.code === 'ECONNRESET' ||
-          error.code === 'ETIMEDOUT' ||
-          error.message?.includes('timeout') ||
-          error.message?.includes('socket hang up') ||
-          error.message?.includes('exceeded');
-
-        if (isExpectedError) {
-          console.log(`[n8n request] Request sent for job ${jobId}. Timeout expected - will check drafts periodically.`);
-
-          // Start background job to check if drafts were updated
-          // This will poll the drafts to see if n8n updated them directly
-          startDraftPolling(jobId, drafts, userId);
-        } else if (error.response?.status && error.response.status >= 400 && error.response.status < 500) {
-          // Client error (4xx) - actual failure
-          console.error(`[n8n request] Request rejected for job ${jobId}: ${error.response.status}`);
-          await Promise.all(drafts.map(draft =>
-            prisma.wordpressPublishLog.update({
-              where: { id: draft.id },
-              data: {
-                status: 'draft',
-                response: {
-                  ...(draft.response as any),
-                  status: 'failed',
-                  error: error.response?.data || 'Request rejected by n8n'
-                }
-              }
-            })
-          ));
-        } else {
-          console.warn(`[n8n request] Unexpected error for job ${jobId}: ${error.message}`);
-        }
-      });
-
-      // Helper function to process n8n response
-      async function processN8nResponse(pages: any[], draftList: any[], jobIdStr: string) {
-        console.log(`[n8n response] Processing ${pages.length} pages for job ${jobIdStr}`);
-
-        for (const page of pages) {
-          const primaryKeyword = page['Primary Keyword'] || page.primaryKeyword || '';
-          const html = page['Html Content'] || page.htmlContent || '';
-
-          if (!primaryKeyword) {
-            console.warn('[n8n response] Page missing primary keyword');
-            continue;
-          }
-
-          // Match by primary keyword and jobId
-          const matchingDraft = draftList.find(d => {
-            const resp = d.response as any;
-            return d.primaryKeyword === primaryKeyword && resp?.jobId === jobIdStr;
-          });
-
-          if (matchingDraft) {
-            const currentResponse = matchingDraft.response as any;
-            await prisma.wordpressPublishLog.update({
-              where: { id: matchingDraft.id },
-              data: {
-                status: 'draft',
-                title: page.Title || page.title || matchingDraft.title,
-                slug: page.slug || page.Slug || null,
-                response: {
-                  ...currentResponse,
-                  htmlContent: html,
-                  title: page.Title || page.title,
-                  metaDescription: page['Meta Description'] || page.metaDescription,
-                  slug: page.slug || page.Slug,
-                  featuredImage: page['Featured Image'] || page.featuredImage,
-                  status: 'completed',
-                  completedAt: new Date().toISOString()
-                }
-              }
-            });
-            console.log(`[n8n response] Updated draft ${matchingDraft.id} for "${primaryKeyword}"`, {
-              jobId: jobIdStr,
-              htmlLength: typeof html === 'string' ? html.length : 0,
-              hasTitle: Boolean(page.Title || page.title),
-              hasMeta: Boolean(page['Meta Description'] || page.metaDescription),
-              hasSlug: Boolean(page.slug || page.Slug),
-            });
-          }
-        }
-      }
-
-      // Background job to periodically check if drafts were updated
-      // (in case n8n updates them through some other mechanism)
-      function startDraftPolling(jobIdStr: string, draftList: any[], userIdNum: number) {
-        let attempts = 0;
-        const maxAttempts = 120; // Check for 30 minutes (120 * 15 seconds)
-
-        const pollInterval = setInterval(async () => {
-          attempts++;
-
-          try {
-            // Check if any drafts have been updated (maybe n8n updated them directly)
-            const updatedDrafts = await prisma.wordpressPublishLog.findMany({
-              where: {
-                id: { in: draftList.map(d => d.id) },
-                userId: userIdNum
-              }
-            });
-
-            // Check if any draft now has htmlContent (means it's completed)
-            const completed = updatedDrafts.some(draft => {
-              const resp = draft.response as any;
-              return resp?.htmlContent || resp?.['Html Content'];
-            });
-
-            if (completed || attempts >= maxAttempts) {
-              clearInterval(pollInterval);
-              if (completed) {
-                console.log(`[draft-polling] Detected completed drafts for job ${jobIdStr}`);
-              }
-            }
-          } catch (error) {
-            console.error(`[draft-polling] Error checking drafts for job ${jobIdStr}:`, error);
-          }
-        }, 15000); // Check every 15 seconds
-      }
-
-      // Don't wait for response - return immediately
-      return;
-      // Note: Response handling is done in the /generation-webhook endpoint
-      // which n8n will call when processing is complete
-    } catch (error: any) {
-      // This catch block should rarely be hit since we're not awaiting
-      console.error(`[n8n request] Unexpected error for job ${jobId}:`, error);
+  // Add to Queue (Job Type: CAMPAIGN_GENERATION)
+  // This will handle retries and persistence across restarts
+  const { addN8nJob, JOB_TYPES } = await import('../services/queueService');
+  await addN8nJob(JOB_TYPES.CAMPAIGN_GENERATION, {
+    url: PILLAR_WEBHOOK_URL,
+    payload,
+    headers: {
+      'Content-Type': 'application/json',
+      [N8N_API_KEY_HEADER]: N8N_API_KEY,
+    },
+    // Timeout 10 mins as per original logic, though we don't expect a response here
+    // since the worker will just fire-and-forget (as per our queueService implementation for this job type)
+    timeout: 600000,
+    meta: {
+      jobId,
+      userId,
+      topicId
     }
-  })();
+  });
 
   res.json({
     success: true,

@@ -33,6 +33,7 @@ import {
 } from '@/types/publish';
 import type { Instance } from 'tippy.js';
 import parse from 'html-react-parser';
+import { usePublishStatus } from '@/hooks/usePublishStatus';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3002';
 
@@ -165,6 +166,40 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
   const [isDirty, setIsDirty] = useState(false);
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
   const [saving, setSaving] = useState(false);
+
+  // Listen for real-time publish updates
+  usePublishStatus({
+    onUpdate: (data) => {
+      // Refresh history to show updated status for everyone
+      if (!initialDraft) {
+        fetchPublishHistory();
+      }
+
+      // If this update is for the currently viewed draft, update the UI
+      if (currentDraftId && data.draftId === currentDraftId) {
+        if (data.status === 'published' && data.publishedUrl) {
+          setPublishResult((prev) => prev ? {
+            ...prev,
+            wordpressUrl: data.publishedUrl,
+          } : null);
+          
+          toast({
+            title: 'Published Successfully',
+            description: `Your content is live! View it here: ${data.publishedUrl}`,
+          });
+
+          // Also refresh integration stats
+          onRefreshWordpressIntegration();
+        } else if (data.status === 'failed') {
+          toast({
+            title: 'Publish Failed',
+            description: data.error || 'An error occurred while publishing',
+            variant: 'destructive',
+          });
+        }
+      }
+    }
+  });
 
   const showPreviewStage = publishStage === 'preview';
 
