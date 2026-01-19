@@ -22,7 +22,12 @@ import {
   Settings,
   User,
   Search,
-  Grid3X3
+  Grid3X3,
+  ChevronLeft,
+  ChevronDown,
+  Check,
+  FileText,
+  X
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
