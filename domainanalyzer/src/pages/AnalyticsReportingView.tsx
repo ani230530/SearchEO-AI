@@ -28,6 +28,9 @@ import {
   DrawerTrigger,
 } from "@/components/ui/drawer";
 import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar as CalendarUI } from "@/components/ui/calendar";
+import { format } from "date-fns";
 
 
 
@@ -359,21 +362,33 @@ const AnalyticsReportingSetup = () => {
         {/* Main Action Trigger */}
         <section className="flex flex-col items-center gap-8 py-10">
           <Drawer open={isDrawerOpen} onOpenChange={setIsDrawerOpen}>
-            <DrawerTrigger asChild>
-              <button
-                className={cn(
-                  "h-20 px-12 rounded-full text-white font-light text-xl flex items-center gap-6 transition-all shadow-2xl hover:scale-105 active:scale-95",
-                  gradients.primary
-                )}
-              >
-                <div className="h-10 w-10 rounded-full bg-white/20 flex items-center justify-center">
-                  <Plus className="h-6 w-6" />
-                </div>
-                Generate New Analytics Report
-                <ChevronRight className="h-6 w-6 opacity-50" />
-              </button>
-            </DrawerTrigger>
-            <DrawerContent className="max-w-4xl mx-auto">
+           <DrawerTrigger asChild>
+  <button
+    className={cn(
+      "group relative h-20 px-14 rounded-full",
+      "text-white font-light text-xl",
+      "flex items-center gap-6",
+      "shadow-2xl transition-all",
+      "hover:scale-105 active:scale-95",
+      "focus:outline-none focus:ring-4 focus:ring-black/20",
+      gradients.primary
+    )}
+  >
+    
+
+    <div className="h-11 w-11 rounded-full bg-white/20 flex items-center justify-center group-hover:bg-white/30 transition">
+      <Plus className="h-6 w-6" />
+    </div>
+
+    <span className="whitespace-nowrap">
+      Generate New Analytics Report
+    </span>
+
+    <ChevronRight className="h-6 w-6 opacity-50 group-hover:translate-x-1 transition" />
+  </button>
+</DrawerTrigger>
+
+            <DrawerContent className="max-w-4xl mx-auto rounded-t-[32px] shadow-2xl">
               <div className="mx-auto w-full max-w-2xl px-6 py-10 space-y-8">
                 <DrawerHeader className="px-0">
                   <DrawerTitle className="text-3xl font-light tracking-tight">Report Configuration</DrawerTitle>
@@ -382,7 +397,8 @@ const AnalyticsReportingSetup = () => {
                   </DrawerDescription>
                 </DrawerHeader>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="bg-white/60 backdrop-blur rounded-2xl p-6 border border-neutral-200">
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <Field
                     label="Report Name"
                     icon={<FileText className="h-4 w-4" />}
@@ -401,14 +417,114 @@ const AnalyticsReportingSetup = () => {
                     onChange={(v) => handleChange("orgName", v)}
                   />
 
-                  <Field
-                    label="Report Month"
-                    icon={<Calendar className="h-4 w-4" />}
-                    type="date"
-                    value={form.reportMonth}
-                    onChange={(v) => handleChange("reportMonth", v)}
-                    required
-                  />
+                 <div className="space-y-2">
+  <label className="flex items-center gap-2 text-sm font-light text-neutral-700">
+    Report Month
+    <span className="text-xs text-neutral-400">(required)</span>
+  </label>
+
+  <Popover>
+    <PopoverTrigger asChild>
+      <button
+        className={cn(
+          "h-12 w-full rounded-full border border-neutral-200",
+          "bg-white/70 px-6 text-left",
+          "flex items-center justify-between",
+          "hover:border-neutral-400 transition",
+          !form.reportMonth && "text-neutral-400"
+        )}
+      >
+        <span>
+          {form.reportMonth
+            ? format(new Date(form.reportMonth), "MMMM yyyy")
+            : "Select report month"}
+        </span>
+        <Calendar className="h-4 w-4 text-neutral-400" />
+      </button>
+    </PopoverTrigger>
+
+    <PopoverContent className="w-auto p-0" align="start">
+   <CalendarUI
+  mode="single"
+ selected={
+  form.reportMonth
+    ? (() => {
+        const [y, m, d] = form.reportMonth.split("-").map(Number);
+        return new Date(y, m - 1, d);
+      })()
+    : undefined
+}
+
+onSelect={(date) => {
+  if (!date) return;
+
+  const localDate = new Date(
+    date.getFullYear(),
+    date.getMonth(),
+    date.getDate()
+  );
+
+  handleChange(
+    "reportMonth",
+    localDate.toLocaleDateString("en-CA")
+  );
+}}
+
+  initialFocus
+  captionLayout="dropdown"
+  fromYear={2000}
+  toYear={new Date().getFullYear() + 1}
+  showOutsideDays
+  fixedWeeks
+  classNames={{
+    /* Header */
+    caption: "flex flex-col gap-2 px-3 pt-3",
+    caption_label: "hidden",
+    caption_dropdowns:
+      "flex justify-center gap-3 border-b pb-3",
+
+    /* Dropdowns */
+    dropdown_month:
+      "w-[130px] rounded-md border border-neutral-200 px-2 py-1 text-sm",
+    dropdown_year:
+      "w-[90px] rounded-md border border-neutral-200 px-2 py-1 text-sm",
+
+    /* Grid */
+    months: "px-3 pb-3",
+    table: "w-full border-collapse",
+
+    head_row: "flex justify-between",
+    head_cell:
+      "w-9 text-xs font-medium text-neutral-500 text-center",
+
+    row: "flex justify-between mt-1",
+
+    cell:
+      "relative w-9 h-9 text-center",
+
+    /* Day buttons */
+    day:
+      "h-9 w-9 rounded-full flex items-center justify-center text-sm transition",
+    day_today:
+      "border border-neutral-300 font-medium",
+    day_selected:
+      "bg-black text-white hover:bg-black focus:bg-black",
+    day_outside:
+      "text-neutral-300 opacity-50",
+    day_disabled:
+      "text-neutral-300 opacity-30",
+  }}
+/>
+
+
+    </PopoverContent>
+  </Popover>
+
+  <p className="text-xs font-light text-neutral-500">
+    Used to calculate month-over-month analytics performance
+  </p>
+</div>
+
 
                   <Field
                     label="GSC Property ID (Optional)"
@@ -449,6 +565,7 @@ const AnalyticsReportingSetup = () => {
                     </button>
                   </DrawerClose>
                 </DrawerFooter>
+                </div>
               </div>
             </DrawerContent>
           </Drawer>

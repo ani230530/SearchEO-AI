@@ -527,7 +527,6 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
   const handleOpenComposeDrawer = useCallback(() => {
     setPublishStage('compose');
     setDrawerStep(1);
-    setPublishDrawerOpen(true);
   }, []);
 
   const handleDrawerNext = () => {
