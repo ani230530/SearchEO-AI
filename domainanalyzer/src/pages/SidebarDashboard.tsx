@@ -5019,7 +5019,7 @@ function CampaignStructureView({
   const [showAddSubPageModal, setShowAddSubPageModal] = useState(false);
   
   // Track draft statuses (published/local drafts)
-  const [draftStatuses, setDraftStatuses] = useState<Map<number, { isPublished: boolean; publishedUrl?: string }>>(new Map());
+  const [draftStatuses, setDraftStatuses] = useState<Map<number, { isPublished: boolean; publishedUrl?: string; draftId?: number }>>(new Map());
 
   const [showAddKeywordModal, setShowAddKeywordModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
