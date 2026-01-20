@@ -4130,6 +4130,7 @@ useEffect(() => {
                       }}
                       viewMode={campaignViewMode}
                       onViewModeChange={setCampaignViewMode}
+                      sidebarOpen={sidebarOpen}
                     />
                   );
               }
@@ -4974,6 +4975,7 @@ interface CampaignStructureViewProps {
   onRefreshWordpressIntegration: () => void;
   viewMode: 'split' | 'graph';
   onViewModeChange: (mode: 'split' | 'graph') => void;
+  sidebarOpen: boolean;
 }
 
 function CampaignStructureView({ 
@@ -4987,7 +4989,8 @@ function CampaignStructureView({
   onConfigureWordpress,
   onRefreshWordpressIntegration,
   viewMode,
-  onViewModeChange
+  onViewModeChange,
+  sidebarOpen
 }: CampaignStructureViewProps) {
   const CAMPAIGN_API_BASE = `${API_BASE_URL}/api/campaigns`;
   // campaignViewMode state lifted to parent
