@@ -28,16 +28,38 @@ import {
   Check,
   FileText,
   X,
-  LogOut
+  LogOut,
+  ChevronUp,
+  ArrowUpDown,
+  Plug,
+  TrendingUp,
+  Menu,
+  Globe
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { maskDomainId } from '@/lib/domainUtils';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { ButtonSpinner } from '@/components/ui/ButtonSpinner';
+import { ButtonSpinner } from '@/components/ui/button-spinner';
 import { CampaignTopicSidebar } from '@/features/campaign/CampaignTopicSidebar';
 import { CampaignTopicDetail } from '@/features/campaign/CampaignTopicDetail';
-import { Topic, CampaignStructure, GenerationPageStatus, DraftStatusRecord, KeywordTableItem } from '@/types';
+import { Topic, CampaignStructure, GenerationPageStatus, DraftStatusRecord, KeywordTableItem, DraftPreview, Keyword } from '@/types';
 import CampaignGraph from '@/components/CampaignGraph';
+import { AuditBarChart, AuditGaugeChart, AuditRadarChart, AuditScoreDistribution, OverallScoreGauge } from '@/components/audit/AuditCharts';
+import { WordpressIntegration } from '@/types/publish';
+import { PDFDownloadLink } from '@react-pdf/renderer';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogTitle } from '@radix-ui/react-alert-dialog';
+import { AuditPDF } from '@/components/audit/AuditPDF';
+import PublishExperience from '@/features/publish/PublishExperience';
+import { CompanyInfoSkeleton } from '@/components/dashboard/CompanyInfoSkeleton';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@radix-ui/react-accordion';
+import AnalyticsReportingView from './AnalyticsReportingView';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import { AlertDialogHeader } from '@/components/ui/alert-dialog';
+import Profile from './Profile';
+import GSCAnalyticsView from '@/components/gsc/GSCAnalyticsView';
+
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3002";
 
@@ -2372,6 +2394,35 @@ useEffect(() => {
                 {tabs.find((t) => t.id === activeTab)?.label || "Dashboard"}
               </h2>
             </div>
+
+            
+            {activeTab === 'campaign' && selectedCampaignId && (
+                <div className="flex items-center gap-2 bg-gray-100/80 p-1 rounded-lg border border-gray-200/50 mr-4">
+                  <button
+                    onClick={() => setCampaignViewMode('split')}
+                    className={`p-1.5 rounded-md transition-all flex items-center gap-2 text-xs font-medium ${
+                      campaignViewMode === 'split' 
+                        ? 'bg-white text-black shadow-sm' 
+                        : 'text-gray-500 hover:text-gray-700'
+                    }`}
+                  >
+                    <List className="h-4 w-4" />
+                    <span>Topics</span>
+                  </button>
+                  <button
+                    onClick={() => setCampaignViewMode('graph')}
+                    className={`p-1.5 rounded-md transition-all flex items-center gap-2 text-xs font-medium ${
+                      campaignViewMode === 'graph' 
+                        ? 'bg-white text-black shadow-sm' 
+                        : 'text-gray-500 hover:text-gray-700'
+                    }`}
+                  >
+                    <Network className="h-4 w-4" />
+                    <span>Map</span>
+                  </button>
+               </div>
+            )}
+
             {user && (
               <div className="flex items-center gap-3">
                 <div
@@ -4023,8 +4074,56 @@ useEffect(() => {
               </div>
             )
           ) : activeTab === "campaign" ? (
-            <div className="max-w-4xl mx-auto px-4 sm:px-6 py-12 sm:py-16">
-              {!selectedCampaignId && (
+            // Campaign Tab Logic - moved logic inside to handle full width for structure view
+            (() => {
+              if (selectedCampaignId) {
+                 const selectedCampaign = campaigns.find(
+                    (c) => c.id === selectedCampaignId
+                  );
+                  if (!selectedCampaign) {
+                    return (
+                      <div className="max-w-4xl mx-auto px-4 sm:px-6 py-12 sm:py-16">
+                        <div className="bg-white rounded-3xl p-8 border border-red-100 text-center text-sm text-red-600">
+                        Selected campaign could not be found. Please go back and
+                        try again.
+                        <div className="mt-4">
+                          <button
+                            onClick={() => setSelectedCampaignId(null)}
+                            className="px-5 py-2 bg-black text-white rounded-full text-sm"
+                          >
+                            Back
+                          </button>
+                        </div>
+                      </div>
+                      </div>
+                    );
+                  }
+                  return (
+                    <CampaignStructureView
+                      campaign={selectedCampaign}
+                      onBack={() => setSelectedCampaignId(null)}
+                      companyDomain={companyDomain}
+                      domainContext={domainContext}
+                      keywordsTableData={keywordsTableData}
+                      hasWordpressIntegration={hasWordpressIntegration}
+                      wpIntegration={wpIntegration}
+                      onConfigureWordpress={handleConfigureWordpress}
+                      onRefreshWordpressIntegration={async () => {
+                        await fetchWordpressIntegration();
+                        if (activeTab === 'campaign') {
+                          await fetchCampaignTabData();
+                        }
+                      }}
+                      viewMode={campaignViewMode}
+                      onViewModeChange={setCampaignViewMode}
+                    />
+                  );
+              }
+
+              // Default Campaign List View (Centered)
+              return (
+              <div className="max-w-4xl mx-auto px-4 sm:px-6 py-12 sm:py-16">
+
                 <>
                   {/* Header */}
                   <div className="flex items-center justify-between mb-8">
@@ -4038,9 +4137,9 @@ useEffect(() => {
                     </div>
                     <button
                       onClick={() => setShowCreateCampaign(!showCreateCampaign)}
-                      className="px-6 py-3 bg-black text-white rounded-full hover:bg-black/90 focus:outline-none focus:ring-4 focus:ring-black/10 transition-all shadow text-base font-medium flex items-center gap-2"
+                      className="h-9 px-4 text-sm bg-black text-white rounded-full hover:bg-neutral-800 transition-all flex items-center gap-2"
                     >
-                      <Plus className="h-5 w-5" />
+                      <Plus className="h-4 w-4" />
                       {showCreateCampaign ? "Cancel" : "New Campaign"}
                     </button>
                   </div>
@@ -4107,7 +4206,6 @@ useEffect(() => {
                     </div>
                   )}
                 </>
-              )}
 
               {/* Campaigns List */}
               {(() => {
@@ -4121,47 +4219,9 @@ useEffect(() => {
                     </div>
                   );
                 }
-
-                if (selectedCampaignId) {
-                  const selectedCampaign = campaigns.find(
-                    (c) => c.id === selectedCampaignId
-                  );
-                  if (!selectedCampaign) {
-                    return (
-                      <div className="bg-white rounded-3xl p-8 border border-red-100 text-center text-sm text-red-600">
-                        Selected campaign could not be found. Please go back and
-                        try again.
-                        <div className="mt-4">
-                          <button
-                            onClick={() => setSelectedCampaignId(null)}
-                            className="px-5 py-2 bg-black text-white rounded-full text-sm"
-                          >
-                            Back
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  }
-                  return (
-                    <CampaignStructureView
-                      campaign={selectedCampaign}
-                      onBack={() => setSelectedCampaignId(null)}
-                      companyDomain={companyDomain}
-                      domainContext={domainContext}
-                      keywordsTableData={keywordsTableData}
-                      hasWordpressIntegration={hasWordpressIntegration}
-                      wpIntegration={wpIntegration}
-                      onConfigureWordpress={handleConfigureWordpress}
-                      onRefreshWordpressIntegration={async () => {
-                        await fetchWordpressIntegration();
-                        if (activeTab === 'campaign') {
-                          await fetchCampaignTabData();
-                        }
-                      }}
-                    />
-                  );
-                }
-
+                
+                // Note: selectedCampaignId case is handled above the container now
+                
                 if (campaigns.length === 0) {
                   return (
                     <div className="bg-white rounded-3xl p-12 border border-gray-100 shadow-sm text-center">
@@ -4272,9 +4332,12 @@ useEffect(() => {
   </div>
 )}
                   </div>
+
                 );
               })()}
             </div>
+            );
+            })()
           ) : activeTab === 'publish' ? (
             companyDomainLoading ? (
               <CompanyInfoSkeleton />
@@ -4289,9 +4352,6 @@ useEffect(() => {
                   onConfigureWordpress={handleConfigureWordpress}
                   onRefreshWordpressIntegration={async () => {
                     await fetchWordpressIntegration();
-                    if (activeTab === 'campaign') {
-                      await fetchCampaignTabData();
-                    }
                   }}
                   isActive={activeTab === 'publish'}
                 />
@@ -4827,18 +4887,6 @@ useEffect(() => {
                 )}
               </div>
             </div>
-          ) : activeTab === 'campaign' ? (
-             <CampaignStructureView 
-                 campaign={campaigns.find(c => c.id === selectedCampaignId) || { id: 0, title: 'Demo Campaign', description: null, createdAt: '', updatedAt: '' }}
-                 onBack={() => setActiveTab('overview')}
-                 companyDomain={companyDomain}
-                 domainContext={domainContext}
-                 keywordsTableData={keywordsTableData}
-                 hasWordpressIntegration={!!wpIntegration}
-                 wpIntegration={wpIntegration}
-                 onConfigureWordpress={() => { setActiveTab('settings'); setActiveCompanySubTab('integration'); }}
-                 onRefreshWordpressIntegration={() => {}}
-             />
           ) : (
             <div style={{
               background: 'rgba(255, 255, 255, 0.8)',
@@ -4910,6 +4958,8 @@ interface CampaignStructureViewProps {
   wpIntegration: WordpressIntegration | null;
   onConfigureWordpress: () => void;
   onRefreshWordpressIntegration: () => void;
+  viewMode: 'split' | 'graph';
+  onViewModeChange: (mode: 'split' | 'graph') => void;
 }
 
 function CampaignStructureView({ 
@@ -4921,10 +4971,12 @@ function CampaignStructureView({
   hasWordpressIntegration,
   wpIntegration,
   onConfigureWordpress,
-  onRefreshWordpressIntegration
+  onRefreshWordpressIntegration,
+  viewMode,
+  onViewModeChange
 }: CampaignStructureViewProps) {
   const CAMPAIGN_API_BASE = `${API_BASE_URL}/api/campaigns`;
-  const [campaignViewMode, setCampaignViewMode] = useState<'split' | 'graph'>('split');
+  // campaignViewMode state lifted to parent
   const [selectedTopicId, setSelectedTopicId] = useState<number | null>(null);
   const [campaignStructure, setCampaignStructure] = useState<CampaignStructure>(
     { topics: [] }
@@ -5210,6 +5262,7 @@ function CampaignStructureView({
           message?: string;
           timestamp?: string;
           pages?: Partial<GenerationPageStatus & { pageType: string; hasHtml?: boolean; error?: string | null }>[];
+          error?: string;
         };
         
         // Handle streaming progress updates
@@ -6066,7 +6119,7 @@ function CampaignStructureView({
       const backendStatus = backendJobStatus.get(jobId);
       
       // Only mark as failed if generation is not active AND backend confirms failed
-      if (status === 'failed' || (status !== 'completed' && !generationActive && backendStatus?.status === 'failed')) {
+      if (status === 'failed' || (!generationActive && backendStatus?.status === 'failed')) {
         status = 'failed';
       } else if (generationActive || backendStatus?.status === 'generating') {
         // Keep as generating if active or backend says generating
@@ -6405,13 +6458,13 @@ function CampaignStructureView({
   );
 };
 
-const handleUpdatePillar = async (topicId: number, title: string) => {
+const handleUpdatePillar = async (topicId: number, updates: { title?: string; referenceUrl?: string }) => {
     try {
       await mutateStructure(
         `${CAMPAIGN_API_BASE}/topics/${topicId}/pillar`,
         {
           method: 'PUT',
-          body: JSON.stringify({ title }),
+          body: JSON.stringify(updates),
         },
         { successMessage: 'Pillar page updated' }
       );
@@ -6561,19 +6614,19 @@ const handleUpdatePillar = async (topicId: number, title: string) => {
     : null;
 
   return (
-    <div className="flex h-screen w-full bg-white overflow-hidden">
+    <div className="flex h-[calc(100vh-4rem)] w-full bg-white overflow-hidden">
       {/* 2. Secondary Sidebar: Topic List */}
-      <div className={`w-80 border-r border-gray-200 bg-white flex-shrink-0 transition-all duration-300 ${campaignViewMode === 'graph' ? 'w-0 opacity-0 overflow-hidden border-none' : ''}`}>
+      <div className={`w-80 border-r border-gray-100 bg-white flex-shrink-0 transition-all duration-300 ${viewMode === 'graph' ? 'w-0 opacity-0 overflow-hidden border-none' : ''}`}>
         <div className="h-full flex flex-col">
           {/* Header */}
-          <div className="h-16 flex items-center px-6 border-b border-gray-100 flex-shrink-0 bg-white z-10">
+          <div className="h-16 flex items-center px-5 border-b border-gray-100 flex-shrink-0 bg-white z-10">
              <button
                 onClick={onBack}
                 className="mr-3 p-1.5 hover:bg-gray-100 rounded-full text-gray-400 hover:text-gray-600 transition-colors"
              >
                <ArrowLeft className="h-4 w-4" />
              </button>
-             <h1 className="font-semibold text-gray-900 truncate" title={campaign.title}>
+             <h1 className="font-medium text-gray-900 truncate text-sm" title={campaign.title}>
                {campaign.title}
              </h1>
           </div>
@@ -6594,53 +6647,11 @@ const handleUpdatePillar = async (topicId: number, title: string) => {
       {/* 3. Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0 bg-gray-50/50 relative">
       
-        {/* Top Bar: View Toggle & Graph Controls */}
-        <header className="h-16 border-b border-gray-200 bg-white flex items-center justify-between px-6 flex-shrink-0 z-20">
-           <div className="flex items-center gap-4">
-              {campaignViewMode === 'graph' && (
-                  <div className="flex items-center gap-3">
-                     <button
-                        onClick={onBack}
-                        className="p-1.5 hover:bg-gray-100 rounded-full text-gray-400 hover:text-gray-600 transition-colors"
-                     >
-                       <ArrowLeft className="h-4 w-4" />
-                     </button>
-                     <h2 className="text-lg font-medium text-gray-900">{campaign.title}</h2>
-                  </div>
-              )}
-           </div>
-
-           <div className="flex items-center gap-2 bg-gray-100/80 p-1 rounded-lg border border-gray-200/50">
-              <button
-                onClick={() => setCampaignViewMode('split')}
-                className={`p-1.5 rounded-md transition-all flex items-center gap-2 text-xs font-medium ${
-                   campaignViewMode === 'split' 
-                     ? 'bg-white text-black shadow-sm' 
-                     : 'text-gray-500 hover:text-gray-700'
-                }`}
-              >
-                <List className="h-4 w-4" />
-                <span>Topics</span>
-              </button>
-              <button
-                onClick={() => setCampaignViewMode('graph')}
-                className={`p-1.5 rounded-md transition-all flex items-center gap-2 text-xs font-medium ${
-                   campaignViewMode === 'graph' 
-                     ? 'bg-white text-black shadow-sm' 
-                     : 'text-gray-500 hover:text-gray-700'
-                }`}
-              >
-                <Network className="h-4 w-4" />
-                <span>Map</span>
-              </button>
-           </div>
-        </header>
-
         {/* Content Body */}
         <div className="flex-1 relative overflow-hidden">
             
             {/* Split View: Detail Pane */}
-            <div className={`absolute inset-0 bg-gray-50/50 transition-opacity duration-300 overflow-y-auto ${campaignViewMode === 'split' ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'}`}>
+            <div className={`absolute inset-0 bg-gray-50/50 transition-opacity duration-300 overflow-y-auto ${viewMode === 'split' ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'}`}>
                <div className="h-full p-8 max-w-5xl mx-auto">
                  {selectedTopic ? (
                    <CampaignTopicDetail
@@ -6683,7 +6694,7 @@ const handleUpdatePillar = async (topicId: number, title: string) => {
             </div>
 
             {/* Graph View: Full Screen */}
-            <div className={`absolute inset-0 bg-white transition-opacity duration-300 ${campaignViewMode === 'graph' ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'}`}>
+            <div className={`absolute inset-0 bg-white transition-opacity duration-300 ${viewMode === 'graph' ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'}`}>
                <div className="w-full h-full">
                 <CampaignGraph
                   campaignStructure={campaignStructure}

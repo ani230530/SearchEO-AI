@@ -1,7 +1,7 @@
 import React from 'react';
 import { Topic, GenerationPageStatus } from '@/types';
 import { Target, FileText, Sparkles, Plus, Trash2, Search } from 'lucide-react';
-import { ButtonSpinner } from '@/components/ui/ButtonSpinner';
+import { ButtonSpinner } from '@/components/ui/button-spinner';
 import { StreamingOverlay } from './StreamingOverlay';
 
 interface CampaignTopicDetailProps {

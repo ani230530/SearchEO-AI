@@ -1,7 +1,7 @@
 import React from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import { Topic, GenerationPageStatus } from '@/types';
-import { ButtonSpinner } from '@/components/ui/ButtonSpinner';
+import { ButtonSpinner } from '@/components/ui/button-spinner';
 
 interface CampaignTopicSidebarProps {
   topics: Topic[];
@@ -25,12 +25,10 @@ export const CampaignTopicSidebar: React.FC<CampaignTopicSidebarProps> = ({
   isTopicGenerating
 }) => {
   return (
-    <div className="flex flex-col h-full bg-white border-r border-gray-100">
-      <div className="p-6 border-b border-gray-100">
-        <h3 className="text-xs uppercase tracking-wider text-gray-500 font-medium">Topics</h3>
-      </div>
-      
-      <div className="flex-1 overflow-y-auto p-4 space-y-2">
+    <div className="flex flex-col h-full bg-white">
+      <div className="flex-1 overflow-y-auto p-3 space-y-1">
+        {topics.length > 0 && <div className="px-3 pt-3 pb-2 text-xs font-medium text-gray-400">Topics</div>}
+        
         {topics.map((topic) => {
           const isSelected = selectedTopicId === topic.id;
           const isGenerating = isTopicGenerating(topic);
@@ -39,22 +37,22 @@ export const CampaignTopicSidebar: React.FC<CampaignTopicSidebarProps> = ({
             <div
               key={topic.id}
               onClick={() => onSelectTopic(topic.id)}
-              className={`group flex items-center justify-between p-3 rounded-xl cursor-pointer transition-all duration-200 border ${
+              className={`group flex items-center justify-between px-3 py-2.5 rounded-lg cursor-pointer transition-all duration-200 ${
                 isSelected
-                  ? 'bg-black text-white border-black shadow-md'
-                  : 'bg-white text-gray-700 border-transparent hover:bg-gray-50 hover:border-gray-200'
+                  ? 'bg-black text-white shadow-sm'
+                  : 'text-gray-600 hover:bg-gray-50'
               }`}
             >
               <div className="flex-1 min-w-0 pr-3">
-                <div className="flex items-center gap-2 mb-0.5">
-                  <h4 className={`font-medium truncate text-sm ${isSelected ? 'text-white' : 'text-gray-900'}`}>
+                <div className="flex items-center gap-2">
+                  <h4 className={`font-medium truncate text-sm leading-tight ${isSelected ? 'text-white' : 'text-gray-900'}`}>
                     {topic.title}
                   </h4>
                   {isGenerating && (
                     <div className="h-1.5 w-1.5 rounded-full bg-blue-500 animate-pulse flex-shrink-0" />
                   )}
                 </div>
-                <p className={`text-xs truncate ${isSelected ? 'text-gray-400' : 'text-gray-500'}`}>
+                <p className={`text-[11px] mt-0.5 truncate ${isSelected ? 'text-gray-400' : 'text-gray-500'}`}>
                   {topic.subPages?.length || 0} sub-pages
                 </p>
               </div>
@@ -64,10 +62,10 @@ export const CampaignTopicSidebar: React.FC<CampaignTopicSidebarProps> = ({
                   e.stopPropagation();
                   onDeleteTopic(topic.id, topic.title);
                 }}
-                className={`opacity-0 group-hover:opacity-100 p-1.5 rounded-full transition-all ${
+                className={`opacity-0 group-hover:opacity-100 p-1 rounded-full transition-all ${
                   isSelected 
                     ? 'hover:bg-white/20 text-white/70 hover:text-white' 
-                    : 'hover:bg-red-50 text-gray-400 hover:text-red-500'
+                    : 'hover:bg-gray-200 text-gray-400 hover:text-red-500'
                 }`}
               >
                 <Trash2 className="h-3.5 w-3.5" />
@@ -85,7 +83,7 @@ export const CampaignTopicSidebar: React.FC<CampaignTopicSidebarProps> = ({
         )}
       </div>
 
-      <div className="p-4 border-t border-gray-100 bg-gray-50/50 space-y-3">
+      <div className="p-4 border-t border-gray-100 bg-white space-y-3">
         <button
           onClick={() => onAddTopic(true)}
           disabled={syncing || aiLoading === "topic"}

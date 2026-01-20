@@ -25,7 +25,7 @@ import PublishHistoryTable from './PublishHistoryTable';
 import Tippy from '@tippyjs/react';
 import 'tippy.js/dist/tippy.css';
 import 'tippy.js/themes/light.css';
-import { KeywordTableItem } from '@/types/keywords';
+import { KeywordTableItem } from '@/types';
 import {
   WordpressIntegration,
   GeneratedArticleContent,
