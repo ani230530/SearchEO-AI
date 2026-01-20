@@ -2155,7 +2155,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
                     disabled={publishLoading || !publishResult}
                     className="px-6 py-2.5 rounded-full bg-black text-white text-sm font-semibold shadow-lg hover:bg-black/90 disabled:opacity-60 transition-colors"
                   >
-                    {publishLoading ? 'Working…' : 'Publish to WordPress'}
+                    {publishLoading ? 'Working…' : (publishResult?.wordpressUrl?.startsWith('http') ? 'Re-publish to WordPress' : 'Publish to WordPress')}
                   </button>
                   <button
                     onClick={handleSaveDraft}

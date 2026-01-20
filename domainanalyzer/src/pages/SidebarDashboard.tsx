@@ -36,7 +36,8 @@ import {
   Menu,
   Globe,
   Eye,
-  ExternalLink
+  ExternalLink,
+  Pencil
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { maskDomainId } from '@/lib/domainUtils';
@@ -6204,26 +6205,21 @@ function CampaignStructureView({
 
     if (job?.hasHtml) {
       return (
-        <div className="flex items-center gap-2">
-           <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-medium bg-green-50 text-green-700 border border-green-100/50">
-             Ready
-           </span>
-           <div className="flex items-center gap-1">
-             <button 
-               onClick={() => viewDraft(job.draftId, pageId)}
-               className="p-1.5 hover:bg-gray-100 text-gray-400 hover:text-gray-700 rounded-full transition-colors"
-               title="Preview"
-             >
-                <Eye className="h-3.5 w-3.5" />
-             </button>
-             <button 
-               onClick={() => publishDraft(job.draftId, pageId)}
-               className="p-1.5 hover:bg-blue-50 text-gray-400 hover:text-blue-600 rounded-full transition-colors"
-               title="Publish"
-             >
-                <Send className="h-3.5 w-3.5" />
-             </button>
-           </div>
+        <div className="flex items-center gap-1.5">
+           <button 
+             onClick={() => viewDraft(job.draftId, pageId)}
+             className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors"
+           >
+              <Eye className="h-3 w-3" />
+              View
+           </button>
+           <button 
+             onClick={() => publishDraft(job.draftId, pageId)}
+             className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-md transition-colors"
+           >
+              <Send className="h-3 w-3" />
+              Publish
+           </button>
         </div>
       );
     }
@@ -6232,17 +6228,25 @@ function CampaignStructureView({
     const draftStatus = draftStatuses.get(pageId);
     if (draftStatus?.isPublished) {
          return (
-            <div className="flex items-center gap-2">
-               <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-medium bg-slate-100 text-slate-600 border border-slate-200/50">
+            <div className="flex items-center gap-1.5">
+               <button 
+                 onClick={() => viewDraft(draftStatus.draftId!, pageId)}
+                 className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors"
+               >
+                  <Pencil className="h-3 w-3" />
+                  Edit
+               </button>
+               <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-green-50 text-green-700 border border-green-100/50">
                  Published
                </span>
                <a 
                  href={draftStatus.publishedUrl} 
                  target="_blank" 
                  rel="noopener noreferrer"
-                 className="p-1.5 hover:bg-gray-100 text-gray-400 hover:text-gray-700 rounded-full transition-colors"
+                 className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors"
                >
-                  <ExternalLink className="h-3.5 w-3.5" />
+                  <ExternalLink className="h-3 w-3" />
+                  View Live
                </a>
             </div>
          );
