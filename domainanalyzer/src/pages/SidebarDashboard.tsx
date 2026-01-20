@@ -7441,7 +7441,7 @@ const handleUpdatePillar = async (topicId: number, updates: { title?: string; re
 
       {/* Preview Overlay - Fills content area beside sidebar */}
       {previewPageId && (
-        <div className="absolute inset-0 z-40 bg-[#f5f6fa] flex flex-col">
+        <div className="fixed inset-0 z-[60] bg-[#f5f6fa] flex flex-col">
           {/* Header with back button */}
           <div className="flex items-center gap-4 px-6 py-4 border-b border-gray-200 bg-white/80 backdrop-blur-sm">
             <button
