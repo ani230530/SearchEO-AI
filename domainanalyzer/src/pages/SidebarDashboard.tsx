@@ -7232,24 +7232,76 @@ const handleUpdatePillar = async (topicId: number, updates: { title?: string; re
 
       </div>
 
-      {/* Generation Config Drawer */}
+      {/* Generation Config Drawer - Matches Publish Tab Style */}
       <Sheet open={generationDrawerOpen} onOpenChange={setGenerationDrawerOpen}>
-        <SheetContent className="w-[400px] sm:w-[540px] overflow-y-auto">
-          <SheetHeader className="mb-6">
-            <SheetTitle>Generate Content</SheetTitle>
-            <SheetDescription>
-              Configure generation options for "{pendingGenerationTopic?.title}".
-            </SheetDescription>
-          </SheetHeader>
+        <SheetContent 
+          side="right" 
+          className="w-full sm:max-w-3xl border-l border-[#e2e4ea] bg-[#f5f6fa] px-10 py-12 overflow-y-auto font-light"
+        >
+          <div className="space-y-10">
+            {/* Header Card */}
+            <div className="rounded-[32px] border border-white/80 bg-white/90 px-6 py-6 shadow-[0_30px_80px_rgba(15,23,42,0.10)] backdrop-blur">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <div className="space-y-3">
+                  <div className="inline-flex items-center gap-2 rounded-full border border-black/10 px-4 py-1 text-[10px] tracking-[0.35em] uppercase text-gray-500">
+                    Content Generation
+                  </div>
+                  <div>
+                    <h3 className="text-[28px] font-light text-gray-900 tracking-tight">
+                      {generateTopicLoading === pendingGenerationTopic?.id ? (
+                        <span className="flex items-center gap-2">
+                          Generating content...
+                          <svg className="h-5 w-5 animate-spin text-gray-400" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4l3-3-3-3v4A8 8 0 104 12z" />
+                          </svg>
+                        </span>
+                      ) : (
+                        `Step ${generationStep} of 3`
+                      )}
+                    </h3>
+                    <p className="text-sm text-gray-500 mt-1">Configure options for "{pendingGenerationTopic?.title}"</p>
+                  </div>
+                </div>
+                <div className="flex flex-col items-end gap-2">
+                  <div className="flex items-center gap-1">
+                    {[1, 2, 3].map((step) => (
+                      <span
+                        key={`progress-${step}`}
+                        className={`h-1.5 w-12 rounded-full transition-all ${
+                          step <= generationStep ? 'bg-black/80' : 'bg-black/10'
+                        }`}
+                      />
+                    ))}
+                  </div>
+                  <p className="text-xs uppercase tracking-[0.3em] text-gray-400">
+                    Generation flow
+                  </p>
+                </div>
+              </div>
+            </div>
 
-          <div className="space-y-8 py-4">
             {/* Step 1: Word Count */}
             {generationStep === 1 && (
-              <div className="space-y-6">
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center">
-                    <Label className="text-base font-medium">Word Count Target</Label>
-                    <span className="text-sm text-gray-500 font-mono bg-gray-100 px-2 py-1 rounded">{generationConfig.wordCount} words</span>
+              <section className="rounded-[36px] border border-white/70 bg-white p-8 shadow-[0_30px_80px_rgba(15,23,42,0.08)] space-y-8">
+                <div className="space-y-2">
+                  <span className="text-[11px] uppercase tracking-[0.35em] text-gray-400">Word cadence</span>
+                  <h4 className="text-2xl font-light text-gray-900">Dial in the depth and pace.</h4>
+                  <p className="text-sm text-gray-500 max-w-2xl">
+                    Glide between quick reads and flagship editorials. Every notch subtly changes paragraph
+                    length, transitions, and how immersive the narration should feel.
+                  </p>
+                </div>
+                <div className="rounded-[28px] border border-gray-100 bg-gray-50/70 p-5 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-semibold text-gray-800">Projected read time</p>
+                      <p className="text-xs text-gray-500">A calm slider tuned for editorial pacing.</p>
+                    </div>
+                    <div className="inline-flex items-baseline gap-2 rounded-full bg-white px-5 py-1.5 shadow-inner">
+                      <span className="text-2xl font-light">{generationConfig.wordCount}</span>
+                      <span className="text-xs uppercase tracking-[0.25em] text-gray-500">words</span>
+                    </div>
                   </div>
                   <Slider
                     value={[generationConfig.wordCount]}
@@ -7259,29 +7311,36 @@ const handleUpdatePillar = async (topicId: number, updates: { title?: string; re
                     onValueChange={(vals) => setGenerationConfig(prev => ({ ...prev, wordCount: vals[0] }))}
                     className="py-4"
                   />
-                  <p className="text-xs text-gray-500">
-                    Determines the approximate length of each article. Longer articles perform better for SEO but take longer to generate.
-                  </p>
                 </div>
-
-                <div className="flex flex-col gap-4 pt-4">
-                   <button 
-                     onClick={() => setGenerationStep(2)}
-                     className="w-full py-2.5 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors font-medium text-sm"
-                   >
-                     Next: Imagery
-                   </button>
-                </div>
-              </div>
+                <button 
+                  onClick={() => setGenerationStep(2)}
+                  className="w-full py-3.5 bg-gray-900 text-white rounded-full hover:bg-gray-800 transition-colors font-medium text-sm"
+                >
+                  Continue to Imagery
+                </button>
+              </section>
             )}
 
             {/* Step 2: Imagery */}
             {generationStep === 2 && (
-              <div className="space-y-6">
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center">
-                    <Label className="text-base font-medium">Images per Article</Label>
-                    <span className="text-sm text-gray-500 font-mono bg-gray-100 px-2 py-1 rounded">{generationConfig.images} images</span>
+              <section className="rounded-[36px] border border-white/70 bg-white p-8 shadow-[0_30px_80px_rgba(15,23,42,0.08)] space-y-8">
+                <div className="space-y-2">
+                  <span className="text-[11px] uppercase tracking-[0.35em] text-gray-400">Visual elements</span>
+                  <h4 className="text-2xl font-light text-gray-900">Set the visual tone.</h4>
+                  <p className="text-sm text-gray-500 max-w-2xl">
+                    Choose how many images to generate and whether to include a featured hero image.
+                  </p>
+                </div>
+                <div className="rounded-[28px] border border-gray-100 bg-gray-50/70 p-5 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-semibold text-gray-800">Images per article</p>
+                      <p className="text-xs text-gray-500">Inline images throughout the content.</p>
+                    </div>
+                    <div className="inline-flex items-baseline gap-2 rounded-full bg-white px-5 py-1.5 shadow-inner">
+                      <span className="text-2xl font-light">{generationConfig.images}</span>
+                      <span className="text-xs uppercase tracking-[0.25em] text-gray-500">images</span>
+                    </div>
                   </div>
                   <Slider
                     value={[generationConfig.images]}
@@ -7292,102 +7351,113 @@ const handleUpdatePillar = async (topicId: number, updates: { title?: string; re
                     className="py-4"
                   />
                 </div>
-
-                <div className="flex items-center justify-between p-4 border border-gray-100 rounded-xl bg-gray-50/50">
+                <div className="flex items-center justify-between p-5 rounded-[28px] border border-gray-100 bg-gray-50/70">
                   <div className="space-y-0.5">
-                    <Label className="text-base">Featured Image</Label>
-                    <p className="text-xs text-gray-500">Generate a high-quality hero image</p>
+                    <p className="text-sm font-semibold text-gray-800">Featured Image</p>
+                    <p className="text-xs text-gray-500">Generate a high-quality hero banner</p>
                   </div>
                   <Switch
                     checked={generationConfig.featuredImage}
                     onCheckedChange={(checked) => setGenerationConfig(prev => ({ ...prev, featuredImage: checked }))}
                   />
                 </div>
-
-                <div className="flex flex-col gap-3 pt-4">
-                   <button 
-                     onClick={() => setGenerationStep(3)}
-                     className="w-full py-2.5 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors font-medium text-sm"
-                   >
-                     Next: Brand Voice
-                   </button>
-                   <button 
-                     onClick={() => setGenerationStep(1)}
-                     className="w-full py-2.5 bg-white text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors font-medium text-sm"
-                   >
-                     Back
-                   </button>
+                <div className="flex gap-3">
+                  <button 
+                    onClick={() => setGenerationStep(1)}
+                    className="flex-1 py-3.5 bg-white text-gray-700 border border-gray-200 rounded-full hover:bg-gray-50 transition-colors font-medium text-sm"
+                  >
+                    Back
+                  </button>
+                  <button 
+                    onClick={() => setGenerationStep(3)}
+                    className="flex-1 py-3.5 bg-gray-900 text-white rounded-full hover:bg-gray-800 transition-colors font-medium text-sm"
+                  >
+                    Continue to Brand
+                  </button>
                 </div>
-              </div>
+              </section>
             )}
 
             {/* Step 3: Brand Voice */}
             {generationStep === 3 && (
-              <div className="space-y-6">
+              <section className="rounded-[36px] border border-white/70 bg-white p-8 shadow-[0_30px_80px_rgba(15,23,42,0.08)] space-y-8">
+                <div className="space-y-2">
+                  <span className="text-[11px] uppercase tracking-[0.35em] text-gray-400">Brand voice</span>
+                  <h4 className="text-2xl font-light text-gray-900">Define your brand's personality.</h4>
+                  <p className="text-sm text-gray-500 max-w-2xl">
+                    The AI will adapt its writing style to match your brand's tone and values.
+                  </p>
+                </div>
                 <div className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="brand-name">Brand Name</Label>
-                    <Input 
-                      id="brand-name"
+                    <label className="text-xs uppercase tracking-[0.35em] text-gray-400">Brand Name</label>
+                    <input
+                      type="text"
                       value={generationConfig.brandName}
                       onChange={(e) => setGenerationConfig(prev => ({ ...prev, brandName: e.target.value }))}
                       placeholder="e.g. Acme Corp"
+                      className="w-full px-5 py-4 rounded-[28px] border border-gray-200 bg-gradient-to-br from-white via-white to-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent text-base shadow-inner"
                     />
                   </div>
-                  
                   <div className="space-y-2">
-                    <Label htmlFor="brand-desc">Tone & Description (Optional)</Label>
-                    <textarea 
-                      id="brand-desc"
-                      className="flex min-h-[100px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    <label className="text-xs uppercase tracking-[0.35em] text-gray-400">Tone & Description (Optional)</label>
+                    <textarea
                       value={generationConfig.brandDescription}
                       onChange={(e) => setGenerationConfig(prev => ({ ...prev, brandDescription: e.target.value }))}
                       placeholder="e.g. Professional, authoritative, yet accessible. Focus on Enterprise solutions."
+                      rows={4}
+                      className="w-full px-5 py-4 rounded-[28px] border border-gray-200 bg-gradient-to-br from-white via-white to-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent text-base shadow-inner resize-none"
                     />
                   </div>
                 </div>
-
-                <div className="flex flex-col gap-3 pt-6">
-                   <button 
-                     onClick={handleConfirmGeneration}
-                     disabled={generateTopicLoading === pendingGenerationTopic?.id}
-                     className="w-full py-3 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors font-medium flex items-center justify-center gap-2"
-                   >
-                     {generateTopicLoading === pendingGenerationTopic?.id ? (
-                       <>
-                         <ButtonSpinner /> Starting Generation...
-                       </>
-                     ) : (
-                       <>
-                         <Sparkles className="w-4 h-4" /> Start Generation
-                       </>
-                     )}
-                   </button>
-                   <button 
-                     onClick={() => setGenerationStep(2)}
-                     className="w-full py-2.5 bg-white text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors font-medium text-sm"
-                   >
-                     Back
-                   </button>
+                <div className="flex gap-3">
+                  <button 
+                    onClick={() => setGenerationStep(2)}
+                    className="flex-1 py-3.5 bg-white text-gray-700 border border-gray-200 rounded-full hover:bg-gray-50 transition-colors font-medium text-sm"
+                  >
+                    Back
+                  </button>
+                  <button 
+                    onClick={handleConfirmGeneration}
+                    disabled={generateTopicLoading === pendingGenerationTopic?.id}
+                    className="flex-1 py-3.5 bg-gray-900 text-white rounded-full hover:bg-gray-800 transition-colors font-medium text-sm flex items-center justify-center gap-2"
+                  >
+                    {generateTopicLoading === pendingGenerationTopic?.id ? (
+                      <>
+                        <ButtonSpinner /> Starting...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-4 h-4" /> Start Generation
+                      </>
+                    )}
+                  </button>
                 </div>
-              </div>
+              </section>
             )}
           </div>
         </SheetContent>
       </Sheet>
 
-      {/* Preview Overlay - Reuses PublishExperience */}
+      {/* Preview Overlay - Fills content area beside sidebar */}
       {previewPageId && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 sm:p-8">
-          <div className="relative bg-white w-full max-w-5xl h-[90vh] rounded-2xl shadow-2xl overflow-hidden flex flex-col">
+        <div className="absolute inset-0 z-40 bg-[#f5f6fa] flex flex-col">
+          {/* Header with back button */}
+          <div className="flex items-center gap-4 px-6 py-4 border-b border-gray-200 bg-white/80 backdrop-blur-sm">
             <button
               onClick={() => { setPreviewPageId(null); setPreviewDraft(null); }}
-              className="absolute top-4 right-4 z-10 p-2 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors"
-              title="Close preview"
+              className="flex items-center gap-2 px-4 py-2 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors text-gray-700"
             >
-              <X className="h-5 w-5 text-gray-600" />
+              <ChevronLeft className="h-4 w-4" />
+              <span className="text-sm font-medium">Back to Campaign</span>
             </button>
-            <div className="flex-1 overflow-y-auto p-4">
+            <div className="flex-1" />
+            <span className="text-sm text-gray-500">Draft Preview</span>
+          </div>
+          
+          {/* Content */}
+          <div className="flex-1 overflow-y-auto p-6">
+            <div className="max-w-5xl mx-auto">
               <PublishExperience
                 companyDomain={companyDomain}
                 domainContext={domainContext}
