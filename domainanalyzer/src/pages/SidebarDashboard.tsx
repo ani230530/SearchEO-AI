@@ -7375,6 +7375,35 @@ const handleUpdatePillar = async (topicId: number, updates: { title?: string; re
           </div>
         </SheetContent>
       </Sheet>
+
+      {/* Preview Overlay - Reuses PublishExperience */}
+      {previewPageId && (
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 sm:p-8">
+          <div className="relative bg-white w-full max-w-5xl h-[90vh] rounded-2xl shadow-2xl overflow-hidden flex flex-col">
+            <button
+              onClick={() => { setPreviewPageId(null); setPreviewDraft(null); }}
+              className="absolute top-4 right-4 z-10 p-2 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors"
+              title="Close preview"
+            >
+              <X className="h-5 w-5 text-gray-600" />
+            </button>
+            <div className="flex-1 overflow-y-auto p-4">
+              <PublishExperience
+                companyDomain={companyDomain}
+                domainContext={domainContext}
+                keywordsTableData={keywordsTableData}
+                hasWordpressIntegration={hasWordpressIntegration}
+                wpIntegration={wpIntegration}
+                onConfigureWordpress={onConfigureWordpress}
+                onRefreshWordpressIntegration={onRefreshWordpressIntegration}
+                isActive={true}
+                initialDraftId={previewPageId}
+                disablePreviewOverlay={true}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 };
