@@ -1498,6 +1498,100 @@ router.delete('/:id', authenticateToken, asyncHandler(async (req: Request, res: 
  * POST /api/campaigns/topics/:topicId/generate-content
  * Generate content for all pages in a topic (pillar + sub-pages)
  */
+/**
+ * GET /active-jobs
+ * Retrieves all currently active generation jobs for the authenticated user (generating or pending).
+ * Hydrates them with the latest streaming logs from Redis so the frontend can resume monitoring.
+ */
+router.get('/active-jobs', authenticateToken, asyncHandler(async (req: Request, res: Response) => {
+  const authReq = req as AuthenticatedRequest;
+  const userId = authReq.user.userId;
+
+  // 1. Fetch active jobs from DB
+  const activeJobs = await prisma.generationJob.findMany({
+    where: {
+      userId,
+      status: {
+        in: ['pending', 'generating']
+      }
+    },
+    include: {
+      topic: {
+        select: {
+          id: true,
+          title: true
+        }
+      },
+      pages: {
+        select: {
+          pageId: true,
+          pageType: true,
+          status: true,
+          progress: true,
+          updatedAt: true
+        }
+      }
+    },
+    orderBy: {
+      startedAt: 'desc'
+    }
+  });
+
+  const STALE_THRESHOLD_MS = 15 * 60 * 1000; // 15 minutes
+  const now = new Date().getTime();
+
+  // 2. Hydrate with Redis streaming messages AND check for staleness
+  const hydratedJobs = await Promise.all(activeJobs.map(async (job) => {
+    // Check staleness
+    const jobModTime = new Date(job.updatedAt).getTime();
+    const isStale = (now - jobModTime) > STALE_THRESHOLD_MS;
+
+    if (isStale) {
+      // Mark as failed in DB
+      await prisma.generationJob.update({
+        where: { id: job.id },
+        data: { status: 'failed' }
+      });
+      // Also mark pages if needed, but job status is primary for UI listing
+
+      return {
+        jobId: job.jobId,
+        topicId: job.topicId,
+        topicTitle: job.topic.title,
+        status: 'failed', // Return failed status
+        startTime: job.startedAt,
+        pages: job.pages,
+        messages: [] // No need for logs on stale failure, or maybe fetch them? fetch them is better context.
+      };
+    }
+
+    const messages = await getStreamingMessages(job.jobId);
+
+    // Sort messages by timestamp if needed, though active push usually keeps them ordered.
+    // Ensure we send back a clean history.
+
+    return {
+      jobId: job.jobId,
+      topicId: job.topicId,
+      topicTitle: job.topic.title,
+      status: job.status,
+      startTime: job.startedAt,
+      pages: job.pages,
+      // Only send the last 50 messages to avoid payload bloat if it's been running long
+      messages: messages.slice(-50)
+    };
+  }));
+
+  res.json({
+    success: true,
+    jobs: hydratedJobs
+  });
+}));
+
+/**
+ * POST /api/campaigns/topics/:topicId/generate-content
+ * Generate content for all pages in a topic (pillar + sub-pages)
+ */
 router.post('/topics/:topicId/generate-content', authenticateToken, asyncHandler(async (req: Request, res: Response) => {
   const authReq = req as AuthenticatedRequest;
   const userId = authReq.user.userId;

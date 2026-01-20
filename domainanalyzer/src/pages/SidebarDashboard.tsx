@@ -34,7 +34,9 @@ import {
   Plug,
   TrendingUp,
   Menu,
-  Globe
+  Globe,
+  Eye,
+  ExternalLink
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { maskDomainId } from '@/lib/domainUtils';
@@ -59,6 +61,18 @@ import remarkGfm from 'remark-gfm';
 import { AlertDialogHeader } from '@/components/ui/alert-dialog';
 import Profile from './Profile';
 import GSCAnalyticsView from '@/components/gsc/GSCAnalyticsView';
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetFooter,
+} from '@/components/ui/sheet';
+import { Slider } from '@/components/ui/slider';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
 
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3002";
@@ -2443,7 +2457,7 @@ useEffect(() => {
         </header>
 
         {/* Content Body */}
-        <div className="content-body">
+        <div className={activeTab === 'campaign' && selectedCampaignId ? "flex-1 min-h-[calc(100vh-80px)] bg-white" : "content-body"}>
           {activeTab === "overview" ? (
            <div className="max-w-7xl mx-auto px-4 sm:px-6 py-10 space-y-12">
 
@@ -4999,6 +5013,10 @@ function CampaignStructureView({
   const [showAddTopicModal, setShowAddTopicModal] = useState(false);
   const [showAddPillarModal, setShowAddPillarModal] = useState(false);
   const [showAddSubPageModal, setShowAddSubPageModal] = useState(false);
+  
+  // Track draft statuses (published/local drafts)
+  const [draftStatuses, setDraftStatuses] = useState<Map<number, { isPublished: boolean; publishedUrl?: string }>>(new Map());
+
   const [showAddKeywordModal, setShowAddKeywordModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteLabel, setDeleteLabel] = useState<string>('');
@@ -5029,6 +5047,18 @@ function CampaignStructureView({
   const [drawerSortConfig, setDrawerSortConfig] = useState<{ key: keyof KeywordTableItem; direction: "asc" | "desc" } | null>(null);
   const [drawerCurrentPage, setDrawerCurrentPage] = useState(1);
   const [drawerItemsPerPage, setDrawerItemsPerPage] = useState(10);
+
+  // Generation Drawer State
+  const [generationDrawerOpen, setGenerationDrawerOpen] = useState(false);
+  const [pendingGenerationTopic, setPendingGenerationTopic] = useState<Topic | null>(null);
+  const [generationConfig, setGenerationConfig] = useState({
+    wordCount: 800,
+    images: 2,
+    featuredImage: true,
+    brandName: '',
+    brandDescription: ''
+  });
+  
   const drawerFilteredKeywords = React.useMemo(() => {
     return keywordsTableData.filter((keyword) => {
       const matchesSearch = keyword.keyword.toLowerCase().includes(drawerSearchTerm.toLowerCase());
@@ -5136,14 +5166,8 @@ function CampaignStructureView({
   const { toast } = useToast();
 
   // Pillar page generation states
-  const [generationDrawerOpen, setGenerationDrawerOpen] = useState(false);
-  const [generationForm, setGenerationForm] = useState({
-    wordCount: 800,
-    images: 2,
-    featuredImage: true,
-    brandName: '',
-    brandDescription: '',
-  });
+  // Pillar page generation states
+  // generationDrawerOpen, generationConfig are already defined above
   // Auto-fill brand fields using company domain/context (mirrors publish tab)
   const derivedBrandName = React.useMemo(() => {
     if (companyDomain) {
@@ -5174,6 +5198,65 @@ function CampaignStructureView({
   
   // Active generation tracking - track last streaming timestamp per jobId
   const [lastStreamingTimestamp, setLastStreamingTimestamp] = useState<Map<string, number>>(new Map());
+
+  // Hydrate active jobs on mount
+  React.useEffect(() => {
+    const fetchActiveJobs = async () => {
+      try {
+        const response = await fetch(`${CAMPAIGN_API_BASE}/active-jobs`, {
+          headers: getAuthHeaders()
+        });
+        
+        if (!response.ok) return;
+        
+        const data = await response.json();
+        if (data.success && data.jobs) {
+          setGenerationJobs(prev => {
+             const updated = new Map(prev);
+             data.jobs.forEach((job: any) => {
+                 job.pages.forEach((p: any) => {
+                     updated.set(p.pageId, {
+                        jobId: job.jobId,
+                        pageId: p.pageId,
+                        pageType: p.pageType,
+                        status: p.status,
+                        draftId: p.draftId, // draftId from DB response
+                        progress: p.progress || 0,
+                        primaryKeyword: p.primaryKeyword,
+                        hasHtml: false, // We'll rely on draft status mostly
+                        updatedAt: new Date().toISOString(),
+                        error: null
+                     });
+                 });
+             });
+             return updated;
+          });
+          
+          setStreamingMessages(prev => {
+              const updated = new Map(prev);
+              data.jobs.forEach((job: any) => {
+                  if (job.messages && job.messages.length > 0) {
+                      updated.set(job.jobId, job.messages);
+                  }
+              });
+              return updated;
+          });
+          
+          setJobIdToTopicId(prev => {
+             const updated = new Map(prev);
+             data.jobs.forEach((job: any) => {
+                 updated.set(job.jobId, job.topicId);
+             });
+             return updated;
+          });
+        }
+      } catch (err) {
+        console.error("Failed to hydrate active jobs", err);
+      }
+    };
+    
+    fetchActiveJobs();
+  }, []);
   
   // Backend job status tracking - stores backend's view of job status
   const [backendJobStatus, setBackendJobStatus] = useState<Map<string, {
@@ -5644,13 +5727,7 @@ function CampaignStructureView({
   }, [campaign.id, fetchStructure]);
 
   // Auto-fill brand fields similar to publish tab
-  useEffect(() => {
-    setGenerationForm((prev) => ({
-      ...prev,
-      brandName: derivedBrandName || prev.brandName || '',
-      brandDescription: derivedBrandDescription || prev.brandDescription || '',
-    }));
-  }, [derivedBrandName, derivedBrandDescription]);
+  // Auto-fill brand fields is handled on initialization in handleGenerateTopic
 
   const topicsSnapshot = campaignStructure.topics;
   useEffect(() => {
@@ -6104,62 +6181,81 @@ function CampaignStructureView({
   const renderStatusPill = (pageId?: number) => {
     if (!pageId) return null;
     const job = generationJobs.get(pageId);
-    if (!job) return null;
     
-    // Use robust status determination
-    let status = job.status;
-    const jobId = job.jobId;
-    
-    // If has HTML, always completed
-    if (job.hasHtml && status !== 'published') {
-      status = 'completed';
-    } else if (status !== 'completed' && status !== 'published' && jobId) {
-      // Check if generation is active
-      const generationActive = isGenerationActive(jobId);
-      const backendStatus = backendJobStatus.get(jobId);
-      
-      // Only mark as failed if generation is not active AND backend confirms failed
-      if (status === 'failed' || (!generationActive && backendStatus?.status === 'failed')) {
-        status = 'failed';
-      } else if (generationActive || backendStatus?.status === 'generating') {
-        // Keep as generating if active or backend says generating
-        status = 'generating';
-      }
+    // Check generating state first
+    const isGenerating = job && !job.hasHtml && (
+      (job.jobId && isGenerationActive(job.jobId)) || 
+      (job.jobId && backendJobStatus.get(job.jobId)?.status === 'generating')
+    );
+
+    if (isGenerating) {
+      return (
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-medium bg-blue-50 text-blue-600 border border-blue-100/50">
+           <div className="h-2.5 w-2.5 text-blue-600 flex items-center justify-center">
+             <ButtonSpinner />
+           </div>
+           Generating
+        </span>
+      );
+    }
+
+    if (job?.hasHtml) {
+      return (
+        <div className="flex items-center gap-2">
+           <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-medium bg-green-50 text-green-700 border border-green-100/50">
+             Ready
+           </span>
+           <div className="flex items-center gap-1">
+             <button 
+               onClick={() => viewDraft(job.draftId, pageId)}
+               className="p-1.5 hover:bg-gray-100 text-gray-400 hover:text-gray-700 rounded-full transition-colors"
+               title="Preview"
+             >
+                <Eye className="h-3.5 w-3.5" />
+             </button>
+             <button 
+               onClick={() => publishDraft(job.draftId, pageId)}
+               className="p-1.5 hover:bg-blue-50 text-gray-400 hover:text-blue-600 rounded-full transition-colors"
+               title="Publish"
+             >
+                <Send className="h-3.5 w-3.5" />
+             </button>
+           </div>
+        </div>
+      );
     }
     
-    if (status === 'pending') return null;
-    const label =
-      status === 'published' ? 'Published' :
-      status === 'completed' ? 'Completed' :
-      status === 'failed' ? 'Failed' :
-      'Generating';
-    const color =
-      status === 'published' ? 'bg-purple-100 text-purple-700' :
-      status === 'completed' ? 'bg-green-100 text-green-700' :
-      status === 'failed' ? 'bg-red-100 text-red-700' :
-      'bg-blue-100 text-blue-700';
-    const progress = job.progress ?? (status === 'completed' || status === 'published' ? 100 : undefined);
+    // Check if published via draft status
+    const draftStatus = draftStatuses.get(pageId);
+    if (draftStatus?.isPublished) {
+         return (
+            <div className="flex items-center gap-2">
+               <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-medium bg-slate-100 text-slate-600 border border-slate-200/50">
+                 Published
+               </span>
+               <a 
+                 href={draftStatus.publishedUrl} 
+                 target="_blank" 
+                 rel="noopener noreferrer"
+                 className="p-1.5 hover:bg-gray-100 text-gray-400 hover:text-gray-700 rounded-full transition-colors"
+               >
+                  <ExternalLink className="h-3.5 w-3.5" />
+               </a>
+            </div>
+         );
+    }
 
-    return (
-        <span className={`px-2 py-1 text-[11px] rounded-full ${color}`}>
-          {label}{typeof progress === 'number' ? ` • ${progress}%` : ''}
-        </span>
-    );
+    return null;
   };
 
   const currentTopic = currentGenerationTopicId
     ? campaignStructure.topics.find((t) => t.id === currentGenerationTopicId)
     : null;
 
-  // Generation drawer stepper (simplified to 3 steps similar to publish flow)
-  const generationSteps = [
-    { id: 1, title: 'Word Count', description: 'Dial in the depth' },
-    { id: 2, title: 'Imagery', description: 'Inline images & featured banner' },
-    { id: 3, title: 'Brand', description: 'Tone & voice alignment' },
-  ];
+  // Generation step state
   const [generationStep, setGenerationStep] = useState(1);
 
-  const handleGenerateTopic = async (topic: Topic, options?: { wordCount: number; images: number; featuredImage: boolean; brandName?: string; brandDescription?: string; }) => {
+  const handleGenerateTopic = (topic: Topic) => {
     if (!canGenerateTopic(topic)) {
       toast({
         title: 'Add keywords first',
@@ -6169,40 +6265,64 @@ function CampaignStructureView({
       return;
     }
 
+    setPendingGenerationTopic(topic);
+    // Reset config with defaults or existing values if applicable
+    setGenerationConfig({
+      wordCount: 800,
+      images: 2,
+      featuredImage: true,
+      brandName: derivedBrandName || 'Brand',
+      brandDescription: derivedBrandDescription || '',
+    });
+    setGenerationStep(1);
+    setGenerationDrawerOpen(true);
+  };
+
+  const handleConfirmGeneration = async () => {
+    const topic = pendingGenerationTopic;
+    if (!topic) return;
+
     setGenerateTopicLoading(topic.id);
     console.log(`[Campaign] Starting generation for topic ${topic.id}: ${topic.title}`);
+
+    // Close drawer immediately
+    setGenerationDrawerOpen(false);
+
     try {
       // Helper function to get primary and longtail keywords from a page's keywords
-      const getKeywordSelections = (pageKeywords: Array<{ id: number; term: string; aiMetadata?: any }>) => {
+      const getKeywordSelections = (
+        pageKeywords: Array<{ id: number; term: string; aiMetadata?: any }>,
+      ) => {
         // Find primary keyword (marked with isPrimary: true in aiMetadata)
-        const primaryKeyword = pageKeywords.find(kw => {
+        const primaryKeyword = pageKeywords.find((kw) => {
           const metadata = kw.aiMetadata as any;
           return metadata?.isPrimary === true;
         });
-        
+
         // Find longtail keywords (marked with isLongtail: true in aiMetadata)
-        const longtailKeywords = pageKeywords.filter(kw => {
+        const longtailKeywords = pageKeywords.filter((kw) => {
           const metadata = kw.aiMetadata as any;
           return metadata?.isLongtail === true;
         });
-        
+
         // Fallback: if no primary selected, use first keyword
         // If no longtail selected, use remaining keywords
         const fallbackPrimary = primaryKeyword || pageKeywords[0];
-        const fallbackLongtail = longtailKeywords.length > 0 
-          ? longtailKeywords 
-          : pageKeywords.filter((_, idx) => idx > 0);
-        
+        const fallbackLongtail =
+          longtailKeywords.length > 0
+            ? longtailKeywords
+            : pageKeywords.filter((_, idx) => idx > 0);
+
         return {
           primary: fallbackPrimary?.term || '',
-          longtail: fallbackLongtail.map(k => k.term).filter(Boolean)
+          longtail: fallbackLongtail.map((k) => k.term).filter(Boolean),
         };
       };
 
       // Build payload from current topic data
       const pillar = topic.pillarPage!;
       const pillarKeywords = getKeywordSelections(pillar.keywords);
-      
+
       const payload = {
         user_id: 'user', // backend uses authenticated user
         campaign_name: campaign.title,
@@ -6210,9 +6330,9 @@ function CampaignStructureView({
           primary_keyword: pillarKeywords.primary || pillar.title,
           longtail_keywords: pillarKeywords.longtail,
           options: {
-            image: options?.images ?? 2,
-            word_count: options?.wordCount ?? 800,
-            featured_image: options?.featuredImage ? 'yes' : 'no',
+            image: generationConfig.images,
+            word_count: generationConfig.wordCount,
+            featured_image: generationConfig.featuredImage ? 'yes' : 'no',
           },
         },
         sub_pillar_pages: topic.subPages.map((sp) => {
@@ -6220,24 +6340,27 @@ function CampaignStructureView({
           return {
             primary_keyword: subPageKeywords.primary || sp.title,
             longtail_keywords: subPageKeywords.longtail,
-          options: {
-            image: options?.images ?? 2,
-            word_count: options?.wordCount ?? 800,
-            featured_image: options?.featuredImage ? 'yes' : 'no',
-          },
+            options: {
+              image: generationConfig.images,
+              word_count: generationConfig.wordCount,
+              featured_image: generationConfig.featuredImage ? 'yes' : 'no',
+            },
           };
         }),
         brand: {
-          brand_name: options?.brandName || campaign.title || 'Brand',
-          brand_description: options?.brandDescription || campaign.description || '',
+          brand_name: generationConfig.brandName,
+          brand_description: generationConfig.brandDescription,
         },
       };
 
-      const response = await fetch(`${API_BASE_URL}/api/campaigns/topics/${topic.id}/generate-content`, {
-        method: 'POST',
-        headers: getAuthHeaders(),
-        body: JSON.stringify(payload),
-      });
+      const response = await fetch(
+        `${API_BASE_URL}/api/campaigns/topics/${topic.id}/generate-content`,
+        {
+          method: 'POST',
+          headers: getAuthHeaders(),
+          body: JSON.stringify(payload),
+        },
+      );
 
       if (response.status === 401 || response.status === 403) {
         handleUnauthorized();
@@ -6249,10 +6372,13 @@ function CampaignStructureView({
         throw new Error(data.error || 'Failed to start generation');
       }
 
-      const { jobId, pages } = data as { jobId: string; pages: { pageId: number; pageType: string; draftId?: number; primaryKeyword?: string; }[] };
+      const { jobId, pages } = data as {
+        jobId: string;
+        pages: { pageId: number; pageType: string; draftId?: number; primaryKeyword?: string }[];
+      };
 
       // Store jobId -> topicId mapping for streaming updates
-      setJobIdToTopicId(prev => {
+      setJobIdToTopicId((prev) => {
         const updated = new Map(prev);
         updated.set(jobId, topic.id);
         return updated;
@@ -6289,7 +6415,7 @@ function CampaignStructureView({
       });
     } finally {
       setGenerateTopicLoading(null);
-      setGenerationDrawerOpen(false);
+      setPendingGenerationTopic(null);
     }
   };
 
@@ -6614,12 +6740,20 @@ const handleUpdatePillar = async (topicId: number, updates: { title?: string; re
     : null;
 
   return (
+    <>
     <div className="flex h-[calc(100vh-4rem)] w-full bg-white overflow-hidden">
       {/* 2. Secondary Sidebar: Topic List */}
-      <div className={`w-80 border-r border-gray-100 bg-white flex-shrink-0 transition-all duration-300 ${viewMode === 'graph' ? 'w-0 opacity-0 overflow-hidden border-none' : ''}`}>
+      <div 
+        className={`w-[280px] border-r border-[#0000001a] flex-shrink-0 transition-all duration-300 ${viewMode === 'graph' ? 'w-0 opacity-0 overflow-hidden border-none' : ''}`}
+        style={{
+          background: 'rgba(255, 255, 255, 0.72)',
+          backdropFilter: 'saturate(180%) blur(20px)',
+          WebkitBackdropFilter: 'saturate(180%) blur(20px)',
+        }}
+      >
         <div className="h-full flex flex-col">
           {/* Header */}
-          <div className="h-16 flex items-center px-5 border-b border-gray-100 flex-shrink-0 bg-white z-10">
+          <div className="h-16 flex items-center px-5 border-b border-[#0000001a] flex-shrink-0 z-10">
              <button
                 onClick={onBack}
                 className="mr-3 p-1.5 hover:bg-gray-100 rounded-full text-gray-400 hover:text-gray-600 transition-colors"
@@ -6739,6 +6873,150 @@ const handleUpdatePillar = async (topicId: number, updates: { title?: string; re
           </div>
         </div>
       )}
+
+      {/* Generation Config Drawer */}
+      <Sheet open={generationDrawerOpen} onOpenChange={setGenerationDrawerOpen}>
+        <SheetContent className="w-[400px] sm:w-[540px] overflow-y-auto">
+          <SheetHeader className="mb-6">
+            <SheetTitle>Generate Content</SheetTitle>
+            <SheetDescription>
+              Configure generation options for "{pendingGenerationTopic?.title}".
+            </SheetDescription>
+          </SheetHeader>
+
+          <div className="space-y-8 py-4">
+            {/* Step 1: Word Count */}
+            {generationStep === 1 && (
+              <div className="space-y-6">
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <Label className="text-base font-medium">Word Count Target</Label>
+                    <span className="text-sm text-gray-500 font-mono bg-gray-100 px-2 py-1 rounded">{generationConfig.wordCount} words</span>
+                  </div>
+                  <Slider
+                    value={[generationConfig.wordCount]}
+                    min={400}
+                    max={3000}
+                    step={100}
+                    onValueChange={(vals) => setGenerationConfig(prev => ({ ...prev, wordCount: vals[0] }))}
+                    className="py-4"
+                  />
+                  <p className="text-xs text-gray-500">
+                    Determines the approximate length of each article. Longer articles perform better for SEO but take longer to generate.
+                  </p>
+                </div>
+
+                <div className="flex flex-col gap-4 pt-4">
+                   <button 
+                     onClick={() => setGenerationStep(2)}
+                     className="w-full py-2.5 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors font-medium text-sm"
+                   >
+                     Next: Imagery
+                   </button>
+                </div>
+              </div>
+            )}
+
+            {/* Step 2: Imagery */}
+            {generationStep === 2 && (
+              <div className="space-y-6">
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <Label className="text-base font-medium">Images per Article</Label>
+                    <span className="text-sm text-gray-500 font-mono bg-gray-100 px-2 py-1 rounded">{generationConfig.images} images</span>
+                  </div>
+                  <Slider
+                    value={[generationConfig.images]}
+                    min={0}
+                    max={5}
+                    step={1}
+                    onValueChange={(vals) => setGenerationConfig(prev => ({ ...prev, images: vals[0] }))}
+                    className="py-4"
+                  />
+                </div>
+
+                <div className="flex items-center justify-between p-4 border border-gray-100 rounded-xl bg-gray-50/50">
+                  <div className="space-y-0.5">
+                    <Label className="text-base">Featured Image</Label>
+                    <p className="text-xs text-gray-500">Generate a high-quality hero image</p>
+                  </div>
+                  <Switch
+                    checked={generationConfig.featuredImage}
+                    onCheckedChange={(checked) => setGenerationConfig(prev => ({ ...prev, featuredImage: checked }))}
+                  />
+                </div>
+
+                <div className="flex flex-col gap-3 pt-4">
+                   <button 
+                     onClick={() => setGenerationStep(3)}
+                     className="w-full py-2.5 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors font-medium text-sm"
+                   >
+                     Next: Brand Voice
+                   </button>
+                   <button 
+                     onClick={() => setGenerationStep(1)}
+                     className="w-full py-2.5 bg-white text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors font-medium text-sm"
+                   >
+                     Back
+                   </button>
+                </div>
+              </div>
+            )}
+
+            {/* Step 3: Brand Voice */}
+            {generationStep === 3 && (
+              <div className="space-y-6">
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="brand-name">Brand Name</Label>
+                    <Input 
+                      id="brand-name"
+                      value={generationConfig.brandName}
+                      onChange={(e) => setGenerationConfig(prev => ({ ...prev, brandName: e.target.value }))}
+                      placeholder="e.g. Acme Corp"
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="brand-desc">Tone & Description (Optional)</Label>
+                    <textarea 
+                      id="brand-desc"
+                      className="flex min-h-[100px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                      value={generationConfig.brandDescription}
+                      onChange={(e) => setGenerationConfig(prev => ({ ...prev, brandDescription: e.target.value }))}
+                      placeholder="e.g. Professional, authoritative, yet accessible. Focus on Enterprise solutions."
+                    />
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-3 pt-6">
+                   <button 
+                     onClick={handleConfirmGeneration}
+                     disabled={generateTopicLoading === pendingGenerationTopic?.id}
+                     className="w-full py-3 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors font-medium flex items-center justify-center gap-2"
+                   >
+                     {generateTopicLoading === pendingGenerationTopic?.id ? (
+                       <>
+                         <ButtonSpinner /> Starting Generation...
+                       </>
+                     ) : (
+                       <>
+                         <Sparkles className="w-4 h-4" /> Start Generation
+                       </>
+                     )}
+                   </button>
+                   <button 
+                     onClick={() => setGenerationStep(2)}
+                     className="w-full py-2.5 bg-white text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors font-medium text-sm"
+                   >
+                     Back
+                   </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
 
       {showAddKeywordModal && addKeywordContext && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[60]">
@@ -6951,7 +7229,153 @@ const handleUpdatePillar = async (topicId: number, updates: { title?: string; re
           </div>
         </div>
       )}
-    </div>
+
+      </div>
+
+      {/* Generation Config Drawer */}
+      <Sheet open={generationDrawerOpen} onOpenChange={setGenerationDrawerOpen}>
+        <SheetContent className="w-[400px] sm:w-[540px] overflow-y-auto">
+          <SheetHeader className="mb-6">
+            <SheetTitle>Generate Content</SheetTitle>
+            <SheetDescription>
+              Configure generation options for "{pendingGenerationTopic?.title}".
+            </SheetDescription>
+          </SheetHeader>
+
+          <div className="space-y-8 py-4">
+            {/* Step 1: Word Count */}
+            {generationStep === 1 && (
+              <div className="space-y-6">
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <Label className="text-base font-medium">Word Count Target</Label>
+                    <span className="text-sm text-gray-500 font-mono bg-gray-100 px-2 py-1 rounded">{generationConfig.wordCount} words</span>
+                  </div>
+                  <Slider
+                    value={[generationConfig.wordCount]}
+                    min={400}
+                    max={3000}
+                    step={100}
+                    onValueChange={(vals) => setGenerationConfig(prev => ({ ...prev, wordCount: vals[0] }))}
+                    className="py-4"
+                  />
+                  <p className="text-xs text-gray-500">
+                    Determines the approximate length of each article. Longer articles perform better for SEO but take longer to generate.
+                  </p>
+                </div>
+
+                <div className="flex flex-col gap-4 pt-4">
+                   <button 
+                     onClick={() => setGenerationStep(2)}
+                     className="w-full py-2.5 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors font-medium text-sm"
+                   >
+                     Next: Imagery
+                   </button>
+                </div>
+              </div>
+            )}
+
+            {/* Step 2: Imagery */}
+            {generationStep === 2 && (
+              <div className="space-y-6">
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <Label className="text-base font-medium">Images per Article</Label>
+                    <span className="text-sm text-gray-500 font-mono bg-gray-100 px-2 py-1 rounded">{generationConfig.images} images</span>
+                  </div>
+                  <Slider
+                    value={[generationConfig.images]}
+                    min={0}
+                    max={5}
+                    step={1}
+                    onValueChange={(vals) => setGenerationConfig(prev => ({ ...prev, images: vals[0] }))}
+                    className="py-4"
+                  />
+                </div>
+
+                <div className="flex items-center justify-between p-4 border border-gray-100 rounded-xl bg-gray-50/50">
+                  <div className="space-y-0.5">
+                    <Label className="text-base">Featured Image</Label>
+                    <p className="text-xs text-gray-500">Generate a high-quality hero image</p>
+                  </div>
+                  <Switch
+                    checked={generationConfig.featuredImage}
+                    onCheckedChange={(checked) => setGenerationConfig(prev => ({ ...prev, featuredImage: checked }))}
+                  />
+                </div>
+
+                <div className="flex flex-col gap-3 pt-4">
+                   <button 
+                     onClick={() => setGenerationStep(3)}
+                     className="w-full py-2.5 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors font-medium text-sm"
+                   >
+                     Next: Brand Voice
+                   </button>
+                   <button 
+                     onClick={() => setGenerationStep(1)}
+                     className="w-full py-2.5 bg-white text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors font-medium text-sm"
+                   >
+                     Back
+                   </button>
+                </div>
+              </div>
+            )}
+
+            {/* Step 3: Brand Voice */}
+            {generationStep === 3 && (
+              <div className="space-y-6">
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="brand-name">Brand Name</Label>
+                    <Input 
+                      id="brand-name"
+                      value={generationConfig.brandName}
+                      onChange={(e) => setGenerationConfig(prev => ({ ...prev, brandName: e.target.value }))}
+                      placeholder="e.g. Acme Corp"
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="brand-desc">Tone & Description (Optional)</Label>
+                    <textarea 
+                      id="brand-desc"
+                      className="flex min-h-[100px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                      value={generationConfig.brandDescription}
+                      onChange={(e) => setGenerationConfig(prev => ({ ...prev, brandDescription: e.target.value }))}
+                      placeholder="e.g. Professional, authoritative, yet accessible. Focus on Enterprise solutions."
+                    />
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-3 pt-6">
+                   <button 
+                     onClick={handleConfirmGeneration}
+                     disabled={generateTopicLoading === pendingGenerationTopic?.id}
+                     className="w-full py-3 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors font-medium flex items-center justify-center gap-2"
+                   >
+                     {generateTopicLoading === pendingGenerationTopic?.id ? (
+                       <>
+                         <ButtonSpinner /> Starting Generation...
+                       </>
+                     ) : (
+                       <>
+                         <Sparkles className="w-4 h-4" /> Start Generation
+                       </>
+                     )}
+                   </button>
+                   <button 
+                     onClick={() => setGenerationStep(2)}
+                     className="w-full py-2.5 bg-white text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors font-medium text-sm"
+                   >
+                     Back
+                   </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
+    </>
   );
 };
 
