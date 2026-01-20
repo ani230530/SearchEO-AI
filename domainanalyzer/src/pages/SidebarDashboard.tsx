@@ -7441,18 +7441,21 @@ const handleUpdatePillar = async (topicId: number, updates: { title?: string; re
 
       {/* Preview Overlay - Fills content area beside sidebar */}
       {previewPageId && (
-        <div className="fixed inset-0 z-[60] bg-[#f5f6fa] flex flex-col">
-          {/* Header with back button */}
-          <div className="flex items-center gap-4 px-6 py-4 border-b border-gray-200 bg-white/80 backdrop-blur-sm">
+        <div 
+          className="fixed top-0 right-0 bottom-0 z-[60] bg-[#f5f6fa] flex flex-col"
+          style={{ left: sidebarOpen ? '280px' : '96px' }}
+        >
+          {/* Header with prominent back button */}
+          <div className="flex items-center gap-4 px-6 py-4 border-b border-gray-200 bg-white shadow-sm">
             <button
               onClick={() => { setPreviewPageId(null); setPreviewDraft(null); }}
-              className="flex items-center gap-2 px-4 py-2 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors text-gray-700"
+              className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-black text-white hover:bg-gray-800 transition-colors"
             >
               <ChevronLeft className="h-4 w-4" />
               <span className="text-sm font-medium">Back to Campaign</span>
             </button>
             <div className="flex-1" />
-            <span className="text-sm text-gray-500">Draft Preview</span>
+            <span className="text-sm text-gray-500 font-medium">Draft Preview</span>
           </div>
           
           {/* Content */}
