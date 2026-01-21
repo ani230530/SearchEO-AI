@@ -20,6 +20,7 @@ import { authenticateToken, AuthenticatedRequest } from './middleware/auth';
 import auditRoutes from './routes/auditRoutes';
 import { addSSEClient, removeSSEClient } from './services/sseService';
 import { startTimeoutChecker } from './services/n8nTimeout';
+import { startCampaignTimeoutChecker } from './services/campaignJobTimeout';
 const app = express();
 const prisma = new PrismaClient();
 
@@ -192,4 +193,7 @@ app.listen(PORT, () => {
 
   // Start n8n timeout checker
   startTimeoutChecker();
+
+  // Start campaign generation timeout checker
+  startCampaignTimeoutChecker();
 }); 

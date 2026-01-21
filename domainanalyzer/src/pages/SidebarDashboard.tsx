@@ -5204,63 +5204,7 @@ function CampaignStructureView({
   const [lastStreamingTimestamp, setLastStreamingTimestamp] = useState<Map<string, number>>(new Map());
 
   // Hydrate active jobs on mount
-  React.useEffect(() => {
-    const fetchActiveJobs = async () => {
-      try {
-        const response = await fetch(`${CAMPAIGN_API_BASE}/active-jobs`, {
-          headers: getAuthHeaders()
-        });
-        
-        if (!response.ok) return;
-        
-        const data = await response.json();
-        if (data.success && data.jobs) {
-          setGenerationJobs(prev => {
-             const updated = new Map(prev);
-             data.jobs.forEach((job: any) => {
-                 job.pages.forEach((p: any) => {
-                     updated.set(p.pageId, {
-                        jobId: job.jobId,
-                        pageId: p.pageId,
-                        pageType: p.pageType,
-                        status: p.status,
-                        draftId: p.draftId, // draftId from DB response
-                        progress: p.progress || 0,
-                        primaryKeyword: p.primaryKeyword,
-                        hasHtml: false, // We'll rely on draft status mostly
-                        updatedAt: new Date().toISOString(),
-                        error: null
-                     });
-                 });
-             });
-             return updated;
-          });
-          
-          setStreamingMessages(prev => {
-              const updated = new Map(prev);
-              data.jobs.forEach((job: any) => {
-                  if (job.messages && job.messages.length > 0) {
-                      updated.set(job.jobId, job.messages);
-                  }
-              });
-              return updated;
-          });
-          
-          setJobIdToTopicId(prev => {
-             const updated = new Map(prev);
-             data.jobs.forEach((job: any) => {
-                 updated.set(job.jobId, job.topicId);
-             });
-             return updated;
-          });
-        }
-      } catch (err) {
-        console.error("Failed to hydrate active jobs", err);
-      }
-    };
-    
-    fetchActiveJobs();
-  }, []);
+
   
   // Backend job status tracking - stores backend's view of job status
   const [backendJobStatus, setBackendJobStatus] = useState<Map<string, {
@@ -5288,6 +5232,90 @@ function CampaignStructureView({
     localStorage.removeItem("authToken");
     window.location.href = "/auth";
   }, []);
+
+  // Hydrate active jobs on mount
+  const fetchActiveJobs = useCallback(async () => {
+    try {
+      const response = await fetch(`${CAMPAIGN_API_BASE}/active-jobs`, {
+        headers: getAuthHeaders()
+      });
+      
+      if (response.status === 401 || response.status === 403) {
+        handleUnauthorized();
+        return;
+      }
+      
+      if (!response.ok) return;
+      
+      const data = await response.json();
+      if (data.success && data.jobs) {
+        // Update generationJobs
+        setGenerationJobs(prev => {
+             const updated = new Map(prev);
+             // First mark all existing generating jobs as potentially stale/checked by backend
+             // If a job is NOT in the backend active list, it might have finished or failed silently
+             // But we don't want to remove it aggressively unless we know for sure.
+             // For now, we just update/upsert what the backend tells us.
+             
+             data.jobs.forEach((job: any) => {
+                 job.pages.forEach((p: any) => {
+                     updated.set(p.pageId, {
+                        jobId: job.jobId,
+                        pageId: p.pageId,
+                        pageType: p.pageType,
+                        status: p.status,
+                        draftId: p.draftId, // draftId from DB response
+                        progress: p.progress || 0,
+                        primaryKeyword: p.primaryKeyword,
+                        hasHtml: false, // We'll rely on draft status mostly
+                        updatedAt: new Date().toISOString(),
+                        error: null
+                     });
+                 });
+             });
+             return updated;
+        });
+        
+        // Update streaming messages
+        setStreamingMessages(prev => {
+            const updated = new Map(prev);
+            data.jobs.forEach((job: any) => {
+                if (job.messages && job.messages.length > 0) {
+                    updated.set(job.jobId, job.messages);
+                }
+            });
+            return updated;
+        });
+        
+        // Update jobId mapping
+        setJobIdToTopicId(prev => {
+           const updated = new Map(prev);
+           data.jobs.forEach((job: any) => {
+               updated.set(job.jobId, job.topicId);
+           });
+           return updated;
+        });
+
+        // Sync backend job status for consistency
+        setBackendJobStatus(prev => {
+          const updated = new Map(prev);
+          data.jobs.forEach((job: any) => {
+            updated.set(job.jobId, {
+              status: job.status,
+              pages: job.pages
+            });
+          });
+          return updated;
+        });
+      }
+    } catch (err) {
+      console.error("Failed to hydrate active jobs", err);
+    }
+  }, [CAMPAIGN_API_BASE, getAuthHeaders, handleUnauthorized]);
+
+  React.useEffect(() => {
+    fetchActiveJobs();
+  }, [fetchActiveJobs]);
 
   // Helper function to extract topicId from jobId pattern
   const extractTopicIdFromJobId = useCallback((jobId: string): number | null => {
@@ -5424,115 +5452,27 @@ function CampaignStructureView({
     };
   }, [handleStreamingUpdate]);
 
-  // Periodic polling for active generation jobs
+  // Periodic polling for active generation jobs using the bulk endpoint
+  // This serves as a fallback if SSE events are missed or not supported
   useEffect(() => {
-    const pollJobStatus = async (jobId: string) => {
-      try {
-        const response = await fetch(
-          `${API_BASE_URL}/api/campaigns/generation-status/${jobId}`,
-          { headers: getAuthHeaders() }
-        );
-
-        if (response.status === 401 || response.status === 403) {
-          handleUnauthorized();
-          return;
-        }
-
-        if (!response.ok) return;
-
-        const data = await response.json();
-        if (!data.success || !data.status) return;
-
-        // Update backend job status
-        setBackendJobStatus(prev => {
-          const updated = new Map(prev);
-          updated.set(jobId, {
-            status: data.status.status,
-            pages: data.pages || []
-          });
-          return updated;
-        });
-
-        // Hydrate streaming messages history if available
-        if (data.messages && Array.isArray(data.messages) && data.messages.length > 0) {
-            setStreamingMessages(prev => {
-                const updated = new Map(prev);
-                // Only update if we don't have messages or backend has more
-                const current = updated.get(jobId) || [];
-                if (data.messages.length > current.length) {
-                    updated.set(jobId, data.messages);
-                }
-                return updated;
-            });
-            // Also update timestamp to keep drawer open/active if needed
-            setLastStreamingTimestamp(prev => {
-                const updated = new Map(prev);
-                updated.set(jobId, Date.now());
-                return updated;
-            });
-        }
-
-        // Update generationJobs with backend status for each page
-        if (data.pages && Array.isArray(data.pages)) {
-          setGenerationJobs(prev => {
-            const updated = new Map(prev);
-            data.pages.forEach((page: { pageId: number; status: string; progress: number }) => {
-              const existing = updated.get(page.pageId);
-              if (existing) {
-                // Only update status if backend says it's different and more authoritative
-                // Don't override 'completed' with 'generating' if page has HTML
-                if (!existing.hasHtml || page.status === 'completed') {
-                  updated.set(page.pageId, {
-                    ...existing,
-                    status: page.status as GenerationPageStatus['status'],
-                    progress: page.progress
-                  });
-                }
-              }
-            });
-            return updated;
-          });
-        }
-      } catch (err) {
-        console.error(`Failed to poll job status for ${jobId}:`, err);
-      }
-    };
-
-    // Get all active jobIds (those with recent streaming or in generating state)
-    const activeJobIds = new Set<string>();
+    // Check if we have any active jobs that need monitoring
+    const hasActiveJobs = Array.from(generationJobs.values()).some(
+      job => job.status === 'generating' || job.status === 'pending'
+    );
     
-    // Add jobIds from streaming messages
-    streamingMessages.forEach((_, jobId) => {
-      if (isGenerationActive(jobId)) {
-        activeJobIds.add(jobId);
-      }
-    });
-    
-    // Add jobIds from generationJobs that are still generating
-    generationJobs.forEach((job) => {
-      if (job.jobId && (job.status === 'generating' || job.status === 'pending')) {
-        activeJobIds.add(job.jobId);
-      }
-    });
+    // Also check streaming messages for recently active jobs
+    const hasRecentStreaming = Array.from(lastStreamingTimestamp.entries()).some(
+       ([jobId, timestamp]) => Date.now() - timestamp < 5 * 60 * 1000 // 5 mins
+    );
 
-    if (activeJobIds.size === 0) return;
+    if (!hasActiveJobs && !hasRecentStreaming) return;
 
-    // Poll each active job
-    activeJobIds.forEach(jobId => {
-      pollJobStatus(jobId);
-    });
-
-    // Set up interval to poll every 30 seconds
     const interval = setInterval(() => {
-      activeJobIds.forEach(jobId => {
-        pollJobStatus(jobId);
-      });
-    }, 30000);
+      fetchActiveJobs();
+    }, 15000); // Poll every 15 seconds
 
-    return () => {
-      clearInterval(interval);
-    };
-  }, [streamingMessages, generationJobs, isGenerationActive, getAuthHeaders, handleUnauthorized]);
+    return () => clearInterval(interval);
+  }, [generationJobs, lastStreamingTimestamp, fetchActiveJobs]);
 
   // Rehydrate generation state on load so generate buttons stay disabled after reload
   useEffect(() => {
@@ -7453,16 +7393,26 @@ const handleUpdatePillar = async (topicId: number, updates: { title?: string; re
           style={{ left: sidebarOpen ? '280px' : '96px' }}
         >
           {/* Header with prominent back button */}
-          <div className="flex items-center gap-4 px-6 py-4 border-b border-gray-200 bg-white shadow-sm">
+          <div className="sticky top-0 z-[70] flex items-center gap-4 px-6 py-4 border-b border-gray-200 bg-white/80 backdrop-blur-md shadow-sm supports-[backdrop-filter]:bg-white/60">
             <button
               onClick={() => { setPreviewPageId(null); setPreviewDraft(null); }}
-              className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-black text-white hover:bg-gray-800 transition-colors"
+              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all shadow-sm group"
             >
-              <ChevronLeft className="h-4 w-4" />
-              <span className="text-sm font-medium">Back to Campaign</span>
+              <ChevronLeft className="h-4 w-4 text-gray-400 group-hover:text-gray-900 transition-colors" />
+              <span className="text-sm font-medium">Back</span>
             </button>
+            <div className="h-6 w-px bg-gray-200" />
+            <span className="text-sm text-gray-900 font-medium">Draft Preview</span>
+            
             <div className="flex-1" />
-            <span className="text-sm text-gray-500 font-medium">Draft Preview</span>
+            
+            <button
+              onClick={() => { setPreviewPageId(null); setPreviewDraft(null); }}
+              className="p-2 rounded-lg text-gray-400 hover:text-gray-900 hover:bg-gray-100 transition-colors"
+              aria-label="Close preview"
+            >
+              <X className="h-5 w-5" />
+            </button>
           </div>
           
           {/* Content */}

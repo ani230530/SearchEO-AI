@@ -57,6 +57,8 @@ const worker = new Worker(
 
             if (job.name === JOB_TYPES.PUBLISH) {
                 await handlePublishFailure(job, error, job.data.meta);
+            } else if (job.name === JOB_TYPES.CAMPAIGN_GENERATION) {
+                await handleCampaignGenerationFailure(job, error, job.data.meta);
             }
 
             if (error.response) {
@@ -186,3 +188,59 @@ export const addN8nJob = async (type: string, data: any) => {
         removeOnFail: false, // Keep failed jobs for inspection
     });
 };
+
+// Helper for Campaign Generation Failure
+async function handleCampaignGenerationFailure(job: Job, error: any, meta: any) {
+    if (!meta) return;
+    const { jobId, topicId, userId } = meta;
+
+    try {
+        // 1. Mark Job as failed
+        const generationJob = await prisma.generationJob.findUnique({
+            where: { jobId },
+            include: { pages: true }
+        });
+
+        if (generationJob) {
+            await prisma.generationJob.update({
+                where: { id: generationJob.id },
+                data: { status: 'failed' }
+            });
+
+            // 2. Mark pending/generating pages as failed
+            const stuckPages = generationJob.pages.filter(p => ['pending', 'generating'].includes(p.status));
+
+            for (const page of stuckPages) {
+                await prisma.generationJobPage.update({
+                    where: { id: page.id },
+                    data: {
+                        status: 'failed',
+                        error: error.message || 'Generation queue job failed'
+                    }
+                });
+
+                // Update draft if exists
+                if (page.draftId) {
+                    await prisma.wordpressPublishLog.update({
+                        where: { id: page.draftId },
+                        data: {
+                            status: 'draft',
+                            response: { error: error.message || 'Generation queue job failed' }
+                        }
+                    }).catch(e => console.error(`Failed to update draft ${page.draftId} failure`, e));
+                }
+            }
+        }
+    } catch (dbError) {
+        console.error('Failed to update campaign job status on failure', dbError);
+    }
+
+    // 3. Broadcast Failure
+    const { broadcastToUser } = await import('./sseService');
+    broadcastToUser(userId, {
+        type: 'generation_update',
+        jobId,
+        status: 'failed',
+        error: error.message
+    });
+}
