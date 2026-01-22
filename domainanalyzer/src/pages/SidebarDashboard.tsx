@@ -5479,6 +5479,7 @@ function CampaignStructureView({
     const rehydrate = async () => {
       if (!campaignStructure.topics || campaignStructure.topics.length === 0) return;
       const newMap = new Map<number, GenerationPageStatus>();
+      const newDraftStatuses = new Map<number, { isPublished: boolean; publishedUrl?: string; draftId?: number }>();
 
       for (const topic of campaignStructure.topics) {
         try {
@@ -5503,6 +5504,15 @@ function CampaignStructureView({
           };
 
           data.pages.forEach((p: DraftStatusRecord) => {
+            // Populate draftStatuses map if published
+            if (p.draftId && (p.status === 'published' || (p.wordpressUrl && p.wordpressUrl.startsWith('http')))) {
+                newDraftStatuses.set(p.pageId, {
+                    isPublished: true,
+                    publishedUrl: p.wordpressUrl || undefined,
+                    draftId: p.draftId
+                });
+            }
+
             // Skip empty/no-job entries so new topics don't show as pending
             if (!p.draftId && !p.jobId && !p.hasHtml) {
               return;
@@ -5573,6 +5583,9 @@ function CampaignStructureView({
 
       if (newMap.size > 0) {
         setGenerationJobs(newMap);
+      }
+      if (newDraftStatuses.size > 0) {
+        setDraftStatuses(newDraftStatuses);
       }
     };
 
@@ -7416,21 +7429,19 @@ const handleUpdatePillar = async (topicId: number, updates: { title?: string; re
           </div>
           
           {/* Content */}
-          <div className="flex-1 overflow-y-auto p-6">
-            <div className="max-w-5xl mx-auto">
-              <PublishExperience
-                companyDomain={companyDomain}
-                domainContext={domainContext}
-                keywordsTableData={keywordsTableData}
-                hasWordpressIntegration={hasWordpressIntegration}
-                wpIntegration={wpIntegration}
-                onConfigureWordpress={onConfigureWordpress}
-                onRefreshWordpressIntegration={onRefreshWordpressIntegration}
-                isActive={true}
-                initialDraftId={previewPageId}
-                disablePreviewOverlay={true}
-              />
-            </div>
+          <div className="relative flex-1 overflow-hidden bg-gray-50">
+            <PublishExperience
+              companyDomain={companyDomain}
+              domainContext={domainContext}
+              keywordsTableData={keywordsTableData}
+              hasWordpressIntegration={hasWordpressIntegration}
+              wpIntegration={wpIntegration}
+              onConfigureWordpress={onConfigureWordpress}
+              onRefreshWordpressIntegration={onRefreshWordpressIntegration}
+              isActive={true}
+              initialDraftId={previewPageId}
+              disablePreviewOverlay={true}
+            />
           </div>
         </div>
       )}
