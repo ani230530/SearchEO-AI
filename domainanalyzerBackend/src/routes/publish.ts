@@ -843,7 +843,8 @@ router.get(
         featuredImage: response.featuredImage || response['Featured Image'] || '',
         primaryKeyword: draft.primaryKeyword || '',
         longtailKeywords: response.longtailKeywords || response['longtail keywords'] || '',
-        wordpressUrl: draft.wordpressUrl
+        wordpressUrl: draft.wordpressUrl,
+        status: draft.status // Return status for polling
       }
     });
   })

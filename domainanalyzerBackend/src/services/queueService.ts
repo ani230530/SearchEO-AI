@@ -38,6 +38,21 @@ const worker = new Worker(
 
             console.log(`[Queue] Sending webhook to ${url}`);
 
+            // Mask secrets for logging
+            const maskSecrets = (value: any): any => {
+                if (!value || typeof value !== 'object') return value;
+                if (Array.isArray(value)) {
+                    return value.map((item) => maskSecrets(item));
+                }
+                const clone: Record<string, any> = { ...value };
+                if (clone.password) clone.password = '***';
+                if (clone.Password) clone.Password = '***';
+                if (clone.token) clone.token = '***';
+                return clone;
+            };
+
+            console.log('[Queue] Payload:', JSON.stringify(maskSecrets(payload), null, 2));
+
             // Perform the actual n8n call
             const response = await axios.post(url, payload, {
                 headers,
@@ -45,6 +60,7 @@ const worker = new Worker(
             });
 
             console.log(`[Queue] Job ${job.id} completed. Status: ${response.status}`);
+            console.log('[Queue] Response Data:', JSON.stringify(response.data, null, 2));
 
             // Handle Job Specific logic
             if (job.name === JOB_TYPES.PUBLISH) {
@@ -111,9 +127,25 @@ async function handlePublishCompletion(job: Job, responseData: any, meta: any) {
         return;
     }
 
-    // Success
+    // Valid URL found
     const finalStatus = 'published';
     const finalUrl = publishedUrl!;
+
+    // Fetch existing log to preserve htmlContent in response
+    const existingLog = await prisma.wordpressPublishLog.findUnique({
+        where: { id: draftId },
+        select: { response: true }
+    });
+
+    const currentResponse = (existingLog?.response as any) || {};
+    const mergedResponse = {
+        ...currentResponse,
+        ...entry,
+        // Ensure we don't lose the content if n8n doesn't return it
+        htmlContent: currentResponse.htmlContent || entry.htmlContent,
+        title: currentResponse.title || entry.title,
+        status: finalStatus
+    };
 
     await prisma.$transaction([
         prisma.wordpressPublishLog.update({
@@ -121,7 +153,7 @@ async function handlePublishCompletion(job: Job, responseData: any, meta: any) {
             data: {
                 wordpressUrl: finalUrl,
                 status: finalStatus,
-                response: responseData,
+                response: mergedResponse,
                 slug: entry?.slug ?? slug,
             }
         }),
@@ -151,7 +183,7 @@ async function handlePublishFailure(job: Job, error: any, meta: any) {
         await prisma.wordpressPublishLog.update({
             where: { id: draftId },
             data: {
-                status: 'draft',
+                status: 'failed',
                 response: { error: error.message || 'Publish job failed' }
             }
         });

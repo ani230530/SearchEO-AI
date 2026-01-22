@@ -196,4 +196,8 @@ app.listen(PORT, () => {
 
   // Start campaign generation timeout checker
   startCampaignTimeoutChecker();
+
+  // Start publish timeout checker
+  const { startPublishTimeoutChecker } = require('./services/publishJobTimeout');
+  startPublishTimeoutChecker();
 }); 

@@ -204,7 +204,61 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
         }
       }
     }
+    }
   });
+
+  // Polling fallback to ensure we don't get stuck in loading state if SSE fails
+  useEffect(() => {
+    if (!publishLoading || !currentDraftId) return;
+
+    const pollInterval = setInterval(async () => {
+      try {
+        // Try campaign endpoint first, then publish endpoint
+        let response = await fetch(`${API_BASE_URL}/api/campaigns/drafts/${currentDraftId}`, {
+          headers: { Authorization: `Bearer ${localStorage.getItem('authToken')}` },
+        });
+
+        if (!response.ok) {
+           response = await fetch(`${API_BASE_URL}/api/publish/drafts/${currentDraftId}`, {
+             headers: { Authorization: `Bearer ${localStorage.getItem('authToken')}` },
+           });
+        }
+
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success && data.draft) {
+             const status = data.draft.status;
+             
+             // If terminal state reached, update UI
+             if (status === 'published') {
+                setPublishLoading(false);
+                if (data.draft.wordpressUrl) {
+                    setPublishResult((prev) => prev ? { ...prev, wordpressUrl: data.draft.wordpressUrl } : null);
+                    toast({
+                        title: 'Published Successfully',
+                        description: `Your content is live! View it here: ${data.draft.wordpressUrl}`,
+                    });
+                    onRefreshWordpressIntegration();
+                    fetchPublishHistory();
+                }
+             } else if (status === 'failed') {
+                setPublishLoading(false);
+                toast({
+                    title: 'Publish Failed',
+                    description: 'The publish job failed (detected via polling).',
+                    variant: 'destructive',
+                });
+                fetchPublishHistory();
+             }
+          }
+        }
+      } catch (err) {
+        console.error('Polling error:', err);
+      }
+    }, 15000); // 15 seconds
+
+    return () => clearInterval(pollInterval);
+  }, [publishLoading, currentDraftId, toast, onRefreshWordpressIntegration, fetchPublishHistory]);
 
   const showPreviewStage = publishStage === 'preview';
 

@@ -433,6 +433,7 @@ exports.Prisma.WordpressPublishLogScalarFieldEnum = {
   status: 'status',
   response: 'response',
   createdAt: 'createdAt',
+  updatedAt: 'updatedAt',
   integrationId: 'integrationId'
 };
 
