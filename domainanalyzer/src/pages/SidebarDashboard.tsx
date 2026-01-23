@@ -75,14 +75,6 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 
-<<<<<<< HEAD
-  OverallScoreGauge,
-} from '@/components/audit/AuditCharts';
-import { motion, AnimatePresence } from "framer-motion";
-import { PDFDownloadLink } from '@react-pdf/renderer';
-import { AuditPDF } from '@/components/audit/AuditPDF';
-=======
->>>>>>> 7ff671ad18c8c9cb939f7046a7227ab043dbdb12
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3002";
 
@@ -326,36 +318,12 @@ const [improvedContent, setImprovedContent] = useState("");
   const navigate = useNavigate();
   const { toast } = useToast();
   const isSidebarExpanded = sidebarOpen || isSidebarHovered;
-<<<<<<< HEAD
-// PUBLISH PAGE STATES
-const [primaryKeyword, setPrimaryKeyword] = useState("");
-const [longtailKeywords, setLongtailKeywords] = useState("");
-const [brandName, setBrandName] = useState("");
-const [brandDescription, setBrandDescription] = useState("");
-const [image, setImage] = useState(1);
-const [wordCount, setWordCount] = useState(1500);
-const [featuredImage, setFeaturedImage] = useState("");
-
-// UI STATES
-const [publishLoading, setPublishLoading] = useState(false);
-const [publishSuccess, setPublishSuccess] = useState(false);
-const [publishError, setPublishError] = useState("");
-const [openSections, setOpenSections] = useState<number[]>([]);
-const toggleSection = (idx: number) => {
-  setOpenSections((prev) =>
-    prev.includes(idx)
-      ? prev.filter((i) => i !== idx)
-      : [...prev, idx]
-  );
-};
-=======
 // Campaign States
 const [campaignViewMode, setCampaignViewMode] = useState<'split' | 'graph'>('split');
 const [selectedTopicId, setSelectedTopicId] = useState<number | null>(null);
 const [campaignStructure, setCampaignStructure] = useState<CampaignStructure>({
   topics: []
 });
->>>>>>> 7ff671ad18c8c9cb939f7046a7227ab043dbdb12
 
   // Initialize selectedTopicId
   useEffect(() => {
@@ -2800,121 +2768,6 @@ useEffect(() => {
                               content: (contentMap[key] || []).join("\n").trim(),
                             };
                           });
-<<<<<<< HEAD
-                          const leftSections = sections.slice(0, 4);
-const rightSections = sections.slice(4, 8);
-
-                       if (sections.some((s) => s.content.length > 0)) {
-  return (
-    <div className="mx-auto w-full px-4">
-      {/* Master Panel */}
-      <div>
-        {/* Header */}
-        <div className="flex items-center justify-between px-8 py-6 border-b border-gray-600/50">
-          <div>
-            <h2 className="text-2xl font-light tracking-tight text-gray-900">
-              Company Info
-            </h2>
-            <p className="text-sm text-gray-500 mt-1">
-              AI-generated strategic analysis & recommendations
-            </p>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <span className="rounded-full bg-blue-50 px-4 py-1 text-xs font-medium text-blue-600 border border-blue-200">
-              Analysis
-            </span>
-          </div>
-        </div>
-
-        {/* Body */}
-       <div className="grid grid-cols-1 md:grid-cols-2 gap-6  py-6">
-        <div className="space-y-4 ">
-  {leftSections.map((sec, idx) => {
-    const globalIdx = idx; // 0–3
-    const isOpen = openSections.includes(globalIdx);
-
-    return (
-      <motion.div
-        key={globalIdx}
-        className="rounded-xl border border-gray-200/60 bg-white overflow-hidden hover:shadow-lg"
-      >
-        <button
-          onClick={() => toggleSection(globalIdx)}
-          className="flex w-full items-center justify-between px-6 py-4 text-left"
-        >
-          <h3 className="text-lg font-light text-gray-900">{sec.title}</h3>
-
-          <motion.div animate={{ rotate: isOpen ? 180 : 0 }}>
-            <ChevronDown size={20} />
-          </motion.div>
-        </button>
-
-        <AnimatePresence initial={false}>
-          {isOpen && (
-            <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: "auto", opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              className="overflow-hidden px-6 pb-6"
-            >
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                {sec.content}
-              </ReactMarkdown>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </motion.div>
-    );
-  })}
-</div>
-
-          <div className="space-y-4">
-  {rightSections.map((sec, idx) => {
-    const globalIdx = idx + 4; // 4–7
-    const isOpen = openSections.includes(globalIdx);
-
-    return (
-      <motion.div
-        key={globalIdx}
-        className="rounded-xl border border-gray-200/60 bg-white overflow-hidden hover:shadow-lg"
-      >
-        <button
-          onClick={() => toggleSection(globalIdx)}
-          className="flex w-full items-center justify-between px-6 py-4 text-left"
-        >
-          <h3 className="text-lg font-light text-gray-900">{sec.title}</h3>
-
-          <motion.div animate={{ rotate: isOpen ? 180 : 0 }}>
-            <ChevronDown size={20} />
-          </motion.div>
-        </button>
-
-        <AnimatePresence initial={false}>
-          {isOpen && (
-            <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: "auto", opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              className="overflow-hidden px-6 pb-6"
-            >
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                {sec.content}
-              </ReactMarkdown>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </motion.div>
-    );
-  })}
-</div>
-
-        </div>
-      </div>
-    </div>
-  );
-}
-=======
                           if (sections.some((s) => s.content.length > 0)) {
                             return (
                               <div className="w-full max-w-[900px] mx-auto bg-white rounded-3xl p-8 border border-gray-100 shadow-sm">
@@ -2941,7 +2794,6 @@ const rightSections = sections.slice(4, 8);
                               </div>
                             );
                           }
->>>>>>> 7ff671ad18c8c9cb939f7046a7227ab043dbdb12
                           return (
                             <div
                               className="relative bg-white rounded-3xl p-8 sm:p-12 border border-gray-100 shadow-sm prose prose-lg prose-gray max-w-none mx-auto
@@ -7329,15 +7181,6 @@ const handleUpdatePillar = async (topicId: number, updates: { title?: string; re
         </div>
       )}
 
-<<<<<<< HEAD
-      {/* Graph Overview */}
-      <div className="w-full h-[700px] mb-10 ">
-        <CampaignGraph
-          campaignStructure={campaignStructure}
-          selectedTopics={selectedTopics}
-        />
-=======
->>>>>>> 7ff671ad18c8c9cb939f7046a7227ab043dbdb12
       </div>
 
       {/* Generation Config Drawer - Matches Publish Tab Style */}
@@ -7346,125 +7189,6 @@ const handleUpdatePillar = async (topicId: number, updates: { title?: string; re
           side="right" 
           className="w-full sm:max-w-3xl border-l border-[#e2e4ea] bg-[#f5f6fa] px-10 py-12 overflow-y-auto font-light"
         >
-<<<<<<< HEAD
-          Continue
-        </button>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => handleAddTopic(false)}
-            disabled={syncing}
-            className="px-4 py-2 bg-gray-100 text-gray-900 rounded-full hover:bg-gray-200 transition-all text-sm font-light flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
-          >
-            <Plus className="h-4 w-4" />
-            Add topic manually
-          </button>
-          <button
-            onClick={() => handleAddTopic(true)}
-            disabled={syncing || aiLoading === "topic"}
-            className="px-4 py-2 bg-black text-white rounded-full hover:bg-black/90 transition-all text-sm font-medium flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
-          >
-            {aiLoading === "topic" ? (
-              <ButtonSpinner />
-            ) : (
-              <Sparkles className="h-4 w-4" />
-            )}
-            {aiLoading === "topic" ? "Generating..." : "AI Generate"}
-          </button>
-        </div>
-      </div>
-
-      {/* Active Generation Progress Section */}
-      {(() => {
-        // Collect all active generations
-        const activeGenerations: Array<{
-          topicId: number;
-          topicTitle: string;
-          jobId: string;
-          messages: Array<{ message: string; timestamp: string }>;
-          pages: Array<{ pageId: number; status: string; progress: number }>;
-        }> = [];
-
-        campaignStructure.topics.forEach(topic => {
-          const topicJobId = Array.from(jobIdToTopicId.entries())
-            .find(([_, tid]) => tid === topic.id)?.[0];
-          
-          if (topicJobId && isGenerationActive(topicJobId)) {
-            const messages = streamingMessages.get(topicJobId) || [];
-            const backendStatus = backendJobStatus.get(topicJobId);
-            
-            // Count completed pages
-            const topicPages = Array.from(generationJobs.values())
-              .filter(job => job.jobId === topicJobId);
-            const completedCount = topicPages.filter(p => p.hasHtml || p.status === 'completed').length;
-            const totalCount = topicPages.length || (topic.pillarPage ? 1 : 0) + topic.subPages.length;
-
-            activeGenerations.push({
-              topicId: topic.id,
-              topicTitle: topic.title,
-              jobId: topicJobId,
-              messages,
-              pages: backendStatus?.pages || []
-            });
-          }
-        });
-
-        if (activeGenerations.length === 0) return null;
-
-        return (
-          <div className="mb-8 space-y-4 hover:shadow-lg">
-            {activeGenerations.map(({ topicId, topicTitle, jobId, messages, pages }) => {
-              const latestMessage = messages[messages.length - 1];
-              
-              // Count pages from generationJobs if backend pages not available
-              const topicPages = Array.from(generationJobs.values())
-                .filter(job => job.jobId === jobId);
-              
-              const completedCount = pages.length > 0 
-                ? pages.filter(p => p.status === 'completed').length
-                : topicPages.filter(p => p.hasHtml || p.status === 'completed').length;
-              
-              const totalCount = pages.length > 0 
-                ? pages.length 
-                : topicPages.length || 3; // Default to 3 if no pages info
-              
-              const progressPercent = totalCount > 0 ? (completedCount / totalCount) * 100 : 0;
-              
-              return (
-                <div
-                  key={jobId}
-                  className="bg-white/80 backdrop-blur-xl border border-gray-200/60 rounded-3xl p-5 shadow-sm transition-all duration-300 hover:shadow-md"
-                  style={{
-                    boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.05)'
-                  }}
-                >
-                  <div className="flex items-start justify-between gap-5">
-                    <div className="flex-1 min-w-0 space-y-2">
-                      <div className="flex items-center gap-3">
-                        <div className="relative flex-shrink-0">
-                          <div className="w-2 h-2 bg-gray-900 rounded-full" />
-                          <div className="absolute inset-0 w-2 h-2 bg-gray-900 rounded-full animate-ping opacity-75" />
-                        </div>
-                        <h4 className="text-sm font-light text-gray-900 tracking-tight truncate" style={{ letterSpacing: '0.01em' }}>
-                          {topicTitle}
-                        </h4>
-                      </div>
-                      
-                      {latestMessage && (
-                        <p className="text-xs text-gray-500 font-extralight ml-5 leading-relaxed" style={{ letterSpacing: '0.005em' }}>
-                          {latestMessage.message}
-                        </p>
-                      )}
-                      
-                      <div className="ml-5 flex items-center gap-3">
-                        <div className="flex-1 h-0.5 bg-gray-100 rounded-full overflow-hidden">
-                          <div
-                            className="h-full bg-gray-900 transition-all duration-500 ease-out"
-                            style={{ width: `${progressPercent}%` }}
-                          />
-                        </div>
-                        <span className="text-[10px] text-gray-400 font-extralight tabular-nums" style={{ letterSpacing: '0.02em' }}>
-                          {completedCount}/{totalCount}
-=======
           <div className="space-y-10">
             {/* Header Card */}
             <div className="rounded-[32px] border border-white/80 bg-white/90 px-6 py-6 shadow-[0_30px_80px_rgba(15,23,42,0.10)] backdrop-blur">
@@ -7482,7 +7206,6 @@ const handleUpdatePillar = async (topicId: number, updates: { title?: string; re
                             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
                             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4l3-3-3-3v4A8 8 0 104 12z" />
                           </svg>
->>>>>>> 7ff671ad18c8c9cb939f7046a7227ab043dbdb12
                         </span>
                       ) : (
                         `Step ${generationStep} of 3`
