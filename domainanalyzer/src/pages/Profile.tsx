@@ -115,7 +115,7 @@ const Profile: React.FC = () => {
               logout();
               navigate("/");
             }}
-            className="absolute top-0 right-0 inline-flex items-center gap-2 px-4 py-2 text-sm font-light text-gray-700 hover:bg-gray-100 rounded-full transition-colors"
+            className="absolute top-0 right-0 inline-flex items-center gap-2 px-4 py-2 text-sm font-light text-gray-700 hover:text-red-500 rounded-full transition-colors"
             style={{ letterSpacing: '0.011em' }}
           >
             <LogOut className="h-4 w-4" />
@@ -143,7 +143,7 @@ const Profile: React.FC = () => {
         <div className="space-y-16">
           {/* Profile Information Card */}
           <div
-            className="bg-white/70 backdrop-blur-md rounded-2xl border border-gray-200 p-8 shadow-sm"
+            className="bg-white/70 backdrop-blur-md rounded-2xl border border-gray-200 p-8 hover:shadow-lg"
             style={{ borderWidth: '0.5px' }}
           >
             <div className="mb-8">
@@ -216,7 +216,7 @@ const Profile: React.FC = () => {
 
           {/* Security Card */}
           <div
-            className="bg-white/70 backdrop-blur-md rounded-2xl border border-gray-200 p-8 shadow-sm"
+            className="bg-white/70 backdrop-blur-md rounded-2xl border border-gray-200 p-8 hover:shadow-lg"
             style={{ borderWidth: '0.5px' }}
           >
             <div className="mb-8">

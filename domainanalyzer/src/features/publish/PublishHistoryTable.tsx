@@ -95,7 +95,7 @@ const PublishHistoryTable: React.FC<PublishHistoryTableProps> = ({
     });
 
   return (
-    <div className="rounded-[32px] border border-gray-100/80 bg-white/85 backdrop-blur-xl shadow-[0_20px_60px_rgba(15,23,42,0.08)] p-8">
+    <div className="rounded-[32px] border border-gray-100/80 bg-white/85 backdrop-blur-xl hover:shadow-lg p-8">
       <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
         <div>
           <h3 className="text-2xl font-light text-black tracking-tight">Drafts & Published Pages</h3>

@@ -390,6 +390,13 @@ const [publishLoading, setPublishLoading] = useState(false);
 const [publishSuccess, setPublishSuccess] = useState(false);
 const [publishError, setPublishError] = useState("");
 const [openSections, setOpenSections] = useState<number[]>([]);
+const toggleSection = (idx: number) => {
+  setOpenSections((prev) =>
+    prev.includes(idx)
+      ? prev.filter((i) => i !== idx)
+      : [...prev, idx]
+  );
+};
 
 
   useEffect(() => {
@@ -399,6 +406,7 @@ const [openSections, setOpenSections] = useState<number[]>([]);
   }, [sidebarOpen]);
 
   const tabs: Tab[] = [
+    { id: 'ai-checker', label: 'AI Checker', icon: <Sparkles className="h-5 w-5" /> },
     { id: 'overview', label: 'Overview', icon: <LayoutDashboard className="h-5 w-5" /> },
     { id: 'analytics', label: 'Company', icon: <Building className="h-5 w-5" /> },
     { id: 'campaign', label: 'Campaign', icon: <Megaphone className="h-5 w-5" /> },
@@ -408,7 +416,6 @@ const [openSections, setOpenSections] = useState<number[]>([]);
     { id: 'analytics-report', label: 'Analytics Reporting', icon: <FileChartColumnIncreasing className="h-5 w-5" /> },
     { id: 'settings', label: 'Settings', icon: <Settings className="h-5 w-5" /> },
     { id: 'profile', label: 'Profile', icon: <User className="h-5 w-5" /> },
-    { id: 'ai-checker', label: 'AI Checker', icon: <Sparkles className="h-5 w-5" /> },
   ];
 
   const validateDomain = (value: string) => {
@@ -2503,7 +2510,7 @@ useEffect(() => {
            <div className="max-w-7xl mx-auto px-4 sm:px-6 py-10 space-y-12">
 
     {/* ===================== HERO ===================== */}
-    <div className="relative overflow-hidden rounded-3xl border border-gray-100 bg-gradient-to-br from-white via-slate-50 to-white shadow-sm">
+    <div className="relative overflow-hidden rounded-3xl border border-gray-100 bg-gradient-to-br from-white via-slate-50 to-white hover:shadow-lg">
       {/* soft glow */}
       <div className="absolute -top-24 -left-24 w-96 h-96 bg-blue-50 rounded-full blur-3xl opacity-60" />
 
@@ -2522,7 +2529,7 @@ useEffect(() => {
             <button
               onClick={() => handleRunAudit(companyDomain)}
               disabled={!companyDomain || auditLoading}
-              className="inline-flex items-center gap-2 px-6 py-3 bg-black text-white rounded-full text-sm font-medium hover:bg-black/90 disabled:opacity-60 transition"
+              className="inline-flex items-center gap-2 px-6 py-3 bg-black text-white rounded-full text-sm font-medium hover:bg-black/90  disabled:opacity-60 transition"
             >
               {auditLoading ? "Running audit…" : "Run audit"}
             </button>
@@ -2532,7 +2539,7 @@ useEffect(() => {
                 setActiveTab("analytics");
                 setActiveCompanySubTab("company-info");
               }}
-              className="px-5 py-3 rounded-full border border-gray-200 bg-white text-sm hover:bg-gray-50 transition"
+              className="px-5 py-3 rounded-full border border-gray-200 bg-white text-sm hover:bg-gray-50  hover:shadow-lg transition"
             >
               Analytics
             </button>
@@ -2595,7 +2602,7 @@ useEffect(() => {
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
       {/* Opportunities Card */}
-<div className="rounded-3xl bg-white border border-gray-100 p-6 shadow-sm hover:shadow-md transition">
+<div className="rounded-3xl bg-white border border-gray-100 p-6 hover:shadow-lg transition">
   <div className="text-xs uppercase tracking-wide text-gray-500">
     Top opportunities
   </div>
@@ -2620,7 +2627,7 @@ useEffect(() => {
 </div>
 
       {/* Audit Summary */}
-      <div className="lg:col-span-2 rounded-3xl bg-white border border-gray-100 p-6 shadow-sm">
+      <div className="lg:col-span-2 rounded-3xl bg-white border border-gray-100 p-6 hover:shadow-lg">
         <div className="flex items-center justify-between mb-6">
           <div>
             <h3 className="text-sm font-medium text-gray-900">
@@ -2685,7 +2692,7 @@ useEffect(() => {
     </div>
 
     {/* ===================== SNAPSHOT ===================== */}
-    <div className="rounded-3xl bg-white border border-gray-100 p-6 shadow-sm">
+    <div className="rounded-3xl bg-white border border-gray-100 p-6 hover:shadow-lg">
       <h4 className="text-sm font-medium text-gray-900 mb-6">
         Snapshot
       </h4>
@@ -2799,14 +2806,16 @@ useEffect(() => {
                               content: (contentMap[key] || []).join("\n").trim(),
                             };
                           });
+                          const leftSections = sections.slice(0, 4);
+const rightSections = sections.slice(4, 8);
+
                        if (sections.some((s) => s.content.length > 0)) {
   return (
     <div className="mx-auto w-full px-4">
       {/* Master Panel */}
-      <div className="rounded-[3.5rem] border border-gray-200/60 bg-gradient-to-br from-white/80 to-white/40 backdrop-blur-xl shadow-2xl shadow-gray-900/5">
-        
+      <div>
         {/* Header */}
-        <div className="flex items-center justify-between px-8 py-6 border-b border-gray-200/50">
+        <div className="flex items-center justify-between px-8 py-6 border-b border-gray-600/50">
           <div>
             <h2 className="text-2xl font-light tracking-tight text-gray-900">
               Company Info
@@ -2824,75 +2833,87 @@ useEffect(() => {
         </div>
 
         {/* Body */}
-        <div className="px-8 py-8 space-y-5">
-          {sections.map((sec, idx) => {
-            const isOpen = openSections.includes(idx);
-            const toggleSection = (idx: number) => {
-              setOpenSections((prev) =>
-                prev.includes(idx)
-                  ? prev.filter((i) => i !== idx)
-                  : [...prev, idx]
-              );
-            };
-            return (
-              <motion.div
-                key={sec.title}
-                layout
-                className={`
-                  group rounded-2xl border transition-all duration-300
-                  ${
-                    isOpen
-                      ? "border-blue-400/40 bg-white shadow-lg shadow-blue-500/10"
-                      : "border-gray-200 bg-white/80 hover:border-blue-300"
-                  }
-                `}
-              >
-                {/* Section Header */}
-                <button
-                  onClick={() => toggleSection(idx)}
-                  className="flex w-full items-center justify-between px-6 py-4 text-left"
-                >
-                  <div>
-                    <h3 className="text-lg font-light tracking-tight text-gray-900">
-                      {sec.title}
-                    </h3>
-                    {/* <p className="text-xs text-gray-500">
-                      Strategic analysis & recommendations
-                    </p> */}
-                  </div>
+       <div className="grid grid-cols-1 md:grid-cols-2 gap-6  py-6">
+        <div className="space-y-4 ">
+  {leftSections.map((sec, idx) => {
+    const globalIdx = idx; // 0–3
+    const isOpen = openSections.includes(globalIdx);
 
-                  <motion.div
-                    animate={{ rotate: isOpen ? 180 : 0 }}
-                    transition={{ duration: 0.3 }}
-                    className="text-gray-400"
-                  >
-                    <ChevronDown size={20} />
-                  </motion.div>
-                </button>
+    return (
+      <motion.div
+        key={globalIdx}
+        className="rounded-xl border border-gray-200/60 bg-white overflow-hidden hover:shadow-lg"
+      >
+        <button
+          onClick={() => toggleSection(globalIdx)}
+          className="flex w-full items-center justify-between px-6 py-4 text-left"
+        >
+          <h3 className="text-lg font-light text-gray-900">{sec.title}</h3>
 
-                {/* Section Content */}
-                <AnimatePresence initial={false}>
-                  {isOpen && (
-                    <motion.div
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: "auto", opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      transition={{ duration: 0.3 }}
-                      className="overflow-hidden"
-                    >
-                      <div className="px-6 pb-6 pt-2">
-                        <div className="prose prose-sm prose-gray max-w-none">
-                          <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                            {sec.content}
-                          </ReactMarkdown>
-                        </div>
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </motion.div>
-            );
-          })}
+          <motion.div animate={{ rotate: isOpen ? 180 : 0 }}>
+            <ChevronDown size={20} />
+          </motion.div>
+        </button>
+
+        <AnimatePresence initial={false}>
+          {isOpen && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="overflow-hidden px-6 pb-6"
+            >
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                {sec.content}
+              </ReactMarkdown>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </motion.div>
+    );
+  })}
+</div>
+
+          <div className="space-y-4">
+  {rightSections.map((sec, idx) => {
+    const globalIdx = idx + 4; // 4–7
+    const isOpen = openSections.includes(globalIdx);
+
+    return (
+      <motion.div
+        key={globalIdx}
+        className="rounded-xl border border-gray-200/60 bg-white overflow-hidden hover:shadow-lg"
+      >
+        <button
+          onClick={() => toggleSection(globalIdx)}
+          className="flex w-full items-center justify-between px-6 py-4 text-left"
+        >
+          <h3 className="text-lg font-light text-gray-900">{sec.title}</h3>
+
+          <motion.div animate={{ rotate: isOpen ? 180 : 0 }}>
+            <ChevronDown size={20} />
+          </motion.div>
+        </button>
+
+        <AnimatePresence initial={false}>
+          {isOpen && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="overflow-hidden px-6 pb-6"
+            >
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                {sec.content}
+              </ReactMarkdown>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </motion.div>
+    );
+  })}
+</div>
+
         </div>
       </div>
     </div>
@@ -2932,7 +2953,7 @@ useEffect(() => {
                     {/* Keywords - Table with Filters and Add Custom Keyword */}
                     {keywordsTableData.length > 0 && (
                       <div className="mt-16">
-                        <div className="bg-white rounded-3xl border border-gray-100 shadow-lg overflow-hidden backdrop-blur-sm">
+                        <div className="bg-white rounded-3xl border border-gray-100 hover:shadow-lg overflow-hidden backdrop-blur-sm">
                           <div className="p-4 sm:p-6 border-b border-gray-100 bg-gradient-to-b from-gray-50/50 to-white">
                             <div className="flex items-center justify-between mb-4">
                               <h2 className="text-2xl font-light text-gray-900 tracking-tight">
@@ -3776,10 +3797,10 @@ useEffect(() => {
                       <IntegrationSkeleton />
                     ) : !gscConnected ? (
                       <div className="bg-white rounded-3xl p-12 border border-gray-100 shadow-sm text-center">
-                        <div className="w-16 h-16 mx-auto mb-6 bg-gray-100 rounded-full flex items-center justify-center">
+                        <div className="w-16 h-16 mx-auto mb-6 bg-gray-100 rounded-full flex items-center justify-center ">
                           <Plug className="h-8 w-8 text-gray-400" />
                         </div>
-                        <h2 className="text-2xl font-light text-black tracking-tight mb-3">
+                        <h2 className="text-2xl font-light text-black tracking-tight mb-3 ">
                           Google Search Console
                         </h2>
                         <p className="text-base font-light text-gray-600 mb-8">
@@ -3795,7 +3816,7 @@ useEffect(() => {
                       </div>
                     ) : (
                       <div className="space-y-6">
-                        <div className="bg-white rounded-3xl p-8 border border-gray-100 shadow-sm">
+                        <div className="bg-white rounded-3xl p-8 border border-gray-100 hover:shadow-lg">
                           <div className="flex items-center justify-between mb-6">
                             <div className="flex items-center gap-3">
                               <div className="w-12 h-12 rounded-xl bg-green-50 flex items-center justify-center">
@@ -3818,7 +3839,7 @@ useEffect(() => {
                             </button>
                           </div>
                           {gscLastSynced && (
-                            <p className="text-xs font-light text-gray-500">
+                            <p className="text-xs font-light text-gray-500 ">
                               Last synced:{" "}
                               {new Date(gscLastSynced).toLocaleString()}
                             </p>
@@ -3850,7 +3871,7 @@ useEffect(() => {
                                     }
                                     className="w-full text-left p-4 rounded-2xl border border-gray-100 hover:border-gray-200 hover:bg-gray-50 transition-all duration-200"
                                   >
-                                    <div className="flex items-center justify-between">
+                                    <div className="flex items-center justify-between ">
                                       <div>
                                         <p className="text-base font-light text-black">
                                           {property.siteUrl}
@@ -3880,7 +3901,7 @@ useEffect(() => {
                             )}
                           </div>
                         ) : (
-                          <div className="bg-white rounded-3xl p-8 border border-gray-100 shadow-sm">
+                          <div className="bg-white rounded-3xl p-8 border border-gray-100 hover:shadow-lg">
                             <div className="flex items-center justify-between mb-6">
                               <div>
                                 <h3 className="text-xl font-light text-black tracking-tight mb-1">
@@ -3910,7 +3931,7 @@ useEffect(() => {
                       </div>
                     )}
 
-                    <div className="bg-white rounded-3xl p-8 border border-gray-100 shadow-sm">
+                    <div className="bg-white rounded-3xl p-8 border border-gray-100 hover:shadow-lg">
                       <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
                         <div>
                           <h3 className="text-2xl font-light text-black tracking-tight">
@@ -4545,7 +4566,7 @@ useEffect(() => {
                     Domain Performance Audit
                   </div>
                   <h1
-                    className="text-5xl sm:text-6xl md:text-7xl font-extralight mb-6 text-gray-900"
+                    className="text-5xl sm:text-6xl md:text-7xl font-extralight mb-6 text-gray-900 "
                     style={{ letterSpacing: '-0.003em', lineHeight: 1.05 }}
                   >
                     Audit Your Domain
@@ -4568,7 +4589,7 @@ useEffect(() => {
                       </span>
                     </div>
 
-                    <div className="flex gap-3">
+                    <div className="flex gap-3 ">
                       <button
                         onClick={() => handleRunAudit(companyDomain)}
                         disabled={auditLoading || !companyDomain}
@@ -4885,7 +4906,7 @@ useEffect(() => {
             </div>
           ) : activeTab === 'settings' ? (
             <div className="max-w-6xl mx-auto px-4 sm:px-6 py-12 sm:py-16">
-              <div className="bg-white rounded-3xl p-12 border border-gray-100 shadow-sm text-center">
+              <div className="bg-white rounded-3xl p-12 border border-gray-100 hover:shadow-lg text-center">
                 <h2 className="text-2xl font-light text-black tracking-tight mb-3">
                   Domain Settings
                 </h2>
@@ -6720,7 +6741,7 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
       )}
 
       {/* Graph Overview */}
-      <div className="w-full h-[700px] mb-10">
+      <div className="w-full h-[700px] mb-10 ">
         <CampaignGraph
           campaignStructure={campaignStructure}
           selectedTopics={selectedTopics}
@@ -6798,7 +6819,7 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
         if (activeGenerations.length === 0) return null;
 
         return (
-          <div className="mb-8 space-y-4">
+          <div className="mb-8 space-y-4 hover:shadow-lg">
             {activeGenerations.map(({ topicId, topicTitle, jobId, messages, pages }) => {
               const latestMessage = messages[messages.length - 1];
               

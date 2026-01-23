@@ -125,7 +125,7 @@ const getScoreColor = (score: number) => {
   return '#DC2626'; // red
 };
 
-const MetricCard = ({ label, value }: { label: string, value: number }) => {
+const MetricCard = ({ label, value, insight }: { label: string, value: number, insight?: string }) => {
   const percent = Math.round(value * 100);
   const color = getScoreColor(value);
   
@@ -197,10 +197,10 @@ export const AuditPDF: React.FC<AuditPDFProps> = ({ data, domain }) => {
         </View>
 
         <View style={styles.grid}>
-          <MetricCard label="Performance" value={data.performance} />
-          <MetricCard label="SEO" value={data.seo} />
-          <MetricCard label="Accessibility" value={data.accessibility} />
-          <MetricCard label="Best Practices" value={data.bestPractices} />
+          <MetricCard label="Performance" value={data.performance} insight="Improve load times, optimize images, and reduce render-blocking scripts."/>
+          <MetricCard label="SEO" value={data.seo} insight="Fix meta tags, use proper headings, and ensure mobile-friendly design."/>
+          <MetricCard label="Accessibility" value={data.accessibility} insight="Add alt texts, ensure color contrast, and support screen readers."/>
+          <MetricCard label="Best Practices" value={data.bestPractices} insight="Update outdated dependencies and follow web security best practices."/>
         </View>
 
         <View style={{ marginTop: 40, padding: 20, backgroundColor: '#f9fafb', borderRadius: 8 }}>

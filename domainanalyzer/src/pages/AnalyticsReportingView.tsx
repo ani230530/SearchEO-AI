@@ -341,7 +341,7 @@ const AnalyticsReportingSetup = () => {
         </header>
 
         {/* Context Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-6xl mx-auto mb-16">
+        {/* <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-6xl mx-auto mb-16">
           <NarrativeCard
             icon={<Zap />}
             title="Zero manual work"
@@ -357,7 +357,7 @@ const AnalyticsReportingSetup = () => {
             title="Real-time updates"
             description="Get notified instantly when your report is ready via live updates."
           />
-        </div>
+        </div> */}
 
         {/* Main Action Trigger */}
         <section className="flex flex-col items-center gap-8 py-10">
@@ -397,7 +397,7 @@ const AnalyticsReportingSetup = () => {
                   </DrawerDescription>
                 </DrawerHeader>
 
-                <div className="bg-white/60 backdrop-blur rounded-2xl p-6 border border-neutral-200">
+                <div className="bg-white/60  rounded-2xl p-6 border border-neutral-200">
                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <Field
                     label="Report Name"
@@ -631,9 +631,9 @@ onSelect={(date) => {
         </section>
 
         {/* History Table */}
-        <section className="max-w-6xl mx-auto space-y-8">
-          <div className="flex items-center justify-between">
-            <div className="space-y-1">
+        <section className="max-w-6xl mx-auto space-y-8 ">
+          <div className="flex items-center justify-between ">
+            <div className="space-y-1 ">
               <h2 className="text-3xl font-light tracking-tight">Recent Reports</h2>
               <p className="text-sm font-light text-neutral-500">
                 A history of your generated analytics reports and presentations.
@@ -648,7 +648,7 @@ onSelect={(date) => {
             </button>
           </div>
 
-          <div className="bg-white/80 backdrop-blur-xl rounded-[32px] border border-neutral-200 overflow-hidden shadow-xl">
+          <div className="bg-white/80 backdrop-blur-xl rounded-[32px] border border-neutral-200 overflow-hidden hover:shadow-lg ">
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
                 <thead>
