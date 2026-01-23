@@ -1,44 +1,88 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LayoutDashboard, BarChart3, Settings, User, LogOut, Menu, X, Building, Globe, CheckCircle, Info, Plug, FileText, ChevronDown, ChevronRight, ChevronLeft, Megaphone, Plus, ChevronUp, Trash2, Sparkles, ArrowLeft, Search, TrendingUp, Grid3X3, List, ArrowUpDown, Loader2, AlertCircle, Check, Send, RefreshCw, ClipboardList, FileChartColumnIncreasing } from 'lucide-react';
-import GSCAnalyticsView from '@/components/gsc/GSCAnalyticsView';
-import AnalyticsReportingView from './AnalyticsReportingView';
-import { useAuth } from '@/contexts/AuthContext';
-import { useToast } from '@/components/ui/use-toast';
-import { maskDomainId } from '@/lib/domainUtils';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
-import CampaignGraph from '@/components/CampaignGraph';
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
-  AlertDialog,
-  AlertDialogContent,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogDescription,
-  AlertDialogAction,
-  AlertDialogCancel,
-} from '@/components/ui/alert-dialog';
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+  ArrowLeft,
+  ChevronRight,
+  Plus,
+  Trash2,
+  AlertCircle,
+  CheckCircle,
+  Loader2,
+  Sparkles,
+  Layout,
+  List,
+  Network,
+  LayoutDashboard,
+  Building,
+  Megaphone,
+  Send,
+  BarChart3,
+  ClipboardList,
+  FileChartColumnIncreasing,
+  Settings,
+  User,
+  Search,
+  Grid3X3,
+  ChevronLeft,
+  ChevronDown,
+  Check,
+  FileText,
+  X,
+  LogOut,
+  ChevronUp,
+  ArrowUpDown,
+  Plug,
+  TrendingUp,
+  Menu,
+  Globe,
+  Eye,
+  ExternalLink,
+  Pencil
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { maskDomainId } from '@/lib/domainUtils';
+import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/hooks/use-toast';
+import { ButtonSpinner } from '@/components/ui/button-spinner';
+import { CampaignTopicSidebar } from '@/features/campaign/CampaignTopicSidebar';
+import { CampaignTopicDetail } from '@/features/campaign/CampaignTopicDetail';
+import { Topic, CampaignStructure, GenerationPageStatus, DraftStatusRecord, KeywordTableItem, DraftPreview, Keyword } from '@/types';
+import CampaignGraph from '@/components/CampaignGraph';
+import { AuditBarChart, AuditGaugeChart, AuditRadarChart, AuditScoreDistribution, OverallScoreGauge } from '@/components/audit/AuditCharts';
+import { WordpressIntegration } from '@/types/publish';
+import { PDFDownloadLink } from '@react-pdf/renderer';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogTitle } from '@radix-ui/react-alert-dialog';
+import { AuditPDF } from '@/components/audit/AuditPDF';
 import PublishExperience from '@/features/publish/PublishExperience';
 import { CompanyInfoSkeleton } from '@/components/dashboard/CompanyInfoSkeleton';
-import { KeywordTableItem } from '@/types/keywords';
-import { WordpressIntegration } from '@/types/publish';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@radix-ui/react-accordion';
+import AnalyticsReportingView from './AnalyticsReportingView';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import { AlertDialogHeader } from '@/components/ui/alert-dialog';
 import Profile from './Profile';
+import GSCAnalyticsView from '@/components/gsc/GSCAnalyticsView';
 import {
-  AuditRadarChart,
-  AuditBarChart,
-  AuditGaugeChart,
-  AuditScoreDistribution,
-  AuditLineChart,
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetFooter,
+} from '@/components/ui/sheet';
+import { Slider } from '@/components/ui/slider';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
 
+<<<<<<< HEAD
   OverallScoreGauge,
 } from '@/components/audit/AuditCharts';
 import { motion, AnimatePresence } from "framer-motion";
 import { PDFDownloadLink } from '@react-pdf/renderer';
 import { AuditPDF } from '@/components/audit/AuditPDF';
+=======
+>>>>>>> 7ff671ad18c8c9cb939f7046a7227ab043dbdb12
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3002";
 
@@ -59,84 +103,7 @@ interface DomainCheckResult {
   lastAnalyzed?: string;
 }
 
-// Campaign Structure Types
-interface Keyword {
-  id: number;
-  term: string;
-  volume: number;
-  difficulty: string;
-  intent?: string | null;
-  cpc?: number;
-  aiMetadata?: any; // For storing isPrimary/isLongtail flags
-}
-
-interface SubPage {
-  id: number;
-  title: string;
-  description?: string | null;
-  summary?: string | null;
-  keywords: Keyword[];
-}
-
-interface PillarPage {
-  id: number;
-  title: string;
-  description?: string | null;
-  summary?: string | null;
-  keywords: Keyword[];
-}
-
-interface Topic {
-  id: number;
-  title: string;
-  description?: string | null;
-  status?: string;
-  source?: string;
-  keywords?: Keyword[];
-  pillarPage: PillarPage | null;
-  subPages: SubPage[];
-}
-
-interface CampaignStructure {
-  topics: Topic[];
-}
-
-type GenerationPageStatus = {
-  jobId: string;
-  pageId: number;
-  pageType: 'pillar' | 'subpage';
-  status: 'pending' | 'generating' | 'completed' | 'failed' | 'published';
-  draftId?: number;
-  progress?: number;
-  primaryKeyword?: string;
-  hasHtml?: boolean;
-  updatedAt?: string;
-  error?: string | null;
-  wordpressUrl?: string | null;
-};
-
-type DraftPreview = {
-  htmlContent: string;
-  title?: string;
-  metaDescription?: string;
-  slug?: string;
-  featuredImage?: string;
-  primaryKeyword?: string;
-};
-
-type DraftStatusRecord = {
-  pageId: number;
-  pageType: string;
-  status: string;
-  draftId?: number;
-  progress?: number;
-  primaryKeyword?: string;
-  jobId?: string;
-  hasHtml?: boolean;
-  updatedAt?: string;
-  error?: string | null;
-  wordpressUrl?: string | null;
-};
+// Types moved to @/types
 
 const summarizeDomainContext = (input: string, maxLines = 6, maxChars = 800) => {
   if (!input) return '';
@@ -152,24 +119,7 @@ const summarizeDomainContext = (input: string, maxLines = 6, maxChars = 800) => 
   return `${limited.slice(0, maxChars)}…`;
 };
 
-const ButtonSpinner = () => (
-  <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24">
-    <circle
-      className="opacity-25"
-      cx="12"
-      cy="12"
-      r="10"
-      stroke="currentColor"
-      strokeWidth="4"
-      fill="none"
-    />
-    <path
-      className="opacity-75"
-      fill="currentColor"
-      d="M4 12a8 8 0 018-8v4l3-3-3-3v4A8 8 0 104 12z"
-    />
-  </svg>
-);
+
 
 const IntegrationSkeleton = () => (
   <div className="max-w-4xl mx-auto space-y-6 animate-pulse">
@@ -376,6 +326,7 @@ const [improvedContent, setImprovedContent] = useState("");
   const navigate = useNavigate();
   const { toast } = useToast();
   const isSidebarExpanded = sidebarOpen || isSidebarHovered;
+<<<<<<< HEAD
 // PUBLISH PAGE STATES
 const [primaryKeyword, setPrimaryKeyword] = useState("");
 const [longtailKeywords, setLongtailKeywords] = useState("");
@@ -397,7 +348,21 @@ const toggleSection = (idx: number) => {
       : [...prev, idx]
   );
 };
+=======
+// Campaign States
+const [campaignViewMode, setCampaignViewMode] = useState<'split' | 'graph'>('split');
+const [selectedTopicId, setSelectedTopicId] = useState<number | null>(null);
+const [campaignStructure, setCampaignStructure] = useState<CampaignStructure>({
+  topics: []
+});
+>>>>>>> 7ff671ad18c8c9cb939f7046a7227ab043dbdb12
 
+  // Initialize selectedTopicId
+  useEffect(() => {
+    if (campaignStructure.topics.length > 0 && selectedTopicId === null) {
+      setSelectedTopicId(campaignStructure.topics[0].id);
+    }
+  }, [campaignStructure.topics, selectedTopicId]);
 
   useEffect(() => {
     if (sidebarOpen) {
@@ -2485,6 +2450,35 @@ useEffect(() => {
                 {tabs.find((t) => t.id === activeTab)?.label || "Dashboard"}
               </h2>
             </div>
+
+            
+            {activeTab === 'campaign' && selectedCampaignId && (
+                <div className="flex items-center gap-2 bg-gray-100/80 p-1 rounded-lg border border-gray-200/50 mr-4">
+                  <button
+                    onClick={() => setCampaignViewMode('split')}
+                    className={`p-1.5 rounded-md transition-all flex items-center gap-2 text-xs font-medium ${
+                      campaignViewMode === 'split' 
+                        ? 'bg-white text-black shadow-sm' 
+                        : 'text-gray-500 hover:text-gray-700'
+                    }`}
+                  >
+                    <List className="h-4 w-4" />
+                    <span>Topics</span>
+                  </button>
+                  <button
+                    onClick={() => setCampaignViewMode('graph')}
+                    className={`p-1.5 rounded-md transition-all flex items-center gap-2 text-xs font-medium ${
+                      campaignViewMode === 'graph' 
+                        ? 'bg-white text-black shadow-sm' 
+                        : 'text-gray-500 hover:text-gray-700'
+                    }`}
+                  >
+                    <Network className="h-4 w-4" />
+                    <span>Map</span>
+                  </button>
+               </div>
+            )}
+
             {user && (
               <div className="flex items-center gap-3">
                 <div
@@ -2505,7 +2499,7 @@ useEffect(() => {
         </header>
 
         {/* Content Body */}
-        <div className="content-body">
+        <div className={activeTab === 'campaign' && selectedCampaignId ? "flex-1 min-h-[calc(100vh-80px)] bg-white" : "content-body"}>
           {activeTab === "overview" ? (
            <div className="max-w-7xl mx-auto px-4 sm:px-6 py-10 space-y-12">
 
@@ -2806,6 +2800,7 @@ useEffect(() => {
                               content: (contentMap[key] || []).join("\n").trim(),
                             };
                           });
+<<<<<<< HEAD
                           const leftSections = sections.slice(0, 4);
 const rightSections = sections.slice(4, 8);
 
@@ -2919,6 +2914,34 @@ const rightSections = sections.slice(4, 8);
     </div>
   );
 }
+=======
+                          if (sections.some((s) => s.content.length > 0)) {
+                            return (
+                              <div className="w-full max-w-[900px] mx-auto bg-white rounded-3xl p-8 border border-gray-100 shadow-sm">
+                                <Accordion type="single" collapsible className="w-full">
+                                  {sections.map((sec, idx) => (
+                                    <AccordionItem key={sec.title} value={`item-${idx}`} className="border-b-gray-100 last:border-0">
+                                      <AccordionTrigger className="text-left text-lg font-medium text-gray-900 hover:text-gray-700 py-4">
+                                        {sec.title}
+                                      </AccordionTrigger>
+                                      <AccordionContent className="text-gray-600 leading-relaxed pb-4">
+                                        <div className="prose prose-sm prose-gray max-w-none">
+                                          {sec.content ? (
+                                            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                              {sec.content}
+                                            </ReactMarkdown>
+                                          ) : (
+                                            <p className="text-gray-500 text-sm">No content</p>
+                                          )}
+                                        </div>
+                                      </AccordionContent>
+                                    </AccordionItem>
+                                  ))}
+                                </Accordion>
+                              </div>
+                            );
+                          }
+>>>>>>> 7ff671ad18c8c9cb939f7046a7227ab043dbdb12
                           return (
                             <div
                               className="relative bg-white rounded-3xl p-8 sm:p-12 border border-gray-100 shadow-sm prose prose-lg prose-gray max-w-none mx-auto
@@ -4223,8 +4246,57 @@ const rightSections = sections.slice(4, 8);
               </div>
             )
           ) : activeTab === "campaign" ? (
-            <div className="max-w-4xl mx-auto px-4 sm:px-6 py-12 sm:py-16">
-              {!selectedCampaignId && (
+            // Campaign Tab Logic - moved logic inside to handle full width for structure view
+            (() => {
+              if (selectedCampaignId) {
+                 const selectedCampaign = campaigns.find(
+                    (c) => c.id === selectedCampaignId
+                  );
+                  if (!selectedCampaign) {
+                    return (
+                      <div className="max-w-4xl mx-auto px-4 sm:px-6 py-12 sm:py-16">
+                        <div className="bg-white rounded-3xl p-8 border border-red-100 text-center text-sm text-red-600">
+                        Selected campaign could not be found. Please go back and
+                        try again.
+                        <div className="mt-4">
+                          <button
+                            onClick={() => setSelectedCampaignId(null)}
+                            className="px-5 py-2 bg-black text-white rounded-full text-sm"
+                          >
+                            Back
+                          </button>
+                        </div>
+                      </div>
+                      </div>
+                    );
+                  }
+                  return (
+                    <CampaignStructureView
+                      campaign={selectedCampaign}
+                      onBack={() => setSelectedCampaignId(null)}
+                      companyDomain={companyDomain}
+                      domainContext={domainContext}
+                      keywordsTableData={keywordsTableData}
+                      hasWordpressIntegration={hasWordpressIntegration}
+                      wpIntegration={wpIntegration}
+                      onConfigureWordpress={handleConfigureWordpress}
+                      onRefreshWordpressIntegration={async () => {
+                        await fetchWordpressIntegration();
+                        if (activeTab === 'campaign') {
+                          await fetchCampaignTabData();
+                        }
+                      }}
+                      viewMode={campaignViewMode}
+                      onViewModeChange={setCampaignViewMode}
+                      sidebarOpen={sidebarOpen}
+                    />
+                  );
+              }
+
+              // Default Campaign List View (Centered)
+              return (
+              <div className="max-w-4xl mx-auto px-4 sm:px-6 py-12 sm:py-16">
+
                 <>
                   {/* Header */}
                   <div className="flex items-center justify-between mb-8">
@@ -4238,9 +4310,9 @@ const rightSections = sections.slice(4, 8);
                     </div>
                     <button
                       onClick={() => setShowCreateCampaign(!showCreateCampaign)}
-                      className="px-6 py-3 bg-black text-white rounded-full hover:bg-black/90 focus:outline-none focus:ring-4 focus:ring-black/10 transition-all shadow text-base font-medium flex items-center gap-2"
+                      className="h-9 px-4 text-sm bg-black text-white rounded-full hover:bg-neutral-800 transition-all flex items-center gap-2"
                     >
-                      <Plus className="h-5 w-5" />
+                      <Plus className="h-4 w-4" />
                       {showCreateCampaign ? "Cancel" : "New Campaign"}
                     </button>
                   </div>
@@ -4307,7 +4379,6 @@ const rightSections = sections.slice(4, 8);
                     </div>
                   )}
                 </>
-              )}
 
               {/* Campaigns List */}
               {(() => {
@@ -4321,47 +4392,9 @@ const rightSections = sections.slice(4, 8);
                     </div>
                   );
                 }
-
-                if (selectedCampaignId) {
-                  const selectedCampaign = campaigns.find(
-                    (c) => c.id === selectedCampaignId
-                  );
-                  if (!selectedCampaign) {
-                    return (
-                      <div className="bg-white rounded-3xl p-8 border border-red-100 text-center text-sm text-red-600">
-                        Selected campaign could not be found. Please go back and
-                        try again.
-                        <div className="mt-4">
-                          <button
-                            onClick={() => setSelectedCampaignId(null)}
-                            className="px-5 py-2 bg-black text-white rounded-full text-sm"
-                          >
-                            Back
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  }
-                  return (
-                    <CampaignStructureView
-                      campaign={selectedCampaign}
-                      onBack={() => setSelectedCampaignId(null)}
-                      companyDomain={companyDomain}
-                      domainContext={domainContext}
-                      keywordsTableData={keywordsTableData}
-                      hasWordpressIntegration={hasWordpressIntegration}
-                      wpIntegration={wpIntegration}
-                      onConfigureWordpress={handleConfigureWordpress}
-                      onRefreshWordpressIntegration={async () => {
-                        await fetchWordpressIntegration();
-                        if (activeTab === 'campaign') {
-                          await fetchCampaignTabData();
-                        }
-                      }}
-                    />
-                  );
-                }
-
+                
+                // Note: selectedCampaignId case is handled above the container now
+                
                 if (campaigns.length === 0) {
                   return (
                     <div className="bg-white rounded-3xl p-12 border border-gray-100 shadow-sm text-center">
@@ -4472,9 +4505,12 @@ const rightSections = sections.slice(4, 8);
   </div>
 )}
                   </div>
+
                 );
               })()}
             </div>
+            );
+            })()
           ) : activeTab === 'publish' ? (
             companyDomainLoading ? (
               <CompanyInfoSkeleton />
@@ -4489,9 +4525,6 @@ const rightSections = sections.slice(4, 8);
                   onConfigureWordpress={handleConfigureWordpress}
                   onRefreshWordpressIntegration={async () => {
                     await fetchWordpressIntegration();
-                    if (activeTab === 'campaign') {
-                      await fetchCampaignTabData();
-                    }
                   }}
                   isActive={activeTab === 'publish'}
                 />
@@ -5080,9 +5113,12 @@ interface CampaignStructureViewProps {
   wpIntegration: WordpressIntegration | null;
   onConfigureWordpress: () => void;
   onRefreshWordpressIntegration: () => void;
+  viewMode: 'split' | 'graph';
+  onViewModeChange: (mode: 'split' | 'graph') => void;
+  sidebarOpen: boolean;
 }
 
-const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({ 
+function CampaignStructureView({ 
   campaign, 
   onBack, 
   companyDomain, 
@@ -5091,9 +5127,14 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
   hasWordpressIntegration,
   wpIntegration,
   onConfigureWordpress,
-  onRefreshWordpressIntegration
-}) => {
+  onRefreshWordpressIntegration,
+  viewMode,
+  onViewModeChange,
+  sidebarOpen
+}: CampaignStructureViewProps) {
   const CAMPAIGN_API_BASE = `${API_BASE_URL}/api/campaigns`;
+  // campaignViewMode state lifted to parent
+  const [selectedTopicId, setSelectedTopicId] = useState<number | null>(null);
   const [campaignStructure, setCampaignStructure] = useState<CampaignStructure>(
     { topics: [] }
   );
@@ -5115,6 +5156,10 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
   const [showAddTopicModal, setShowAddTopicModal] = useState(false);
   const [showAddPillarModal, setShowAddPillarModal] = useState(false);
   const [showAddSubPageModal, setShowAddSubPageModal] = useState(false);
+  
+  // Track draft statuses (published/local drafts)
+  const [draftStatuses, setDraftStatuses] = useState<Map<number, { isPublished: boolean; publishedUrl?: string; draftId?: number }>>(new Map());
+
   const [showAddKeywordModal, setShowAddKeywordModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteLabel, setDeleteLabel] = useState<string>('');
@@ -5145,6 +5190,18 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
   const [drawerSortConfig, setDrawerSortConfig] = useState<{ key: keyof KeywordTableItem; direction: "asc" | "desc" } | null>(null);
   const [drawerCurrentPage, setDrawerCurrentPage] = useState(1);
   const [drawerItemsPerPage, setDrawerItemsPerPage] = useState(10);
+
+  // Generation Drawer State
+  const [generationDrawerOpen, setGenerationDrawerOpen] = useState(false);
+  const [pendingGenerationTopic, setPendingGenerationTopic] = useState<Topic | null>(null);
+  const [generationConfig, setGenerationConfig] = useState({
+    wordCount: 800,
+    images: 2,
+    featuredImage: true,
+    brandName: '',
+    brandDescription: ''
+  });
+  
   const drawerFilteredKeywords = React.useMemo(() => {
     return keywordsTableData.filter((keyword) => {
       const matchesSearch = keyword.keyword.toLowerCase().includes(drawerSearchTerm.toLowerCase());
@@ -5252,14 +5309,8 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
   const { toast } = useToast();
 
   // Pillar page generation states
-  const [generationDrawerOpen, setGenerationDrawerOpen] = useState(false);
-  const [generationForm, setGenerationForm] = useState({
-    wordCount: 800,
-    images: 2,
-    featuredImage: true,
-    brandName: '',
-    brandDescription: '',
-  });
+  // Pillar page generation states
+  // generationDrawerOpen, generationConfig are already defined above
   // Auto-fill brand fields using company domain/context (mirrors publish tab)
   const derivedBrandName = React.useMemo(() => {
     if (companyDomain) {
@@ -5290,6 +5341,9 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
   
   // Active generation tracking - track last streaming timestamp per jobId
   const [lastStreamingTimestamp, setLastStreamingTimestamp] = useState<Map<string, number>>(new Map());
+
+  // Hydrate active jobs on mount
+
   
   // Backend job status tracking - stores backend's view of job status
   const [backendJobStatus, setBackendJobStatus] = useState<Map<string, {
@@ -5317,6 +5371,90 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
     localStorage.removeItem("authToken");
     window.location.href = "/auth";
   }, []);
+
+  // Hydrate active jobs on mount
+  const fetchActiveJobs = useCallback(async () => {
+    try {
+      const response = await fetch(`${CAMPAIGN_API_BASE}/active-jobs`, {
+        headers: getAuthHeaders()
+      });
+      
+      if (response.status === 401 || response.status === 403) {
+        handleUnauthorized();
+        return;
+      }
+      
+      if (!response.ok) return;
+      
+      const data = await response.json();
+      if (data.success && data.jobs) {
+        // Update generationJobs
+        setGenerationJobs(prev => {
+             const updated = new Map(prev);
+             // First mark all existing generating jobs as potentially stale/checked by backend
+             // If a job is NOT in the backend active list, it might have finished or failed silently
+             // But we don't want to remove it aggressively unless we know for sure.
+             // For now, we just update/upsert what the backend tells us.
+             
+             data.jobs.forEach((job: any) => {
+                 job.pages.forEach((p: any) => {
+                     updated.set(p.pageId, {
+                        jobId: job.jobId,
+                        pageId: p.pageId,
+                        pageType: p.pageType,
+                        status: p.status,
+                        draftId: p.draftId, // draftId from DB response
+                        progress: p.progress || 0,
+                        primaryKeyword: p.primaryKeyword,
+                        hasHtml: false, // We'll rely on draft status mostly
+                        updatedAt: new Date().toISOString(),
+                        error: null
+                     });
+                 });
+             });
+             return updated;
+        });
+        
+        // Update streaming messages
+        setStreamingMessages(prev => {
+            const updated = new Map(prev);
+            data.jobs.forEach((job: any) => {
+                if (job.messages && job.messages.length > 0) {
+                    updated.set(job.jobId, job.messages);
+                }
+            });
+            return updated;
+        });
+        
+        // Update jobId mapping
+        setJobIdToTopicId(prev => {
+           const updated = new Map(prev);
+           data.jobs.forEach((job: any) => {
+               updated.set(job.jobId, job.topicId);
+           });
+           return updated;
+        });
+
+        // Sync backend job status for consistency
+        setBackendJobStatus(prev => {
+          const updated = new Map(prev);
+          data.jobs.forEach((job: any) => {
+            updated.set(job.jobId, {
+              status: job.status,
+              pages: job.pages
+            });
+          });
+          return updated;
+        });
+      }
+    } catch (err) {
+      console.error("Failed to hydrate active jobs", err);
+    }
+  }, [CAMPAIGN_API_BASE, getAuthHeaders, handleUnauthorized]);
+
+  React.useEffect(() => {
+    fetchActiveJobs();
+  }, [fetchActiveJobs]);
 
   // Helper function to extract topicId from jobId pattern
   const extractTopicIdFromJobId = useCallback((jobId: string): number | null => {
@@ -5378,6 +5516,7 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
           message?: string;
           timestamp?: string;
           pages?: Partial<GenerationPageStatus & { pageType: string; hasHtml?: boolean; error?: string | null }>[];
+          error?: string;
         };
         
         // Handle streaming progress updates
@@ -5452,102 +5591,34 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
     };
   }, [handleStreamingUpdate]);
 
-  // Periodic polling for active generation jobs
+  // Periodic polling for active generation jobs using the bulk endpoint
+  // This serves as a fallback if SSE events are missed or not supported
   useEffect(() => {
-    const pollJobStatus = async (jobId: string) => {
-      try {
-        const response = await fetch(
-          `${API_BASE_URL}/api/campaigns/generation-status/${jobId}`,
-          { headers: getAuthHeaders() }
-        );
-
-        if (response.status === 401 || response.status === 403) {
-          handleUnauthorized();
-          return;
-        }
-
-        if (!response.ok) return;
-
-        const data = await response.json();
-        if (!data.success || !data.status) return;
-
-        // Update backend job status
-        setBackendJobStatus(prev => {
-          const updated = new Map(prev);
-          updated.set(jobId, {
-            status: data.status.status,
-            pages: data.pages || []
-          });
-          return updated;
-        });
-
-        // Update generationJobs with backend status for each page
-        if (data.pages && Array.isArray(data.pages)) {
-          setGenerationJobs(prev => {
-            const updated = new Map(prev);
-            data.pages.forEach((page: { pageId: number; status: string; progress: number }) => {
-              const existing = updated.get(page.pageId);
-              if (existing) {
-                // Only update status if backend says it's different and more authoritative
-                // Don't override 'completed' with 'generating' if page has HTML
-                if (!existing.hasHtml || page.status === 'completed') {
-                  updated.set(page.pageId, {
-                    ...existing,
-                    status: page.status as GenerationPageStatus['status'],
-                    progress: page.progress
-                  });
-                }
-              }
-            });
-            return updated;
-          });
-        }
-      } catch (err) {
-        console.error(`Failed to poll job status for ${jobId}:`, err);
-      }
-    };
-
-    // Get all active jobIds (those with recent streaming or in generating state)
-    const activeJobIds = new Set<string>();
+    // Check if we have any active jobs that need monitoring
+    const hasActiveJobs = Array.from(generationJobs.values()).some(
+      job => job.status === 'generating' || job.status === 'pending'
+    );
     
-    // Add jobIds from streaming messages
-    streamingMessages.forEach((_, jobId) => {
-      if (isGenerationActive(jobId)) {
-        activeJobIds.add(jobId);
-      }
-    });
-    
-    // Add jobIds from generationJobs that are still generating
-    generationJobs.forEach((job) => {
-      if (job.jobId && (job.status === 'generating' || job.status === 'pending')) {
-        activeJobIds.add(job.jobId);
-      }
-    });
+    // Also check streaming messages for recently active jobs
+    const hasRecentStreaming = Array.from(lastStreamingTimestamp.entries()).some(
+       ([jobId, timestamp]) => Date.now() - timestamp < 5 * 60 * 1000 // 5 mins
+    );
 
-    if (activeJobIds.size === 0) return;
+    if (!hasActiveJobs && !hasRecentStreaming) return;
 
-    // Poll each active job
-    activeJobIds.forEach(jobId => {
-      pollJobStatus(jobId);
-    });
-
-    // Set up interval to poll every 30 seconds
     const interval = setInterval(() => {
-      activeJobIds.forEach(jobId => {
-        pollJobStatus(jobId);
-      });
-    }, 30000);
+      fetchActiveJobs();
+    }, 15000); // Poll every 15 seconds
 
-    return () => {
-      clearInterval(interval);
-    };
-  }, [streamingMessages, generationJobs, isGenerationActive, getAuthHeaders, handleUnauthorized]);
+    return () => clearInterval(interval);
+  }, [generationJobs, lastStreamingTimestamp, fetchActiveJobs]);
 
   // Rehydrate generation state on load so generate buttons stay disabled after reload
   useEffect(() => {
     const rehydrate = async () => {
       if (!campaignStructure.topics || campaignStructure.topics.length === 0) return;
       const newMap = new Map<number, GenerationPageStatus>();
+      const newDraftStatuses = new Map<number, { isPublished: boolean; publishedUrl?: string; draftId?: number }>();
 
       for (const topic of campaignStructure.topics) {
         try {
@@ -5572,6 +5643,15 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
           };
 
           data.pages.forEach((p: DraftStatusRecord) => {
+            // Populate draftStatuses map if published
+            if (p.draftId && (p.status === 'published' || (p.wordpressUrl && p.wordpressUrl.startsWith('http')))) {
+                newDraftStatuses.set(p.pageId, {
+                    isPublished: true,
+                    publishedUrl: p.wordpressUrl || undefined,
+                    draftId: p.draftId
+                });
+            }
+
             // Skip empty/no-job entries so new topics don't show as pending
             if (!p.draftId && !p.jobId && !p.hasHtml) {
               return;
@@ -5642,6 +5722,9 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
 
       if (newMap.size > 0) {
         setGenerationJobs(newMap);
+      }
+      if (newDraftStatuses.size > 0) {
+        setDraftStatuses(newDraftStatuses);
       }
     };
 
@@ -5740,13 +5823,7 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
   }, [campaign.id, fetchStructure]);
 
   // Auto-fill brand fields similar to publish tab
-  useEffect(() => {
-    setGenerationForm((prev) => ({
-      ...prev,
-      brandName: derivedBrandName || prev.brandName || '',
-      brandDescription: derivedBrandDescription || prev.brandDescription || '',
-    }));
-  }, [derivedBrandName, derivedBrandDescription]);
+  // Auto-fill brand fields is handled on initialization in handleGenerateTopic
 
   const topicsSnapshot = campaignStructure.topics;
   useEffect(() => {
@@ -5987,6 +6064,9 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
 
   // Stable check for topic generation status - prevents flickering
   const isTopicGenerating = useCallback((topic: Topic) => {
+    // 0. Check explicit loading state first (prevents jitter)
+    if (generateTopicLoading === topic.id) return true;
+
     const pageIds = [
       topic.pillarPage?.id,
       ...(topic.subPages || []).map((sp) => sp.id),
@@ -6010,12 +6090,14 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
         if (backendStatus?.status === 'generating' || backendStatus?.status === 'pending') {
           return true;
         }
+        return true; // Fallback: if in generationJobs map and no HTML, assume generating
       }
       
-      // Check job status (but prefer streaming/backend status)
-      return job.status === 'generating' || job.status === 'pending';
+      // If no jobId but in map and no HTML, assume initial generating state
+      return true; 
     });
-  }, [generationJobs, isGenerationActive, backendJobStatus]);
+  }, [generationJobs, backendJobStatus, generateTopicLoading, isGenerationActive]);
+
 
   const viewDraft = async (draftId?: number, pageId?: number) => {
     if (!draftId) return;
@@ -6195,62 +6277,84 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
   const renderStatusPill = (pageId?: number) => {
     if (!pageId) return null;
     const job = generationJobs.get(pageId);
-    if (!job) return null;
     
-    // Use robust status determination
-    let status = job.status;
-    const jobId = job.jobId;
-    
-    // If has HTML, always completed
-    if (job.hasHtml && status !== 'published') {
-      status = 'completed';
-    } else if (status !== 'completed' && status !== 'published' && jobId) {
-      // Check if generation is active
-      const generationActive = isGenerationActive(jobId);
-      const backendStatus = backendJobStatus.get(jobId);
-      
-      // Only mark as failed if generation is not active AND backend confirms failed
-      if (status === 'failed' || (status !== 'completed' && !generationActive && backendStatus?.status === 'failed')) {
-        status = 'failed';
-      } else if (generationActive || backendStatus?.status === 'generating') {
-        // Keep as generating if active or backend says generating
-        status = 'generating';
-      }
+    // Check generating state first
+    const isGenerating = job && !job.hasHtml && (
+      (job.jobId && isGenerationActive(job.jobId)) || 
+      (job.jobId && backendJobStatus.get(job.jobId)?.status === 'generating')
+    );
+
+    if (isGenerating) {
+      return (
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-medium bg-blue-50 text-blue-600 border border-blue-100/50">
+           <div className="h-2.5 w-2.5 text-blue-600 flex items-center justify-center">
+             <ButtonSpinner />
+           </div>
+           Generating
+        </span>
+      );
+    }
+
+    if (job?.hasHtml) {
+      return (
+        <div className="flex items-center gap-1.5">
+           <button 
+             onClick={() => viewDraft(job.draftId, pageId)}
+             className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors"
+           >
+              <Eye className="h-3 w-3" />
+              View
+           </button>
+           <button 
+             onClick={() => publishDraft(job.draftId, pageId)}
+             className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-md transition-colors"
+           >
+              <Send className="h-3 w-3" />
+              Publish
+           </button>
+        </div>
+      );
     }
     
-    if (status === 'pending') return null;
-    const label =
-      status === 'published' ? 'Published' :
-      status === 'completed' ? 'Completed' :
-      status === 'failed' ? 'Failed' :
-      'Generating';
-    const color =
-      status === 'published' ? 'bg-purple-100 text-purple-700' :
-      status === 'completed' ? 'bg-green-100 text-green-700' :
-      status === 'failed' ? 'bg-red-100 text-red-700' :
-      'bg-blue-100 text-blue-700';
-    const progress = job.progress ?? (status === 'completed' || status === 'published' ? 100 : undefined);
+    // Check if published via draft status
+    const draftStatus = draftStatuses.get(pageId);
+    if (draftStatus?.isPublished) {
+         return (
+            <div className="flex items-center gap-1.5">
+               <button 
+                 onClick={() => viewDraft(draftStatus.draftId!, pageId)}
+                 className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors"
+               >
+                  <Pencil className="h-3 w-3" />
+                  Edit
+               </button>
+               <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-green-50 text-green-700 border border-green-100/50">
+                 Published
+               </span>
+               <a 
+                 href={draftStatus.publishedUrl} 
+                 target="_blank" 
+                 rel="noopener noreferrer"
+                 className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors"
+               >
+                  <ExternalLink className="h-3 w-3" />
+                  View Live
+               </a>
+            </div>
+         );
+    }
 
-    return (
-        <span className={`px-2 py-1 text-[11px] rounded-full ${color}`}>
-          {label}{typeof progress === 'number' ? ` • ${progress}%` : ''}
-        </span>
-    );
+    return null;
   };
 
   const currentTopic = currentGenerationTopicId
     ? campaignStructure.topics.find((t) => t.id === currentGenerationTopicId)
     : null;
 
-  // Generation drawer stepper (simplified to 3 steps similar to publish flow)
-  const generationSteps = [
-    { id: 1, title: 'Word Count', description: 'Dial in the depth' },
-    { id: 2, title: 'Imagery', description: 'Inline images & featured banner' },
-    { id: 3, title: 'Brand', description: 'Tone & voice alignment' },
-  ];
+  // Generation step state
   const [generationStep, setGenerationStep] = useState(1);
 
-  const handleGenerateTopic = async (topic: Topic, options?: { wordCount: number; images: number; featuredImage: boolean; brandName?: string; brandDescription?: string; }) => {
+  const handleGenerateTopic = (topic: Topic) => {
     if (!canGenerateTopic(topic)) {
       toast({
         title: 'Add keywords first',
@@ -6259,39 +6363,65 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
       });
       return;
     }
+
+    setPendingGenerationTopic(topic);
+    // Reset config with defaults or existing values if applicable
+    setGenerationConfig({
+      wordCount: 800,
+      images: 2,
+      featuredImage: true,
+      brandName: derivedBrandName || 'Brand',
+      brandDescription: derivedBrandDescription || '',
+    });
+    setGenerationStep(1);
+    setGenerationDrawerOpen(true);
+  };
+
+  const handleConfirmGeneration = async () => {
+    const topic = pendingGenerationTopic;
+    if (!topic) return;
+
     setGenerateTopicLoading(topic.id);
+    console.log(`[Campaign] Starting generation for topic ${topic.id}: ${topic.title}`);
+
+    // Close drawer immediately
+    setGenerationDrawerOpen(false);
+
     try {
       // Helper function to get primary and longtail keywords from a page's keywords
-      const getKeywordSelections = (pageKeywords: Array<{ id: number; term: string; aiMetadata?: any }>) => {
+      const getKeywordSelections = (
+        pageKeywords: Array<{ id: number; term: string; aiMetadata?: any }>,
+      ) => {
         // Find primary keyword (marked with isPrimary: true in aiMetadata)
-        const primaryKeyword = pageKeywords.find(kw => {
+        const primaryKeyword = pageKeywords.find((kw) => {
           const metadata = kw.aiMetadata as any;
           return metadata?.isPrimary === true;
         });
-        
+
         // Find longtail keywords (marked with isLongtail: true in aiMetadata)
-        const longtailKeywords = pageKeywords.filter(kw => {
+        const longtailKeywords = pageKeywords.filter((kw) => {
           const metadata = kw.aiMetadata as any;
           return metadata?.isLongtail === true;
         });
-        
+
         // Fallback: if no primary selected, use first keyword
         // If no longtail selected, use remaining keywords
         const fallbackPrimary = primaryKeyword || pageKeywords[0];
-        const fallbackLongtail = longtailKeywords.length > 0 
-          ? longtailKeywords 
-          : pageKeywords.filter((_, idx) => idx > 0);
-        
+        const fallbackLongtail =
+          longtailKeywords.length > 0
+            ? longtailKeywords
+            : pageKeywords.filter((_, idx) => idx > 0);
+
         return {
           primary: fallbackPrimary?.term || '',
-          longtail: fallbackLongtail.map(k => k.term).filter(Boolean)
+          longtail: fallbackLongtail.map((k) => k.term).filter(Boolean),
         };
       };
 
       // Build payload from current topic data
       const pillar = topic.pillarPage!;
       const pillarKeywords = getKeywordSelections(pillar.keywords);
-      
+
       const payload = {
         user_id: 'user', // backend uses authenticated user
         campaign_name: campaign.title,
@@ -6299,9 +6429,9 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
           primary_keyword: pillarKeywords.primary || pillar.title,
           longtail_keywords: pillarKeywords.longtail,
           options: {
-            image: options?.images ?? 2,
-            word_count: options?.wordCount ?? 800,
-            featured_image: options?.featuredImage ? 'yes' : 'no',
+            image: generationConfig.images,
+            word_count: generationConfig.wordCount,
+            featured_image: generationConfig.featuredImage ? 'yes' : 'no',
           },
         },
         sub_pillar_pages: topic.subPages.map((sp) => {
@@ -6309,24 +6439,27 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
           return {
             primary_keyword: subPageKeywords.primary || sp.title,
             longtail_keywords: subPageKeywords.longtail,
-          options: {
-            image: options?.images ?? 2,
-            word_count: options?.wordCount ?? 800,
-            featured_image: options?.featuredImage ? 'yes' : 'no',
-          },
+            options: {
+              image: generationConfig.images,
+              word_count: generationConfig.wordCount,
+              featured_image: generationConfig.featuredImage ? 'yes' : 'no',
+            },
           };
         }),
         brand: {
-          brand_name: options?.brandName || campaign.title || 'Brand',
-          brand_description: options?.brandDescription || campaign.description || '',
+          brand_name: generationConfig.brandName,
+          brand_description: generationConfig.brandDescription,
         },
       };
 
-      const response = await fetch(`${API_BASE_URL}/api/campaigns/topics/${topic.id}/generate-content`, {
-        method: 'POST',
-        headers: getAuthHeaders(),
-        body: JSON.stringify(payload),
-      });
+      const response = await fetch(
+        `${API_BASE_URL}/api/campaigns/topics/${topic.id}/generate-content`,
+        {
+          method: 'POST',
+          headers: getAuthHeaders(),
+          body: JSON.stringify(payload),
+        },
+      );
 
       if (response.status === 401 || response.status === 403) {
         handleUnauthorized();
@@ -6338,10 +6471,13 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
         throw new Error(data.error || 'Failed to start generation');
       }
 
-      const { jobId, pages } = data as { jobId: string; pages: { pageId: number; pageType: string; draftId?: number; primaryKeyword?: string; }[] };
+      const { jobId, pages } = data as {
+        jobId: string;
+        pages: { pageId: number; pageType: string; draftId?: number; primaryKeyword?: string }[];
+      };
 
       // Store jobId -> topicId mapping for streaming updates
-      setJobIdToTopicId(prev => {
+      setJobIdToTopicId((prev) => {
         const updated = new Map(prev);
         updated.set(jobId, topic.id);
         return updated;
@@ -6378,7 +6514,7 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
       });
     } finally {
       setGenerateTopicLoading(null);
-      setGenerationDrawerOpen(false);
+      setPendingGenerationTopic(null);
     }
   };
 
@@ -6547,6 +6683,21 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
   );
 };
 
+const handleUpdatePillar = async (topicId: number, updates: { title?: string; referenceUrl?: string }) => {
+    try {
+      await mutateStructure(
+        `${CAMPAIGN_API_BASE}/topics/${topicId}/pillar`,
+        {
+          method: 'PUT',
+          body: JSON.stringify(updates),
+        },
+        { successMessage: 'Pillar page updated' }
+      );
+    } catch {
+      // handled upstream
+    }
+  };
+
   const handleDeleteSubPage = (subPageId: number) => {
   confirmDelete("Sub-page", () =>
     mutateStructure(
@@ -6681,39 +6832,477 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
     );
   };
 
+  // --- Render ---
+  
+  const selectedTopic = selectedTopicId 
+    ? campaignStructure.topics.find(t => t.id === selectedTopicId) || null 
+    : null;
+
   return (
-    <div className="w-full mx-auto">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-8">
-        <div className="flex items-center gap-4">
-          <button
-            onClick={onBack}
-            className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-            title="Back to campaigns"
-          >
-            <ArrowLeft className="h-5 w-5 text-gray-600" />
-          </button>
-          <div>
-            <h2 className="text-3xl font-thin text-black tracking-tight mb-2">
-              {campaign.title}
-            </h2>
-            {campaign.description && (
-              <p className="text-base font-light text-gray-600">
-                {campaign.description}
-              </p>
-            )}
+    <>
+    <div className="flex h-[calc(100vh-4rem)] w-full bg-white overflow-hidden">
+      {/* 2. Secondary Sidebar: Topic List */}
+      <div 
+        className={`w-[280px] border-r border-[#0000001a] flex-shrink-0 transition-all duration-300 ${viewMode === 'graph' ? 'w-0 opacity-0 overflow-hidden border-none' : ''}`}
+        style={{
+          background: 'rgba(255, 255, 255, 0.72)',
+          backdropFilter: 'saturate(180%) blur(20px)',
+          WebkitBackdropFilter: 'saturate(180%) blur(20px)',
+        }}
+      >
+        <div className="h-full flex flex-col">
+          {/* Header */}
+          <div className="h-16 flex items-center px-5 border-b border-[#0000001a] flex-shrink-0 z-10">
+             <button
+                onClick={onBack}
+                className="mr-3 p-1.5 hover:bg-gray-100 rounded-full text-gray-400 hover:text-gray-600 transition-colors"
+             >
+               <ArrowLeft className="h-4 w-4" />
+             </button>
+             <h1 className="font-medium text-gray-900 truncate text-sm" title={campaign.title}>
+               {campaign.title}
+             </h1>
           </div>
+
+          <CampaignTopicSidebar
+            topics={campaignStructure.topics}
+            selectedTopicId={selectedTopicId}
+            onSelectTopic={setSelectedTopicId}
+            onAddTopic={(isAi) => isAi ? handleAddTopic(true) : handleAddTopic(false)}
+            onDeleteTopic={handleDeleteTopic}
+            aiLoading={aiLoading}
+            syncing={syncing}
+            isTopicGenerating={isTopicGenerating}
+          />
         </div>
-        {syncing && (
-          <div className="flex items-center gap-2 text-xs font-light text-gray-500">
-            <span className="inline-flex h-2 w-2 rounded-full bg-gray-400 animate-pulse"></span>
-            Syncing changes...
-          </div>
-        )}
       </div>
 
+      {/* 3. Main Content Area */}
+      <div className="flex-1 flex flex-col min-w-0 bg-gray-50/50 relative">
+      
+        {/* Content Body */}
+        <div className="flex-1 relative overflow-hidden">
+            
+            {/* Split View: Detail Pane */}
+            <div className={`absolute inset-0 bg-gray-50/50 transition-opacity duration-300 overflow-y-auto ${viewMode === 'split' ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'}`}>
+               <div className="h-full p-8 max-w-5xl mx-auto">
+                 {selectedTopic ? (
+                   <CampaignTopicDetail
+                     topic={selectedTopic}
+                     isGenerating={isTopicGenerating(selectedTopic)}
+                     streamingMessages={
+                       (jobIdToTopicId.size > 0 
+                         ? Array.from(jobIdToTopicId.entries()).find(([_, tid]) => tid === selectedTopicId)?.[0] 
+                         : undefined) 
+                         ? streamingMessages.get(Array.from(jobIdToTopicId.entries()).find(([_, tid]) => tid === selectedTopicId)![0]) || []
+                         : []
+                     }
+                     jobId={
+                       Array.from(jobIdToTopicId.entries()).find(([_, tid]) => tid === selectedTopicId)?.[0]
+                     }
+                     generationJobs={generationJobs}
+                     onGenerateTopic={handleGenerateTopic}
+                     onReferenceUrlChange={(tid, url) => {
+                        const t = campaignStructure.topics.find(t => t.id === tid);
+                        if(t) handleUpdatePillar(t.pillarPage!.id, { referenceUrl: url });
+                     }}
+                     onDeletePillar={handleDeletePillarPage}
+                     onDeleteSubPage={handleDeleteSubPage}
+                     renderStatusPill={renderStatusPill}
+                     onAddSubPage={(tid) => { setTargetTopicId(tid); setShowAddSubPageModal(true); }}
+                     onAddKeyword={handleAddKeyword}
+                     onDeleteKeyword={handleDeleteKeyword}
+                     onSelectPrimaryKeyword={handleSelectPrimaryKeyword}
+                     onSelectLongtailKeyword={handleSelectLongtailKeyword}
+                     onDeselectKeyword={handleDeselectKeyword}
+                     aiLoading={aiLoading}
+                   />
+                 ) : (
+                   <div className="h-full flex flex-col items-center justify-center text-gray-400">
+                     <Layout className="h-12 w-12 mb-4 opacity-20" />
+                     <p>Select a topic to view details</p>
+                   </div>
+                 )}
+               </div>
+            </div>
+
+            {/* Graph View: Full Screen */}
+            <div className={`absolute inset-0 bg-white transition-opacity duration-300 ${viewMode === 'graph' ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'}`}>
+               <div className="w-full h-full">
+                <CampaignGraph
+                  campaignStructure={campaignStructure}
+                  selectedTopics={selectedTopics}
+                />
+               </div>
+            </div>
+
+        </div>
+      </div>
+{showAddSubPageModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md border border-gray-100">
+            <h2 className="text-xl font-light text-gray-900 mb-6">Add Sub Page</h2>
+            <input
+              type="text"
+              placeholder="Page Title"
+              className="w-full p-4 border border-gray-200 rounded-xl mb-6 text-sm focus:ring-2 focus:ring-black/5 focus:border-black outline-none transition-all"
+              value={newSubPageTitle}
+              onChange={(e) => setNewSubPageTitle(e.target.value)}
+              autoFocus
+              onKeyDown={(e) => {
+                if(e.key === 'Enter') handleSubmitSubPage();
+                if(e.key === 'Escape') setShowAddSubPageModal(false);
+              }}
+            />
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setShowAddSubPageModal(false)}
+                className="px-6 py-2.5 rounded-full text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSubmitSubPage}
+                disabled={!newSubPageTitle.trim()}
+                className="px-6 py-2.5 bg-black text-white rounded-full hover:bg-black/90 disabled:opacity-50 disabled:cursor-not-allowed transition-all text-sm font-medium shadow-lg shadow-black/10"
+              >
+                Add Page
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Generation Config Drawer */}
+      <Sheet open={generationDrawerOpen} onOpenChange={setGenerationDrawerOpen}>
+        <SheetContent className="w-[400px] sm:w-[540px] overflow-y-auto">
+          <SheetHeader className="mb-6">
+            <SheetTitle>Generate Content</SheetTitle>
+            <SheetDescription>
+              Configure generation options for "{pendingGenerationTopic?.title}".
+            </SheetDescription>
+          </SheetHeader>
+
+          <div className="space-y-8 py-4">
+            {/* Step 1: Word Count */}
+            {generationStep === 1 && (
+              <div className="space-y-6">
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <Label className="text-base font-medium">Word Count Target</Label>
+                    <span className="text-sm text-gray-500 font-mono bg-gray-100 px-2 py-1 rounded">{generationConfig.wordCount} words</span>
+                  </div>
+                  <Slider
+                    value={[generationConfig.wordCount]}
+                    min={400}
+                    max={3000}
+                    step={100}
+                    onValueChange={(vals) => setGenerationConfig(prev => ({ ...prev, wordCount: vals[0] }))}
+                    className="py-4"
+                  />
+                  <p className="text-xs text-gray-500">
+                    Determines the approximate length of each article. Longer articles perform better for SEO but take longer to generate.
+                  </p>
+                </div>
+
+                <div className="flex flex-col gap-4 pt-4">
+                   <button 
+                     onClick={() => setGenerationStep(2)}
+                     className="w-full py-2.5 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors font-medium text-sm"
+                   >
+                     Next: Imagery
+                   </button>
+                </div>
+              </div>
+            )}
+
+            {/* Step 2: Imagery */}
+            {generationStep === 2 && (
+              <div className="space-y-6">
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <Label className="text-base font-medium">Images per Article</Label>
+                    <span className="text-sm text-gray-500 font-mono bg-gray-100 px-2 py-1 rounded">{generationConfig.images} images</span>
+                  </div>
+                  <Slider
+                    value={[generationConfig.images]}
+                    min={0}
+                    max={5}
+                    step={1}
+                    onValueChange={(vals) => setGenerationConfig(prev => ({ ...prev, images: vals[0] }))}
+                    className="py-4"
+                  />
+                </div>
+
+                <div className="flex items-center justify-between p-4 border border-gray-100 rounded-xl bg-gray-50/50">
+                  <div className="space-y-0.5">
+                    <Label className="text-base">Featured Image</Label>
+                    <p className="text-xs text-gray-500">Generate a high-quality hero image</p>
+                  </div>
+                  <Switch
+                    checked={generationConfig.featuredImage}
+                    onCheckedChange={(checked) => setGenerationConfig(prev => ({ ...prev, featuredImage: checked }))}
+                  />
+                </div>
+
+                <div className="flex flex-col gap-3 pt-4">
+                   <button 
+                     onClick={() => setGenerationStep(3)}
+                     className="w-full py-2.5 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors font-medium text-sm"
+                   >
+                     Next: Brand Voice
+                   </button>
+                   <button 
+                     onClick={() => setGenerationStep(1)}
+                     className="w-full py-2.5 bg-white text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors font-medium text-sm"
+                   >
+                     Back
+                   </button>
+                </div>
+              </div>
+            )}
+
+            {/* Step 3: Brand Voice */}
+            {generationStep === 3 && (
+              <div className="space-y-6">
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="brand-name">Brand Name</Label>
+                    <Input 
+                      id="brand-name"
+                      value={generationConfig.brandName}
+                      onChange={(e) => setGenerationConfig(prev => ({ ...prev, brandName: e.target.value }))}
+                      placeholder="e.g. Acme Corp"
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="brand-desc">Tone & Description (Optional)</Label>
+                    <textarea 
+                      id="brand-desc"
+                      className="flex min-h-[100px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                      value={generationConfig.brandDescription}
+                      onChange={(e) => setGenerationConfig(prev => ({ ...prev, brandDescription: e.target.value }))}
+                      placeholder="e.g. Professional, authoritative, yet accessible. Focus on Enterprise solutions."
+                    />
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-3 pt-6">
+                   <button 
+                     onClick={handleConfirmGeneration}
+                     disabled={generateTopicLoading === pendingGenerationTopic?.id}
+                     className="w-full py-3 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors font-medium flex items-center justify-center gap-2"
+                   >
+                     {generateTopicLoading === pendingGenerationTopic?.id ? (
+                       <>
+                         <ButtonSpinner /> Starting Generation...
+                       </>
+                     ) : (
+                       <>
+                         <Sparkles className="w-4 h-4" /> Start Generation
+                       </>
+                     )}
+                   </button>
+                   <button 
+                     onClick={() => setGenerationStep(2)}
+                     className="w-full py-2.5 bg-white text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors font-medium text-sm"
+                   >
+                     Back
+                   </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      {showAddKeywordModal && addKeywordContext && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[60]">
+          <div className="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-lg border border-gray-100 transform transition-all scale-100">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h2 className="text-xl font-light text-gray-900">Add Keyword</h2>
+                <p className="text-sm text-gray-500 mt-1">
+                  Adding to <span className="font-medium text-gray-900">{addKeywordContext.type === 'pillar' ? 'Pillar Page' : 'Sub Page'}</span>
+                </p>
+              </div>
+              <button 
+                onClick={() => setShowAddKeywordModal(false)}
+                className="p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-400 hover:text-gray-600"
+              >
+                <Trash2 className="h-5 w-5 rotate-45" />
+              </button>
+            </div>
+
+            {/* Keyword Type Selection */}
+            <div className="flex bg-gray-100 p-1 rounded-lg mb-6">
+              <button
+                className={`flex-1 py-2 text-sm font-medium rounded-md transition-all ${
+                  newKeywordType === 'primary' 
+                    ? 'bg-white text-black shadow-sm' 
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+                onClick={() => setNewKeywordType('primary')}
+              >
+                Primary
+              </button>
+              <button
+                className={`flex-1 py-2 text-sm font-medium rounded-md transition-all ${
+                  newKeywordType === 'longtail' 
+                    ? 'bg-white text-black shadow-sm' 
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+                onClick={() => setNewKeywordType('longtail')}
+              >
+                Longtail
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              {/* Searchable Dropdown */}
+              <div className="relative">
+                <label className="block text-xs uppercase tracking-wider text-gray-500 font-medium mb-1.5">
+                  Keyword Term
+                </label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <input
+                    type="text"
+                    placeholder="Search or enter custom keyword..."
+                    className="w-full pl-9 pr-4 py-3 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-black/5 focus:border-black outline-none transition-all"
+                    value={keywordSearchOpen ? keywordSearchValue : newKeywordTerm}
+                    onChange={(e) => {
+                      setKeywordSearchValue(e.target.value);
+                      setNewKeywordTerm(e.target.value);
+                      setKeywordSearchOpen(true);
+                    }}
+                    onFocus={() => {
+                        setKeywordSearchOpen(true);
+                        // Ensure keywords are loaded
+                        if (availableKeywords.length === 0) {
+                            fetchDomainKeywords(campaign.id);
+                        }
+                    }}
+                  />
+                </div>
+                
+                {/* Dropdown Results */}
+                {keywordSearchOpen && (
+                  <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl shadow-xl border border-gray-100 max-h-60 overflow-y-auto z-50 animate-in fade-in zoom-in-95 duration-200">
+                    {loadingKeywords ? (
+                      <div className="p-8 text-center text-gray-400 flex flex-col items-center">
+                        <Loader2 className="h-5 w-5 animate-spin mb-2" />
+                        <span className="text-xs">Loading suggestions...</span>
+                      </div>
+                    ) : (
+                      <>
+                         {availableKeywords
+                          .filter(k => k.term.toLowerCase().includes(keywordSearchValue.toLowerCase()))
+                          .slice(0, 50) 
+                          .map((k) => (
+                            <button
+                              key={k.id}
+                              className="w-full text-left px-4 py-3 hover:bg-gray-50 flex items-center justify-between group transition-colors border-b border-gray-50 last:border-0"
+                              onClick={() => {
+                                setNewKeywordTerm(k.term);
+                                setNewKeywordVolume(k.volume?.toString() || '');
+                                setNewKeywordDifficulty(k.difficulty || 'Medium');
+                                setKeywordSearchOpen(false);
+                              }}
+                            >
+                              <div>
+                                <span className="text-sm text-gray-900 font-medium">{k.term}</span>
+                                <div className="flex items-center gap-2 mt-0.5">
+                                   <span className={`text-[10px] px-1.5 py-0.5 rounded ${
+                                      k.difficulty === 'Easy' ? 'bg-green-100 text-green-700' :
+                                      k.difficulty === 'Hard' ? 'bg-red-100 text-red-700' :
+                                      'bg-yellow-100 text-yellow-700'
+                                   }`}>
+                                     {k.difficulty || 'Medium'}
+                                   </span>
+                                   {k.volume && (
+                                     <span className="text-[10px] text-gray-400">
+                                       Vol: {k.volume.toLocaleString()}
+                                     </span>
+                                   )}
+                                </div>
+                              </div>
+                              <Plus className="h-4 w-4 text-gray-300 group-hover:text-black transition-colors" />
+                            </button>
+                          ))}
+                        
+                        {/* No results state */}
+                        {availableKeywords.filter(k => k.term.toLowerCase().includes(keywordSearchValue.toLowerCase())).length === 0 && (
+                          <div className="p-4 text-center">
+                            <p className="text-sm text-gray-500 mb-2">No matching keywords found</p>
+                            <button
+                                onClick={() => setKeywordSearchOpen(false)}
+                                className="text-xs text-blue-600 hover:underline font-medium"
+                            >
+                                Use &quot;{keywordSearchValue}&quot; as custom keyword
+                            </button>
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs uppercase tracking-wider text-gray-500 font-medium mb-1.5">
+                    Volume
+                  </label>
+                  <input
+                    type="number"
+                    placeholder="e.g. 1000"
+                    className="w-full p-3 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-black/5 focus:border-black outline-none transition-all"
+                    value={newKeywordVolume}
+                    onChange={(e) => setNewKeywordVolume(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs uppercase tracking-wider text-gray-500 font-medium mb-1.5">
+                    Difficulty
+                  </label>
+                  <select
+                    className="w-full p-3 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-black/5 focus:border-black outline-none transition-all bg-white"
+                    value={newKeywordDifficulty}
+                    onChange={(e) => setNewKeywordDifficulty(e.target.value)}
+                  >
+                    <option value="Easy">Easy</option>
+                    <option value="Medium">Medium</option>
+                    <option value="Hard">Hard</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 mt-8 pt-6 border-t border-gray-100">
+              <button
+                onClick={() => setShowAddKeywordModal(false)}
+                className="px-6 py-2.5 rounded-full text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors"
+                disabled={keywordSearchOpen}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSubmitKeyword}
+                disabled={!newKeywordTerm.trim() || keywordSearchOpen}
+                className="px-8 py-2.5 bg-black text-white rounded-full hover:bg-black/90 disabled:opacity-50 disabled:cursor-not-allowed transition-all text-sm font-medium shadow-lg shadow-black/10 flex items-center gap-2"
+              >
+                <Plus className="h-4 w-4" />
+                Add Keyword
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showDeleteModal && (
-        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-[70]">
           <div className="bg-white p-6 rounded-xl shadow-xl w-[90%] max-w-sm">
             <h2 className="text-lg font-medium text-gray-800">Delete {deleteLabel}?</h2>
             <p className="text-sm text-gray-500 mt-2">
@@ -6740,21 +7329,24 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
         </div>
       )}
 
+<<<<<<< HEAD
       {/* Graph Overview */}
       <div className="w-full h-[700px] mb-10 ">
         <CampaignGraph
           campaignStructure={campaignStructure}
           selectedTopics={selectedTopics}
         />
+=======
+>>>>>>> 7ff671ad18c8c9cb939f7046a7227ab043dbdb12
       </div>
 
-      {/* Actions */}
-      <div className="flex flex-wrap items-center justify-between gap-4 mb-10">
-        <button
-          onClick={handleContinue}
-          disabled={selectedTopics.size === 0 || syncing}
-          className="px-6 py-2.5 bg-black text-white rounded-full hover:bg-black/90 disabled:bg-gray-300 disabled:cursor-not-allowed transition-all text-sm font-medium flex items-center gap-2 shadow-sm"
+      {/* Generation Config Drawer - Matches Publish Tab Style */}
+      <Sheet open={generationDrawerOpen} onOpenChange={setGenerationDrawerOpen}>
+        <SheetContent 
+          side="right" 
+          className="w-full sm:max-w-3xl border-l border-[#e2e4ea] bg-[#f5f6fa] px-10 py-12 overflow-y-auto font-light"
         >
+<<<<<<< HEAD
           Continue
         </button>
         <div className="flex items-center gap-2">
@@ -6872,1824 +7464,201 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
                         </div>
                         <span className="text-[10px] text-gray-400 font-extralight tabular-nums" style={{ letterSpacing: '0.02em' }}>
                           {completedCount}/{totalCount}
+=======
+          <div className="space-y-10">
+            {/* Header Card */}
+            <div className="rounded-[32px] border border-white/80 bg-white/90 px-6 py-6 shadow-[0_30px_80px_rgba(15,23,42,0.10)] backdrop-blur">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <div className="space-y-3">
+                  <div className="inline-flex items-center gap-2 rounded-full border border-black/10 px-4 py-1 text-[10px] tracking-[0.35em] uppercase text-gray-500">
+                    Content Generation
+                  </div>
+                  <div>
+                    <h3 className="text-[28px] font-light text-gray-900 tracking-tight">
+                      {generateTopicLoading === pendingGenerationTopic?.id ? (
+                        <span className="flex items-center gap-2">
+                          Generating content...
+                          <svg className="h-5 w-5 animate-spin text-gray-400" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4l3-3-3-3v4A8 8 0 104 12z" />
+                          </svg>
+>>>>>>> 7ff671ad18c8c9cb939f7046a7227ab043dbdb12
                         </span>
-                      </div>
-                    </div>
+                      ) : (
+                        `Step ${generationStep} of 3`
+                      )}
+                    </h3>
+                    <p className="text-sm text-gray-500 mt-1">Configure options for "{pendingGenerationTopic?.title}"</p>
                   </div>
                 </div>
-              );
-            })}
-          </div>
-        );
-      })()}
-
-      {/* Topics List */}
-      <div className="space-y-4">
-        {campaignStructure.topics.map((topic) => {
-          // Find jobId for this topic
-          const topicJobId = Array.from(jobIdToTopicId.entries())
-            .find(([_, tid]) => tid === topic.id)?.[0] || null;
-          const topicMessages = topicJobId ? streamingMessages.get(topicJobId) || [] : [];
-          
-          return (
-            <div
-              key={topic.id}
-              className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden relative"
-            >
-              {/* Streaming Progress Indicator */}
-              <StreamingProgressIndicator 
-                topicId={topic.id}
-                jobId={topicJobId}
-                messages={topicMessages}
-              />
-              
-              {/* Topic Header */}
-              <div className="flex items-center justify-between p-6 hover:bg-gray-50 transition-colors">
-              <div className="flex items-center gap-3 flex-1">
-                <button
-                  onClick={() => toggleTopic(topic.id)}
-                  className="p-1 hover:bg-gray-200 rounded transition-colors"
-                >
-                  <ChevronRight
-                    className={`h-5 w-5 text-gray-400 transition-transform duration-200 ${
-                      expandedTopics.has(topic.id) ? "rotate-90" : ""
-                    }`}
-                  />
-                </button>
-                <div className="w-10 h-10 rounded-lg bg-purple-50 flex items-center justify-center">
-                  <Sparkles className="h-5 w-5 text-purple-600" />
-                </div>
-                <div className="flex-1">
-                  <h3 className="text-lg font-light text-black tracking-tight">
-                    {topic.title}
-                  </h3>
-                  <p className="text-xs font-light text-gray-500 mt-0.5">
-                    {topic.pillarPage ? "1 pillar page" : "No pillar page"} •{" "}
-                    {topic.subPages.length} sub-page
-                    {topic.subPages.length !== 1 ? "s" : ""}
+                <div className="flex flex-col items-end gap-2">
+                  <div className="flex items-center gap-1">
+                    {[1, 2, 3].map((step) => (
+                      <span
+                        key={`progress-${step}`}
+                        className={`h-1.5 w-12 rounded-full transition-all ${
+                          step <= generationStep ? 'bg-black/80' : 'bg-black/10'
+                        }`}
+                      />
+                    ))}
+                  </div>
+                  <p className="text-xs uppercase tracking-[0.3em] text-gray-400">
+                    Generation flow
                   </p>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                  <button
-                  onClick={() => {
-                    setCurrentGenerationTopicId(topic.id);
-                    setGenerationForm((prev) => ({
-                      ...prev,
-                      wordCount: prev.wordCount || 800,
-                      images: prev.images || 2,
-                      featuredImage: prev.featuredImage ?? true,
-                      brandName: derivedBrandName || prev.brandName || '',
-                      brandDescription: derivedBrandDescription || prev.brandDescription || '',
-                    }));
-                    setGenerationDrawerOpen(true);
-                  }}
-                  disabled={
-                    !canGenerateTopic(topic) ||
-                    generateTopicLoading === topic.id ||
-                    isTopicGenerating(topic)
-                  }
-                  className="inline-flex items-center gap-2 px-3 py-2 text-xs font-semibold rounded-full bg-gradient-to-r from-black to-gray-800 text-white shadow-sm hover:opacity-90 transition disabled:opacity-50 disabled:cursor-not-allowed"
-                  title={
-                    canGenerateTopic(topic)
-                      ? 'Generate content for this topic'
-                      : 'Add a pillar page and at least one keyword per page to enable generation'
-                  }
-                >
-                  {generateTopicLoading === topic.id || isTopicGenerating(topic) ? (
-                    <>
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      <span>Generating…</span>
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="h-3.5 w-3.5" />
-                      <span>Generate</span>
-                    </>
-                  )}
-                  </button>
-                <button
-                  onClick={() => handleDeleteTopic(topic.id)}
-                  disabled={syncing}
-                  className="p-2 text-gray-400 hover:text-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  title="Delete topic"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
-              </div>
             </div>
 
-            {/* Topic Content */}
-            {expandedTopics.has(topic.id) && (
-              <div className="px-6 pb-6 pt-0 border-t border-gray-100">
-                <div className="pt-6 space-y-4">
-                  {/* Pillar Page Section */}
-                  <div>
-                    <div className="flex items-center justify-between mb-3">
-                      <h4 className="text-sm font-medium text-gray-900">
-                        Pillar Page
-                      </h4>
-                      {!topic.pillarPage && (
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => handleAddPillarPage(topic.id, false)}
-                            disabled={syncing}
-                            className="px-3 py-1.5 text-xs font-light text-gray-600 hover:text-black hover:bg-gray-100 rounded-full transition-all flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
-                          >
-                            <Plus className="h-3.5 w-3.5" />
-                            Add pillar page manually
-                          </button>
-                          <button
-                            onClick={() => handleAddPillarPage(topic.id, true)}
-                            disabled={
-                              syncing || aiLoading === `pillar-${topic.id}`
-                            }
-                            className="px-3 py-1.5 text-xs font-light text-white bg-black hover:bg-black/90 rounded-full transition-all flex items-center gap-1.5 disabled:opacity-60 disabled:cursor-not-allowed"
-                          >
-                            {aiLoading === `pillar-${topic.id}` ? (
-                              <ButtonSpinner />
-                            ) : (
-                              <Sparkles className="h-3.5 w-3.5" />
-                            )}
-                            {aiLoading === `pillar-${topic.id}`
-                              ? "Generating"
-                              : "Generate pillar page"}
-                          </button>
-                        </div>
-                      )}
-                    </div>
-
-                    {topic.pillarPage ? (
-                      <div className="bg-gray-50 rounded-xl border border-gray-200 p-4">
-                        <div className="flex items-center justify-between mb-3">
-                          <div className="flex items-center gap-3 flex-1">
-                            <button
-                              onClick={() =>
-                                togglePillarPage(topic.pillarPage!.id)
-                              }
-                              className="p-1 hover:bg-gray-200 rounded transition-colors"
-                            >
-                              <ChevronRight
-                                className={`h-4 w-4 text-gray-400 transition-transform duration-200 ${
-                                  expandedPillarPages.has(topic.pillarPage!.id)
-                                    ? "rotate-90"
-                                    : ""
-                                }`}
-                              />
-                            </button>
-                            <div className="w-8 h-8 rounded-lg bg-green-50 flex items-center justify-center">
-                              <FileText className="h-4 w-4 text-green-600" />
-                            </div>
-                            <div className="flex-1">
-                              <div className="flex items-center gap-3">
-                              <h5 className="text-sm font-light text-black">{topic.pillarPage.title}</h5>
-                                {(() => {
-                                  const job = generationJobs.get(topic.pillarPage.id);
-                                  const updatedAtMs = job?.updatedAt ? new Date(job.updatedAt).getTime() : undefined;
-                                  const staleClient = updatedAtMs ? (Date.now() - updatedAtMs > 5 * 60 * 1000) : false;
-                                  const status = staleClient && !job?.hasHtml ? 'failed' : job?.status;
-                                  const isLoading = viewLoadingPageId === topic.pillarPage.id;
-                                  const isPublishing = publishLoadingPageId === topic.pillarPage.id;
-                                  const isPublished = status === 'published' && job?.wordpressUrl;
-                                  const canView = (status === 'completed' || status === 'published') && job?.draftId;
-                                  
-                                  if (canView) {
-                                    return (
-                                      <div className="flex items-center gap-2">
-                                        <button
-                                          onClick={(e) => {
-                                            e.preventDefault();
-                                            e.stopPropagation();
-                                            viewDraft(job.draftId, topic.pillarPage.id);
-                                          }}
-                                          disabled={isLoading || isPublishing}
-                                          className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-black text-white text-xs font-medium hover:bg-gray-800 transition-all disabled:opacity-60 disabled:cursor-not-allowed shadow-sm"
-                                        >
-                                          {isLoading ? (
-                                            <>
-                                              <Loader2 className="h-3 w-3 animate-spin" />
-                                              Opening...
-                                            </>
-                                          ) : (
-                                            'View'
-                                          )}
-                                        </button>
-                                        {isPublished && job.wordpressUrl && (
-                                          <a
-                                            href={job.wordpressUrl}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            onClick={(e) => e.stopPropagation()}
-                                            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple-600 text-white text-xs font-medium hover:bg-purple-700 transition-all shadow-sm"
-                                          >
-                                            View Live
-                                          </a>
-                                        )}
-                                        {!isPublished && (
-                                          <button
-                                            onClick={(e) => {
-                                              e.preventDefault();
-                                              e.stopPropagation();
-                                              publishDraft(job.draftId, topic.pillarPage.id);
-                                            }}
-                                            disabled={isLoading || isPublishing || !hasWordpressIntegration}
-                                            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-600 text-white text-xs font-medium hover:bg-blue-700 transition-all disabled:opacity-60 disabled:cursor-not-allowed shadow-sm"
-                                            title={!hasWordpressIntegration ? 'WordPress integration required' : ''}
-                                          >
-                                            {isPublishing ? (
-                                              <>
-                                                <Loader2 className="h-3 w-3 animate-spin" />
-                                                Publishing...
-                                              </>
-                                            ) : (
-                                              'Publish'
-                                            )}
-                                          </button>
-                                        )}
-                                      </div>
-                                    );
-                                  }
-                                  return null;
-                                })()}
-                              </div>
-                              <p className="text-xs font-light text-gray-500 mt-0.5">
-                                {topic.pillarPage.keywords.length} keyword
-                                {topic.pillarPage.keywords.length !== 1
-                                  ? "s"
-                                  : ""}
-                              </p>
-                                  <div className="mt-1">
-                                    {renderStatusPill(topic.pillarPage.id)}
-                                  </div>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <button
-                              onClick={() => handleDeletePillarPage(topic.id)}
-                              disabled={syncing}
-                              className="p-1.5 text-gray-400 hover:text-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                              title="Delete pillar page"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </button>
-                          </div>
-                        </div>
-
-                        {/* Pillar Page Keywords */}
-                        {expandedPillarPages.has(topic.pillarPage.id) && (
-                          <div className="ml-11 mt-3 space-y-4">
-                            {/* Primary Keywords Section */}
-                            <div>
-                              <div className="flex items-center justify-between mb-2">
-                                <label className="text-xs font-medium text-gray-700">
-                                  Primary Keywords <span className="text-red-500">*</span>
-                                </label>
-                            <div className="flex items-center gap-1">
-                              <button
-                                onClick={() => handleAddKeyword('pillar', topic.id, topic.pillarPage!.id, false)}
-                                  disabled={syncing}
-                                  className="px-2 py-1 text-xs font-light text-gray-600 hover:text-black hover:bg-gray-100 rounded-full transition-all flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
-                                    title="Add primary keyword manually"
-                              >
-                                <Plus className="h-3 w-3" />
-                              </button>
-                              <button
-                                    onClick={async () => {
-                                      if (aiLoading === `primary-keyword-${topic.pillarPage!.id}`) return;
-                                      setAiLoading(`primary-keyword-${topic.pillarPage!.id}`);
-                                      try {
-                                        const response = await fetch(`${CAMPAIGN_API_BASE}/pages/${topic.pillarPage!.id}/keywords/ai`, {
-                                          method: 'POST',
-                                          headers: getAuthHeaders(),
-                                          body: JSON.stringify({ count: 1, keywordType: 'primary' })
-                                        });
-                                        if (!response.ok) throw new Error('Failed to generate');
-                                        const data = await response.json();
-                                        if (data.success) {
-                                          fetchStructure(campaign.id);
-                                          toast({
-                                            title: 'Keyword generated',
-                                            description: 'Primary keyword generated successfully',
-                                          });
-                                        }
-                                      } catch (error) {
-                                        console.error('Error generating primary keyword:', error);
-                                        toast({
-                                          title: 'Generation failed',
-                                          description: 'Unable to generate primary keyword',
-                                          variant: 'destructive'
-                                        });
-                                      } finally {
-                                        setAiLoading(null);
-                                      }
-                                    }}
-                                    disabled={syncing || aiLoading === `primary-keyword-${topic.pillarPage!.id}`}
-                                  className="px-2 py-1 text-xs font-light text-white bg-black hover:bg-black/90 rounded-full transition-all flex items-center gap-1 disabled:opacity-60 disabled:cursor-not-allowed"
-                                    title="AI generate primary keyword"
-                              >
-                                    {aiLoading === `primary-keyword-${topic.pillarPage!.id}` ? <ButtonSpinner /> : <Sparkles className="h-3 w-3" />}
-                                    Generate primary keywords
-                              </button>
-                                </div>
-                              </div>
-                              <div className="space-y-2">
-                                {(() => {
-                                  // Only show keywords that are actually marked as primary
-                                  const primaryKeywords = topic.pillarPage.keywords.filter(kw => {
-                                    const metadata = kw.aiMetadata as any;
-                                    return metadata && metadata.isPrimary === true;
-                                  });
-                                  
-                                  return primaryKeywords.length > 0 ? (
-                                    primaryKeywords.map((keyword) => (
-                                      <div
-                                        key={keyword.id}
-                                        className="flex items-center justify-between p-2 bg-white rounded-lg border border-gray-200 hover:border-gray-300 transition-colors"
-                                      >
-                                        <div className="flex items-center gap-3">
-                                          <div className="w-6 h-6 rounded bg-purple-50 flex items-center justify-center">
-                                            <span className="text-[10px] font-medium text-purple-600">P</span>
-                                          </div>
-                                          <div>
-                                            <p className="text-sm font-light text-black">{keyword.term}</p>
-                                            <p className="text-xs font-light text-gray-500">
-                                              Vol: {keyword.volume.toLocaleString()} • KD: {keyword.difficulty}
-                                            </p>
-                                          </div>
-                            </div>
-                            <button
-                                          onClick={() => handleDeleteKeyword({ type: 'pillar', topicId: topic.id, pageId: topic.pillarPage!.id }, keyword.id)}
-                              disabled={syncing}
-                                          className="p-1 text-gray-400 hover:text-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                                          title="Delete keyword"
-                            >
-                                          <X className="h-3.5 w-3.5" />
-                            </button>
-                                      </div>
-                                    ))
-                                  ) : (
-                                    <p className="text-xs font-light text-gray-500 italic py-2">No primary keywords yet</p>
-                                  );
-                                })()}
-                          </div>
-                        </div>
-
-                            {/* Longtail Keywords Section */}
-                            <div>
-                              <div className="flex items-center justify-between mb-2">
-                                <label className="text-xs font-medium text-gray-700">
-                                  Longtail Keywords
-                                </label>
-                                <div className="flex items-center gap-1">
-                                  <button
-                                    onClick={() => handleAddKeyword('pillar', topic.id, topic.pillarPage!.id, false, 'longtail')}
-                                    disabled={syncing}
-                                    className="px-2 py-1 text-xs font-light text-gray-600 hover:text-black hover:bg-gray-100 rounded-full transition-all flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
-                                    title="Add longtail keyword manually"
-                                  >
-                                    <Plus className="h-3 w-3" />
-                                  </button>
-                                  <button
-                                    onClick={async () => {
-                                      if (aiLoading === `longtail-keyword-${topic.pillarPage!.id}`) return;
-                                      setAiLoading(`longtail-keyword-${topic.pillarPage!.id}`);
-                                      try {
-                                        const response = await fetch(`${CAMPAIGN_API_BASE}/pages/${topic.pillarPage!.id}/keywords/ai`, {
-                                          method: 'POST',
-                                          headers: getAuthHeaders(),
-                                          body: JSON.stringify({ count: 3, keywordType: 'longtail' })
-                                        });
-                                        if (!response.ok) throw new Error('Failed to generate');
-                                        const data = await response.json();
-                                        if (data.success) {
-                                          fetchStructure(campaign.id);
-                                          toast({
-                                            title: 'Keywords generated',
-                                            description: 'Longtail keywords generated successfully',
-                                          });
-                                        }
-                                      } catch (error) {
-                                        console.error('Error generating longtail keywords:', error);
-                                        toast({
-                                          title: 'Generation failed',
-                                          description: 'Unable to generate longtail keywords',
-                                          variant: 'destructive'
-                                        });
-                                      } finally {
-                                        setAiLoading(null);
-                                      }
-                                    }}
-                                    disabled={syncing || aiLoading === `longtail-keyword-${topic.pillarPage!.id}`}
-                                    className="px-2 py-1 text-xs font-light text-white bg-black hover:bg-black/90 rounded-full transition-all flex items-center gap-1 disabled:opacity-60 disabled:cursor-not-allowed"
-                                    title="AI generate longtail keywords"
-                                  >
-                                    {aiLoading === `longtail-keyword-${topic.pillarPage!.id}` ? <ButtonSpinner /> : <Sparkles className="h-3 w-3" />}
-                                    Generate longtail keywords
-                                  </button>
-                                </div>
-                              </div>
-                              <div className="space-y-2">
-                                {(() => {
-                                  // Filter keywords marked as longtail (and exclude primary)
-                                  const longtailKeywords = topic.pillarPage.keywords.filter(kw => {
-                                    const metadata = kw.aiMetadata as any;
-                                    const isPrimary = metadata && metadata.isPrimary === true;
-                                    const isLongtail = metadata && metadata.isLongtail === true;
-                                    // Only show if marked as longtail and not primary
-                                    return isLongtail && !isPrimary;
-                                  });
-                                  
-                                  return longtailKeywords.length > 0 ? (
-                                    longtailKeywords.map((keyword) => (
-                                <div
-                                  key={keyword.id}
-                                  className="flex items-center justify-between p-2 bg-white rounded-lg border border-gray-200 hover:border-gray-300 transition-colors"
-                                >
-                                  <div className="flex items-center gap-3">
-                                          <div className="w-6 h-6 rounded bg-green-50 flex items-center justify-center">
-                                            <span className="text-[10px] font-medium text-green-600">L</span>
-                                    </div>
-                                    <div>
-                                      <p className="text-sm font-light text-black">
-                                        {keyword.term}
-                                      </p>
-                                      <p className="text-xs font-light text-gray-500">
-                                        Vol: {keyword.volume.toLocaleString()} •
-                                        KD: {keyword.difficulty}
-                                      </p>
-                                    </div>
-                                  </div>
-                                  <button
-                                    onClick={() => handleDeleteKeyword(keyword.id)}
-                                    disabled={syncing}
-                                    className="p-1 text-gray-400 hover:text-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                                    title="Delete keyword"
-                                  >
-                                    <X className="h-3.5 w-3.5" />
-                                  </button>
-                                </div>
-                              ))
-                            ) : (
-                                    <p className="text-xs font-light text-gray-500 italic py-2">No longtail keywords yet</p>
-                                  );
-                                })()}
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <p className="text-xs font-light text-gray-500 italic py-2">
-                        No pillar page created yet
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Sub Pages Section */}
-                  <div>
-                    <div className="flex items-center justify-between mb-3">
-                      <h4 className="text-sm font-medium text-gray-900">
-                        Sub Pages
-                      </h4>
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => handleAddSubPage(topic.id, false)}
-                          disabled={syncing}
-                          className="px-3 py-1.5 text-xs font-light text-gray-600 hover:text-black hover:bg-gray-100 rounded-full transition-all flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          <Plus className="h-3.5 w-3.5" />
-                          Add sub page manually
-                        </button>
-                        <button
-                          onClick={() => handleAddSubPage(topic.id, true)}
-                          disabled={
-                            syncing || aiLoading === `subpage-${topic.id}`
-                          }
-                          className="px-3 py-1.5 text-xs font-light text-white bg-black hover:bg-black/90 rounded-full transition-all flex items-center gap-1.5 disabled:opacity-60 disabled:cursor-not-allowed"
-                        >
-                          {aiLoading === `subpage-${topic.id}` ? (
-                            <ButtonSpinner />
-                          ) : (
-                            <Sparkles className="h-3.5 w-3.5" />
-                          )}
-                          {aiLoading === `subpage-${topic.id}`
-                            ? "Generating"
-                            : "Generate sub page"}
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="space-y-3">
-                      {topic.subPages.length > 0 ? (
-                        topic.subPages.map((subPage) => (
-                          <div
-                            key={subPage.id}
-                            className="bg-gray-50 rounded-xl border border-gray-200 p-4"
-                          >
-                            <div className="flex items-center justify-between mb-3">
-                              <div className="flex items-center gap-3 flex-1">
-                                <button
-                                  onClick={() => toggleSubPage(subPage.id)}
-                                  className="p-1 hover:bg-gray-200 rounded transition-colors"
-                                >
-                                  <ChevronRight
-                                    className={`h-4 w-4 text-gray-400 transition-transform duration-200 ${
-                                      expandedSubPages.has(subPage.id)
-                                        ? "rotate-90"
-                                        : ""
-                                    }`}
-                                  />
-                                </button>
-                                <div className="w-8 h-8 rounded-lg bg-orange-50 flex items-center justify-center">
-                                  <FileText className="h-4 w-4 text-orange-600" />
-                                </div>
-                                <div className="flex-1">
-                                  <div className="flex items-center gap-3">
-                                  <h5 className="text-sm font-light text-black">{subPage.title}</h5>
-                                    {(() => {
-                                      const job = generationJobs.get(subPage.id);
-                                      const updatedAtMs = job?.updatedAt ? new Date(job.updatedAt).getTime() : undefined;
-                                      const staleClient = updatedAtMs ? (Date.now() - updatedAtMs > 5 * 60 * 1000) : false;
-                                      const status = staleClient && !job?.hasHtml ? 'failed' : job?.status;
-                                      const isLoading = viewLoadingPageId === subPage.id;
-                                      const isPublishing = publishLoadingPageId === subPage.id;
-                                      const isPublished = status === 'published' && job?.wordpressUrl;
-                                      const canView = (status === 'completed' || status === 'published') && job?.draftId;
-                                      
-                                      if (canView) {
-                                        return (
-                                          <div className="flex items-center gap-2">
-                                            <button
-                                              onClick={(e) => {
-                                                e.preventDefault();
-                                                e.stopPropagation();
-                                                viewDraft(job.draftId, subPage.id);
-                                              }}
-                                              disabled={isLoading || isPublishing}
-                                              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-black text-white text-xs font-medium hover:bg-gray-800 transition-all disabled:opacity-60 disabled:cursor-not-allowed shadow-sm"
-                                            >
-                                              {isLoading ? (
-                                                <>
-                                                  <Loader2 className="h-3 w-3 animate-spin" />
-                                                  Opening...
-                                                </>
-                                              ) : (
-                                                'View'
-                                              )}
-                                            </button>
-                                            {isPublished && job.wordpressUrl && (
-                                              <a
-                                                href={job.wordpressUrl}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                onClick={(e) => e.stopPropagation()}
-                                                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple-600 text-white text-xs font-medium hover:bg-purple-700 transition-all shadow-sm"
-                                              >
-                                                View Live
-                                              </a>
-                                            )}
-                                            {!isPublished && (
-                                              <button
-                                                onClick={(e) => {
-                                                  e.preventDefault();
-                                                  e.stopPropagation();
-                                                  publishDraft(job.draftId, subPage.id);
-                                                }}
-                                                disabled={isLoading || isPublishing || !hasWordpressIntegration}
-                                                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-600 text-white text-xs font-medium hover:bg-blue-700 transition-all disabled:opacity-60 disabled:cursor-not-allowed shadow-sm"
-                                                title={!hasWordpressIntegration ? 'WordPress integration required' : ''}
-                                              >
-                                                {isPublishing ? (
-                                                  <>
-                                                    <Loader2 className="h-3 w-3 animate-spin" />
-                                                    Publishing...
-                                                  </>
-                                                ) : (
-                                                  'Publish'
-                                                )}
-                                              </button>
-                                            )}
-                                          </div>
-                                        );
-                                      }
-                                      return null;
-                                    })()}
-                                  </div>
-                                  <p className="text-xs font-light text-gray-500 mt-0.5">
-                                    {subPage.keywords.length} keyword
-                                    {subPage.keywords.length !== 1 ? "s" : ""}
-                                  </p>
-                                  <div className="mt-1">
-                                    {renderStatusPill(subPage.id)}
-                                  </div>
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <div className="flex items-center gap-1">
-                                  <button
-                                    onClick={() =>
-                                      handleAddKeyword(
-                                        "subpage",
-                                        topic.id,
-                                        subPage.id,
-                                        false
-                                      )
-                                    }
-                                    disabled={syncing}
-                                    className="px-2 py-1 text-xs font-light text-gray-600 hover:text-black hover:bg-gray-100 rounded-full transition-all flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
-                                    title="Add keyword manually"
-                                  >
-                                    <Plus className="h-3 w-3" />
-                                    Add keyword manually
-                                  </button>
-                                  <button
-                                    onClick={() =>
-                                      handleAddKeyword(
-                                        "subpage",
-                                        topic.id,
-                                        subPage.id,
-                                        true
-                                      )
-                                    }
-                                    disabled={
-                                      syncing ||
-                                      aiLoading === `keyword-${subPage.id}`
-                                    }
-                                    className="px-2 py-1 text-xs font-light text-white bg-black hover:bg-black/90 rounded-full transition-all flex items-center gap-1 disabled:opacity-60 disabled:cursor-not-allowed"
-                                    title="AI generate keywords"
-                                  >
-                                    {aiLoading === `keyword-${subPage.id}` ? (
-                                      <ButtonSpinner />
-                                    ) : (
-                                      <Sparkles className="h-3 w-3" />
-                                    )}
-                                    Generate keywords
-                                  </button>
-                                </div>
-                                <button
-                                 onClick={() => handleDeleteSubPage(subPage.id)}
-
-                                  disabled={syncing}
-                                  className="p-1.5 text-gray-400 hover:text-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                                  title="Delete sub-page"
-                                >
-                                  <Trash2 className="h-3.5 w-3.5" />
-                            </button>
-                          </div>
-                        </div>
-
-                        {/* Sub Page Keywords */}
-                        {expandedSubPages.has(subPage.id) && (
-                          <div className="ml-11 mt-3 space-y-4">
-                            {/* Primary Keywords Section */}
-                            <div>
-                              <div className="flex items-center justify-between mb-2">
-                                <label className="text-xs font-medium text-gray-700">
-                                  Primary Keywords <span className="text-red-500">*</span>
-                                </label>
-                                <div className="flex items-center gap-1">
-                                  {/* <button
-                                    onClick={() => handleAddKeyword('subpage', topic.id, subPage.id, false, 'primary')}
-                                    disabled={syncing}
-                                    className="px-2 py-1 text-xs font-light text-gray-600 hover:text-black hover:bg-gray-100 rounded-full transition-all flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
-                                    title="Add primary keyword manually"
-                                  >
-                                    <Plus className="h-3 w-3" />
-                                  </button> */}
-                                  <button
-                                    onClick={async () => {
-                                      if (aiLoading === `primary-keyword-${subPage.id}`) return;
-                                      setAiLoading(`primary-keyword-${subPage.id}`);
-                                      try {
-                                        const response = await fetch(`${CAMPAIGN_API_BASE}/pages/${subPage.id}/keywords/ai`, {
-                                          method: 'POST',
-                                          headers: getAuthHeaders(),
-                                          body: JSON.stringify({ count: 1, keywordType: 'primary' })
-                                        });
-                                        if (!response.ok) throw new Error('Failed to generate');
-                                        const data = await response.json();
-                                        if (data.success) {
-                                          fetchStructure(campaign.id);
-                                          toast({
-                                            title: 'Keyword generated',
-                                            description: 'Primary keyword generated successfully',
-                                          });
-                                        }
-                                      } catch (error) {
-                                        console.error('Error generating primary keyword:', error);
-                                        toast({
-                                          title: 'Generation failed',
-                                          description: 'Unable to generate primary keyword',
-                                          variant: 'destructive'
-                                        });
-                                      } finally {
-                                        setAiLoading(null);
-                                      }
-                                    }}
-                                    disabled={syncing || aiLoading === `primary-keyword-${subPage.id}`}
-                                    className="px-2 py-1 text-xs font-light text-white bg-black hover:bg-black/90 rounded-full transition-all flex items-center gap-1 disabled:opacity-60 disabled:cursor-not-allowed"
-                                    title="AI generate primary keyword"
-                                  >
-                                    {aiLoading === `primary-keyword-${subPage.id}` ? <ButtonSpinner /> : <Sparkles className="h-3 w-3" />}
-                                    Generate primary keywords
-                                  </button>
-                                </div>
-                              </div>
-                              <div className="space-y-2">
-                                {(() => {
-                                  // Only show keywords that are actually marked as primary
-                                  const primaryKeywords = subPage.keywords.filter(kw => {
-                                    const metadata = kw.aiMetadata as any;
-                                    return metadata && metadata.isPrimary === true;
-                                  });
-                                  
-                                  return primaryKeywords.length > 0 ? (
-                                    primaryKeywords.map((keyword) => (
-                                    <div
-                                      key={keyword.id}
-                                      className="flex items-center justify-between p-2 bg-white rounded-lg border border-gray-200 hover:border-gray-300 transition-colors"
-                                    >
-                                      <div className="flex items-center gap-3">
-                                          <div className="w-6 h-6 rounded bg-purple-50 flex items-center justify-center">
-                                            <span className="text-[10px] font-medium text-purple-600">P</span>
-                                        </div>
-                                        <div>
-                                          <p className="text-sm font-light text-black">
-                                            {keyword.term}
-                                          </p>
-                                          <p className="text-xs font-light text-gray-500">
-                                            Vol:{" "}
-                                            {keyword.volume.toLocaleString()} •
-                                            KD: {keyword.difficulty}
-                                          </p>
-                                        </div>
-                                      </div>
-                                      <button
-                                        onClick={() => handleDeleteKeyword(keyword.id)}
-
-                                        disabled={syncing}
-                                        className="p-1 text-gray-400 hover:text-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                                        title="Delete keyword"
-                                      >
-                                        <X className="h-3.5 w-3.5" />
-                                      </button>
-                                    </div>
-                                  ))
-                                ) : (
-                                    <p className="text-xs font-light text-gray-500 italic py-2">No primary keywords yet</p>
-                                  );
-                                })()}
-                              </div>
-                            </div>
-
-                            {/* Longtail Keywords Section */}
-                            <div>
-                              <div className="flex items-center justify-between mb-2">
-                                <label className="text-xs font-medium text-gray-700">
-                                  Longtail Keywords
-                                </label>
-                                <div className="flex items-center gap-1">
-                                  {/* <button
-                                    onClick={() => handleAddKeyword('subpage', topic.id, subPage.id, false, 'longtail')}
-                                    disabled={syncing}
-                                    className="px-2 py-1 text-xs font-light text-gray-600 hover:text-black hover:bg-gray-100 rounded-full transition-all flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
-                                    title="Add longtail keyword manually"
-                                  >
-                                    <Plus className="h-3 w-3" />
-                                  </button> */}
-                                  <button
-                                    onClick={async () => {
-                                      if (aiLoading === `longtail-keyword-${subPage.id}`) return;
-                                      setAiLoading(`longtail-keyword-${subPage.id}`);
-                                      try {
-                                        const response = await fetch(`${CAMPAIGN_API_BASE}/pages/${subPage.id}/keywords/ai`, {
-                                          method: 'POST',
-                                          headers: getAuthHeaders(),
-                                          body: JSON.stringify({ count: 3, keywordType: 'longtail' })
-                                        });
-                                        if (!response.ok) throw new Error('Failed to generate');
-                                        const data = await response.json();
-                                        if (data.success) {
-                                          fetchStructure(campaign.id);
-                                          toast({
-                                            title: 'Keywords generated',
-                                            description: 'Longtail keywords generated successfully',
-                                          });
-                                        }
-                                      } catch (error) {
-                                        console.error('Error generating longtail keywords:', error);
-                                        toast({
-                                          title: 'Generation failed',
-                                          description: 'Unable to generate longtail keywords',
-                                          variant: 'destructive'
-                                        });
-                                      } finally {
-                                        setAiLoading(null);
-                                      }
-                                    }}
-                                    disabled={syncing || aiLoading === `longtail-keyword-${subPage.id}`}
-                                    className="px-2 py-1 text-xs font-light text-white bg-black hover:bg-black/90 rounded-full transition-all flex items-center gap-1 disabled:opacity-60 disabled:cursor-not-allowed"
-                                    title="AI generate longtail keywords"
-                                  >
-                                    {aiLoading === `longtail-keyword-${subPage.id}` ? <ButtonSpinner /> : <Sparkles className="h-3 w-3" />}
-                                    Generate longtail keywords
-                                  </button>
-                                </div>
-                              </div>
-                              <div className="space-y-2">
-                                {(() => {
-                                  // Filter keywords marked as longtail (and exclude primary)
-                                  const longtailKeywords = subPage.keywords.filter(kw => {
-                                    const metadata = kw.aiMetadata as any;
-                                    const isPrimary = metadata && metadata.isPrimary === true;
-                                    const isLongtail = metadata && metadata.isLongtail === true;
-                                    // Only show if marked as longtail and not primary
-                                    return isLongtail && !isPrimary;
-                                  });
-                                  
-                                  return longtailKeywords.length > 0 ? (
-                                    longtailKeywords.map((keyword) => (
-                                      <div
-                                        key={keyword.id}
-                                        className="flex items-center justify-between p-2 bg-white rounded-lg border border-gray-200 hover:border-gray-300 transition-colors"
-                                      >
-                                        <div className="flex items-center gap-3">
-                                          <div className="w-6 h-6 rounded bg-green-50 flex items-center justify-center">
-                                            <span className="text-[10px] font-medium text-green-600">L</span>
-                                          </div>
-                                          <div>
-                                            <p className="text-sm font-light text-black">{keyword.term}</p>
-                                            <p className="text-xs font-light text-gray-500">
-                                              Vol: {keyword.volume.toLocaleString()} • KD: {keyword.difficulty}
-                                            </p>
-                                          </div>
-                                        </div>
-                                        <button
-                                          onClick={() => handleDeleteKeyword({ type: 'subpage', topicId: topic.id, pageId: subPage.id }, keyword.id)}
-                                          disabled={syncing}
-                                          className="p-1 text-gray-400 hover:text-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                                          title="Delete keyword"
-                                        >
-                                          <X className="h-3.5 w-3.5" />
-                                        </button>
-                                      </div>
-                                    ))
-                                  ) : (
-                                    <p className="text-xs font-light text-gray-500 italic py-2">No longtail keywords yet</p>
-                                  );
-                                })()}
-                              </div>
-                            </div>
-                              </div>
-                            )}
-                          </div>
-                        ))
-                      ) : (
-                        <p className="text-xs font-light text-gray-500 italic py-2">
-                          No sub-pages created yet
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-          );
-        })}
-
-        {campaignStructure.topics.length === 0 && (
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-12 text-center">
-            <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
-              <Sparkles className="h-8 w-8 text-gray-400" />
-            </div>
-            <h3 className="text-lg font-light text-black mb-2">
-              No Topics Yet
-            </h3>
-            <p className="text-sm font-light text-gray-600 mb-4">
-              Add your first topic to get started
-            </p>
-            <div className="flex items-center justify-center gap-2">
-              <button
-                onClick={() => handleAddTopic(false)}
-                className="px-4 py-2 bg-gray-100 text-gray-900 rounded-full hover:bg-gray-200 transition-all text-sm font-light flex items-center gap-2"
-              >
-                <Plus className="h-4 w-4" />
-                Add topic manually
-              </button>
-              <button
-                onClick={() => handleAddTopic(true)}
-                className="px-4 py-2 bg-black text-white rounded-full hover:bg-black/90 transition-all text-sm font-medium flex items-center gap-2"
-              >
-                <Sparkles className="h-4 w-4" />
-                AI Generate
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Add Topic Modal */}
-      {showAddTopicModal && (
-        <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl border border-gray-200 shadow-xl p-8 max-w-md w-full">
-            <h3 className="text-xl font-light text-black tracking-tight mb-6">
-              Add New Topic
-            </h3>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-light text-gray-900 mb-2">
-                  Topic Title
-                </label>
-                <input
-                  type="text"
-                  value={newTopicTitle}
-                  onChange={(e) => setNewTopicTitle(e.target.value)}
-                  placeholder="Enter topic title"
-                  className="w-full px-4 py-3 text-base font-light rounded-2xl border border-gray-200 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all"
-                  autoFocus
-                />
-              </div>
-            </div>
-            <div className="flex items-center justify-end gap-3 mt-6">
-              <button
-                onClick={() => {
-                  setShowAddTopicModal(false);
-                  setNewTopicTitle("");
-                }}
-                className="px-6 py-3 bg-gray-100 text-gray-900 rounded-full hover:bg-gray-200 transition-all text-base font-light"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSubmitTopic}
-                className="px-6 py-3 bg-black text-white rounded-full hover:bg-black/90 transition-all text-base font-medium"
-              >
-                Add Topic
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Add Pillar Page Modal */}
-      {showAddPillarModal && (
-        <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl border border-gray-200 shadow-xl p-8 max-w-md w-full">
-            <h3 className="text-xl font-light text-black tracking-tight mb-6">
-              {targetTopicId &&
-              campaignStructure.topics.find((t) => t.id === targetTopicId)
-                ?.pillarPage
-                ? "Edit Pillar Page"
-                : "Add Pillar Page"}
-            </h3>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-light text-gray-900 mb-2">
-                  Pillar Page Title
-                </label>
-                <input
-                  type="text"
-                  value={newPillarTitle}
-                  onChange={(e) => setNewPillarTitle(e.target.value)}
-                  placeholder="Enter pillar page title"
-                  className="w-full px-4 py-3 text-base font-light rounded-2xl border border-gray-200 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all"
-                  autoFocus
-                />
-              </div>
-            </div>
-            <div className="flex items-center justify-end gap-3 mt-6">
-              <button
-                onClick={() => {
-                  setShowAddPillarModal(false);
-                  setNewPillarTitle("");
-                  setTargetTopicId(null);
-                }}
-                className="px-6 py-3 bg-gray-100 text-gray-900 rounded-full hover:bg-gray-200 transition-all text-base font-light"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSubmitPillarPage}
-                className="px-6 py-3 bg-black text-white rounded-full hover:bg-black/90 transition-all text-base font-medium"
-              >
-                {targetTopicId &&
-                campaignStructure.topics.find((t) => t.id === targetTopicId)
-                  ?.pillarPage
-                  ? "Update Pillar Page"
-                  : "Add Pillar Page"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Add Sub-Page Modal */}
-      {showAddSubPageModal && (
-        <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl border border-gray-200 shadow-xl p-8 max-w-md w-full">
-            <h3 className="text-xl font-light text-black tracking-tight mb-6">
-              Add New Sub-Page
-            </h3>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-light text-gray-900 mb-2">
-                  Sub-Page Title
-                </label>
-                <input
-                  type="text"
-                  value={newSubPageTitle}
-                  onChange={(e) => setNewSubPageTitle(e.target.value)}
-                  placeholder="Enter sub-page title"
-                  className="w-full px-4 py-3 text-base font-light rounded-2xl border border-gray-200 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all"
-                  autoFocus
-                />
-              </div>
-            </div>
-            <div className="flex items-center justify-end gap-3 mt-6">
-              <button
-                onClick={() => {
-                  setShowAddSubPageModal(false);
-                  setNewSubPageTitle("");
-                  setTargetTopicId(null);
-                }}
-                className="px-6 py-3 bg-gray-100 text-gray-900 rounded-full hover:bg-gray-200 transition-all text-base font-light"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSubmitSubPage}
-                className="px-6 py-3 bg-black text-white rounded-full hover:bg-black/90 transition-all text-base font-medium"
-              >
-                Add Sub-Page
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Add Keyword Modal */}
-      {showAddKeywordModal && (
-        <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl border border-gray-200 shadow-xl p-8 max-w-md w-full">
-            <h3 className="text-xl font-light text-black tracking-tight mb-6">
-              Add New Keyword
-            </h3>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-light text-gray-900 mb-2">
-                  Keyword Term
-                  {availableKeywords.length > 0 && (
-                    <span className="ml-2 text-xs text-gray-500">
-                      ({availableKeywords.length} keywords available)
-                    </span>
-                  )}
-                </label>
-                <Popover open={keywordSearchOpen} onOpenChange={setKeywordSearchOpen}>
-                  <PopoverTrigger asChild>
-                    <button
-                      type="button"
-                      role="combobox"
-                      aria-expanded={keywordSearchOpen}
-                      className="w-full px-4 py-3 text-base font-light rounded-2xl border border-gray-200 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all flex items-center justify-between text-left"
-                    >
-                      <span className={cn("truncate", !newKeywordTerm && "text-gray-400")}>
-                        {newKeywordTerm || "Search or type keyword..."}
-                      </span>
-                      <Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                    </button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-[calc(100vw-4rem)] max-w-md p-0" align="start">
-                    <Command shouldFilter={false}>
-                      <CommandInput
-                        placeholder="Search keywords..."
-                        value={keywordSearchValue}
-                        onValueChange={(value) => {
-                          console.log('Search value changed:', value);
-                          setKeywordSearchValue(value);
-                        }}
-                        className="h-9"
-                      />
-                      <CommandList>
-                        {loadingKeywords ? (
-                          <div className="py-6 text-center text-sm text-gray-500">Loading keywords...</div>
-                        ) : (
-                          <>
-                            <CommandEmpty>
-                              {availableKeywords.length === 0 
-                                ? "No keywords in domain yet. Type to create new."
-                                : "No keywords match your search. Type to create new."}
-                            </CommandEmpty>
-                            {availableKeywords.length > 0 && (
-                              <CommandGroup>
-                                {availableKeywords
-                                  .filter((kw) => {
-                                    if (!keywordSearchValue) return true;
-                                    return kw.term.toLowerCase().includes(keywordSearchValue.toLowerCase());
-                                  })
-                                  .map((keyword) => {
-                                    console.log('Rendering keyword item:', keyword.term, 'matches search:', !keywordSearchValue || keyword.term.toLowerCase().includes(keywordSearchValue.toLowerCase()));
-                                    return (
-                                    <CommandItem
-                                      key={keyword.id}
-                                      value={keyword.term}
-                                      onSelect={() => {
-                                        console.log('Keyword selected:', keyword.term);
-                                        setNewKeywordTerm(keyword.term);
-                                        setNewKeywordVolume(keyword.volume?.toString() || '');
-                                        setNewKeywordDifficulty(keyword.difficulty || 'Medium');
-                                        setKeywordSearchValue('');
-                                        setKeywordSearchOpen(false);
-                                      }}
-                                      className="cursor-pointer"
-                                    >
-                                      <Check
-                                        className={cn(
-                                          "mr-2 h-4 w-4",
-                                          newKeywordTerm === keyword.term ? "opacity-100" : "opacity-0"
-                                        )}
-                                      />
-                                      <div className="flex-1">
-                                        <div className="font-medium">{keyword.term}</div>
-                                        <div className="text-xs text-gray-500">
-                                          Volume: {keyword.volume?.toLocaleString() || 'N/A'} • 
-                                          Difficulty: {keyword.difficulty || 'N/A'}
-                                          {keyword.intent && ` • Intent: ${keyword.intent}`}
-                                        </div>
-                                      </div>
-                                    </CommandItem>
-                                    );
-                                  })}
-                              </CommandGroup>
-                            )}
-                          </>
-                        )}
-                      </CommandList>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
-                <div className="mt-2 flex items-center justify-between">
-                  <button
-                    type="button"
-                    onClick={() => setKeywordPickerDrawerOpen(true)}
-                    className="px-3 py-2 border border-gray-200 text-gray-900 rounded-full hover:bg-gray-50 transition-all text-sm font-medium"
-                  >
-                    Browse keyword table
-                  </button>
-                </div>
-                <input
-                  type="text"
-                  value={newKeywordTerm}
-                  onChange={(e) => {
-                    setNewKeywordTerm(e.target.value);
-                    setKeywordSearchValue(e.target.value);
-                    // Try to find matching keyword and auto-fill
-                    const matching = availableKeywords.find(
-                      kw => kw.term.toLowerCase() === e.target.value.toLowerCase()
-                    );
-                    if (matching) {
-                      setNewKeywordVolume(matching.volume?.toString() || '');
-                      setNewKeywordDifficulty(matching.difficulty || 'Medium');
-                    }
-                  }}
-                  placeholder="Or type a new keyword"
-                  className="w-full mt-2 px-4 py-3 text-base font-light rounded-2xl border border-gray-200 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-light text-gray-900 mb-2">Keyword Type</label>
-                <div className="flex gap-4">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="keywordType"
-                      value="primary"
-                      checked={newKeywordType === 'primary'}
-                      onChange={(e) => setNewKeywordType(e.target.value as 'primary' | 'longtail')}
-                      className="w-4 h-4 text-purple-600 focus:ring-purple-500"
-                    />
-                    <span className="text-sm font-light text-gray-900">Primary Keyword</span>
-                  </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="keywordType"
-                      value="longtail"
-                      checked={newKeywordType === 'longtail'}
-                      onChange={(e) => setNewKeywordType(e.target.value as 'primary' | 'longtail')}
-                      className="w-4 h-4 text-green-600 focus:ring-green-500"
-                    />
-                    <span className="text-sm font-light text-gray-900">Longtail Keyword</span>
-                  </label>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-light text-gray-900 mb-2">
-                    Volume
-                  </label>
-                  <input
-                    type="number"
-                    value={newKeywordVolume}
-                    onChange={(e) => setNewKeywordVolume(e.target.value)}
-                    placeholder="0"
-                    className="w-full px-4 py-3 text-base font-light rounded-2xl border border-gray-200 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-light text-gray-900 mb-2">
-                    Difficulty
-                  </label>
-                  <select
-                    value={newKeywordDifficulty}
-                    onChange={(e) => setNewKeywordDifficulty(e.target.value)}
-                    className="w-full px-4 py-3 text-base font-light rounded-2xl border border-gray-200 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all"
-                  >
-                    <option value="Low">Low</option>
-                    <option value="Medium">Medium</option>
-                    <option value="High">High</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-            <div className="flex items-center justify-end gap-3 mt-6">
-              <button
-                onClick={() => {
-                  setShowAddKeywordModal(false);
-                  setNewKeywordTerm('');
-                  setNewKeywordVolume('');
-                  setNewKeywordDifficulty('Medium');
-                  setKeywordSearchValue('');
-                  setKeywordSearchOpen(false);
-                  setAddKeywordContext(null);
-                }}
-                className="px-6 py-3 bg-gray-100 text-gray-900 rounded-full hover:bg-gray-200 transition-all text-base font-light"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSubmitKeyword}
-                className="px-6 py-3 bg-black text-white rounded-full hover:bg-black/90 transition-all text-base font-medium"
-              >
-                Add Keyword
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-      <Sheet
-        open={keywordPickerDrawerOpen}
-        onOpenChange={(open) => {
-          setKeywordPickerDrawerOpen(open);
-        }}
-      >
-        <SheetContent
-          side="right"
-          className="w-full sm:max-w-6xl border-l border-[#e2e4ea] bg-[#f5f6fa] px-8 py-10 overflow-y-auto font-light"
-        >
-          <div className="space-y-8">
-            <div className="rounded-[32px] border border-white/80 bg-white/90 px-6 py-6 shadow-[0_30px_80px_rgba(15,23,42,0.10)] backdrop-blur flex flex-col gap-3">
-              <div className="inline-flex items-center gap-2 rounded-full border border-black/10 px-4 py-1 text-[10px] tracking-[0.35em] uppercase text-gray-500">
-                Keyword picker
-              </div>
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <h3 className="text-[26px] font-light text-gray-900 tracking-tight">Choose from table</h3>
-                  <p className="text-sm text-gray-500">Search, filter, and select a keyword to fill the form.</p>
-                </div>
-                <div>
-                  <button
-                    onClick={() => setKeywordPickerDrawerOpen(false)}
-                    className="px-3 py-1.5 rounded-full bg-gray-100 text-gray-800 text-xs font-semibold border border-gray-200 hover:bg-gray-200"
-                  >
-                    Close
-                  </button>
-                </div>
-              </div>
-            </div>
-            <div className="rounded-[32px] border border-white/80 bg-white/90 px-6 py-6 shadow-[0_30px_80px_rgba(15,23,42,0.10)] backdrop-blur">
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6">
-                <div className="flex items-center space-x-4">
-                  <div className="relative">
-                    <Search className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                    <input
-                      type="text"
-                      placeholder="Search keywords..."
-                      value={drawerSearchTerm}
-                      onChange={(e) => setDrawerSearchTerm(e.target.value)}
-                      className="pl-10 pr-3 py-2.5 border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent text-sm bg-gray-50/50 transition-all duration-200 w-72"
-                    />
-                  </div>
-                  <select
-                    value={drawerCompetition}
-                    onChange={(e) => setDrawerCompetition(e.target.value)}
-                    className="px-3 py-2.5 border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent text-sm bg-gray-50/50 transition-all duration-200 appearance-none cursor-pointer"
-                  >
-                    <option value="">All Competition</option>
-                    <option value="Low">Low</option>
-                    <option value="Medium">Medium</option>
-                    <option value="High">High</option>
-                  </select>
-                  <select
-                    value={drawerIntent}
-                    onChange={(e) => setDrawerIntent(e.target.value)}
-                    className="px-3 py-2.5 border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent text-sm bg-gray-50/50 transition-all duration-200 appearance-none cursor-pointer"
-                  >
-                    <option value="">All Intent</option>
-                    <option value="Informational">Informational</option>
-                    <option value="Commercial">Commercial</option>
-                    <option value="Transactional">Transactional</option>
-                  </select>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="flex items-center bg-gray-100 rounded-2xl p-1">
-                    <button
-                      onClick={() => setDrawerViewMode("cards")}
-                      className={`flex items-center space-x-2 px-4 py-2 rounded-xl transition-all duration-200 text-sm font-medium ${
-                        drawerViewMode === "cards" ? "bg-white text-gray-900 shadow-sm" : "text-gray-600 hover:text-gray-900"
-                      }`}
-                    >
-                      <Grid3X3 className="w-4 h-4" />
-                      <span>Cards</span>
-                    </button>
-                    <button
-                      onClick={() => setDrawerViewMode("table")}
-                      className={`flex items-center space-x-2 px-4 py-2 rounded-xl transition-all duration-200 text-sm font-medium ${
-                        drawerViewMode === "table" ? "bg-white text-gray-900 shadow-sm" : "text-gray-600 hover:text-gray-900"
-                      }`}
-                    >
-                      <List className="w-4 h-4" />
-                      <span>Table</span>
-                    </button>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-gray-600">Rows</span>
-                    <div className="flex items-center bg-white border border-gray-200 rounded-2xl px-1 shadow-sm">
-                      <button
-                        onClick={() => {
-                          const next = Math.max(5, drawerItemsPerPage - 5);
-                          setDrawerItemsPerPage(next);
-                          setDrawerCurrentPage(1);
-                        }}
-                        className="px-2 py-1 text-gray-700 hover:text-gray-900 disabled:text-gray-300"
-                        disabled={drawerItemsPerPage <= 5}
-                        aria-label="Decrease rows"
-                      >
-                        −
-                      </button>
-                      <input
-                        type="number"
-                        min={5}
-                        max={200}
-                        step={5}
-                        value={drawerItemsPerPage}
-                        onChange={(e) => {
-                          const raw = parseInt(e.target.value, 10);
-                          if (Number.isNaN(raw)) return;
-                          const clamped = Math.max(5, Math.min(200, raw));
-                          setDrawerItemsPerPage(clamped);
-                          setDrawerCurrentPage(1);
-                        }}
-                        className="w-16 text-center px-2 py-1.5 text-sm border-0 focus:outline-none focus:ring-0 bg-transparent"
-                      />
-                      <button
-                        onClick={() => {
-                          const next = Math.min(200, drawerItemsPerPage + 5);
-                          setDrawerItemsPerPage(next);
-                          setDrawerCurrentPage(1);
-                        }}
-                        className="px-2 py-1 text-gray-700 hover:text-gray-900 disabled:text-gray-300"
-                        disabled={drawerItemsPerPage >= 200}
-                        aria-label="Increase rows"
-                      >
-                        +
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div className="bg-white rounded-3xl border border-gray-200 overflow-hidden shadow-sm">
-                <div className="bg-gray-50/80 border-b border-gray-200">
-                  <div className="grid grid-cols-10 gap-4 px-6 py-4 text-sm font-semibold text-gray-700">
-                    <div
-                      className="col-span-3 flex items-center space-x-2 cursor-pointer hover:text-gray-900 transition-colors"
-                      onClick={() => drawerHandleSort("keyword")}
-                    >
-                      <span>Keyword</span>
-                      {drawerGetSortIcon("keyword")}
-                    </div>
-                    <div
-                      className="col-span-1 flex items-center space-x-2 cursor-pointer hover:text-gray-900 transition-colors justify-center"
-                      onClick={() => drawerHandleSort("volume")}
-                    >
-                      <span>Volume</span>
-                      {drawerGetSortIcon("volume")}
-                    </div>
-                    <div
-                      className="col-span-1 flex items-center space-x-2 cursor-pointer hover:text-gray-900 transition-colors justify-center"
-                      onClick={() => drawerHandleSort("competition")}
-                    >
-                      <span>Competition</span>
-                      {drawerGetSortIcon("competition")}
-                    </div>
-                    <div
-                      className="col-span-1 flex items-center space-x-2 cursor-pointer hover:text-gray-900 transition-colors justify-center"
-                      onClick={() => drawerHandleSort("cpc")}
-                    >
-                      <span>CPC</span>
-                      {drawerGetSortIcon("cpc")}
-                    </div>
-                    <div
-                      className="col-span-1 flex items-center space-x-2 cursor-pointer hover:text-gray-900 transition-colors justify-center"
-                      onClick={() => drawerHandleSort("organic")}
-                    >
-                      <span>Organic</span>
-                      {drawerGetSortIcon("organic")}
-                    </div>
-                    <div
-                      className="col-span-1 flex items-center space-x-2 cursor-pointer hover:text-gray-900 transition-colors justify-center"
-                      onClick={() => drawerHandleSort("intent")}
-                    >
-                      <span>Intent</span>
-                      {drawerGetSortIcon("intent")}
-                    </div>
-                    <div
-                      className="col-span-2 flex items-center space-x-2 cursor-pointer hover:text-gray-900 transition-colors justify-center"
-                      onClick={() => drawerHandleSort("trend")}
-                    >
-                      <span>Trend</span>
-                      {drawerGetSortIcon("trend")}
-                    </div>
-                  </div>
-                </div>
-                <div className="divide-y divide-gray-100">
-                  {drawerCurrentKeywords.map((keyword) => (
-                    <div
-                      key={keyword.id}
-                      className="grid grid-cols-10 gap-4 px-6 py-4 hover:bg-gray-50/80 transition-all duration-200 cursor-pointer"
-                      onClick={() => {
-                        setNewKeywordTerm(keyword.keyword);
-                        setNewKeywordVolume(String(keyword.volume));
-                        setNewKeywordDifficulty(keyword.competition || "Medium");
-                        setKeywordPickerDrawerOpen(false);
-                        setKeywordSearchOpen(false);
-                      }}
-                    >
-                      <div className="col-span-3 flex items-center space-x-3">
-                        <div>
-                          <div className="font-semibold text-gray-900 text-sm flex items-center space-x-2">
-                            <span>{keyword.keyword}</span>
-                            {keyword.isCustom && (
-                              <span className="bg-purple-100 text-purple-800 px-2 py-0.5 rounded-full text-xs font-semibold">
-                                Custom
-                              </span>
-                            )}
-                          </div>
-                          <div className="text-xs text-gray-500 mt-0.5 truncate max-w-xs">
-                            {keyword.url}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="col-span-1 flex items-center justify-center">
-                        <span className="font-semibold text-gray-900 text-sm">
-                          {keyword.volume >= 1000 ? `${(keyword.volume / 1000).toFixed(1)}K` : keyword.volume.toLocaleString()}
-                        </span>
-                      </div>
-                      <div className="col-span-1 flex items-center justify-center">
-                        <span className={drawerCompetitionBadge(keyword.competition)}>
-                          {keyword.competition}
-                        </span>
-                      </div>
-                      <div className="col-span-1 flex items-center justify-center">
-                        <span className="font-semibold text-gray-900 text-sm">
-                          ${keyword.cpc.toFixed(2)}
-                        </span>
-                      </div>
-                      <div className="col-span-1 flex items-center justify-center">
-                        <span className="text-gray-700 text-sm">
-                          {keyword.organic.toLocaleString()}
-                        </span>
-                      </div>
-                      <div className="col-span-1 flex items-center justify-center">
-                        <span
-                          className={`px-2 py-1 rounded-full text-xs font-medium ${
-                            keyword.intent === "Commercial"
-                              ? "bg-blue-100 text-blue-800"
-                              : keyword.intent === "Transactional"
-                              ? "bg-green-100 text-green-800"
-                              : "bg-gray-100 text-gray-800"
-                          }`}
-                        >
-                          {keyword.intent}
-                        </span>
-                      </div>
-                      <div className="col-span-2 flex items-center justify-center">
-                        <div className="flex items-center space-x-1">
-                          <TrendingUp
-                            className={`w-4 h-4 ${
-                              keyword.trend === "Rising"
-                                ? "text-green-500"
-                                : keyword.trend === "Falling"
-                                ? "text-red-500"
-                                : "text-gray-500"
-                            }`}
-                          />
-                          <span className="text-sm text-gray-700">
-                            {keyword.trend}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                {drawerTotalPages > 1 && (
-                  <div className="bg-gray-50/50 border-t border-gray-200 px-6 py-4">
-                    <div className="flex items-center justify-between">
-                      <div className="text-sm text-gray-600">
-                        Showing {drawerStartIndex + 1} to {Math.min(drawerEndIndex, drawerSortedKeywords.length)} of {drawerSortedKeywords.length} keywords
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <button
-                          onClick={() => drawerHandlePageChange(drawerCurrentPage - 1)}
-                          disabled={drawerCurrentPage === 1}
-                          className={`flex items-center space-x-1 px-3 py-2 rounded-xl text-sm font-medium transition-all duration-200 ${
-                            drawerCurrentPage === 1 ? "text-gray-400 cursor-not-allowed" : "text-gray-700 hover:text-gray-900 hover:bg-gray-100"
-                          }`}
-                        >
-                          <ChevronUp className="w-4 h-4 rotate-90" />
-                          <span>Previous</span>
-                        </button>
-                        <div className="flex items-center space-x-1">
-                          {drawerGetPageNumbers().map((page, index) => (
-                            <React.Fragment key={index}>
-                              {page === "..." ? (
-                                <span className="px-2 py-2 text-gray-400">...</span>
-                              ) : (
-                                <button
-                                  onClick={() => drawerHandlePageChange(page as number)}
-                                  className={`w-8 h-8 rounded-xl text-sm font-medium transition-all duration-200 flex items-center justify-center ${
-                                    drawerCurrentPage === page ? "bg-gray-900 text-white shadow-sm" : "text-gray-700 hover:text-gray-900 hover:bg-gray-100"
-                                  }`}
-                                >
-                                  {page}
-                                </button>
-                              )}
-                            </React.Fragment>
-                          ))}
-                        </div>
-                        <button
-                          onClick={() => drawerHandlePageChange(drawerCurrentPage + 1)}
-                          disabled={drawerCurrentPage >= drawerTotalPages}
-                          className={`flex items-center space-x-1 px-3 py-2 rounded-xl text-sm font-medium transition-all duration-200 ${
-                            drawerCurrentPage >= drawerTotalPages ? "text-gray-400 cursor-not-allowed" : "text-gray-700 hover:text-gray-900 hover:bg-gray-100"
-                          }`}
-                        >
-                          <span>Next</span>
-                          <ChevronUp className="w-4 h-4 -rotate-90" />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-                {drawerSortedKeywords.length === 0 && (
-                  <div className="py-12 text-center">
-                    <p className="text-gray-500">No keywords match your current filters.</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </SheetContent>
-      </Sheet>
-      {/* Generation Drawer */}
-      <Sheet
-        open={generationDrawerOpen}
-        onOpenChange={(open) => {
-          setGenerationDrawerOpen(open);
-          if (!open) {
-            setCurrentGenerationTopicId(null);
-            setGenerationStep(1);
-          }
-        }}
-      >
-        <SheetContent
-          side="right"
-          className="w-full sm:max-w-3xl border-l border-[#e2e4ea] bg-[#f5f6fa] px-8 py-10 overflow-y-auto font-light"
-        >
-          <div className="space-y-8">
-            <div className="rounded-[32px] border border-white/80 bg-white/90 px-6 py-6 shadow-[0_30px_80px_rgba(15,23,42,0.10)] backdrop-blur flex flex-col gap-3">
-                  <div className="inline-flex items-center gap-2 rounded-full border border-black/10 px-4 py-1 text-[10px] tracking-[0.35em] uppercase text-gray-500">
-                Generation setup
-                  </div>
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                  <h3 className="text-[26px] font-light text-gray-900 tracking-tight">Configure content</h3>
-                  <p className="text-sm text-gray-500">Length, imagery, and brand—keywords are already chosen.</p>
-                  </div>
-                {hasWordpressIntegration ? (
-  <div className="px-3 py-1.5 rounded-full bg-emerald-50 text-emerald-700 text-xs font-semibold border border-emerald-100">
-    WordPress Connected
-  </div>
-) : (
-  <div className="px-3 py-1.5 rounded-full bg-red-50 text-red-700 text-xs font-semibold border border-red-100">
-    WordPress Not Connected
-  </div>
-)}
-              </div>
-              <div className="flex items-center gap-2">
-                {generationSteps.map((step) => (
-                  <div key={step.id} className="flex items-center gap-2">
-                    <div
-                      className={`h-2 w-2 rounded-full ${
-                        generationStep >= step.id ? 'bg-black' : 'bg-gray-300'
-                        }`}
-                      />
-                    <span className={`text-xs font-medium ${generationStep >= step.id ? 'text-gray-900' : 'text-gray-400'}`}>
-                      {step.title}
-                    </span>
-                    {step.id !== generationSteps.length && (
-                      <div className="h-px w-6 bg-gray-200" />
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-
+            {/* Step 1: Word Count */}
             {generationStep === 1 && (
-              <section className="rounded-[32px] border border-white/80 bg-white/90 px-6 py-6 shadow-[0_30px_80px_rgba(15,23,42,0.10)] backdrop-blur flex flex-col gap-5">
+              <section className="rounded-[36px] border border-white/70 bg-white p-8 shadow-[0_30px_80px_rgba(15,23,42,0.08)] space-y-8">
+                <div className="space-y-2">
+                  <span className="text-[11px] uppercase tracking-[0.35em] text-gray-400">Word cadence</span>
+                  <h4 className="text-2xl font-light text-gray-900">Dial in the depth and pace.</h4>
+                  <p className="text-sm text-gray-500 max-w-2xl">
+                    Glide between quick reads and flagship editorials. Every notch subtly changes paragraph
+                    length, transitions, and how immersive the narration should feel.
+                  </p>
+                </div>
+                <div className="rounded-[28px] border border-gray-100 bg-gray-50/70 p-5 space-y-4">
                   <div className="flex items-center justify-between">
                     <div>
-                    <div className="text-xs uppercase tracking-[0.35em] text-gray-500">Word cadence</div>
-                    <h3 className="text-[24px] font-light text-gray-900">Dial in the depth</h3>
-                    <p className="text-sm text-gray-500">Tune the total word count for the generated pages.</p>
+                      <p className="text-sm font-semibold text-gray-800">Projected read time</p>
+                      <p className="text-xs text-gray-500">A calm slider tuned for editorial pacing.</p>
                     </div>
-                  <div className="inline-flex items-baseline gap-1 rounded-full bg-gray-50 px-4 py-1 shadow-inner border border-gray-100">
-                    <span className="text-xl font-light">{generationForm.wordCount}</span>
-                    <span className="text-[11px] uppercase tracking-[0.25em] text-gray-500">words</span>
-                    </div>
-                  </div>
-                <div className="rounded-2xl border border-gray-100 bg-gray-50/70 p-4 space-y-3">
-                    <input
-                      type="range"
-                      min={500}
-                      max={2000}
-                      step={50}
-                      value={generationForm.wordCount}
-                      onChange={(e) =>
-                      setGenerationForm((prev) => ({ ...prev, wordCount: Number(e.target.value) || 800 }))
-                      }
-                      className="w-full h-2 rounded-full bg-gradient-to-r from-gray-200 via-gray-300 to-gray-400 accent-black"
-                    />
-                  <div className="flex justify-between text-[11px] uppercase tracking-[0.3em] text-gray-400">
-                    <span>Brief</span>
-                    <span>Feature</span>
-                    <span>Chronicle</span>
+                    <div className="inline-flex items-baseline gap-2 rounded-full bg-white px-5 py-1.5 shadow-inner">
+                      <span className="text-2xl font-light">{generationConfig.wordCount}</span>
+                      <span className="text-xs uppercase tracking-[0.25em] text-gray-500">words</span>
                     </div>
                   </div>
-                <div className="flex items-center justify-between">
-                  <button
-                    onClick={() => {
-                      setGenerationDrawerOpen(false);
-                      setCurrentGenerationTopicId(null);
-                    }}
-                    className="px-4 py-2 rounded-full border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={() => setGenerationStep(2)}
-                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-gray-900 text-white text-sm font-semibold hover:bg-black/90"
-                  >
-                    Next
-                    <ChevronRight className="h-4 w-4" />
-                  </button>
+                  <Slider
+                    value={[generationConfig.wordCount]}
+                    min={400}
+                    max={3000}
+                    step={100}
+                    onValueChange={(vals) => setGenerationConfig(prev => ({ ...prev, wordCount: vals[0] }))}
+                    className="py-4"
+                  />
                 </div>
+                <button 
+                  onClick={() => setGenerationStep(2)}
+                  className="w-full py-3.5 bg-gray-900 text-white rounded-full hover:bg-gray-800 transition-colors font-medium text-sm"
+                >
+                  Continue to Imagery
+                </button>
               </section>
             )}
 
+            {/* Step 2: Imagery */}
             {generationStep === 2 && (
-              <section className="rounded-[32px] border border-white/80 bg-white/90 px-6 py-6 shadow-[0_30px_80px_rgba(15,23,42,0.10)] backdrop-blur space-y-5">
-                <div className="flex items-center justify-between">
-                      <div>
-                    <div className="text-xs uppercase tracking-[0.35em] text-gray-500">Imagery</div>
-                    <h3 className="text-[24px] font-light text-gray-900">Compose the visuals</h3>
-                    <p className="text-sm text-gray-500">Control inline images and the featured banner.</p>
-                      </div>
-                  <div className="px-3 py-1.5 rounded-full bg-emerald-50 text-emerald-700 text-xs font-semibold border border-emerald-100">
-                    WordPress Connected
-                  </div>
+              <section className="rounded-[36px] border border-white/70 bg-white p-8 shadow-[0_30px_80px_rgba(15,23,42,0.08)] space-y-8">
+                <div className="space-y-2">
+                  <span className="text-[11px] uppercase tracking-[0.35em] text-gray-400">Visual elements</span>
+                  <h4 className="text-2xl font-light text-gray-900">Set the visual tone.</h4>
+                  <p className="text-sm text-gray-500 max-w-2xl">
+                    Choose how many images to generate and whether to include a featured hero image.
+                  </p>
                 </div>
-                <div className="rounded-2xl border border-gray-100 bg-gray-50/70 p-4 space-y-4">
+                <div className="rounded-[28px] border border-gray-100 bg-gray-50/70 p-5 space-y-4">
                   <div className="flex items-center justify-between">
-                    <div className="text-sm font-semibold text-gray-800">Inline images</div>
-                    <span className="text-sm text-gray-700">{generationForm.images}</span>
+                    <div>
+                      <p className="text-sm font-semibold text-gray-800">Images per article</p>
+                      <p className="text-xs text-gray-500">Inline images throughout the content.</p>
                     </div>
-                    <div className="flex items-center gap-3">
-                      <button
-                        onClick={() =>
-                          setGenerationForm((prev) => ({ ...prev, images: Math.max(0, prev.images - 1) }))
-                        }
-                      className="w-10 h-10 rounded-full border border-gray-200 text-lg leading-none flex items-center justify-center hover:border-gray-300 bg-white"
-                      >
-                        −
-                      </button>
-                      <div className="flex-1 h-2 rounded-full bg-gray-100">
-                        <div
-                          className="h-full rounded-full bg-gray-900 transition-all"
-                        style={{ width: `${Math.min(4, Math.max(0, generationForm.images)) / 4 * 100}%` }}
-                        />
-                      </div>
-                      <button
-                        onClick={() =>
-                          setGenerationForm((prev) => ({ ...prev, images: Math.min(4, prev.images + 1) }))
-                        }
-                      className="w-10 h-10 rounded-full border border-gray-200 text-lg leading-none flex items-center justify-center hover:border-gray-300 bg-white"
-                      >
-                        +
-                      </button>
+                    <div className="inline-flex items-baseline gap-2 rounded-full bg-white px-5 py-1.5 shadow-inner">
+                      <span className="text-2xl font-light">{generationConfig.images}</span>
+                      <span className="text-xs uppercase tracking-[0.25em] text-gray-500">images</span>
                     </div>
-                  <div className="rounded-2xl border border-gray-100 bg-white shadow-sm p-4 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <p className="text-sm font-semibold text-gray-900">Hero banner</p>
-                        <p className="text-xs text-gray-500">Ideal for previews and social sharing.</p>
                   </div>
-                      <span className="text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-700">Optional</span>
-                    </div>
-                    <button
-                      onClick={() =>
-                        setGenerationForm((prev) => ({ ...prev, featuredImage: !prev.featuredImage }))
-                      }
-                      className={`w-full px-4 py-3 rounded-[30px] border text-sm font-medium transition-all ${
-                        generationForm.featuredImage
-                          ? 'bg-black text-white border-black shadow-lg'
-                          : 'border-gray-200 text-gray-700 hover:bg-gray-100'
-                      }`}
-                    >
-                      {generationForm.featuredImage ? 'Use featured banner' : 'Skip featured banner'}
-                    </button>
-                  </div>
+                  <Slider
+                    value={[generationConfig.images]}
+                    min={0}
+                    max={5}
+                    step={1}
+                    onValueChange={(vals) => setGenerationConfig(prev => ({ ...prev, images: vals[0] }))}
+                    className="py-4"
+                  />
                 </div>
-                <div className="flex items-center justify-between">
-                  <button
+                <div className="flex items-center justify-between p-5 rounded-[28px] border border-gray-100 bg-gray-50/70">
+                  <div className="space-y-0.5">
+                    <p className="text-sm font-semibold text-gray-800">Featured Image</p>
+                    <p className="text-xs text-gray-500">Generate a high-quality hero banner</p>
+                  </div>
+                  <Switch
+                    checked={generationConfig.featuredImage}
+                    onCheckedChange={(checked) => setGenerationConfig(prev => ({ ...prev, featuredImage: checked }))}
+                  />
+                </div>
+                <div className="flex gap-3">
+                  <button 
                     onClick={() => setGenerationStep(1)}
-                    className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                    className="flex-1 py-3.5 bg-white text-gray-700 border border-gray-200 rounded-full hover:bg-gray-50 transition-colors font-medium text-sm"
                   >
-                    <ChevronLeft className="h-4 w-4" />
                     Back
                   </button>
-                  <button
+                  <button 
                     onClick={() => setGenerationStep(3)}
-                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-gray-900 text-white text-sm font-semibold hover:bg-black/90"
+                    className="flex-1 py-3.5 bg-gray-900 text-white rounded-full hover:bg-gray-800 transition-colors font-medium text-sm"
                   >
-                    Next
-                    <ChevronRight className="h-4 w-4" />
+                    Continue to Brand
                   </button>
                 </div>
               </section>
             )}
 
+            {/* Step 3: Brand Voice */}
             {generationStep === 3 && (
-              <section className="rounded-[32px] border border-white/80 bg-white/90 px-6 py-6 shadow-[0_30px_80px_rgba(15,23,42,0.10)] backdrop-blur space-y-5">
-                <div className="space-y-1">
-                  <div className="text-xs uppercase tracking-[0.35em] text-gray-500">Brand</div>
-                  <h3 className="text-[24px] font-light text-gray-900">Align tone & voice</h3>
-                  <p className="text-sm text-gray-500">We’ll weave this into the generated pages.</p>
+              <section className="rounded-[36px] border border-white/70 bg-white p-8 shadow-[0_30px_80px_rgba(15,23,42,0.08)] space-y-8">
+                <div className="space-y-2">
+                  <span className="text-[11px] uppercase tracking-[0.35em] text-gray-400">Brand voice</span>
+                  <h4 className="text-2xl font-light text-gray-900">Define your brand's personality.</h4>
+                  <p className="text-sm text-gray-500 max-w-2xl">
+                    The AI will adapt its writing style to match your brand's tone and values.
+                  </p>
                 </div>
-                <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-4">
                   <div className="space-y-2">
-                    <label className="block text-xs uppercase tracking-[0.35em] text-gray-500">Brand name</label>
+                    <label className="text-xs uppercase tracking-[0.35em] text-gray-400">Brand Name</label>
                     <input
                       type="text"
-                      value={generationForm.brandName}
-                      onChange={(e) => setGenerationForm((f) => ({ ...f, brandName: e.target.value }))}
-                      className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm shadow-inner focus:ring-2 focus:ring-black/10"
+                      value={generationConfig.brandName}
+                      onChange={(e) => setGenerationConfig(prev => ({ ...prev, brandName: e.target.value }))}
+                      placeholder="e.g. Acme Corp"
+                      className="w-full px-5 py-4 rounded-[28px] border border-gray-200 bg-gradient-to-br from-white via-white to-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent text-base shadow-inner"
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="block text-xs uppercase tracking-[0.35em] text-gray-500">Brand description</label>
+                    <label className="text-xs uppercase tracking-[0.35em] text-gray-400">Tone & Description (Optional)</label>
                     <textarea
-                      value={generationForm.brandDescription}
-                      onChange={(e) => setGenerationForm((f) => ({ ...f, brandDescription: e.target.value }))}
-                      className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm shadow-inner focus:ring-2 focus:ring-black/10"
-                      rows={3}
+                      value={generationConfig.brandDescription}
+                      onChange={(e) => setGenerationConfig(prev => ({ ...prev, brandDescription: e.target.value }))}
+                      placeholder="e.g. Professional, authoritative, yet accessible. Focus on Enterprise solutions."
+                      rows={4}
+                      className="w-full px-5 py-4 rounded-[28px] border border-gray-200 bg-gradient-to-br from-white via-white to-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent text-base shadow-inner resize-none"
                     />
                   </div>
                 </div>
-                    <div className="flex items-center justify-between">
-              <button
+                <div className="flex gap-3">
+                  <button 
                     onClick={() => setGenerationStep(2)}
-                    className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50"
-              >
-                <ChevronLeft className="h-4 w-4" />
-                Back
-              </button>
-                  <button
-                    disabled={!currentTopic || generateTopicLoading === currentTopic?.id}
-                    onClick={() => currentTopic && handleGenerateTopic(currentTopic, generationForm)}
-                    className="px-6 py-2.5 rounded-full bg-black text-white text-sm font-semibold shadow-[0_20px_40px_rgba(0,0,0,0.12)] hover:bg-black/90 disabled:opacity-60 disabled:cursor-not-allowed"
+                    className="flex-1 py-3.5 bg-white text-gray-700 border border-gray-200 rounded-full hover:bg-gray-50 transition-colors font-medium text-sm"
                   >
-                    {generateTopicLoading === currentTopic?.id ? 'Starting…' : 'Start generation'}
+                    Back
+                  </button>
+                  <button 
+                    onClick={handleConfirmGeneration}
+                    disabled={generateTopicLoading === pendingGenerationTopic?.id}
+                    className="flex-1 py-3.5 bg-gray-900 text-white rounded-full hover:bg-gray-800 transition-colors font-medium text-sm flex items-center justify-center gap-2"
+                  >
+                    {generateTopicLoading === pendingGenerationTopic?.id ? (
+                      <>
+                        <ButtonSpinner /> Starting...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-4 h-4" /> Start Generation
+                      </>
+                    )}
                   </button>
                 </div>
               </section>
@@ -8698,111 +7667,53 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
         </SheetContent>
       </Sheet>
 
-      {/* Draft Preview Overlay (publish-style) */}
-      {previewDraft && (
+      {/* Preview Overlay - Fills content area beside sidebar */}
+      {previewPageId && (
         <div 
-          className="fixed inset-0 z-50 bg-white"
-          style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}
-          onClick={(e) => {
-            // Prevent clicks from propagating to parent elements that might cause tab navigation
-            e.stopPropagation();
-          }}
-          onMouseDown={(e) => {
-            // Prevent mousedown from propagating
-            e.stopPropagation();
-          }}
+          className="fixed top-0 right-0 bottom-0 z-[60] bg-[#f5f6fa] flex flex-col"
+          style={{ left: sidebarOpen ? '280px' : '96px' }}
         >
-          <PublishExperience
-            companyDomain={companyDomain}
-            domainContext={domainContext}
-            keywordsTableData={keywordsTableData}
-            hasWordpressIntegration={hasWordpressIntegration}
-            wpIntegration={wpIntegration}
-            onConfigureWordpress={onConfigureWordpress}
-            onRefreshWordpressIntegration={onRefreshWordpressIntegration}
-            isActive={true}
-            disablePreviewOverlay={true}
-            initialDraft={{
-              primaryKeyword: previewDraft?.primaryKeyword || '',
-              htmlContent: previewDraft?.htmlContent || '',
-              featuredImage: previewDraft?.featuredImage,
-              title: previewDraft?.title,
-              metaDescription: previewDraft?.metaDescription,
-              slug: previewDraft?.slug,
-              longtailKeywords: '', // not provided by API yet
-              wordpressUrl: undefined,
-            }}
-            initialDraftId={previewPageId}
-          />
-          <button
-            onClick={async () => {
-              setClosePreviewLoading(true);
-              try {
-                // Refresh draft status when closing to show any updates
-                if (campaignStructure.topics && campaignStructure.topics.length > 0) {
-                  try {
-                    // Rehydrate draft status to pick up any changes
-                    const rehydrateMap = new Map<number, GenerationPageStatus>();
-                    for (const topic of campaignStructure.topics) {
-                      try {
-                        const response = await fetch(
-                          `${API_BASE_URL}/api/campaigns/topics/${topic.id}/drafts-status`,
-                          { headers: getAuthHeaders() }
-                        );
-                        if (response.ok) {
-                          const data = await response.json();
-                          if (data.success && data.pages) {
-                            data.pages.forEach((p: DraftStatusRecord) => {
-                              if (p.draftId || p.jobId || p.hasHtml) {
-                                rehydrateMap.set(p.pageId, {
-                                  jobId: p.jobId || '',
-                                  pageId: p.pageId,
-                                  pageType: p.pageType === 'subpage' ? 'subpage' : 'pillar',
-                                  status: (p.status || 'pending') as GenerationPageStatus['status'],
-                                  draftId: p.draftId,
-                                  progress: typeof p.progress === 'number' ? p.progress : p.hasHtml ? 100 : 0,
-                                  primaryKeyword: p.primaryKeyword,
-                                  hasHtml: p.hasHtml,
-                                  updatedAt: p.updatedAt,
-                                  error: p.error || null,
-                                  wordpressUrl: p.wordpressUrl || null,
-                                });
-                              }
-                            });
-                          }
-                        }
-                      } catch (err) {
-                        // Silently fail for individual topics
-                      }
-                    }
-                    if (rehydrateMap.size > 0) {
-                      setGenerationJobs(rehydrateMap);
-                    }
-                  } catch (err) {
-                    // Silently fail refresh
-                  }
-                }
-              } finally {
-              setPreviewDraft(null);
-              setPreviewPageId(null);
-                setClosePreviewLoading(false);
-              }
-            }}
-            disabled={closePreviewLoading}
-            className="fixed top-4 right-4 z-[60] inline-flex items-center gap-2 px-4 py-2.5 rounded-full border border-gray-200 bg-white text-sm font-medium text-gray-900 hover:bg-gray-50 shadow-sm disabled:opacity-60 disabled:cursor-not-allowed transition-all"
-          >
-            {closePreviewLoading ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Closing...
-              </>
-            ) : (
-              'Close'
-            )}
-          </button>
+          {/* Header with prominent back button */}
+          <div className="sticky top-0 z-[70] flex items-center gap-4 px-6 py-4 border-b border-gray-200 bg-white/80 backdrop-blur-md shadow-sm supports-[backdrop-filter]:bg-white/60">
+            <button
+              onClick={() => { setPreviewPageId(null); setPreviewDraft(null); }}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all shadow-sm group"
+            >
+              <ChevronLeft className="h-4 w-4 text-gray-400 group-hover:text-gray-900 transition-colors" />
+              <span className="text-sm font-medium">Back</span>
+            </button>
+            <div className="h-6 w-px bg-gray-200" />
+            <span className="text-sm text-gray-900 font-medium">Draft Preview</span>
+            
+            <div className="flex-1" />
+            
+            <button
+              onClick={() => { setPreviewPageId(null); setPreviewDraft(null); }}
+              className="p-2 rounded-lg text-gray-400 hover:text-gray-900 hover:bg-gray-100 transition-colors"
+              aria-label="Close preview"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+          
+          {/* Content */}
+          <div className="relative flex-1 overflow-hidden bg-gray-50">
+            <PublishExperience
+              companyDomain={companyDomain}
+              domainContext={domainContext}
+              keywordsTableData={keywordsTableData}
+              hasWordpressIntegration={hasWordpressIntegration}
+              wpIntegration={wpIntegration}
+              onConfigureWordpress={onConfigureWordpress}
+              onRefreshWordpressIntegration={onRefreshWordpressIntegration}
+              isActive={true}
+              initialDraftId={previewPageId}
+              disablePreviewOverlay={true}
+            />
+          </div>
         </div>
       )}
-    </div>
+    </>
   );
 };
 

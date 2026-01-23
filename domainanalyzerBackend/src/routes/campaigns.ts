@@ -10,6 +10,7 @@ import {
 import axios from 'axios';
 import { decryptToken } from '../services/tokenEncryption';
 import { authService } from '../services/authService';
+import { saveStreamingMessage, getStreamingMessages } from '../services/streamingService';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -17,13 +18,43 @@ const prisma = new PrismaClient();
 // Helper to compute aggregate job status
 // Job stays 'generating' until ALL pages are completed
 // Only mark as 'failed' if truly failed (not just incomplete)
-const computeJobStatus = (pages: { status: string }[]) => {
+// ZOMBIE CHECK: If a page has been 'generating' for > 15 mins, consider it stuck/failed
+const computeJobStatus = (pages: { status: string; updatedAt: Date }[]) => {
   if (pages.length === 0) return 'pending';
+
+  const now = new Date();
+  const STALE_THRESHOLD_MS = 15 * 60 * 1000; // 15 minutes
+
+  // Check for active generation
+  const isGenerating = pages.some(p => {
+    if (p.status === 'generating' || p.status === 'pending') {
+      const timeSinceUpdate = now.getTime() - new Date(p.updatedAt).getTime();
+      // If it's been generating for < 15 mins, it's still active. 
+      // If > 15 mins, we ignore it here (it will fall through to failed check or completed)
+      return timeSinceUpdate < STALE_THRESHOLD_MS;
+    }
+    return false;
+  });
+
+  if (isGenerating) return 'generating';
+
+  // If we are here, there are no *active* generating pages.
+  // We check if everything is completed.
   if (pages.every(p => p.status === 'completed')) return 'completed';
-  if (pages.some(p => p.status === 'failed')) return 'failed';
-  // If any page is generating or pending, job is still generating
-  if (pages.some(p => p.status === 'generating' || p.status === 'pending')) return 'generating';
-  return 'pending';
+
+  // If there are failed pages OR stale pages (generating > 15m), it's failed
+  const hasFailuresOrStalls = pages.some(p => {
+    if (p.status === 'failed') return true;
+    if (p.status === 'generating' || p.status === 'pending') {
+      const timeSinceUpdate = now.getTime() - new Date(p.updatedAt).getTime();
+      return timeSinceUpdate >= STALE_THRESHOLD_MS;
+    }
+    return false;
+  });
+
+  if (hasFailuresOrStalls) return 'failed';
+
+  return 'completed'; // Fallback
 };
 
 function asyncHandler(fn: (req: Request, res: Response, next: any) => Promise<any>) {
@@ -713,7 +744,13 @@ router.delete('/topics/:topicId', authenticateToken, asyncHandler(async (req: Re
     return res.status(404).json({ success: false, error: 'Topic not found' });
   }
 
-  await prisma.campaignTopic.delete({ where: { id: topicId } });
+  await prisma.$transaction(async (tx) => {
+    // Manually delete related GenerationJobs first due to missing Cascade on schema
+    await tx.generationJob.deleteMany({
+      where: { topicId }
+    });
+    await tx.campaignTopic.delete({ where: { id: topicId } });
+  });
   return respondWithStructure(res, topic.campaignId, userId);
 }));
 
@@ -1006,7 +1043,14 @@ router.delete('/pages/:pageId', authenticateToken, asyncHandler(async (req: Requ
     return res.status(404).json({ success: false, error: 'Page not found' });
   }
 
-  await prisma.campaignPage.delete({ where: { id: pageId } });
+  await prisma.$transaction(async (tx) => {
+    // Cleanup generation job pages that reference this page
+    // (Explicitly doing this to prevent foreign key errors or orphaned data)
+    await tx.generationJobPage.deleteMany({
+      where: { pageId }
+    });
+    await tx.campaignPage.delete({ where: { id: pageId } });
+  });
   return respondWithStructure(res, page.topic.campaignId, userId);
 }));
 
@@ -1422,13 +1466,125 @@ router.delete('/:id', authenticateToken, asyncHandler(async (req: Request, res: 
     });
   }
 
-  await prisma.campaign.delete({
-    where: { id: campaignId }
+  await prisma.$transaction(async (tx) => {
+    // 1. Find all topics to get their IDs so we can clean up jobs
+    const topics = await tx.campaignTopic.findMany({
+      where: { campaignId },
+      select: { id: true }
+    });
+    const topicIds = topics.map(t => t.id);
+
+    if (topicIds.length > 0) {
+      // 2. Delete all GenerationJobs for these topics
+      // (This is required because GenerationJob -> CampaignTopic is not cascade delete)
+      await tx.generationJob.deleteMany({
+        where: { topicId: { in: topicIds } }
+      });
+    }
+
+    // 3. Delete the campaign (this will cascade to topics/pages/keywords)
+    await tx.campaign.delete({
+      where: { id: campaignId }
+    });
   });
 
   res.json({
     success: true,
     message: 'Campaign deleted successfully'
+  });
+}));
+
+/**
+ * POST /api/campaigns/topics/:topicId/generate-content
+ * Generate content for all pages in a topic (pillar + sub-pages)
+ */
+/**
+ * GET /active-jobs
+ * Retrieves all currently active generation jobs for the authenticated user (generating or pending).
+ * Hydrates them with the latest streaming logs from Redis so the frontend can resume monitoring.
+ */
+router.get('/active-jobs', authenticateToken, asyncHandler(async (req: Request, res: Response) => {
+  const authReq = req as AuthenticatedRequest;
+  const userId = authReq.user.userId;
+
+  // 1. Fetch active jobs from DB
+  const activeJobs = await prisma.generationJob.findMany({
+    where: {
+      userId,
+      status: {
+        in: ['pending', 'generating']
+      }
+    },
+    include: {
+      topic: {
+        select: {
+          id: true,
+          title: true
+        }
+      },
+      pages: {
+        select: {
+          pageId: true,
+          pageType: true,
+          status: true,
+          progress: true,
+          updatedAt: true
+        }
+      }
+    },
+    orderBy: {
+      startedAt: 'desc'
+    }
+  });
+
+  const STALE_THRESHOLD_MS = 15 * 60 * 1000; // 15 minutes
+  const now = new Date().getTime();
+
+  // 2. Hydrate with Redis streaming messages AND check for staleness
+  const hydratedJobs = await Promise.all(activeJobs.map(async (job) => {
+    // Check staleness
+    const jobModTime = new Date(job.updatedAt).getTime();
+    const isStale = (now - jobModTime) > STALE_THRESHOLD_MS;
+
+    if (isStale) {
+      // Mark as failed in DB
+      await prisma.generationJob.update({
+        where: { id: job.id },
+        data: { status: 'failed' }
+      });
+      // Also mark pages if needed, but job status is primary for UI listing
+
+      return {
+        jobId: job.jobId,
+        topicId: job.topicId,
+        topicTitle: job.topic.title,
+        status: 'failed', // Return failed status
+        startTime: job.startedAt,
+        pages: job.pages,
+        messages: [] // No need for logs on stale failure, or maybe fetch them? fetch them is better context.
+      };
+    }
+
+    const messages = await getStreamingMessages(job.jobId);
+
+    // Sort messages by timestamp if needed, though active push usually keeps them ordered.
+    // Ensure we send back a clean history.
+
+    return {
+      jobId: job.jobId,
+      topicId: job.topicId,
+      topicTitle: job.topic.title,
+      status: job.status,
+      startTime: job.startedAt,
+      pages: job.pages,
+      // Only send the last 50 messages to avoid payload bloat if it's been running long
+      messages: messages.slice(-50)
+    };
+  }));
+
+  res.json({
+    success: true,
+    jobs: hydratedJobs
   });
 }));
 
@@ -1709,179 +1865,25 @@ router.post('/topics/:topicId/generate-content', authenticateToken, asyncHandler
   const N8N_API_KEY = process.env.N8N_API_KEY || '1234';
   const N8N_API_KEY_HEADER = process.env.N8N_API_KEY_HEADER || 'key';
 
-  // Process webhook asynchronously (fire and forget)
-  // n8n will process this in background and call back via webhook when done
-  // We don't wait for response since it takes ~3min per page (9min for 3 pages)
-  // The connection would timeout, so we handle it as fire-and-forget
-  (async () => {
-    try {
-      // Send request - try to catch response even if timeout occurs
-      // n8n processes for ~9 minutes, so we'll timeout, but we'll also set up
-      // a background job to periodically check if drafts were updated
-      axios.post(PILLAR_WEBHOOK_URL, payload, {
-        headers: {
-          'Content-Type': 'application/json',
-          [N8N_API_KEY_HEADER]: N8N_API_KEY,
-        },
-        timeout: 600000, // 10 minutes - try to wait as long as possible
-        validateStatus: () => true, // Accept any status code
-      }).then((response) => {
-        // Success! n8n returned response (unlikely but possible)
-        console.log(`[n8n request] Received response for job ${jobId}. Status: ${response.status}`);
-        console.log('[n8n request] Response body (truncated)', {
-          jobId,
-          status: response.status,
-          bodyType: Array.isArray(response.data) ? 'array' : typeof response.data,
-          pages: Array.isArray(response.data) ? response.data.length : 1,
-        });
-
-        // Process the response immediately
-        const pages = Array.isArray(response.data) ? response.data : [response.data];
-        processN8nResponse(pages, drafts, jobId);
-      }).catch(async (error: any) => {
-        // Check if response data is available even though we timed out
-        if (error.response?.data) {
-          console.log(`[n8n request] Got response data despite timeout for job ${jobId}`);
-          const pages = Array.isArray(error.response.data) ? error.response.data : [error.response.data];
-          console.log('[n8n request] Timeout body (truncated)', {
-            jobId,
-            pages: pages.length,
-            keys: Object.keys(pages[0] || {}),
-          });
-          await processN8nResponse(pages, drafts, jobId);
-          return;
-        }
-
-        // Timeout/connection reset is EXPECTED for long-running processes
-        const isExpectedError =
-          error.code === 'ECONNRESET' ||
-          error.code === 'ETIMEDOUT' ||
-          error.message?.includes('timeout') ||
-          error.message?.includes('socket hang up') ||
-          error.message?.includes('exceeded');
-
-        if (isExpectedError) {
-          console.log(`[n8n request] Request sent for job ${jobId}. Timeout expected - will check drafts periodically.`);
-
-          // Start background job to check if drafts were updated
-          // This will poll the drafts to see if n8n updated them directly
-          startDraftPolling(jobId, drafts, userId);
-        } else if (error.response?.status && error.response.status >= 400 && error.response.status < 500) {
-          // Client error (4xx) - actual failure
-          console.error(`[n8n request] Request rejected for job ${jobId}: ${error.response.status}`);
-          await Promise.all(drafts.map(draft =>
-            prisma.wordpressPublishLog.update({
-              where: { id: draft.id },
-              data: {
-                status: 'draft',
-                response: {
-                  ...(draft.response as any),
-                  status: 'failed',
-                  error: error.response?.data || 'Request rejected by n8n'
-                }
-              }
-            })
-          ));
-        } else {
-          console.warn(`[n8n request] Unexpected error for job ${jobId}: ${error.message}`);
-        }
-      });
-
-      // Helper function to process n8n response
-      async function processN8nResponse(pages: any[], draftList: any[], jobIdStr: string) {
-        console.log(`[n8n response] Processing ${pages.length} pages for job ${jobIdStr}`);
-
-        for (const page of pages) {
-          const primaryKeyword = page['Primary Keyword'] || page.primaryKeyword || '';
-          const html = page['Html Content'] || page.htmlContent || '';
-
-          if (!primaryKeyword) {
-            console.warn('[n8n response] Page missing primary keyword');
-            continue;
-          }
-
-          // Match by primary keyword and jobId
-          const matchingDraft = draftList.find(d => {
-            const resp = d.response as any;
-            return d.primaryKeyword === primaryKeyword && resp?.jobId === jobIdStr;
-          });
-
-          if (matchingDraft) {
-            const currentResponse = matchingDraft.response as any;
-            await prisma.wordpressPublishLog.update({
-              where: { id: matchingDraft.id },
-              data: {
-                status: 'draft',
-                title: page.Title || page.title || matchingDraft.title,
-                slug: page.slug || page.Slug || null,
-                response: {
-                  ...currentResponse,
-                  htmlContent: html,
-                  title: page.Title || page.title,
-                  metaDescription: page['Meta Description'] || page.metaDescription,
-                  slug: page.slug || page.Slug,
-                  featuredImage: page['Featured Image'] || page.featuredImage,
-                  status: 'completed',
-                  completedAt: new Date().toISOString()
-                }
-              }
-            });
-            console.log(`[n8n response] Updated draft ${matchingDraft.id} for "${primaryKeyword}"`, {
-              jobId: jobIdStr,
-              htmlLength: typeof html === 'string' ? html.length : 0,
-              hasTitle: Boolean(page.Title || page.title),
-              hasMeta: Boolean(page['Meta Description'] || page.metaDescription),
-              hasSlug: Boolean(page.slug || page.Slug),
-            });
-          }
-        }
-      }
-
-      // Background job to periodically check if drafts were updated
-      // (in case n8n updates them through some other mechanism)
-      function startDraftPolling(jobIdStr: string, draftList: any[], userIdNum: number) {
-        let attempts = 0;
-        const maxAttempts = 120; // Check for 30 minutes (120 * 15 seconds)
-
-        const pollInterval = setInterval(async () => {
-          attempts++;
-
-          try {
-            // Check if any drafts have been updated (maybe n8n updated them directly)
-            const updatedDrafts = await prisma.wordpressPublishLog.findMany({
-              where: {
-                id: { in: draftList.map(d => d.id) },
-                userId: userIdNum
-              }
-            });
-
-            // Check if any draft now has htmlContent (means it's completed)
-            const completed = updatedDrafts.some(draft => {
-              const resp = draft.response as any;
-              return resp?.htmlContent || resp?.['Html Content'];
-            });
-
-            if (completed || attempts >= maxAttempts) {
-              clearInterval(pollInterval);
-              if (completed) {
-                console.log(`[draft-polling] Detected completed drafts for job ${jobIdStr}`);
-              }
-            }
-          } catch (error) {
-            console.error(`[draft-polling] Error checking drafts for job ${jobIdStr}:`, error);
-          }
-        }, 15000); // Check every 15 seconds
-      }
-
-      // Don't wait for response - return immediately
-      return;
-      // Note: Response handling is done in the /generation-webhook endpoint
-      // which n8n will call when processing is complete
-    } catch (error: any) {
-      // This catch block should rarely be hit since we're not awaiting
-      console.error(`[n8n request] Unexpected error for job ${jobId}:`, error);
+  // Add to Queue (Job Type: CAMPAIGN_GENERATION)
+  // This will handle retries and persistence across restarts
+  const { addN8nJob, JOB_TYPES } = await import('../services/queueService');
+  await addN8nJob(JOB_TYPES.CAMPAIGN_GENERATION, {
+    url: PILLAR_WEBHOOK_URL,
+    payload,
+    headers: {
+      'Content-Type': 'application/json',
+      [N8N_API_KEY_HEADER]: N8N_API_KEY,
+    },
+    // Timeout 10 mins as per original logic, though we don't expect a response here
+    // since the worker will just fire-and-forget (as per our queueService implementation for this job type)
+    timeout: 600000,
+    meta: {
+      jobId,
+      userId,
+      topicId
     }
-  })();
+  });
 
   res.json({
     success: true,
@@ -2469,6 +2471,11 @@ router.post('/streaming-webhook', asyncHandler(async (req: Request, res: Respons
       return resp?.jobId === job_id;
     });
 
+    // 1. Persist the message for reliability (page reloads)
+    // We save it even if we can't find the user immediately, so history is preserved
+    const timestamp = new Date().toISOString();
+    await saveStreamingMessage(job_id, message, timestamp);
+
     if (!matchingDraft) {
       console.warn(`[streaming-webhook] No draft found with job_id: ${job_id}`);
       // Return 200 to avoid n8n retries, but log the issue
@@ -2485,7 +2492,7 @@ router.post('/streaming-webhook', asyncHandler(async (req: Request, res: Respons
       type: 'streaming',
       jobId: job_id,
       message: message,
-      timestamp: new Date().toISOString()
+      timestamp
     });
 
     console.log(`[streaming-webhook] ✅ Broadcasted progress update to user ${userId} for job ${job_id}`);
@@ -2551,13 +2558,35 @@ router.get('/topics/:topicId/drafts-status', authenticateToken, asyncHandler(asy
   const latestJob = await prisma.generationJob.findFirst({
     where: { topicId, userId },
     orderBy: { startedAt: 'desc' },
-    include: { pages: true }
+    select: {
+      id: true,
+      jobId: true,
+      status: true,
+      pages: {
+        select: {
+          pageId: true,
+          status: true,
+          progress: true,
+          hasHtml: true,
+          error: true,
+          updatedAt: true,
+          draftId: true,
+          primaryKeyword: true,
+          pageType: true,
+        }
+      }
+    }
   });
 
   if (!latestJob) {
     // No job yet, return pending for all pages
     return res.json({
       success: true,
+      status: {
+        status: 'pending',
+        active: false,
+        progress: 0
+      },
       pages: pageIds.map((pageId) => ({
         pageId,
         pageType: topic.pages.find(p => p.id === pageId)?.pageType || 'pillar',
@@ -2568,9 +2597,16 @@ router.get('/topics/:topicId/drafts-status', authenticateToken, asyncHandler(asy
         progress: 0,
         hasHtml: false,
         updatedAt: null,
-      }))
+        wordpressUrl: null,
+      })),
+      messages: []
     });
   }
+
+  const jobId = latestJob.jobId;
+
+  // Fetch persisted streaming messages
+  const streamingMessages = await getStreamingMessages(jobId);
 
   // Map job pages - use Promise.all for async draft fetching
   const pages = await Promise.all(

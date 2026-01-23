@@ -30276,6 +30276,7 @@ export namespace Prisma {
     slug: string | null
     status: string | null
     createdAt: Date | null
+    updatedAt: Date | null
     integrationId: number | null
   }
 
@@ -30288,6 +30289,7 @@ export namespace Prisma {
     slug: string | null
     status: string | null
     createdAt: Date | null
+    updatedAt: Date | null
     integrationId: number | null
   }
 
@@ -30301,6 +30303,7 @@ export namespace Prisma {
     status: number
     response: number
     createdAt: number
+    updatedAt: number
     integrationId: number
     _all: number
   }
@@ -30327,6 +30330,7 @@ export namespace Prisma {
     slug?: true
     status?: true
     createdAt?: true
+    updatedAt?: true
     integrationId?: true
   }
 
@@ -30339,6 +30343,7 @@ export namespace Prisma {
     slug?: true
     status?: true
     createdAt?: true
+    updatedAt?: true
     integrationId?: true
   }
 
@@ -30352,6 +30357,7 @@ export namespace Prisma {
     status?: true
     response?: true
     createdAt?: true
+    updatedAt?: true
     integrationId?: true
     _all?: true
   }
@@ -30452,6 +30458,7 @@ export namespace Prisma {
     status: string | null
     response: JsonValue | null
     createdAt: Date
+    updatedAt: Date
     integrationId: number | null
     _count: WordpressPublishLogCountAggregateOutputType | null
     _avg: WordpressPublishLogAvgAggregateOutputType | null
@@ -30484,6 +30491,7 @@ export namespace Prisma {
     status?: boolean
     response?: boolean
     createdAt?: boolean
+    updatedAt?: boolean
     integrationId?: boolean
     user?: boolean | UserDefaultArgs<ExtArgs>
     integration?: boolean | WordpressPublishLog$integrationArgs<ExtArgs>
@@ -30499,6 +30507,7 @@ export namespace Prisma {
     status?: boolean
     response?: boolean
     createdAt?: boolean
+    updatedAt?: boolean
     integrationId?: boolean
     user?: boolean | UserDefaultArgs<ExtArgs>
     integration?: boolean | WordpressPublishLog$integrationArgs<ExtArgs>
@@ -30515,10 +30524,11 @@ export namespace Prisma {
     status?: boolean
     response?: boolean
     createdAt?: boolean
+    updatedAt?: boolean
     integrationId?: boolean
   }
 
-  export type WordpressPublishLogOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "userId" | "wordpressUrl" | "primaryKeyword" | "title" | "slug" | "status" | "response" | "createdAt" | "integrationId", ExtArgs["result"]["wordpressPublishLog"]>
+  export type WordpressPublishLogOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "userId" | "wordpressUrl" | "primaryKeyword" | "title" | "slug" | "status" | "response" | "createdAt" | "updatedAt" | "integrationId", ExtArgs["result"]["wordpressPublishLog"]>
   export type WordpressPublishLogInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     user?: boolean | UserDefaultArgs<ExtArgs>
     integration?: boolean | WordpressPublishLog$integrationArgs<ExtArgs>
@@ -30544,6 +30554,7 @@ export namespace Prisma {
       status: string | null
       response: Prisma.JsonValue | null
       createdAt: Date
+      updatedAt: Date
       integrationId: number | null
     }, ExtArgs["result"]["wordpressPublishLog"]>
     composites: {}
@@ -30949,6 +30960,7 @@ export namespace Prisma {
     readonly status: FieldRef<"WordpressPublishLog", 'String'>
     readonly response: FieldRef<"WordpressPublishLog", 'Json'>
     readonly createdAt: FieldRef<"WordpressPublishLog", 'DateTime'>
+    readonly updatedAt: FieldRef<"WordpressPublishLog", 'DateTime'>
     readonly integrationId: FieldRef<"WordpressPublishLog", 'Int'>
   }
     
@@ -49425,6 +49437,7 @@ export namespace Prisma {
     status: 'status',
     response: 'response',
     createdAt: 'createdAt',
+    updatedAt: 'updatedAt',
     integrationId: 'integrationId'
   };
 
@@ -51865,6 +51878,7 @@ export namespace Prisma {
     status?: StringNullableFilter<"WordpressPublishLog"> | string | null
     response?: JsonNullableFilter<"WordpressPublishLog">
     createdAt?: DateTimeFilter<"WordpressPublishLog"> | Date | string
+    updatedAt?: DateTimeFilter<"WordpressPublishLog"> | Date | string
     integrationId?: IntNullableFilter<"WordpressPublishLog"> | number | null
     user?: XOR<UserRelationFilter, UserWhereInput>
     integration?: XOR<WordpressIntegrationNullableRelationFilter, WordpressIntegrationWhereInput> | null
@@ -51880,6 +51894,7 @@ export namespace Prisma {
     status?: SortOrderInput | SortOrder
     response?: SortOrderInput | SortOrder
     createdAt?: SortOrder
+    updatedAt?: SortOrder
     integrationId?: SortOrderInput | SortOrder
     user?: UserOrderByWithRelationInput
     integration?: WordpressIntegrationOrderByWithRelationInput
@@ -51898,6 +51913,7 @@ export namespace Prisma {
     status?: StringNullableFilter<"WordpressPublishLog"> | string | null
     response?: JsonNullableFilter<"WordpressPublishLog">
     createdAt?: DateTimeFilter<"WordpressPublishLog"> | Date | string
+    updatedAt?: DateTimeFilter<"WordpressPublishLog"> | Date | string
     integrationId?: IntNullableFilter<"WordpressPublishLog"> | number | null
     user?: XOR<UserRelationFilter, UserWhereInput>
     integration?: XOR<WordpressIntegrationNullableRelationFilter, WordpressIntegrationWhereInput> | null
@@ -51913,6 +51929,7 @@ export namespace Prisma {
     status?: SortOrderInput | SortOrder
     response?: SortOrderInput | SortOrder
     createdAt?: SortOrder
+    updatedAt?: SortOrder
     integrationId?: SortOrderInput | SortOrder
     _count?: WordpressPublishLogCountOrderByAggregateInput
     _avg?: WordpressPublishLogAvgOrderByAggregateInput
@@ -51934,6 +51951,7 @@ export namespace Prisma {
     status?: StringNullableWithAggregatesFilter<"WordpressPublishLog"> | string | null
     response?: JsonNullableWithAggregatesFilter<"WordpressPublishLog">
     createdAt?: DateTimeWithAggregatesFilter<"WordpressPublishLog"> | Date | string
+    updatedAt?: DateTimeWithAggregatesFilter<"WordpressPublishLog"> | Date | string
     integrationId?: IntNullableWithAggregatesFilter<"WordpressPublishLog"> | number | null
   }
 
@@ -55479,6 +55497,7 @@ export namespace Prisma {
     status?: string | null
     response?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: Date | string
+    updatedAt?: Date | string
     user: UserCreateNestedOneWithoutPublishLogsInput
     integration?: WordpressIntegrationCreateNestedOneWithoutPublishLogsInput
   }
@@ -55493,6 +55512,7 @@ export namespace Prisma {
     status?: string | null
     response?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: Date | string
+    updatedAt?: Date | string
     integrationId?: number | null
   }
 
@@ -55504,6 +55524,7 @@ export namespace Prisma {
     status?: NullableStringFieldUpdateOperationsInput | string | null
     response?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     user?: UserUpdateOneRequiredWithoutPublishLogsNestedInput
     integration?: WordpressIntegrationUpdateOneWithoutPublishLogsNestedInput
   }
@@ -55518,6 +55539,7 @@ export namespace Prisma {
     status?: NullableStringFieldUpdateOperationsInput | string | null
     response?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     integrationId?: NullableIntFieldUpdateOperationsInput | number | null
   }
 
@@ -55531,6 +55553,7 @@ export namespace Prisma {
     status?: string | null
     response?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: Date | string
+    updatedAt?: Date | string
     integrationId?: number | null
   }
 
@@ -55542,6 +55565,7 @@ export namespace Prisma {
     status?: NullableStringFieldUpdateOperationsInput | string | null
     response?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
   export type WordpressPublishLogUncheckedUpdateManyInput = {
@@ -55554,6 +55578,7 @@ export namespace Prisma {
     status?: NullableStringFieldUpdateOperationsInput | string | null
     response?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     integrationId?: NullableIntFieldUpdateOperationsInput | number | null
   }
 
@@ -58820,6 +58845,7 @@ export namespace Prisma {
     status?: SortOrder
     response?: SortOrder
     createdAt?: SortOrder
+    updatedAt?: SortOrder
     integrationId?: SortOrder
   }
 
@@ -58838,6 +58864,7 @@ export namespace Prisma {
     slug?: SortOrder
     status?: SortOrder
     createdAt?: SortOrder
+    updatedAt?: SortOrder
     integrationId?: SortOrder
   }
 
@@ -58850,6 +58877,7 @@ export namespace Prisma {
     slug?: SortOrder
     status?: SortOrder
     createdAt?: SortOrder
+    updatedAt?: SortOrder
     integrationId?: SortOrder
   }
 
@@ -63048,6 +63076,7 @@ export namespace Prisma {
     status?: string | null
     response?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: Date | string
+    updatedAt?: Date | string
     integration?: WordpressIntegrationCreateNestedOneWithoutPublishLogsInput
   }
 
@@ -63060,6 +63089,7 @@ export namespace Prisma {
     status?: string | null
     response?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: Date | string
+    updatedAt?: Date | string
     integrationId?: number | null
   }
 
@@ -63237,6 +63267,7 @@ export namespace Prisma {
     status?: StringNullableFilter<"WordpressPublishLog"> | string | null
     response?: JsonNullableFilter<"WordpressPublishLog">
     createdAt?: DateTimeFilter<"WordpressPublishLog"> | Date | string
+    updatedAt?: DateTimeFilter<"WordpressPublishLog"> | Date | string
     integrationId?: IntNullableFilter<"WordpressPublishLog"> | number | null
   }
 
@@ -68648,6 +68679,7 @@ export namespace Prisma {
     status?: string | null
     response?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: Date | string
+    updatedAt?: Date | string
     user: UserCreateNestedOneWithoutPublishLogsInput
   }
 
@@ -68661,6 +68693,7 @@ export namespace Prisma {
     status?: string | null
     response?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: Date | string
+    updatedAt?: Date | string
   }
 
   export type WordpressPublishLogCreateOrConnectWithoutIntegrationInput = {
@@ -72113,6 +72146,7 @@ export namespace Prisma {
     status?: string | null
     response?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: Date | string
+    updatedAt?: Date | string
     integrationId?: number | null
   }
 
@@ -72228,6 +72262,7 @@ export namespace Prisma {
     status?: NullableStringFieldUpdateOperationsInput | string | null
     response?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     integration?: WordpressIntegrationUpdateOneWithoutPublishLogsNestedInput
   }
 
@@ -72240,6 +72275,7 @@ export namespace Prisma {
     status?: NullableStringFieldUpdateOperationsInput | string | null
     response?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     integrationId?: NullableIntFieldUpdateOperationsInput | number | null
   }
 
@@ -72252,6 +72288,7 @@ export namespace Prisma {
     status?: NullableStringFieldUpdateOperationsInput | string | null
     response?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     integrationId?: NullableIntFieldUpdateOperationsInput | number | null
   }
 
@@ -73782,6 +73819,7 @@ export namespace Prisma {
     status?: string | null
     response?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: Date | string
+    updatedAt?: Date | string
   }
 
   export type WordpressPublishLogUpdateWithoutIntegrationInput = {
@@ -73792,6 +73830,7 @@ export namespace Prisma {
     status?: NullableStringFieldUpdateOperationsInput | string | null
     response?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     user?: UserUpdateOneRequiredWithoutPublishLogsNestedInput
   }
 
@@ -73805,6 +73844,7 @@ export namespace Prisma {
     status?: NullableStringFieldUpdateOperationsInput | string | null
     response?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
   export type WordpressPublishLogUncheckedUpdateManyWithoutIntegrationInput = {
@@ -73817,6 +73857,7 @@ export namespace Prisma {
     status?: NullableStringFieldUpdateOperationsInput | string | null
     response?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
   export type GenerationJobPageCreateManyJobInput = {
