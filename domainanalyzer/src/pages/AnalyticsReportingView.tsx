@@ -335,8 +335,8 @@ const AnalyticsReportingSetup = () => {
           </h1>
 
           <p className="text-xl font-light text-neutral-500 max-w-3xl mx-auto">
-            Generate comprehensive analytics reports automatically from your audit data.
-            Select your report parameters below.
+            Generate complete monthly analytics reports with trends and comparisons. <br />
+            Quickly review key metrics and track performance across all channels.
           </p>
         </header>
  {/* Main Action Trigger */}
@@ -508,7 +508,7 @@ onSelect={(date) => {
 
                   <Field
                     label="GSC Property ID (Optional)"
-                    helper="Leave blank to use your domain"
+                    // helper="Leave blank to use your domain"
                     icon={<BarChart3 className="h-4 w-4" />}
                     placeholder="e.g. 485147447"
                     value={form.analyticsPropertyId}

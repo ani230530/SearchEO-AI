@@ -78,7 +78,7 @@ const renderKeywords = (
         <span className="whitespace-normal">{k.term}</span>
 
         {/* Action Overlay */}
-        <div className="flex items-center gap-1 opacity-100 transition-opacity ml-2">
+        <div className="flex items-center gap-1 ml-2">
           {/* Only show Make Primary if not already primary */}
           {!k.aiMetadata?.isPrimary && (
             <button
@@ -139,7 +139,7 @@ const renderKeywords = (
              <div className="space-y-2">
                 <div className="flex items-center justify-between">
                     <span className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Keywords</span>
-                    <div className="flex items-center gap-2 opacity-100  transition-opacity">
+                    <div className="flex items-center gap-2">
                          <button onClick={() => onAddKeyword(type, topic.id, pageId, true, 'longtail')} disabled={aiLoading === `keyword-${pageId}`} className="text-[10px] text-blue-600 hover:text-blue-800 flex items-center gap-1 transition-colors">
                             {aiLoading === `keyword-${pageId}` ? <div className="h-3 w-3 text-blue-600 flex items-center justify-center"><ButtonSpinner /></div> : <Sparkles className="h-3 w-3"/>} 
                             AI Suggest

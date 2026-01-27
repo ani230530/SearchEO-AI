@@ -10,6 +10,7 @@ import {
   Loader2,
   Sparkles,
   Layout,
+  Info,
   List,
   Network,
   LayoutDashboard,
@@ -157,7 +158,15 @@ const tooltipInfo = {
 };
 
 const SidebarDashboard = () => {
-  const [activeTab, setActiveTab] = useState<TabId>("overview");
+const [activeTab, setActiveTab] = useState<TabId>(() => {
+  return (localStorage.getItem("activeTab") as TabId) || "overview";
+});
+useEffect(() => {
+  if (activeTab) {
+    localStorage.setItem("activeTab", activeTab);
+  }
+}, [activeTab]);
+
   const [activeCompanySubTab, setActiveCompanySubTab] =
     useState<CompanySubTabId>("company-info");
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -517,6 +526,43 @@ const handleRunAudit = async (url?: string) => {
   } finally {
     setAuditLoading(false);
   }
+};
+const InfoTooltip = ({ text }: { text: string }) => (
+  <span className="relative inline-flex items-center ml-1">
+    {/* Trigger */}
+    <span className="peer text-gray-400 hover:text-gray-600 transition-colorstext-xs">
+     <Info />
+    </span>
+
+    {/* Tooltip */}
+    <span
+      className="
+        pointer-events-none absolute left-1/2 -translate-x-1/2 bottom-full mb-2
+        w-64 rounded-xl bg-gray-900 text-white text-[11px] leading-relaxed
+        px-3 py-2 opacity-0 scale-95 translate-y-1
+        peer-hover:opacity-100 peer-hover:scale-100 peer-hover:translate-y-0
+        transition-all duration-200 ease-out z-50
+      "
+    >
+      {text}
+      <span className="absolute left-1/2 -translate-x-1/2 top-full w-2 h-2 bg-gray-900 rotate-45" />
+    </span>
+  </span>
+);
+
+const categoryDescriptions: Record<string, string> = {
+  Performance: "Overall speed and responsiveness of the page.",
+  SEO: "How well the page is optimized for search engines.",
+  Accessibility: "How usable the page is for users with disabilities.",
+  "Best Practices": "Adherence to modern web development best practices.",
+};
+
+const metricDescriptions: Record<string, string> = {
+  fcp: "Time until the first visible content appears on the page.",
+  lcp: "Time it takes for the largest visible element to fully render.",
+  cls: "Measures visual stability by tracking unexpected layout shifts.",
+  tbt: "Total time the page is blocked from responding to user input.",
+  speedIndex: "How quickly content is visually displayed during load.",
 };
 
 // Handle Send to N8n
@@ -2598,28 +2644,47 @@ useEffect(() => {
 
       {/* Opportunities Card */}
 <div className="rounded-3xl bg-white border border-gray-100 p-6 hover:shadow-lg transition">
-  <div className="text-xs uppercase tracking-wide text-gray-500">
-    Top opportunities
+  {/* Card Header */}
+  <div className="flex items-center justify-between mb-4">
+    <div className="text-xs uppercase tracking-wide text-gray-500">
+      Top Opportunities
+    </div>
+    <div className="text-xs uppercase tracking-wide text-gray-500">
+      Volume
+    </div>
   </div>
 
-  <div className="mt-4 space-y-4">
-    {keywordsTableData.slice(0, 5).map((item, idx) => (
-      <div key={idx} className="flex items-center justify-between">
-        <div>
-          <div className="text-lg font-medium text-gray-900">
-            {item?.keyword || "No keywords yet"}
+  <div className="space-y-4">
+    {keywordsTableData
+      .slice() // make a copy to sort safely
+      .sort((a, b) => (b.volume || 0) - (a.volume || 0)) // sort descending by volume
+      .slice(0, 5) // top 5
+      .map((item, idx) => (
+        <div key={idx} className="flex items-center justify-between">
+          <div>
+            <div className="text-lg font-medium text-gray-900">
+              {item?.keyword || "No keywords yet"}
+            </div>
+            <div className="text-xs text-gray-400 mt-1">
+              High potential growth keyword
+            </div>
           </div>
-          <div className="text-xs text-gray-400 mt-1">
-            High potential growth keyword
+
+          {/* Volume badge */}
+          <div className="px-3 py-2 rounded-2xl bg-blue-50 flex items-center justify-center min-w-[50px]">
+            <span className="text-sm font-semibold text-blue-600">
+              {item?.volume
+                ? item.volume >= 1000
+                  ? `${(item.volume / 1000).toFixed(1)}K`
+                  : item.volume.toLocaleString()
+                : "-"}
+            </span>
           </div>
         </div>
-        <div className="p-3 rounded-2xl bg-blue-50">
-          <TrendingUp className="h-5 w-5 text-blue-600" />
-        </div>
-      </div>
-    ))}
+      ))}
   </div>
 </div>
+
 
  {/* Audit Completed Modal */}
               {showAuditModal && (
@@ -4774,7 +4839,7 @@ const rightSections = sections.slice(4, 8);
                   const avg = scored.reduce((a, b) => a + b.score, 0) / scored.length;
                   const best = scored.reduce((a, b) => (b.score > a.score ? b : a));
                   const worst = scored.reduce((a, b) => (b.score < a.score ? b : a));
-
+                  
                   return (
                     <div ref={resultsRef} className="space-y-16">
                       {/* Overall Score Section */}
@@ -4889,17 +4954,33 @@ const rightSections = sections.slice(4, 8);
                         >
                           Individual Metrics
                         </h3>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-6">
-                          {categories.map(({ label, value }) => (
-                            <div
-                              key={label}
-                              className="bg-white/70 backdrop-blur-md rounded-2xl border border-gray-200 p-6 shadow-sm hover:shadow-md transition-all"
-                              style={{ borderWidth: '0.5px' }}
-                            >
-                              <AuditGaugeChart label={label} score={value} size={140} />
-                            </div>
-                          ))}
-                        </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-6">
+  {categories.map(({ label, value }) => (
+    <div
+      key={label}
+      className="bg-white/70 backdrop-blur-md rounded-2xl border border-gray-200 p-6 shadow-sm hover:shadow-md transition-all"
+      style={{ borderWidth: '0.5px' }}
+    >
+      {/* Metric Title + Tooltip */}
+      <div className="flex items-center justify-center gap-1 mb-4">
+        <span
+          className="text-sm font-light text-gray-700"
+          style={{ letterSpacing: '0.011em' }}
+        >
+          {label}
+        </span>
+
+        {categoryDescriptions[label] && (
+          <InfoTooltip text={categoryDescriptions[label]} />
+        )}
+      </div>
+
+      {/* Gauge */}
+      <AuditGaugeChart label={null} score={value} size={140} />
+    </div>
+  ))}
+</div>
+
                       </div>
 
                       {/* Screenshot Section */}
@@ -4951,9 +5032,18 @@ const rightSections = sections.slice(4, 8);
                                   className="flex justify-between items-center px-4 py-3 rounded-xl bg-gray-50/50 border border-gray-200 hover:bg-gray-50 transition-all"
                                   style={{ borderWidth: '0.5px' }}
                                 >
-                                  <span className="font-light text-gray-900" style={{ letterSpacing: '0.011em' }}>
-                                    {key.toUpperCase()} <span className="text-gray-500">({fullForms[key] || key})</span>
-                                  </span>
+                                  <span
+  className="font-light text-gray-900 flex items-center gap-1"
+  style={{ letterSpacing: '0.011em' }}
+>
+  {key.toUpperCase()}
+  <span className="text-gray-500">({fullForms[key] || key})</span>
+
+  {metricDescriptions[key] && (
+    <InfoTooltip text={metricDescriptions[key]} />
+  )}
+</span>
+
                                   <span className="font-mono text-sm font-light text-gray-700 bg-white px-3 py-1 rounded-lg border border-gray-200" style={{ borderWidth: '0.5px' }}>
                                     {String(value)}
                                   </span>
