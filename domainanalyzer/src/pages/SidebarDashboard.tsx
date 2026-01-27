@@ -51,7 +51,7 @@ import CampaignGraph from '@/components/CampaignGraph';
 import { AuditBarChart, AuditGaugeChart, AuditRadarChart, AuditScoreDistribution, OverallScoreGauge } from '@/components/audit/AuditCharts';
 import { WordpressIntegration } from '@/types/publish';
 import { PDFDownloadLink } from '@react-pdf/renderer';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogTitle } from '@radix-ui/react-alert-dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogTitle,AlertDialogOverlay } from '@radix-ui/react-alert-dialog';
 import { AuditPDF } from '@/components/audit/AuditPDF';
 import PublishExperience from '@/features/publish/PublishExperience';
 import { CompanyInfoSkeleton } from '@/components/dashboard/CompanyInfoSkeleton';
@@ -61,6 +61,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { AlertDialogHeader } from '@/components/ui/alert-dialog';
 import Profile from './Profile';
+import {AnimatePresence, motion} from 'framer-motion'
 import GSCAnalyticsView from '@/components/gsc/GSCAnalyticsView';
 import {
   Sheet,
@@ -284,6 +285,28 @@ const [improvedContent, setImprovedContent] = useState("");
   const [selectedCampaignId, setSelectedCampaignId] = useState<number | null>(
     null
   );
+
+  // PUBLISH PAGE STATES
+const [primaryKeyword, setPrimaryKeyword] = useState("");
+const [longtailKeywords, setLongtailKeywords] = useState("");
+const [brandName, setBrandName] = useState("");
+const [brandDescription, setBrandDescription] = useState("");
+const [image, setImage] = useState(1);
+const [wordCount, setWordCount] = useState(1500);
+const [featuredImage, setFeaturedImage] = useState("");
+
+// UI STATES
+const [publishLoading, setPublishLoading] = useState(false);
+const [publishSuccess, setPublishSuccess] = useState(false);
+const [publishError, setPublishError] = useState("");
+const [openSections, setOpenSections] = useState<number[]>([]);
+const toggleSection = (idx: number) => {
+  setOpenSections((prev) =>
+    prev.includes(idx)
+      ? prev.filter((i) => i !== idx)
+      : [...prev, idx]
+  );
+};
   // Company info carousel: track index and count to show arrows conditionally
   const companyCarouselRef = useRef<HTMLDivElement | null>(null);
   const [companyCurrentIndex, setCompanyCurrentIndex] = useState(0);
@@ -445,7 +468,7 @@ const overallScore =
     ? (auditData.performance +
         auditData.seo +
         auditData.accessibility +
-        auditData.bestPractices) / 5
+        auditData.bestPractices) / 4
     : 0;
 
 
@@ -2505,38 +2528,48 @@ useEffect(() => {
             >
               Analytics
             </button>
-
-            {companyDomain && (
-              <a
-                href={
-                  companyDomain.startsWith("http")
-                    ? companyDomain
-                    : `https://${companyDomain}`
-                }
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-sm text-blue-600 hover:underline"
-              >
-                Visit site →
-              </a>
-            )}
           </div>
         </div>
 
         {/* Right */}
         <div className="flex items-center gap-10">
-          <div className="text-center">
-            <div className="text-xs text-gray-500 mb-2">Overall health</div>
-            <OverallScoreGauge
-              size={120}
-              score={
-                ((auditResult?.performance || 0) +
-                  (auditResult?.seo || 0) +
-                  (auditResult?.accessibility || 0) +
-                  (auditResult?.bestPractices || 0)) / 5 || 0
-              }
-            />
-          </div>
+         
+            {companyDomain && (
+             <div className="text-center mb-12 flex flex-col items-center gap-4">
+                  <div className="inline-flex items-center gap-3 bg-blue-50 border border-blue-200 text-blue-700 px-5 py-3 rounded-2xl shadow-sm">
+                    <img
+                      src={`https://www.google.com/s2/favicons?domain=${companyDomain}&sz=64`}
+                      srcSet={`https://www.google.com/s2/favicons?domain=${companyDomain}&sz=64 1x, https://www.google.com/s2/favicons?domain=${companyDomain}&sz=128 2x, https://www.google.com/s2/favicons?domain=${companyDomain}&sz=256 4x`}
+                      sizes="32px"
+                      alt="favicon"
+                      width={32}
+                      height={32}
+                      className="w-8 h-8 rounded-md"
+                      onError={(e) => {
+                        e.currentTarget.src = `https://logo.clearbit.com/${companyDomain}`;
+                        e.currentTarget.srcset = '';
+                      }}
+                    />
+                    <span className="font-medium text-lg tracking-tight">
+                      {" "}
+                      <a
+                        href={
+                          companyDomain.startsWith("http")
+                            ? companyDomain
+                            : `https://${companyDomain}`
+                        }
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-600 hover:underline text-lg"
+                      >
+                        {companyDomain
+                          .replace(/^https?:\/\//, "")
+                          .replace(/^www\./, "")}
+                      </a>
+                    </span>
+                  </div>
+                </div>
+            )}
 
           <div className="hidden lg:block w-px h-24 bg-gray-100" />
 
@@ -2561,7 +2594,7 @@ useEffect(() => {
     </div>
 
     {/* ===================== KPI GRID ===================== */}
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
       {/* Opportunities Card */}
 <div className="rounded-3xl bg-white border border-gray-100 p-6 hover:shadow-lg transition">
@@ -2588,96 +2621,214 @@ useEffect(() => {
   </div>
 </div>
 
-      {/* Audit Summary */}
-      <div className="lg:col-span-2 rounded-3xl bg-white border border-gray-100 p-6 hover:shadow-lg">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h3 className="text-sm font-medium text-gray-900">
-              Audit summary
-            </h3>
-            <p className="text-xs text-gray-400">
-              Lighthouse performance breakdown
-            </p>
-          </div>
+ {/* Audit Completed Modal */}
+              {showAuditModal && (
+<div className="absolute inset-0 z-50 flex items-center justify-center">
+  <div className="max-w-md w-full rounded-2xl bg-white shadow-2xl">
+              <AlertDialog open={showAuditModal} onOpenChange={setShowAuditModal}>
+                <AlertDialogOverlay className="fixed inset-0 bg-black/20 backdrop-blur-sm z-40" />
+                <AlertDialogContent className=" fixed left-1/2 top-1/2 z-50
+    -translate-x-1/2 -translate-y-1/2
+    max-w-md w-full
+    rounded-2xl
+    bg-white
+    border border-gray-100
+    shadow-2xl
+    animate-in fade-in zoom-in-95">
+                  <div className="p-4 rounded-lg bg-gradient-to-r from-white/80 to-gray-50 border border-gray-100">
+                    <AlertDialogHeader>
+                      <AlertDialogTitle className="text-2xl font-medium">Audit Completed</AlertDialogTitle>
+                      <AlertDialogDescription className="text-sm text-muted-foreground">
+                        Your domain audit has finished. Here's a quick summary — you can view the full report or download it.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
 
-          <button
-            onClick={() => {
-              setActiveTab("audit");
-              setTimeout(() => setShowAuditModal(true), 120);
-            }}
-            className="text-sm text-blue-600 hover:underline"
-          >
-            View details
-          </button>
-        </div>
+                    <div className="mt-4 flex items-center gap-4">
+                      <div className="flex-shrink-0">
+                        <OverallScoreGauge score={Math.round(((auditResult?.performance||0)+(auditResult?.seo||0)+(auditResult?.accessibility||0)+(auditResult?.bestPractices||0))/4*100)/100 || 0} />
+                      </div>
+                      <div className="flex-1">
+                        <div className="text-sm text-gray-600 mb-2">Top category</div>
+                        <div className="text-base font-medium text-gray-900">
+                          {auditResult ? (
+                            (() => {
+                              const cats = [
+                                { k: 'Performance', v: auditResult.performance },
+                                { k: 'SEO', v: auditResult.seo },
+                                { k: 'Accessibility', v: auditResult.accessibility },
+                                { k: 'Best Practices', v: auditResult.bestPractices },
+                              ];
+                              const scored = cats.map(c => ({ ...c, s: Math.round((c.v||0)*100) }));
+                              const best = scored.reduce((a,b)=> b.s > a.s ? b : a, scored[0]);
+                              return `${best.k} — ${best.s}%`;
+                            })()
+                          ) : '—'}
+                        </div>
+                        <div className="text-xs text-gray-500 mt-2">Click below to view the full interactive report.</div>
+                      </div>
+                    </div>
 
-        {!auditResult ? (
-          <p className="text-sm text-gray-500">
-            Run an audit to view performance metrics.
-          </p>
-        ) : (
-          <div className="flex flex-col sm:flex-row gap-8 items-center">
-            <OverallScoreGauge
-              size={96}
-              score={
-                ((auditResult.performance || 0) +
-                  (auditResult.seo || 0) +
-                  (auditResult.accessibility || 0) +
-                  (auditResult.bestPractices || 0)) / 5
-              }
-            />
-
-            <div className="grid grid-cols-2 gap-4 flex-1 text-sm">
-              {[
-                ["Performance", auditResult.performance],
-                ["SEO", auditResult.seo],
-                ["Accessibility", auditResult.accessibility],
-                ["Best Practices", auditResult.bestPractices],
-              ].map(([label, value]) => {
-                const pct = Math.round((value || 0) * 100);
-                return (
-                  <div
-                    key={label}
-                    className="flex items-center justify-between bg-gray-50 rounded-xl px-4 py-2"
-                  >
-                    <span className="text-gray-600">{label}</span>
-                    <span className="font-semibold text-gray-900">
-                      {pct}%
-                    </span>
+                    <div className="mt-6 flex items-center justify-end gap-2">
+                      {auditResult && companyDomain && (
+                        <PDFDownloadLink
+                          document={<AuditPDF data={auditResult} domain={companyDomain} />}
+                          fileName={`audit-${companyDomain}-${new Date().toISOString().split('T')[0]}.pdf`}
+                          className="px-4 py-2 rounded-full border border-gray-200 text-sm font-light bg-white hover:bg-gray-50 flex items-center justify-center"
+                        >
+                          {({ loading }) => (loading ? 'Preparing...' : 'Export PDF')}
+                        </PDFDownloadLink>
+                      )}
+                      <AlertDialogAction onClick={handleViewReport} className="px-4 py-2 rounded-full bg-black text-white text-sm">View Full Report</AlertDialogAction>
+                      <AlertDialogCancel className="px-4 py-2 rounded-full border border-gray-200 text-sm">Close</AlertDialogCancel>
+                    </div>
                   </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
+                </AlertDialogContent>
+              </AlertDialog>
+                </div>
+</div>
+)}
+      {/* Audit Summary */}
+   <div className="lg:col-span-1 rounded-3xl bg-white border border-gray-100 p-6 shadow-sm hover:shadow-lg transition-shadow duration-300">
+  {/* Header */}
+  <div className="flex items-center justify-between mb-4">
+    <div>
+      <h3 className="text-base font-semibold text-gray-900">
+        Audit Summary
+      </h3>
+      <p className="text-xs text-gray-400">
+        Lighthouse performance breakdown
+      </p>
+    </div>
+
+    <button
+      onClick={() => {
+        setActiveTab("audit");
+        setTimeout(() => setShowAuditModal(true), 120);
+      }}
+      className="text-sm font-medium text-blue-600 hover:underline transition-colors duration-200"
+    >
+      View details
+    </button>
+  </div>
+
+  {!auditResult ? (
+    <p className="text-sm text-gray-500">
+      Run an audit to view performance metrics.
+    </p>
+  ) : (
+    <div className="flex flex-col gap-4">
+      {/* Overall score centered */}
+      <div className="flex justify-center mb-4">
+        <OverallScoreGauge
+          size={150}
+          score={
+            ((auditResult.performance || 0) +
+              (auditResult.seo || 0) +
+              (auditResult.accessibility || 0) +
+              (auditResult.bestPractices || 0)) /
+            4
+          }
+        />
       </div>
+
+      {/* Metrics grid */}
+      <div className="grid grid-cols-2 gap-2">
+        {[
+          ["Performance", auditResult.performance],
+          ["SEO", auditResult.seo],
+          ["Accessibility", auditResult.accessibility],
+          ["Best Practices", auditResult.bestPractices],
+        ].map(([label, value]) => {
+          const pct = Math.round((value || 0) * 100);
+
+          // Optional dynamic colors
+          let bgColor = "bg-gray-50";
+          let textColor = "text-gray-900";
+
+          if (pct >= 90) {
+            bgColor = "bg-green-50";
+            textColor = "text-green-700";
+          } else if (pct >= 70) {
+            bgColor = "bg-yellow-50";
+            textColor = "text-yellow-700";
+          } else if (pct >= 40) {
+            bgColor = "bg-orange-50";
+            textColor = "text-orange-700";
+          } else {
+            bgColor = "bg-red-50";
+            textColor = "text-red-700";
+          }
+
+          return (
+            <div
+              key={label}
+              className={`flex items-center justify-between rounded-xl px-3 py-2 ${bgColor}`}
+            >
+              <span className="text-sm text-gray-600">{label}</span>
+              <span className={`font-semibold ${textColor}`}>{pct}%</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  )}
+</div>
+
     </div>
 
     {/* ===================== SNAPSHOT ===================== */}
-    <div className="rounded-3xl bg-white border border-gray-100 p-6 hover:shadow-lg">
-      <h4 className="text-sm font-medium text-gray-900 mb-6">
-        Snapshot
-      </h4>
+  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+  <div className="rounded-3xl bg-white border border-gray-100 p-6 hover:shadow-lg transition">
+    <div className="mb-6">
+      <h4 className="text-sm font-medium text-gray-900">Snapshot</h4>
+      <p className="text-xs text-gray-400 mt-1">
+        Quick overview of your setup
+      </p>
+    </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-6 text-center">
-        {[
-          ["Keywords", keywordsTableData.length],
-          ["Campaigns", campaigns.length],
-          ["WordPress", hasWordpressIntegration ? "Connected" : "—"],
-          ["Integrations", hasWordpressIntegration ? "WordPress" : "—"],
-        ].map(([label, value]) => (
+    <div className="grid grid-cols-2 gap-4">
+      {[
+        ["Keywords", keywordsTableData.length],
+        ["Campaigns", campaigns.length],
+        ["WordPress", hasWordpressIntegration ? "Connected" : "Not connected"],
+        ["Integrations", hasWordpressIntegration ? "WordPress" : "—"],
+      ].map(([label, value]) => {
+        const isConnected =
+          value === "Connected" || value === "Disconnected" ;
+
+        return (
           <div
             key={label}
-            className="rounded-2xl bg-gradient-to-br from-gray-50 to-white p-4"
+            className="group rounded-2xl border border-gray-100 bg-gray-50/60 p-4 text-left hover:bg-white hover:shadow-sm transition"
           >
-            <div className="text-xs text-gray-500">{label}</div>
-            <div className="mt-2 text-2xl font-semibold text-gray-900">
-              {value}
+            <div className="text-xs uppercase tracking-wide text-gray-500">
+              {label}
+            </div>
+
+            <div className="mt-2 flex items-center justify-between">
+              <div
+                className={cn(
+                  "text-2xl font-semibold",
+                  isConnected
+                    ? "text-green-600"
+                    : "text-gray-900"
+                )}
+              >
+                {value}
+              </div>
+
+              {isConnected && (
+                <span className="flex items-center gap-1 text-xs font-medium text-green-600">
+                  <span className="h-2 w-2 rounded-full bg-green-500" />
+                </span>
+              )}
             </div>
           </div>
-        ))}
-      </div>
+        );
+      })}
     </div>
+  </div>
+</div>
   </div>
           ) : activeTab === "analytics" ? (
             companyDomainLoading ? (
@@ -2768,32 +2919,119 @@ useEffect(() => {
                               content: (contentMap[key] || []).join("\n").trim(),
                             };
                           });
-                          if (sections.some((s) => s.content.length > 0)) {
-                            return (
-                              <div className="w-full max-w-[900px] mx-auto bg-white rounded-3xl p-8 border border-gray-100 shadow-sm">
-                                <Accordion type="single" collapsible className="w-full">
-                                  {sections.map((sec, idx) => (
-                                    <AccordionItem key={sec.title} value={`item-${idx}`} className="border-b-gray-100 last:border-0">
-                                      <AccordionTrigger className="text-left text-lg font-medium text-gray-900 hover:text-gray-700 py-4">
-                                        {sec.title}
-                                      </AccordionTrigger>
-                                      <AccordionContent className="text-gray-600 leading-relaxed pb-4">
-                                        <div className="prose prose-sm prose-gray max-w-none">
-                                          {sec.content ? (
-                                            <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                                              {sec.content}
-                                            </ReactMarkdown>
-                                          ) : (
-                                            <p className="text-gray-500 text-sm">No content</p>
-                                          )}
-                                        </div>
-                                      </AccordionContent>
-                                    </AccordionItem>
-                                  ))}
-                                </Accordion>
-                              </div>
-                            );
-                          }
+                                                    const leftSections = sections.slice(0, 4);
+const rightSections = sections.slice(4, 8);
+
+                       if (sections.some((s) => s.content.length > 0)) {
+  return (
+    <div className="mx-auto w-full px-4">
+      {/* Master Panel */}
+      <div>
+        {/* Header */}
+        <div className="flex items-center justify-between px-8 py-6 border-b border-gray-600/50">
+          <div>
+            <h2 className="text-2xl font-light tracking-tight text-gray-900">
+              Company Info
+            </h2>
+            <p className="text-sm text-gray-500 mt-1">
+              AI-generated strategic analysis & recommendations
+            </p>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <span className="rounded-full bg-blue-50 px-4 py-1 text-xs font-medium text-blue-600 border border-blue-200">
+              Analysis
+            </span>
+          </div>
+        </div>
+
+        {/* Body */}
+       <div className="grid grid-cols-1 md:grid-cols-2 gap-6  py-6">
+        <div className="space-y-4 ">
+  {leftSections.map((sec, idx) => {
+    const globalIdx = idx; // 0–3
+    const isOpen = openSections.includes(globalIdx);
+
+    return (
+      <motion.div
+        key={globalIdx}
+        className="rounded-xl border border-gray-200/60 bg-white overflow-hidden hover:shadow-lg"
+      >
+        <button
+          onClick={() => toggleSection(globalIdx)}
+          className="flex w-full items-center justify-between px-6 py-4 text-left"
+        >
+          <h3 className="text-lg font-light text-gray-900">{sec.title}</h3>
+
+          <motion.div animate={{ rotate: isOpen ? 180 : 0 }}>
+            <ChevronDown size={20} />
+          </motion.div>
+        </button>
+
+        <AnimatePresence initial={false}>
+          {isOpen && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="overflow-hidden px-6 pb-6"
+            >
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                {sec.content}
+              </ReactMarkdown>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </motion.div>
+    );
+  })}
+</div>
+
+          <div className="space-y-4">
+  {rightSections.map((sec, idx) => {
+    const globalIdx = idx + 4; // 4–7
+    const isOpen = openSections.includes(globalIdx);
+
+    return (
+      <motion.div
+        key={globalIdx}
+        className="rounded-xl border border-gray-200/60 bg-white overflow-hidden hover:shadow-lg"
+      >
+        <button
+          onClick={() => toggleSection(globalIdx)}
+          className="flex w-full items-center justify-between px-6 py-4 text-left"
+        >
+          <h3 className="text-lg font-light text-gray-900">{sec.title}</h3>
+
+          <motion.div animate={{ rotate: isOpen ? 180 : 0 }}>
+            <ChevronDown size={20} />
+          </motion.div>
+        </button>
+
+        <AnimatePresence initial={false}>
+          {isOpen && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="overflow-hidden px-6 pb-6"
+            >
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                {sec.content}
+              </ReactMarkdown>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </motion.div>
+    );
+  })}
+</div>
+
+        </div>
+      </div>
+    </div>
+  );
+}
                           return (
                             <div
                               className="relative bg-white rounded-3xl p-8 sm:p-12 border border-gray-100 shadow-sm prose prose-lg prose-gray max-w-none mx-auto
@@ -4384,6 +4622,7 @@ useEffect(() => {
             )
           ) : activeTab === 'audit' ? (
             <div className="relative min-h-screen w-full">
+             
               {/* Background Layer */}
               <div className="fixed inset-0 pointer-events-none">
                 <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-gray-100 rounded-full blur-3xl opacity-20" />
@@ -4392,58 +4631,6 @@ useEffect(() => {
 
               {/* Content Layer */}
               <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 py-16 sm:py-24">
-                {/* Audit Completed Modal */}
-                <AlertDialog open={showAuditModal} onOpenChange={setShowAuditModal}>
-                  <AlertDialogContent className="max-w-md">
-                    <div className="p-4 rounded-lg bg-gradient-to-r from-white/80 to-gray-50 border border-gray-100">
-                      <AlertDialogHeader>
-                        <AlertDialogTitle className="text-2xl font-medium">Audit Completed</AlertDialogTitle>
-                        <AlertDialogDescription className="text-sm text-muted-foreground">
-                          Your domain audit has finished. Here's a quick summary — you can view the full report or download it.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-
-                      <div className="mt-4 flex items-center gap-4">
-                        <div className="flex-shrink-0">
-                          <OverallScoreGauge score={Math.round(((auditResult?.performance||0)+(auditResult?.seo||0)+(auditResult?.accessibility||0)+(auditResult?.bestPractices||0))/5*100)/100 || 0} />
-                        </div>
-                        <div className="flex-1">
-                          <div className="text-sm text-gray-600 mb-2">Top category</div>
-                          <div className="text-base font-medium text-gray-900">
-                            {auditResult ? (
-                              (() => {
-                                const cats = [
-                                  { k: 'Performance', v: auditResult.performance },
-                                  { k: 'SEO', v: auditResult.seo },
-                                  { k: 'Accessibility', v: auditResult.accessibility },
-                                  { k: 'Best Practices', v: auditResult.bestPractices },
-                                ];
-                                const scored = cats.map(c => ({ ...c, s: Math.round((c.v||0)*100) }));
-                                const best = scored.reduce((a,b)=> b.s > a.s ? b : a, scored[0]);
-                                return `${best.k} — ${best.s}%`;
-                              })()
-                            ) : '—'}
-                          </div>
-                          <div className="text-xs text-gray-500 mt-2">Click below to view the full interactive report.</div>
-                        </div>
-                      </div>
-
-                      <div className="mt-6 flex items-center justify-end gap-2">
-                        {auditResult && companyDomain && (
-                          <PDFDownloadLink
-                            document={<AuditPDF data={auditResult} domain={companyDomain} />}
-                            fileName={`audit-${companyDomain}-${new Date().toISOString().split('T')[0]}.pdf`}
-                            className="px-4 py-2 rounded-full border border-gray-200 text-sm font-light bg-white hover:bg-gray-50 flex items-center justify-center"
-                          >
-                            {({ loading }) => (loading ? 'Preparing...' : 'Export PDF')}
-                          </PDFDownloadLink>
-                        )}
-                        <AlertDialogAction onClick={handleViewReport} className="px-4 py-2 rounded-full bg-black text-white text-sm">View Full Report</AlertDialogAction>
-                        <AlertDialogCancel className="px-4 py-2 rounded-full border border-gray-200 text-sm">Close</AlertDialogCancel>
-                      </div>
-                    </div>
-                  </AlertDialogContent>
-                </AlertDialog>
 
                 {/* Hero Section */}
                 <div className="text-center mb-20">
