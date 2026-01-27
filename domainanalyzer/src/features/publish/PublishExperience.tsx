@@ -2706,7 +2706,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
           // Render with full-screen overlay wrapper (for standalone use in publish tab)
           // Only render if active (to prevent showing when viewing from campaign)
           isActive ? (
-            <div className="fixed inset-0 z-50 bg-white overflow-y-auto">
+            <div className="fixed inset-0 z-0 bg-white  space-x-[280px]">
             <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-xl border-b border-gray-100 shadow-sm">
               <div className="max-w-7xl mx-auto px-6 py-4">
                 <div className="flex items-center justify-between gap-4">
@@ -2805,7 +2805,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
             <div className="h-[calc(100vh-80px)] flex overflow-hidden">
               {/* Left Sidebar - Article Stats */}
               {publishResult && (
-                <div className="w-80 border-r border-gray-200 bg-gray-50/50 overflow-y-auto">
+                <div className="w-180 border-r border-gray-200 bg-gray-50/50 overflow-y-auto">
                   <div className="p-6 space-y-6">
                     <div>
                       <h4 className="text-xs uppercase tracking-[0.3em] text-gray-500 mb-3">Article Stats</h4>

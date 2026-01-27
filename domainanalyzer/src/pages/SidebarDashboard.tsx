@@ -4605,8 +4605,8 @@ const rightSections = sections.slice(4, 8);
             companyDomainLoading ? (
               <CompanyInfoSkeleton />
                 ) : (
-              <div className="max-w-6xl mx-auto px-4 sm:px-6 py-12 sm:py-16 space-y-8">
-                <PublishExperience
+                  <div className="max-w-6xl mx-auto px-4 sm:px-6 py-12 sm:py-16">
+                  <PublishExperience
                   companyDomain={companyDomain}
                   domainContext={domainContext}
                   keywordsTableData={keywordsTableData}
@@ -4960,7 +4960,7 @@ const rightSections = sections.slice(4, 8);
                                 </div>
                               );
                             })}
-                          </div>
+                          </div> 
                         </details>
                       )}
                     </div>
@@ -7168,9 +7168,9 @@ const handleUpdatePillar = async (topicId: number, updates: { title?: string; re
               </div>
               <button 
                 onClick={() => setShowAddKeywordModal(false)}
-                className="p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-400 hover:text-gray-600"
+                className="p-2 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors text-gray-400 hover:text-gray-600"
               >
-                <Trash2 className="h-5 w-5 rotate-45" />
+                <Trash2 className="h-5 w-5 " />
               </button>
             </div>
 
