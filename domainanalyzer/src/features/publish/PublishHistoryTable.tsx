@@ -110,7 +110,7 @@ const PublishHistoryTable: React.FC<PublishHistoryTableProps> = ({
           </button>
           <button
             onClick={onNewDraft}
-            className="px-4 py-2 text-sm rounded-full bg-black text-white hover:bg-black/90 shadow"
+            className="inline-flex items-center gap-2 px-6 py-3 bg-black text-white rounded-full text-sm font-medium hover:bg-black/90  disabled:opacity-60 transition"
           >
             New draft
           </button>

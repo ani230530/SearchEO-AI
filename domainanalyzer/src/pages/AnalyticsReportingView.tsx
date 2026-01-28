@@ -12,6 +12,7 @@ import {
   CheckCircle2,
   Layers,
   Zap,
+  FileSpreadsheet,
   Database,
   ChevronRight,
   Plus,
@@ -325,7 +326,7 @@ const AnalyticsReportingSetup = () => {
       <div className="max-w-7xl mx-auto px-6 py-4 space-y-10">
         {/* Header */}
         <header className="text-center space-y-8">
-          <div className="inline-flex items-center gap-2 px-4 py-1 rounded-full bg-black text-white text-xs font-light">
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gray-200 text-black text-xs font-light">
             <Sparkles className="h-3 w-3" />
             Fully Automated Reports
           </div>
@@ -340,14 +341,14 @@ const AnalyticsReportingSetup = () => {
           </p>
         </header>
  {/* Main Action Trigger */}
-        <section className="flex flex-col items-center gap-8 py-10">
+        <section className="flex flex-col items-center gap-6 py6">
           <Drawer open={isDrawerOpen} onOpenChange={setIsDrawerOpen}>
            <DrawerTrigger asChild>
   <button
     className={cn(
-      "group relative h-10 px-10 py-10 rounded-full",
+      "group relative h-5 px-4 py-6 rounded-full",
       "text-white font-light text-sm",
-      "flex items-center gap-3",
+      "flex items-center gap-1",
       "shadow-2xl transition-all",
       "hover:scale-105 active:scale-95",
       "focus:outline-none focus:ring-4 focus:ring-black/20",
@@ -356,12 +357,12 @@ const AnalyticsReportingSetup = () => {
   >
     
 
-    <div className="h-11 w-11 rounded-full bg-white/20 flex items-center justify-center group-hover:bg-white/30 transition">
+    <div className="h-7 w-7 rounded-full  flex items-center justify-center group-hover:bg-white/10 transition">
       <Plus className="h-6 w-6" />
     </div>
 
     <span className="whitespace-nowrap">
-      Generate New Analytics Report
+      Generate Report
     </span>
 
     <ChevronRight className="h-6 w-6 opacity-50 group-hover:translate-x-1 transition" />
@@ -697,7 +698,7 @@ onSelect={(date) => {
                                 rel="noopener noreferrer"
                                 className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-green-600 hover:bg-green-700 text-white text-xs font-light transition shadow-sm hover:shadow-md"
                               >
-                                <FileText className="h-3 w-3" />
+                                <FileSpreadsheet className="h-3 w-3" />
                                 Sheets
                               </a>
                             )}

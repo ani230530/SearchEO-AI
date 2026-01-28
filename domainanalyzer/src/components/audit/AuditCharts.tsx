@@ -327,7 +327,7 @@ export const OverallScoreGauge: React.FC<{ score: number; size?: number }> = ({ 
   const percent = Math.round(score * 100);
   const color = getScoreColor(score);
   // size is now a prop
-  const radius = size / 2 - 15;
+  const radius = size / 2 - 10;
   const circumference = 2 * Math.PI * radius;
   const offset = circumference - (percent / 100) * circumference;
 
@@ -340,7 +340,7 @@ export const OverallScoreGauge: React.FC<{ score: number; size?: number }> = ({ 
             cy={size / 2}
             r={radius}
             stroke="#e5e7eb"
-            strokeWidth="12"
+            strokeWidth="7"
             fill="transparent"
           />
           <circle
@@ -348,7 +348,7 @@ export const OverallScoreGauge: React.FC<{ score: number; size?: number }> = ({ 
             cy={size / 2}
             r={radius}
             stroke={color}
-            strokeWidth="12"
+            strokeWidth="7"
             fill="transparent"
             strokeDasharray={circumference}
             strokeDashoffset={offset}

@@ -33,14 +33,14 @@ export const CampaignTopicSidebar: React.FC<CampaignTopicSidebarProps> = ({
           className="w-full py-2.5 bg-black text-white rounded-xl hover:bg-black/90 transition-all text-xs font-medium flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed shadow-sm"
         >
           {aiLoading === "topic" ? <ButtonSpinner /> : <Plus className="h-3.5 w-3.5" />}
-          {aiLoading === "topic" ? "Generating..." : "AI Generate Topic"}
+          {aiLoading === "topic" ? "Generating..." : "Generate Topic"}
         </button>
         
         <button
           onClick={() => onAddTopic(false)}
           disabled={syncing}
           className="w-full py-2.5 bg-white border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 transition-all text-xs font-medium flex items-center justify-center gap-2 disabled:opacity-60"
-        >
+        ><Plus className="h-3.5 w-3.5" />
           Add Manually
         </button>
       </div>

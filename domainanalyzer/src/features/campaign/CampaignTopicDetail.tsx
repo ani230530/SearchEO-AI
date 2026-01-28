@@ -64,7 +64,7 @@ const renderKeywords = (
     return (
       <div
         key={k.id}
-        className={`group relative flex items-center pr-3 pl-3 py-1.5 rounded-full text-sm font-medium transition-all border cursor-pointer
+        className={`group relative flex items-center pr-3 pl-3 py-1.5 rounded-full text-sm font-medium  border cursor-pointer
           ${variant === 'primary'
             ? 'bg-white text-black border-black shadow-sm'
             : variant === 'longtail'
@@ -183,7 +183,7 @@ const renderKeywords = (
         <button
           onClick={() => onGenerateTopic(topic)}
           disabled={isGenerating}
-          className="h-10 px-6 rounded-full bg-[#1d1d1f] hover:bg-black text-white text-sm font-medium transition-all shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 group"
+          className="inline-flex items-center gap-2 px-6 py-3 bg-black text-white rounded-full text-sm font-medium hover:bg-black/90  disabled:opacity-60 transition"
         >
           {isGenerating ? (
              <>

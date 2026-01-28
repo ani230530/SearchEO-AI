@@ -52,7 +52,7 @@ const PublishOverviewCard: React.FC<PublishOverviewCardProps> = ({
       <div className="flex flex-wrap items-center gap-3 mt-6">
         <button
           onClick={onOpenComposeDrawer}
-          className="px-6 py-3 rounded-full bg-black text-white text-sm font-semibold shadow-lg hover:bg-black/90 transition-colors"
+          className="inline-flex items-center gap-2 px-6 py-3 bg-black text-white rounded-full text-sm font-medium hover:bg-black/90  disabled:opacity-60 transition"
         >
           Publish a page
         </button>

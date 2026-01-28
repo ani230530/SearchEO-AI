@@ -2805,7 +2805,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
             <div className="h-[calc(100vh-80px)] flex overflow-hidden">
               {/* Left Sidebar - Article Stats */}
               {publishResult && (
-                <div className="w-180 border-r border-gray-200 bg-gray-50/50 overflow-y-auto">
+                <div className="w-80 border-r border-gray-200 bg-gray-50/50 overflow-y-auto">
                   <div className="p-6 space-y-6">
                     <div>
                       <h4 className="text-xs uppercase tracking-[0.3em] text-gray-500 mb-3">Article Stats</h4>

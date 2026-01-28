@@ -26,6 +26,7 @@ import {
   Grid3X3,
   ChevronLeft,
   ChevronDown,
+  ChartNoAxesCombined,
   Check,
   FileText,
   X,
@@ -76,6 +77,8 @@ import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
+import TrendsChart, { TrendDataPoint } from "@/components/gsc/TrendsChart";
+
 
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3002";
@@ -104,7 +107,7 @@ const summarizeDomainContext = (input: string, maxLines = 6, maxChars = 800) => 
   const normalized = input.replace(/\r\n/g, '\n');
   const lines = normalized
     .split('\n')
-    .map((line) => line.trim())
+    .map((line) => line.trim()) 
     .filter(Boolean);
   const limited = lines.slice(0, maxLines).join('\n');
   if (limited.length <= maxChars) {
@@ -437,6 +440,11 @@ const handleAnalyze = async () => {
 };
 
 
+const normalizedDomain = companyDomain
+  .replace(/^https?:\/\//, "")
+  .replace(/^www\./, "")
+  .split("/")[0];
+
 
 // Fetch existing audit for company domain
 const fetchAudit = useCallback(async () => {
@@ -538,7 +546,7 @@ const InfoTooltip = ({ text }: { text: string }) => (
     <span
       className="
         pointer-events-none absolute left-1/2 -translate-x-1/2 bottom-full mb-2
-        w-64 rounded-xl bg-gray-900 text-white text-[11px] leading-relaxed
+        w-64 rounded-xl bg-gray-800 text-white text-sm leading-relaxed
         px-3 py-2 opacity-0 scale-95 translate-y-1
         peer-hover:opacity-100 peer-hover:scale-100 peer-hover:translate-y-0
         transition-all duration-200 ease-out z-50
@@ -2410,7 +2418,7 @@ useEffect(() => {
                         }`}
                       >
                         <FileText className="h-4 w-4" />
-                        <span>Company info</span>
+                        <span>Domain Info</span>
                         {activeCompanySubTab === "company-info" && (
                           <ChevronDown className="h-3 w-3 ml-auto" />
                         )}
@@ -2583,19 +2591,16 @@ useEffect(() => {
             {companyDomain && (
              <div className="text-center mb-12 flex flex-col items-center gap-4">
                   <div className="inline-flex items-center gap-3 bg-blue-50 border border-blue-200 text-blue-700 px-5 py-3 rounded-2xl shadow-sm">
-                    <img
-                      src={`https://www.google.com/s2/favicons?domain=${companyDomain}&sz=64`}
-                      srcSet={`https://www.google.com/s2/favicons?domain=${companyDomain}&sz=64 1x, https://www.google.com/s2/favicons?domain=${companyDomain}&sz=128 2x, https://www.google.com/s2/favicons?domain=${companyDomain}&sz=256 4x`}
-                      sizes="32px"
-                      alt="favicon"
-                      width={32}
-                      height={32}
-                      className="w-8 h-8 rounded-md"
-                      onError={(e) => {
-                        e.currentTarget.src = `https://logo.clearbit.com/${companyDomain}`;
-                        e.currentTarget.srcset = '';
-                      }}
-                    />
+                   <img
+  src={`https://img.logo.dev/${normalizedDomain}?token=pk_DTdFFG1JT9WOCjATvZEzIA&size=128`}
+  alt="Company logo"
+  width={32}
+  height={32}
+  className="w-8 h-8 rounded-md"
+  loading="lazy"
+/>
+
+
                     <span className="font-medium text-lg tracking-tight">
                       {" "}
                       <a
@@ -2644,7 +2649,6 @@ useEffect(() => {
 
       {/* Opportunities Card */}
 <div className="rounded-3xl bg-white border border-gray-100 p-6 hover:shadow-lg transition">
-  {/* Card Header */}
   <div className="flex items-center justify-between mb-4">
     <div className="text-xs uppercase tracking-wide text-gray-500">
       Top Opportunities
@@ -2656,9 +2660,9 @@ useEffect(() => {
 
   <div className="space-y-4">
     {keywordsTableData
-      .slice() // make a copy to sort safely
-      .sort((a, b) => (b.volume || 0) - (a.volume || 0)) // sort descending by volume
-      .slice(0, 5) // top 5
+      .slice()
+      .sort((a, b) => (b.volume || 0) - (a.volume || 0)) 
+      .slice(0, 5) 
       .map((item, idx) => (
         <div key={idx} className="flex items-center justify-between">
           <div>
@@ -2672,7 +2676,7 @@ useEffect(() => {
 
           {/* Volume badge */}
           <div className="px-3 py-2 rounded-2xl bg-blue-50 flex items-center justify-center min-w-[50px]">
-            <span className="text-sm font-semibold text-blue-600">
+            <span className="text-sm font-medium text-blue-700">
               {item?.volume
                 ? item.volume >= 1000
                   ? `${(item.volume / 1000).toFixed(1)}K`
@@ -2757,7 +2761,7 @@ useEffect(() => {
   {/* Header */}
   <div className="flex items-center justify-between mb-4">
     <div>
-      <h3 className="text-base font-semibold text-gray-900">
+      <h3 className="text-base font-medium text-gray-900">
         Audit Summary
       </h3>
       <p className="text-xs text-gray-400">
@@ -2781,16 +2785,16 @@ useEffect(() => {
       Run an audit to view performance metrics.
     </p>
   ) : (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-4 ">
       {/* Overall score centered */}
-      <div className="flex justify-center mb-4">
+      <div className="flex justify-center mb-4 ">
         <OverallScoreGauge
           size={150}
           score={
             ((auditResult.performance || 0) +
-              (auditResult.seo || 0) +
-              (auditResult.accessibility || 0) +
-              (auditResult.bestPractices || 0)) /
+            (auditResult.seo || 0) +
+            (auditResult.accessibility || 0) +
+            (auditResult.bestPractices || 0)) /
             4
           }
         />
@@ -2805,11 +2809,11 @@ useEffect(() => {
           ["Best Practices", auditResult.bestPractices],
         ].map(([label, value]) => {
           const pct = Math.round((value || 0) * 100);
-
+          
           // Optional dynamic colors
           let bgColor = "bg-gray-50";
           let textColor = "text-gray-900";
-
+          
           if (pct >= 90) {
             bgColor = "bg-green-50";
             textColor = "text-green-700";
@@ -2823,12 +2827,13 @@ useEffect(() => {
             bgColor = "bg-red-50";
             textColor = "text-red-700";
           }
-
+          
           return (
             <div
-              key={label}
-              className={`flex items-center justify-between rounded-xl px-3 py-2 ${bgColor}`}
+            key={label}
+            className={`flex items-center justify-between rounded-xl px-3 py-2 ${bgColor}`}
             >
+            <ChartNoAxesCombined /> 
               <span className="text-sm text-gray-600">{label}</span>
               <span className={`font-semibold ${textColor}`}>{pct}%</span>
             </div>
@@ -2893,7 +2898,27 @@ useEffect(() => {
       })}
     </div>
   </div>
+  <div className="grid grid-cols-1 lg:grid-cols-1 gap-6">
+ <div className="px-4 py-6 grid-cols-1 lg:grid-cols-1 rounded-3xl bg-white border border-gray-100 p-6 hover:shadow-lg transition space-y-2">
+      <h3 className='py-2'>Suggested Next Actions</h3>
+                           <div className="flex justify-between items-center px-4 py-3 rounded-xl bg-gray-50/50 border border-gray-200 hover:bg-gray-50 transition-all" style={{ borderWidth: '0.5px' }}>
+                                  <span className="font-light text-gray-900 flex items-center gap-1" style={{ letterSpacing: '0.011em' }}> Publish 1 ready article</span>
 </div>
+                           <div className="flex justify-between items-center px-4 py-3 rounded-xl bg-gray-50/50 border border-gray-200 hover:bg-gray-50 transition-all" style={{ borderWidth: '0.5px' }}>
+                                  <span className="font-light text-gray-900 flex items-center gap-1" style={{ letterSpacing: '0.011em' }}> Connect WordPress</span>
+</div>
+                           <div className="flex justify-between items-center px-4 py-3 rounded-xl bg-gray-50/50 border border-gray-200 hover:bg-gray-50 transition-all" style={{ borderWidth: '0.5px' }}>
+                                  <span className="font-light text-gray-900 flex items-center gap-1" style={{ letterSpacing: '0.011em' }}> Connect Google Search Console</span>
+</div>
+                           <div className="flex justify-between items-center px-4 py-3 rounded-xl bg-gray-50/50 border border-gray-200 hover:bg-gray-50 transition-all" style={{ borderWidth: '0.5px' }}>
+                                  <span className="font-light text-gray-900 flex items-center gap-1" style={{ letterSpacing: '0.011em' }}> Improve SEO for 2 blogs</span>
+</div>
+  </div>
+</div>
+  </div>
+ <div className="px-4 py-6 grid-cols-1 lg:grid-cols-1 rounded-3xl bg-white border border-gray-100 p-6 hover:shadow-lg transition">
+   <GSCAnalyticsView/>
+  </div>
   </div>
           ) : activeTab === "analytics" ? (
             companyDomainLoading ? (
@@ -2902,20 +2927,16 @@ useEffect(() => {
               <div className="max-w-6xl mx-auto px-4 sm:px-6 py-12 sm:py-16">
                 {/* Company Domain Heading */}
                 <div className="text-center mb-12 flex flex-col items-center gap-4">
-                  <div className="inline-flex items-center gap-3 bg-blue-50 border border-blue-200 text-blue-700 px-5 py-3 rounded-2xl shadow-sm">
-                    <img
-                      src={`https://www.google.com/s2/favicons?domain=${companyDomain}&sz=64`}
-                      srcSet={`https://www.google.com/s2/favicons?domain=${companyDomain}&sz=64 1x, https://www.google.com/s2/favicons?domain=${companyDomain}&sz=128 2x, https://www.google.com/s2/favicons?domain=${companyDomain}&sz=256 4x`}
-                      sizes="32px"
-                      alt="favicon"
-                      width={32}
-                      height={32}
-                      className="w-8 h-8 rounded-md"
-                      onError={(e) => {
-                        e.currentTarget.src = `https://logo.clearbit.com/${companyDomain}`;
-                        e.currentTarget.srcset = '';
-                      }}
-                    />
+                  <div className="inline-flex items-center gap-5 bg-blue-50 border border-blue-200 text-blue-700 px-5 py-3 rounded-3xl shadow-sm">
+                   <img
+  src={`https://img.logo.dev/${normalizedDomain}?token=pk_DTdFFG1JT9WOCjATvZEzIA&size=128`}
+  alt="Company logo"
+  width={32}
+  height={32}
+  className="w-8 h-8 rounded-md object-contain bg-white"
+  loading="lazy"
+/>
+
                     <span className="font-medium text-lg tracking-tight">
                       {" "}
                       <a
@@ -2945,14 +2966,14 @@ useEffect(() => {
                         {(() => {
                           const full = domainContext;
                           const headers = [
-                            "BUSINESS MODEL ANALYSIS",
-                            "TARGET AUDIENCE PROFILING",
-                            "VALUE PROPOSITION & POSITIONING",
-                            "SEO & CONTENT STRATEGY INSIGHTS",
-                            "COMPETITIVE INTELLIGENCE",
-                            "MARKET DYNAMICS",
-                            "LOCATION-BASED SEO ANALYSIS",
-                            "SEO OPPORTUNITY ANALYSIS",
+                            "Business Model Analysis",
+                            "Target Audience Profiling",
+                            "Value Proposition & Positioning",
+                            "SEO & Content Strategy Insights",
+                            "Competitive Intelligence",
+                            "Market Dynamics",
+                            "Location-Based SEO Analysis",
+                            "SEO Opportunity Analysis",
                           ];
                           const normalize = (s: string) =>
                             s
@@ -2989,14 +3010,14 @@ const rightSections = sections.slice(4, 8);
 
                        if (sections.some((s) => s.content.length > 0)) {
   return (
-    <div className="mx-auto w-full px-4">
+    <div className="p-4 sm:p-6 border-b border-gray-100 bg-gradient-to-b from-gray-50/50 to-white rounded-3xl">
       {/* Master Panel */}
       <div>
         {/* Header */}
         <div className="flex items-center justify-between px-8 py-6 border-b border-gray-600/50">
           <div>
             <h2 className="text-2xl font-light tracking-tight text-gray-900">
-              Company Info
+              Domain Info
             </h2>
             <p className="text-sm text-gray-500 mt-1">
               AI-generated strategic analysis & recommendations
@@ -3014,7 +3035,7 @@ const rightSections = sections.slice(4, 8);
        <div className="grid grid-cols-1 md:grid-cols-2 gap-6  py-6">
         <div className="space-y-4 ">
   {leftSections.map((sec, idx) => {
-    const globalIdx = idx; // 0–3
+    const globalIdx = idx; 
     const isOpen = openSections.includes(globalIdx);
 
     return (
@@ -3625,8 +3646,8 @@ const rightSections = sections.slice(4, 8);
                                       {/* Keyword Column */}
                                       <div className="col-span-3 flex items-center space-x-3">
                                         <div>
-                                          <div className="font-semibold text-gray-900 text-sm flex items-center space-x-2">
-                                            <span>{keyword.keyword}</span>
+                                          <div className="font-medium text-gray-900 text-sm flex items-center space-x-2">
+                                            <span>{keyword.keyword.charAt(0).toUpperCase() + keyword.keyword.slice(1)}</span>
                                             {keyword.isCustom && (
                                               <span className="bg-purple-100 text-purple-800 px-2 py-0.5 rounded-full text-xs font-semibold">
                                                 Custom
@@ -3959,7 +3980,7 @@ const rightSections = sections.slice(4, 8);
                             const maskedId = maskDomainId(createdDomainId);
                             navigate(`/dashboard/${maskedId}`);
                           }}
-                          className="px-6 py-3 bg-black text-white rounded-full hover:bg-black/90 focus:outline-none focus:ring-4 focus:ring-black/10 transition-all shadow text-base font-medium"
+                          className="inline-flex items-center gap-2 px-6 py-3 bg-black text-white rounded-full text-sm font-medium hover:bg-black/90  disabled:opacity-60 transition"
                         >
                           View Full Dashboard
                         </button>
@@ -3970,7 +3991,7 @@ const rightSections = sections.slice(4, 8);
 
                 {/* Integration Tab Content */}
                 {activeCompanySubTab === 'integration' && (
-                  <div className="max-w-4xl mx-auto space-y-6">
+                  <div className="max-w-6xl mx-auto space-y-6">
                     {gscStatusLoading ? (
                       <IntegrationSkeleton />
                     ) : !gscConnected ? (
@@ -4191,7 +4212,7 @@ const rightSections = sections.slice(4, 8);
                             <button
                               onClick={handleSaveWordpressIntegration}
                               disabled={wpIntegrationSaving}
-                              className="px-6 py-3 bg-black text-white rounded-full hover:bg-black/90 disabled:opacity-60"
+                              className="inline-flex items-center gap-2 px-6 py-3 bg-black text-white rounded-full text-sm font-medium hover:bg-black/90  disabled:opacity-60 transition"
                             >
                               {wpIntegrationSaving ? 'Saving…' : hasWordpressIntegration ? 'Update Connection' : 'Save Connection'}
                             </button>
@@ -4450,7 +4471,7 @@ const rightSections = sections.slice(4, 8);
 
               // Default Campaign List View (Centered)
               return (
-              <div className="max-w-4xl mx-auto px-4 sm:px-6 py-12 sm:py-16">
+              <div className="max-w-6xl mx-auto px-4 sm:px-6 py-12 sm:py-16">
 
                 <>
                   {/* Header */}
@@ -4465,7 +4486,7 @@ const rightSections = sections.slice(4, 8);
                     </div>
                     <button
                       onClick={() => setShowCreateCampaign(!showCreateCampaign)}
-                      className="h-9 px-4 text-sm bg-black text-white rounded-full hover:bg-neutral-800 transition-all flex items-center gap-2"
+                      className="inline-flex items-center gap-2 px-6 py-3 bg-black text-white rounded-full text-sm font-medium hover:bg-black/90  disabled:opacity-60 transition"
                     >
                       <Plus className="h-4 w-4" />
                       {showCreateCampaign ? "Cancel" : "New Campaign"}
@@ -4718,10 +4739,10 @@ const rightSections = sections.slice(4, 8);
                   {/* Action Section */}
                   <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-8">
                     <div
-                      className="flex-1 max-w-md bg-white/70 backdrop-blur-md border border-gray-200 rounded-full px-6 py-4 flex items-center justify-between shadow-sm"
+                      className="flex-1 max-w-md bg-white/70 backdrop-blur-md border border-gray-200 rounded-full px-6 py-3 flex items-center justify-between shadow-sm"
                       style={{ borderWidth: '0.5px' }}
                     >
-                      <span className="text-gray-700 font-light truncate" style={{ letterSpacing: '0.011em' }}>
+                      <span className="text-gray-700 font-light truncate " style={{ letterSpacing: '0.011em' }}>
                         {companyDomain || "No domain available"}
                       </span>
                     </div>
@@ -4731,7 +4752,7 @@ const rightSections = sections.slice(4, 8);
                         onClick={() => handleRunAudit(companyDomain)}
                         disabled={auditLoading || !companyDomain}
                         className={cn(
-                          "h-12 px-8 rounded-full text-white font-light transition-all duration-200 flex items-center justify-center gap-2",
+                          "inline-flex items-center gap-2 px-6 py-3 bg-black text-white rounded-full text-sm font-medium hover:bg-black/90  disabled:opacity-60 transition",
                           "bg-black hover:bg-gray-800 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed",
                           auditLoading && "cursor-not-allowed"
                         )}
