@@ -44,45 +44,94 @@ export const CampaignTopicDetail: React.FC<CampaignTopicDetailProps> = ({
   aiLoading
 }) => {
 
-  const renderKeywords = (
-      keywords: any[],
-      type: 'pillar' | 'subpage',
-      pageId: number
-    ) => {
-      const primary = keywords.filter((k) => k.aiMetadata?.isPrimary);
-      const longtail = keywords.filter((k) => k.aiMetadata?.isLongtail);
-      const others = keywords.filter((k) => !k.aiMetadata?.isPrimary && !k.aiMetadata?.isLongtail);
+const renderKeywords = (
+  keywords: any[],
+  type: 'pillar' | 'subpage',
+  pageId: number
+) => {
+  const primary = keywords.filter((k) => k.aiMetadata?.isPrimary);
+  const longtail = keywords.filter((k) => k.aiMetadata?.isLongtail);
+  const others = keywords.filter((k) => !k.aiMetadata?.isPrimary && !k.aiMetadata?.isLongtail);
 
-      const KeywordChip = ({ k, variant }: { k: any, variant: 'primary' | 'longtail' | 'default' }) => (
-        <div
-          key={k.id}
-          className={`group relative flex items-center pr-2 pl-3 py-1.5 rounded-full text-xs transition-all border ${
-            variant === 'primary' 
-                ? 'bg-[#1d1d1f] text-white border-transparent shadow-sm'
-                : variant === 'longtail'
-                ? 'bg-gray-50 text-gray-700 border-gray-100'
-                : 'bg-white text-gray-400 border-dashed border-gray-200'
-          }`}
-        >
-          <span className="font-medium truncate max-w-[120px] mr-1" title={k.term}>
-            {k.term}
-          </span>
-          
-          {/* Action Overlay */}
-          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity absolute right-1 top-1/2 -translate-y-1/2 bg-inherit pl-2">
-            {variant !== 'primary' && (
-                 <button onClick={() => onSelectPrimaryKeyword(k.id)} title="Make Primary" className="hover:text-blue-500"><Target className="h-3 w-3" /></button>
-            )}
-            {variant !== 'longtail' && (
-                 <button onClick={() => onSelectLongtailKeyword(k.id)} title="Make Longtail" className="hover:text-purple-500"><FileText className="h-3 w-3" /></button>
-            )}
-             <button onClick={() => onDeselectKeyword(k.id)} title="Reset" className="hover:text-orange-500"><Search className="h-3 w-3" /></button>
-            <button onClick={() => onDeleteKeyword({ type, topicId: topic.id, pageId }, k.id)} className="text-gray-400 hover:text-red-500">
-               <Trash2 className="h-3 w-3" />
+  const KeywordChip = ({ k }: { k: any }) => {
+    // Determine the variant dynamically
+    const variant: 'primary' | 'longtail' | 'default' = k.aiMetadata?.isPrimary
+      ? 'primary'
+      : k.aiMetadata?.isLongtail
+      ? 'longtail'
+      : 'default';
+
+    return (
+      <div
+        key={k.id}
+        className={`group relative flex items-center pr-3 pl-3 py-1.5 rounded-full text-sm font-medium  border cursor-pointer
+          ${variant === 'primary'
+            ? 'bg-white text-black border-black shadow-sm'
+            : variant === 'longtail'
+            ? 'bg-gray-50 text-gray-700 border border-gray-200'
+            : 'bg-white text-gray-500 border-dashed border-gray-300'
+          }
+        `}
+        title={k.term}
+      >
+        {/* Keyword Text */}
+        <span className="whitespace-normal">{k.term}</span>
+
+        {/* Action Overlay */}
+        <div className="flex items-center gap-1 ml-2">
+          {/* Only show Make Primary if not already primary */}
+          {!k.aiMetadata?.isPrimary && (
+            <button
+              onClick={() => onSelectPrimaryKeyword(k.id)}
+              title="Make Primary"
+              className="p-1 hover:text-blue-500 rounded"
+            >
+              <Target className="h-4 w-4" />
             </button>
-          </div>
+          )}
+
+          {/* Only show Make Longtail if not already longtail */}
+          {!k.aiMetadata?.isLongtail && (
+            <button
+              onClick={() => onSelectLongtailKeyword(k.id)}
+              title="Make Longtail"
+              className="p-1 hover:text-purple-500 rounded"
+            >
+              <FileText className="h-4 w-4" />
+            </button>
+          )}
+
+          <button
+            onClick={() => onDeselectKeyword(k.id)}
+            title="Reset"
+            className="p-1 hover:text-orange-500 rounded"
+          >
+            <Search className="h-4 w-4" />
+          </button>
+
+          <button
+            onClick={() => onDeleteKeyword({ type, topicId: topic.id, pageId }, k.id)}
+            title="Delete"
+            className="p-1 hover:text-red-500 rounded"
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
         </div>
-      );
+      </div>
+    );
+  };
+
+  const renderGroup = (list: any[], label: string) => (
+    <div className="mb-3">
+      <div className="text-xs font-semibold text-gray-400 mb-1">{label}</div>
+      <div className="flex flex-wrap gap-2">
+        {list.map((k) => (
+          <KeywordChip key={k.id} k={k} />
+        ))}
+      </div>
+    </div>
+  );
+
 
       return (
         <div className="space-y-4 mt-6">
@@ -90,7 +139,7 @@ export const CampaignTopicDetail: React.FC<CampaignTopicDetailProps> = ({
              <div className="space-y-2">
                 <div className="flex items-center justify-between">
                     <span className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Keywords</span>
-                    <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="flex items-center gap-2">
                          <button onClick={() => onAddKeyword(type, topic.id, pageId, true, 'longtail')} disabled={aiLoading === `keyword-${pageId}`} className="text-[10px] text-blue-600 hover:text-blue-800 flex items-center gap-1 transition-colors">
                             {aiLoading === `keyword-${pageId}` ? <div className="h-3 w-3 text-blue-600 flex items-center justify-center"><ButtonSpinner /></div> : <Sparkles className="h-3 w-3"/>} 
                             AI Suggest
@@ -107,10 +156,10 @@ export const CampaignTopicDetail: React.FC<CampaignTopicDetailProps> = ({
                      {keywords.length === 0 && (
                          <div className="text-xs text-gray-400 italic py-1 font-light">No keywords assigned yet.</div>
                      )}
+{primary.map(k => <KeywordChip key={k.id} k={k} />)}
+{longtail.map(k => <KeywordChip key={k.id} k={k} />)}
+{others.map(k => <KeywordChip key={k.id} k={k} />)}
 
-                     {primary.map(k => <KeywordChip key={k.id} k={k} variant="primary" />)}
-                     {longtail.map(k => <KeywordChip key={k.id} k={k} variant="longtail" />)}
-                     {others.map(k => <KeywordChip key={k.id} k={k} variant="default" />)}
                 </div>
              </div>
         </div>
@@ -134,7 +183,7 @@ export const CampaignTopicDetail: React.FC<CampaignTopicDetailProps> = ({
         <button
           onClick={() => onGenerateTopic(topic)}
           disabled={isGenerating}
-          className="h-10 px-6 rounded-full bg-[#1d1d1f] hover:bg-black text-white text-sm font-medium transition-all shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 group"
+          className="inline-flex items-center gap-2 px-6 py-3 bg-black text-white rounded-full text-sm font-medium hover:bg-black/90  disabled:opacity-60 transition"
         >
           {isGenerating ? (
              <>
@@ -165,18 +214,18 @@ export const CampaignTopicDetail: React.FC<CampaignTopicDetailProps> = ({
                          {renderStatusPill(topic.pillarPage.id)}
                     </div>
                     <h4 className="text-xl font-medium text-[#1d1d1f] mb-2 tracking-tight">{topic.pillarPage.title}</h4>
-                    <input
+                    {/* <input
                       type="url"
                       placeholder="Add reference URL..."
                       value={topic.referenceUrl || ''}
                       onChange={(e) => onReferenceUrlChange(topic.id, e.target.value)}
                       className="w-full text-xs text-gray-500 placeholder:text-gray-300 bg-transparent border-none p-0 focus:ring-0 hover:text-gray-900 transition-colors"
-                    />
+                    /> */}
                  </div>
                  
                  <button 
                    onClick={() => onDeletePillar(topic.id)}
-                   className="opacity-0 group-hover:opacity-100 p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-full transition-all"
+                   className="opacity-100  p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-full transition-all"
                    title="Delete Pillar Page"
                  >
                     <Trash2 className="h-4 w-4" />
@@ -208,7 +257,7 @@ export const CampaignTopicDetail: React.FC<CampaignTopicDetailProps> = ({
                         </div>
                         <button 
                             onClick={() => onDeleteSubPage(subPage.id)}
-                            className="opacity-0 group-hover:opacity-100 p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-full transition-all"
+                            className="opacity-100  p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-full transition-all"
                         >
                             <Trash2 className="h-3.5 w-3.5" />
                         </button>

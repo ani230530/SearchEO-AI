@@ -8,9 +8,11 @@ import {
   BarChart3,
   Sparkles,
   Play,
+  Presentation,
   CheckCircle2,
   Layers,
   Zap,
+  FileSpreadsheet,
   Database,
   ChevronRight,
   Plus,
@@ -309,7 +311,6 @@ const AnalyticsReportingSetup = () => {
 
   useEffect(() => {
     return () => {
-      // Cleanup would go here if we stored eventSource ref
     };
   }, []);
 
@@ -322,52 +323,32 @@ const AnalyticsReportingSetup = () => {
         <div className="absolute bottom-0 right-1/4 w-[500px] h-[500px] bg-neutral-300 rounded-full blur-3xl opacity-30" />
       </div>
 
-      <div className="max-w-7xl mx-auto px-6 py-24 space-y-20">
+      <div className="max-w-7xl mx-auto px-6 py-4 space-y-10">
         {/* Header */}
-        <header className="text-center space-y-6">
-          <div className="inline-flex items-center gap-2 px-4 py-1 rounded-full bg-black text-white text-xs font-light">
+        <header className="text-center space-y-8">
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gray-200 text-black text-xs font-light">
             <Sparkles className="h-3 w-3" />
-            Fully Automated Reporting
+            Fully Automated Reports
           </div>
 
           <h1 className="text-6xl font-extralight tracking-tight">
-            Analytics Reporting Engine
+            Analytics Reports
           </h1>
 
           <p className="text-xl font-light text-neutral-500 max-w-3xl mx-auto">
-            Generate comprehensive analytics reports automatically from your audit data.
-            Select your report parameters below.
+            Generate complete monthly analytics reports with trends and comparisons. <br />
+            Quickly review key metrics and track performance across all channels.
           </p>
         </header>
-
-        {/* Context Cards */}
-        {/* <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-6xl mx-auto mb-16">
-          <NarrativeCard
-            icon={<Zap />}
-            title="Zero manual work"
-            description="Reports are generated automatically from your latest audit data."
-          />
-          <NarrativeCard
-            icon={<Database />}
-            title="Uses your audit data"
-            description="Pulls performance metrics from your company domain audit results."
-          />
-          <NarrativeCard
-            icon={<CheckCircle2 />}
-            title="Real-time updates"
-            description="Get notified instantly when your report is ready via live updates."
-          />
-        </div> */}
-
-        {/* Main Action Trigger */}
-        <section className="flex flex-col items-center gap-8 py-10">
+ {/* Main Action Trigger */}
+        <section className="flex flex-col items-center gap-6 py6">
           <Drawer open={isDrawerOpen} onOpenChange={setIsDrawerOpen}>
            <DrawerTrigger asChild>
   <button
     className={cn(
-      "group relative h-20 px-14 rounded-full",
-      "text-white font-light text-xl",
-      "flex items-center gap-6",
+      "group relative h-5 px-4 py-6 rounded-full",
+      "text-white font-light text-sm",
+      "flex items-center gap-1",
       "shadow-2xl transition-all",
       "hover:scale-105 active:scale-95",
       "focus:outline-none focus:ring-4 focus:ring-black/20",
@@ -376,12 +357,12 @@ const AnalyticsReportingSetup = () => {
   >
     
 
-    <div className="h-11 w-11 rounded-full bg-white/20 flex items-center justify-center group-hover:bg-white/30 transition">
+    <div className="h-7 w-7 rounded-full  flex items-center justify-center group-hover:bg-white/10 transition">
       <Plus className="h-6 w-6" />
     </div>
 
     <span className="whitespace-nowrap">
-      Generate New Analytics Report
+      Generate Report
     </span>
 
     <ChevronRight className="h-6 w-6 opacity-50 group-hover:translate-x-1 transition" />
@@ -528,7 +509,7 @@ onSelect={(date) => {
 
                   <Field
                     label="GSC Property ID (Optional)"
-                    helper="Leave blank to use your domain"
+                    // helper="Leave blank to use your domain"
                     icon={<BarChart3 className="h-4 w-4" />}
                     placeholder="e.g. 485147447"
                     value={form.analyticsPropertyId}
@@ -629,16 +610,37 @@ onSelect={(date) => {
             </div>
           )}
         </section>
+        {/* Context Cards */}
+        {/* <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-6xl mx-auto mb-16">
+          <NarrativeCard
+            icon={<Zap />}
+            title="Zero manual work"
+            description="Reports are generated automatically from your latest audit data."
+          />
+          <NarrativeCard
+            icon={<Database />}
+            title="Uses your audit data"
+            description="Pulls performance metrics from your company domain audit results."
+          />
+          <NarrativeCard
+            icon={<CheckCircle2 />}
+            title="Real-time updates"
+            description="Get notified instantly when your report is ready via live updates."
+          />
+        </div> */}
+
+     
 
         {/* History Table */}
         <section className="max-w-6xl mx-auto space-y-8 ">
           <div className="flex items-center justify-between ">
             <div className="space-y-1 ">
-              <h2 className="text-3xl font-light tracking-tight">Recent Reports</h2>
-              <p className="text-sm font-light text-neutral-500">
+              <h2 className="mx-3 text-3xl font-light tracking-tight">Recent Reports</h2>
+              <p className="text-sm mx-3 font-light text-neutral-500">
                 A history of your generated analytics reports and presentations.
               </p>
             </div>
+              
             <button
               onClick={fetchHistory}
               className="p-2 hover:bg-neutral-100 rounded-full transition-colors"
@@ -696,7 +698,7 @@ onSelect={(date) => {
                                 rel="noopener noreferrer"
                                 className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-green-600 hover:bg-green-700 text-white text-xs font-light transition shadow-sm hover:shadow-md"
                               >
-                                <FileText className="h-3 w-3" />
+                                <FileSpreadsheet className="h-3 w-3" />
                                 Sheets
                               </a>
                             )}
@@ -707,7 +709,7 @@ onSelect={(date) => {
                                 rel="noopener noreferrer"
                                 className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-blue-600 hover:bg-blue-700 text-white text-xs font-light transition shadow-sm hover:shadow-md"
                               >
-                                <FileText className="h-3 w-3" />
+                                <Presentation className="h-3 w-3" />
                                 Slides
                               </a>
                             )}

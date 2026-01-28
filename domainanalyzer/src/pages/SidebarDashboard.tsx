@@ -10,6 +10,7 @@ import {
   Loader2,
   Sparkles,
   Layout,
+  Info,
   List,
   Network,
   LayoutDashboard,
@@ -25,6 +26,7 @@ import {
   Grid3X3,
   ChevronLeft,
   ChevronDown,
+  ChartNoAxesCombined,
   Check,
   FileText,
   X,
@@ -51,7 +53,7 @@ import CampaignGraph from '@/components/CampaignGraph';
 import { AuditBarChart, AuditGaugeChart, AuditRadarChart, AuditScoreDistribution, OverallScoreGauge } from '@/components/audit/AuditCharts';
 import { WordpressIntegration } from '@/types/publish';
 import { PDFDownloadLink } from '@react-pdf/renderer';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogTitle } from '@radix-ui/react-alert-dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogTitle,AlertDialogOverlay } from '@radix-ui/react-alert-dialog';
 import { AuditPDF } from '@/components/audit/AuditPDF';
 import PublishExperience from '@/features/publish/PublishExperience';
 import { CompanyInfoSkeleton } from '@/components/dashboard/CompanyInfoSkeleton';
@@ -61,6 +63,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { AlertDialogHeader } from '@/components/ui/alert-dialog';
 import Profile from './Profile';
+import {AnimatePresence, motion} from 'framer-motion'
 import GSCAnalyticsView from '@/components/gsc/GSCAnalyticsView';
 import {
   Sheet,
@@ -74,6 +77,8 @@ import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
+import TrendsChart, { TrendDataPoint } from "@/components/gsc/TrendsChart";
+
 
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3002";
@@ -102,7 +107,7 @@ const summarizeDomainContext = (input: string, maxLines = 6, maxChars = 800) => 
   const normalized = input.replace(/\r\n/g, '\n');
   const lines = normalized
     .split('\n')
-    .map((line) => line.trim())
+    .map((line) => line.trim()) 
     .filter(Boolean);
   const limited = lines.slice(0, maxLines).join('\n');
   if (limited.length <= maxChars) {
@@ -156,7 +161,15 @@ const tooltipInfo = {
 };
 
 const SidebarDashboard = () => {
-  const [activeTab, setActiveTab] = useState<TabId>("overview");
+const [activeTab, setActiveTab] = useState<TabId>(() => {
+  return (localStorage.getItem("activeTab") as TabId) || "overview";
+});
+useEffect(() => {
+  if (activeTab) {
+    localStorage.setItem("activeTab", activeTab);
+  }
+}, [activeTab]);
+
   const [activeCompanySubTab, setActiveCompanySubTab] =
     useState<CompanySubTabId>("company-info");
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -284,6 +297,28 @@ const [improvedContent, setImprovedContent] = useState("");
   const [selectedCampaignId, setSelectedCampaignId] = useState<number | null>(
     null
   );
+
+  // PUBLISH PAGE STATES
+const [primaryKeyword, setPrimaryKeyword] = useState("");
+const [longtailKeywords, setLongtailKeywords] = useState("");
+const [brandName, setBrandName] = useState("");
+const [brandDescription, setBrandDescription] = useState("");
+const [image, setImage] = useState(1);
+const [wordCount, setWordCount] = useState(1500);
+const [featuredImage, setFeaturedImage] = useState("");
+
+// UI STATES
+const [publishLoading, setPublishLoading] = useState(false);
+const [publishSuccess, setPublishSuccess] = useState(false);
+const [publishError, setPublishError] = useState("");
+const [openSections, setOpenSections] = useState<number[]>([]);
+const toggleSection = (idx: number) => {
+  setOpenSections((prev) =>
+    prev.includes(idx)
+      ? prev.filter((i) => i !== idx)
+      : [...prev, idx]
+  );
+};
   // Company info carousel: track index and count to show arrows conditionally
   const companyCarouselRef = useRef<HTMLDivElement | null>(null);
   const [companyCurrentIndex, setCompanyCurrentIndex] = useState(0);
@@ -405,6 +440,11 @@ const handleAnalyze = async () => {
 };
 
 
+const normalizedDomain = companyDomain
+  .replace(/^https?:\/\//, "")
+  .replace(/^www\./, "")
+  .split("/")[0];
+
 
 // Fetch existing audit for company domain
 const fetchAudit = useCallback(async () => {
@@ -445,7 +485,7 @@ const overallScore =
     ? (auditData.performance +
         auditData.seo +
         auditData.accessibility +
-        auditData.bestPractices) / 5
+        auditData.bestPractices) / 4
     : 0;
 
 
@@ -494,6 +534,43 @@ const handleRunAudit = async (url?: string) => {
   } finally {
     setAuditLoading(false);
   }
+};
+const InfoTooltip = ({ text }: { text: string }) => (
+  <span className="relative inline-flex items-center ml-1">
+    {/* Trigger */}
+    <span className="peer text-gray-400 hover:text-gray-600 transition-colorstext-xs">
+     <Info />
+    </span>
+
+    {/* Tooltip */}
+    <span
+      className="
+        pointer-events-none absolute left-1/2 -translate-x-1/2 bottom-full mb-2
+        w-64 rounded-xl bg-gray-800 text-white text-sm leading-relaxed
+        px-3 py-2 opacity-0 scale-95 translate-y-1
+        peer-hover:opacity-100 peer-hover:scale-100 peer-hover:translate-y-0
+        transition-all duration-200 ease-out z-50
+      "
+    >
+      {text}
+      <span className="absolute left-1/2 -translate-x-1/2 top-full w-2 h-2 bg-gray-900 rotate-45" />
+    </span>
+  </span>
+);
+
+const categoryDescriptions: Record<string, string> = {
+  Performance: "Overall speed and responsiveness of the page.",
+  SEO: "How well the page is optimized for search engines.",
+  Accessibility: "How usable the page is for users with disabilities.",
+  "Best Practices": "Adherence to modern web development best practices.",
+};
+
+const metricDescriptions: Record<string, string> = {
+  fcp: "Time until the first visible content appears on the page.",
+  lcp: "Time it takes for the largest visible element to fully render.",
+  cls: "Measures visual stability by tracking unexpected layout shifts.",
+  tbt: "Total time the page is blocked from responding to user input.",
+  speedIndex: "How quickly content is visually displayed during load.",
 };
 
 // Handle Send to N8n
@@ -2341,7 +2418,7 @@ useEffect(() => {
                         }`}
                       >
                         <FileText className="h-4 w-4" />
-                        <span>Company info</span>
+                        <span>Domain Info</span>
                         {activeCompanySubTab === "company-info" && (
                           <ChevronDown className="h-3 w-3 ml-auto" />
                         )}
@@ -2505,38 +2582,45 @@ useEffect(() => {
             >
               Analytics
             </button>
-
-            {companyDomain && (
-              <a
-                href={
-                  companyDomain.startsWith("http")
-                    ? companyDomain
-                    : `https://${companyDomain}`
-                }
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-sm text-blue-600 hover:underline"
-              >
-                Visit site →
-              </a>
-            )}
           </div>
         </div>
 
         {/* Right */}
         <div className="flex items-center gap-10">
-          <div className="text-center">
-            <div className="text-xs text-gray-500 mb-2">Overall health</div>
-            <OverallScoreGauge
-              size={120}
-              score={
-                ((auditResult?.performance || 0) +
-                  (auditResult?.seo || 0) +
-                  (auditResult?.accessibility || 0) +
-                  (auditResult?.bestPractices || 0)) / 5 || 0
-              }
-            />
-          </div>
+         
+            {companyDomain && (
+             <div className="text-center mb-12 flex flex-col items-center gap-4">
+                  <div className="inline-flex items-center gap-3 bg-blue-50 border border-blue-200 text-blue-700 px-5 py-3 rounded-2xl shadow-sm">
+                   <img
+  src={`https://img.logo.dev/${normalizedDomain}?token=pk_DTdFFG1JT9WOCjATvZEzIA&size=128`}
+  alt="Company logo"
+  width={32}
+  height={32}
+  className="w-8 h-8 rounded-md"
+  loading="lazy"
+/>
+
+
+                    <span className="font-medium text-lg tracking-tight">
+                      {" "}
+                      <a
+                        href={
+                          companyDomain.startsWith("http")
+                            ? companyDomain
+                            : `https://${companyDomain}`
+                        }
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-600 hover:underline text-lg"
+                      >
+                        {companyDomain
+                          .replace(/^https?:\/\//, "")
+                          .replace(/^www\./, "")}
+                      </a>
+                    </span>
+                  </div>
+                </div>
+            )}
 
           <div className="hidden lg:block w-px h-24 bg-gray-100" />
 
@@ -2561,123 +2645,280 @@ useEffect(() => {
     </div>
 
     {/* ===================== KPI GRID ===================== */}
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
       {/* Opportunities Card */}
 <div className="rounded-3xl bg-white border border-gray-100 p-6 hover:shadow-lg transition">
-  <div className="text-xs uppercase tracking-wide text-gray-500">
-    Top opportunities
+  <div className="flex items-center justify-between mb-4">
+    <div className="text-xs uppercase tracking-wide text-gray-500">
+      Top Opportunities
+    </div>
+    <div className="text-xs uppercase tracking-wide text-gray-500">
+      Volume
+    </div>
   </div>
 
-  <div className="mt-4 space-y-4">
-    {keywordsTableData.slice(0, 5).map((item, idx) => (
-      <div key={idx} className="flex items-center justify-between">
-        <div>
-          <div className="text-lg font-medium text-gray-900">
-            {item?.keyword || "No keywords yet"}
+  <div className="space-y-4">
+    {keywordsTableData
+      .slice()
+      .sort((a, b) => (b.volume || 0) - (a.volume || 0)) 
+      .slice(0, 5) 
+      .map((item, idx) => (
+        <div key={idx} className="flex items-center justify-between">
+          <div>
+            <div className="text-lg font-medium text-gray-900">
+              {item?.keyword || "No keywords yet"}
+            </div>
+            <div className="text-xs text-gray-400 mt-1">
+              High potential growth keyword
+            </div>
           </div>
-          <div className="text-xs text-gray-400 mt-1">
-            High potential growth keyword
+
+          {/* Volume badge */}
+          <div className="px-3 py-2 rounded-2xl bg-blue-50 flex items-center justify-center min-w-[50px]">
+            <span className="text-sm font-medium text-blue-700">
+              {item?.volume
+                ? item.volume >= 1000
+                  ? `${(item.volume / 1000).toFixed(1)}K`
+                  : item.volume.toLocaleString()
+                : "-"}
+            </span>
           </div>
         </div>
-        <div className="p-3 rounded-2xl bg-blue-50">
-          <TrendingUp className="h-5 w-5 text-blue-600" />
-        </div>
-      </div>
-    ))}
+      ))}
   </div>
 </div>
 
-      {/* Audit Summary */}
-      <div className="lg:col-span-2 rounded-3xl bg-white border border-gray-100 p-6 hover:shadow-lg">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h3 className="text-sm font-medium text-gray-900">
-              Audit summary
-            </h3>
-            <p className="text-xs text-gray-400">
-              Lighthouse performance breakdown
-            </p>
-          </div>
 
-          <button
-            onClick={() => {
-              setActiveTab("audit");
-              setTimeout(() => setShowAuditModal(true), 120);
-            }}
-            className="text-sm text-blue-600 hover:underline"
-          >
-            View details
-          </button>
-        </div>
+ {/* Audit Completed Modal */}
+              {showAuditModal && (
+<div className="absolute inset-0 z-50 flex items-center justify-center">
+  <div className="max-w-md w-full rounded-2xl bg-white shadow-2xl">
+              <AlertDialog open={showAuditModal} onOpenChange={setShowAuditModal}>
+                <AlertDialogOverlay className="fixed inset-0 bg-black/20 backdrop-blur-sm z-40" />
+                <AlertDialogContent className=" fixed left-1/2 top-1/2 z-50
+    -translate-x-1/2 -translate-y-1/2
+    max-w-md w-full
+    rounded-2xl
+    bg-white
+    border border-gray-100
+    shadow-2xl
+    animate-in fade-in zoom-in-95">
+                  <div className="p-4 rounded-lg bg-gradient-to-r from-white/80 to-gray-50 border border-gray-100">
+                    <AlertDialogHeader>
+                      <AlertDialogTitle className="text-2xl font-medium">Audit Completed</AlertDialogTitle>
+                      <AlertDialogDescription className="text-sm text-muted-foreground">
+                        Your domain audit has finished. Here's a quick summary — you can view the full report or download it.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
 
-        {!auditResult ? (
-          <p className="text-sm text-gray-500">
-            Run an audit to view performance metrics.
-          </p>
-        ) : (
-          <div className="flex flex-col sm:flex-row gap-8 items-center">
-            <OverallScoreGauge
-              size={96}
-              score={
-                ((auditResult.performance || 0) +
-                  (auditResult.seo || 0) +
-                  (auditResult.accessibility || 0) +
-                  (auditResult.bestPractices || 0)) / 5
-              }
-            />
+                    <div className="mt-4 flex items-center gap-4">
+                      <div className="flex-shrink-0">
+                        <OverallScoreGauge score={Math.round(((auditResult?.performance||0)+(auditResult?.seo||0)+(auditResult?.accessibility||0)+(auditResult?.bestPractices||0))/4*100)/100 || 0} />
+                      </div>
+                      <div className="flex-1">
+                        <div className="text-sm text-gray-600 mb-2">Top category</div>
+                        <div className="text-base font-medium text-gray-900">
+                          {auditResult ? (
+                            (() => {
+                              const cats = [
+                                { k: 'Performance', v: auditResult.performance },
+                                { k: 'SEO', v: auditResult.seo },
+                                { k: 'Accessibility', v: auditResult.accessibility },
+                                { k: 'Best Practices', v: auditResult.bestPractices },
+                              ];
+                              const scored = cats.map(c => ({ ...c, s: Math.round((c.v||0)*100) }));
+                              const best = scored.reduce((a,b)=> b.s > a.s ? b : a, scored[0]);
+                              return `${best.k} — ${best.s}%`;
+                            })()
+                          ) : '—'}
+                        </div>
+                        <div className="text-xs text-gray-500 mt-2">Click below to view the full interactive report.</div>
+                      </div>
+                    </div>
 
-            <div className="grid grid-cols-2 gap-4 flex-1 text-sm">
-              {[
-                ["Performance", auditResult.performance],
-                ["SEO", auditResult.seo],
-                ["Accessibility", auditResult.accessibility],
-                ["Best Practices", auditResult.bestPractices],
-              ].map(([label, value]) => {
-                const pct = Math.round((value || 0) * 100);
-                return (
-                  <div
-                    key={label}
-                    className="flex items-center justify-between bg-gray-50 rounded-xl px-4 py-2"
-                  >
-                    <span className="text-gray-600">{label}</span>
-                    <span className="font-semibold text-gray-900">
-                      {pct}%
-                    </span>
+                    <div className="mt-6 flex items-center justify-end gap-2">
+                      {auditResult && companyDomain && (
+                        <PDFDownloadLink
+                          document={<AuditPDF data={auditResult} domain={companyDomain} />}
+                          fileName={`audit-${companyDomain}-${new Date().toISOString().split('T')[0]}.pdf`}
+                          className="px-4 py-2 rounded-full border border-gray-200 text-sm font-light bg-white hover:bg-gray-50 flex items-center justify-center"
+                        >
+                          {({ loading }) => (loading ? 'Preparing...' : 'Export PDF')}
+                        </PDFDownloadLink>
+                      )}
+                      <AlertDialogAction onClick={handleViewReport} className="px-4 py-2 rounded-full bg-black text-white text-sm">View Full Report</AlertDialogAction>
+                      <AlertDialogCancel className="px-4 py-2 rounded-full border border-gray-200 text-sm">Close</AlertDialogCancel>
+                    </div>
                   </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
+                </AlertDialogContent>
+              </AlertDialog>
+                </div>
+</div>
+)}
+      {/* Audit Summary */}
+   <div className="lg:col-span-1 rounded-3xl bg-white border border-gray-100 p-6 shadow-sm hover:shadow-lg transition-shadow duration-300">
+  {/* Header */}
+  <div className="flex items-center justify-between mb-4">
+    <div>
+      <h3 className="text-base font-medium text-gray-900">
+        Audit Summary
+      </h3>
+      <p className="text-xs text-gray-400">
+        Lighthouse performance breakdown
+      </p>
+    </div>
+
+    <button
+      onClick={() => {
+        setActiveTab("audit");
+        setTimeout(() => setShowAuditModal(true), 120);
+      }}
+      className="text-sm font-medium text-blue-600 hover:underline transition-colors duration-200"
+    >
+      View details
+    </button>
+  </div>
+
+  {!auditResult ? (
+    <p className="text-sm text-gray-500">
+      Run an audit to view performance metrics.
+    </p>
+  ) : (
+    <div className="flex flex-col gap-4 ">
+      {/* Overall score centered */}
+      <div className="flex justify-center mb-4 ">
+        <OverallScoreGauge
+          size={150}
+          score={
+            ((auditResult.performance || 0) +
+            (auditResult.seo || 0) +
+            (auditResult.accessibility || 0) +
+            (auditResult.bestPractices || 0)) /
+            4
+          }
+        />
       </div>
+
+      {/* Metrics grid */}
+      <div className="grid grid-cols-2 gap-2">
+        {[
+          ["Performance", auditResult.performance],
+          ["SEO", auditResult.seo],
+          ["Accessibility", auditResult.accessibility],
+          ["Best Practices", auditResult.bestPractices],
+        ].map(([label, value]) => {
+          const pct = Math.round((value || 0) * 100);
+          
+          // Optional dynamic colors
+          let bgColor = "bg-gray-50";
+          let textColor = "text-gray-900";
+          
+          if (pct >= 90) {
+            bgColor = "bg-green-50";
+            textColor = "text-green-700";
+          } else if (pct >= 70) {
+            bgColor = "bg-yellow-50";
+            textColor = "text-yellow-700";
+          } else if (pct >= 40) {
+            bgColor = "bg-orange-50";
+            textColor = "text-orange-700";
+          } else {
+            bgColor = "bg-red-50";
+            textColor = "text-red-700";
+          }
+          
+          return (
+            <div
+            key={label}
+            className={`flex items-center justify-between rounded-xl px-3 py-2 ${bgColor}`}
+            >
+            <ChartNoAxesCombined /> 
+              <span className="text-sm text-gray-600">{label}</span>
+              <span className={`font-semibold ${textColor}`}>{pct}%</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  )}
+</div>
+
     </div>
 
     {/* ===================== SNAPSHOT ===================== */}
-    <div className="rounded-3xl bg-white border border-gray-100 p-6 hover:shadow-lg">
-      <h4 className="text-sm font-medium text-gray-900 mb-6">
-        Snapshot
-      </h4>
+  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+  <div className="rounded-3xl bg-white border border-gray-100 p-6 hover:shadow-lg transition">
+    <div className="mb-6">
+      <h4 className="text-sm font-medium text-gray-900">Snapshot</h4>
+      <p className="text-xs text-gray-400 mt-1">
+        Quick overview of your setup
+      </p>
+    </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-6 text-center">
-        {[
-          ["Keywords", keywordsTableData.length],
-          ["Campaigns", campaigns.length],
-          ["WordPress", hasWordpressIntegration ? "Connected" : "—"],
-          ["Integrations", hasWordpressIntegration ? "WordPress" : "—"],
-        ].map(([label, value]) => (
+    <div className="grid grid-cols-2 gap-4">
+      {[
+        ["Keywords", keywordsTableData.length],
+        ["Campaigns", campaigns.length],
+        ["WordPress", hasWordpressIntegration ? "Connected" : "Not connected"],
+        ["Integrations", hasWordpressIntegration ? "WordPress" : "—"],
+      ].map(([label, value]) => {
+        const isConnected =
+          value === "Connected" || value === "Disconnected" ;
+
+        return (
           <div
             key={label}
-            className="rounded-2xl bg-gradient-to-br from-gray-50 to-white p-4"
+            className="group rounded-2xl border border-gray-100 bg-gray-50/60 p-4 text-left hover:bg-white hover:shadow-sm transition"
           >
-            <div className="text-xs text-gray-500">{label}</div>
-            <div className="mt-2 text-2xl font-semibold text-gray-900">
-              {value}
+            <div className="text-xs uppercase tracking-wide text-gray-500">
+              {label}
+            </div>
+
+            <div className="mt-2 flex items-center justify-between">
+              <div
+                className={cn(
+                  "text-2xl font-semibold",
+                  isConnected
+                    ? "text-green-600"
+                    : "text-gray-900"
+                )}
+              >
+                {value}
+              </div>
+
+              {isConnected && (
+                <span className="flex items-center gap-1 text-xs font-medium text-green-600">
+                  <span className="h-2 w-2 rounded-full bg-green-500" />
+                </span>
+              )}
             </div>
           </div>
-        ))}
-      </div>
+        );
+      })}
     </div>
+  </div>
+  <div className="grid grid-cols-1 lg:grid-cols-1 gap-6">
+ <div className="px-4 py-6 grid-cols-1 lg:grid-cols-1 rounded-3xl bg-white border border-gray-100 p-6 hover:shadow-lg transition space-y-2">
+      <h3 className='py-2'>Suggested Next Actions</h3>
+                           <div className="flex justify-between items-center px-4 py-3 rounded-xl bg-gray-50/50 border border-gray-200 hover:bg-gray-50 transition-all" style={{ borderWidth: '0.5px' }}>
+                                  <span className="font-light text-gray-900 flex items-center gap-1" style={{ letterSpacing: '0.011em' }}> Publish 1 ready article</span>
+</div>
+                           <div className="flex justify-between items-center px-4 py-3 rounded-xl bg-gray-50/50 border border-gray-200 hover:bg-gray-50 transition-all" style={{ borderWidth: '0.5px' }}>
+                                  <span className="font-light text-gray-900 flex items-center gap-1" style={{ letterSpacing: '0.011em' }}> Connect WordPress</span>
+</div>
+                           <div className="flex justify-between items-center px-4 py-3 rounded-xl bg-gray-50/50 border border-gray-200 hover:bg-gray-50 transition-all" style={{ borderWidth: '0.5px' }}>
+                                  <span className="font-light text-gray-900 flex items-center gap-1" style={{ letterSpacing: '0.011em' }}> Connect Google Search Console</span>
+</div>
+                           <div className="flex justify-between items-center px-4 py-3 rounded-xl bg-gray-50/50 border border-gray-200 hover:bg-gray-50 transition-all" style={{ borderWidth: '0.5px' }}>
+                                  <span className="font-light text-gray-900 flex items-center gap-1" style={{ letterSpacing: '0.011em' }}> Improve SEO for 2 blogs</span>
+</div>
+  </div>
+</div>
+  </div>
+ <div className="px-4 py-6 grid-cols-1 lg:grid-cols-1 rounded-3xl bg-white border border-gray-100 p-6 hover:shadow-lg transition">
+   <GSCAnalyticsView/>
+  </div>
   </div>
           ) : activeTab === "analytics" ? (
             companyDomainLoading ? (
@@ -2686,20 +2927,16 @@ useEffect(() => {
               <div className="max-w-6xl mx-auto px-4 sm:px-6 py-12 sm:py-16">
                 {/* Company Domain Heading */}
                 <div className="text-center mb-12 flex flex-col items-center gap-4">
-                  <div className="inline-flex items-center gap-3 bg-blue-50 border border-blue-200 text-blue-700 px-5 py-3 rounded-2xl shadow-sm">
-                    <img
-                      src={`https://www.google.com/s2/favicons?domain=${companyDomain}&sz=64`}
-                      srcSet={`https://www.google.com/s2/favicons?domain=${companyDomain}&sz=64 1x, https://www.google.com/s2/favicons?domain=${companyDomain}&sz=128 2x, https://www.google.com/s2/favicons?domain=${companyDomain}&sz=256 4x`}
-                      sizes="32px"
-                      alt="favicon"
-                      width={32}
-                      height={32}
-                      className="w-8 h-8 rounded-md"
-                      onError={(e) => {
-                        e.currentTarget.src = `https://logo.clearbit.com/${companyDomain}`;
-                        e.currentTarget.srcset = '';
-                      }}
-                    />
+                  <div className="inline-flex items-center gap-5 bg-blue-50 border border-blue-200 text-blue-700 px-5 py-3 rounded-3xl shadow-sm">
+                   <img
+  src={`https://img.logo.dev/${normalizedDomain}?token=pk_DTdFFG1JT9WOCjATvZEzIA&size=128`}
+  alt="Company logo"
+  width={32}
+  height={32}
+  className="w-8 h-8 rounded-md object-contain bg-white"
+  loading="lazy"
+/>
+
                     <span className="font-medium text-lg tracking-tight">
                       {" "}
                       <a
@@ -2729,14 +2966,14 @@ useEffect(() => {
                         {(() => {
                           const full = domainContext;
                           const headers = [
-                            "BUSINESS MODEL ANALYSIS",
-                            "TARGET AUDIENCE PROFILING",
-                            "VALUE PROPOSITION & POSITIONING",
-                            "SEO & CONTENT STRATEGY INSIGHTS",
-                            "COMPETITIVE INTELLIGENCE",
-                            "MARKET DYNAMICS",
-                            "LOCATION-BASED SEO ANALYSIS",
-                            "SEO OPPORTUNITY ANALYSIS",
+                            "Business Model Analysis",
+                            "Target Audience Profiling",
+                            "Value Proposition & Positioning",
+                            "SEO & Content Strategy Insights",
+                            "Competitive Intelligence",
+                            "Market Dynamics",
+                            "Location-Based SEO Analysis",
+                            "SEO Opportunity Analysis",
                           ];
                           const normalize = (s: string) =>
                             s
@@ -2768,32 +3005,119 @@ useEffect(() => {
                               content: (contentMap[key] || []).join("\n").trim(),
                             };
                           });
-                          if (sections.some((s) => s.content.length > 0)) {
-                            return (
-                              <div className="w-full max-w-[900px] mx-auto bg-white rounded-3xl p-8 border border-gray-100 shadow-sm">
-                                <Accordion type="single" collapsible className="w-full">
-                                  {sections.map((sec, idx) => (
-                                    <AccordionItem key={sec.title} value={`item-${idx}`} className="border-b-gray-100 last:border-0">
-                                      <AccordionTrigger className="text-left text-lg font-medium text-gray-900 hover:text-gray-700 py-4">
-                                        {sec.title}
-                                      </AccordionTrigger>
-                                      <AccordionContent className="text-gray-600 leading-relaxed pb-4">
-                                        <div className="prose prose-sm prose-gray max-w-none">
-                                          {sec.content ? (
-                                            <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                                              {sec.content}
-                                            </ReactMarkdown>
-                                          ) : (
-                                            <p className="text-gray-500 text-sm">No content</p>
-                                          )}
-                                        </div>
-                                      </AccordionContent>
-                                    </AccordionItem>
-                                  ))}
-                                </Accordion>
-                              </div>
-                            );
-                          }
+                                                    const leftSections = sections.slice(0, 4);
+const rightSections = sections.slice(4, 8);
+
+                       if (sections.some((s) => s.content.length > 0)) {
+  return (
+    <div className="p-4 sm:p-6 border-b border-gray-100 bg-gradient-to-b from-gray-50/50 to-white rounded-3xl">
+      {/* Master Panel */}
+      <div>
+        {/* Header */}
+        <div className="flex items-center justify-between px-8 py-6 border-b border-gray-600/50">
+          <div>
+            <h2 className="text-2xl font-light tracking-tight text-gray-900">
+              Domain Info
+            </h2>
+            <p className="text-sm text-gray-500 mt-1">
+              AI-generated strategic analysis & recommendations
+            </p>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <span className="rounded-full bg-blue-50 px-4 py-1 text-xs font-medium text-blue-600 border border-blue-200">
+              Analysis
+            </span>
+          </div>
+        </div>
+
+        {/* Body */}
+       <div className="grid grid-cols-1 md:grid-cols-2 gap-6  py-6">
+        <div className="space-y-4 ">
+  {leftSections.map((sec, idx) => {
+    const globalIdx = idx; 
+    const isOpen = openSections.includes(globalIdx);
+
+    return (
+      <motion.div
+        key={globalIdx}
+        className="rounded-xl border border-gray-200/60 bg-white overflow-hidden hover:shadow-lg"
+      >
+        <button
+          onClick={() => toggleSection(globalIdx)}
+          className="flex w-full items-center justify-between px-6 py-4 text-left"
+        >
+          <h3 className="text-lg font-light text-gray-900">{sec.title}</h3>
+
+          <motion.div animate={{ rotate: isOpen ? 180 : 0 }}>
+            <ChevronDown size={20} />
+          </motion.div>
+        </button>
+
+        <AnimatePresence initial={false}>
+          {isOpen && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="overflow-hidden px-6 pb-6"
+            >
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                {sec.content}
+              </ReactMarkdown>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </motion.div>
+    );
+  })}
+</div>
+
+          <div className="space-y-4">
+  {rightSections.map((sec, idx) => {
+    const globalIdx = idx + 4; // 4–7
+    const isOpen = openSections.includes(globalIdx);
+
+    return (
+      <motion.div
+        key={globalIdx}
+        className="rounded-xl border border-gray-200/60 bg-white overflow-hidden hover:shadow-lg"
+      >
+        <button
+          onClick={() => toggleSection(globalIdx)}
+          className="flex w-full items-center justify-between px-6 py-4 text-left"
+        >
+          <h3 className="text-lg font-light text-gray-900">{sec.title}</h3>
+
+          <motion.div animate={{ rotate: isOpen ? 180 : 0 }}>
+            <ChevronDown size={20} />
+          </motion.div>
+        </button>
+
+        <AnimatePresence initial={false}>
+          {isOpen && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="overflow-hidden px-6 pb-6"
+            >
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                {sec.content}
+              </ReactMarkdown>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </motion.div>
+    );
+  })}
+</div>
+
+        </div>
+      </div>
+    </div>
+  );
+}
                           return (
                             <div
                               className="relative bg-white rounded-3xl p-8 sm:p-12 border border-gray-100 shadow-sm prose prose-lg prose-gray max-w-none mx-auto
@@ -3322,8 +3646,8 @@ useEffect(() => {
                                       {/* Keyword Column */}
                                       <div className="col-span-3 flex items-center space-x-3">
                                         <div>
-                                          <div className="font-semibold text-gray-900 text-sm flex items-center space-x-2">
-                                            <span>{keyword.keyword}</span>
+                                          <div className="font-medium text-gray-900 text-sm flex items-center space-x-2">
+                                            <span>{keyword.keyword.charAt(0).toUpperCase() + keyword.keyword.slice(1)}</span>
                                             {keyword.isCustom && (
                                               <span className="bg-purple-100 text-purple-800 px-2 py-0.5 rounded-full text-xs font-semibold">
                                                 Custom
@@ -3656,7 +3980,7 @@ useEffect(() => {
                             const maskedId = maskDomainId(createdDomainId);
                             navigate(`/dashboard/${maskedId}`);
                           }}
-                          className="px-6 py-3 bg-black text-white rounded-full hover:bg-black/90 focus:outline-none focus:ring-4 focus:ring-black/10 transition-all shadow text-base font-medium"
+                          className="inline-flex items-center gap-2 px-6 py-3 bg-black text-white rounded-full text-sm font-medium hover:bg-black/90  disabled:opacity-60 transition"
                         >
                           View Full Dashboard
                         </button>
@@ -3667,7 +3991,7 @@ useEffect(() => {
 
                 {/* Integration Tab Content */}
                 {activeCompanySubTab === 'integration' && (
-                  <div className="max-w-4xl mx-auto space-y-6">
+                  <div className="max-w-6xl mx-auto space-y-6">
                     {gscStatusLoading ? (
                       <IntegrationSkeleton />
                     ) : !gscConnected ? (
@@ -3888,7 +4212,7 @@ useEffect(() => {
                             <button
                               onClick={handleSaveWordpressIntegration}
                               disabled={wpIntegrationSaving}
-                              className="px-6 py-3 bg-black text-white rounded-full hover:bg-black/90 disabled:opacity-60"
+                              className="inline-flex items-center gap-2 px-6 py-3 bg-black text-white rounded-full text-sm font-medium hover:bg-black/90  disabled:opacity-60 transition"
                             >
                               {wpIntegrationSaving ? 'Saving…' : hasWordpressIntegration ? 'Update Connection' : 'Save Connection'}
                             </button>
@@ -4147,7 +4471,7 @@ useEffect(() => {
 
               // Default Campaign List View (Centered)
               return (
-              <div className="max-w-4xl mx-auto px-4 sm:px-6 py-12 sm:py-16">
+              <div className="max-w-6xl mx-auto px-4 sm:px-6 py-12 sm:py-16">
 
                 <>
                   {/* Header */}
@@ -4162,7 +4486,7 @@ useEffect(() => {
                     </div>
                     <button
                       onClick={() => setShowCreateCampaign(!showCreateCampaign)}
-                      className="h-9 px-4 text-sm bg-black text-white rounded-full hover:bg-neutral-800 transition-all flex items-center gap-2"
+                      className="inline-flex items-center gap-2 px-6 py-3 bg-black text-white rounded-full text-sm font-medium hover:bg-black/90  disabled:opacity-60 transition"
                     >
                       <Plus className="h-4 w-4" />
                       {showCreateCampaign ? "Cancel" : "New Campaign"}
@@ -4367,8 +4691,8 @@ useEffect(() => {
             companyDomainLoading ? (
               <CompanyInfoSkeleton />
                 ) : (
-              <div className="max-w-6xl mx-auto px-4 sm:px-6 py-12 sm:py-16 space-y-8">
-                <PublishExperience
+                  <div className="max-w-6xl mx-auto px-4 sm:px-6 py-12 sm:py-16">
+                  <PublishExperience
                   companyDomain={companyDomain}
                   domainContext={domainContext}
                   keywordsTableData={keywordsTableData}
@@ -4384,6 +4708,7 @@ useEffect(() => {
             )
           ) : activeTab === 'audit' ? (
             <div className="relative min-h-screen w-full">
+             
               {/* Background Layer */}
               <div className="fixed inset-0 pointer-events-none">
                 <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-gray-100 rounded-full blur-3xl opacity-20" />
@@ -4392,58 +4717,6 @@ useEffect(() => {
 
               {/* Content Layer */}
               <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 py-16 sm:py-24">
-                {/* Audit Completed Modal */}
-                <AlertDialog open={showAuditModal} onOpenChange={setShowAuditModal}>
-                  <AlertDialogContent className="max-w-md">
-                    <div className="p-4 rounded-lg bg-gradient-to-r from-white/80 to-gray-50 border border-gray-100">
-                      <AlertDialogHeader>
-                        <AlertDialogTitle className="text-2xl font-medium">Audit Completed</AlertDialogTitle>
-                        <AlertDialogDescription className="text-sm text-muted-foreground">
-                          Your domain audit has finished. Here's a quick summary — you can view the full report or download it.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-
-                      <div className="mt-4 flex items-center gap-4">
-                        <div className="flex-shrink-0">
-                          <OverallScoreGauge score={Math.round(((auditResult?.performance||0)+(auditResult?.seo||0)+(auditResult?.accessibility||0)+(auditResult?.bestPractices||0))/5*100)/100 || 0} />
-                        </div>
-                        <div className="flex-1">
-                          <div className="text-sm text-gray-600 mb-2">Top category</div>
-                          <div className="text-base font-medium text-gray-900">
-                            {auditResult ? (
-                              (() => {
-                                const cats = [
-                                  { k: 'Performance', v: auditResult.performance },
-                                  { k: 'SEO', v: auditResult.seo },
-                                  { k: 'Accessibility', v: auditResult.accessibility },
-                                  { k: 'Best Practices', v: auditResult.bestPractices },
-                                ];
-                                const scored = cats.map(c => ({ ...c, s: Math.round((c.v||0)*100) }));
-                                const best = scored.reduce((a,b)=> b.s > a.s ? b : a, scored[0]);
-                                return `${best.k} — ${best.s}%`;
-                              })()
-                            ) : '—'}
-                          </div>
-                          <div className="text-xs text-gray-500 mt-2">Click below to view the full interactive report.</div>
-                        </div>
-                      </div>
-
-                      <div className="mt-6 flex items-center justify-end gap-2">
-                        {auditResult && companyDomain && (
-                          <PDFDownloadLink
-                            document={<AuditPDF data={auditResult} domain={companyDomain} />}
-                            fileName={`audit-${companyDomain}-${new Date().toISOString().split('T')[0]}.pdf`}
-                            className="px-4 py-2 rounded-full border border-gray-200 text-sm font-light bg-white hover:bg-gray-50 flex items-center justify-center"
-                          >
-                            {({ loading }) => (loading ? 'Preparing...' : 'Export PDF')}
-                          </PDFDownloadLink>
-                        )}
-                        <AlertDialogAction onClick={handleViewReport} className="px-4 py-2 rounded-full bg-black text-white text-sm">View Full Report</AlertDialogAction>
-                        <AlertDialogCancel className="px-4 py-2 rounded-full border border-gray-200 text-sm">Close</AlertDialogCancel>
-                      </div>
-                    </div>
-                  </AlertDialogContent>
-                </AlertDialog>
 
                 {/* Hero Section */}
                 <div className="text-center mb-20">
@@ -4466,10 +4739,10 @@ useEffect(() => {
                   {/* Action Section */}
                   <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-8">
                     <div
-                      className="flex-1 max-w-md bg-white/70 backdrop-blur-md border border-gray-200 rounded-full px-6 py-4 flex items-center justify-between shadow-sm"
+                      className="flex-1 max-w-md bg-white/70 backdrop-blur-md border border-gray-200 rounded-full px-6 py-3 flex items-center justify-between shadow-sm"
                       style={{ borderWidth: '0.5px' }}
                     >
-                      <span className="text-gray-700 font-light truncate" style={{ letterSpacing: '0.011em' }}>
+                      <span className="text-gray-700 font-light truncate " style={{ letterSpacing: '0.011em' }}>
                         {companyDomain || "No domain available"}
                       </span>
                     </div>
@@ -4479,7 +4752,7 @@ useEffect(() => {
                         onClick={() => handleRunAudit(companyDomain)}
                         disabled={auditLoading || !companyDomain}
                         className={cn(
-                          "h-12 px-8 rounded-full text-white font-light transition-all duration-200 flex items-center justify-center gap-2",
+                          "inline-flex items-center gap-2 px-6 py-3 bg-black text-white rounded-full text-sm font-medium hover:bg-black/90  disabled:opacity-60 transition",
                           "bg-black hover:bg-gray-800 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed",
                           auditLoading && "cursor-not-allowed"
                         )}
@@ -4587,7 +4860,7 @@ useEffect(() => {
                   const avg = scored.reduce((a, b) => a + b.score, 0) / scored.length;
                   const best = scored.reduce((a, b) => (b.score > a.score ? b : a));
                   const worst = scored.reduce((a, b) => (b.score < a.score ? b : a));
-
+                  
                   return (
                     <div ref={resultsRef} className="space-y-16">
                       {/* Overall Score Section */}
@@ -4702,17 +4975,33 @@ useEffect(() => {
                         >
                           Individual Metrics
                         </h3>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-6">
-                          {categories.map(({ label, value }) => (
-                            <div
-                              key={label}
-                              className="bg-white/70 backdrop-blur-md rounded-2xl border border-gray-200 p-6 shadow-sm hover:shadow-md transition-all"
-                              style={{ borderWidth: '0.5px' }}
-                            >
-                              <AuditGaugeChart label={label} score={value} size={140} />
-                            </div>
-                          ))}
-                        </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-6">
+  {categories.map(({ label, value }) => (
+    <div
+      key={label}
+      className="bg-white/70 backdrop-blur-md rounded-2xl border border-gray-200 p-6 shadow-sm hover:shadow-md transition-all"
+      style={{ borderWidth: '0.5px' }}
+    >
+      {/* Metric Title + Tooltip */}
+      <div className="flex items-center justify-center gap-1 mb-4">
+        <span
+          className="text-sm font-light text-gray-700"
+          style={{ letterSpacing: '0.011em' }}
+        >
+          {label}
+        </span>
+
+        {categoryDescriptions[label] && (
+          <InfoTooltip text={categoryDescriptions[label]} />
+        )}
+      </div>
+
+      {/* Gauge */}
+      <AuditGaugeChart label={null} score={value} size={140} />
+    </div>
+  ))}
+</div>
+
                       </div>
 
                       {/* Screenshot Section */}
@@ -4764,16 +5053,25 @@ useEffect(() => {
                                   className="flex justify-between items-center px-4 py-3 rounded-xl bg-gray-50/50 border border-gray-200 hover:bg-gray-50 transition-all"
                                   style={{ borderWidth: '0.5px' }}
                                 >
-                                  <span className="font-light text-gray-900" style={{ letterSpacing: '0.011em' }}>
-                                    {key.toUpperCase()} <span className="text-gray-500">({fullForms[key] || key})</span>
-                                  </span>
+                                  <span
+  className="font-light text-gray-900 flex items-center gap-1"
+  style={{ letterSpacing: '0.011em' }}
+>
+  {key.toUpperCase()}
+  <span className="text-gray-500">({fullForms[key] || key})</span>
+
+  {metricDescriptions[key] && (
+    <InfoTooltip text={metricDescriptions[key]} />
+  )}
+</span>
+
                                   <span className="font-mono text-sm font-light text-gray-700 bg-white px-3 py-1 rounded-lg border border-gray-200" style={{ borderWidth: '0.5px' }}>
                                     {String(value)}
                                   </span>
                                 </div>
                               );
                             })}
-                          </div>
+                          </div> 
                         </details>
                       )}
                     </div>
@@ -6981,9 +7279,9 @@ const handleUpdatePillar = async (topicId: number, updates: { title?: string; re
               </div>
               <button 
                 onClick={() => setShowAddKeywordModal(false)}
-                className="p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-400 hover:text-gray-600"
+                className="p-2 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors text-gray-400 hover:text-gray-600"
               >
-                <Trash2 className="h-5 w-5 rotate-45" />
+                <Trash2 className="h-5 w-5 " />
               </button>
             </div>
 

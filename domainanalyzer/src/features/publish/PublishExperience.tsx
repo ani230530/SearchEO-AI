@@ -167,6 +167,26 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
   const [saving, setSaving] = useState(false);
 
+   const fetchPublishHistory = useCallback(async () => {
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/publish/history`, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('authToken')}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      if (!response.ok) {
+        throw new Error('Failed to fetch publish history');
+      }
+      const data = await response.json();
+      if (data.success) {
+        setPublishHistory(data.logs || []);
+      }
+    } catch (error) {
+      console.error('Error fetching publish history:', error);
+    }
+  }, []);
+
   // Listen for real-time publish updates
   usePublishStatus({
     onUpdate: (data) => {
@@ -203,7 +223,6 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
           });
         }
       }
-    }
     }
   });
 
@@ -345,26 +364,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
     { id: 4, title: 'Long-tail Notes', description: 'Supportive angles' },
   ];
 
-  const fetchPublishHistory = useCallback(async () => {
-    try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/publish/history`, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem('authToken')}`,
-          'Content-Type': 'application/json',
-        },
-      });
-      if (!response.ok) {
-        throw new Error('Failed to fetch publish history');
-      }
-      const data = await response.json();
-      if (data.success) {
-        setPublishHistory(data.logs || []);
-      }
-    } catch (error) {
-      console.error('Error fetching publish history:', error);
-    }
-  }, []);
-
+ 
   useEffect(() => {
     // Only fetch history when actually in publish tab (not when viewing from campaign overlay)
     // If initialDraft is provided, we're in campaign preview mode, so don't fetch history
@@ -2706,7 +2706,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
           // Render with full-screen overlay wrapper (for standalone use in publish tab)
           // Only render if active (to prevent showing when viewing from campaign)
           isActive ? (
-            <div className="fixed inset-0 z-50 bg-white overflow-y-auto">
+            <div className="fixed inset-0 z-0 bg-white  space-x-[280px]">
             <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-xl border-b border-gray-100 shadow-sm">
               <div className="max-w-7xl mx-auto px-6 py-4">
                 <div className="flex items-center justify-between gap-4">

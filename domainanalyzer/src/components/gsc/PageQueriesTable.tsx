@@ -502,7 +502,7 @@ const PageQueriesTable = ({
         {onShowTrendsChange && (
           <button
             onClick={() => onShowTrendsChange(!showTrends)}
-            className={`h-10 px-5 border rounded-full text-sm font-light tracking-tight transition-all duration-200 inline-flex items-center gap-2 ${
+            className={`inline-flex items-center gap-2 px-6 py-3 bg-black text-white rounded-full text-sm font-medium hover:bg-black/90  disabled:opacity-60 transition ${
               showTrends
                 ? 'border-gray-900 bg-gray-900 text-white hover:bg-gray-800'
                 : 'border-gray-200 text-gray-700 hover:bg-gray-50'
