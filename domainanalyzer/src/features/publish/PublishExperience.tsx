@@ -9,8 +9,10 @@ import {
   Check,
   CheckCircle,
   Plus,
+  Save ,
   X,
   ArrowUpDown,
+  RotateCcw,
   Edit,
   Eye,
   Trash2,
@@ -2204,22 +2206,22 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
                     </button>
                   )}
                   <button
-                    onClick={handlePublishToWordpress}
-                    disabled={publishLoading || !publishResult}
-                    className="px-6 py-2.5 rounded-full bg-black text-white text-sm font-semibold shadow-lg hover:bg-black/90 disabled:opacity-60 transition-colors"
-                  >
-                    {publishLoading ? 'Working…' : (publishResult?.wordpressUrl?.startsWith('http') ? 'Re-publish to WordPress' : 'Publish to WordPress')}
-                  </button>
-                  <button
                     onClick={handleSaveDraft}
                     disabled={saving || !publishResult || !hasUnsavedChanges}
                     className={`px-5 py-2.5 rounded-full border text-sm font-medium transition-colors ${
                       hasUnsavedChanges 
-                        ? 'border-orange-300 bg-orange-50 text-orange-700 hover:bg-orange-100' 
+                        ? 'border-orange-300 text-orange-50 text-orange-700 hover:bg-orange-100' 
                         : 'border-gray-200 bg-white text-gray-900 hover:bg-gray-50'
                     } disabled:opacity-50 disabled:cursor-not-allowed`}
                   >
-                    {saving ? 'Saving…' : hasUnsavedChanges ? 'Save Draft • Unsaved' : 'Save Draft'}
+                    <Save className='h-5 w-5' />
+                    {/* {saving ? 'Saving…' : hasUnsavedChanges ? 'Save Draft • Unsaved' : 'Save Draft'} */}
+                  </button>
+                  <button
+                    onClick={handleResetDraft}
+                    className="px-4 py-2 rounded-full text-sm font-medium text-gray-500 hover:text-gray-900 transition-colors"
+                  >
+                   <RotateCcw className='h-5 w-5'/>
                   </button>
                   <button
                     onClick={handleGenerateContent}
@@ -2229,10 +2231,11 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
                     {publishLoading ? 'Generating…' : publishResult ? 'Regenerate' : 'Generate'}
                   </button>
                   <button
-                    onClick={handleResetDraft}
-                    className="px-4 py-2 rounded-full text-sm font-medium text-gray-500 hover:text-gray-900 transition-colors"
+                    onClick={handlePublishToWordpress}
+                    disabled={publishLoading || !publishResult}
+                    className="px-6 py-2.5 rounded-full bg-black text-white text-sm font-medium shadow-lg hover:bg-black/90 disabled:opacity-60 transition-colors"
                   >
-                    Reset Draft
+                    {publishLoading ? 'Working…' : (publishResult?.wordpressUrl?.startsWith('http') ? 'Re-publish to WordPress' : 'Publish to WordPress')}
                   </button>
                 </div>
               </div>
@@ -2298,7 +2301,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
                           <p className="text-xs text-gray-500">Manage images in your article</p>
                           <button
                             onClick={() => setShowAddImageModal(true)}
-                            className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-gray-900 text-white text-xs font-medium hover:bg-gray-800"
+                            className="inline-flex items-center gap-2 px-1 py-1 bg-black text-white rounded-full text-sm font-medium hover:bg-black/90  disabled:opacity-60 transition"
                           >
                             <Plus className="h-3.5 w-3.5" />
                             Add
@@ -2746,56 +2749,60 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
                   <div className="flex flex-wrap items-center gap-3 justify-end flex-shrink-0">
                     {publishResult && (
                       <button
+                      title={isEditMode ? "Exit edit mode" : "Edit content"}
                         onClick={handleToggleEditMode}
-                        className={`px-5 py-2.5 rounded-full border text-sm font-medium transition-colors ${
+                        className={`px-1 py-2 rounded-full text-sm font-medium text-gray-500 hover:text-gray-900 transition-colors ${
                           isEditMode
-                            ? 'border-gray-900 bg-gray-900 text-white hover:bg-gray-800'
-                            : 'border-gray-200 bg-white text-gray-900 hover:bg-gray-50'
+                            ? 'border-gray-900 text-gray-900 hover:text-gray-500'
+                            : 'border-gray-200 text-gray-500 hover:text-gray-900'
                         }`}
                       >
                         {isEditMode ? (
-                          <span className="flex items-center gap-2">
-                            <Eye className="h-4 w-4" />
-                            Preview
+                          <span className="flex items-center ">
+                            <Edit className='h-5 w-5' />
+                         
                           </span>
                         ) : (
-                          <span className="flex items-center gap-2">
-                            <Edit className="h-4 w-4" />
-                            Edit Mode
+                          <span className="flex items-center ">
+                            <Edit className='h-5 w-5' />
+                           
                           </span>
                         )}
                       </button>
                     )}
                     <button
-                      onClick={handlePublishToWordpress}
-                      disabled={publishLoading || !publishResult}
-                      className="px-6 py-2.5 rounded-full bg-black text-white text-sm font-semibold shadow-lg hover:bg-black/90 disabled:opacity-60 transition-colors"
-                    >
-                      {publishLoading ? 'Working…' : 'Publish to WordPress'}
-                    </button>
-                    <button
+                    title='Save Draft'
                       onClick={handleSaveDraft}
                       disabled={saving || !publishResult || !hasUnsavedChanges}
-                      className={`px-5 py-2.5 rounded-full border text-sm font-medium transition-colors ${
+                      className={`px-1 py-2 rounded-full text-sm font-medium text-gray-500 hover:text-gray-900 transition-colors${
                         hasUnsavedChanges 
-                          ? 'border-orange-300 bg-orange-50 text-orange-700 hover:bg-orange-100' 
-                          : 'border-gray-200 bg-white text-gray-900 hover:bg-gray-50'
+                          ? 'border-gray-900 text-gray-900 hover:text-gray-500' 
+                          : 'border-gray-200 text-gray-500 hover:text-gray-900'
                       } disabled:opacity-50 disabled:cursor-not-allowed`}
                     >
-                      {saving ? 'Saving…' : hasUnsavedChanges ? 'Save Draft • Unsaved' : 'Save Draft'}
+                      <Save className='h-5 w-5'/>
+                      {/* {saving ? 'Saving…' : hasUnsavedChanges ? 'Save Draft • Unsaved' : 'Save Draft'} */}
+                    </button>
+                    <button
+                    title='Reset'
+                      onClick={handleResetDraft}
+                      className="px-1 py-2 rounded-full text-sm font-medium text-gray-500 hover:text-gray-900 transition-colors"
+                    >
+                     <RotateCcw className='h-5 w-5'/>
                     </button>
                     <button
                       onClick={handleGenerateContent}
                       disabled={publishLoading}
-                      className="px-5 py-2.5 rounded-full border border-gray-200 bg-white text-sm font-medium text-gray-900 hover:bg-gray-50 disabled:opacity-60 transition-colors"
+                      className="px-5 py-2.5 rounded-full border border-gray-200 bg-white text-sm font-medium text-gray-900 hover:bg-gray-50 hover:border-gray-900 disabled:opacity-60 transition-colors"
                     >
                       {publishLoading ? 'Generating…' : publishResult ? 'Regenerate' : 'Generate'}
                     </button>
                     <button
-                      onClick={handleResetDraft}
-                      className="px-4 py-2 rounded-full text-sm font-medium text-gray-500 hover:text-gray-900 transition-colors"
+                      onClick={handlePublishToWordpress}
+                      disabled={publishLoading || !publishResult}
+                      className="px-6 py-2.5 rounded-full bg-black text-white text-sm font-medium shadow-lg hover:bg-gray-600 disabled:opacity-60 transition-colors"
                     >
-                      Reset Draft
+                      {publishLoading ? 'Working…' : 'Publish to WordPress'}
                     </button>
                   </div>
                 </div>
@@ -2861,9 +2868,9 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
                           <p className="text-xs text-gray-500">Manage images in your article</p>
                           <button
                             onClick={() => setShowAddImageModal(true)}
-                            className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-gray-900 text-white text-xs font-medium hover:bg-gray-800"
+                            className="inline-flex items-center gap-2 px-2 py-1 text-black rounded-full text-sm font-medium hover:bg-gray-200  disabled:opacity-60 transition"
                           >
-                            <Plus className="h-3.5 w-3.5" />
+                            <Plus className="h-2.5 w-2.5" />
                             Add
                           </button>
                         </div>

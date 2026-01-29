@@ -211,9 +211,9 @@ const renderKeywords = (
                  <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-3 mb-3">
                          <span className="bg-gray-100 text-gray-600 px-3 py-1 rounded-full text-[10px] font-semibold tracking-wide uppercase">Pillar Page</span>
-                         {renderStatusPill(topic.pillarPage.id)}
                     </div>
                     <h4 className="text-xl font-medium text-[#1d1d1f] mb-2 tracking-tight">{topic.pillarPage.title}</h4>
+                         {renderStatusPill(topic.pillarPage.id)}
                     {/* <input
                       type="url"
                       placeholder="Add reference URL..."

@@ -376,7 +376,7 @@ const [campaignStructure, setCampaignStructure] = useState<CampaignStructure>({
   const tabs: Tab[] = [
     { id: 'ai-checker', label: 'AI Checker', icon: <Sparkles className="h-5 w-5" /> },
     { id: 'overview', label: 'Overview', icon: <LayoutDashboard className="h-5 w-5" /> },
-    { id: 'analytics', label: 'Company', icon: <Building className="h-5 w-5" /> },
+    { id: 'analytics', label: 'Company', icon: <Building className="h-5 w-5" /> } ,
     { id: 'campaign', label: 'Campaign', icon: <Megaphone className="h-5 w-5" /> },
     { id: 'publish', label: 'Publish', icon: <Send className="h-5 w-5" /> },
     { id: 'gsc-analytics', label: 'GSC Analytics', icon: <BarChart3 className="h-5 w-5" /> },
@@ -2079,7 +2079,7 @@ useEffect(() => {
         }
 
         .sidebar-header {
-          padding: calc(env(safe-area-inset-top) + 20px) 20px 20px 20px;
+          padding: 0px 12px 0px 24px;
           border-bottom: 0.5px solid rgba(0, 0, 0, 0.1);
         }
 
@@ -2193,7 +2193,7 @@ useEffect(() => {
         .content-header {
           position: sticky;
           top: 0;
-          padding: calc(env(safe-area-inset-top) + 12px) 24px 12px 24px;
+          padding: calc(env(safe-area-inset-top) + 18px) 24px 12px 24px;
           background: rgba(255, 255, 255, 0.72);
           backdrop-filter: saturate(180%) blur(20px);
           -webkit-backdrop-filter: saturate(180%) blur(20px);
@@ -2344,7 +2344,7 @@ useEffect(() => {
                 fontWeight: "400",
                 letterSpacing: "-0.022em",
                 color: "#1d1d1f",
-                margin: "0",
+                marginTop: "20px",
               }}
             >
               Dashboard
@@ -2360,6 +2360,7 @@ useEffect(() => {
                 cursor: "pointer",
                 display: "flex",
                 alignItems: "center",
+                marginTop: "20px",
                 justifyContent: "center",
                 transition: "background 0.2s ease",
               }}
@@ -2400,41 +2401,45 @@ useEffect(() => {
                 >
                   <span className="sidebar-tab-icon">{tab.icon}</span>
                   <span className="sidebar-tab-label">{tab.label}</span>
-                  {tab.id === "analytics" &&
-                    activeTab === "analytics" &&
-                    showResults && (
-                      <ChevronDown className="h-4 w-4 ml-auto sidebar-tab-chevron" />
-                    )}
+                  {tab.id === "analytics" && (
+  <ChevronDown
+    className={`h-4 w-4 ml-auto sidebar-tab-chevron transition-transform ${
+      activeTab === "analytics" && showResults ? "rotate-180" : ""
+    }`}
+  />
+)}
+
                 </button>
                 {/* Show sub-tabs when Company is active and results are shown */}
                 {tab.id === "analytics" &&
                   activeTab === "analytics" &&
                   showResults && (
+                    
                     <div className="ml-8 mt-1 space-y-1 sidebar-subtabs">
+                      
                       <button
                         onClick={() => setActiveCompanySubTab("company-info")}
                         className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-light transition-all duration-200 ${
                           activeCompanySubTab === "company-info"
                             ? "bg-blue-50 text-blue-700"
-                            : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+                            : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
                         }`}
                       >
                         <FileText className="h-4 w-4" />
                         <span>Domain Info</span>
-                        {activeCompanySubTab === "company-info" && (
-                          <ChevronDown className="h-3 w-3 ml-auto" />
-                        )}
+                        {activeCompanySubTab === "company-info" }
                       </button>
                       <button
                         onClick={() => setActiveCompanySubTab("integration")}
                         className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-light transition-all duration-200 ${
-                          activeCompanySubTab === "integration"
-                            ? "bg-gray-100 text-gray-900 rounded-lg"
-                            : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+                          activeCompanySubTab === "integration" 
+                            ? "bg-blue-50 text-blue-700"
+                            : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
                         }`}
                       >
                         <Plug className="h-4 w-4" />
                         <span>Integration</span>
+                        {activeCompanySubTab === "integration" }
                       </button>
                     </div>
                   )}
@@ -2588,61 +2593,63 @@ useEffect(() => {
         </div>
 
         {/* Right */}
-        <div className="flex items-center gap-10">
-         
-            {companyDomain && (
-             <div className="text-center mb-12 flex flex-col items-center gap-4">
-                  <div className="inline-flex items-center gap-3 bg-blue-50 border border-blue-200 text-blue-700 px-5 py-3 rounded-2xl shadow-sm">
-                   <img
-  src={`https://img.logo.dev/${normalizedDomain}?token=pk_DTdFFG1JT9WOCjATvZEzIA&size=128`}
-  alt="Company logo"
-  width={32}
-  height={32}
-  className="w-8 h-8 rounded-md"
-  loading="lazy"
-/>
+          <div className="hidden lg:block w-px h-54 bg-gray-200" />
+<div className="flex flex-col items-center gap-6">
+  {companyDomain && (
+    <div className="inline-flex items-center gap-3 bg-blue-50 border border-blue-200 text-blue-700 px-5 py-3 rounded-2xl shadow-sm">
+      <img
+        src={`https://img.logo.dev/${normalizedDomain}?token=pk_DTdFFG1JT9WOCjATvZEzIA&size=128`}
+        alt="Company logo"
+        width={32}
+        height={32}
+        className="w-8 h-8 rounded-md"
+        loading="lazy"
+      />
+      <span className="font-medium text-lg tracking-tight">
+        <a
+          href={companyDomain.startsWith("http") ? companyDomain : `https://${companyDomain}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-blue-600 hover:underline text-lg"
+        >
+          {companyDomain.replace(/^https?:\/\//, "").replace(/^www\./, "")}
+        </a>
+      </span>
+    </div>
+  )}
 
-
-                    <span className="font-medium text-lg tracking-tight">
-                      {" "}
-                      <a
-                        href={
-                          companyDomain.startsWith("http")
-                            ? companyDomain
-                            : `https://${companyDomain}`
-                        }
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-blue-600 hover:underline text-lg"
-                      >
-                        {companyDomain
-                          .replace(/^https?:\/\//, "")
-                          .replace(/^www\./, "")}
-                      </a>
-                    </span>
-                  </div>
-                </div>
-            )}
-
-          <div className="hidden lg:block w-px h-24 bg-gray-100" />
-
-          <div className="space-y-4 text-sm">
-            <div>
-              <div className="text-xs text-gray-500">Last scanned</div>
-              <div className="font-medium text-gray-900">
-                {auditData?.updatedAt
-                  ? new Date(auditData.updatedAt).toLocaleString()
-                  : "Never"}
-              </div>
-            </div>
-            <div>
-              <div className="text-xs text-gray-500">Keywords tracked</div>
-              <div className="font-medium text-gray-900">
-                {keywordsTableData.length}
-              </div>
-            </div>
+  {/* Info blocks*/}
+  <div className="flex flex-col-2 items-center gap-20">
+    <div>
+      <div className="text-xs text-gray-500">Last scanned</div>
+      {auditData?.updatedAt ? (
+        <>
+          <div className="font-medium text-gray-900">
+            {new Date(auditData.updatedAt).toLocaleDateString("en-GB", {
+              day: "numeric",
+              month: "short",
+              year: "numeric",
+            })}
           </div>
-        </div>
+          <div className="text-xs text-gray-900">
+            {new Date(auditData.updatedAt).toLocaleTimeString("en-US", {
+              hour: "2-digit",
+              minute: "2-digit",
+            })}
+          </div>
+        </>
+      ) : (
+        <div className="font-medium text-gray-900">Never</div>
+      )}
+    </div>
+
+    <div>
+      <div className="text-xs text-gray-500">Keywords tracked</div>
+      <div className="font-medium text-gray-900">{keywordsTableData.length}</div>
+    </div>
+  </div>
+</div>
+
       </div>
     </div>
 
@@ -2652,10 +2659,10 @@ useEffect(() => {
       {/* Opportunities Card */}
 <div className="rounded-3xl bg-white border border-gray-100 p-6 hover:shadow-lg transition">
   <div className="flex items-center justify-between mb-4">
-    <div className="text-xs uppercase tracking-wide text-gray-500">
+    <h3 className="text-base font-medium text-gray-900">
       Top Opportunities
-    </div>
-    <div className="text-xs uppercase tracking-wide text-gray-500">
+    </h3>
+    <div className="text-base font-medium text-gray-900">
       Volume
     </div>
   </div>
@@ -2668,8 +2675,8 @@ useEffect(() => {
       .map((item, idx) => (
         <div key={idx} className="flex items-center justify-between">
           <div>
-            <div className="text-lg font-medium text-gray-900">
-              {item?.keyword || "No keywords yet"}
+            <div className="text-lg font-medium text-gray-700"> 
+              {item?.keyword.charAt(0).toUpperCase() + item?.keyword.slice(1)|| "No keywords yet"}
             </div>
             <div className="text-xs text-gray-400 mt-1">
               High potential growth keyword
@@ -2782,68 +2789,70 @@ useEffect(() => {
     </button>
   </div>
 
-  {!auditResult ? (
-    <p className="text-sm text-gray-500">
-      Run an audit to view performance metrics.
-    </p>
-  ) : (
-    <div className="flex flex-col gap-4 ">
-      {/* Overall score centered */}
-      <div className="flex justify-center mb-4 ">
-        <OverallScoreGauge
-          size={150}
-          score={
-            ((auditResult.performance || 0) +
-            (auditResult.seo || 0) +
-            (auditResult.accessibility || 0) +
-            (auditResult.bestPractices || 0)) /
-            4
-          }
-        />
-      </div>
+ {!auditResult ? (
+  <p className="text-sm text-gray-500">
+    Run an audit to view performance metrics.
+  </p>
+) : (
+  <div className="flex gap-6">
+  {/* Metrics grid on the left */}
+  <div className="flex flex-col gap-6 flex-1">
+    {[
+      ["Performance", auditResult.performance],
+      ["SEO", auditResult.seo],
+      ["Accessibility", auditResult.accessibility],
+      ["Best Practices", auditResult.bestPractices],
+    ].map(([label, value]) => {
+      const pct = Math.round((value || 0) * 100);
+      let bgColor = "bg-gray-50";
+      let textColor = "text-gray-900";
 
-      {/* Metrics grid */}
-      <div className="grid grid-cols-2 gap-2">
-        {[
-          ["Performance", auditResult.performance],
-          ["SEO", auditResult.seo],
-          ["Accessibility", auditResult.accessibility],
-          ["Best Practices", auditResult.bestPractices],
-        ].map(([label, value]) => {
-          const pct = Math.round((value || 0) * 100);
-          
-          // Optional dynamic colors
-          let bgColor = "bg-gray-50";
-          let textColor = "text-gray-900";
-          
-          if (pct >= 90) {
-            bgColor = "bg-green-50";
-            textColor = "text-green-700";
-          } else if (pct >= 70) {
-            bgColor = "bg-yellow-50";
-            textColor = "text-yellow-700";
-          } else if (pct >= 40) {
-            bgColor = "bg-orange-50";
-            textColor = "text-orange-700";
-          } else {
-            bgColor = "bg-red-50";
-            textColor = "text-red-700";
-          }
-          
-          return (
-            <div
-            key={label}
-            className={`flex items-center justify-between rounded-xl px-3 py-2 ${bgColor}`}
-            >
-            <ChartNoAxesCombined /> 
-              <span className="text-sm text-gray-600">{label}</span>
-              <span className={`font-semibold ${textColor}`}>{pct}%</span>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  )}
+      if (pct >= 80) {
+        bgColor = "bg-green-50";
+        textColor = "text-green-700";
+      } else if (pct >= 60) {
+        bgColor = "bg-yellow-50";
+        textColor = "text-yellow-700";
+      } else if (pct >= 40) {
+        bgColor = "bg-orange-50";
+        textColor = "text-orange-700";
+      } else {
+        bgColor = "bg-red-50";
+        textColor = "text-red-700";
+      }
+
+      return (
+        <div
+          key={label}
+          className={`flex items-center justify-between rounded-xl px-3 py-4 ${bgColor}`}
+        >
+          <div className="flex items-center gap-2">
+            <ChartNoAxesCombined />
+            <span className="text-medium text-gray-600">{label}</span>
+          </div>
+          <span className={`font-semibold ${textColor}`}>{pct}%</span>
+        </div>
+      );
+    })}
+  </div>
+
+  {/* Overall score on the right, vertically centered */}
+  <div className="flex items-center justify-center">
+    <OverallScoreGauge
+      size={150}
+      score={
+        ((auditResult.performance || 0) +
+          (auditResult.seo || 0) +
+          (auditResult.accessibility || 0) +
+          (auditResult.bestPractices || 0)) /
+        4
+      }
+    />
+  </div>
+</div>
+
+)}
+
 </div>
 
     </div>
@@ -2852,7 +2861,7 @@ useEffect(() => {
   <div className="grid grid-cols-1 lg:grid-cols-1 gap-6">
   <div className="rounded-3xl bg-white border border-gray-100 p-6 hover:shadow-lg transition">
     <div className="mb-6">
-      <h4 className="text-sm font-medium text-gray-900">Snapshot</h4>
+      <h3 className="text-base font-medium text-gray-900">Snapshot</h3>
       <p className="text-xs text-gray-400 mt-1">
         Quick overview of your setup
       </p>
@@ -3661,7 +3670,7 @@ const rightSections = sections.slice(4, 8);
 
                                       {/* Volume Column */}
                                       <div className="col-span-1 flex items-center justify-center">
-                                        <span className="font-semibold text-gray-900 text-sm">
+                                        <span className="font-medium text-gray-900 text-sm">
                                           {keyword.volume >= 1000
                                             ? `${(
                                                 keyword.volume / 1000
@@ -3683,7 +3692,7 @@ const rightSections = sections.slice(4, 8);
 
                                       {/* CPC Column */}
                                       <div className="col-span-1 flex items-center justify-center">
-                                        <span className="font-semibold text-gray-900 text-sm">
+                                        <span className="font-medium text-gray-900 text-sm">
                                           ${keyword.cpc.toFixed(2)}
                                         </span>
                                       </div>

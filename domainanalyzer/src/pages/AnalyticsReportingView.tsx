@@ -16,6 +16,7 @@ import {
   Database,
   ChevronRight,
   Plus,
+  RefreshCw,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast";
@@ -646,7 +647,7 @@ onSelect={(date) => {
               className="p-2 hover:bg-neutral-100 rounded-full transition-colors"
               title="Refresh history"
             >
-              <Layers className={cn("h-5 w-5", isLoadingHistory && "animate-spin")} />
+              <RefreshCw className={cn("h-5 w-5", isLoadingHistory && "animate-spin")} />
             </button>
           </div>
 
