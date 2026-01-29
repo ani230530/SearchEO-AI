@@ -121,6 +121,13 @@ async function handlePublishCompletion(job: Job, responseData: any, meta: any) {
 
     const hasValidUrl = publishedUrl && publishedUrl !== baseSiteUrl && !publishedUrl.startsWith('draft://');
 
+    console.log('[Queue:Debug] Publish Logic Check:', {
+        publishedUrl,
+        baseSiteUrl,
+        hasValidUrl,
+        integrationId
+    });
+
     if (!hasValidUrl) {
         // Treated as failure if no URL
         await handlePublishFailure(job, new Error('No valid published URL returned'), meta);
