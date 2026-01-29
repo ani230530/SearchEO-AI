@@ -85,7 +85,8 @@ import TrendsChart, { TrendDataPoint } from "@/components/gsc/TrendsChart";
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3002";
 
 type TabId = 'overview' | 'analytics' | 'campaign' | 'publish' | 'settings' | 'profile' | 'ai-checker' | 'gsc-analytics' | 'audit' | 'analytics-report';
-type CompanySubTabId = 'company-info' | 'integration' | 'blog-performance';
+type CompanySubTabId = 'company-info' | 'integration';
+type GscSubTabId = 'whole-analytics' | 'blog-performance';
 
 interface Tab {
   id: TabId;
@@ -173,6 +174,7 @@ useEffect(() => {
 
   const [activeCompanySubTab, setActiveCompanySubTab] =
     useState<CompanySubTabId>("company-info");
+  const [activeGscSubTab, setActiveGscSubTab] = useState<GscSubTabId>("whole-analytics");
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isSidebarHovered, setIsSidebarHovered] = useState(false);
   const [companyDomain, setCompanyDomain] = useState("");
@@ -2442,17 +2444,6 @@ useEffect(() => {
                         <span>Integration</span>
                         {activeCompanySubTab === "integration" }
                       </button>
-                      <button
-                        onClick={() => setActiveCompanySubTab("blog-performance")}
-                        className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-light transition-all duration-200 ${
-                          activeCompanySubTab === "blog-performance" 
-                            ? "bg-blue-50 text-blue-700"
-                            : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
-                        }`}
-                      >
-                        <BarChart3 className="h-4 w-4" />
-                        <span>Blog Performance</span>
-                      </button>
                     </div>
                   )}
               </div>
@@ -4254,13 +4245,6 @@ const rightSections = sections.slice(4, 8);
                     </div>
                   </div>
                 )}
-
-                {/* Blog Performance Tab Content */}
-                {activeCompanySubTab === 'blog-performance' && (
-                  <div className="max-w-6xl mx-auto">
-                    <GSCBlogAnalytics />
-                  </div>
-                )}
               </div>
             ) : isLoading ? (
               <div className="min-h-screen bg-white flex items-center justify-center px-4">
@@ -5112,7 +5096,44 @@ const rightSections = sections.slice(4, 8);
           ) : activeTab === 'analytics-report' ? (
             <AnalyticsReportingView />
           ): activeTab === 'gsc-analytics' ? (
-            <GSCAnalyticsView />
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+              {/* GSC Sub-tabs */}
+              <div className="flex items-center gap-2 mb-8 border-b border-gray-100 pb-4">
+                <button
+                  onClick={() => setActiveGscSubTab('whole-analytics')}
+                  className={`px-5 py-2.5 rounded-full text-sm font-medium transition-all duration-200 ${
+                    activeGscSubTab === 'whole-analytics'
+                      ? 'bg-purple-600 text-white shadow-lg shadow-purple-200'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
+                >
+                  <span className="flex items-center gap-2">
+                    <ChartNoAxesCombined className="h-4 w-4" />
+                    Whole Analytics
+                  </span>
+                </button>
+                <button
+                  onClick={() => setActiveGscSubTab('blog-performance')}
+                  className={`px-5 py-2.5 rounded-full text-sm font-medium transition-all duration-200 ${
+                    activeGscSubTab === 'blog-performance'
+                      ? 'bg-purple-600 text-white shadow-lg shadow-purple-200'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
+                >
+                  <span className="flex items-center gap-2">
+                    <BarChart3 className="h-4 w-4" />
+                    Our Blog Performance
+                  </span>
+                </button>
+              </div>
+
+              {/* GSC Sub-tab Content */}
+              {activeGscSubTab === 'whole-analytics' ? (
+                <GSCAnalyticsView />
+              ) : (
+                <GSCBlogAnalytics />
+              )}
+            </div>
           ) : activeTab === 'profile' ? (
             <div className="max-w-8xl mx-auto px-4 sm:px-6 py-12 sm:py-16 space-y-12">
               <Profile />
