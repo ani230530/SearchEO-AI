@@ -16,9 +16,12 @@ const PublishHistoryTable: React.FC<PublishHistoryTableProps> = ({
 }) => {
   const renderRows = () =>
     entries.map((entry) => {
-      const readableUrl = entry.wordpressUrl?.replace(/^https?:\/\//, '').replace(/\/$/, '');
-      const slugPath = entry.slug ? `${entry.slug}` : '';
-      const fullUrl = readableUrl && slugPath ? `https://${readableUrl}/${slugPath}` : entry.wordpressUrl;
+      
+      // Trust the wordpressUrl from backend as the full URL
+      const fullUrl = entry.wordpressUrl;
+      // For display, strip protocol
+      const displayUrl = fullUrl ? fullUrl.replace(/^https?:\/\//, '').replace(/\/$/, '') : '';
+      
       const statusLabel = (entry.status || 'queued').toLowerCase();
       const isDraft = statusLabel === 'draft';
       const isGenerating = statusLabel === 'generating';
@@ -38,8 +41,8 @@ const PublishHistoryTable: React.FC<PublishHistoryTableProps> = ({
             <p className="font-medium text-gray-900">
               {entry.title || entry.slug || entry.primaryKeyword || 'Untitled Post'}
             </p>
-            {fullUrl && !isDraft && (
-              <p className="text-xs text-gray-500 truncate max-w-[220px]">{fullUrl}</p>
+            {displayUrl && !isDraft && (
+              <p className="text-xs text-gray-500 truncate max-w-[220px]" title={displayUrl}>{displayUrl}</p>
             )}
           </td>
           <td className="py-4 pr-4 text-gray-700">{entry.primaryKeyword || '—'}</td>
