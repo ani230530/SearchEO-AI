@@ -1601,6 +1601,18 @@ router.post('/topics/:topicId/generate-content', authenticateToken, asyncHandler
     return res.status(400).json({ success: false, error: 'Invalid topic ID' });
   }
 
+  // Concurrency Check: Prevent double submission
+  const activeJob = await prisma.generationJob.findFirst({
+    where: {
+      topicId,
+      status: { in: ['generating', 'pending'] }
+    }
+  });
+
+  if (activeJob) {
+    return res.status(409).json({ success: false, error: 'A generation job is already in progress for this topic.' });
+  }
+
   const topic = await prisma.campaignTopic.findFirst({
     where: {
       id: topicId,
@@ -1823,6 +1835,11 @@ router.post('/topics/:topicId/generate-content', authenticateToken, asyncHandler
   // For local development, it will use the request host
   const callbackBaseUrl = process.env.CALLBACK_BASE_URL || `${req.protocol}://${req.get('host')}`;
   const callbackUrl = `${callbackBaseUrl}/api/campaigns/generation-webhook`;
+
+  if (!process.env.CALLBACK_BASE_URL) {
+    console.warn('[Warning] CALLBACK_BASE_URL not set in environment. Using request host for n8n callback:', callbackBaseUrl);
+    console.warn('If n8n is running externally, it will fail to reach this localhost URL.');
+  }
 
   // Construct streaming URL from environment variable (for deployment/prod) or fallback to callback base URL
   // Set STREAMING_BASE_URL env var in deployment/production (e.g., https://your-domain.com)
@@ -2671,7 +2688,13 @@ router.get('/topics/:topicId/drafts-status', authenticateToken, asyncHandler(asy
     })
   );
 
-  res.json({ success: true, pages, job: { jobId: latestJob.jobId, status: latestJob.status } });
+  res.json({
+    success: true,
+    pages,
+    job: { jobId: latestJob.jobId, status: latestJob.status },
+    messages: streamingMessages
+  });
+
 }));
 
 /**
@@ -2715,4 +2738,3 @@ router.get('/drafts/:draftId', authenticateToken, asyncHandler(async (req: Reque
 }));
 
 export default router;
-
