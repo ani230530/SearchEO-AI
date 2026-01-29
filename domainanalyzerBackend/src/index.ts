@@ -14,6 +14,7 @@ import authRouter from './routes/auth';
 import userRouter from './routes/user';
 import googleSearchConsoleRouter, { handleOAuthCallback } from './routes/googleSearchConsole';
 import publishRouter from './routes/publish';
+import blogAnalyticsRouter from './routes/blogAnalytics';
 import campaignsRouter from './routes/campaigns';
 import { PrismaClient } from '../generated/prisma';
 import { authenticateToken, AuthenticatedRequest } from './middleware/auth';
@@ -125,6 +126,7 @@ app.use('/api/enhanced-phrases', enhancedPhrasesRouter);
 app.use('/api/ai-queries', aiQueriesRouter);
 app.use('/api/competitor', competitorRouter);
 app.use('/api/dashboard', dashboardRouter);
+app.use('/api/blog-analytics', blogAnalyticsRouter);
 app.use('/api/audit', auditRoutes);
 
 // SSE endpoint for real-time updates

@@ -65,6 +65,7 @@ import { AlertDialogHeader } from '@/components/ui/alert-dialog';
 import Profile from './Profile';
 import {AnimatePresence, motion} from 'framer-motion'
 import GSCAnalyticsView from '@/components/gsc/GSCAnalyticsView';
+import GSCBlogAnalytics from '@/features/analytics/GSCBlogAnalytics';
 import {
   Sheet,
   SheetContent,
@@ -84,7 +85,7 @@ import TrendsChart, { TrendDataPoint } from "@/components/gsc/TrendsChart";
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3002";
 
 type TabId = 'overview' | 'analytics' | 'campaign' | 'publish' | 'settings' | 'profile' | 'ai-checker' | 'gsc-analytics' | 'audit' | 'analytics-report';
-type CompanySubTabId = 'company-info' | 'integration';
+type CompanySubTabId = 'company-info' | 'integration' | 'blog-performance';
 
 interface Tab {
   id: TabId;
@@ -2441,6 +2442,17 @@ useEffect(() => {
                         <span>Integration</span>
                         {activeCompanySubTab === "integration" }
                       </button>
+                      <button
+                        onClick={() => setActiveCompanySubTab("blog-performance")}
+                        className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-light transition-all duration-200 ${
+                          activeCompanySubTab === "blog-performance" 
+                            ? "bg-blue-50 text-blue-700"
+                            : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+                        }`}
+                      >
+                        <BarChart3 className="h-4 w-4" />
+                        <span>Blog Performance</span>
+                      </button>
                     </div>
                   )}
               </div>
@@ -4240,6 +4252,13 @@ const rightSections = sections.slice(4, 8);
                         </div>
                       )}
                     </div>
+                  </div>
+                )}
+
+                {/* Blog Performance Tab Content */}
+                {activeCompanySubTab === 'blog-performance' && (
+                  <div className="max-w-6xl mx-auto">
+                    <GSCBlogAnalytics />
                   </div>
                 )}
               </div>
