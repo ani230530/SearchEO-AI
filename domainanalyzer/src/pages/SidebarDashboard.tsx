@@ -943,6 +943,8 @@ useEffect(() => {
     } else {
       setKeywordsTableData([]);
     }
+    console.log("keywords:", keywords.length);
+  console.log("createdDomainId:", createdDomainId);
   }, [keywords, createdDomainId, companyDomain]);
 
   // Filter and sort keywords
@@ -2472,7 +2474,7 @@ useEffect(() => {
         <header className="content-header">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <button
+              {/* <button
                 className="desktop-sidebar-toggle"
                 onClick={() => setSidebarOpen((prev) => !prev)}
                 aria-label={sidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
@@ -2482,7 +2484,7 @@ useEffect(() => {
                 ) : (
                   <Menu className="h-4 w-4 text-gray-700" />
                 )}
-              </button>
+              </button> */}
               <h2
                 style={{
                   fontSize: "28px",
@@ -2568,7 +2570,7 @@ useEffect(() => {
             <button
               onClick={() => handleRunAudit(companyDomain)}
               disabled={!companyDomain || auditLoading}
-              className="inline-flex items-center gap-2 px-6 py-3 bg-black text-white rounded-full text-sm font-medium hover:bg-black/90  disabled:opacity-60 transition"
+              className="inline-flex items-center gap-2 px-6 py-3 bg-black text-white rounded-full text-sm font-medium hover:bg-gray-700  disabled:opacity-60 transition"
             >
               {auditLoading ? "Running audit…" : "Run audit"}
             </button>
@@ -2847,7 +2849,7 @@ useEffect(() => {
     </div>
 
     {/* ===================== SNAPSHOT ===================== */}
-  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+  <div className="grid grid-cols-1 lg:grid-cols-1 gap-6">
   <div className="rounded-3xl bg-white border border-gray-100 p-6 hover:shadow-lg transition">
     <div className="mb-6">
       <h4 className="text-sm font-medium text-gray-900">Snapshot</h4>
@@ -2856,7 +2858,7 @@ useEffect(() => {
       </p>
     </div>
 
-    <div className="grid grid-cols-2 gap-4">
+    <div className="grid grid-cols-4 gap-4">
       {[
         ["Keywords", keywordsTableData.length],
         ["Campaigns", campaigns.length],
@@ -2898,7 +2900,7 @@ useEffect(() => {
       })}
     </div>
   </div>
-  <div className="grid grid-cols-1 lg:grid-cols-1 gap-6">
+  {/* <div className="grid grid-cols-1 lg:grid-cols-1 gap-6">
  <div className="px-4 py-6 grid-cols-1 lg:grid-cols-1 rounded-3xl bg-white border border-gray-100 p-6 hover:shadow-lg transition space-y-2">
       <h3 className='py-2'>Suggested Next Actions</h3>
                            <div className="flex justify-between items-center px-4 py-3 rounded-xl bg-gray-50/50 border border-gray-200 hover:bg-gray-50 transition-all" style={{ borderWidth: '0.5px' }}>
@@ -2914,7 +2916,7 @@ useEffect(() => {
                                   <span className="font-light text-gray-900 flex items-center gap-1" style={{ letterSpacing: '0.011em' }}> Improve SEO for 2 blogs</span>
 </div>
   </div>
-</div>
+</div> */}
   </div>
  <div className="px-4 py-6 grid-cols-1 lg:grid-cols-1 rounded-3xl bg-white border border-gray-100 p-6 hover:shadow-lg transition">
    <GSCAnalyticsView/>
@@ -7070,7 +7072,8 @@ const handleUpdatePillar = async (topicId: number, updates: { title?: string; re
                  ) : (
                    <div className="h-full flex flex-col items-center justify-center text-gray-400">
                      <Layout className="h-12 w-12 mb-4 opacity-20" />
-                     <p>Select a topic to view details</p>
+                     <p>Create/Select your topic to get started.</p>
+                     <img className="mt-4 h-40 w-40" src="/public/Campaign.png" alt="Campaign" />
                    </div>
                  )}
                </div>
