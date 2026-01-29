@@ -693,15 +693,15 @@ const PageQueriesTable = ({
                       className="w-4 h-4 text-gray-900 border-gray-300 rounded focus:ring-gray-900"
                     />
                   )}
-                  <div className="font-semibold text-gray-900 text-sm">{query.query}</div>
+                  <div className="font-medium text-gray-900 text-sm">{query.query}</div>
                 </div>
                 <div className="flex items-center justify-center">
-                  <span className="font-semibold text-gray-900 text-sm">
+                  <span className="font-medium text-gray-900 text-sm">
                     {query.clicks.toLocaleString()}
                   </span>
                 </div>
                 <div className="flex items-center justify-center">
-                  <span className="font-semibold text-gray-900 text-sm">
+                  <span className="font-medium text-gray-900 text-sm">
                     {query.impressions.toLocaleString()}
                   </span>
                 </div>
