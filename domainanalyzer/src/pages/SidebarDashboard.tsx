@@ -6239,6 +6239,9 @@ function CampaignStructureView({
       
       // If page has HTML, it's completed (not generating)
       if (job.hasHtml) return false;
+
+      // If explicitly marked as failed (e.g. by zombie check), it's not generating
+      if (job.status === 'failed' || job.status === 'completed') return false;
       
       // Check if generation is active via streaming
       if (job.jobId && isGenerationActive(job.jobId)) {
