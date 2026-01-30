@@ -437,6 +437,60 @@ router.get('/', authenticateToken, asyncHandler(async (req: Request, res: Respon
 }));
 
 /**
+ * PUT /api/campaigns/:id
+ * Update a campaign's title and description
+ */
+router.put('/:id', authenticateToken, asyncHandler(async (req: Request, res: Response) => {
+  const authReq = req as AuthenticatedRequest;
+  const userId = authReq.user.userId;
+  const campaignId = parseInt(req.params.id, 10);
+  const { title, description } = req.body;
+
+  if (isNaN(campaignId)) {
+    return res.status(400).json({ success: false, error: 'Invalid campaign ID' });
+  }
+
+  if (!title || !title.trim()) {
+    return res.status(400).json({ success: false, error: 'Title is required' });
+  }
+
+  // Check ownership
+  const campaign = await prisma.campaign.findFirst({
+    where: {
+      id: campaignId,
+      domain: {
+        userId: userId,
+        isCompanyDomain: true
+      }
+    }
+  });
+
+  if (!campaign) {
+    return res.status(404).json({ success: false, error: 'Campaign not found' });
+  }
+
+  // Update the campaign
+  const updatedCampaign = await prisma.campaign.update({
+    where: { id: campaignId },
+    data: {
+      title: title.trim(),
+      description: description?.trim() || null
+    }
+  });
+
+  res.json({
+    success: true,
+    campaign: {
+      id: updatedCampaign.id,
+      title: updatedCampaign.title,
+      description: updatedCampaign.description,
+      createdAt: updatedCampaign.createdAt,
+      updatedAt: updatedCampaign.updatedAt
+    }
+  });
+}));
+
+/**
  * POST /api/campaigns
  * Create a new campaign for user's company domain
  */

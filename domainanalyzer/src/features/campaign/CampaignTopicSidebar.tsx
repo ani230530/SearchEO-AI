@@ -30,7 +30,7 @@ export const CampaignTopicSidebar: React.FC<CampaignTopicSidebarProps> = ({
         <button
           onClick={() => onAddTopic(true)}
           disabled={syncing || aiLoading === "topic"}
-          className="w-full py-2.5 bg-black text-white rounded-xl hover:bg-black/90 transition-all text-xs font-medium flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed shadow-sm"
+          className="w-full py-2.5 inline-flex items-center gap-2 px-6 py-3 bg-black text-white rounded-full text-sm font-medium hover:bg-gray-600 justify-center disabled:opacity-60 transition"
         >
           {aiLoading === "topic" ? <ButtonSpinner /> : <Plus className="h-3.5 w-3.5" />}
           {aiLoading === "topic" ? "Generating..." : "Generate Topic"}
@@ -39,7 +39,7 @@ export const CampaignTopicSidebar: React.FC<CampaignTopicSidebarProps> = ({
         <button
           onClick={() => onAddTopic(false)}
           disabled={syncing}
-          className="w-full py-2.5 bg-white border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 transition-all text-xs font-medium flex items-center justify-center gap-2 disabled:opacity-60"
+          className="w-full py-2.5 inline-flex items-center gap-2 px-6 py-3 rounded-full border text-gray-700 border-gray-200 bg-white text-sm hover:bg-gray-100 justify-center hover:text-gray-700 hover:shadow-lg transition"
         ><Plus className="h-3.5 w-3.5" />
           Add Manually
         </button>

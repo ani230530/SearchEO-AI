@@ -5,6 +5,7 @@ import {
   ChevronRight,
   Plus,
   Trash2,
+  Edit,
   AlertCircle,
   CheckCircle,
   Loader2,
@@ -39,7 +40,8 @@ import {
   Globe,
   Eye,
   ExternalLink,
-  Pencil
+  Pencil,
+  ArrowRight
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { maskDomainId } from '@/lib/domainUtils';
@@ -359,6 +361,12 @@ const [selectedTopicId, setSelectedTopicId] = useState<number | null>(null);
 const [campaignStructure, setCampaignStructure] = useState<CampaignStructure>({
   topics: []
 });
+// For inline editing of campaigns
+const [showEditModal, setShowEditModal] = useState(false);
+const [editingCampaignId, setEditingCampaignId] = useState<number | null>(null);
+const [editTitle, setEditTitle] = useState('');
+const [editDescription, setEditDescription] = useState('');
+
 
   // Initialize selectedTopicId
   useEffect(() => {
@@ -1616,6 +1624,65 @@ useEffect(() => {
     }
   };
 
+ const handleUpdateCampaign = async () => {
+  if (!editTitle.trim()) {
+    toast({
+      title: "Title Required",
+      description: "Please enter a campaign title",
+      variant: "destructive",
+    });
+    return;
+  }
+
+  if (editingCampaignId === null) return;
+
+  try {
+    const response = await fetch(
+      `${import.meta.env.VITE_API_URL}/api/campaigns/${editingCampaignId}`,
+      {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("authToken")}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          title: editTitle.trim(),
+          description: editDescription.trim() || null,
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || "Failed to update campaign");
+    }
+
+    const data = await response.json();
+
+    if (data.success) {
+      toast({
+        title: "Campaign Updated",
+        description: "Your campaign has been updated successfully",
+      });
+      setEditingCampaignId(null);
+      setEditTitle("");
+      setEditDescription("");
+      fetchCampaigns();
+    }
+  } catch (error) {
+    console.error("Error updating campaign:", error);
+    toast({
+      title: "Error",
+      description:
+        error instanceof Error
+          ? error.message
+          : "Failed to update campaign",
+      variant: "destructive",
+    });
+  }
+};
+
+
   const handleDeleteCampaign = async (campaignId: number) => {
     try {
       const response = await fetch(
@@ -2558,7 +2625,7 @@ useEffect(() => {
     {/* ===================== HERO ===================== */}
     <div className="relative overflow-hidden rounded-3xl border border-gray-100 bg-gradient-to-br from-white via-slate-50 to-white hover:shadow-lg">
       {/* soft glow */}
-      <div className="absolute -top-24 -left-24 w-96 h-96 bg-blue-50 rounded-full blur-3xl opacity-60" />
+      <div className="absolute -top-24 -left-24 w-96 h-96 bg-white rounded-full blur-3xl opacity-60" />
 
       <div className="relative p-8 sm:p-10 flex flex-col lg:flex-row gap-10 justify-between">
         {/* Left */}
@@ -2575,9 +2642,9 @@ useEffect(() => {
             <button
               onClick={() => handleRunAudit(companyDomain)}
               disabled={!companyDomain || auditLoading}
-              className="inline-flex items-center gap-2 px-6 py-3 bg-black text-white rounded-full text-sm font-medium hover:bg-gray-700  disabled:opacity-60 transition"
+              className="inline-flex items-center gap-2 px-6 py-3 bg-black text-white rounded-full text-sm font-medium hover:bg-gray-600  disabled:opacity-60 transition"
             >
-              {auditLoading ? "Running audit…" : "Run audit"}
+              {auditLoading ? "Running audit…" : "Run Audit"}
             </button>
 
             <button
@@ -2585,7 +2652,7 @@ useEffect(() => {
                 setActiveTab("analytics");
                 setActiveCompanySubTab("company-info");
               }}
-              className="px-5 py-3 rounded-full border border-gray-200 bg-white text-sm hover:bg-gray-50  hover:shadow-lg transition"
+              className="px-5 py-3 rounded-full border text-gray-700 border-gray-200 bg-white text-sm hover:bg-gray-100 hover:text-gray-700 hover:shadow-lg transition"
             >
               Analytics
             </button>
@@ -2659,7 +2726,7 @@ useEffect(() => {
       {/* Opportunities Card */}
 <div className="rounded-3xl bg-white border border-gray-100 p-6 hover:shadow-lg transition">
   <div className="flex items-center justify-between mb-4">
-    <h3 className="text-base font-medium text-gray-900">
+    <h3 className="text-[28px] font-medium text-gray-900">
       Top Opportunities
     </h3>
     <div className="text-base font-medium text-gray-900">
@@ -2770,7 +2837,7 @@ useEffect(() => {
   {/* Header */}
   <div className="flex items-center justify-between mb-4">
     <div>
-      <h3 className="text-base font-medium text-gray-900">
+      <h3 className="text-[28px] font-medium text-gray-900">
         Audit Summary
       </h3>
       <p className="text-xs text-gray-400">
@@ -2779,14 +2846,22 @@ useEffect(() => {
     </div>
 
     <button
-      onClick={() => {
-        setActiveTab("audit");
-        setTimeout(() => setShowAuditModal(true), 120);
-      }}
-      className="text-sm font-medium text-blue-600 hover:underline transition-colors duration-200"
-    >
-      View details
-    </button>
+  onClick={() => {
+    setActiveTab("audit");
+    setTimeout(() => setShowAuditModal(true), 120);
+  }}
+  className="group text-sm font-medium text-black  transition-colors duration-200 flex items-center gap-1"
+>
+  View Details
+  <span className="relative flex items-center w-4 h-4">
+    <ChevronRight
+      className="absolute inset-0 w-4 h-4 transition-all duration-200 ease-in-out group-hover:opacity-0 group-hover:translate-x-1"
+    />
+    <ArrowRight
+      className="absolute inset-0 w-4 h-4 opacity-0 transition-all duration-200 ease-in-out group-hover:opacity-100 group-hover:translate-x-0"
+    />
+  </span>
+</button>
   </div>
 
  {!auditResult ? (
@@ -2807,7 +2882,7 @@ useEffect(() => {
       let bgColor = "bg-gray-50";
       let textColor = "text-gray-900";
 
-      if (pct >= 80) {
+      if (pct >= 80) { 
         bgColor = "bg-green-50";
         textColor = "text-green-700";
       } else if (pct >= 60) {
@@ -2861,7 +2936,7 @@ useEffect(() => {
   <div className="grid grid-cols-1 lg:grid-cols-1 gap-6">
   <div className="rounded-3xl bg-white border border-gray-100 p-6 hover:shadow-lg transition">
     <div className="mb-6">
-      <h3 className="text-base font-medium text-gray-900">Snapshot</h3>
+      <h3 className="text-[28px] font-medium text-gray-900">Snapshot</h3>
       <p className="text-xs text-gray-400 mt-1">
         Quick overview of your setup
       </p>
@@ -2880,7 +2955,7 @@ useEffect(() => {
         return (
           <div
             key={label}
-            className="group rounded-2xl border border-gray-100 bg-gray-50/60 p-4 text-left hover:bg-white hover:shadow-sm transition"
+            className="group rounded-2xl border border-gray-100 bg-gray-50/60 p-4 text-left  hover:shadow-sm transition"
           >
             <div className="text-xs uppercase tracking-wide text-gray-500">
               {label}
@@ -2937,36 +3012,9 @@ useEffect(() => {
             ) : showResults ? (
               <div className="max-w-6xl mx-auto px-4 sm:px-6 py-12 sm:py-16">
                 {/* Company Domain Heading */}
-                <div className="text-center mb-12 flex flex-col items-center gap-4">
-                  <div className="inline-flex items-center gap-5 bg-blue-50 border border-blue-200 text-blue-700 px-5 py-3 rounded-3xl shadow-sm">
-                   <img
-  src={`https://img.logo.dev/${normalizedDomain}?token=pk_DTdFFG1JT9WOCjATvZEzIA&size=128`}
-  alt="Company logo"
-  width={32}
-  height={32}
-  className="w-8 h-8 rounded-md object-contain bg-white"
-  loading="lazy"
-/>
-
-                    <span className="font-medium text-lg tracking-tight">
-                      {" "}
-                      <a
-                        href={
-                          companyDomain.startsWith("http")
-                            ? companyDomain
-                            : `https://${companyDomain}`
-                        }
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-blue-600 hover:underline text-lg"
-                      >
-                        {companyDomain
-                          .replace(/^https?:\/\//, "")
-                          .replace(/^www\./, "")}
-                      </a>
-                    </span>
-                  </div>
-                </div>
+                {/* <div className="text-center mb-12 flex flex-col items-center gap-4">
+                
+                </div> */}
 
                 {/* Company Info Tab Content */}
                 {activeCompanySubTab === "company-info" && (
@@ -3021,29 +3069,54 @@ const rightSections = sections.slice(4, 8);
 
                        if (sections.some((s) => s.content.length > 0)) {
   return (
-    <div className="p-4 sm:p-6 border-b border-gray-100 bg-gradient-to-b from-gray-50/50 to-white rounded-3xl">
+    <div className="p-4 sm:p-6 bg-white rounded-3xl border border-gray-100 hover:shadow-lg overflow-hidden backdrop-blur-sm">
       {/* Master Panel */}
       <div>
         {/* Header */}
-        <div className="flex items-center justify-between px-8 py-6 border-b border-gray-600/50">
+        <div className="flex items-center justify-between px-4 py-6 border-gray-600/50">
           <div>
-            <h2 className="text-2xl font-light tracking-tight text-gray-900">
+            <h1 className="text-2xl font-light tracking-tight text-gray-900">
               Domain Info
-            </h2>
+            </h1>
             <p className="text-sm text-gray-500 mt-1">
               AI-generated strategic analysis & recommendations
             </p>
           </div>
 
           <div className="flex items-center gap-3">
-            <span className="rounded-full bg-blue-50 px-4 py-1 text-xs font-medium text-blue-600 border border-blue-200">
-              Analysis
-            </span>
+            <div className="inline-flex items-center gap-5 bg-blue-50 border border-blue-200 text-blue-700 px-5 py-3 rounded-3xl shadow-sm">
+                   <img
+  src={`https://img.logo.dev/${normalizedDomain}?token=pk_DTdFFG1JT9WOCjATvZEzIA&size=128`}
+  alt="Company logo"
+  width={32}
+  height={32}
+  className="w-8 h-8 rounded-md object-contain bg-white"
+  loading="lazy"
+/>
+
+                    <span className="font-medium text-lg tracking-tight">
+                      {" "}
+                      <a
+                        href={
+                          companyDomain.startsWith("http")
+                            ? companyDomain
+                            : `https://${companyDomain}`
+                        }
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-600 hover:underline text-lg"
+                      >
+                        {companyDomain
+                          .replace(/^https?:\/\//, "")
+                          .replace(/^www\./, "")}
+                      </a>
+                    </span>
+                  </div>
           </div>
         </div>
 
         {/* Body */}
-       <div className="grid grid-cols-1 md:grid-cols-2 gap-6  py-6">
+       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-6">
         <div className="space-y-4 ">
   {leftSections.map((sec, idx) => {
     const globalIdx = idx; 
@@ -3991,7 +4064,7 @@ const rightSections = sections.slice(4, 8);
                             const maskedId = maskDomainId(createdDomainId);
                             navigate(`/dashboard/${maskedId}`);
                           }}
-                          className="inline-flex items-center gap-2 px-6 py-3 bg-black text-white rounded-full text-sm font-medium hover:bg-black/90  disabled:opacity-60 transition"
+                          className="inline-flex items-center gap-2 px-6 py-3 bg-black text-white rounded-full text-sm font-medium hover:bg-gray-600  disabled:opacity-60 transition"
                         >
                           View Full Dashboard
                         </button>
@@ -4019,7 +4092,7 @@ const rightSections = sections.slice(4, 8);
                         </p>
                         <button
                           onClick={handleConnectGsc}
-                          className="px-8 py-3 bg-black text-white rounded-full hover:bg-black/90 focus:outline-none focus:ring-4 focus:ring-black/10 transition-all shadow text-base font-medium"
+                          className="px-8 py-3 inline-flex items-center gap-2 px-6 py-3 bg-black text-white rounded-full text-sm font-medium hover:bg-gray-600  disabled:opacity-60 transitions"
                         >
                           Connect Google Search Console
                         </button>
@@ -4223,7 +4296,7 @@ const rightSections = sections.slice(4, 8);
                             <button
                               onClick={handleSaveWordpressIntegration}
                               disabled={wpIntegrationSaving}
-                              className="inline-flex items-center gap-2 px-6 py-3 bg-black text-white rounded-full text-sm font-medium hover:bg-black/90  disabled:opacity-60 transition"
+                              className="inline-flex items-center gap-2 px-6 py-3 bg-black text-white rounded-full text-sm font-medium hover:bg-gray-600  disabled:opacity-60 transition"
                             >
                               {wpIntegrationSaving ? 'Saving…' : hasWordpressIntegration ? 'Update Connection' : 'Save Connection'}
                             </button>
@@ -4231,7 +4304,7 @@ const rightSections = sections.slice(4, 8);
                               <button
                                 onClick={handleDisconnectWordpress}
                                 disabled={wpIntegrationDeleting}
-                                className="px-6 py-3 border border-gray-200 text-gray-700 rounded-full hover:bg-gray-50 disabled:opacity-60"
+                                className="px-6 py-3 rounded-full border text-gray-700 border-gray-200 bg-white text-sm hover:bg-gray-100 hover:text-gray-700 hover:shadow-lg transition"
                               >
                                 {wpIntegrationDeleting ? 'Removing…' : 'Disconnect'}
                               </button>
@@ -4482,22 +4555,22 @@ const rightSections = sections.slice(4, 8);
 
               // Default Campaign List View (Centered)
               return (
-              <div className="max-w-6xl mx-auto px-4 sm:px-6 py-12 sm:py-16">
+              <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
 
-                <>
+                <div className='p-4 sm:p-6 bg-white rounded-3xl border border-gray-100 hover:shadow-lg overflow-hidden backdrop-blur-sm'>
                   {/* Header */}
                   <div className="flex items-center justify-between mb-8">
                     <div>
-                      <h2 className="text-3xl font-thin text-black tracking-tight mb-2">
+                      <h1 className="text-3xl font-thin text-black tracking-tight mb-2">
                         Campaigns
-                      </h2>
+                      </h1>
                       <p className="text-base font-light text-gray-600">
                         Manage your marketing campaigns
                       </p>
                     </div>
                     <button
                       onClick={() => setShowCreateCampaign(!showCreateCampaign)}
-                      className="inline-flex items-center gap-2 px-6 py-3 bg-black text-white rounded-full text-sm font-medium hover:bg-black/90  disabled:opacity-60 transition"
+                      className="inline-flex items-center gap-2 px-6 py-3 bg-black text-white rounded-full text-sm font-medium hover:bg-gray-600  disabled:opacity-60 transition"
                     >
                       <Plus className="h-4 w-4" />
                       {showCreateCampaign ? "Cancel" : "New Campaign"}
@@ -4551,13 +4624,13 @@ const rightSections = sections.slice(4, 8);
                               setNewCampaignTitle("");
                               setNewCampaignDescription("");
                             }}
-                            className="px-6 py-3 bg-gray-100 text-gray-900 rounded-full hover:bg-gray-200 transition-all duration-200 text-base font-light"
+                            className="px-6 py-3 rounded-full border text-gray-700 border-gray-200 bg-white text-sm hover:bg-gray-100 hover:text-gray-700 hover:shadow-lg transition"
                           >
                             Cancel
                           </button>
                           <button
                             type="submit"
-                            className="px-6 py-3 bg-black text-white rounded-full hover:bg-black/90 focus:outline-none focus:ring-4 focus:ring-black/10 transition-all shadow text-base font-medium"
+                            className="px-6 py-3 inline-flex items-center gap-2 px-6 py-3 bg-black text-white rounded-full text-sm font-medium hover:bg-gray-600  disabled:opacity-60 transition"
                           >
                             Create Campaign
                           </button>
@@ -4565,7 +4638,7 @@ const rightSections = sections.slice(4, 8);
                       </form>
                     </div>
                   )}
-                </>
+                
 
               {/* Campaigns List */}
               {(() => {
@@ -4605,96 +4678,144 @@ const rightSections = sections.slice(4, 8);
                   );
                 }
 
-                return (
-                  <div className="space-y-3">
-                    {campaigns.map((campaign) => (
-                      <div
-                        key={campaign.id}
-                        className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden transition-all duration-200 hover:shadow-md"
-                      >
-                        {/* Campaign Row */}
-                        <div className="flex items-center justify-between p-6">
-                          <div className="flex-1 min-w-0">
-                            <h3 className="text-lg font-light text-black tracking-tight mb-1 truncate">
-                              {campaign.title}
-                            </h3>
-                            {campaign.description && (
-                              <p className="text-sm font-light text-gray-600 line-clamp-1">
-                                {campaign.description}
-                              </p>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-3 ml-4">
-                            <button
-                              onClick={() => setSelectedCampaignId(campaign.id)}
-                              className="px-4 py-2 bg-transparent text-black rounded-full hover:border-2 transition-all text-sm font-medium flex items-center gap-2"
-                              title="View campaign structure"
-                            >
-                              View
-                              <ChevronRight className="h-4 w-4" />
-                            </button>
-                            <button
-                              onClick={() => setDeleteId(campaign.id)}
-                              className="p-2 text-gray-400 hover:text-red-600 transition-colors"
-                              title="Delete campaign"
-                            >
-                              <Trash2 className="h-5 w-5" />
-                            </button>
-                          </div>
-                        </div>
+               return (
+<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-6">
+  {campaigns.map((campaign) => {
+    const isEditing = editingCampaignId === campaign.id;
 
-                        {/* Campaign details accordion */}
-                        {expandedCampaignId === campaign.id && (
-                          <div className="px-6 pb-6 pt-0 border-t border-gray-100">
-                            <div className="pt-6 space-y-4">
-                              <div>
-                                <h4 className="text-sm font-medium text-gray-900 mb-2">
-                                  Description
-                                </h4>
-                                <p className="text-sm font-light text-gray-700">
-                                  {campaign.description ||
-                                    "No description provided"}
-                                </p>
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                    {deleteId && (
-  <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50">
-    <div className="bg-white p-6 rounded-xl shadow-xl w-[90%] max-w-sm">
-      <h2 className="text-lg font-medium text-gray-800">Delete Campaign?</h2>
+    return (
+      <div
+        key={campaign.id}
+        className="bg-gray-50/60 rounded-3xl border border-gray-100 hover:shadow-lg shadow-sm p-6 flex flex-col min-h-[180px]"
+      >
+          <div className="flex flex-col flex-1">
+            {/* Top row: Title & View */}
+            <div className="flex justify-between items-start mb-2">
+              <h3 className="text-lg font-light text-black tracking-tight truncate">
+                {campaign.title}
+              </h3>
+              <button
+  onClick={() => setSelectedCampaignId(campaign.id)}
+  className="group text-sm font-medium text-black transition-transform duration-200 ease-in-out flex items-center gap-1 hover:scale-105"
+>
+  View
+  <span className="relative flex items-center w-4 h-4">
+    <ChevronRight
+      className="absolute inset-0 w-4 h-4 transition-all duration-200 ease-in-out group-hover:opacity-0 group-hover:translate-x-1"
+    />
+    <ArrowRight
+      className="absolute inset-0 w-4 h-4 opacity-0 transition-all duration-200 ease-in-out group-hover:opacity-100 group-hover:translate-x-0"
+    />
+  </span>
+</button>
+            </div>
 
-      <p className="text-sm text-gray-500 mt-2">
-        Are you sure you want to delete this campaign?
-      </p>
+            {/* Description */}
+            {campaign.description ? (
+              <p className="text-sm font-light text-gray-600 line-clamp-3 mb-4">
+                {campaign.description}
+              </p>
+            ) : (
+              <p className="text-sm font-light text-gray-400 italic mb-4">
+                No description provided
+              </p>
+            )}
+          </div>
+            {/* Bottom actions: Edit & Delete */}
+            <div className="flex justify-end gap-2">
+              <button
+  onClick={() => {
+    setEditingCampaignId(campaign.id);
+    setEditTitle(campaign.title);
+    setEditDescription(campaign.description || '');
+    setShowEditModal(true); 
+  }}
+  className="text-gray-400 hover:text-blue-600 flex items-center gap-1"
+>
+  <Edit className="h-5 w-5" />
+</button>
 
-      <div className="flex justify-end gap-3 mt-6">
-        <button
-          onClick={() => setDeleteId(null)}
-          className="px-4 py-2 rounded-lg text-sm bg-gray-100 hover:bg-gray-200"
-        >
-          Cancel
-        </button>
+              <button
+  onClick={() =>
+    confirmDelete("Campaign", () => 
+      handleDeleteCampaign(campaign.id)
+    )
+  }
+  className="text-gray-400 hover:text-red-600 flex items-center gap-1" 
+>
+  <Trash2 className="h-5 w-5" />
+</button>
 
-        <button
-          onClick={() => {
-            handleDeleteCampaign(deleteId!);
-            setDeleteId(null);
-          }}
-          className="px-4 py-2 rounded-lg text-sm bg-black text-white hover:bg-red-700"
-        >
-          Delete
-        </button>
+            </div>
       </div>
+    );
+  })}
+</div>
+);
+
+              })()}
+            </div>
+              {showEditModal && editingCampaignId !== null && (
+  <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50">
+    <div className="bg-white rounded-3xl p-8 w-full max-w-md shadow-lg">
+      <h3 className="text-xl font-light text-black tracking-tight mb-6">
+        Edit Campaign
+      </h3>
+      <form
+        onSubmit={async (e) => {
+          e.preventDefault();
+          await handleUpdateCampaign();
+          setShowEditModal(false);
+          setEditingCampaignId(null);
+          setEditTitle('');
+          setEditDescription('');
+        }}
+        className="space-y-6"
+      >
+        <div>
+          <label className="block text-base font-light text-black mb-2">
+            Title
+          </label>
+          <input
+            type="text"
+            value={editTitle}
+            onChange={(e) => setEditTitle(e.target.value)}
+            placeholder="Enter campaign title"
+            className="w-full px-4 py-3 text-base font-light rounded-2xl border border-gray-200 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-black"
+            required
+          />
+        </div>
+        <div>
+          <label className="block text-base font-light text-black mb-2">
+            Description
+          </label>
+          <textarea
+            value={editDescription}
+            onChange={(e) => setEditDescription(e.target.value)}
+            placeholder="Enter campaign description (optional)"
+            rows={4}
+            className="w-full px-4 py-3 text-base font-light rounded-2xl border border-gray-200 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-black resize-none"
+          />
+        </div>
+        <div className="flex items-center justify-end gap-4">
+          <button
+            type="button"
+            onClick={() => setShowEditModal(false)}
+            className="px-6 py-3 rounded-full border text-gray-700 border-gray-200 bg-white text-sm hover:bg-gray-100 hover:text-gray-700 hover:shadow-lg transition"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            className="px-6 py-3 inline-flex items-center gap-2 bg-black text-white rounded-full text-sm font-medium hover:bg-gray-600"
+          >
+            Save
+          </button>
+        </div>
+      </form>
     </div>
   </div>
 )}
-                  </div>
-
-                );
-              })()}
             </div>
             );
             })()
@@ -5357,8 +5478,8 @@ function CampaignStructureView({
   const [pendingGenerationTopic, setPendingGenerationTopic] = useState<Topic | null>(null);
   const [generationConfig, setGenerationConfig] = useState({
     wordCount: 800,
-    images: 2,
-    featuredImage: true,
+    images: 0,
+    featuredImage: false,
     brandName: '',
     brandDescription: ''
   });
@@ -6529,8 +6650,8 @@ function CampaignStructureView({
     // Reset config with defaults or existing values if applicable
     setGenerationConfig({
       wordCount: 800,
-      images: 2,
-      featuredImage: true,
+      images: 0,
+      featuredImage: false,
       brandName: derivedBrandName || 'Brand',
       brandDescription: derivedBrandDescription || '',
     });
@@ -7573,12 +7694,15 @@ const handleUpdatePillar = async (topicId: number, updates: { title?: string; re
                     className="py-4"
                   />
                 </div>
-                <button 
-                  onClick={() => setGenerationStep(2)}
-                  className="w-full py-3.5 bg-gray-900 text-white rounded-full hover:bg-gray-800 transition-colors font-medium text-sm"
-                >
-                  Continue to Imagery
-                </button>
+               <div className="flex justify-end">
+  <button 
+    onClick={() => setGenerationStep(2)}
+    className="inline-flex items-center gap-2 px-6 py-3 bg-black text-white rounded-full text-sm font-medium hover:bg-gray-600 disabled:opacity-60 transition"
+  >
+    Continue to Imagery
+  </button>
+</div>
+
               </section>
             )}
 
@@ -7622,16 +7746,16 @@ const handleUpdatePillar = async (topicId: number, updates: { title?: string; re
                     onCheckedChange={(checked) => setGenerationConfig(prev => ({ ...prev, featuredImage: checked }))}
                   />
                 </div>
-                <div className="flex gap-3">
+                <div className="flex justify-end gap-3">
                   <button 
                     onClick={() => setGenerationStep(1)}
-                    className="flex-1 py-3.5 bg-white text-gray-700 border border-gray-200 rounded-full hover:bg-gray-50 transition-colors font-medium text-sm"
+                    className="inline-flex items-center gap-2 px-6 py-3 bg-white text-gray-700 border border-gray-200 rounded-full text-sm hover:bg-gray-100 hover:text-gray-700 hover:shadow-lg transition"
                   >
                     Back
                   </button>
                   <button 
                     onClick={() => setGenerationStep(3)}
-                    className="flex-1 py-3.5 bg-gray-900 text-white rounded-full hover:bg-gray-800 transition-colors font-medium text-sm"
+                    className="inline-flex items-center gap-2 px-6 py-3 bg-black text-white rounded-full text-sm font-medium hover:bg-gray-600 disabled:opacity-60 transition"
                   >
                     Continue to Brand
                   </button>
@@ -7671,17 +7795,17 @@ const handleUpdatePillar = async (topicId: number, updates: { title?: string; re
                     />
                   </div>
                 </div>
-                <div className="flex gap-3">
+                <div className="flex justify-end gap-3">
                   <button 
                     onClick={() => setGenerationStep(2)}
-                    className="flex-1 py-3.5 bg-white text-gray-700 border border-gray-200 rounded-full hover:bg-gray-50 transition-colors font-medium text-sm"
+                    className="inline-flex items-center gap-2 px-6 py-3 bg-white text-gray-700 border border-gray-200 rounded-full text-sm hover:bg-gray-100 hover:text-gray-700 hover:shadow-lg transition"
                   >
                     Back
                   </button>
                   <button 
                     onClick={handleConfirmGeneration}
                     disabled={generateTopicLoading === pendingGenerationTopic?.id}
-                    className="flex-1 py-3.5 bg-gray-900 text-white rounded-full hover:bg-gray-800 transition-colors font-medium text-sm flex items-center justify-center gap-2"
+                    className="inline-flex items-center gap-2 px-6 py-3 bg-black text-white rounded-full text-sm font-medium hover:bg-gray-600 disabled:opacity-60 transition"
                   >
                     {generateTopicLoading === pendingGenerationTopic?.id ? (
                       <>
