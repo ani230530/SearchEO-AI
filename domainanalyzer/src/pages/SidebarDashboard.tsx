@@ -5467,6 +5467,9 @@ function CampaignStructureView({
   );
   const [selectedTopics, setSelectedTopics] = useState<Set<number>>(new Set());
 
+  // Track generation job statuses
+  const [generationJobs, setGenerationJobs] = useState<Map<number, GenerationPageStatus>>(new Map());
+
   // Modal states
   const [showAddTopicModal, setShowAddTopicModal] = useState(false);
   const [showAddPillarModal, setShowAddPillarModal] = useState(false);
@@ -5645,6 +5648,9 @@ function CampaignStructureView({
   const [viewLoadingPageId, setViewLoadingPageId] = useState<number | null>(null);
   const [closePreviewLoading, setClosePreviewLoading] = useState(false);
   const [publishLoadingPageId, setPublishLoadingPageId] = useState<number | null>(null);
+  const [publishingPageIds, setPublishingPageIds] = useState<Set<number>>(new Set());
+  const [draftToPageMap, setDraftToPageMap] = useState<Map<number, number>>(new Map());
+  const [draftStatuses, setDraftStatuses] = useState<Map<number, { isPublished: boolean; isFailed?: boolean; publishedUrl?: string; draftId?: number; error?: string }>>(new Map());
   
   // Streaming progress state
   const [streamingMessages, setStreamingMessages] = useState<Map<string, Array<{
