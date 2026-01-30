@@ -66,6 +66,7 @@ import Profile from './Profile';
 import {AnimatePresence, motion} from 'framer-motion'
 import GSCAnalyticsView from '@/components/gsc/GSCAnalyticsView';
 import GSCBlogAnalytics from '@/features/analytics/GSCBlogAnalytics';
+import { usePublishStatus } from '@/hooks/usePublishStatus';
 import {
   Sheet,
   SheetContent,
@@ -274,6 +275,10 @@ const sseRef = useRef<EventSource | null>(null);
   });
   const [gscConnected, setGscConnected] = useState(false);
   const [gscAnalysis, setGscAnalysis] = useState(null);
+  // Track pages currently being published (waiting for SSE confirmation)
+  const [publishingPageIds, setPublishingPageIds] = useState<Set<number>>(new Set());
+  // Map draftId to pageId so SSE handler knows which page to update
+  const [draftToPageMap, setDraftToPageMap] = useState<Map<number, number>>(new Map());
 const [improvedContent, setImprovedContent] = useState("");
   const [gscEmail, setGscEmail] = useState<string>("");
   const [gscSelectedProperty, setGscSelectedProperty] = useState<string>("");
@@ -375,6 +380,77 @@ const [campaignStructure, setCampaignStructure] = useState<CampaignStructure>({
       setIsSidebarHovered(false);
     }
   }, [sidebarOpen]);
+
+  // Listen for real-time publish updates via SSE
+  usePublishStatus({
+    onUpdate: (data) => {
+      // Find which page this draftId corresponds to
+      const pageId = draftToPageMap.get(data.draftId);
+      
+      // Always clear publishing state for this draft
+      if (data.status === 'published' || data.status === 'failed') {
+        if (pageId) {
+          setPublishingPageIds(prev => {
+            const next = new Set(prev);
+            next.delete(pageId);
+            return next;
+          });
+        }
+        // Clean up the mapping
+        setDraftToPageMap(prev => {
+          const next = new Map(prev);
+          next.delete(data.draftId);
+          return next;
+        });
+      }
+
+      if (data.status === 'published' && data.publishedUrl) {
+        // Update generationJobs with the published URL
+        if (pageId) {
+          setGenerationJobs(prev => {
+            const existing = prev.get(pageId);
+            if (existing) {
+              const updated = new Map(prev);
+              updated.set(pageId, {
+                ...existing,
+                wordpressUrl: data.publishedUrl || null,
+              });
+              return updated;
+            }
+            return prev;
+          });
+        }
+
+        // Also update draftStatuses for the View Live button
+        setDraftStatuses(prev => {
+          const updated = new Map(prev);
+          // Find entry by draftId
+          for (const [pid, status] of updated.entries()) {
+            if (status.draftId === data.draftId) {
+              updated.set(pid, {
+                ...status,
+                isPublished: true,
+                publishedUrl: data.publishedUrl,
+              });
+              break;
+            }
+          }
+          return updated;
+        });
+
+        toast({
+          title: 'Published Successfully',
+          description: `Your content is live! View it at: ${data.publishedUrl}`,
+        });
+      } else if (data.status === 'failed') {
+        toast({
+          title: 'Publish Failed',
+          description: data.error || 'An error occurred while publishing to WordPress',
+          variant: 'destructive',
+        });
+      }
+    }
+  });
 
   const tabs: Tab[] = [
     { id: 'ai-checker', label: 'AI Checker', icon: <Sparkles className="h-5 w-5" /> },
@@ -6349,8 +6425,11 @@ function CampaignStructureView({
       return;
     }
 
+    // Set loading state for this page
     if (pageId) {
       setPublishLoadingPageId(pageId);
+      // Track that this page is publishing (SSE will clear this)
+      setPublishingPageIds(prev => new Set(prev).add(pageId));
     }
 
     try {
@@ -6387,7 +6466,7 @@ function CampaignStructureView({
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          draftId: draftId, // Pass draftId to update existing draft instead of creating new one
+          draftId: draftId,
           primaryKeyword: draft.primaryKeyword,
           htmlContent: draft.htmlContent,
           featuredImage: draft.featuredImage,
@@ -6402,68 +6481,24 @@ function CampaignStructureView({
         throw new Error(publishData.error || 'Publish request failed');
       }
 
-      // Show appropriate toast based on publish status
-      if (publishData.status === 'published' && publishData.publishedUrl) {
-        toast({
-          title: 'Published',
-          description: `Content published successfully. View it here: ${publishData.publishedUrl}`,
-        });
-      } else if (publishData.status === 'failed') {
-        toast({
-          title: 'Publish Failed',
-          description: 'WordPress did not return a valid URL. The publish may have failed.',
-          variant: 'destructive',
-        });
-      } else {
-        toast({
-          title: 'Published',
-          description: 'Content sent to WordPress successfully',
-        });
+      // Job queued successfully - store mapping for SSE handler
+      // The actual publishedUrl will come via SSE when n8n responds
+      if (publishData.draftId && pageId) {
+        setDraftToPageMap(prev => new Map(prev).set(publishData.draftId, pageId));
       }
 
-      // Refresh draft status to show updated state
-      if (campaignStructure.topics && campaignStructure.topics.length > 0) {
-        try {
-          const rehydrateMap = new Map<number, GenerationPageStatus>();
-          for (const topic of campaignStructure.topics) {
-            try {
-              const statusResponse = await fetch(
-                `${API_BASE_URL}/api/campaigns/topics/${topic.id}/drafts-status`,
-                { headers: getAuthHeaders() }
-              );
-              if (statusResponse.ok) {
-                const statusData = await statusResponse.json();
-                if (statusData.success && statusData.pages) {
-                  statusData.pages.forEach((p: DraftStatusRecord) => {
-                    if (p.draftId || p.jobId || p.hasHtml) {
-                      rehydrateMap.set(p.pageId, {
-                        jobId: p.jobId || '',
-                        pageId: p.pageId,
-                        pageType: p.pageType === 'subpage' ? 'subpage' : 'pillar',
-                        status: (p.status || 'pending') as GenerationPageStatus['status'],
-                        draftId: p.draftId,
-                        progress: typeof p.progress === 'number' ? p.progress : p.hasHtml ? 100 : 0,
-                        primaryKeyword: p.primaryKeyword,
-                        hasHtml: p.hasHtml,
-                        updatedAt: p.updatedAt,
-                        error: p.error || null,
-                        wordpressUrl: p.wordpressUrl || null,
-                      });
-                    }
-                  });
-                }
-              }
-            } catch (err) {
-              // Silently fail for individual topics
-            }
-          }
-          if (rehydrateMap.size > 0) {
-            setGenerationJobs(rehydrateMap);
-          }
-        } catch (err) {
-          // Silently fail refresh
-        }
+      // Show "Publishing..." toast - success toast will come from SSE handler
+      toast({
+        title: 'Publishing...',
+        description: 'Your content is being published to WordPress. This may take a moment.',
+      });
+
+      // Clear the initial loading state but keep publishingPageIds set
+      // SSE handler will clear publishingPageIds when done
+      if (pageId) {
+        setPublishLoadingPageId(null);
       }
+
     } catch (error) {
       console.error('Error publishing draft:', error);
       toast({
@@ -6471,9 +6506,14 @@ function CampaignStructureView({
         description: error instanceof Error ? error.message : 'Unable to publish content',
         variant: 'destructive',
       });
-    } finally {
+      // On error, clear all loading states
       if (pageId) {
         setPublishLoadingPageId(null);
+        setPublishingPageIds(prev => {
+          const next = new Set(prev);
+          next.delete(pageId);
+          return next;
+        });
       }
     }
   };
@@ -6481,6 +6521,16 @@ function CampaignStructureView({
   const renderStatusPill = (pageId?: number) => {
     if (!pageId) return null;
     const job = generationJobs.get(pageId);
+
+    // Check if currently publishing (waiting for SSE confirmation)
+    if (publishingPageIds.has(pageId)) {
+      return (
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-medium bg-purple-50 text-purple-600 border border-purple-100/50">
+           <Loader2 className="h-3 w-3 animate-spin" />
+           Publishing...
+        </span>
+      );
+    }
     
     // Check generating state first
     const isGenerating = job && !job.hasHtml && (
