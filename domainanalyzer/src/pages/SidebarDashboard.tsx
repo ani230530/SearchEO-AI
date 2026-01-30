@@ -280,6 +280,10 @@ const sseRef = useRef<EventSource | null>(null);
   const [publishingPageIds, setPublishingPageIds] = useState<Set<number>>(new Set());
   // Map draftId to pageId so SSE handler knows which page to update
   const [draftToPageMap, setDraftToPageMap] = useState<Map<number, number>>(new Map());
+  // Track draft statuses (published/local drafts/failed)
+  const [draftStatuses, setDraftStatuses] = useState<Map<number, { isPublished: boolean; isFailed?: boolean; publishedUrl?: string; draftId?: number; error?: string }>>(new Map());
+  // Track generation job statuses
+  const [generationJobs, setGenerationJobs] = useState<Map<number, GenerationPageStatus>>(new Map());
 const [improvedContent, setImprovedContent] = useState("");
   const [gscEmail, setGscEmail] = useState<string>("");
   const [gscSelectedProperty, setGscSelectedProperty] = useState<string>("");
@@ -5468,8 +5472,7 @@ function CampaignStructureView({
   const [showAddPillarModal, setShowAddPillarModal] = useState(false);
   const [showAddSubPageModal, setShowAddSubPageModal] = useState(false);
   
-  // Track draft statuses (published/local drafts/failed)
-  const [draftStatuses, setDraftStatuses] = useState<Map<number, { isPublished: boolean; isFailed?: boolean; publishedUrl?: string; draftId?: number; error?: string }>>(new Map());
+
 
   const [showAddKeywordModal, setShowAddKeywordModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -5633,7 +5636,7 @@ function CampaignStructureView({
     () => summarizeDomainContext(domainContext || ''),
     [domainContext]
   );
-  const [generationJobs, setGenerationJobs] = useState<Map<number, GenerationPageStatus>>(new Map());
+
   const [generateTopicLoading, setGenerateTopicLoading] = useState<number | null>(null);
   const [pollingInterval, setPollingInterval] = useState<NodeJS.Timeout | null>(null);
   const [previewPageId, setPreviewPageId] = useState<number | null>(null);
