@@ -39,7 +39,8 @@ import {
   Globe,
   Eye,
   ExternalLink,
-  Pencil
+  Pencil,
+  RefreshCw
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { maskDomainId } from '@/lib/domainUtils';
@@ -443,6 +444,39 @@ const [campaignStructure, setCampaignStructure] = useState<CampaignStructure>({
           description: `Your content is live! View it at: ${data.publishedUrl}`,
         });
       } else if (data.status === 'failed') {
+        // Update draftStatuses to show failed state with View/Retry buttons
+        setDraftStatuses(prev => {
+          const updated = new Map(prev);
+          for (const [pid, status] of updated.entries()) {
+            if (status.draftId === data.draftId) {
+              updated.set(pid, {
+                ...status,
+                isFailed: true,
+                isPublished: false,
+                error: data.error,
+              });
+              break;
+            }
+          }
+          return updated;
+        });
+
+        // Also update via pageId if we have the mapping
+        if (pageId) {
+          setDraftStatuses(prev => {
+            const updated = new Map(prev);
+            const existing = updated.get(pageId);
+            updated.set(pageId, {
+              ...existing,
+              isFailed: true,
+              isPublished: false,
+              draftId: data.draftId,
+              error: data.error,
+            });
+            return updated;
+          });
+        }
+
         toast({
           title: 'Publish Failed',
           description: data.error || 'An error occurred while publishing to WordPress',
@@ -5434,8 +5468,8 @@ function CampaignStructureView({
   const [showAddPillarModal, setShowAddPillarModal] = useState(false);
   const [showAddSubPageModal, setShowAddSubPageModal] = useState(false);
   
-  // Track draft statuses (published/local drafts)
-  const [draftStatuses, setDraftStatuses] = useState<Map<number, { isPublished: boolean; publishedUrl?: string; draftId?: number }>>(new Map());
+  // Track draft statuses (published/local drafts/failed)
+  const [draftStatuses, setDraftStatuses] = useState<Map<number, { isPublished: boolean; isFailed?: boolean; publishedUrl?: string; draftId?: number; error?: string }>>(new Map());
 
   const [showAddKeywordModal, setShowAddKeywordModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -6570,8 +6604,34 @@ function CampaignStructureView({
       );
     }
     
-    // Check if published via draft status
+    // Check if publish failed via draft status
     const draftStatus = draftStatuses.get(pageId);
+    if (draftStatus?.isFailed || job?.status === 'failed') {
+      const failedDraftId = draftStatus?.draftId || job?.draftId;
+      return (
+        <div className="flex items-center gap-1.5">
+           <button 
+             onClick={() => viewDraft(failedDraftId, pageId)}
+             className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors"
+           >
+              <Eye className="h-3 w-3" />
+              View
+           </button>
+           <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-red-50 text-red-700 border border-red-100/50">
+             Failed
+           </span>
+           <button 
+             onClick={() => publishDraft(failedDraftId, pageId)}
+             className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-md transition-colors"
+           >
+              <RefreshCw className="h-3 w-3" />
+              Retry
+           </button>
+        </div>
+      );
+    }
+
+    // Check if published via draft status
     if (draftStatus?.isPublished) {
          return (
             <div className="flex items-center gap-1.5">
