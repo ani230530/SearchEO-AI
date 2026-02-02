@@ -855,20 +855,40 @@ useEffect(() => {
     return () => clearInterval(interval);
   }, [loadingSteps]);
 
-  const fetchCompanyDomain = useCallback(async () => {
+  /* 
+    Updated fetchCompanyDomain to be more robust:
+    1. It doesn't clear keywords on error, preserving previous state if a transient error occurs.
+    2. It only runs when necessary.
+  */
+  const fetchCompanyDomain = useCallback(async (force = false) => {
+    // If we already have keywords and we're not forcing a refresh, we might want to skip
+    // But for now, let's just make sure we don't clear them on error.
+    
     try {
       setCompanyDomainLoading(true);
+      // Add timestamp to prevent caching
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/user/company-domain`,
+        `${import.meta.env.VITE_API_URL}/api/user/company-domain?t=${Date.now()}`,
         {
           headers: {
             Authorization: `Bearer ${localStorage.getItem("authToken")}`,
             "Content-Type": "application/json",
+            "Cache-Control": "no-cache",
+            "Pragma": "no-cache"
           },
         }
       );
 
       if (!response.ok) {
+        // If it's a 404, it might genuinely mean "no domain", so we clear.
+        // But if it's 500 or network error, we should probably keep existing data.
+        if (response.status === 404) {
+           setCompanyDomain("");
+           setDomainContext("");
+           setKeywords([]);
+           setCreatedDomainId(null);
+           setShowResults(false);
+        }
         throw new Error("Failed to fetch company domain");
       }
 
@@ -878,7 +898,13 @@ useEffect(() => {
         // Company domain exists - show results
         setCompanyDomain(data.domain.url);
         setDomainContext(data.domain.context || "");
-        setKeywords(data.keywords || []);
+        
+        // IMPORTANT: Only update keywords if we received them, or if the list is explicitly empty but valid.
+        // This prevents overwriting with empty array if backend has an issue returning keywords but returns domain.
+        if (data.keywords) {
+             setKeywords(data.keywords);
+        }
+        
         setCreatedDomainId(data.domain.id);
         setShowResults(true);
       } else {
@@ -891,12 +917,12 @@ useEffect(() => {
       }
     } catch (error) {
       console.error("Error fetching company domain:", error);
-      // On error, show form
-      setShowResults(false);
+      // On error, DO NOT clear state immediately to avoid flickering or data loss on transient network issues
+      // unless we are sure it's a "not found" case (handled above).
     } finally {
       setCompanyDomainLoading(false);
     }
-  }, []);
+  }, []); // Intentionally empty dependencies to keep it stable
 
   // Fetch all campaign tab data in parallel when campaign tab is active
   const fetchCampaignTabData = useCallback(async () => {
@@ -904,12 +930,15 @@ useEffect(() => {
     
     setCampaignTabDataLoading(true);
     try {
+    try {
       // Fetch all required data in parallel
       const [domainResponse, wpResponse] = await Promise.all([
-        fetch(`${import.meta.env.VITE_API_URL}/api/user/company-domain`, {
+        fetch(`${import.meta.env.VITE_API_URL}/api/user/company-domain?t=${Date.now()}`, {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
             'Content-Type': 'application/json',
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache'
           },
         }),
         fetch(`${import.meta.env.VITE_API_URL}/api/publish/wordpress`, {
@@ -926,14 +955,12 @@ useEffect(() => {
         if (domainData.success && domainData.domain) {
           setCompanyDomain(domainData.domain.url);
           setDomainContext(domainData.domain.context || '');
-          setKeywords(domainData.keywords || []);
+          if (domainData.keywords) {
+             setKeywords(domainData.keywords);
+          }
           setCreatedDomainId(domainData.domain.id);
-        } else {
-          setCompanyDomain('');
-          setDomainContext('');
-          setKeywords([]);
-          setCreatedDomainId(null);
         }
+        // If domain missing, we might want to clear, but let's be careful not to break UI
       }
 
       // Process WordPress integration data
@@ -951,7 +978,6 @@ useEffect(() => {
       }
     } catch (error) {
       console.error('Error fetching campaign tab data:', error);
-      // Don't show toast for campaign tab - it's background loading
     } finally {
       setCampaignTabDataLoading(false);
     }
@@ -963,20 +989,33 @@ useEffect(() => {
     }
   }, [activeTab, fetchCampaignTabData]);
 
+  // Modified useEffect: Only fetch company domain on specific tabs or if currently empty
   useEffect(() => {
-      fetchCompanyDomain();
-  }, [activeTab, fetchCompanyDomain]);
+      // We always want to fetch on initial mount (handled by the other useEffect below) or if we are on tabs that assume data presence.
+      // But we shouldn't re-fetch on *every* tab switch if we already have data, to prevent flickering.
+      const shouldFetch = 
+        activeTab === 'overview' || 
+        activeTab === 'analytics' ||
+        (activeTab === 'publish' && !companyDomain); // Fetch on publish if we don't know the domain yet
+
+      if (shouldFetch) {
+          fetchCompanyDomain();
+      }
+  }, [activeTab, fetchCompanyDomain, companyDomain]); 
 
   // Fetch audit when audit tab is active
   useEffect(() => {
     if (activeTab === 'audit') {
       fetchAudit();
     }
-  }, [activeTab]);
+  }, [activeTab, fetchAudit]);
 
-  // On mount: load company domain and any existing audit so Overview reflects latest data on reload
+  // On mount: load company domain and any existing audit
   useEffect(() => {
-    fetchCompanyDomain();
+    // Check if we already have data to avoid double fetch
+    if (!companyDomain) {
+        fetchCompanyDomain();
+    }
     fetchAudit();
   }, [fetchCompanyDomain, fetchAudit]);
 
