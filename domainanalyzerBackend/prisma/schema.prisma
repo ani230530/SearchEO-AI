@@ -15,6 +15,9 @@ model User {
   name      String?
   refreshToken String?
   refreshTokenExpiry DateTime?
+  emailVerified Boolean @default(false)
+  emailVerificationToken String?
+  emailVerificationTokenExpiry DateTime?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   domains   Domain[]
@@ -422,6 +425,7 @@ model WordpressPublishLog {
   status        String?
   response      Json?
   createdAt     DateTime @default(now())
+  updatedAt     DateTime @default(now()) @updatedAt
   user          User     @relation(fields: [userId], references: [id])
   integration   WordpressIntegration? @relation(fields: [integrationId], references: [id])
   integrationId Int?
@@ -709,7 +713,23 @@ model AuditResult {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
   domain         Domain   @relation(fields: [domainId], references: [id], onDelete: Cascade)
+  n8nRequests    N8nRequest[]
 
   @@index([domainId])
+}
+
+model N8nRequest {
+  id             Int      @id @default(autoincrement())
+  requestId      String   @unique @default(uuid())
+  auditResultId  Int
+  auditResult    AuditResult @relation(fields: [auditResultId], references: [id], onDelete: Cascade)
+  status         String   @default("pending")  // pending | processing | completed | failed
+  requestPayload Json
+  responseData   Json?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([auditResultId])
+  @@index([requestId])
 }
 

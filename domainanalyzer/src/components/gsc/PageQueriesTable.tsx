@@ -9,9 +9,14 @@ import {
   SortingState,
   useReactTable,
 } from "@tanstack/react-table";
-import { ArrowDown, ArrowUp, Download, ArrowLeft, ChevronUp, TrendingUp, TrendingDown, Loader2, ChevronDown } from "lucide-react";
+import { ArrowDown, ArrowUp, Download, ArrowLeft, ChevronUp, TrendingUp, TrendingDown, Loader2, ChevronDown, Search, Filter, X } from "lucide-react";
 import { formatDateForDisplay, getDateRangeDescription } from "@/lib/gsc/dateUtils";
 import { toast } from "sonner";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 import TrendsChart, { TrendDataPoint } from "./TrendsChart";
 
 export interface QueryData {
@@ -62,6 +67,27 @@ const PageQueriesTable = ({
   const [currentPage, setCurrentPage] = useState(0);
   const [selectedQueries, setSelectedQueries] = useState<string[]>([]);
   const [selectedMetrics, setSelectedMetrics] = useState<("clicks" | "impressions" | "ctr" | "position")[]>(["clicks", "impressions"]);
+  const [searchQuery, setSearchQuery] = useState<string>("");
+
+  // Filter states
+  const [clicksRange, setClicksRange] = useState<{ min: string; max: string }>({ min: "", max: "" });
+  const [impressionsRange, setImpressionsRange] = useState<{ min: string; max: string }>({ min: "", max: "" });
+  const [positionRange, setPositionRange] = useState<{ min: string; max: string }>({ min: "", max: "" });
+  const [ctrRange, setCtrRange] = useState<{ min: string; max: string }>({ min: "", max: "" });
+  
+  const activeFilterCount = [
+    clicksRange.min, clicksRange.max,
+    impressionsRange.min, impressionsRange.max,
+    positionRange.min, positionRange.max,
+    ctrRange.min, ctrRange.max
+  ].filter(Boolean).length;
+
+  const clearFilters = () => {
+    setClicksRange({ min: "", max: "" });
+    setImpressionsRange({ min: "", max: "" });
+    setPositionRange({ min: "", max: "" });
+    setCtrRange({ min: "", max: "" });
+  };
 
   // Export to CSV
   const handleExport = () => {
@@ -199,9 +225,41 @@ const PageQueriesTable = ({
   };
 
   // Sort data - MUST be called before any early returns to maintain hook order
+  // Sort data - MUST be called before any early returns to maintain hook order
   const sortedData = useMemo(() => {
-    if (sorting.length === 0) return data;
-    const sorted = [...data];
+    // Filter by search query
+    let filtered = data;
+    if (searchQuery) {
+      filtered = data.filter((item) => 
+        item.query.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+    }
+
+    // Filter by metrics
+    if (activeFilterCount > 0) {
+      filtered = filtered.filter(item => {
+        // Clicks
+        if (clicksRange.min && item.clicks < Number(clicksRange.min)) return false;
+        if (clicksRange.max && item.clicks > Number(clicksRange.max)) return false;
+        
+        // Impressions
+        if (impressionsRange.min && item.impressions < Number(impressionsRange.min)) return false;
+        if (impressionsRange.max && item.impressions > Number(impressionsRange.max)) return false;
+
+        // Position
+        if (positionRange.min && item.position < Number(positionRange.min)) return false;
+        if (positionRange.max && item.position > Number(positionRange.max)) return false;
+
+        // CTR
+        if (ctrRange.min && (item.ctr * 100) < Number(ctrRange.min)) return false;
+        if (ctrRange.max && (item.ctr * 100) > Number(ctrRange.max)) return false;
+
+        return true;
+      });
+    }
+
+    if (sorting.length === 0) return filtered;
+    const sorted = [...filtered];
     const sort = sorting[0];
     sorted.sort((a, b) => {
       const aVal = a[sort.id as keyof QueryData];
@@ -212,7 +270,7 @@ const PageQueriesTable = ({
       return String(aVal).localeCompare(String(bVal)) * (sort.desc ? -1 : 1);
     });
     return sorted;
-  }, [data, sorting]);
+  }, [data, sorting, searchQuery, clicksRange, impressionsRange, positionRange, ctrRange, activeFilterCount]);
 
   // Render date range info
   const renderDateRangeInfo = () => {
@@ -301,11 +359,150 @@ const PageQueriesTable = ({
       </div>
 
       {/* Controls */}
-      <div className="flex items-center justify-center gap-3 mb-6">
+      <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center mb-6">
+        <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
+          <div className="relative w-full sm:w-72">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Input 
+              placeholder="Search queries..." 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9 bg-white border-gray-200 rounded-full text-sm font-light focus-visible:ring-gray-900"
+            />
+          </div>
+
+          <div className="flex items-center gap-2">
+            {activeFilterCount > 0 && (
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={clearFilters}
+                className="text-gray-500 hover:text-gray-900 h-9 hidden sm:flex"
+              >
+                Clear Filters
+                <X className="ml-2 h-3.5 w-3.5" />
+              </Button>
+            )}
+
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="gap-2 rounded-full border-gray-200 h-10">
+                  <Filter className="h-4 w-4" />
+                  Filters
+                  {activeFilterCount > 0 && (
+                    <Badge variant="secondary" className="ml-1 px-1.5 h-5 min-w-[1.25rem] flex items-center justify-center bg-gray-100 text-gray-900">
+                      {activeFilterCount}
+                    </Badge>
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-80 p-4" align="end">
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between border-b pb-2">
+                    <h4 className="font-medium text-sm">Filter by Metrics</h4>
+                    {activeFilterCount > 0 && (
+                      <Button variant="ghost" size="sm" onClick={clearFilters} className="h-auto p-0 text-xs text-gray-500 hover:text-gray-900">
+                        Reset
+                      </Button>
+                    )}
+                  </div>
+                  
+                  <div className="grid gap-4">
+                    <div className="space-y-2">
+                      <Label className="text-xs font-medium text-gray-500">Clicks</Label>
+                      <div className="flex items-center gap-2">
+                        <Input 
+                          placeholder="Min" 
+                          type="number" 
+                          value={clicksRange.min}
+                          onChange={(e) => setClicksRange(prev => ({ ...prev, min: e.target.value }))}
+                          className="h-8 text-xs"
+                        />
+                        <span className="text-gray-300">-</span>
+                        <Input 
+                          placeholder="Max" 
+                          type="number" 
+                          value={clicksRange.max}
+                          onChange={(e) => setClicksRange(prev => ({ ...prev, max: e.target.value }))}
+                          className="h-8 text-xs"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-xs font-medium text-gray-500">Impressions</Label>
+                      <div className="flex items-center gap-2">
+                        <Input 
+                          placeholder="Min" 
+                          type="number" 
+                          value={impressionsRange.min}
+                          onChange={(e) => setImpressionsRange(prev => ({ ...prev, min: e.target.value }))}
+                          className="h-8 text-xs"
+                        />
+                        <span className="text-gray-300">-</span>
+                        <Input 
+                          placeholder="Max" 
+                          type="number" 
+                          value={impressionsRange.max}
+                          onChange={(e) => setImpressionsRange(prev => ({ ...prev, max: e.target.value }))}
+                          className="h-8 text-xs"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-xs font-medium text-gray-500">Avg Position</Label>
+                      <div className="flex items-center gap-2">
+                        <Input 
+                          placeholder="Min (Best: 1)" 
+                          type="number" 
+                          value={positionRange.min}
+                          onChange={(e) => setPositionRange(prev => ({ ...prev, min: e.target.value }))}
+                          className="h-8 text-xs"
+                        />
+                        <span className="text-gray-300">-</span>
+                        <Input 
+                          placeholder="Max" 
+                          type="number" 
+                          value={positionRange.max}
+                          onChange={(e) => setPositionRange(prev => ({ ...prev, max: e.target.value }))}
+                          className="h-8 text-xs"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-xs font-medium text-gray-500">CTR (%)</Label>
+                      <div className="flex items-center gap-2">
+                        <Input 
+                          placeholder="Min %" 
+                          type="number" 
+                          value={ctrRange.min}
+                          onChange={(e) => setCtrRange(prev => ({ ...prev, min: e.target.value }))}
+                          className="h-8 text-xs"
+                        />
+                        <span className="text-gray-300">-</span>
+                        <Input 
+                          placeholder="Max %" 
+                          type="number" 
+                          value={ctrRange.max}
+                          onChange={(e) => setCtrRange(prev => ({ ...prev, max: e.target.value }))}
+                          className="h-8 text-xs"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </PopoverContent>
+            </Popover>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3">
         {onShowTrendsChange && (
           <button
             onClick={() => onShowTrendsChange(!showTrends)}
-            className={`h-10 px-5 border rounded-full text-sm font-light tracking-tight transition-all duration-200 inline-flex items-center gap-2 ${
+            className={`inline-flex items-center gap-2 px-6 py-3 bg-black text-white rounded-full text-sm font-medium hover:bg-black/90  disabled:opacity-60 transition ${
               showTrends
                 ? 'border-gray-900 bg-gray-900 text-white hover:bg-gray-800'
                 : 'border-gray-200 text-gray-700 hover:bg-gray-50'
@@ -322,6 +519,7 @@ const PageQueriesTable = ({
           <Download className="h-4 w-4" />
           Export CSV
         </button>
+      </div>
       </div>
 
       {renderDateRangeInfo()}
@@ -495,15 +693,15 @@ const PageQueriesTable = ({
                       className="w-4 h-4 text-gray-900 border-gray-300 rounded focus:ring-gray-900"
                     />
                   )}
-                  <div className="font-semibold text-gray-900 text-sm">{query.query}</div>
+                  <div className="font-medium text-gray-900 text-sm">{query.query}</div>
                 </div>
                 <div className="flex items-center justify-center">
-                  <span className="font-semibold text-gray-900 text-sm">
+                  <span className="font-medium text-gray-900 text-sm">
                     {query.clicks.toLocaleString()}
                   </span>
                 </div>
                 <div className="flex items-center justify-center">
-                  <span className="font-semibold text-gray-900 text-sm">
+                  <span className="font-medium text-gray-900 text-sm">
                     {query.impressions.toLocaleString()}
                   </span>
                 </div>

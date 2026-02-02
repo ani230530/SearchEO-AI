@@ -127,6 +127,9 @@ exports.Prisma.UserScalarFieldEnum = {
   name: 'name',
   refreshToken: 'refreshToken',
   refreshTokenExpiry: 'refreshTokenExpiry',
+  emailVerified: 'emailVerified',
+  emailVerificationToken: 'emailVerificationToken',
+  emailVerificationTokenExpiry: 'emailVerificationTokenExpiry',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 };
@@ -430,6 +433,7 @@ exports.Prisma.WordpressPublishLogScalarFieldEnum = {
   status: 'status',
   response: 'response',
   createdAt: 'createdAt',
+  updatedAt: 'updatedAt',
   integrationId: 'integrationId'
 };
 
@@ -627,6 +631,17 @@ exports.Prisma.AuditResultScalarFieldEnum = {
   updatedAt: 'updatedAt'
 };
 
+exports.Prisma.N8nRequestScalarFieldEnum = {
+  id: 'id',
+  requestId: 'requestId',
+  auditResultId: 'auditResultId',
+  status: 'status',
+  requestPayload: 'requestPayload',
+  responseData: 'responseData',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
 exports.Prisma.SortOrder = {
   asc: 'asc',
   desc: 'desc'
@@ -704,7 +719,8 @@ exports.Prisma.ModelName = {
   CampaignTopic: 'CampaignTopic',
   CampaignPage: 'CampaignPage',
   CampaignKeyword: 'CampaignKeyword',
-  AuditResult: 'AuditResult'
+  AuditResult: 'AuditResult',
+  N8nRequest: 'N8nRequest'
 };
 
 /**

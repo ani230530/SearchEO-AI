@@ -25,7 +25,6 @@ interface AuditData {
   seo: number;
   accessibility: number;
   bestPractices: number;
-  pwa: number;
 }
 
 interface AuditChartsProps {
@@ -51,7 +50,6 @@ export const AuditRadarChart: React.FC<AuditChartsProps> = ({ data }) => {
     { metric: 'SEO', score: Math.round(data.seo * 100), fullMark: 100 },
     { metric: 'Accessibility', score: Math.round(data.accessibility * 100), fullMark: 100 },
     { metric: 'Best Practices', score: Math.round(data.bestPractices * 100), fullMark: 100 },
-    { metric: 'PWA', score: Math.round(data.pwa * 100), fullMark: 100 },
   ];
 
   return (
@@ -100,7 +98,6 @@ export const AuditBarChart: React.FC<AuditChartsProps> = ({ data }) => {
     { name: 'SEO', score: Math.round(data.seo * 100) },
     { name: 'Accessibility', score: Math.round(data.accessibility * 100) },
     { name: 'Best Practices', score: Math.round(data.bestPractices * 100) },
-    { name: 'PWA', score: Math.round(data.pwa * 100) },
   ].map((item) => ({
     ...item,
     color: getScoreColor(item.score / 100),
@@ -231,7 +228,6 @@ export const AuditScoreDistribution: React.FC<AuditChartsProps> = ({ data }) => 
     data.seo,
     data.accessibility,
     data.bestPractices,
-    data.pwa,
   ];
 
   scores.forEach((score) => {
@@ -327,11 +323,11 @@ export const AuditLineChart: React.FC<{ data?: Array<{ date: string; score: numb
 };
 
 // Overall Score Gauge (Large, Prominent)
-export const OverallScoreGauge: React.FC<{ score: number }> = ({ score }) => {
+export const OverallScoreGauge: React.FC<{ score: number; size?: number }> = ({ score, size = 200 }) => {
   const percent = Math.round(score * 100);
   const color = getScoreColor(score);
-  const size = 200;
-  const radius = size / 2 - 15;
+  // size is now a prop
+  const radius = size / 2 - 10;
   const circumference = 2 * Math.PI * radius;
   const offset = circumference - (percent / 100) * circumference;
 
@@ -344,7 +340,7 @@ export const OverallScoreGauge: React.FC<{ score: number }> = ({ score }) => {
             cy={size / 2}
             r={radius}
             stroke="#e5e7eb"
-            strokeWidth="12"
+            strokeWidth="7"
             fill="transparent"
           />
           <circle
@@ -352,7 +348,7 @@ export const OverallScoreGauge: React.FC<{ score: number }> = ({ score }) => {
             cy={size / 2}
             r={radius}
             stroke={color}
-            strokeWidth="12"
+            strokeWidth="7"
             fill="transparent"
             strokeDasharray={circumference}
             strokeDashoffset={offset}
@@ -366,13 +362,23 @@ export const OverallScoreGauge: React.FC<{ score: number }> = ({ score }) => {
           <div className="text-center">
             <div
               className="text-6xl font-light"
-              style={{ color: '#1d1d1f', letterSpacing: '-0.003em', lineHeight: 1.05 }}
+              style={{ 
+                color: '#1d1d1f', 
+                letterSpacing: '-0.003em', 
+                lineHeight: 1.05,
+                fontSize: `${size * 0.3}px` // Scale font size relative to chart size
+              }}
             >
               {percent}
             </div>
             <div
               className="text-lg mt-1"
-              style={{ color: '#86868b', letterSpacing: '0.011em', fontWeight: 300 }}
+              style={{ 
+                color: '#86868b', 
+                letterSpacing: '0.011em', 
+                fontWeight: 300,
+                fontSize: `${size * 0.09}px` // Scale label size
+              }}
             >
               Overall Score
             </div>

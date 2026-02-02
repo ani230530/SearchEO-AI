@@ -9,8 +9,10 @@ import {
   Check,
   CheckCircle,
   Plus,
+  Save ,
   X,
   ArrowUpDown,
+  RotateCcw,
   Edit,
   Eye,
   Trash2,
@@ -25,7 +27,7 @@ import PublishHistoryTable from './PublishHistoryTable';
 import Tippy from '@tippyjs/react';
 import 'tippy.js/dist/tippy.css';
 import 'tippy.js/themes/light.css';
-import { KeywordTableItem } from '@/types/keywords';
+import { KeywordTableItem } from '@/types';
 import {
   WordpressIntegration,
   GeneratedArticleContent,
@@ -33,6 +35,7 @@ import {
 } from '@/types/publish';
 import type { Instance } from 'tippy.js';
 import parse from 'html-react-parser';
+import { usePublishStatus } from '@/hooks/usePublishStatus';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3002';
 
@@ -166,6 +169,118 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
   const [saving, setSaving] = useState(false);
 
+   const fetchPublishHistory = useCallback(async () => {
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/publish/history`, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('authToken')}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      if (!response.ok) {
+        throw new Error('Failed to fetch publish history');
+      }
+      const data = await response.json();
+      if (data.success) {
+        setPublishHistory(data.logs || []);
+      }
+    } catch (error) {
+      console.error('Error fetching publish history:', error);
+    }
+  }, []);
+
+  // Listen for real-time publish updates
+  usePublishStatus({
+    onUpdate: (data) => {
+      // Refresh history to show updated status for everyone
+      if (!initialDraft) {
+        fetchPublishHistory();
+      }
+
+      // If this update is for the currently viewed draft, update the UI
+      if (currentDraftId && data.draftId === currentDraftId) {
+        // ALWAYS clear loading state on a terminal update
+        if (data.status === 'published' || data.status === 'failed') {
+          setPublishLoading(false);
+        }
+
+        if (data.status === 'published' && data.publishedUrl) {
+          setPublishResult((prev) => prev ? {
+            ...prev,
+            wordpressUrl: data.publishedUrl,
+          } : null);
+          
+          toast({
+            title: 'Published Successfully',
+            description: `Your content is live! View it here: ${data.publishedUrl}`,
+          });
+
+          // Also refresh integration stats
+          onRefreshWordpressIntegration();
+        } else if (data.status === 'failed') {
+          toast({
+            title: 'Publish Failed',
+            description: data.error || 'An error occurred while publishing',
+            variant: 'destructive',
+          });
+        }
+      }
+    }
+  });
+
+  // Polling fallback to ensure we don't get stuck in loading state if SSE fails
+  useEffect(() => {
+    if (!publishLoading || !currentDraftId) return;
+
+    const pollInterval = setInterval(async () => {
+      try {
+        // Try campaign endpoint first, then publish endpoint
+        let response = await fetch(`${API_BASE_URL}/api/campaigns/drafts/${currentDraftId}`, {
+          headers: { Authorization: `Bearer ${localStorage.getItem('authToken')}` },
+        });
+
+        if (!response.ok) {
+           response = await fetch(`${API_BASE_URL}/api/publish/drafts/${currentDraftId}`, {
+             headers: { Authorization: `Bearer ${localStorage.getItem('authToken')}` },
+           });
+        }
+
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success && data.draft) {
+             const status = data.draft.status;
+             
+             // If terminal state reached, update UI
+             if (status === 'published') {
+                setPublishLoading(false);
+                if (data.draft.wordpressUrl) {
+                    setPublishResult((prev) => prev ? { ...prev, wordpressUrl: data.draft.wordpressUrl } : null);
+                    toast({
+                        title: 'Published Successfully',
+                        description: `Your content is live! View it here: ${data.draft.wordpressUrl}`,
+                    });
+                    onRefreshWordpressIntegration();
+                    fetchPublishHistory();
+                }
+             } else if (status === 'failed') {
+                setPublishLoading(false);
+                toast({
+                    title: 'Publish Failed',
+                    description: 'The publish job failed (detected via polling).',
+                    variant: 'destructive',
+                });
+                fetchPublishHistory();
+             }
+          }
+        }
+      } catch (err) {
+        console.error('Polling error:', err);
+      }
+    }, 15000); // 15 seconds
+
+    return () => clearInterval(pollInterval);
+  }, [publishLoading, currentDraftId, toast, onRefreshWordpressIntegration, fetchPublishHistory]);
+
   const showPreviewStage = publishStage === 'preview';
 
   // SINGLE SOURCE OF TRUTH for HTML content in preview
@@ -251,26 +366,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
     { id: 4, title: 'Long-tail Notes', description: 'Supportive angles' },
   ];
 
-  const fetchPublishHistory = useCallback(async () => {
-    try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/publish/history`, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem('authToken')}`,
-          'Content-Type': 'application/json',
-        },
-      });
-      if (!response.ok) {
-        throw new Error('Failed to fetch publish history');
-      }
-      const data = await response.json();
-      if (data.success) {
-        setPublishHistory(data.logs || []);
-      }
-    } catch (error) {
-      console.error('Error fetching publish history:', error);
-    }
-  }, []);
-
+ 
   useEffect(() => {
     // Only fetch history when actually in publish tab (not when viewing from campaign overlay)
     // If initialDraft is provided, we're in campaign preview mode, so don't fetch history
@@ -527,7 +623,6 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
   const handleOpenComposeDrawer = useCallback(() => {
     setPublishStage('compose');
     setDrawerStep(1);
-    setPublishDrawerOpen(true);
   }, []);
 
   const handleDrawerNext = () => {
@@ -1240,6 +1335,10 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
       // SIMPLE: Just use currentHtmlContent - user should save manually before publishing
       const latestHtmlContent = currentHtmlContent;
 
+      // AUTO-SAVE: Ensure DB has latest content before we publish and potentially re-fetch
+      // This prevents stale DB data from overwriting local edits when we fetchDraftFromDb later
+      await saveDraftToDatabase(true);
+
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/publish/publish`, {
         method: 'POST',
         headers: {
@@ -1264,33 +1363,42 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
 
       // Update publishResult with published status and URL
       if (data.status === 'published' && data.publishedUrl) {
+        const publishedUrl = data.publishedUrl;
+        
         setPublishResult((prev) => prev ? {
           ...prev,
-          wordpressUrl: data.publishedUrl,
+          wordpressUrl: publishedUrl,
         } : null);
+        
         toast({
           title: 'Published',
-          description: data.publishedUrl ? `Content published successfully. View it here: ${data.publishedUrl}` : 'Content sent to WordPress',
+          description: `Content published successfully. View it here: ${publishedUrl}`,
         });
-      } else if (data.status === 'failed') {
-        toast({
-          title: 'Publish Failed',
-          description: 'WordPress did not return a valid URL. The publish may have failed.',
-          variant: 'destructive',
-        });
-      } else {
-      toast({
-        title: 'Published',
-        description: 'Content sent to WordPress',
-      });
-      }
 
-      // Refresh draft from DB to get updated status
-      if (currentDraftId) {
-        fetchDraftFromDb(currentDraftId);
+        // IMMMEDIATE UPDATE: Manually update history state so "View Live" appears instantly
+        if (currentDraftId) {
+          setPublishHistory((prev) => prev.map(entry => {
+            if (entry.id === currentDraftId) {
+              return {
+                ...entry,
+                status: 'published',
+                wordpressUrl: publishedUrl,
+                updatedAt: new Date().toISOString()
+              };
+            }
+            return entry;
+          }));
+        }
+        
+        // Also fetch to be sure
+        fetchDraftFromDb(currentDraftId!); // we know currentDraftId exists if we're here
+        fetchPublishHistory();
+        onRefreshWordpressIntegration();
+        
+      } else {
+        // STRICT FAILURE HANDLING: If no URL, treat as failed even if status says published
+        throw new Error('WordPress did not return a valid URL. The publish may have failed.');
       }
-      fetchPublishHistory();
-      onRefreshWordpressIntegration();
     } catch (error) {
       console.error('Error publishing to WordPress:', error);
       toast({
@@ -2091,36 +2199,29 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
                           : 'border-gray-200 bg-white text-gray-900 hover:bg-gray-50'
                       }`}
                     >
-                      {isEditMode ? (
-                        <span className="flex items-center gap-2">
-                          <Eye className="h-4 w-4" />
-                          Preview
-                        </span>
-                      ) : (
-                        <span className="flex items-center gap-2">
-                          <Edit className="h-4 w-4" />
-                          Edit Mode
-                        </span>
-                      )}
+                      <span className="flex items-center gap-2">
+                        {isEditMode ? <Eye className="h-4 w-4" /> : <Edit className="h-4 w-4" />}
+                        {isEditMode ? 'Preview' : 'Edit Mode'}
+                      </span>
                     </button>
                   )}
-                  <button
-                    onClick={handlePublishToWordpress}
-                    disabled={publishLoading || !publishResult}
-                    className="px-6 py-2.5 rounded-full bg-black text-white text-sm font-semibold shadow-lg hover:bg-black/90 disabled:opacity-60 transition-colors"
-                  >
-                    {publishLoading ? 'Working…' : 'Publish to WordPress'}
-                  </button>
                   <button
                     onClick={handleSaveDraft}
                     disabled={saving || !publishResult || !hasUnsavedChanges}
                     className={`px-5 py-2.5 rounded-full border text-sm font-medium transition-colors ${
                       hasUnsavedChanges 
-                        ? 'border-orange-300 bg-orange-50 text-orange-700 hover:bg-orange-100' 
+                        ? 'border-orange-300 text-orange-50 text-orange-700 hover:bg-orange-100' 
                         : 'border-gray-200 bg-white text-gray-900 hover:bg-gray-50'
                     } disabled:opacity-50 disabled:cursor-not-allowed`}
                   >
-                    {saving ? 'Saving…' : hasUnsavedChanges ? 'Save Draft • Unsaved' : 'Save Draft'}
+                    <Save className='h-5 w-5' />
+                    {/* {saving ? 'Saving…' : hasUnsavedChanges ? 'Save Draft • Unsaved' : 'Save Draft'} */}
+                  </button>
+                  <button
+                    onClick={handleResetDraft}
+                    className="px-4 py-2 rounded-full text-sm font-medium text-gray-500 hover:text-gray-900 transition-colors"
+                  >
+                   <RotateCcw className='h-5 w-5'/>
                   </button>
                   <button
                     onClick={handleGenerateContent}
@@ -2130,10 +2231,11 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
                     {publishLoading ? 'Generating…' : publishResult ? 'Regenerate' : 'Generate'}
                   </button>
                   <button
-                    onClick={handleResetDraft}
-                    className="px-4 py-2 rounded-full text-sm font-medium text-gray-500 hover:text-gray-900 transition-colors"
+                    onClick={handlePublishToWordpress}
+                    disabled={publishLoading || !publishResult}
+                    className="px-6 py-2.5 rounded-full bg-black text-white text-sm font-medium shadow-lg hover:bg-black/90 disabled:opacity-60 transition-colors"
                   >
-                    Reset Draft
+                    {publishLoading ? 'Working…' : (publishResult?.wordpressUrl?.startsWith('http') ? 'Re-publish to WordPress' : 'Publish to WordPress')}
                   </button>
                 </div>
               </div>
@@ -2199,7 +2301,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
                           <p className="text-xs text-gray-500">Manage images in your article</p>
                           <button
                             onClick={() => setShowAddImageModal(true)}
-                            className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-gray-900 text-white text-xs font-medium hover:bg-gray-800"
+                            className="inline-flex items-center gap-2 px-1 py-1 bg-black text-white rounded-full text-sm font-medium hover:bg-black/90  disabled:opacity-60 transition"
                           >
                             <Plus className="h-3.5 w-3.5" />
                             Add
@@ -2607,7 +2709,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
           // Render with full-screen overlay wrapper (for standalone use in publish tab)
           // Only render if active (to prevent showing when viewing from campaign)
           isActive ? (
-            <div className="fixed inset-0 z-50 bg-white overflow-y-auto">
+            <div className="fixed inset-0 z-0 bg-white  space-x-[280px]">
             <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-xl border-b border-gray-100 shadow-sm">
               <div className="max-w-7xl mx-auto px-6 py-4">
                 <div className="flex items-center justify-between gap-4">
@@ -2647,56 +2749,60 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
                   <div className="flex flex-wrap items-center gap-3 justify-end flex-shrink-0">
                     {publishResult && (
                       <button
+                      title={isEditMode ? "Exit edit mode" : "Edit content"}
                         onClick={handleToggleEditMode}
-                        className={`px-5 py-2.5 rounded-full border text-sm font-medium transition-colors ${
+                        className={`px-1 py-2 rounded-full text-sm font-medium text-gray-500 hover:text-gray-900 transition-colors ${
                           isEditMode
-                            ? 'border-gray-900 bg-gray-900 text-white hover:bg-gray-800'
-                            : 'border-gray-200 bg-white text-gray-900 hover:bg-gray-50'
+                            ? 'border-gray-900 text-gray-900 hover:text-gray-500'
+                            : 'border-gray-200 text-gray-500 hover:text-gray-900'
                         }`}
                       >
                         {isEditMode ? (
-                          <span className="flex items-center gap-2">
-                            <Eye className="h-4 w-4" />
-                            Preview
+                          <span className="flex items-center ">
+                            <Edit className='h-5 w-5' />
+                         
                           </span>
                         ) : (
-                          <span className="flex items-center gap-2">
-                            <Edit className="h-4 w-4" />
-                            Edit Mode
+                          <span className="flex items-center ">
+                            <Edit className='h-5 w-5' />
+                           
                           </span>
                         )}
                       </button>
                     )}
                     <button
-                      onClick={handlePublishToWordpress}
-                      disabled={publishLoading || !publishResult}
-                      className="px-6 py-2.5 rounded-full bg-black text-white text-sm font-semibold shadow-lg hover:bg-black/90 disabled:opacity-60 transition-colors"
-                    >
-                      {publishLoading ? 'Working…' : 'Publish to WordPress'}
-                    </button>
-                    <button
+                    title='Save Draft'
                       onClick={handleSaveDraft}
                       disabled={saving || !publishResult || !hasUnsavedChanges}
-                      className={`px-5 py-2.5 rounded-full border text-sm font-medium transition-colors ${
+                      className={`px-1 py-2 rounded-full text-sm font-medium text-gray-500 hover:text-gray-900 transition-colors${
                         hasUnsavedChanges 
-                          ? 'border-orange-300 bg-orange-50 text-orange-700 hover:bg-orange-100' 
-                          : 'border-gray-200 bg-white text-gray-900 hover:bg-gray-50'
+                          ? 'border-gray-900 text-gray-900 hover:text-gray-500' 
+                          : 'border-gray-200 text-gray-500 hover:text-gray-900'
                       } disabled:opacity-50 disabled:cursor-not-allowed`}
                     >
-                      {saving ? 'Saving…' : hasUnsavedChanges ? 'Save Draft • Unsaved' : 'Save Draft'}
+                      <Save className='h-5 w-5'/>
+                      {/* {saving ? 'Saving…' : hasUnsavedChanges ? 'Save Draft • Unsaved' : 'Save Draft'} */}
+                    </button>
+                    <button
+                    title='Reset'
+                      onClick={handleResetDraft}
+                      className="px-1 py-2 rounded-full text-sm font-medium text-gray-500 hover:text-gray-900 transition-colors"
+                    >
+                     <RotateCcw className='h-5 w-5'/>
                     </button>
                     <button
                       onClick={handleGenerateContent}
                       disabled={publishLoading}
-                      className="px-5 py-2.5 rounded-full border border-gray-200 bg-white text-sm font-medium text-gray-900 hover:bg-gray-50 disabled:opacity-60 transition-colors"
+                      className="px-5 py-2.5 rounded-full border border-gray-200 bg-white text-sm font-medium text-gray-900 hover:bg-gray-50 hover:border-gray-900 disabled:opacity-60 transition-colors"
                     >
                       {publishLoading ? 'Generating…' : publishResult ? 'Regenerate' : 'Generate'}
                     </button>
                     <button
-                      onClick={handleResetDraft}
-                      className="px-4 py-2 rounded-full text-sm font-medium text-gray-500 hover:text-gray-900 transition-colors"
+                      onClick={handlePublishToWordpress}
+                      disabled={publishLoading || !publishResult}
+                      className="px-6 py-2.5 rounded-full bg-black text-white text-sm font-medium shadow-lg hover:bg-gray-600 disabled:opacity-60 transition-colors"
                     >
-                      Reset Draft
+                      {publishLoading ? 'Working…' : 'Publish to WordPress'}
                     </button>
                   </div>
                 </div>
@@ -2762,9 +2868,9 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
                           <p className="text-xs text-gray-500">Manage images in your article</p>
                           <button
                             onClick={() => setShowAddImageModal(true)}
-                            className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-gray-900 text-white text-xs font-medium hover:bg-gray-800"
+                            className="inline-flex items-center gap-2 px-2 py-1 text-black rounded-full text-sm font-medium hover:bg-gray-200  disabled:opacity-60 transition"
                           >
-                            <Plus className="h-3.5 w-3.5" />
+                            <Plus className="h-2.5 w-2.5" />
                             Add
                           </button>
                         </div>

@@ -1,6 +1,8 @@
 import { PrismaClient } from '../../generated/prisma';
 import * as bcrypt from 'bcryptjs';
 import * as jwt from 'jsonwebtoken';
+import nodemailer from 'nodemailer';
+import crypto from 'crypto';
 
 const prisma = new PrismaClient();
 const JWT_SECRET = process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-in-production';
@@ -20,13 +22,14 @@ export interface UserLoginData {
 }
 
 export interface AuthResponse {
-  user: {
+  user?: {
     id: number;
     email: string;
     name?: string;
   };
-  token: string;
-  refreshToken: string;
+  token?: string;
+  refreshToken?: string;
+  message?: string;
 }
 
 export interface JWTPayload {
@@ -46,10 +49,11 @@ export class AuthService {
   // Register a new user
   async register(userData: UserRegistrationData): Promise<AuthResponse> {
     const { email, password, name } = userData;
+    const normalizedEmail = email.trim().toLowerCase();
 
     // Check if user already exists
     const existingUser = await prisma.user.findUnique({
-      where: { email }
+      where: { email: normalizedEmail }
     });
 
     if (existingUser) {
@@ -60,12 +64,19 @@ export class AuthService {
     const saltRounds = 12;
     const hashedPassword = await bcrypt.hash(password, saltRounds);
 
-    // Create user
+    // Generate email verification token
+    const verificationToken = crypto.randomBytes(32).toString('hex');
+    const verificationTokenExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24h
+
+    // Create user (unverified)
     const user = await prisma.user.create({
       data: {
-        email,
+        email: normalizedEmail,
         password: hashedPassword,
-        name
+        name,
+        emailVerified: false,
+        emailVerificationToken: verificationToken,
+        emailVerificationTokenExpiry: verificationTokenExpiry
       },
       select: {
         id: true,
@@ -74,37 +85,27 @@ export class AuthService {
       }
     });
 
-    // Generate tokens
-    const token = this.generateToken(user.id, user.email);
-    const refreshToken = this.generateRefreshToken(user.id, user.email);
-    const refreshTokenExpiry = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
-
-    // Store refresh token in database
-    await prisma.user.update({
-      where: { id: user.id },
-      data: {
-        refreshToken,
-        refreshTokenExpiry
-      }
-    });
+    // Send verification email
+    try {
+      await this.sendVerificationEmail(user.email, verificationToken, user.name || undefined);
+    } catch (err) {
+      // Continue even if email fails; user can request resend later
+      console.error('Failed to send verification email:', err);
+    }
 
     return {
-      user: {
-        ...user,
-        name: user.name === null ? undefined : user.name
-      },
-      token,
-      refreshToken
+      message: 'Registration successful. Please check your email to verify your account.'
     };
   }
 
   // Login user
   async login(loginData: UserLoginData): Promise<AuthResponse> {
     const { email, password } = loginData;
+    const normalizedEmail = email.trim().toLowerCase();
 
     // Find user by email
     const user = await prisma.user.findUnique({
-      where: { email }
+      where: { email: normalizedEmail }
     });
 
     if (!user) {
@@ -115,6 +116,11 @@ export class AuthService {
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
       throw new Error('Invalid email or password');
+    }
+
+    // Require verified email
+    if (!user.emailVerified) {
+      throw new Error('Please verify your email before logging in');
     }
 
     // Generate tokens
@@ -140,6 +146,95 @@ export class AuthService {
       token,
       refreshToken
     };
+  }
+
+  // Verify email using token
+  async verifyEmailToken(token: string): Promise<{ success: boolean }> {
+    const user = await prisma.user.findFirst({
+      where: {
+        emailVerificationToken: token
+      }
+    });
+    if (!user) {
+      throw new Error('Invalid verification token');
+    }
+    if (user.emailVerificationTokenExpiry && user.emailVerificationTokenExpiry < new Date()) {
+      throw new Error('Verification token expired');
+    }
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        emailVerified: true,
+        emailVerificationToken: null,
+        emailVerificationTokenExpiry: null
+      }
+    });
+    return { success: true };
+  }
+
+  private resendRateLimit = new Map<string, number>();
+
+  // Resend verification email
+  async resendVerificationEmail(email: string): Promise<{ success: boolean }> {
+    const normalizedEmail = email.trim().toLowerCase();
+    const now = Date.now();
+    const last = this.resendRateLimit.get(normalizedEmail) || 0;
+    if (now - last < 60_000) {
+      return { success: true };
+    }
+    this.resendRateLimit.set(normalizedEmail, now);
+    const user = await prisma.user.findUnique({ where: { email: normalizedEmail } });
+    if (!user) {
+      return { success: true };
+    }
+    if (user.emailVerified) {
+      return { success: true };
+    }
+    const verificationToken = crypto.randomBytes(32).toString('hex');
+    const verificationTokenExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        emailVerificationToken: verificationToken,
+        emailVerificationTokenExpiry: verificationTokenExpiry
+      }
+    });
+    await this.sendVerificationEmail(user.email, verificationToken, user.name || undefined);
+    return { success: true };
+  }
+
+  // Send verification email
+  private async sendVerificationEmail(email: string, token: string, name?: string) {
+    const gmailUser = process.env.GMAIL_USER;
+    const gmailPass = process.env.GMAIL_PASS;
+    if (!gmailUser || !gmailPass) {
+      throw new Error('GMAIL_USER and GMAIL_PASS must be set');
+    }
+    const transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: gmailUser,
+        pass: gmailPass
+      }
+    });
+    const backendUrl = process.env.BACKEND_PUBLIC_URL || `http://localhost:${process.env.PORT || 3002}`;
+    const verifyUrl = `${backendUrl}/api/auth/verify-email?token=${token}`;
+    const from = process.env.EMAIL_FROM || gmailUser;
+    await transporter.sendMail({
+      from,
+      to: email,
+      subject: 'Verify your email',
+      html: `
+        <div style="font-family: Arial, sans-serif; font-size: 16px;">
+          <p>${name ? `Hi ${name},` : 'Hi,'}</p>
+          <p>Thanks for signing up. Please confirm your email address by clicking the button below:</p>
+          <p><a href="${verifyUrl}" style="display:inline-block;padding:10px 16px;background:#000;color:#fff;border-radius:6px;text-decoration:none;">Confirm Email</a></p>
+          <p>If the button doesn't work, copy and paste this link into your browser:</p>
+          <p><a href="${verifyUrl}">${verifyUrl}</a></p>
+          <p>This link expires in 24 hours.</p>
+        </div>
+      `
+    });
   }
 
   // Verify JWT token

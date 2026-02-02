@@ -1,35 +1,96 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LayoutDashboard, BarChart3, Settings, User, LogOut, Menu, X, Building, Globe, CheckCircle, Info, Plug, FileText, ChevronDown, ChevronRight, ChevronLeft, Megaphone, Plus, ChevronUp, Trash2, Sparkles, ArrowLeft, Search, TrendingUp, Grid3X3, List, ArrowUpDown, Loader2, AlertCircle, Check, Send, RefreshCw, ClipboardList } from 'lucide-react';
-import GSCAnalyticsView from '@/components/gsc/GSCAnalyticsView';
-import { useAuth } from '@/contexts/AuthContext';
-import { useToast } from '@/components/ui/use-toast';
-import { maskDomainId } from '@/lib/domainUtils';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
-import CampaignGraph from '@/components/CampaignGraph';
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import {
+  ArrowLeft,
+  ChevronRight,
+  Plus,
+  Trash2,
+  Edit,
+  AlertCircle,
+  CheckCircle,
+  Loader2,
+  Sparkles,
+  Layout,
+  Info,
+  List,
+  Network,
+  LayoutDashboard,
+  Building,
+  Megaphone,
+  Send,
+  BarChart3,
+  ClipboardList,
+  FileChartColumnIncreasing,
+  Settings,
+  User,
+  Search,
+  Grid3X3,
+  ChevronLeft,
+  ChevronDown,
+  ChartNoAxesCombined,
+  Check,
+  FileText,
+  X,
+  LogOut,
+  ChevronUp,
+  ArrowUpDown,
+  Plug,
+  TrendingUp,
+  Menu,
+  Globe,
+  Eye,
+  ExternalLink,
+  Pencil,
+  RefreshCw,
+  ArrowRight
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { maskDomainId } from '@/lib/domainUtils';
+import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/hooks/use-toast';
+import { ButtonSpinner } from '@/components/ui/button-spinner';
+import { CampaignTopicSidebar } from '@/features/campaign/CampaignTopicSidebar';
+import { CampaignTopicDetail } from '@/features/campaign/CampaignTopicDetail';
+import { Topic, CampaignStructure, GenerationPageStatus, DraftStatusRecord, KeywordTableItem, DraftPreview, Keyword } from '@/types';
+import CampaignGraph from '@/components/CampaignGraph';
+import { AuditBarChart, AuditGaugeChart, AuditRadarChart, AuditScoreDistribution, OverallScoreGauge } from '@/components/audit/AuditCharts';
+import { WordpressIntegration } from '@/types/publish';
+import { PDFDownloadLink } from '@react-pdf/renderer';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogTitle,AlertDialogOverlay } from '@radix-ui/react-alert-dialog';
+import { AuditPDF } from '@/components/audit/AuditPDF';
 import PublishExperience from '@/features/publish/PublishExperience';
 import { CompanyInfoSkeleton } from '@/components/dashboard/CompanyInfoSkeleton';
-import { KeywordTableItem } from '@/types/keywords';
-import { WordpressIntegration } from '@/types/publish';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@radix-ui/react-accordion';
+import AnalyticsReportingView from './AnalyticsReportingView';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import { AlertDialogHeader } from '@/components/ui/alert-dialog';
 import Profile from './Profile';
+import {AnimatePresence, motion} from 'framer-motion'
+import GSCAnalyticsView from '@/components/gsc/GSCAnalyticsView';
+import GSCBlogAnalytics from '@/features/analytics/GSCBlogAnalytics';
+import { usePublishStatus } from '@/hooks/usePublishStatus';
 import {
-  AuditRadarChart,
-  AuditBarChart,
-  AuditGaugeChart,
-  AuditScoreDistribution,
-  AuditLineChart,
-  OverallScoreGauge,
-} from '@/components/audit/AuditCharts';
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetFooter,
+} from '@/components/ui/sheet';
+import { Slider } from '@/components/ui/slider';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import TrendsChart, { TrendDataPoint } from "@/components/gsc/TrendsChart";
+
+
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3002";
 
-type TabId = 'overview' | 'analytics' | 'campaign' | 'publish' | 'settings' | 'profile' | 'ai-checker' | 'gsc-analytics' | 'audit';
+type TabId = 'overview' | 'analytics' | 'campaign' | 'publish' | 'settings' | 'profile' | 'ai-checker' | 'gsc-analytics' | 'audit' | 'analytics-report';
 type CompanySubTabId = 'company-info' | 'integration';
+type GscSubTabId = 'whole-analytics' | 'blog-performance';
 
 interface Tab {
   id: TabId;
@@ -45,91 +106,14 @@ interface DomainCheckResult {
   lastAnalyzed?: string;
 }
 
-// Campaign Structure Types
-interface Keyword {
-  id: number;
-  term: string;
-  volume: number;
-  difficulty: string;
-  intent?: string | null;
-  cpc?: number;
-  aiMetadata?: any; // For storing isPrimary/isLongtail flags
-}
-
-interface SubPage {
-  id: number;
-  title: string;
-  description?: string | null;
-  summary?: string | null;
-  keywords: Keyword[];
-}
-
-interface PillarPage {
-  id: number;
-  title: string;
-  description?: string | null;
-  summary?: string | null;
-  keywords: Keyword[];
-}
-
-interface Topic {
-  id: number;
-  title: string;
-  description?: string | null;
-  status?: string;
-  source?: string;
-  keywords?: Keyword[];
-  pillarPage: PillarPage | null;
-  subPages: SubPage[];
-}
-
-interface CampaignStructure {
-  topics: Topic[];
-}
-
-type GenerationPageStatus = {
-  jobId: string;
-  pageId: number;
-  pageType: 'pillar' | 'subpage';
-  status: 'pending' | 'generating' | 'completed' | 'failed' | 'published';
-  draftId?: number;
-  progress?: number;
-  primaryKeyword?: string;
-  hasHtml?: boolean;
-  updatedAt?: string;
-  error?: string | null;
-  wordpressUrl?: string | null;
-};
-
-type DraftPreview = {
-  htmlContent: string;
-  title?: string;
-  metaDescription?: string;
-  slug?: string;
-  featuredImage?: string;
-  primaryKeyword?: string;
-};
-
-type DraftStatusRecord = {
-  pageId: number;
-  pageType: string;
-  status: string;
-  draftId?: number;
-  progress?: number;
-  primaryKeyword?: string;
-  jobId?: string;
-  hasHtml?: boolean;
-  updatedAt?: string;
-  error?: string | null;
-  wordpressUrl?: string | null;
-};
+// Types moved to @/types
 
 const summarizeDomainContext = (input: string, maxLines = 6, maxChars = 800) => {
   if (!input) return '';
   const normalized = input.replace(/\r\n/g, '\n');
   const lines = normalized
     .split('\n')
-    .map((line) => line.trim())
+    .map((line) => line.trim()) 
     .filter(Boolean);
   const limited = lines.slice(0, maxLines).join('\n');
   if (limited.length <= maxChars) {
@@ -138,24 +122,7 @@ const summarizeDomainContext = (input: string, maxLines = 6, maxChars = 800) => 
   return `${limited.slice(0, maxChars)}…`;
 };
 
-const ButtonSpinner = () => (
-  <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24">
-    <circle
-      className="opacity-25"
-      cx="12"
-      cy="12"
-      r="10"
-      stroke="currentColor"
-      strokeWidth="4"
-      fill="none"
-    />
-    <path
-      className="opacity-75"
-      fill="currentColor"
-      d="M4 12a8 8 0 018-8v4l3-3-3-3v4A8 8 0 104 12z"
-    />
-  </svg>
-);
+
 
 const IntegrationSkeleton = () => (
   <div className="max-w-4xl mx-auto space-y-6 animate-pulse">
@@ -182,6 +149,7 @@ const IntegrationSkeleton = () => (
                 <div className="h-4 w-48 bg-gray-200 rounded-full" />
                 <div className="h-3 w-32 bg-gray-100 rounded-full" />
               </div>
+              
               <div className="w-8 h-8 bg-gray-100 rounded-full" />
             </div>
           </div>
@@ -196,13 +164,21 @@ const tooltipInfo = {
   SEO: "Shows how well your domain is optimized for search engines.",
   Accessibility: "Indicates how usable the site is for all users, including disabilities.",
   "Best Practices": "Checks if your site follows recommended web development standards.",
-  PWA: "Shows how well your domain qualifies as a Progressive Web App.",
 };
 
 const SidebarDashboard = () => {
-  const [activeTab, setActiveTab] = useState<TabId>("overview");
+const [activeTab, setActiveTab] = useState<TabId>(() => {
+  return (localStorage.getItem("activeTab") as TabId) || "overview";
+});
+useEffect(() => {
+  if (activeTab) {
+    localStorage.setItem("activeTab", activeTab);
+  }
+}, [activeTab]);
+
   const [activeCompanySubTab, setActiveCompanySubTab] =
     useState<CompanySubTabId>("company-info");
+  const [activeGscSubTab, setActiveGscSubTab] = useState<GscSubTabId>("whole-analytics");
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isSidebarHovered, setIsSidebarHovered] = useState(false);
   const [companyDomain, setCompanyDomain] = useState("");
@@ -210,12 +186,28 @@ const SidebarDashboard = () => {
   const [domainError, setDomainError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [deleteId, setDeleteId] = useState<number | null>(null);
-  const [auditData, setAuditData] = useState<any>(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteLabel, setDeleteLabel] = useState<string>('');
+  const [deleteAction, setDeleteAction] = useState<(() => void) | null>(null);
+
+  function confirmDelete(label: string, action: () => void) {
+    setDeleteLabel(label);
+    setDeleteAction(() => action);
+    setShowDeleteModal(true);
+  }
+const [auditData, setAuditData] = useState<any>(null);
 const [auditLoading, setAuditLoading] = useState(false);
 const [auditError, setAuditError] = useState<string | null>(null);
 const [auditResult, setAuditResult] = useState<any>(null);
 const [auditComplete, setAuditComplete] = useState(false);
+const [showAuditModal, setShowAuditModal] = useState(false);
+const resultsRef = useRef<HTMLDivElement | null>(null);
 const [activeChartTab, setActiveChartTab] = useState<'overview' | 'comparison' | 'distribution'>('overview');
+const [n8nSending, setN8nSending] = useState(false);
+const [n8nRequestId, setN8nRequestId] = useState<string | null>(null);
+const [n8nStatus, setN8nStatus] = useState<'processing' | 'completed' | 'failed' | null>(null);
+const [n8nResults, setN8nResults] = useState<{sheetsUrl?: string; slidesUrl?: string} | null>(null);
+const sseRef = useRef<EventSource | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loadingSteps, setLoadingSteps] = useState([
     {
@@ -275,6 +267,8 @@ const [activeChartTab, setActiveChartTab] = useState<'overview' | 'comparison' |
   const [showAddKeyword, setShowAddKeyword] = useState(false);
   const [newKeyword, setNewKeyword] = useState("");
   const [isAddingKeyword, setIsAddingKeyword] = useState(false);
+  const [confirmUpdateOpen, setConfirmUpdateOpen] = useState(false);
+  const [updateLoading, setUpdateLoading] = useState(false);
   const [showCountByCompetition, setShowCountByCompetition] = useState<
     Record<string, number>
   >({
@@ -284,6 +278,14 @@ const [activeChartTab, setActiveChartTab] = useState<'overview' | 'comparison' |
   });
   const [gscConnected, setGscConnected] = useState(false);
   const [gscAnalysis, setGscAnalysis] = useState(null);
+  // Track pages currently being published (waiting for SSE confirmation)
+  const [publishingPageIds, setPublishingPageIds] = useState<Set<number>>(new Set());
+  // Map draftId to pageId so SSE handler knows which page to update
+  const [draftToPageMap, setDraftToPageMap] = useState<Map<number, number>>(new Map());
+  // Track draft statuses (published/local drafts/failed)
+  const [draftStatuses, setDraftStatuses] = useState<Map<number, { isPublished: boolean; isFailed?: boolean; publishedUrl?: string; draftId?: number; error?: string }>>(new Map());
+  // Track generation job statuses
+  const [generationJobs, setGenerationJobs] = useState<Map<number, GenerationPageStatus>>(new Map());
 const [improvedContent, setImprovedContent] = useState("");
   const [gscEmail, setGscEmail] = useState<string>("");
   const [gscSelectedProperty, setGscSelectedProperty] = useState<string>("");
@@ -310,11 +312,8 @@ const [improvedContent, setImprovedContent] = useState("");
   const [selectedCampaignId, setSelectedCampaignId] = useState<number | null>(
     null
   );
-  const { user, logout } = useAuth();
-  const navigate = useNavigate();
-  const { toast } = useToast();
-  const isSidebarExpanded = sidebarOpen || isSidebarHovered;
-// PUBLISH PAGE STATES
+
+  // PUBLISH PAGE STATES
 const [primaryKeyword, setPrimaryKeyword] = useState("");
 const [longtailKeywords, setLongtailKeywords] = useState("");
 const [brandName, setBrandName] = useState("");
@@ -327,7 +326,67 @@ const [featuredImage, setFeaturedImage] = useState("");
 const [publishLoading, setPublishLoading] = useState(false);
 const [publishSuccess, setPublishSuccess] = useState(false);
 const [publishError, setPublishError] = useState("");
+const [openSections, setOpenSections] = useState<number[]>([]);
+const toggleSection = (idx: number) => {
+  setOpenSections((prev) =>
+    prev.includes(idx)
+      ? prev.filter((i) => i !== idx)
+      : [...prev, idx]
+  );
+};
+  // Company info carousel: track index and count to show arrows conditionally
+  const companyCarouselRef = useRef<HTMLDivElement | null>(null);
+  const [companyCurrentIndex, setCompanyCurrentIndex] = useState(0);
+  const [companySectionsCount, setCompanySectionsCount] = useState(0);
+  const companyCarouselCleanupRef = useRef<(() => void) | null>(null);
+  const setCompanyCarouselRef = useCallback((el: HTMLDivElement | null) => {
+    if (companyCarouselCleanupRef.current) {
+      companyCarouselCleanupRef.current();
+      companyCarouselCleanupRef.current = null;
+    }
+    companyCarouselRef.current = el;
+    if (!el) {
+      setCompanySectionsCount(0);
+      setCompanyCurrentIndex(0);
+      return;
+    }
+    const update = () => {
+      const count = Math.max(0, el.children.length);
+      setCompanySectionsCount(count);
+      const idx = Math.round(el.scrollLeft / Math.max(1, el.clientWidth));
+      setCompanyCurrentIndex(Math.min(Math.max(0, idx), Math.max(0, count - 1)));
+    };
+    update();
+    el.addEventListener('scroll', update);
+    window.addEventListener('resize', update);
+    companyCarouselCleanupRef.current = () => {
+      el.removeEventListener('scroll', update);
+      window.removeEventListener('resize', update);
+    };
+  }, []);
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  const isSidebarExpanded = sidebarOpen || isSidebarHovered;
+// Campaign States
+const [campaignViewMode, setCampaignViewMode] = useState<'split' | 'graph'>('split');
+const [selectedTopicId, setSelectedTopicId] = useState<number | null>(null);
+const [campaignStructure, setCampaignStructure] = useState<CampaignStructure>({
+  topics: []
+});
+// For inline editing of campaigns
+const [showEditModal, setShowEditModal] = useState(false);
+const [editingCampaignId, setEditingCampaignId] = useState<number | null>(null);
+const [editTitle, setEditTitle] = useState('');
+const [editDescription, setEditDescription] = useState('');
 
+
+  // Initialize selectedTopicId
+  useEffect(() => {
+    if (campaignStructure.topics.length > 0 && selectedTopicId === null) {
+      setSelectedTopicId(campaignStructure.topics[0].id);
+    }
+  }, [campaignStructure.topics, selectedTopicId]);
 
   useEffect(() => {
     if (sidebarOpen) {
@@ -335,16 +394,121 @@ const [publishError, setPublishError] = useState("");
     }
   }, [sidebarOpen]);
 
+  // Listen for real-time publish updates via SSE
+  usePublishStatus({
+    onUpdate: (data) => {
+      // Find which page this draftId corresponds to
+      const pageId = draftToPageMap.get(data.draftId);
+      
+      // Always clear publishing state for this draft
+      if (data.status === 'published' || data.status === 'failed') {
+        if (pageId) {
+          setPublishingPageIds(prev => {
+            const next = new Set(prev);
+            next.delete(pageId);
+            return next;
+          });
+        }
+        // Clean up the mapping
+        setDraftToPageMap(prev => {
+          const next = new Map(prev);
+          next.delete(data.draftId);
+          return next;
+        });
+      }
+
+      if (data.status === 'published' && data.publishedUrl) {
+        // Update generationJobs with the published URL
+        if (pageId) {
+          setGenerationJobs(prev => {
+            const existing = prev.get(pageId);
+            if (existing) {
+              const updated = new Map(prev);
+              updated.set(pageId, {
+                ...existing,
+                wordpressUrl: data.publishedUrl || null,
+              });
+              return updated;
+            }
+            return prev;
+          });
+        }
+
+        // Also update draftStatuses for the View Live button
+        setDraftStatuses(prev => {
+          const updated = new Map(prev);
+          // Find entry by draftId
+          for (const [pid, status] of updated.entries()) {
+            if (status.draftId === data.draftId) {
+              updated.set(pid, {
+                ...status,
+                isPublished: true,
+                publishedUrl: data.publishedUrl,
+              });
+              break;
+            }
+          }
+          return updated;
+        });
+
+        toast({
+          title: 'Published Successfully',
+          description: `Your content is live! View it at: ${data.publishedUrl}`,
+        });
+      } else if (data.status === 'failed') {
+        // Update draftStatuses to show failed state with View/Retry buttons
+        setDraftStatuses(prev => {
+          const updated = new Map(prev);
+          for (const [pid, status] of updated.entries()) {
+            if (status.draftId === data.draftId) {
+              updated.set(pid, {
+                ...status,
+                isFailed: true,
+                isPublished: false,
+                error: data.error,
+              });
+              break;
+            }
+          }
+          return updated;
+        });
+
+        // Also update via pageId if we have the mapping
+        if (pageId) {
+          setDraftStatuses(prev => {
+            const updated = new Map(prev);
+            const existing = updated.get(pageId);
+            updated.set(pageId, {
+              ...existing,
+              isFailed: true,
+              isPublished: false,
+              draftId: data.draftId,
+              error: data.error,
+            });
+            return updated;
+          });
+        }
+
+        toast({
+          title: 'Publish Failed',
+          description: data.error || 'An error occurred while publishing to WordPress',
+          variant: 'destructive',
+        });
+      }
+    }
+  });
+
   const tabs: Tab[] = [
+    { id: 'ai-checker', label: 'AI Checker', icon: <Sparkles className="h-5 w-5" /> },
     { id: 'overview', label: 'Overview', icon: <LayoutDashboard className="h-5 w-5" /> },
-    { id: 'analytics', label: 'Company', icon: <Building className="h-5 w-5" /> },
+    { id: 'analytics', label: 'Company', icon: <Building className="h-5 w-5" /> } ,
     { id: 'campaign', label: 'Campaign', icon: <Megaphone className="h-5 w-5" /> },
     { id: 'publish', label: 'Publish', icon: <Send className="h-5 w-5" /> },
     { id: 'gsc-analytics', label: 'GSC Analytics', icon: <BarChart3 className="h-5 w-5" /> },
     { id: 'audit', label: 'Audit', icon: <ClipboardList className="h-5 w-5" /> },
+    { id: 'analytics-report', label: 'Analytics Reporting', icon: <FileChartColumnIncreasing className="h-5 w-5" /> },
     { id: 'settings', label: 'Settings', icon: <Settings className="h-5 w-5" /> },
     { id: 'profile', label: 'Profile', icon: <User className="h-5 w-5" /> },
-    { id: 'ai-checker', label: 'AI Checker', icon: <Sparkles className="h-5 w-5" /> },
   ];
 
   const validateDomain = (value: string) => {
@@ -401,9 +565,14 @@ const handleAnalyze = async () => {
 };
 
 
+const normalizedDomain = companyDomain
+  .replace(/^https?:\/\//, "")
+  .replace(/^www\./, "")
+  .split("/")[0];
+
 
 // Fetch existing audit for company domain
-const fetchAudit = async () => {
+const fetchAudit = useCallback(async () => {
   const token = localStorage.getItem("authToken");
   if (!token) return;
 
@@ -425,7 +594,6 @@ const fetchAudit = async () => {
           seo: data.audit.seo,
           accessibility: data.audit.accessibility,
           bestPractices: data.audit.bestPractices,
-          pwa: data.audit.pwa,
           audits: data.audit.audits,
           screenshot: data.audit.screenshotUrl || null,
         });
@@ -435,7 +603,16 @@ const fetchAudit = async () => {
   } catch (err) {
     console.error('Error fetching audit:', err);
   }
-};
+}, []);
+
+const overallScore =
+  auditData
+    ? (auditData.performance +
+        auditData.seo +
+        auditData.accessibility +
+        auditData.bestPractices) / 4
+    : 0;
+
 
 //Handle Run Audit
 const handleRunAudit = async (url?: string) => {
@@ -467,8 +644,9 @@ const handleRunAudit = async (url?: string) => {
     const data = await resp.json();
     if (data.success) {
       setAuditResult(data.normalized);
-      setAuditData(data.audit);
+      // setAuditData(data.audit);
       setAuditComplete(true);
+      setShowAuditModal(true);
       setTimeout(() => setAuditComplete(false), 3500);
     }
   } catch (err) {
@@ -482,6 +660,153 @@ const handleRunAudit = async (url?: string) => {
     setAuditLoading(false);
   }
 };
+const InfoTooltip = ({ text }: { text: string }) => (
+  <span className="relative inline-flex items-center ml-1">
+    {/* Trigger */}
+    <span className="peer text-gray-400 hover:text-gray-600 transition-colorstext-xs">
+     <Info />
+    </span>
+
+    {/* Tooltip */}
+    <span
+      className="
+        pointer-events-none absolute left-1/2 -translate-x-1/2 bottom-full mb-2
+        w-64 rounded-xl bg-gray-800 text-white text-sm leading-relaxed
+        px-3 py-2 opacity-0 scale-95 translate-y-1
+        peer-hover:opacity-100 peer-hover:scale-100 peer-hover:translate-y-0
+        transition-all duration-200 ease-out z-50
+      "
+    >
+      {text}
+      <span className="absolute left-1/2 -translate-x-1/2 top-full w-2 h-2 bg-gray-900 rotate-45" />
+    </span>
+  </span>
+);
+
+const categoryDescriptions: Record<string, string> = {
+  Performance: "Overall speed and responsiveness of the page.",
+  SEO: "How well the page is optimized for search engines.",
+  Accessibility: "How usable the page is for users with disabilities.",
+  "Best Practices": "Adherence to modern web development best practices.",
+};
+
+const metricDescriptions: Record<string, string> = {
+  fcp: "Time until the first visible content appears on the page.",
+  lcp: "Time it takes for the largest visible element to fully render.",
+  cls: "Measures visual stability by tracking unexpected layout shifts.",
+  tbt: "Total time the page is blocked from responding to user input.",
+  speedIndex: "How quickly content is visually displayed during load.",
+};
+
+// Handle Send to N8n
+const handleSendToN8n = async () => {
+  const token = localStorage.getItem("authToken");
+  if (!token) {
+    console.error("Missing token");
+    return;
+  }
+
+  setN8nSending(true);
+  setN8nStatus(null);
+  setN8nResults(null);
+
+  try {
+    const resp = await fetch(`${import.meta.env.VITE_API_URL}/api/audit/n8n/send`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!resp.ok) {
+      const errorData = await resp.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Failed to send to n8n');
+    }
+
+    const data = await resp.json();
+    if (data.success) {
+      setN8nRequestId(data.requestId);
+      setN8nStatus('processing');
+      toast({
+        title: 'Processing',
+        description: 'N8n is processing your request',
+      });
+      
+      // Connect to SSE for real-time updates
+      connectSSE(token, data.requestId);
+    }
+  } catch (err) {
+    console.error(err);
+    toast({
+      title: 'Failed to Send',
+      description: err instanceof Error ? err.message : 'Failed to send to n8n',
+      variant: 'destructive',
+    });
+    setN8nSending(false);
+  }
+};
+
+// Connect to SSE for n8n updates
+const connectSSE = (token: string, requestId: string) => {
+  if (sseRef.current) {
+    sseRef.current.close();
+  }
+
+  const url = `${import.meta.env.VITE_API_URL}/api/sse?token=${encodeURIComponent(token)}`;
+  const eventSource = new EventSource(url);
+
+  eventSource.onmessage = (event) => {
+    try {
+      const data = JSON.parse(event.data);
+      if (data.type === 'n8n_update' && data.data?.requestId === requestId) {
+        setN8nStatus(data.data.status);
+        
+        if (data.data.status === 'completed') {
+          setN8nResults({
+            sheetsUrl: data.data.googleSheetsUrl,
+            slidesUrl: data.data.googleSlidesUrl
+          });
+          toast({
+            title: 'Success',
+            description: 'N8n processing completed successfully',
+          });
+          eventSource.close();
+          sseRef.current = null;
+          setN8nSending(false);
+        } else if (data.data.status === 'failed') {
+          toast({
+            title: 'Failed',
+            description: data.data.error || 'N8n processing failed',
+            variant: 'destructive',
+          });
+          eventSource.close();
+          sseRef.current = null;
+          setN8nSending(false);
+        }
+      }
+    } catch (err) {
+      console.error('Error parsing SSE:', err);
+    }
+  };
+
+  eventSource.onerror = () => {
+    eventSource.close();
+    sseRef.current = null;
+  };
+
+  sseRef.current = eventSource;
+};
+
+// Cleanup SSE on unmount
+useEffect(() => {
+  return () => {
+    if (sseRef.current) {
+      sseRef.current.close();
+      sseRef.current = null;
+    }
+  };
+}, []);
 
 
 
@@ -489,6 +814,14 @@ const handleRunAudit = async (url?: string) => {
     setCompanyDomain(value);
     if (value) validateDomain(value);
   };
+
+  const handleViewReport = () => {
+    setShowAuditModal(false);
+    setTimeout(() => {
+      resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 220);
+  };
+
 
   // Handle URL query parameters for tab navigation (e.g., from OAuth callback)
   useEffect(() => {
@@ -631,11 +964,7 @@ const handleRunAudit = async (url?: string) => {
   }, [activeTab, fetchCampaignTabData]);
 
   useEffect(() => {
-    if (activeTab === 'analytics' || activeTab === 'publish') {
       fetchCompanyDomain();
-    } else {
-      setCompanyDomainLoading(false);
-    }
   }, [activeTab, fetchCompanyDomain]);
 
   // Fetch audit when audit tab is active
@@ -644,6 +973,12 @@ const handleRunAudit = async (url?: string) => {
       fetchAudit();
     }
   }, [activeTab]);
+
+  // On mount: load company domain and any existing audit so Overview reflects latest data on reload
+  useEffect(() => {
+    fetchCompanyDomain();
+    fetchAudit();
+  }, [fetchCompanyDomain, fetchAudit]);
 
   // Helper function to determine intent based on keyword content
   const determineIntent = (keyword: string): string => {
@@ -733,6 +1068,8 @@ const handleRunAudit = async (url?: string) => {
     } else {
       setKeywordsTableData([]);
     }
+    console.log("keywords:", keywords.length);
+  console.log("createdDomainId:", createdDomainId);
   }, [keywords, createdDomainId, companyDomain]);
 
   // Filter and sort keywords
@@ -1247,12 +1584,7 @@ const handleRunAudit = async (url?: string) => {
     }
   };
 
-  const handleDisconnectWordpress = async () => {
-    if (!wpIntegration || wpIntegrationDeleting) return;
-    if (!confirm('Disconnect WordPress publishing? Stored credentials will be removed.')) {
-      return;
-    }
-
+  const doDisconnectWordpress = async () => {
     try {
       setWpIntegrationDeleting(true);
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/publish/wordpress`, {
@@ -1286,6 +1618,11 @@ const handleRunAudit = async (url?: string) => {
     }
   };
 
+  const handleDisconnectWordpress = () => {
+    if (!wpIntegration || wpIntegrationDeleting) return;
+    confirmDelete("WordPress connection", doDisconnectWordpress);
+  };
+
   const handleConfigureWordpress = useCallback(() => {
     setActiveTab('analytics');
     setActiveCompanySubTab('integration');
@@ -1294,10 +1631,9 @@ const handleRunAudit = async (url?: string) => {
 
 
   useEffect(() => {
-    if (activeTab === 'analytics' && activeCompanySubTab === 'integration') {
       fetchGscStatus();
       fetchWordpressIntegration();
-    }
+    
     // Also refresh campaign tab data if we're on campaign tab and WordPress integration might have changed
     if (activeTab === 'campaign' && activeCompanySubTab === 'integration') {
       fetchCampaignTabData();
@@ -1342,7 +1678,9 @@ const handleRunAudit = async (url?: string) => {
   }, [toast]);
 
   useEffect(() => {
-    if (activeTab === 'campaign') {
+    if (activeTab === 'campaign' || activeTab === 'overview') {
+      // Fetch campaigns for both the Campaign tab and the Overview
+      // so Overview can show recent campaigns/quick access.
       fetchCampaigns();
     }
   }, [activeTab, fetchCampaigns]);
@@ -1402,6 +1740,65 @@ const handleRunAudit = async (url?: string) => {
       });
     }
   };
+
+ const handleUpdateCampaign = async () => {
+  if (!editTitle.trim()) {
+    toast({
+      title: "Title Required",
+      description: "Please enter a campaign title",
+      variant: "destructive",
+    });
+    return;
+  }
+
+  if (editingCampaignId === null) return;
+
+  try {
+    const response = await fetch(
+      `${import.meta.env.VITE_API_URL}/api/campaigns/${editingCampaignId}`,
+      {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("authToken")}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          title: editTitle.trim(),
+          description: editDescription.trim() || null,
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || "Failed to update campaign");
+    }
+
+    const data = await response.json();
+
+    if (data.success) {
+      toast({
+        title: "Campaign Updated",
+        description: "Your campaign has been updated successfully",
+      });
+      setEditingCampaignId(null);
+      setEditTitle("");
+      setEditDescription("");
+      fetchCampaigns();
+    }
+  } catch (error) {
+    console.error("Error updating campaign:", error);
+    toast({
+      title: "Error",
+      description:
+        error instanceof Error
+          ? error.message
+          : "Failed to update campaign",
+      variant: "destructive",
+    });
+  }
+};
+
 
   const handleDeleteCampaign = async (campaignId: number) => {
     try {
@@ -1866,7 +2263,7 @@ const handleRunAudit = async (url?: string) => {
         }
 
         .sidebar-header {
-          padding: calc(env(safe-area-inset-top) + 20px) 20px 20px 20px;
+          padding: 0px 12px 0px 24px;
           border-bottom: 0.5px solid rgba(0, 0, 0, 0.1);
         }
 
@@ -1980,7 +2377,7 @@ const handleRunAudit = async (url?: string) => {
         .content-header {
           position: sticky;
           top: 0;
-          padding: calc(env(safe-area-inset-top) + 12px) 24px 12px 24px;
+          padding: calc(env(safe-area-inset-top) + 18px) 24px 12px 24px;
           background: rgba(255, 255, 255, 0.72);
           backdrop-filter: saturate(180%) blur(20px);
           -webkit-backdrop-filter: saturate(180%) blur(20px);
@@ -2131,7 +2528,7 @@ const handleRunAudit = async (url?: string) => {
                 fontWeight: "400",
                 letterSpacing: "-0.022em",
                 color: "#1d1d1f",
-                margin: "0",
+                marginTop: "20px",
               }}
             >
               Dashboard
@@ -2147,6 +2544,7 @@ const handleRunAudit = async (url?: string) => {
                 cursor: "pointer",
                 display: "flex",
                 alignItems: "center",
+                marginTop: "20px",
                 justifyContent: "center",
                 transition: "background 0.2s ease",
               }}
@@ -2187,41 +2585,45 @@ const handleRunAudit = async (url?: string) => {
                 >
                   <span className="sidebar-tab-icon">{tab.icon}</span>
                   <span className="sidebar-tab-label">{tab.label}</span>
-                  {tab.id === "analytics" &&
-                    activeTab === "analytics" &&
-                    showResults && (
-                      <ChevronDown className="h-4 w-4 ml-auto sidebar-tab-chevron" />
-                    )}
+                  {tab.id === "analytics" && (
+  <ChevronDown
+    className={`h-4 w-4 ml-auto sidebar-tab-chevron transition-transform ${
+      activeTab === "analytics" && showResults ? "rotate-180" : ""
+    }`}
+  />
+)}
+
                 </button>
                 {/* Show sub-tabs when Company is active and results are shown */}
                 {tab.id === "analytics" &&
                   activeTab === "analytics" &&
                   showResults && (
+                    
                     <div className="ml-8 mt-1 space-y-1 sidebar-subtabs">
+                      
                       <button
                         onClick={() => setActiveCompanySubTab("company-info")}
                         className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-light transition-all duration-200 ${
                           activeCompanySubTab === "company-info"
                             ? "bg-blue-50 text-blue-700"
-                            : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+                            : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
                         }`}
                       >
                         <FileText className="h-4 w-4" />
-                        <span>Company info</span>
-                        {activeCompanySubTab === "company-info" && (
-                          <ChevronDown className="h-3 w-3 ml-auto" />
-                        )}
+                        <span>Domain Info</span>
+                        {activeCompanySubTab === "company-info" }
                       </button>
                       <button
                         onClick={() => setActiveCompanySubTab("integration")}
                         className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-light transition-all duration-200 ${
-                          activeCompanySubTab === "integration"
-                            ? "bg-gray-100 text-gray-900 rounded-lg"
-                            : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+                          activeCompanySubTab === "integration" 
+                            ? "bg-blue-50 text-blue-700"
+                            : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
                         }`}
                       >
                         <Plug className="h-4 w-4" />
                         <span>Integration</span>
+                        {activeCompanySubTab === "integration" }
                       </button>
                     </div>
                   )}
@@ -2261,7 +2663,7 @@ const handleRunAudit = async (url?: string) => {
         <header className="content-header">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <button
+              {/* <button
                 className="desktop-sidebar-toggle"
                 onClick={() => setSidebarOpen((prev) => !prev)}
                 aria-label={sidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
@@ -2271,7 +2673,7 @@ const handleRunAudit = async (url?: string) => {
                 ) : (
                   <Menu className="h-4 w-4 text-gray-700" />
                 )}
-              </button>
+              </button> */}
               <h2
                 style={{
                   fontSize: "28px",
@@ -2284,6 +2686,35 @@ const handleRunAudit = async (url?: string) => {
                 {tabs.find((t) => t.id === activeTab)?.label || "Dashboard"}
               </h2>
             </div>
+
+            
+            {activeTab === 'campaign' && selectedCampaignId && (
+                <div className="flex items-center gap-2 bg-gray-100/80 p-1 rounded-lg border border-gray-200/50 mr-4">
+                  <button
+                    onClick={() => setCampaignViewMode('split')}
+                    className={`p-1.5 rounded-md transition-all flex items-center gap-2 text-xs font-medium ${
+                      campaignViewMode === 'split' 
+                        ? 'bg-white text-black shadow-sm' 
+                        : 'text-gray-500 hover:text-gray-700'
+                    }`}
+                  >
+                    <List className="h-4 w-4" />
+                    <span>Topics</span>
+                  </button>
+                  <button
+                    onClick={() => setCampaignViewMode('graph')}
+                    className={`p-1.5 rounded-md transition-all flex items-center gap-2 text-xs font-medium ${
+                      campaignViewMode === 'graph' 
+                        ? 'bg-white text-black shadow-sm' 
+                        : 'text-gray-500 hover:text-gray-700'
+                    }`}
+                  >
+                    <Network className="h-4 w-4" />
+                    <span>Map</span>
+                  </button>
+               </div>
+            )}
+
             {user && (
               <div className="flex items-center gap-3">
                 <div
@@ -2304,20 +2735,482 @@ const handleRunAudit = async (url?: string) => {
         </header>
 
         {/* Content Body */}
-        <div className="content-body">
-          {activeTab === "analytics" ? (
+        <div className={activeTab === 'campaign' && selectedCampaignId ? "flex-1 min-h-[calc(100vh-80px)] bg-white" : "content-body"}>
+          {activeTab === "overview" ? (
+           <div className="max-w-7xl mx-auto px-4 sm:px-6 py-10 space-y-12">
+
+    {/* ===================== HERO ===================== */}
+    <div className="relative overflow-hidden rounded-3xl border border-gray-100 bg-gradient-to-br from-white via-slate-50 to-white hover:shadow-lg">
+      {/* soft glow */}
+      <div className="absolute -top-24 -left-24 w-96 h-96 bg-white rounded-full blur-3xl opacity-60" />
+
+      <div className="relative p-8 sm:p-10 flex flex-col lg:flex-row gap-10 justify-between">
+        {/* Left */}
+        <div className="max-w-xl">
+          <h1 className="text-4xl sm:text-5xl font-light text-gray-900 leading-tight">
+            Overview
+          </h1>
+          <p className="mt-3 text-base text-gray-600">
+            A real-time snapshot of your domain’s SEO health, performance,
+            and growth potential.
+          </p>
+
+          <div className="mt-6 flex flex-wrap items-center gap-3">
+            <button
+              onClick={() => handleRunAudit(companyDomain)}
+              disabled={!companyDomain || auditLoading}
+              className="inline-flex items-center gap-2 px-6 py-3 bg-black text-white rounded-full text-sm font-medium hover:bg-gray-600  disabled:opacity-60 transition"
+            >
+              {auditLoading ? "Running audit…" : "Run Audit"}
+            </button>
+
+            <button
+              onClick={() => {
+                setActiveTab("analytics");
+                setActiveCompanySubTab("company-info");
+              }}
+              className="px-5 py-3 rounded-full border text-gray-700 border-gray-200 bg-white text-sm hover:bg-gray-100 hover:text-gray-700 hover:shadow-lg transition"
+            >
+              Analytics
+            </button>
+          </div>
+        </div>
+
+        {/* Right */}
+          <div className="hidden lg:block w-px h-54 bg-gray-200" />
+<div className="flex flex-col items-center gap-6">
+  {companyDomain && (
+    <div className="inline-flex items-center gap-3 bg-blue-50 border border-blue-200 text-blue-700 px-5 py-3 rounded-2xl shadow-sm">
+      <img
+        src={`https://img.logo.dev/${normalizedDomain}?token=pk_DTdFFG1JT9WOCjATvZEzIA&size=128`}
+        alt="Company logo"
+        width={32}
+        height={32}
+        className="w-8 h-8 rounded-md"
+        loading="lazy"
+      />
+      <span className="font-medium text-lg tracking-tight">
+        <a
+          href={companyDomain.startsWith("http") ? companyDomain : `https://${companyDomain}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-blue-600 hover:underline text-lg"
+        >
+          {companyDomain.replace(/^https?:\/\//, "").replace(/^www\./, "")}
+        </a>
+      </span>
+    </div>
+  )}
+
+  {/* Info blocks*/}
+  <div className="flex flex-col-2 items-center gap-20">
+    <div>
+      <div className="text-xs text-gray-500">Last scanned</div>
+      {auditData?.updatedAt ? (
+        <>
+          <div className="font-medium text-gray-900">
+            {new Date(auditData.updatedAt).toLocaleDateString("en-GB", {
+              day: "numeric",
+              month: "short",
+              year: "numeric",
+            })}
+          </div>
+          <div className="text-xs text-gray-900">
+            {new Date(auditData.updatedAt).toLocaleTimeString("en-US", {
+              hour: "2-digit",
+              minute: "2-digit",
+            })}
+          </div>
+        </>
+      ) : (
+        <div className="font-medium text-gray-900">Never</div>
+      )}
+    </div>
+
+    <div>
+      <div className="text-xs text-gray-500">Keywords tracked</div>
+      <div className="font-medium text-gray-900">{keywordsTableData.length}</div>
+    </div>
+  </div>
+</div>
+
+      </div>
+    </div>
+
+    {/* ===================== KPI GRID ===================== */}
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+      {/* Opportunities Card */}
+<div className="rounded-3xl bg-white border border-gray-100 p-6 hover:shadow-lg transition">
+  <div className="flex items-center justify-between mb-4">
+    <h3 className="text-[28px] font-medium text-gray-900">
+      Top Opportunities
+    </h3>
+    <div className="text-base font-medium text-gray-900">
+      Volume
+    </div>
+  </div>
+
+  <div className="space-y-4">
+    {keywordsTableData
+      .slice()
+      .sort((a, b) => (b.volume || 0) - (a.volume || 0)) 
+      .slice(0, 5) 
+      .map((item, idx) => (
+        <div key={idx} className="flex items-center justify-between">
+          <div>
+            <div className="text-lg font-medium text-gray-700"> 
+              {item?.keyword.charAt(0).toUpperCase() + item?.keyword.slice(1)|| "No keywords yet"}
+            </div>
+            <div className="text-xs text-gray-400 mt-1">
+              High potential growth keyword
+            </div>
+          </div>
+
+          {/* Volume badge */}
+          <div className="px-3 py-2 rounded-2xl bg-blue-50 flex items-center justify-center min-w-[50px]">
+            <span className="text-sm font-medium text-blue-700">
+              {item?.volume
+                ? item.volume >= 1000
+                  ? `${(item.volume / 1000).toFixed(1)}K`
+                  : item.volume.toLocaleString()
+                : "-"}
+            </span>
+          </div>
+        </div>
+      ))}
+  </div>
+</div>
+
+
+ {/* Audit Completed Modal */}
+              {showAuditModal && (
+<div className="absolute inset-0 z-50 flex items-center justify-center">
+  <div className="max-w-md w-full rounded-2xl bg-white shadow-2xl">
+              <AlertDialog open={showAuditModal} onOpenChange={setShowAuditModal}>
+                <AlertDialogOverlay className="fixed inset-0 bg-black/20 backdrop-blur-sm z-40" />
+                <AlertDialogContent className=" fixed left-1/2 top-1/2 z-50
+    -translate-x-1/2 -translate-y-1/2
+    max-w-md w-full
+    rounded-2xl
+    bg-white
+    border border-gray-100
+    shadow-2xl
+    animate-in fade-in zoom-in-95">
+                  <div className="p-4 rounded-lg bg-gradient-to-r from-white/80 to-gray-50 border border-gray-100">
+                    <AlertDialogHeader>
+                      <AlertDialogTitle className="text-2xl font-medium">Audit Completed</AlertDialogTitle>
+                      <AlertDialogDescription className="text-sm text-muted-foreground">
+                        Your domain audit has finished. Here's a quick summary — you can view the full report or download it.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+
+                    <div className="mt-4 flex items-center gap-4">
+                      <div className="flex-shrink-0">
+                        <OverallScoreGauge score={Math.round(((auditResult?.performance||0)+(auditResult?.seo||0)+(auditResult?.accessibility||0)+(auditResult?.bestPractices||0))/4*100)/100 || 0} />
+                      </div>
+                      <div className="flex-1">
+                        <div className="text-sm text-gray-600 mb-2">Top category</div>
+                        <div className="text-base font-medium text-gray-900">
+                          {auditResult ? (
+                            (() => {
+                              const cats = [
+                                { k: 'Performance', v: auditResult.performance },
+                                { k: 'SEO', v: auditResult.seo },
+                                { k: 'Accessibility', v: auditResult.accessibility },
+                                { k: 'Best Practices', v: auditResult.bestPractices },
+                              ];
+                              const scored = cats.map(c => ({ ...c, s: Math.round((c.v||0)*100) }));
+                              const best = scored.reduce((a,b)=> b.s > a.s ? b : a, scored[0]);
+                              return `${best.k} — ${best.s}%`;
+                            })()
+                          ) : '—'}
+                        </div>
+                        <div className="text-xs text-gray-500 mt-2">Click below to view the full interactive report.</div>
+                      </div>
+                    </div>
+
+                    <div className="mt-6 flex items-center justify-end gap-2">
+                      {auditResult && companyDomain && (
+                        <PDFDownloadLink
+                          document={<AuditPDF data={auditResult} domain={companyDomain} />}
+                          fileName={`audit-${companyDomain}-${new Date().toISOString().split('T')[0]}.pdf`}
+                          className="px-4 py-2 rounded-full border border-gray-200 text-sm font-light bg-white hover:bg-gray-50 flex items-center justify-center"
+                        >
+                          {({ loading }) => (loading ? 'Preparing...' : 'Export PDF')}
+                        </PDFDownloadLink>
+                      )}
+                      <AlertDialogAction onClick={handleViewReport} className="px-4 py-2 rounded-full bg-black text-white text-sm">View Full Report</AlertDialogAction>
+                      <AlertDialogCancel className="px-4 py-2 rounded-full border border-gray-200 text-sm">Close</AlertDialogCancel>
+                    </div>
+                  </div>
+                </AlertDialogContent>
+              </AlertDialog>
+                </div>
+</div>
+)}
+      {/* Audit Summary */}
+   <div className="lg:col-span-1 rounded-3xl bg-white border border-gray-100 p-6 shadow-sm hover:shadow-lg transition-shadow duration-300">
+  {/* Header */}
+  <div className="flex items-center justify-between mb-4">
+    <div>
+      <h3 className="text-[28px] font-medium text-gray-900">
+        Audit Summary
+      </h3>
+      <p className="text-xs text-gray-400">
+        Lighthouse performance breakdown
+      </p>
+    </div>
+
+    <button
+  onClick={() => {
+    setActiveTab("audit");
+    setTimeout(() => setShowAuditModal(true), 120);
+  }}
+  className="group text-sm font-medium text-black  transition-colors duration-200 flex items-center gap-1"
+>
+  View Details
+  <span className="relative flex items-center w-4 h-4">
+    <ChevronRight
+      className="absolute inset-0 w-4 h-4 transition-all duration-200 ease-in-out group-hover:opacity-0 group-hover:translate-x-1"
+    />
+    <ArrowRight
+      className="absolute inset-0 w-4 h-4 opacity-0 transition-all duration-200 ease-in-out group-hover:opacity-100 group-hover:translate-x-0"
+    />
+  </span>
+</button>
+  </div>
+
+ {!auditResult ? (
+  <p className="text-sm text-gray-500">
+    Run an audit to view performance metrics.
+  </p>
+) : (
+  <div className="flex gap-6">
+  {/* Metrics grid on the left */}
+  <div className="flex flex-col gap-6 flex-1">
+    {[
+      ["Performance", auditResult.performance],
+      ["SEO", auditResult.seo],
+      ["Accessibility", auditResult.accessibility],
+      ["Best Practices", auditResult.bestPractices],
+    ].map(([label, value]) => {
+      const pct = Math.round((value || 0) * 100);
+      let bgColor = "bg-gray-50";
+      let textColor = "text-gray-900";
+
+      if (pct >= 80) { 
+        bgColor = "bg-green-50";
+        textColor = "text-green-700";
+      } else if (pct >= 60) {
+        bgColor = "bg-yellow-50";
+        textColor = "text-yellow-700";
+      } else if (pct >= 40) {
+        bgColor = "bg-orange-50";
+        textColor = "text-orange-700";
+      } else {
+        bgColor = "bg-red-50";
+        textColor = "text-red-700";
+      }
+
+      return (
+        <div
+          key={label}
+          className={`flex items-center justify-between rounded-xl px-3 py-4 ${bgColor}`}
+        >
+          <div className="flex items-center gap-2">
+            <ChartNoAxesCombined />
+            <span className="text-medium text-gray-600">{label}</span>
+          </div>
+          <span className={`font-semibold ${textColor}`}>{pct}%</span>
+        </div>
+      );
+    })}
+  </div>
+
+  {/* Overall score on the right, vertically centered */}
+  <div className="flex items-center justify-center">
+    <OverallScoreGauge
+      size={150}
+      score={
+        ((auditResult.performance || 0) +
+          (auditResult.seo || 0) +
+          (auditResult.accessibility || 0) +
+          (auditResult.bestPractices || 0)) /
+        4
+      }
+    />
+  </div>
+</div>
+
+)}
+
+</div>
+
+    </div>
+
+    {/* ===================== SNAPSHOT ===================== */}
+  <div className="grid grid-cols-1 lg:grid-cols-1 gap-6">
+  <div className="rounded-3xl bg-white border border-gray-100 p-6 hover:shadow-lg transition">
+    <div className="mb-6">
+      <h3 className="text-[28px] font-medium text-gray-900">Snapshot</h3>
+      <p className="text-xs text-gray-400 mt-1">
+        Quick overview of your setup
+      </p>
+    </div>
+
+    <div className="grid grid-cols-4 gap-4">
+      {[
+        ["Keywords", keywordsTableData.length],
+        ["Campaigns", campaigns.length],
+        ["WordPress", hasWordpressIntegration ? "Connected" : "Not connected"],
+        ["Integrations", hasWordpressIntegration ? "WordPress" : "—"],
+      ].map(([label, value]) => {
+        const isConnected =
+          value === "Connected" || value === "Disconnected" ;
+
+        return (
+          <div
+            key={label}
+            className="group rounded-2xl border border-gray-100 bg-gray-50/60 p-4 text-left  hover:shadow-sm transition"
+          >
+            <div className="text-xs uppercase tracking-wide text-gray-500">
+              {label}
+            </div>
+
+            <div className="mt-2 flex items-center justify-between">
+              <div
+                className={cn(
+                  "text-2xl font-semibold",
+                  isConnected
+                    ? "text-green-600"
+                    : "text-gray-900"
+                )}
+              >
+                {value}
+              </div>
+
+              {isConnected && (
+                <span className="flex items-center gap-1 text-xs font-medium text-green-600">
+                  <span className="h-2 w-2 rounded-full bg-green-500" />
+                </span>
+              )}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  </div>
+  {/* <div className="grid grid-cols-1 lg:grid-cols-1 gap-6">
+ <div className="px-4 py-6 grid-cols-1 lg:grid-cols-1 rounded-3xl bg-white border border-gray-100 p-6 hover:shadow-lg transition space-y-2">
+      <h3 className='py-2'>Suggested Next Actions</h3>
+                           <div className="flex justify-between items-center px-4 py-3 rounded-xl bg-gray-50/50 border border-gray-200 hover:bg-gray-50 transition-all" style={{ borderWidth: '0.5px' }}>
+                                  <span className="font-light text-gray-900 flex items-center gap-1" style={{ letterSpacing: '0.011em' }}> Publish 1 ready article</span>
+</div>
+                           <div className="flex justify-between items-center px-4 py-3 rounded-xl bg-gray-50/50 border border-gray-200 hover:bg-gray-50 transition-all" style={{ borderWidth: '0.5px' }}>
+                                  <span className="font-light text-gray-900 flex items-center gap-1" style={{ letterSpacing: '0.011em' }}> Connect WordPress</span>
+</div>
+                           <div className="flex justify-between items-center px-4 py-3 rounded-xl bg-gray-50/50 border border-gray-200 hover:bg-gray-50 transition-all" style={{ borderWidth: '0.5px' }}>
+                                  <span className="font-light text-gray-900 flex items-center gap-1" style={{ letterSpacing: '0.011em' }}> Connect Google Search Console</span>
+</div>
+                           <div className="flex justify-between items-center px-4 py-3 rounded-xl bg-gray-50/50 border border-gray-200 hover:bg-gray-50 transition-all" style={{ borderWidth: '0.5px' }}>
+                                  <span className="font-light text-gray-900 flex items-center gap-1" style={{ letterSpacing: '0.011em' }}> Improve SEO for 2 blogs</span>
+</div>
+  </div>
+</div> */}
+  </div>
+ <div className="px-4 py-6 grid-cols-1 lg:grid-cols-1 rounded-3xl bg-white border border-gray-100 p-6 hover:shadow-lg transition">
+   <GSCAnalyticsView/>
+  </div>
+  </div>
+          ) : activeTab === "analytics" ? (
             companyDomainLoading ? (
               <CompanyInfoSkeleton />
             ) : showResults ? (
               <div className="max-w-6xl mx-auto px-4 sm:px-6 py-12 sm:py-16">
                 {/* Company Domain Heading */}
-                <div className="text-center mb-12 flex flex-col items-center gap-4">
-                  <div className="inline-flex items-center gap-3 bg-blue-50 border border-blue-200 text-blue-700 px-5 py-3 rounded-2xl shadow-sm">
-                    <img
-                      src={`https://www.google.com/s2/favicons?domain=${companyDomain}&sz=64`}
-                      alt="favicon"
-                      className="w-8 h-8 rounded-md"
-                    />
+                {/* <div className="text-center mb-12 flex flex-col items-center gap-4">
+                
+                </div> */}
+
+                {/* Company Info Tab Content */}
+                {activeCompanySubTab === "company-info" && (
+                  <div>
+                    {/* Domain Context - Centered and Wide */}
+                    {domainContext && (
+                      <div className="mb-16">
+                        {(() => {
+                          const full = domainContext;
+                          const headers = [
+                            "Business Model Analysis",
+                            "Target Audience Profiling",
+                            "Value Proposition & Positioning",
+                            "SEO & Content Strategy Insights",
+                            "Competitive Intelligence",
+                            "Market Dynamics",
+                            "Location-Based SEO Analysis",
+                            "SEO Opportunity Analysis",
+                          ];
+                          const normalize = (s: string) =>
+                            s
+                              .replace(/\*\*/g, "")
+                              .replace(/^\s*\d+\.\s*/, "")
+                              .replace(/[:]+$/, "")
+                              .trim()
+                              .toUpperCase();
+                          const target = headers.map((h) => normalize(h));
+                          const lines = full.split(/\r?\n/);
+                          const contentMap: Record<string, string[]> = {};
+                          target.forEach((t) => (contentMap[t] = []));
+                          let current: string | null = null;
+                          for (const line of lines) {
+                            const n = normalize(line);
+                            const matched = target.find((t) => n.startsWith(t) || n.includes(t));
+                            if (matched) {
+                              current = matched;
+                              continue;
+                            }
+                            if (current) {
+                              contentMap[current].push(line);
+                            }
+                          }
+                          const sections = headers.map((h) => {
+                            const key = normalize(h);
+                            return {
+                              title: h,
+                              content: (contentMap[key] || []).join("\n").trim(),
+                            };
+                          });
+                                                    const leftSections = sections.slice(0, 4);
+const rightSections = sections.slice(4, 8);
+
+                       if (sections.some((s) => s.content.length > 0)) {
+  return (
+    <div className="p-4 sm:p-6 bg-white rounded-3xl border border-gray-100 hover:shadow-lg overflow-hidden backdrop-blur-sm">
+      {/* Master Panel */}
+      <div>
+        {/* Header */}
+        <div className="flex items-center justify-between px-4 py-6 border-gray-600/50">
+          <div>
+            <h1 className="text-2xl font-light tracking-tight text-gray-900">
+              Domain Info
+            </h1>
+            <p className="text-sm text-gray-500 mt-1">
+              AI-generated strategic analysis & recommendations
+            </p>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <div className="inline-flex items-center gap-5 bg-blue-50 border border-blue-200 text-blue-700 px-5 py-3 rounded-3xl shadow-sm">
+                   <img
+  src={`https://img.logo.dev/${normalizedDomain}?token=pk_DTdFFG1JT9WOCjATvZEzIA&size=128`}
+  alt="Company logo"
+  width={32}
+  height={32}
+  className="w-8 h-8 rounded-md object-contain bg-white"
+  loading="lazy"
+/>
+
                     <span className="font-medium text-lg tracking-tight">
                       {" "}
                       <a
@@ -2336,106 +3229,131 @@ const handleRunAudit = async (url?: string) => {
                       </a>
                     </span>
                   </div>
-                </div>
+          </div>
+        </div>
 
-                {/* Company Info Tab Content */}
-                {activeCompanySubTab === "company-info" && (
-                  <div>
-                    {/* Domain Context - Centered and Wide */}
-                    {domainContext && (
-                      <div className="mb-16">
-                        <div
-                          className="relative bg-white rounded-3xl p-8 sm:p-12 border border-gray-100 shadow-sm prose prose-lg prose-gray max-w-none mx-auto
-                          prose-headings:font-light prose-headings:text-gray-900 prose-headings:tracking-tight prose-headings:text-center
-                          prose-h1:text-3xl prose-h1:mb-6 prose-h1:mt-0
-                          prose-h2:text-2xl prose-h2:mb-5 prose-h2:mt-10
-                          prose-h3:text-xl prose-h3:mb-4 prose-h3:mt-8
-                          prose-p:text-gray-700 prose-p:leading-relaxed prose-p:mb-5 prose-p:text-center
-                          prose-strong:text-gray-900 prose-strong:font-medium
-                          prose-ul:my-6 prose-ul:pl-8 prose-ul:list-disc
-                          prose-ol:my-6 prose-ol:pl-8 prose-ol:list-decimal
-                          prose-li:text-gray-700 prose-li:my-3
-                          prose-a:text-blue-600 prose-a:no-underline hover:prose-a:underline
-                          prose-code:text-sm prose-code:bg-gray-100 prose-code:px-2 prose-code:py-1 prose-code:rounded prose-code:font-mono
-                          prose-pre:bg-gray-900 prose-pre:text-gray-100 prose-pre:rounded-2xl prose-pre:p-6 prose-pre:overflow-x-auto prose-pre:my-8
-                          prose-blockquote:border-l-4 prose-blockquote:border-gray-300 prose-blockquote:pl-6 prose-blockquote:italic prose-blockquote:text-gray-600 prose-blockquote:my-8
-                          prose-hr:border-gray-200 prose-hr:my-10
-                          prose-table:w-full prose-table:border-collapse prose-table:my-8
-                          prose-th:border prose-th:border-gray-300 prose-th:bg-gray-50 prose-th:px-5 prose-th:py-3 prose-th:text-left prose-th:font-medium prose-th:text-gray-900
-                          prose-td:border prose-td:border-gray-200 prose-td:px-5 prose-td:py-3 prose-td:text-gray-700
-                          prose-img:rounded-2xl prose-img:shadow-md prose-img:my-8 prose-img:mx-auto"
-                        >
-                          <ReactMarkdown
-                            remarkPlugins={[remarkGfm]}
-                            components={{
-                              // Custom styling for code blocks
-                              code: ({ className, children, ...props }) => {
-                                const match = /language-(\w+)/.exec(
-                                  className || ""
-                                );
-                                const isInline = !match;
-                                return isInline ? (
-                                  <code className={className} {...props}>
-                                    {children}
-                                  </code>
-                                ) : (
-                                  <code
-                                    className={`${className} block`}
-                                    {...props}
-                                  >
-                                    {children}
-                                  </code>
-                                );
-                              },
-                              // Custom styling for links
-                              a: ({ children, ...props }) => (
-                                <a
-                                  {...props}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="text-blue-600 hover:text-blue-700 transition-colors"
-                                >
-                                  {children}
-                                </a>
-                              ),
-                            }}
-                          >
-                            {displayedDomainContext}
-                          </ReactMarkdown>
-                          {!isContextExpanded && hasAdditionalContext && (
-                            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-white via-white/85 to-transparent" />
-                          )}
-                        </div>
+        {/* Body */}
+       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-6">
+        <div className="space-y-4 ">
+  {leftSections.map((sec, idx) => {
+    const globalIdx = idx; 
+    const isOpen = openSections.includes(globalIdx);
 
-                        {hasAdditionalContext && (
-                          <div className="flex justify-center mt-4">
-                            <button
-                              onClick={() =>
-                                setIsContextExpanded((prev) => !prev)
-                              }
-                              aria-expanded={isContextExpanded}
-                              className="inline-flex items-center space-x-2 px-5 py-2.5 rounded-full bg-gray-900 text-white text-sm font-medium shadow-lg shadow-gray-900/20 hover:bg-gray-800 transition-all duration-200"
+    return (
+      <motion.div
+        key={globalIdx}
+        className="rounded-xl border border-gray-200/60 bg-white overflow-hidden hover:shadow-lg"
+      >
+        <button
+          onClick={() => toggleSection(globalIdx)}
+          className="flex w-full items-center justify-between px-6 py-4 text-left"
+        >
+          <h3 className="text-lg font-light text-gray-900">{sec.title}</h3>
+
+          <motion.div animate={{ rotate: isOpen ? 180 : 0 }}>
+            <ChevronDown size={20} />
+          </motion.div>
+        </button>
+
+        <AnimatePresence initial={false}>
+          {isOpen && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="overflow-hidden px-6 pb-6"
+            >
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                {sec.content}
+              </ReactMarkdown>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </motion.div>
+    );
+  })}
+</div>
+
+          <div className="space-y-4">
+  {rightSections.map((sec, idx) => {
+    const globalIdx = idx + 4; // 4–7
+    const isOpen = openSections.includes(globalIdx);
+
+    return (
+      <motion.div
+        key={globalIdx}
+        className="rounded-xl border border-gray-200/60 bg-white overflow-hidden hover:shadow-lg"
+      >
+        <button
+          onClick={() => toggleSection(globalIdx)}
+          className="flex w-full items-center justify-between px-6 py-4 text-left"
+        >
+          <h3 className="text-lg font-light text-gray-900">{sec.title}</h3>
+
+          <motion.div animate={{ rotate: isOpen ? 180 : 0 }}>
+            <ChevronDown size={20} />
+          </motion.div>
+        </button>
+
+        <AnimatePresence initial={false}>
+          {isOpen && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="overflow-hidden px-6 pb-6"
+            >
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                {sec.content}
+              </ReactMarkdown>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </motion.div>
+    );
+  })}
+</div>
+
+        </div>
+      </div>
+    </div>
+  );
+}
+                          return (
+                            <div
+                              className="relative bg-white rounded-3xl p-8 sm:p-12 border border-gray-100 shadow-sm prose prose-lg prose-gray max-w-none mx-auto
+                              prose-headings:font-light prose-headings:text-gray-900 prose-headings:tracking-tight prose-headings:text-center
+                              prose-h1:text-3xl prose-h1:mb-6 prose-h1:mt-0
+                              prose-h2:text-2xl prose-h2:mb-5 prose-h2:mt-10
+                              prose-h3:text-xl prose-h3:mb-4 prose-h3:mt-8
+                              prose-p:text-gray-700 prose-p:leading-relaxed prose-p:mb-5 prose-p:text-center
+                              prose-strong:text-gray-900 prose-strong:font-medium
+                              prose-ul:my-6 prose-ul:pl-8 prose-ul:list-disc
+                              prose-ol:my-6 prose-ol:pl-8 prose-ol:list-decimal
+                              prose-li:text-gray-700 prose-li:my-3
+                              prose-a:text-blue-600 prose-a:no-underline hover:prose-a:underline
+                              prose-code:text-sm prose-code:bg-gray-100 prose-code:px-2 prose-code:py-1 prose-code:rounded prose-code:font-mono
+                              prose-pre:bg-gray-900 prose-pre:text-gray-100 prose-pre:rounded-2xl prose-pre:p-6 prose-pre:overflow-x-auto prose-pre:my-8
+                              prose-blockquote:border-l-4 prose-blockquote:border-gray-300 prose-blockquote:pl-6 prose-blockquote:italic prose-blockquote:text-gray-600 prose-blockquote:my-8
+                              prose-hr:border-gray-200 prose-hr:my-10
+                              prose-table:w-full prose-table:border-collapse prose-table:my-8
+                              prose-th:border prose-th:border-gray-300 prose-th:bg-gray-50 prose-th:px-5 prose-th:py-3 prose-th:text-left prose-th:font-medium prose-th:text-gray-900
+                              prose-td:border prose-td:border-gray-200 prose-td:px-5 prose-td:py-3 prose-td:text-gray-700
+                              prose-img:rounded-2xl prose-img:shadow-md prose-img:my-8 prose-img:mx-auto"
                             >
-                              <span>
-                                {isContextExpanded
-                                  ? "Show Less"
-                                  : "Read Full Analysis"}
-                              </span>
-                              <ChevronDown
-                                className={`w-4 h-4 transition-transform duration-200 ${
-                                  isContextExpanded ? "rotate-180" : ""
-                                }`}
-                              />
-                            </button>
-                          </div>
-                        )}
+                              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                {displayedDomainContext}
+                              </ReactMarkdown>
+                            </div>
+                          );
+                        })()}
                       </div>
                     )}
 
                     {/* Keywords - Table with Filters and Add Custom Keyword */}
                     {keywordsTableData.length > 0 && (
                       <div className="mt-16">
-                        <div className="bg-white rounded-3xl border border-gray-100 shadow-lg overflow-hidden backdrop-blur-sm">
+                        <div className="bg-white rounded-3xl border border-gray-100 hover:shadow-lg overflow-hidden backdrop-blur-sm">
                           <div className="p-4 sm:p-6 border-b border-gray-100 bg-gradient-to-b from-gray-50/50 to-white">
                             <div className="flex items-center justify-between mb-4">
                               <h2 className="text-2xl font-light text-gray-900 tracking-tight">
@@ -2633,9 +3551,7 @@ const handleRunAudit = async (url?: string) => {
                                               ),
                                               trend: "Stable",
                                               position: 0,
-                                              url: `https://${companyDomain}/${saveResult.keyword.term
-                                                .toLowerCase()
-                                                .replace(/\s+/g, "-")}`,
+                                              url: '',
                                               updated: new Date()
                                                 .toISOString()
                                                 .split("T")[0],
@@ -2931,23 +3847,20 @@ const handleRunAudit = async (url?: string) => {
                                       {/* Keyword Column */}
                                       <div className="col-span-3 flex items-center space-x-3">
                                         <div>
-                                          <div className="font-semibold text-gray-900 text-sm flex items-center space-x-2">
-                                            <span>{keyword.keyword}</span>
+                                          <div className="font-medium text-gray-900 text-sm flex items-center space-x-2">
+                                            <span>{keyword.keyword.charAt(0).toUpperCase() + keyword.keyword.slice(1)}</span>
                                             {keyword.isCustom && (
                                               <span className="bg-purple-100 text-purple-800 px-2 py-0.5 rounded-full text-xs font-semibold">
                                                 Custom
                                               </span>
                                             )}
                                           </div>
-                                          <div className="text-xs text-gray-500 mt-0.5 truncate max-w-xs">
-                                            {keyword.url}
-                                          </div>
                                         </div>
                                       </div>
 
                                       {/* Volume Column */}
                                       <div className="col-span-1 flex items-center justify-center">
-                                        <span className="font-semibold text-gray-900 text-sm">
+                                        <span className="font-medium text-gray-900 text-sm">
                                           {keyword.volume >= 1000
                                             ? `${(
                                                 keyword.volume / 1000
@@ -2969,7 +3882,7 @@ const handleRunAudit = async (url?: string) => {
 
                                       {/* CPC Column */}
                                       <div className="col-span-1 flex items-center justify-center">
-                                        <span className="font-semibold text-gray-900 text-sm">
+                                        <span className="font-medium text-gray-900 text-sm">
                                           ${keyword.cpc.toFixed(2)}
                                         </span>
                                       </div>
@@ -3262,48 +4175,13 @@ const handleRunAudit = async (url?: string) => {
 
                     {/* Action Buttons */}
                     <div className="flex items-center justify-center gap-4 mt-12">
-                      <button
-                        onClick={() => {
-                          setShowResults(false);
-                          setCompanyDomain("");
-                          setDomainError("");
-                          setDomainContext("");
-                          setKeywords([]);
-                          setCreatedDomainId(null);
-                          setLoadingSteps([
-                            {
-                              name: "Domain Validation",
-                              status: "pending",
-                              progress: 0,
-                            },
-                            {
-                              name: "SSL Certificate Check",
-                              status: "pending",
-                              progress: 0,
-                            },
-                            {
-                              name: "Server Response Analysis",
-                              status: "pending",
-                              progress: 0,
-                            },
-                            {
-                              name: "Domain Extraction & Keyword Generation",
-                              status: "pending",
-                              progress: 0,
-                            },
-                          ]);
-                        }}
-                        className="px-6 py-3 bg-gray-100 text-gray-900 rounded-full hover:bg-gray-200 transition-all duration-200 text-base font-light"
-                      >
-                        Update Company Domain
-                      </button>
                       {createdDomainId && (
                         <button
                           onClick={() => {
                             const maskedId = maskDomainId(createdDomainId);
                             navigate(`/dashboard/${maskedId}`);
                           }}
-                          className="px-6 py-3 bg-black text-white rounded-full hover:bg-black/90 focus:outline-none focus:ring-4 focus:ring-black/10 transition-all shadow text-base font-medium"
+                          className="inline-flex items-center gap-2 px-6 py-3 bg-black text-white rounded-full text-sm font-medium hover:bg-gray-600  disabled:opacity-60 transition"
                         >
                           View Full Dashboard
                         </button>
@@ -3314,15 +4192,15 @@ const handleRunAudit = async (url?: string) => {
 
                 {/* Integration Tab Content */}
                 {activeCompanySubTab === 'integration' && (
-                  <div className="max-w-4xl mx-auto space-y-6">
+                  <div className="max-w-6xl mx-auto space-y-6">
                     {gscStatusLoading ? (
                       <IntegrationSkeleton />
                     ) : !gscConnected ? (
                       <div className="bg-white rounded-3xl p-12 border border-gray-100 shadow-sm text-center">
-                        <div className="w-16 h-16 mx-auto mb-6 bg-gray-100 rounded-full flex items-center justify-center">
+                        <div className="w-16 h-16 mx-auto mb-6 bg-gray-100 rounded-full flex items-center justify-center ">
                           <Plug className="h-8 w-8 text-gray-400" />
                         </div>
-                        <h2 className="text-2xl font-light text-black tracking-tight mb-3">
+                        <h2 className="text-2xl font-light text-black tracking-tight mb-3 ">
                           Google Search Console
                         </h2>
                         <p className="text-base font-light text-gray-600 mb-8">
@@ -3331,14 +4209,14 @@ const handleRunAudit = async (url?: string) => {
                         </p>
                         <button
                           onClick={handleConnectGsc}
-                          className="px-8 py-3 bg-black text-white rounded-full hover:bg-black/90 focus:outline-none focus:ring-4 focus:ring-black/10 transition-all shadow text-base font-medium"
+                          className="px-8 py-3 inline-flex items-center gap-2 px-6 py-3 bg-black text-white rounded-full text-sm font-medium hover:bg-gray-600  disabled:opacity-60 transitions"
                         >
                           Connect Google Search Console
                         </button>
                       </div>
                     ) : (
                       <div className="space-y-6">
-                        <div className="bg-white rounded-3xl p-8 border border-gray-100 shadow-sm">
+                        <div className="bg-white rounded-3xl p-8 border border-gray-100 hover:shadow-lg">
                           <div className="flex items-center justify-between mb-6">
                             <div className="flex items-center gap-3">
                               <div className="w-12 h-12 rounded-xl bg-green-50 flex items-center justify-center">
@@ -3361,7 +4239,7 @@ const handleRunAudit = async (url?: string) => {
                             </button>
                           </div>
                           {gscLastSynced && (
-                            <p className="text-xs font-light text-gray-500">
+                            <p className="text-xs font-light text-gray-500 ">
                               Last synced:{" "}
                               {new Date(gscLastSynced).toLocaleString()}
                             </p>
@@ -3393,7 +4271,7 @@ const handleRunAudit = async (url?: string) => {
                                     }
                                     className="w-full text-left p-4 rounded-2xl border border-gray-100 hover:border-gray-200 hover:bg-gray-50 transition-all duration-200"
                                   >
-                                    <div className="flex items-center justify-between">
+                                    <div className="flex items-center justify-between ">
                                       <div>
                                         <p className="text-base font-light text-black">
                                           {property.siteUrl}
@@ -3423,7 +4301,7 @@ const handleRunAudit = async (url?: string) => {
                             )}
                           </div>
                         ) : (
-                          <div className="bg-white rounded-3xl p-8 border border-gray-100 shadow-sm">
+                          <div className="bg-white rounded-3xl p-8 border border-gray-100 hover:shadow-lg">
                             <div className="flex items-center justify-between mb-6">
                               <div>
                                 <h3 className="text-xl font-light text-black tracking-tight mb-1">
@@ -3453,7 +4331,7 @@ const handleRunAudit = async (url?: string) => {
                       </div>
                     )}
 
-                    <div className="bg-white rounded-3xl p-8 border border-gray-100 shadow-sm">
+                    <div className="bg-white rounded-3xl p-8 border border-gray-100 hover:shadow-lg">
                       <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
                         <div>
                           <h3 className="text-2xl font-light text-black tracking-tight">
@@ -3535,7 +4413,7 @@ const handleRunAudit = async (url?: string) => {
                             <button
                               onClick={handleSaveWordpressIntegration}
                               disabled={wpIntegrationSaving}
-                              className="px-6 py-3 bg-black text-white rounded-full hover:bg-black/90 disabled:opacity-60"
+                              className="inline-flex items-center gap-2 px-6 py-3 bg-black text-white rounded-full text-sm font-medium hover:bg-gray-600  disabled:opacity-60 transition"
                             >
                               {wpIntegrationSaving ? 'Saving…' : hasWordpressIntegration ? 'Update Connection' : 'Save Connection'}
                             </button>
@@ -3543,7 +4421,7 @@ const handleRunAudit = async (url?: string) => {
                               <button
                                 onClick={handleDisconnectWordpress}
                                 disabled={wpIntegrationDeleting}
-                                className="px-6 py-3 border border-gray-200 text-gray-700 rounded-full hover:bg-gray-50 disabled:opacity-60"
+                                className="px-6 py-3 rounded-full border text-gray-700 border-gray-200 bg-white text-sm hover:bg-gray-100 hover:text-gray-700 hover:shadow-lg transition"
                               >
                                 {wpIntegrationDeleting ? 'Removing…' : 'Disconnect'}
                               </button>
@@ -3745,24 +4623,73 @@ const handleRunAudit = async (url?: string) => {
               </div>
             )
           ) : activeTab === "campaign" ? (
-            <div className="max-w-4xl mx-auto px-4 sm:px-6 py-12 sm:py-16">
-              {!selectedCampaignId && (
-                <>
+            // Campaign Tab Logic - moved logic inside to handle full width for structure view
+            (() => {
+              if (selectedCampaignId) {
+                 const selectedCampaign = campaigns.find(
+                    (c) => c.id === selectedCampaignId
+                  );
+                  if (!selectedCampaign) {
+                    return (
+                      <div className="max-w-4xl mx-auto px-4 sm:px-6 py-12 sm:py-16">
+                        <div className="bg-white rounded-3xl p-8 border border-red-100 text-center text-sm text-red-600">
+                        Selected campaign could not be found. Please go back and
+                        try again.
+                        <div className="mt-4">
+                          <button
+                            onClick={() => setSelectedCampaignId(null)}
+                            className="px-5 py-2 bg-black text-white rounded-full text-sm"
+                          >
+                            Back
+                          </button>
+                        </div>
+                      </div>
+                      </div>
+                    );
+                  }
+                  return (
+                    <CampaignStructureView
+                      campaign={selectedCampaign}
+                      onBack={() => setSelectedCampaignId(null)}
+                      companyDomain={companyDomain}
+                      domainContext={domainContext}
+                      keywordsTableData={keywordsTableData}
+                      hasWordpressIntegration={hasWordpressIntegration}
+                      wpIntegration={wpIntegration}
+                      onConfigureWordpress={handleConfigureWordpress}
+                      onRefreshWordpressIntegration={async () => {
+                        await fetchWordpressIntegration();
+                        if (activeTab === 'campaign') {
+                          await fetchCampaignTabData();
+                        }
+                      }}
+                      viewMode={campaignViewMode}
+                      onViewModeChange={setCampaignViewMode}
+                      sidebarOpen={sidebarOpen}
+                    />
+                  );
+              }
+
+              // Default Campaign List View (Centered)
+              return (
+              <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
+
+                <div className='p-4 sm:p-6 bg-white rounded-3xl border border-gray-100 hover:shadow-lg overflow-hidden backdrop-blur-sm'>
                   {/* Header */}
                   <div className="flex items-center justify-between mb-8">
                     <div>
-                      <h2 className="text-3xl font-thin text-black tracking-tight mb-2">
+                      <h1 className="text-3xl font-thin text-black tracking-tight mb-2">
                         Campaigns
-                      </h2>
+                      </h1>
                       <p className="text-base font-light text-gray-600">
                         Manage your marketing campaigns
                       </p>
                     </div>
                     <button
                       onClick={() => setShowCreateCampaign(!showCreateCampaign)}
-                      className="px-6 py-3 bg-black text-white rounded-full hover:bg-black/90 focus:outline-none focus:ring-4 focus:ring-black/10 transition-all shadow text-base font-medium flex items-center gap-2"
+                      className="inline-flex items-center gap-2 px-6 py-3 bg-black text-white rounded-full text-sm font-medium hover:bg-gray-600  disabled:opacity-60 transition"
                     >
-                      <Plus className="h-5 w-5" />
+                      <Plus className="h-4 w-4" />
                       {showCreateCampaign ? "Cancel" : "New Campaign"}
                     </button>
                   </div>
@@ -3814,13 +4741,13 @@ const handleRunAudit = async (url?: string) => {
                               setNewCampaignTitle("");
                               setNewCampaignDescription("");
                             }}
-                            className="px-6 py-3 bg-gray-100 text-gray-900 rounded-full hover:bg-gray-200 transition-all duration-200 text-base font-light"
+                            className="px-6 py-3 rounded-full border text-gray-700 border-gray-200 bg-white text-sm hover:bg-gray-100 hover:text-gray-700 hover:shadow-lg transition"
                           >
                             Cancel
                           </button>
                           <button
                             type="submit"
-                            className="px-6 py-3 bg-black text-white rounded-full hover:bg-black/90 focus:outline-none focus:ring-4 focus:ring-black/10 transition-all shadow text-base font-medium"
+                            className="px-6 py-3 inline-flex items-center gap-2 px-6 py-3 bg-black text-white rounded-full text-sm font-medium hover:bg-gray-600  disabled:opacity-60 transition"
                           >
                             Create Campaign
                           </button>
@@ -3828,8 +4755,7 @@ const handleRunAudit = async (url?: string) => {
                       </form>
                     </div>
                   )}
-                </>
-              )}
+                
 
               {/* Campaigns List */}
               {(() => {
@@ -3843,47 +4769,9 @@ const handleRunAudit = async (url?: string) => {
                     </div>
                   );
                 }
-
-                if (selectedCampaignId) {
-                  const selectedCampaign = campaigns.find(
-                    (c) => c.id === selectedCampaignId
-                  );
-                  if (!selectedCampaign) {
-                    return (
-                      <div className="bg-white rounded-3xl p-8 border border-red-100 text-center text-sm text-red-600">
-                        Selected campaign could not be found. Please go back and
-                        try again.
-                        <div className="mt-4">
-                          <button
-                            onClick={() => setSelectedCampaignId(null)}
-                            className="px-5 py-2 bg-black text-white rounded-full text-sm"
-                          >
-                            Back
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  }
-                  return (
-                    <CampaignStructureView
-                      campaign={selectedCampaign}
-                      onBack={() => setSelectedCampaignId(null)}
-                      companyDomain={companyDomain}
-                      domainContext={domainContext}
-                      keywordsTableData={keywordsTableData}
-                      hasWordpressIntegration={hasWordpressIntegration}
-                      wpIntegration={wpIntegration}
-                      onConfigureWordpress={handleConfigureWordpress}
-                      onRefreshWordpressIntegration={async () => {
-                        await fetchWordpressIntegration();
-                        if (activeTab === 'campaign') {
-                          await fetchCampaignTabData();
-                        }
-                      }}
-                    />
-                  );
-                }
-
+                
+                // Note: selectedCampaignId case is handled above the container now
+                
                 if (campaigns.length === 0) {
                   return (
                     <div className="bg-white rounded-3xl p-12 border border-gray-100 shadow-sm text-center">
@@ -3907,102 +4795,153 @@ const handleRunAudit = async (url?: string) => {
                   );
                 }
 
-                return (
-                  <div className="space-y-3">
-                    {campaigns.map((campaign) => (
-                      <div
-                        key={campaign.id}
-                        className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden transition-all duration-200 hover:shadow-md"
-                      >
-                        {/* Campaign Row */}
-                        <div className="flex items-center justify-between p-6">
-                          <div className="flex-1 min-w-0">
-                            <h3 className="text-lg font-light text-black tracking-tight mb-1 truncate">
-                              {campaign.title}
-                            </h3>
-                            {campaign.description && (
-                              <p className="text-sm font-light text-gray-600 line-clamp-1">
-                                {campaign.description}
-                              </p>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-3 ml-4">
-                            <button
-                              onClick={() => setSelectedCampaignId(campaign.id)}
-                              className="px-4 py-2 bg-transparent text-black rounded-full hover:border-2 transition-all text-sm font-medium flex items-center gap-2"
-                              title="View campaign structure"
-                            >
-                              View
-                              <ChevronRight className="h-4 w-4" />
-                            </button>
-                            <button
-                              onClick={() => setDeleteId(campaign.id)}
-                              className="p-2 text-gray-400 hover:text-red-600 transition-colors"
-                              title="Delete campaign"
-                            >
-                              <Trash2 className="h-5 w-5" />
-                            </button>
-                          </div>
-                        </div>
+               return (
+<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-6">
+  {campaigns.map((campaign) => {
+    const isEditing = editingCampaignId === campaign.id;
 
-                        {/* Campaign details accordion */}
-                        {expandedCampaignId === campaign.id && (
-                          <div className="px-6 pb-6 pt-0 border-t border-gray-100">
-                            <div className="pt-6 space-y-4">
-                              <div>
-                                <h4 className="text-sm font-medium text-gray-900 mb-2">
-                                  Description
-                                </h4>
-                                <p className="text-sm font-light text-gray-700">
-                                  {campaign.description ||
-                                    "No description provided"}
-                                </p>
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                    {deleteId && (
-  <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50">
-    <div className="bg-white p-6 rounded-xl shadow-xl w-[90%] max-w-sm">
-      <h2 className="text-lg font-medium text-gray-800">Delete Campaign?</h2>
+    return (
+      <div
+        key={campaign.id}
+        className="bg-gray-50/60 rounded-3xl border border-gray-100 hover:shadow-lg shadow-sm p-6 flex flex-col min-h-[180px]"
+      >
+          <div className="flex flex-col flex-1">
+            {/* Top row: Title & View */}
+            <div className="flex justify-between items-start mb-2">
+              <h3 className="text-lg font-light text-black tracking-tight truncate">
+                {campaign.title}
+              </h3>
+              <button
+  onClick={() => setSelectedCampaignId(campaign.id)}
+  className="group text-sm font-medium text-black transition-transform duration-200 ease-in-out flex items-center gap-1 hover:scale-105"
+>
+  View
+  <span className="relative flex items-center w-4 h-4">
+    <ChevronRight
+      className="absolute inset-0 w-4 h-4 transition-all duration-200 ease-in-out group-hover:opacity-0 group-hover:translate-x-1"
+    />
+    <ArrowRight
+      className="absolute inset-0 w-4 h-4 opacity-0 transition-all duration-200 ease-in-out group-hover:opacity-100 group-hover:translate-x-0"
+    />
+  </span>
+</button>
+            </div>
 
-      <p className="text-sm text-gray-500 mt-2">
-        Are you sure you want to delete this campaign?
-      </p>
+            {/* Description */}
+            {campaign.description ? (
+              <p className="text-sm font-light text-gray-600 line-clamp-3 mb-4">
+                {campaign.description}
+              </p>
+            ) : (
+              <p className="text-sm font-light text-gray-400 italic mb-4">
+                No description provided
+              </p>
+            )}
+          </div>
+            {/* Bottom actions: Edit & Delete */}
+            <div className="flex justify-end gap-2">
+              <button
+  onClick={() => {
+    setEditingCampaignId(campaign.id);
+    setEditTitle(campaign.title);
+    setEditDescription(campaign.description || '');
+    setShowEditModal(true); 
+  }}
+  className="text-gray-400 hover:text-blue-600 flex items-center gap-1"
+>
+  <Edit className="h-5 w-5" />
+</button>
 
-      <div className="flex justify-end gap-3 mt-6">
-        <button
-          onClick={() => setDeleteId(null)}
-          className="px-4 py-2 rounded-lg text-sm bg-gray-100 hover:bg-gray-200"
-        >
-          Cancel
-        </button>
+              <button
+  onClick={() =>
+    confirmDelete("Campaign", () => 
+      handleDeleteCampaign(campaign.id)
+    )
+  }
+  className="text-gray-400 hover:text-red-600 flex items-center gap-1" 
+>
+  <Trash2 className="h-5 w-5" />
+</button>
 
-        <button
-          onClick={() => {
-            handleDeleteCampaign(deleteId!);
-            setDeleteId(null);
-          }}
-          className="px-4 py-2 rounded-lg text-sm bg-black text-white hover:bg-red-700"
-        >
-          Delete
-        </button>
+            </div>
       </div>
+    );
+  })}
+</div>
+);
+
+              })()}
+            </div>
+              {showEditModal && editingCampaignId !== null && (
+  <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50">
+    <div className="bg-white rounded-3xl p-8 w-full max-w-md shadow-lg">
+      <h3 className="text-xl font-light text-black tracking-tight mb-6">
+        Edit Campaign
+      </h3>
+      <form
+        onSubmit={async (e) => {
+          e.preventDefault();
+          await handleUpdateCampaign();
+          setShowEditModal(false);
+          setEditingCampaignId(null);
+          setEditTitle('');
+          setEditDescription('');
+        }}
+        className="space-y-6"
+      >
+        <div>
+          <label className="block text-base font-light text-black mb-2">
+            Title
+          </label>
+          <input
+            type="text"
+            value={editTitle}
+            onChange={(e) => setEditTitle(e.target.value)}
+            placeholder="Enter campaign title"
+            className="w-full px-4 py-3 text-base font-light rounded-2xl border border-gray-200 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-black"
+            required
+          />
+        </div>
+        <div>
+          <label className="block text-base font-light text-black mb-2">
+            Description
+          </label>
+          <textarea
+            value={editDescription}
+            onChange={(e) => setEditDescription(e.target.value)}
+            placeholder="Enter campaign description (optional)"
+            rows={4}
+            className="w-full px-4 py-3 text-base font-light rounded-2xl border border-gray-200 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-black resize-none"
+          />
+        </div>
+        <div className="flex items-center justify-end gap-4">
+          <button
+            type="button"
+            onClick={() => setShowEditModal(false)}
+            className="px-6 py-3 rounded-full border text-gray-700 border-gray-200 bg-white text-sm hover:bg-gray-100 hover:text-gray-700 hover:shadow-lg transition"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            className="px-6 py-3 inline-flex items-center gap-2 bg-black text-white rounded-full text-sm font-medium hover:bg-gray-600"
+          >
+            Save
+          </button>
+        </div>
+      </form>
     </div>
   </div>
 )}
-                  </div>
-                );
-              })()}
             </div>
+            );
+            })()
           ) : activeTab === 'publish' ? (
             companyDomainLoading ? (
               <CompanyInfoSkeleton />
                 ) : (
-              <div className="max-w-6xl mx-auto px-4 sm:px-6 py-12 sm:py-16 space-y-8">
-                <PublishExperience
+                  <div className="max-w-6xl mx-auto px-4 sm:px-6 py-12 sm:py-16">
+                  <PublishExperience
                   companyDomain={companyDomain}
                   domainContext={domainContext}
                   keywordsTableData={keywordsTableData}
@@ -4011,9 +4950,6 @@ const handleRunAudit = async (url?: string) => {
                   onConfigureWordpress={handleConfigureWordpress}
                   onRefreshWordpressIntegration={async () => {
                     await fetchWordpressIntegration();
-                    if (activeTab === 'campaign') {
-                      await fetchCampaignTabData();
-                    }
                   }}
                   isActive={activeTab === 'publish'}
                 />
@@ -4021,6 +4957,7 @@ const handleRunAudit = async (url?: string) => {
             )
           ) : activeTab === 'audit' ? (
             <div className="relative min-h-screen w-full">
+             
               {/* Background Layer */}
               <div className="fixed inset-0 pointer-events-none">
                 <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-gray-100 rounded-full blur-3xl opacity-20" />
@@ -4029,28 +4966,6 @@ const handleRunAudit = async (url?: string) => {
 
               {/* Content Layer */}
               <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 py-16 sm:py-24">
-                {/* Audit Completed Toast */}
-                {auditComplete && (
-                  <div className="fixed bottom-6 right-6 z-50">
-                    <div className="bg-black text-white px-6 py-3 rounded-full shadow-xl flex items-center gap-3 border border-white/20 backdrop-blur-sm" style={{ letterSpacing: '0.011em' }}>
-                      <svg
-                        className="h-4 w-4 flex-shrink-0"
-                        xmlns="http://www.w3.org/2000/svg"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={3}
-                          d="M5 13l4 4L19 7"
-                        />
-                      </svg>
-                      <span className="font-light text-sm">Audit Completed!</span>
-                    </div>
-                  </div>
-                )}
 
                 {/* Hero Section */}
                 <div className="text-center mb-20">
@@ -4058,7 +4973,7 @@ const handleRunAudit = async (url?: string) => {
                     Domain Performance Audit
                   </div>
                   <h1
-                    className="text-5xl sm:text-6xl md:text-7xl font-extralight mb-6 text-gray-900"
+                    className="text-5xl sm:text-6xl md:text-7xl font-extralight mb-6 text-gray-900 "
                     style={{ letterSpacing: '-0.003em', lineHeight: 1.05 }}
                   >
                     Audit Your Domain
@@ -4073,34 +4988,106 @@ const handleRunAudit = async (url?: string) => {
                   {/* Action Section */}
                   <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-8">
                     <div
-                      className="flex-1 max-w-md bg-white/70 backdrop-blur-md border border-gray-200 rounded-full px-6 py-4 flex items-center justify-between shadow-sm"
+                      className="flex-1 max-w-md bg-white/70 backdrop-blur-md border border-gray-200 rounded-full px-6 py-3 flex items-center justify-between shadow-sm"
                       style={{ borderWidth: '0.5px' }}
                     >
-                      <span className="text-gray-700 font-light truncate" style={{ letterSpacing: '0.011em' }}>
+                      <span className="text-gray-700 font-light truncate " style={{ letterSpacing: '0.011em' }}>
                         {companyDomain || "No domain available"}
                       </span>
                     </div>
 
-                    <button
-                      onClick={() => handleRunAudit(companyDomain)}
-                      disabled={auditLoading || !companyDomain}
-                      className={cn(
-                        "h-12 px-8 rounded-full text-white font-light transition-all duration-200 flex items-center justify-center gap-2",
-                        "bg-black hover:bg-gray-800 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed",
-                        auditLoading && "cursor-not-allowed"
-                      )}
-                      style={{ letterSpacing: '-0.022em' }}
-                    >
-                      {auditLoading ? (
-                        <>
-                          <Loader2 className="h-5 w-5 animate-spin" />
-                          <span>Running Audit…</span>
-                        </>
-                      ) : (
-                        "Start Audit"
-                      )}
-                    </button>
+                    <div className="flex gap-3 ">
+                      <button
+                        onClick={() => handleRunAudit(companyDomain)}
+                        disabled={auditLoading || !companyDomain}
+                        className={cn(
+                          "inline-flex items-center gap-2 px-6 py-3 bg-black text-white rounded-full text-sm font-medium hover:bg-black/90  disabled:opacity-60 transition",
+                          "bg-black hover:bg-gray-800 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed",
+                          auditLoading && "cursor-not-allowed"
+                        )}
+                        style={{ letterSpacing: '-0.022em' }}
+                      >
+                        {auditLoading ? (
+                          <>
+                            <Loader2 className="h-5 w-5 animate-spin" />
+                            <span>Running Audit…</span>
+                          </>
+                        ) : (
+                          "Start Audit"
+                        )}
+                      </button>
+                       <PDFDownloadLink
+                            document={<AuditPDF data={auditResult} domain={companyDomain} />}
+                            fileName={`audit-${companyDomain}-${new Date().toISOString().split('T')[0]}.pdf`}
+                            className="px-4 py-2 rounded-full border border-gray-200 text-sm font-light bg-white hover:bg-gray-50 flex items-center justify-center"
+                          >
+                            {({ loading }) => (loading ? 'Preparing...' : 'Export PDF')}
+                          </PDFDownloadLink>
+                    </div>
                   </div>
+
+                  {/* N8n Results Display */}
+                  {(n8nStatus || n8nResults) && (
+                    <div className="mt-6 p-6 bg-white/70 backdrop-blur-md rounded-2xl border border-gray-200 shadow-sm" style={{ borderWidth: '0.5px' }}>
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-lg font-light text-gray-900" style={{ letterSpacing: '-0.003em' }}>
+                          N8n Processing
+                        </h3>
+                        <div className={cn(
+                          "px-3 py-1 rounded-full text-xs font-light",
+                          n8nStatus === 'processing' && "bg-blue-50 text-blue-700",
+                          n8nStatus === 'completed' && "bg-green-50 text-green-700",
+                          n8nStatus === 'failed' && "bg-red-50 text-red-700"
+                        )}>
+                          {n8nStatus === 'processing' && 'Processing...'}
+                          {n8nStatus === 'completed' && 'Completed'}
+                          {n8nStatus === 'failed' && 'Failed'}
+                        </div>
+                      </div>
+
+                      {n8nStatus === 'processing' && (
+                        <div className="flex items-center gap-2 text-sm text-gray-600">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          <span>N8n is generating your reports...</span>
+                        </div>
+                      )}
+
+                      {n8nResults && (
+                        <div className="space-y-3">
+                          {n8nResults.sheetsUrl && (
+                            <a
+                              href={n8nResults.sheetsUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-3 p-4 rounded-xl bg-green-50 hover:bg-green-100 transition-colors border border-green-200"
+                              style={{ borderWidth: '0.5px' }}
+                            >
+                              <FileText className="h-5 w-5 text-green-700" />
+                              <div>
+                                <div className="text-sm font-medium text-green-900">Google Sheets Report</div>
+                                <div className="text-xs text-green-600">Click to open</div>
+                              </div>
+                            </a>
+                          )}
+                          {n8nResults.slidesUrl && (
+                            <a
+                              href={n8nResults.slidesUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-3 p-4 rounded-xl bg-blue-50 hover:bg-blue-100 transition-colors border border-blue-200"
+                              style={{ borderWidth: '0.5px' }}
+                            >
+                              <FileText className="h-5 w-5 text-blue-700" />
+                              <div>
+                                <div className="text-sm font-medium text-blue-900">Google Slides Presentation</div>
+                                <div className="text-xs text-blue-600">Click to open</div>
+                              </div>
+                            </a>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   {auditData && auditData.updatedAt && (
                     <p className="text-sm font-light text-gray-400" style={{ letterSpacing: '0.011em' }}>
@@ -4116,20 +5103,19 @@ const handleRunAudit = async (url?: string) => {
                     { label: "SEO", value: auditResult.seo },
                     { label: "Accessibility", value: auditResult.accessibility },
                     { label: "Best Practices", value: auditResult.bestPractices },
-                    { label: "PWA", value: auditResult.pwa },
                   ];
 
                   const scored = categories.map(c => ({ ...c, score: Math.round((c.value || 0) * 100) }));
                   const avg = scored.reduce((a, b) => a + b.score, 0) / scored.length;
                   const best = scored.reduce((a, b) => (b.score > a.score ? b : a));
                   const worst = scored.reduce((a, b) => (b.score < a.score ? b : a));
-
+                  
                   return (
-                    <div className="space-y-16">
+                    <div ref={resultsRef} className="space-y-16">
                       {/* Overall Score Section */}
                       <div className="flex flex-col items-center justify-center py-12">
                         <div className="mb-8">
-                          <OverallScoreGauge score={avg / 100} />
+                          <OverallScoreGauge score={overallScore} />
                         </div>
                         <div className="flex gap-8 text-center">
                           <div>
@@ -4238,17 +5224,33 @@ const handleRunAudit = async (url?: string) => {
                         >
                           Individual Metrics
                         </h3>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
-                          {categories.map(({ label, value }) => (
-                            <div
-                              key={label}
-                              className="bg-white/70 backdrop-blur-md rounded-2xl border border-gray-200 p-6 shadow-sm hover:shadow-md transition-all"
-                              style={{ borderWidth: '0.5px' }}
-                            >
-                              <AuditGaugeChart label={label} score={value} size={140} />
-                            </div>
-                          ))}
-                        </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-6">
+  {categories.map(({ label, value }) => (
+    <div
+      key={label}
+      className="bg-white/70 backdrop-blur-md rounded-2xl border border-gray-200 p-6 shadow-sm hover:shadow-md transition-all"
+      style={{ borderWidth: '0.5px' }}
+    >
+      {/* Metric Title + Tooltip */}
+      <div className="flex items-center justify-center gap-1 mb-4">
+        <span
+          className="text-sm font-light text-gray-700"
+          style={{ letterSpacing: '0.011em' }}
+        >
+          {label}
+        </span>
+
+        {categoryDescriptions[label] && (
+          <InfoTooltip text={categoryDescriptions[label]} />
+        )}
+      </div>
+
+      {/* Gauge */}
+      <AuditGaugeChart label={null} score={value} size={140} />
+    </div>
+  ))}
+</div>
+
                       </div>
 
                       {/* Screenshot Section */}
@@ -4300,16 +5302,25 @@ const handleRunAudit = async (url?: string) => {
                                   className="flex justify-between items-center px-4 py-3 rounded-xl bg-gray-50/50 border border-gray-200 hover:bg-gray-50 transition-all"
                                   style={{ borderWidth: '0.5px' }}
                                 >
-                                  <span className="font-light text-gray-900" style={{ letterSpacing: '0.011em' }}>
-                                    {key.toUpperCase()} <span className="text-gray-500">({fullForms[key] || key})</span>
-                                  </span>
+                                  <span
+  className="font-light text-gray-900 flex items-center gap-1"
+  style={{ letterSpacing: '0.011em' }}
+>
+  {key.toUpperCase()}
+  <span className="text-gray-500">({fullForms[key] || key})</span>
+
+  {metricDescriptions[key] && (
+    <InfoTooltip text={metricDescriptions[key]} />
+  )}
+</span>
+
                                   <span className="font-mono text-sm font-light text-gray-700 bg-white px-3 py-1 rounded-lg border border-gray-200" style={{ borderWidth: '0.5px' }}>
                                     {String(value)}
                                   </span>
                                 </div>
                               );
                             })}
-                          </div>
+                          </div> 
                         </details>
                       )}
                     </div>
@@ -4317,11 +5328,155 @@ const handleRunAudit = async (url?: string) => {
                 })()}
               </div>
             </div>
-          ) : activeTab === 'gsc-analytics' ? (
-            <GSCAnalyticsView />
+          ) : activeTab === 'analytics-report' ? (
+            <AnalyticsReportingView />
+          ): activeTab === 'gsc-analytics' ? (
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+              {/* GSC Sub-tabs */}
+              <div className="flex items-center gap-2 mb-8 border-b border-gray-100 pb-4">
+                <button
+                  onClick={() => setActiveGscSubTab('whole-analytics')}
+                  className={`px-5 py-2.5 rounded-full text-sm font-medium transition-all duration-200 ${
+                    activeGscSubTab === 'whole-analytics'
+                      ? 'bg-purple-600 text-white shadow-lg shadow-purple-200'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
+                >
+                  <span className="flex items-center gap-2">
+                    <ChartNoAxesCombined className="h-4 w-4" />
+                    Whole Analytics
+                  </span>
+                </button>
+                <button
+                  onClick={() => setActiveGscSubTab('blog-performance')}
+                  className={`px-5 py-2.5 rounded-full text-sm font-medium transition-all duration-200 ${
+                    activeGscSubTab === 'blog-performance'
+                      ? 'bg-purple-600 text-white shadow-lg shadow-purple-200'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
+                >
+                  <span className="flex items-center gap-2">
+                    <BarChart3 className="h-4 w-4" />
+                    Our Blog Performance
+                  </span>
+                </button>
+              </div>
+
+              {/* GSC Sub-tab Content */}
+              {activeGscSubTab === 'whole-analytics' ? (
+                <GSCAnalyticsView />
+              ) : (
+                <GSCBlogAnalytics />
+              )}
+            </div>
           ) : activeTab === 'profile' ? (
             <div className="max-w-8xl mx-auto px-4 sm:px-6 py-12 sm:py-16 space-y-12">
               <Profile />
+            </div>
+          ) : activeTab === 'settings' ? (
+            <div className="max-w-6xl mx-auto px-4 sm:px-6 py-12 sm:py-16">
+              <div className="bg-white rounded-3xl p-12 border border-gray-100 hover:shadow-lg text-center">
+                <h2 className="text-2xl font-light text-black tracking-tight mb-3">
+                  Domain Settings
+                </h2>
+                <p className="text-base font-light text-gray-600 mb-8">
+                  Update your company domain
+                </p>
+                <div className="flex items-center justify-center gap-4">
+                  <button
+                    onClick={() => setConfirmUpdateOpen(true)}
+                    className="px-6 py-3 bg-gray-100 text-gray-900 rounded-full hover:bg-gray-200 transition-all duration-200 text-base font-light"
+                  >
+                    Update Company Domain
+                  </button>
+                </div>
+                {confirmUpdateOpen && (
+                  <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50">
+                    <div className="bg-white p-6 rounded-xl shadow-xl w-[90%] max-w-sm">
+                      <h2 className="text-lg font-medium text-gray-800">Remove Company Domain?</h2>
+                      <p className="text-sm text-gray-500 mt-2">
+                        This will remove your current company domain and take you to re-enter a new one.
+                      </p>
+                      <div className="flex justify-end gap-3 mt-6">
+                        <button
+                          onClick={() => { if (!updateLoading) setConfirmUpdateOpen(false); }}
+                          disabled={updateLoading}
+                          className="px-4 py-2 rounded-lg text-sm bg-gray-100 hover:bg-gray-200 disabled:opacity-60 disabled:cursor-not-allowed"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={async () => {
+                            if (updateLoading) return;
+                            setUpdateLoading(true);
+                            try {
+                              const resp = await fetch(`${import.meta.env.VITE_API_URL}/api/user/company-domain`, {
+                                headers: {
+                                  Authorization: `Bearer ${localStorage.getItem("authToken")}`,
+                                  "Content-Type": "application/json",
+                                },
+                              });
+                              if (resp.ok) {
+                                const data = await resp.json();
+                                const id = data?.domain?.id;
+                                if (id) {
+                                  await fetch(`${import.meta.env.VITE_API_URL}/api/domain/${id}`, {
+                                    method: "DELETE",
+                                    headers: {
+                                      Authorization: `Bearer ${localStorage.getItem("authToken")}`,
+                                      "Content-Type": "application/json",
+                                    },
+                                  });
+                                }
+                              }
+                            } catch (_) {
+                              // ignore
+                            } finally {
+                              setUpdateLoading(false);
+                              setConfirmUpdateOpen(false);
+                            }
+                            setActiveTab('analytics');
+                            setActiveCompanySubTab('company-info');
+                            setShowResults(false);
+                            setCompanyDomain("");
+                            setDomainError("");
+                            setDomainContext("");
+                            setKeywords([]);
+                            setKeywordsTableData([]);
+                            setCreatedDomainId(null);
+                            setLoadingSteps([
+                              {
+                                name: "Domain Validation",
+                                status: "pending",
+                                progress: 0,
+                              },
+                              {
+                                name: "SSL Certificate Check",
+                                status: "pending",
+                                progress: 0,
+                              },
+                              {
+                                name: "Server Response Analysis",
+                                status: "pending",
+                                progress: 0,
+                              },
+                              {
+                                name: "Domain Extraction & Keyword Generation",
+                                status: "pending",
+                                progress: 0,
+                              },
+                            ]);
+                          }}
+                          className="px-4 py-2 rounded-lg text-sm bg-black text-white hover:bg-black/90 disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2"
+                        >
+                          {updateLoading ? <ButtonSpinner /> : null}
+                          {updateLoading ? 'Updating…' : 'Confirm'}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           ) : (
             <div style={{
@@ -4344,6 +5499,33 @@ const handleRunAudit = async (url?: string) => {
               </p>
             </div>
           )}
+        {showDeleteModal && (
+          <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50">
+            <div className="bg-white p-6 rounded-xl shadow-xl w-[90%] max-w-sm">
+              <h2 className="text-lg font-medium text-gray-800">Delete {deleteLabel}?</h2>
+              <p className="text-sm text-gray-500 mt-2">
+                Are you sure you want to delete this {deleteLabel}?
+              </p>
+              <div className="flex justify-end gap-3 mt-6">
+                <button
+                  onClick={() => setShowDeleteModal(false)}
+                  className="px-4 py-2 rounded-lg text-sm bg-gray-100 hover:bg-gray-200"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    if (deleteAction) deleteAction();
+                    setShowDeleteModal(false);
+                  }}
+                  className="px-4 py-2 rounded-lg text-sm bg-black text-white hover:bg-red-700"
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
         </div>
       </main>
     </div>
@@ -4367,9 +5549,12 @@ interface CampaignStructureViewProps {
   wpIntegration: WordpressIntegration | null;
   onConfigureWordpress: () => void;
   onRefreshWordpressIntegration: () => void;
+  viewMode: 'split' | 'graph';
+  onViewModeChange: (mode: 'split' | 'graph') => void;
+  sidebarOpen: boolean;
 }
 
-const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({ 
+function CampaignStructureView({ 
   campaign, 
   onBack, 
   companyDomain, 
@@ -4378,9 +5563,14 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
   hasWordpressIntegration,
   wpIntegration,
   onConfigureWordpress,
-  onRefreshWordpressIntegration
-}) => {
+  onRefreshWordpressIntegration,
+  viewMode,
+  onViewModeChange,
+  sidebarOpen
+}: CampaignStructureViewProps) {
   const CAMPAIGN_API_BASE = `${API_BASE_URL}/api/campaigns`;
+  // campaignViewMode state lifted to parent
+  const [selectedTopicId, setSelectedTopicId] = useState<number | null>(null);
   const [campaignStructure, setCampaignStructure] = useState<CampaignStructure>(
     { topics: [] }
   );
@@ -4398,10 +5588,16 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
   );
   const [selectedTopics, setSelectedTopics] = useState<Set<number>>(new Set());
 
+  // Track generation job statuses
+  const [generationJobs, setGenerationJobs] = useState<Map<number, GenerationPageStatus>>(new Map());
+
   // Modal states
   const [showAddTopicModal, setShowAddTopicModal] = useState(false);
   const [showAddPillarModal, setShowAddPillarModal] = useState(false);
   const [showAddSubPageModal, setShowAddSubPageModal] = useState(false);
+  
+
+
   const [showAddKeywordModal, setShowAddKeywordModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteLabel, setDeleteLabel] = useState<string>('');
@@ -4424,19 +5620,135 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
   const [keywordSearchOpen, setKeywordSearchOpen] = useState(false);
   const [keywordSearchValue, setKeywordSearchValue] = useState('');
   const [loadingKeywords, setLoadingKeywords] = useState(false);
+  const [keywordPickerDrawerOpen, setKeywordPickerDrawerOpen] = useState(false);
+  const [drawerSearchTerm, setDrawerSearchTerm] = useState('');
+  const [drawerCompetition, setDrawerCompetition] = useState('');
+  const [drawerIntent, setDrawerIntent] = useState('');
+  const [drawerViewMode, setDrawerViewMode] = useState<"table" | "cards">("table");
+  const [drawerSortConfig, setDrawerSortConfig] = useState<{ key: keyof KeywordTableItem; direction: "asc" | "desc" } | null>(null);
+  const [drawerCurrentPage, setDrawerCurrentPage] = useState(1);
+  const [drawerItemsPerPage, setDrawerItemsPerPage] = useState(10);
+
+  // Generation Drawer State
+  const [generationDrawerOpen, setGenerationDrawerOpen] = useState(false);
+  const [pendingGenerationTopic, setPendingGenerationTopic] = useState<Topic | null>(null);
+  const [generationConfig, setGenerationConfig] = useState({
+    wordCount: 800,
+    images: 0,
+    featuredImage: false,
+    brandName: '',
+    brandDescription: ''
+  });
+  
+  const drawerFilteredKeywords = React.useMemo(() => {
+    return keywordsTableData.filter((keyword) => {
+      const matchesSearch = keyword.keyword.toLowerCase().includes(drawerSearchTerm.toLowerCase());
+      const matchesCompetition = !drawerCompetition || keyword.competition === drawerCompetition;
+      const matchesIntent = !drawerIntent || keyword.intent === drawerIntent;
+      return matchesSearch && matchesCompetition && matchesIntent;
+    });
+  }, [keywordsTableData, drawerSearchTerm, drawerCompetition, drawerIntent]);
+  const drawerSortedKeywords = React.useMemo(() => {
+    const sortableKeywords = [...drawerFilteredKeywords];
+    if (drawerSortConfig !== null) {
+      sortableKeywords.sort((a, b) => {
+        const aValue = a[drawerSortConfig.key];
+        const bValue = b[drawerSortConfig.key];
+        if (typeof aValue === "number" && typeof bValue === "number") {
+          return drawerSortConfig.direction === "asc" ? aValue - bValue : bValue - aValue;
+        }
+        const aStr = String(aValue).toLowerCase();
+        const bStr = String(bValue).toLowerCase();
+        if (aStr < bStr) {
+          return drawerSortConfig.direction === "asc" ? -1 : 1;
+        }
+        if (aStr > bStr) {
+          return drawerSortConfig.direction === "asc" ? 1 : -1;
+        }
+        return 0;
+      });
+    }
+    return sortableKeywords;
+  }, [drawerFilteredKeywords, drawerSortConfig]);
+  const drawerTotalPages = Math.max(1, Math.ceil(drawerSortedKeywords.length / drawerItemsPerPage));
+  const drawerStartIndex = (drawerCurrentPage - 1) * drawerItemsPerPage;
+  const drawerEndIndex = drawerStartIndex + drawerItemsPerPage;
+  const drawerCurrentKeywords = drawerSortedKeywords.slice(drawerStartIndex, drawerEndIndex);
+  const drawerHandleSort = useCallback((key: keyof KeywordTableItem) => {
+    let direction: "asc" | "desc" = "asc";
+    if (drawerSortConfig && drawerSortConfig.key === key && drawerSortConfig.direction === "asc") {
+      direction = "desc";
+    }
+    setDrawerSortConfig({ key, direction });
+  }, [drawerSortConfig]);
+  const drawerGetSortIcon = useCallback((key: keyof KeywordTableItem) => {
+    if (!drawerSortConfig || drawerSortConfig.key !== key) {
+      return <ArrowUpDown className="w-4 h-4 text-gray-400" />;
+    }
+    return drawerSortConfig.direction === "asc" ? (
+      <ChevronUp className="w-4 h-4 text-gray-700" />
+    ) : (
+      <ChevronDown className="w-4 h-4 text-gray-700" />
+    );
+  }, [drawerSortConfig]);
+  const drawerHandlePageChange = useCallback((page: number) => {
+    const totalPagesCalc = Math.max(1, Math.ceil(drawerSortedKeywords.length / drawerItemsPerPage));
+    if (page >= 1 && page <= totalPagesCalc) {
+      setDrawerCurrentPage(page);
+    }
+  }, [drawerSortedKeywords.length, drawerItemsPerPage]);
+  const drawerGetPageNumbers = useCallback(() => {
+    const pages: Array<number | string> = [];
+    const maxVisiblePages = 5;
+    if (drawerTotalPages <= maxVisiblePages) {
+      for (let i = 1; i <= drawerTotalPages; i++) {
+        pages.push(i);
+      }
+    } else {
+      if (drawerCurrentPage <= 3) {
+        for (let i = 1; i <= 4; i++) {
+          pages.push(i);
+        }
+        pages.push("...");
+        pages.push(drawerTotalPages);
+      } else if (drawerCurrentPage >= drawerTotalPages - 2) {
+        pages.push(1);
+        pages.push("...");
+        for (let i = drawerTotalPages - 3; i <= drawerTotalPages; i++) {
+          pages.push(i);
+        }
+      } else {
+        pages.push(1);
+        pages.push("...");
+        for (let i = drawerCurrentPage - 1; i <= drawerCurrentPage + 1; i++) {
+          pages.push(i);
+        }
+        pages.push("...");
+        pages.push(drawerTotalPages);
+      }
+    }
+    return pages;
+  }, [drawerTotalPages, drawerCurrentPage]);
+  const drawerCompetitionBadge = useCallback((competition: string) => {
+    const baseClasses = "px-2.5 py-1 rounded-full text-xs font-semibold";
+    switch (competition) {
+      case "High":
+        return `${baseClasses} bg-red-100 text-red-800`;
+      case "Medium":
+        return `${baseClasses} bg-yellow-100 text-yellow-800`;
+      case "Low":
+        return `${baseClasses} bg-green-100 text-green-800`;
+      default:
+        return `${baseClasses} bg-gray-100 text-gray-800`;
+    }
+  }, []);
 
   const [targetTopicId, setTargetTopicId] = useState<number | null>(null);
   const { toast } = useToast();
 
   // Pillar page generation states
-  const [generationDrawerOpen, setGenerationDrawerOpen] = useState(false);
-  const [generationForm, setGenerationForm] = useState({
-    wordCount: 800,
-    images: 2,
-    featuredImage: true,
-    brandName: '',
-    brandDescription: '',
-  });
+  // Pillar page generation states
+  // generationDrawerOpen, generationConfig are already defined above
   // Auto-fill brand fields using company domain/context (mirrors publish tab)
   const derivedBrandName = React.useMemo(() => {
     if (companyDomain) {
@@ -4448,7 +5760,7 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
     () => summarizeDomainContext(domainContext || ''),
     [domainContext]
   );
-  const [generationJobs, setGenerationJobs] = useState<Map<number, GenerationPageStatus>>(new Map());
+
   const [generateTopicLoading, setGenerateTopicLoading] = useState<number | null>(null);
   const [pollingInterval, setPollingInterval] = useState<NodeJS.Timeout | null>(null);
   const [previewPageId, setPreviewPageId] = useState<number | null>(null);
@@ -4457,6 +5769,9 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
   const [viewLoadingPageId, setViewLoadingPageId] = useState<number | null>(null);
   const [closePreviewLoading, setClosePreviewLoading] = useState(false);
   const [publishLoadingPageId, setPublishLoadingPageId] = useState<number | null>(null);
+  const [publishingPageIds, setPublishingPageIds] = useState<Set<number>>(new Set());
+  const [draftToPageMap, setDraftToPageMap] = useState<Map<number, number>>(new Map());
+  const [draftStatuses, setDraftStatuses] = useState<Map<number, { isPublished: boolean; isFailed?: boolean; publishedUrl?: string; draftId?: number; error?: string }>>(new Map());
   
   // Streaming progress state
   const [streamingMessages, setStreamingMessages] = useState<Map<string, Array<{
@@ -4467,6 +5782,9 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
   
   // Active generation tracking - track last streaming timestamp per jobId
   const [lastStreamingTimestamp, setLastStreamingTimestamp] = useState<Map<string, number>>(new Map());
+
+  // Hydrate active jobs on mount
+
   
   // Backend job status tracking - stores backend's view of job status
   const [backendJobStatus, setBackendJobStatus] = useState<Map<string, {
@@ -4494,6 +5812,90 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
     localStorage.removeItem("authToken");
     window.location.href = "/auth";
   }, []);
+
+  // Hydrate active jobs on mount
+  const fetchActiveJobs = useCallback(async () => {
+    try {
+      const response = await fetch(`${CAMPAIGN_API_BASE}/active-jobs`, {
+        headers: getAuthHeaders()
+      });
+      
+      if (response.status === 401 || response.status === 403) {
+        handleUnauthorized();
+        return;
+      }
+      
+      if (!response.ok) return;
+      
+      const data = await response.json();
+      if (data.success && data.jobs) {
+        // Update generationJobs
+        setGenerationJobs(prev => {
+             const updated = new Map(prev);
+             // First mark all existing generating jobs as potentially stale/checked by backend
+             // If a job is NOT in the backend active list, it might have finished or failed silently
+             // But we don't want to remove it aggressively unless we know for sure.
+             // For now, we just update/upsert what the backend tells us.
+             
+             data.jobs.forEach((job: any) => {
+                 job.pages.forEach((p: any) => {
+                     updated.set(p.pageId, {
+                        jobId: job.jobId,
+                        pageId: p.pageId,
+                        pageType: p.pageType,
+                        status: p.status,
+                        draftId: p.draftId, // draftId from DB response
+                        progress: p.progress || 0,
+                        primaryKeyword: p.primaryKeyword,
+                        hasHtml: false, // We'll rely on draft status mostly
+                        updatedAt: new Date().toISOString(),
+                        error: null
+                     });
+                 });
+             });
+             return updated;
+        });
+        
+        // Update streaming messages
+        setStreamingMessages(prev => {
+            const updated = new Map(prev);
+            data.jobs.forEach((job: any) => {
+                if (job.messages && job.messages.length > 0) {
+                    updated.set(job.jobId, job.messages);
+                }
+            });
+            return updated;
+        });
+        
+        // Update jobId mapping
+        setJobIdToTopicId(prev => {
+           const updated = new Map(prev);
+           data.jobs.forEach((job: any) => {
+               updated.set(job.jobId, job.topicId);
+           });
+           return updated;
+        });
+
+        // Sync backend job status for consistency
+        setBackendJobStatus(prev => {
+          const updated = new Map(prev);
+          data.jobs.forEach((job: any) => {
+            updated.set(job.jobId, {
+              status: job.status,
+              pages: job.pages
+            });
+          });
+          return updated;
+        });
+      }
+    } catch (err) {
+      console.error("Failed to hydrate active jobs", err);
+    }
+  }, [CAMPAIGN_API_BASE, getAuthHeaders, handleUnauthorized]);
+
+  React.useEffect(() => {
+    fetchActiveJobs();
+  }, [fetchActiveJobs]);
 
   // Helper function to extract topicId from jobId pattern
   const extractTopicIdFromJobId = useCallback((jobId: string): number | null => {
@@ -4555,12 +5957,24 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
           message?: string;
           timestamp?: string;
           pages?: Partial<GenerationPageStatus & { pageType: string; hasHtml?: boolean; error?: string | null }>[];
+          error?: string;
         };
         
         // Handle streaming progress updates
         if (data.type === 'streaming') {
           handleStreamingUpdate(data.jobId, data.message, data.timestamp);
           return;
+        }
+
+        // Handle n8n critical errors
+        if (data.type === 'n8n_error') {
+          console.error('Received n8n error:', data);
+          toast({
+            title: 'Generation Failed',
+            description: data.error || 'An external error occurred during processing',
+            variant: 'destructive',
+          });
+          // We don't return here, allowing the 'drafts' update (if triggered) to also process
         }
         
         // Handle draft updates
@@ -4618,102 +6032,34 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
     };
   }, [handleStreamingUpdate]);
 
-  // Periodic polling for active generation jobs
+  // Periodic polling for active generation jobs using the bulk endpoint
+  // This serves as a fallback if SSE events are missed or not supported
   useEffect(() => {
-    const pollJobStatus = async (jobId: string) => {
-      try {
-        const response = await fetch(
-          `${API_BASE_URL}/api/campaigns/generation-status/${jobId}`,
-          { headers: getAuthHeaders() }
-        );
-
-        if (response.status === 401 || response.status === 403) {
-          handleUnauthorized();
-          return;
-        }
-
-        if (!response.ok) return;
-
-        const data = await response.json();
-        if (!data.success || !data.status) return;
-
-        // Update backend job status
-        setBackendJobStatus(prev => {
-          const updated = new Map(prev);
-          updated.set(jobId, {
-            status: data.status.status,
-            pages: data.pages || []
-          });
-          return updated;
-        });
-
-        // Update generationJobs with backend status for each page
-        if (data.pages && Array.isArray(data.pages)) {
-          setGenerationJobs(prev => {
-            const updated = new Map(prev);
-            data.pages.forEach((page: { pageId: number; status: string; progress: number }) => {
-              const existing = updated.get(page.pageId);
-              if (existing) {
-                // Only update status if backend says it's different and more authoritative
-                // Don't override 'completed' with 'generating' if page has HTML
-                if (!existing.hasHtml || page.status === 'completed') {
-                  updated.set(page.pageId, {
-                    ...existing,
-                    status: page.status as GenerationPageStatus['status'],
-                    progress: page.progress
-                  });
-                }
-              }
-            });
-            return updated;
-          });
-        }
-      } catch (err) {
-        console.error(`Failed to poll job status for ${jobId}:`, err);
-      }
-    };
-
-    // Get all active jobIds (those with recent streaming or in generating state)
-    const activeJobIds = new Set<string>();
+    // Check if we have any active jobs that need monitoring
+    const hasActiveJobs = Array.from(generationJobs.values()).some(
+      job => job.status === 'generating' || job.status === 'pending'
+    );
     
-    // Add jobIds from streaming messages
-    streamingMessages.forEach((_, jobId) => {
-      if (isGenerationActive(jobId)) {
-        activeJobIds.add(jobId);
-      }
-    });
-    
-    // Add jobIds from generationJobs that are still generating
-    generationJobs.forEach((job) => {
-      if (job.jobId && (job.status === 'generating' || job.status === 'pending')) {
-        activeJobIds.add(job.jobId);
-      }
-    });
+    // Also check streaming messages for recently active jobs
+    const hasRecentStreaming = Array.from(lastStreamingTimestamp.entries()).some(
+       ([jobId, timestamp]) => Date.now() - timestamp < 5 * 60 * 1000 // 5 mins
+    );
 
-    if (activeJobIds.size === 0) return;
+    if (!hasActiveJobs && !hasRecentStreaming) return;
 
-    // Poll each active job
-    activeJobIds.forEach(jobId => {
-      pollJobStatus(jobId);
-    });
-
-    // Set up interval to poll every 30 seconds
     const interval = setInterval(() => {
-      activeJobIds.forEach(jobId => {
-        pollJobStatus(jobId);
-      });
-    }, 30000);
+      fetchActiveJobs();
+    }, 15000); // Poll every 15 seconds
 
-    return () => {
-      clearInterval(interval);
-    };
-  }, [streamingMessages, generationJobs, isGenerationActive, getAuthHeaders, handleUnauthorized]);
+    return () => clearInterval(interval);
+  }, [generationJobs, lastStreamingTimestamp, fetchActiveJobs]);
 
   // Rehydrate generation state on load so generate buttons stay disabled after reload
   useEffect(() => {
     const rehydrate = async () => {
       if (!campaignStructure.topics || campaignStructure.topics.length === 0) return;
       const newMap = new Map<number, GenerationPageStatus>();
+      const newDraftStatuses = new Map<number, { isPublished: boolean; publishedUrl?: string; draftId?: number }>();
 
       for (const topic of campaignStructure.topics) {
         try {
@@ -4738,6 +6084,15 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
           };
 
           data.pages.forEach((p: DraftStatusRecord) => {
+            // Populate draftStatuses map if published
+            if (p.draftId && (p.status === 'published' || (p.wordpressUrl && p.wordpressUrl.startsWith('http')))) {
+                newDraftStatuses.set(p.pageId, {
+                    isPublished: true,
+                    publishedUrl: p.wordpressUrl || undefined,
+                    draftId: p.draftId
+                });
+            }
+
             // Skip empty/no-job entries so new topics don't show as pending
             if (!p.draftId && !p.jobId && !p.hasHtml) {
               return;
@@ -4809,6 +6164,9 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
       if (newMap.size > 0) {
         setGenerationJobs(newMap);
       }
+      if (newDraftStatuses.size > 0) {
+        setDraftStatuses(newDraftStatuses);
+      }
     };
 
     rehydrate();
@@ -4859,11 +6217,11 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
     [getAuthHeaders, handleUnauthorized, toast]
   );
 
-  const confirmDelete = (label: string, action: () => void) => {
+  function confirmDelete(label: string, action: () => void) {
     setDeleteLabel(label);
     setDeleteAction(() => action);
     setShowDeleteModal(true);
-  };
+  }
 
   const fetchStructure = useCallback(
     async (targetCampaignId: number) => {
@@ -4906,13 +6264,7 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
   }, [campaign.id, fetchStructure]);
 
   // Auto-fill brand fields similar to publish tab
-  useEffect(() => {
-    setGenerationForm((prev) => ({
-      ...prev,
-      brandName: derivedBrandName || prev.brandName || '',
-      brandDescription: derivedBrandDescription || prev.brandDescription || '',
-    }));
-  }, [derivedBrandName, derivedBrandDescription]);
+  // Auto-fill brand fields is handled on initialization in handleGenerateTopic
 
   const topicsSnapshot = campaignStructure.topics;
   useEffect(() => {
@@ -5153,6 +6505,9 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
 
   // Stable check for topic generation status - prevents flickering
   const isTopicGenerating = useCallback((topic: Topic) => {
+    // 0. Check explicit loading state first (prevents jitter)
+    if (generateTopicLoading === topic.id) return true;
+
     const pageIds = [
       topic.pillarPage?.id,
       ...(topic.subPages || []).map((sp) => sp.id),
@@ -5164,6 +6519,9 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
       
       // If page has HTML, it's completed (not generating)
       if (job.hasHtml) return false;
+
+      // If explicitly marked as failed (e.g. by zombie check), it's not generating
+      if (job.status === 'failed' || job.status === 'completed') return false;
       
       // Check if generation is active via streaming
       if (job.jobId && isGenerationActive(job.jobId)) {
@@ -5176,12 +6534,14 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
         if (backendStatus?.status === 'generating' || backendStatus?.status === 'pending') {
           return true;
         }
+        return true; // Fallback: if in generationJobs map and no HTML, assume generating
       }
       
-      // Check job status (but prefer streaming/backend status)
-      return job.status === 'generating' || job.status === 'pending';
+      // If no jobId but in map and no HTML, assume initial generating state
+      return true; 
     });
-  }, [generationJobs, isGenerationActive, backendJobStatus]);
+  }, [generationJobs, backendJobStatus, generateTopicLoading, isGenerationActive]);
+
 
   const viewDraft = async (draftId?: number, pageId?: number) => {
     if (!draftId) return;
@@ -5229,8 +6589,11 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
       return;
     }
 
+    // Set loading state for this page
     if (pageId) {
       setPublishLoadingPageId(pageId);
+      // Track that this page is publishing (SSE will clear this)
+      setPublishingPageIds(prev => new Set(prev).add(pageId));
     }
 
     try {
@@ -5267,7 +6630,7 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          draftId: draftId, // Pass draftId to update existing draft instead of creating new one
+          draftId: draftId,
           primaryKeyword: draft.primaryKeyword,
           htmlContent: draft.htmlContent,
           featuredImage: draft.featuredImage,
@@ -5282,68 +6645,24 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
         throw new Error(publishData.error || 'Publish request failed');
       }
 
-      // Show appropriate toast based on publish status
-      if (publishData.status === 'published' && publishData.publishedUrl) {
-        toast({
-          title: 'Published',
-          description: `Content published successfully. View it here: ${publishData.publishedUrl}`,
-        });
-      } else if (publishData.status === 'failed') {
-        toast({
-          title: 'Publish Failed',
-          description: 'WordPress did not return a valid URL. The publish may have failed.',
-          variant: 'destructive',
-        });
-      } else {
-        toast({
-          title: 'Published',
-          description: 'Content sent to WordPress successfully',
-        });
+      // Job queued successfully - store mapping for SSE handler
+      // The actual publishedUrl will come via SSE when n8n responds
+      if (publishData.draftId && pageId) {
+        setDraftToPageMap(prev => new Map(prev).set(publishData.draftId, pageId));
       }
 
-      // Refresh draft status to show updated state
-      if (campaignStructure.topics && campaignStructure.topics.length > 0) {
-        try {
-          const rehydrateMap = new Map<number, GenerationPageStatus>();
-          for (const topic of campaignStructure.topics) {
-            try {
-              const statusResponse = await fetch(
-                `${API_BASE_URL}/api/campaigns/topics/${topic.id}/drafts-status`,
-                { headers: getAuthHeaders() }
-              );
-              if (statusResponse.ok) {
-                const statusData = await statusResponse.json();
-                if (statusData.success && statusData.pages) {
-                  statusData.pages.forEach((p: DraftStatusRecord) => {
-                    if (p.draftId || p.jobId || p.hasHtml) {
-                      rehydrateMap.set(p.pageId, {
-                        jobId: p.jobId || '',
-                        pageId: p.pageId,
-                        pageType: p.pageType === 'subpage' ? 'subpage' : 'pillar',
-                        status: (p.status || 'pending') as GenerationPageStatus['status'],
-                        draftId: p.draftId,
-                        progress: typeof p.progress === 'number' ? p.progress : p.hasHtml ? 100 : 0,
-                        primaryKeyword: p.primaryKeyword,
-                        hasHtml: p.hasHtml,
-                        updatedAt: p.updatedAt,
-                        error: p.error || null,
-                        wordpressUrl: p.wordpressUrl || null,
-                      });
-                    }
-                  });
-                }
-              }
-            } catch (err) {
-              // Silently fail for individual topics
-            }
-          }
-          if (rehydrateMap.size > 0) {
-            setGenerationJobs(rehydrateMap);
-          }
-        } catch (err) {
-          // Silently fail refresh
-        }
+      // Show "Publishing..." toast - success toast will come from SSE handler
+      toast({
+        title: 'Publishing...',
+        description: 'Your content is being published to WordPress. This may take a moment.',
+      });
+
+      // Clear the initial loading state but keep publishingPageIds set
+      // SSE handler will clear publishingPageIds when done
+      if (pageId) {
+        setPublishLoadingPageId(null);
       }
+
     } catch (error) {
       console.error('Error publishing draft:', error);
       toast({
@@ -5351,9 +6670,14 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
         description: error instanceof Error ? error.message : 'Unable to publish content',
         variant: 'destructive',
       });
-    } finally {
+      // On error, clear all loading states
       if (pageId) {
         setPublishLoadingPageId(null);
+        setPublishingPageIds(prev => {
+          const next = new Set(prev);
+          next.delete(pageId);
+          return next;
+        });
       }
     }
   };
@@ -5361,62 +6685,120 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
   const renderStatusPill = (pageId?: number) => {
     if (!pageId) return null;
     const job = generationJobs.get(pageId);
-    if (!job) return null;
-    
-    // Use robust status determination
-    let status = job.status;
-    const jobId = job.jobId;
-    
-    // If has HTML, always completed
-    if (job.hasHtml && status !== 'published') {
-      status = 'completed';
-    } else if (status !== 'completed' && status !== 'published' && jobId) {
-      // Check if generation is active
-      const generationActive = isGenerationActive(jobId);
-      const backendStatus = backendJobStatus.get(jobId);
-      
-      // Only mark as failed if generation is not active AND backend confirms failed
-      if (status === 'failed' || (status !== 'completed' && !generationActive && backendStatus?.status === 'failed')) {
-        status = 'failed';
-      } else if (generationActive || backendStatus?.status === 'generating') {
-        // Keep as generating if active or backend says generating
-        status = 'generating';
-      }
+
+    // Check if currently publishing (waiting for SSE confirmation)
+    if (publishingPageIds.has(pageId)) {
+      return (
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-medium bg-purple-50 text-purple-600 border border-purple-100/50">
+           <Loader2 className="h-3 w-3 animate-spin" />
+           Publishing...
+        </span>
+      );
     }
     
-    if (status === 'pending') return null;
-    const label =
-      status === 'published' ? 'Published' :
-      status === 'completed' ? 'Completed' :
-      status === 'failed' ? 'Failed' :
-      'Generating';
-    const color =
-      status === 'published' ? 'bg-purple-100 text-purple-700' :
-      status === 'completed' ? 'bg-green-100 text-green-700' :
-      status === 'failed' ? 'bg-red-100 text-red-700' :
-      'bg-blue-100 text-blue-700';
-    const progress = job.progress ?? (status === 'completed' || status === 'published' ? 100 : undefined);
-
-    return (
-        <span className={`px-2 py-1 text-[11px] rounded-full ${color}`}>
-          {label}{typeof progress === 'number' ? ` • ${progress}%` : ''}
-        </span>
+    // Check generating state first
+    const isGenerating = job && !job.hasHtml && (
+      (job.jobId && isGenerationActive(job.jobId)) || 
+      (job.jobId && backendJobStatus.get(job.jobId)?.status === 'generating')
     );
+
+    if (isGenerating) {
+      return (
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-medium bg-blue-50 text-blue-600 border border-blue-100/50">
+           <div className="h-2.5 w-2.5 text-blue-600 flex items-center justify-center">
+             <ButtonSpinner />
+           </div>
+           Generating
+        </span>
+      );
+    }
+
+    if (job?.hasHtml) {
+      return (
+        <div className="flex items-center gap-1.5">
+           <button 
+             onClick={() => viewDraft(job.draftId, pageId)}
+             className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors"
+           >
+              <Eye className="h-3 w-3" />
+              View
+           </button>
+           <button 
+             onClick={() => publishDraft(job.draftId, pageId)}
+             className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-md transition-colors"
+           >
+              <Send className="h-3 w-3" />
+              Publish
+           </button>
+        </div>
+      );
+    }
+    
+    // Check if publish failed via draft status
+    const draftStatus = draftStatuses.get(pageId);
+    if (draftStatus?.isFailed || job?.status === 'failed') {
+      const failedDraftId = draftStatus?.draftId || job?.draftId;
+      return (
+        <div className="flex items-center gap-1.5">
+           <button 
+             onClick={() => viewDraft(failedDraftId, pageId)}
+             className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors"
+           >
+              <Eye className="h-3 w-3" />
+              View
+           </button>
+           <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-red-50 text-red-700 border border-red-100/50">
+             Failed
+           </span>
+           <button 
+             onClick={() => publishDraft(failedDraftId, pageId)}
+             className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-md transition-colors"
+           >
+              <RefreshCw className="h-3 w-3" />
+              Retry
+           </button>
+        </div>
+      );
+    }
+
+    // Check if published via draft status
+    if (draftStatus?.isPublished) {
+         return (
+            <div className="flex items-center gap-1.5">
+               <button 
+                 onClick={() => viewDraft(draftStatus.draftId!, pageId)}
+                 className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors"
+               >
+                  <Pencil className="h-3 w-3" />
+                  Edit
+               </button>
+               <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-green-50 text-green-700 border border-green-100/50">
+                 Published
+               </span>
+               <a 
+                 href={draftStatus.publishedUrl} 
+                 target="_blank" 
+                 rel="noopener noreferrer"
+                 className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors"
+               >
+                  <ExternalLink className="h-3 w-3" />
+                  View Live
+               </a>
+            </div>
+         );
+    }
+
+    return null;
   };
 
   const currentTopic = currentGenerationTopicId
     ? campaignStructure.topics.find((t) => t.id === currentGenerationTopicId)
     : null;
 
-  // Generation drawer stepper (simplified to 3 steps similar to publish flow)
-  const generationSteps = [
-    { id: 1, title: 'Word Count', description: 'Dial in the depth' },
-    { id: 2, title: 'Imagery', description: 'Inline images & featured banner' },
-    { id: 3, title: 'Brand', description: 'Tone & voice alignment' },
-  ];
+  // Generation step state
   const [generationStep, setGenerationStep] = useState(1);
 
-  const handleGenerateTopic = async (topic: Topic, options?: { wordCount: number; images: number; featuredImage: boolean; brandName?: string; brandDescription?: string; }) => {
+  const handleGenerateTopic = (topic: Topic) => {
     if (!canGenerateTopic(topic)) {
       toast({
         title: 'Add keywords first',
@@ -5425,39 +6807,65 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
       });
       return;
     }
+
+    setPendingGenerationTopic(topic);
+    // Reset config with defaults or existing values if applicable
+    setGenerationConfig({
+      wordCount: 800,
+      images: 0,
+      featuredImage: false,
+      brandName: derivedBrandName || 'Brand',
+      brandDescription: derivedBrandDescription || '',
+    });
+    setGenerationStep(1);
+    setGenerationDrawerOpen(true);
+  };
+
+  const handleConfirmGeneration = async () => {
+    const topic = pendingGenerationTopic;
+    if (!topic) return;
+
     setGenerateTopicLoading(topic.id);
+    console.log(`[Campaign] Starting generation for topic ${topic.id}: ${topic.title}`);
+
+    // Close drawer immediately
+    setGenerationDrawerOpen(false);
+
     try {
       // Helper function to get primary and longtail keywords from a page's keywords
-      const getKeywordSelections = (pageKeywords: Array<{ id: number; term: string; aiMetadata?: any }>) => {
+      const getKeywordSelections = (
+        pageKeywords: Array<{ id: number; term: string; aiMetadata?: any }>,
+      ) => {
         // Find primary keyword (marked with isPrimary: true in aiMetadata)
-        const primaryKeyword = pageKeywords.find(kw => {
+        const primaryKeyword = pageKeywords.find((kw) => {
           const metadata = kw.aiMetadata as any;
           return metadata?.isPrimary === true;
         });
-        
+
         // Find longtail keywords (marked with isLongtail: true in aiMetadata)
-        const longtailKeywords = pageKeywords.filter(kw => {
+        const longtailKeywords = pageKeywords.filter((kw) => {
           const metadata = kw.aiMetadata as any;
           return metadata?.isLongtail === true;
         });
-        
+
         // Fallback: if no primary selected, use first keyword
         // If no longtail selected, use remaining keywords
         const fallbackPrimary = primaryKeyword || pageKeywords[0];
-        const fallbackLongtail = longtailKeywords.length > 0 
-          ? longtailKeywords 
-          : pageKeywords.filter((_, idx) => idx > 0);
-        
+        const fallbackLongtail =
+          longtailKeywords.length > 0
+            ? longtailKeywords
+            : pageKeywords.filter((_, idx) => idx > 0);
+
         return {
           primary: fallbackPrimary?.term || '',
-          longtail: fallbackLongtail.map(k => k.term).filter(Boolean)
+          longtail: fallbackLongtail.map((k) => k.term).filter(Boolean),
         };
       };
 
       // Build payload from current topic data
       const pillar = topic.pillarPage!;
       const pillarKeywords = getKeywordSelections(pillar.keywords);
-      
+
       const payload = {
         user_id: 'user', // backend uses authenticated user
         campaign_name: campaign.title,
@@ -5465,9 +6873,9 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
           primary_keyword: pillarKeywords.primary || pillar.title,
           longtail_keywords: pillarKeywords.longtail,
           options: {
-            image: options?.images ?? 2,
-            word_count: options?.wordCount ?? 800,
-            featured_image: options?.featuredImage ? 'yes' : 'no',
+            image: generationConfig.images,
+            word_count: generationConfig.wordCount,
+            featured_image: generationConfig.featuredImage ? 'yes' : 'no',
           },
         },
         sub_pillar_pages: topic.subPages.map((sp) => {
@@ -5475,24 +6883,27 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
           return {
             primary_keyword: subPageKeywords.primary || sp.title,
             longtail_keywords: subPageKeywords.longtail,
-          options: {
-            image: options?.images ?? 2,
-            word_count: options?.wordCount ?? 800,
-            featured_image: options?.featuredImage ? 'yes' : 'no',
-          },
+            options: {
+              image: generationConfig.images,
+              word_count: generationConfig.wordCount,
+              featured_image: generationConfig.featuredImage ? 'yes' : 'no',
+            },
           };
         }),
         brand: {
-          brand_name: options?.brandName || campaign.title || 'Brand',
-          brand_description: options?.brandDescription || campaign.description || '',
+          brand_name: generationConfig.brandName,
+          brand_description: generationConfig.brandDescription,
         },
       };
 
-      const response = await fetch(`${API_BASE_URL}/api/campaigns/topics/${topic.id}/generate-content`, {
-        method: 'POST',
-        headers: getAuthHeaders(),
-        body: JSON.stringify(payload),
-      });
+      const response = await fetch(
+        `${API_BASE_URL}/api/campaigns/topics/${topic.id}/generate-content`,
+        {
+          method: 'POST',
+          headers: getAuthHeaders(),
+          body: JSON.stringify(payload),
+        },
+      );
 
       if (response.status === 401 || response.status === 403) {
         handleUnauthorized();
@@ -5504,10 +6915,13 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
         throw new Error(data.error || 'Failed to start generation');
       }
 
-      const { jobId, pages } = data as { jobId: string; pages: { pageId: number; pageType: string; draftId?: number; primaryKeyword?: string; }[] };
+      const { jobId, pages } = data as {
+        jobId: string;
+        pages: { pageId: number; pageType: string; draftId?: number; primaryKeyword?: string }[];
+      };
 
       // Store jobId -> topicId mapping for streaming updates
-      setJobIdToTopicId(prev => {
+      setJobIdToTopicId((prev) => {
         const updated = new Map(prev);
         updated.set(jobId, topic.id);
         return updated;
@@ -5544,7 +6958,7 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
       });
     } finally {
       setGenerateTopicLoading(null);
-      setGenerationDrawerOpen(false);
+      setPendingGenerationTopic(null);
     }
   };
 
@@ -5713,6 +7127,21 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
   );
 };
 
+const handleUpdatePillar = async (topicId: number, updates: { title?: string; referenceUrl?: string }) => {
+    try {
+      await mutateStructure(
+        `${CAMPAIGN_API_BASE}/topics/${topicId}/pillar`,
+        {
+          method: 'PUT',
+          body: JSON.stringify(updates),
+        },
+        { successMessage: 'Pillar page updated' }
+      );
+    } catch {
+      // handled upstream
+    }
+  };
+
   const handleDeleteSubPage = (subPageId: number) => {
   confirmDelete("Sub-page", () =>
     mutateStructure(
@@ -5723,14 +7152,21 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
   );
 };
 
-  const handleDeleteKeyword = (_context: { type: 'pillar' | 'subpage'; topicId: number; pageId: number }, keywordId: number) => {
-    if (!confirm('Are you sure you want to delete this keyword?')) return;
-    mutateStructure(`${CAMPAIGN_API_BASE}/keywords/${keywordId}`, {
-      method: 'DELETE'
-    }, { successMessage: "Keyword deleted" }).catch(() => {
-      /* handled upstream */
-    });
-  };
+  const handleDeleteKeyword = (
+  _context: { type: 'pillar' | 'subpage'; topicId: number; pageId: number },
+  keywordId: number
+) => {
+  setDeleteLabel('keyword')
+  setDeleteAction(() => () =>
+    mutateStructure(
+      `${CAMPAIGN_API_BASE}/keywords/${keywordId}`,
+      { method: 'DELETE' },
+      { successMessage: 'Keyword deleted' }
+    )
+  )
+  setShowDeleteModal(true)
+}
+
 
   const handleSelectPrimaryKeyword = async (keywordId: number) => {
     try {
@@ -5840,39 +7276,478 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
     );
   };
 
+  // --- Render ---
+  
+  const selectedTopic = selectedTopicId 
+    ? campaignStructure.topics.find(t => t.id === selectedTopicId) || null 
+    : null;
+
   return (
-    <div className="w-full mx-auto">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-8">
-        <div className="flex items-center gap-4">
-          <button
-            onClick={onBack}
-            className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-            title="Back to campaigns"
-          >
-            <ArrowLeft className="h-5 w-5 text-gray-600" />
-          </button>
-          <div>
-            <h2 className="text-3xl font-thin text-black tracking-tight mb-2">
-              {campaign.title}
-            </h2>
-            {campaign.description && (
-              <p className="text-base font-light text-gray-600">
-                {campaign.description}
-              </p>
-            )}
+    <>
+    <div className="flex h-[calc(100vh-4rem)] w-full bg-white overflow-hidden">
+      {/* 2. Secondary Sidebar: Topic List */}
+      <div 
+        className={`w-[280px] border-r border-[#0000001a] flex-shrink-0 transition-all duration-300 ${viewMode === 'graph' ? 'w-0 opacity-0 overflow-hidden border-none' : ''}`}
+        style={{
+          background: 'rgba(255, 255, 255, 0.72)',
+          backdropFilter: 'saturate(180%) blur(20px)',
+          WebkitBackdropFilter: 'saturate(180%) blur(20px)',
+        }}
+      >
+        <div className="h-full flex flex-col">
+          {/* Header */}
+          <div className="h-16 flex items-center px-5 border-b border-[#0000001a] flex-shrink-0 z-10">
+             <button
+                onClick={onBack}
+                className="mr-3 p-1.5 hover:bg-gray-100 rounded-full text-gray-400 hover:text-gray-600 transition-colors"
+             >
+               <ArrowLeft className="h-4 w-4" />
+             </button>
+             <h1 className="font-medium text-gray-900 truncate text-sm" title={campaign.title}>
+               {campaign.title}
+             </h1>
           </div>
+
+          <CampaignTopicSidebar
+            topics={campaignStructure.topics}
+            selectedTopicId={selectedTopicId}
+            onSelectTopic={setSelectedTopicId}
+            onAddTopic={(isAi) => isAi ? handleAddTopic(true) : handleAddTopic(false)}
+            onDeleteTopic={handleDeleteTopic}
+            aiLoading={aiLoading}
+            syncing={syncing}
+            isTopicGenerating={isTopicGenerating}
+          />
         </div>
-        {syncing && (
-          <div className="flex items-center gap-2 text-xs font-light text-gray-500">
-            <span className="inline-flex h-2 w-2 rounded-full bg-gray-400 animate-pulse"></span>
-            Syncing changes...
-          </div>
-        )}
       </div>
 
+      {/* 3. Main Content Area */}
+      <div className="flex-1 flex flex-col min-w-0 bg-gray-50/50 relative">
+      
+        {/* Content Body */}
+        <div className="flex-1 relative overflow-hidden">
+            
+            {/* Split View: Detail Pane */}
+            <div className={`absolute inset-0 bg-gray-50/50 transition-opacity duration-300 overflow-y-auto ${viewMode === 'split' ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'}`}>
+               <div className="h-full p-8 max-w-5xl mx-auto">
+                 {selectedTopic ? (
+                   <CampaignTopicDetail
+                     topic={selectedTopic}
+                     isGenerating={isTopicGenerating(selectedTopic)}
+                     streamingMessages={
+                       (jobIdToTopicId.size > 0 
+                         ? Array.from(jobIdToTopicId.entries()).find(([_, tid]) => tid === selectedTopicId)?.[0] 
+                         : undefined) 
+                         ? streamingMessages.get(Array.from(jobIdToTopicId.entries()).find(([_, tid]) => tid === selectedTopicId)![0]) || []
+                         : []
+                     }
+                     jobId={
+                       Array.from(jobIdToTopicId.entries()).find(([_, tid]) => tid === selectedTopicId)?.[0]
+                     }
+                     generationJobs={generationJobs}
+                     onGenerateTopic={handleGenerateTopic}
+                     onReferenceUrlChange={(tid, url) => {
+                        const t = campaignStructure.topics.find(t => t.id === tid);
+                        if(t) handleUpdatePillar(t.pillarPage!.id, { referenceUrl: url });
+                     }}
+                     onDeletePillar={handleDeletePillarPage}
+                     onDeleteSubPage={handleDeleteSubPage}
+                     renderStatusPill={renderStatusPill}
+                     onAddSubPage={(tid) => { setTargetTopicId(tid); setShowAddSubPageModal(true); }}
+                     onAddKeyword={handleAddKeyword}
+                     onDeleteKeyword={handleDeleteKeyword}
+                     onSelectPrimaryKeyword={handleSelectPrimaryKeyword}
+                     onSelectLongtailKeyword={handleSelectLongtailKeyword}
+                     onDeselectKeyword={handleDeselectKeyword}
+                     aiLoading={aiLoading}
+                   />
+                 ) : (
+                   <div className="h-full flex flex-col items-center justify-center text-gray-400">
+                     <Layout className="h-12 w-12 mb-4 opacity-20" />
+                     <p>Create/Select your topic to get started.</p>
+                     <img className="mt-4 h-40 w-40" src="/public/Campaign.png" alt="Campaign" />
+                   </div>
+                 )}
+               </div>
+            </div>
+
+            {/* Graph View: Full Screen */}
+            <div className={`absolute inset-0 bg-white transition-opacity duration-300 ${viewMode === 'graph' ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'}`}>
+               <div className="w-full h-full">
+                <CampaignGraph
+                  campaignStructure={campaignStructure}
+                  selectedTopics={selectedTopics}
+                />
+               </div>
+            </div>
+
+        </div>
+      </div>
+{showAddSubPageModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md border border-gray-100">
+            <h2 className="text-xl font-light text-gray-900 mb-6">Add Sub Page</h2>
+            <input
+              type="text"
+              placeholder="Page Title"
+              className="w-full p-4 border border-gray-200 rounded-xl mb-6 text-sm focus:ring-2 focus:ring-black/5 focus:border-black outline-none transition-all"
+              value={newSubPageTitle}
+              onChange={(e) => setNewSubPageTitle(e.target.value)}
+              autoFocus
+              onKeyDown={(e) => {
+                if(e.key === 'Enter') handleSubmitSubPage();
+                if(e.key === 'Escape') setShowAddSubPageModal(false);
+              }}
+            />
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setShowAddSubPageModal(false)}
+                className="px-6 py-2.5 rounded-full text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSubmitSubPage}
+                disabled={!newSubPageTitle.trim()}
+                className="px-6 py-2.5 bg-black text-white rounded-full hover:bg-black/90 disabled:opacity-50 disabled:cursor-not-allowed transition-all text-sm font-medium shadow-lg shadow-black/10"
+              >
+                Add Page
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Generation Config Drawer */}
+      <Sheet open={generationDrawerOpen} onOpenChange={setGenerationDrawerOpen}>
+        <SheetContent className="w-[400px] sm:w-[540px] overflow-y-auto">
+          <SheetHeader className="mb-6">
+            <SheetTitle>Generate Content</SheetTitle>
+            <SheetDescription>
+              Configure generation options for "{pendingGenerationTopic?.title}".
+            </SheetDescription>
+          </SheetHeader>
+
+          <div className="space-y-8 py-4">
+            {/* Step 1: Word Count */}
+            {generationStep === 1 && (
+              <div className="space-y-6">
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <Label className="text-base font-medium">Word Count Target</Label>
+                    <span className="text-sm text-gray-500 font-mono bg-gray-100 px-2 py-1 rounded">{generationConfig.wordCount} words</span>
+                  </div>
+                  <Slider
+                    value={[generationConfig.wordCount]}
+                    min={400}
+                    max={3000}
+                    step={100}
+                    onValueChange={(vals) => setGenerationConfig(prev => ({ ...prev, wordCount: vals[0] }))}
+                    className="py-4"
+                  />
+                  <p className="text-xs text-gray-500">
+                    Determines the approximate length of each article. Longer articles perform better for SEO but take longer to generate.
+                  </p>
+                </div>
+
+                <div className="flex flex-col gap-4 pt-4">
+                   <button 
+                     onClick={() => setGenerationStep(2)}
+                     className="w-full py-2.5 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors font-medium text-sm"
+                   >
+                     Next: Imagery
+                   </button>
+                </div>
+              </div>
+            )}
+
+            {/* Step 2: Imagery */}
+            {generationStep === 2 && (
+              <div className="space-y-6">
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <Label className="text-base font-medium">Images per Article</Label>
+                    <span className="text-sm text-gray-500 font-mono bg-gray-100 px-2 py-1 rounded">{generationConfig.images} images</span>
+                  </div>
+                  <Slider
+                    value={[generationConfig.images]}
+                    min={0}
+                    max={5}
+                    step={1}
+                    onValueChange={(vals) => setGenerationConfig(prev => ({ ...prev, images: vals[0] }))}
+                    className="py-4"
+                  />
+                </div>
+
+                <div className="flex items-center justify-between p-4 border border-gray-100 rounded-xl bg-gray-50/50">
+                  <div className="space-y-0.5">
+                    <Label className="text-base">Featured Image</Label>
+                    <p className="text-xs text-gray-500">Generate a high-quality hero image</p>
+                  </div>
+                  <Switch
+                    checked={generationConfig.featuredImage}
+                    onCheckedChange={(checked) => setGenerationConfig(prev => ({ ...prev, featuredImage: checked }))}
+                  />
+                </div>
+
+                <div className="flex flex-col gap-3 pt-4">
+                   <button 
+                     onClick={() => setGenerationStep(3)}
+                     className="w-full py-2.5 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors font-medium text-sm"
+                   >
+                     Next: Brand Voice
+                   </button>
+                   <button 
+                     onClick={() => setGenerationStep(1)}
+                     className="w-full py-2.5 bg-white text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors font-medium text-sm"
+                   >
+                     Back
+                   </button>
+                </div>
+              </div>
+            )}
+
+            {/* Step 3: Brand Voice */}
+            {generationStep === 3 && (
+              <div className="space-y-6">
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="brand-name">Brand Name</Label>
+                    <Input 
+                      id="brand-name"
+                      value={generationConfig.brandName}
+                      onChange={(e) => setGenerationConfig(prev => ({ ...prev, brandName: e.target.value }))}
+                      placeholder="e.g. Acme Corp"
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="brand-desc">Tone & Description (Optional)</Label>
+                    <textarea 
+                      id="brand-desc"
+                      className="flex min-h-[100px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                      value={generationConfig.brandDescription}
+                      onChange={(e) => setGenerationConfig(prev => ({ ...prev, brandDescription: e.target.value }))}
+                      placeholder="e.g. Professional, authoritative, yet accessible. Focus on Enterprise solutions."
+                    />
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-3 pt-6">
+                   <button 
+                     onClick={handleConfirmGeneration}
+                     disabled={generateTopicLoading === pendingGenerationTopic?.id}
+                     className="w-full py-3 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors font-medium flex items-center justify-center gap-2"
+                   >
+                     {generateTopicLoading === pendingGenerationTopic?.id ? (
+                       <>
+                         <ButtonSpinner /> Starting Generation...
+                       </>
+                     ) : (
+                       <>
+                         <Sparkles className="w-4 h-4" /> Start Generation
+                       </>
+                     )}
+                   </button>
+                   <button 
+                     onClick={() => setGenerationStep(2)}
+                     className="w-full py-2.5 bg-white text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors font-medium text-sm"
+                   >
+                     Back
+                   </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      {showAddKeywordModal && addKeywordContext && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[60]">
+          <div className="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-lg border border-gray-100 transform transition-all scale-100">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h2 className="text-xl font-light text-gray-900">Add Keyword</h2>
+                <p className="text-sm text-gray-500 mt-1">
+                  Adding to <span className="font-medium text-gray-900">{addKeywordContext.type === 'pillar' ? 'Pillar Page' : 'Sub Page'}</span>
+                </p>
+              </div>
+              <button 
+                onClick={() => setShowAddKeywordModal(false)}
+                className="p-2 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors text-gray-400 hover:text-gray-600"
+              >
+                <Trash2 className="h-5 w-5 " />
+              </button>
+            </div>
+
+            {/* Keyword Type Selection */}
+            <div className="flex bg-gray-100 p-1 rounded-lg mb-6">
+              <button
+                className={`flex-1 py-2 text-sm font-medium rounded-md transition-all ${
+                  newKeywordType === 'primary' 
+                    ? 'bg-white text-black shadow-sm' 
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+                onClick={() => setNewKeywordType('primary')}
+              >
+                Primary
+              </button>
+              <button
+                className={`flex-1 py-2 text-sm font-medium rounded-md transition-all ${
+                  newKeywordType === 'longtail' 
+                    ? 'bg-white text-black shadow-sm' 
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+                onClick={() => setNewKeywordType('longtail')}
+              >
+                Longtail
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              {/* Searchable Dropdown */}
+              <div className="relative">
+                <label className="block text-xs uppercase tracking-wider text-gray-500 font-medium mb-1.5">
+                  Keyword Term
+                </label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <input
+                    type="text"
+                    placeholder="Search or enter custom keyword..."
+                    className="w-full pl-9 pr-4 py-3 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-black/5 focus:border-black outline-none transition-all"
+                    value={keywordSearchOpen ? keywordSearchValue : newKeywordTerm}
+                    onChange={(e) => {
+                      setKeywordSearchValue(e.target.value);
+                      setNewKeywordTerm(e.target.value);
+                      setKeywordSearchOpen(true);
+                    }}
+                    onFocus={() => {
+                        setKeywordSearchOpen(true);
+                        // Ensure keywords are loaded
+                        if (availableKeywords.length === 0) {
+                            fetchDomainKeywords(campaign.id);
+                        }
+                    }}
+                  />
+                </div>
+                
+                {/* Dropdown Results */}
+                {keywordSearchOpen && (
+                  <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl shadow-xl border border-gray-100 max-h-60 overflow-y-auto z-50 animate-in fade-in zoom-in-95 duration-200">
+                    {loadingKeywords ? (
+                      <div className="p-8 text-center text-gray-400 flex flex-col items-center">
+                        <Loader2 className="h-5 w-5 animate-spin mb-2" />
+                        <span className="text-xs">Loading suggestions...</span>
+                      </div>
+                    ) : (
+                      <>
+                         {availableKeywords
+                          .filter(k => k.term.toLowerCase().includes(keywordSearchValue.toLowerCase()))
+                          .slice(0, 50) 
+                          .map((k) => (
+                            <button
+                              key={k.id}
+                              className="w-full text-left px-4 py-3 hover:bg-gray-50 flex items-center justify-between group transition-colors border-b border-gray-50 last:border-0"
+                              onClick={() => {
+                                setNewKeywordTerm(k.term);
+                                setNewKeywordVolume(k.volume?.toString() || '');
+                                setNewKeywordDifficulty(k.difficulty || 'Medium');
+                                setKeywordSearchOpen(false);
+                              }}
+                            >
+                              <div>
+                                <span className="text-sm text-gray-900 font-medium">{k.term}</span>
+                                <div className="flex items-center gap-2 mt-0.5">
+                                   <span className={`text-[10px] px-1.5 py-0.5 rounded ${
+                                      k.difficulty === 'Easy' ? 'bg-green-100 text-green-700' :
+                                      k.difficulty === 'Hard' ? 'bg-red-100 text-red-700' :
+                                      'bg-yellow-100 text-yellow-700'
+                                   }`}>
+                                     {k.difficulty || 'Medium'}
+                                   </span>
+                                   {k.volume && (
+                                     <span className="text-[10px] text-gray-400">
+                                       Vol: {k.volume.toLocaleString()}
+                                     </span>
+                                   )}
+                                </div>
+                              </div>
+                              <Plus className="h-4 w-4 text-gray-300 group-hover:text-black transition-colors" />
+                            </button>
+                          ))}
+                        
+                        {/* No results state */}
+                        {availableKeywords.filter(k => k.term.toLowerCase().includes(keywordSearchValue.toLowerCase())).length === 0 && (
+                          <div className="p-4 text-center">
+                            <p className="text-sm text-gray-500 mb-2">No matching keywords found</p>
+                            <button
+                                onClick={() => setKeywordSearchOpen(false)}
+                                className="text-xs text-blue-600 hover:underline font-medium"
+                            >
+                                Use &quot;{keywordSearchValue}&quot; as custom keyword
+                            </button>
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs uppercase tracking-wider text-gray-500 font-medium mb-1.5">
+                    Volume
+                  </label>
+                  <input
+                    type="number"
+                    placeholder="e.g. 1000"
+                    className="w-full p-3 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-black/5 focus:border-black outline-none transition-all"
+                    value={newKeywordVolume}
+                    onChange={(e) => setNewKeywordVolume(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs uppercase tracking-wider text-gray-500 font-medium mb-1.5">
+                    Difficulty
+                  </label>
+                  <select
+                    className="w-full p-3 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-black/5 focus:border-black outline-none transition-all bg-white"
+                    value={newKeywordDifficulty}
+                    onChange={(e) => setNewKeywordDifficulty(e.target.value)}
+                  >
+                    <option value="Easy">Easy</option>
+                    <option value="Medium">Medium</option>
+                    <option value="Hard">Hard</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 mt-8 pt-6 border-t border-gray-100">
+              <button
+                onClick={() => setShowAddKeywordModal(false)}
+                className="px-6 py-2.5 rounded-full text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors"
+                disabled={keywordSearchOpen}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSubmitKeyword}
+                disabled={!newKeywordTerm.trim() || keywordSearchOpen}
+                className="px-8 py-2.5 bg-black text-white rounded-full hover:bg-black/90 disabled:opacity-50 disabled:cursor-not-allowed transition-all text-sm font-medium shadow-lg shadow-black/10 flex items-center gap-2"
+              >
+                <Plus className="h-4 w-4" />
+                Add Keyword
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showDeleteModal && (
-        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-[70]">
           <div className="bg-white p-6 rounded-xl shadow-xl w-[90%] max-w-sm">
             <h2 className="text-lg font-medium text-gray-800">Delete {deleteLabel}?</h2>
             <p className="text-sm text-gray-500 mt-2">
@@ -5899,1611 +7774,210 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
         </div>
       )}
 
-      {/* Graph Overview */}
-      <div className="w-full h-[700px] mb-10">
-        <CampaignGraph
-          campaignStructure={campaignStructure}
-          selectedTopics={selectedTopics}
-        />
       </div>
 
-      {/* Actions */}
-      <div className="flex flex-wrap items-center justify-between gap-4 mb-10">
-        <button
-          onClick={handleContinue}
-          disabled={selectedTopics.size === 0 || syncing}
-          className="px-6 py-2.5 bg-black text-white rounded-full hover:bg-black/90 disabled:bg-gray-300 disabled:cursor-not-allowed transition-all text-sm font-medium flex items-center gap-2 shadow-sm"
+      {/* Generation Config Drawer - Matches Publish Tab Style */}
+      <Sheet open={generationDrawerOpen} onOpenChange={setGenerationDrawerOpen}>
+        <SheetContent 
+          side="right" 
+          className="w-full sm:max-w-3xl border-l border-[#e2e4ea] bg-[#f5f6fa] px-10 py-12 overflow-y-auto font-light"
         >
-          Continue
-        </button>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => handleAddTopic(false)}
-            disabled={syncing}
-            className="px-4 py-2 bg-gray-100 text-gray-900 rounded-full hover:bg-gray-200 transition-all text-sm font-light flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
-          >
-            <Plus className="h-4 w-4" />
-            Manual
-          </button>
-          <button
-            onClick={() => handleAddTopic(true)}
-            disabled={syncing || aiLoading === "topic"}
-            className="px-4 py-2 bg-black text-white rounded-full hover:bg-black/90 transition-all text-sm font-medium flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
-          >
-            {aiLoading === "topic" ? (
-              <ButtonSpinner />
-            ) : (
-              <Sparkles className="h-4 w-4" />
-            )}
-            {aiLoading === "topic" ? "Generating..." : "AI Generate"}
-          </button>
-        </div>
-      </div>
-
-      {/* Active Generation Progress Section */}
-      {(() => {
-        // Collect all active generations
-        const activeGenerations: Array<{
-          topicId: number;
-          topicTitle: string;
-          jobId: string;
-          messages: Array<{ message: string; timestamp: string }>;
-          pages: Array<{ pageId: number; status: string; progress: number }>;
-        }> = [];
-
-        campaignStructure.topics.forEach(topic => {
-          const topicJobId = Array.from(jobIdToTopicId.entries())
-            .find(([_, tid]) => tid === topic.id)?.[0];
-          
-          if (topicJobId && isGenerationActive(topicJobId)) {
-            const messages = streamingMessages.get(topicJobId) || [];
-            const backendStatus = backendJobStatus.get(topicJobId);
-            
-            // Count completed pages
-            const topicPages = Array.from(generationJobs.values())
-              .filter(job => job.jobId === topicJobId);
-            const completedCount = topicPages.filter(p => p.hasHtml || p.status === 'completed').length;
-            const totalCount = topicPages.length || (topic.pillarPage ? 1 : 0) + topic.subPages.length;
-
-            activeGenerations.push({
-              topicId: topic.id,
-              topicTitle: topic.title,
-              jobId: topicJobId,
-              messages,
-              pages: backendStatus?.pages || []
-            });
-          }
-        });
-
-        if (activeGenerations.length === 0) return null;
-
-        return (
-          <div className="mb-8 space-y-4">
-            {activeGenerations.map(({ topicId, topicTitle, jobId, messages, pages }) => {
-              const latestMessage = messages[messages.length - 1];
-              
-              // Count pages from generationJobs if backend pages not available
-              const topicPages = Array.from(generationJobs.values())
-                .filter(job => job.jobId === jobId);
-              
-              const completedCount = pages.length > 0 
-                ? pages.filter(p => p.status === 'completed').length
-                : topicPages.filter(p => p.hasHtml || p.status === 'completed').length;
-              
-              const totalCount = pages.length > 0 
-                ? pages.length 
-                : topicPages.length || 3; // Default to 3 if no pages info
-              
-              const progressPercent = totalCount > 0 ? (completedCount / totalCount) * 100 : 0;
-              
-              return (
-                <div
-                  key={jobId}
-                  className="bg-white/80 backdrop-blur-xl border border-gray-200/60 rounded-3xl p-5 shadow-sm transition-all duration-300 hover:shadow-md"
-                  style={{
-                    boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.05)'
-                  }}
-                >
-                  <div className="flex items-start justify-between gap-5">
-                    <div className="flex-1 min-w-0 space-y-2">
-                      <div className="flex items-center gap-3">
-                        <div className="relative flex-shrink-0">
-                          <div className="w-2 h-2 bg-gray-900 rounded-full" />
-                          <div className="absolute inset-0 w-2 h-2 bg-gray-900 rounded-full animate-ping opacity-75" />
-                        </div>
-                        <h4 className="text-sm font-light text-gray-900 tracking-tight truncate" style={{ letterSpacing: '0.01em' }}>
-                          {topicTitle}
-                        </h4>
-                      </div>
-                      
-                      {latestMessage && (
-                        <p className="text-xs text-gray-500 font-extralight ml-5 leading-relaxed" style={{ letterSpacing: '0.005em' }}>
-                          {latestMessage.message}
-                        </p>
-                      )}
-                      
-                      <div className="ml-5 flex items-center gap-3">
-                        <div className="flex-1 h-0.5 bg-gray-100 rounded-full overflow-hidden">
-                          <div
-                            className="h-full bg-gray-900 transition-all duration-500 ease-out"
-                            style={{ width: `${progressPercent}%` }}
-                          />
-                        </div>
-                        <span className="text-[10px] text-gray-400 font-extralight tabular-nums" style={{ letterSpacing: '0.02em' }}>
-                          {completedCount}/{totalCount}
+          <div className="space-y-10">
+            {/* Header Card */}
+            <div className="rounded-[32px] border border-white/80 bg-white/90 px-6 py-6 shadow-[0_30px_80px_rgba(15,23,42,0.10)] backdrop-blur">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <div className="space-y-3">
+                  <div className="inline-flex items-center gap-2 rounded-full border border-black/10 px-4 py-1 text-[10px] tracking-[0.35em] uppercase text-gray-500">
+                    Content Generation
+                  </div>
+                  <div>
+                    <h3 className="text-[28px] font-light text-gray-900 tracking-tight">
+                      {generateTopicLoading === pendingGenerationTopic?.id ? (
+                        <span className="flex items-center gap-2">
+                          Generating content...
+                          <svg className="h-5 w-5 animate-spin text-gray-400" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4l3-3-3-3v4A8 8 0 104 12z" />
+                          </svg>
                         </span>
-                      </div>
-                    </div>
+                      ) : (
+                        `Step ${generationStep} of 3`
+                      )}
+                    </h3>
+                    <p className="text-sm text-gray-500 mt-1">Configure options for "{pendingGenerationTopic?.title}"</p>
                   </div>
                 </div>
-              );
-            })}
-          </div>
-        );
-      })()}
-
-      {/* Topics List */}
-      <div className="space-y-4">
-        {campaignStructure.topics.map((topic) => {
-          // Find jobId for this topic
-          const topicJobId = Array.from(jobIdToTopicId.entries())
-            .find(([_, tid]) => tid === topic.id)?.[0] || null;
-          const topicMessages = topicJobId ? streamingMessages.get(topicJobId) || [] : [];
-          
-          return (
-            <div
-              key={topic.id}
-              className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden relative"
-            >
-              {/* Streaming Progress Indicator */}
-              <StreamingProgressIndicator 
-                topicId={topic.id}
-                jobId={topicJobId}
-                messages={topicMessages}
-              />
-              
-              {/* Topic Header */}
-              <div className="flex items-center justify-between p-6 hover:bg-gray-50 transition-colors">
-              <div className="flex items-center gap-3 flex-1">
-                <button
-                  onClick={() => toggleTopic(topic.id)}
-                  className="p-1 hover:bg-gray-200 rounded transition-colors"
-                >
-                  <ChevronRight
-                    className={`h-5 w-5 text-gray-400 transition-transform duration-200 ${
-                      expandedTopics.has(topic.id) ? "rotate-90" : ""
-                    }`}
-                  />
-                </button>
-                <div className="w-10 h-10 rounded-lg bg-purple-50 flex items-center justify-center">
-                  <Sparkles className="h-5 w-5 text-purple-600" />
-                </div>
-                <div className="flex-1">
-                  <h3 className="text-lg font-light text-black tracking-tight">
-                    {topic.title}
-                  </h3>
-                  <p className="text-xs font-light text-gray-500 mt-0.5">
-                    {topic.pillarPage ? "1 pillar page" : "No pillar page"} •{" "}
-                    {topic.subPages.length} sub-page
-                    {topic.subPages.length !== 1 ? "s" : ""}
+                <div className="flex flex-col items-end gap-2">
+                  <div className="flex items-center gap-1">
+                    {[1, 2, 3].map((step) => (
+                      <span
+                        key={`progress-${step}`}
+                        className={`h-1.5 w-12 rounded-full transition-all ${
+                          step <= generationStep ? 'bg-black/80' : 'bg-black/10'
+                        }`}
+                      />
+                    ))}
+                  </div>
+                  <p className="text-xs uppercase tracking-[0.3em] text-gray-400">
+                    Generation flow
                   </p>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                  <button
-                  onClick={() => {
-                    setCurrentGenerationTopicId(topic.id);
-                    setGenerationForm((prev) => ({
-                      ...prev,
-                      wordCount: prev.wordCount || 800,
-                      images: prev.images || 2,
-                      featuredImage: prev.featuredImage ?? true,
-                      brandName: derivedBrandName || prev.brandName || '',
-                      brandDescription: derivedBrandDescription || prev.brandDescription || '',
-                    }));
-                    setGenerationDrawerOpen(true);
-                  }}
-                  disabled={
-                    !canGenerateTopic(topic) ||
-                    generateTopicLoading === topic.id ||
-                    isTopicGenerating(topic)
-                  }
-                  className="inline-flex items-center gap-2 px-3 py-2 text-xs font-semibold rounded-full bg-gradient-to-r from-black to-gray-800 text-white shadow-sm hover:opacity-90 transition disabled:opacity-50 disabled:cursor-not-allowed"
-                  title={
-                    canGenerateTopic(topic)
-                      ? 'Generate content for this topic'
-                      : 'Add a pillar page and at least one keyword per page to enable generation'
-                  }
-                >
-                  {generateTopicLoading === topic.id || isTopicGenerating(topic) ? (
-                    <>
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      <span>Generating…</span>
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="h-3.5 w-3.5" />
-                      <span>Generate</span>
-                    </>
-                  )}
-                  </button>
-                <button
-                  onClick={() => handleDeleteTopic(topic.id)}
-                  disabled={syncing}
-                  className="p-2 text-gray-400 hover:text-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  title="Delete topic"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
-              </div>
             </div>
 
-            {/* Topic Content */}
-            {expandedTopics.has(topic.id) && (
-              <div className="px-6 pb-6 pt-0 border-t border-gray-100">
-                <div className="pt-6 space-y-4">
-                  {/* Pillar Page Section */}
-                  <div>
-                    <div className="flex items-center justify-between mb-3">
-                      <h4 className="text-sm font-medium text-gray-900">
-                        Pillar Page
-                      </h4>
-                      {!topic.pillarPage && (
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => handleAddPillarPage(topic.id, false)}
-                            disabled={syncing}
-                            className="px-3 py-1.5 text-xs font-light text-gray-600 hover:text-black hover:bg-gray-100 rounded-full transition-all flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
-                          >
-                            <Plus className="h-3.5 w-3.5" />
-                            Manual
-                          </button>
-                          <button
-                            onClick={() => handleAddPillarPage(topic.id, true)}
-                            disabled={
-                              syncing || aiLoading === `pillar-${topic.id}`
-                            }
-                            className="px-3 py-1.5 text-xs font-light text-white bg-black hover:bg-black/90 rounded-full transition-all flex items-center gap-1.5 disabled:opacity-60 disabled:cursor-not-allowed"
-                          >
-                            {aiLoading === `pillar-${topic.id}` ? (
-                              <ButtonSpinner />
-                            ) : (
-                              <Sparkles className="h-3.5 w-3.5" />
-                            )}
-                            {aiLoading === `pillar-${topic.id}`
-                              ? "Generating"
-                              : "AI"}
-                          </button>
-                        </div>
-                      )}
-                    </div>
-
-                    {topic.pillarPage ? (
-                      <div className="bg-gray-50 rounded-xl border border-gray-200 p-4">
-                        <div className="flex items-center justify-between mb-3">
-                          <div className="flex items-center gap-3 flex-1">
-                            <button
-                              onClick={() =>
-                                togglePillarPage(topic.pillarPage!.id)
-                              }
-                              className="p-1 hover:bg-gray-200 rounded transition-colors"
-                            >
-                              <ChevronRight
-                                className={`h-4 w-4 text-gray-400 transition-transform duration-200 ${
-                                  expandedPillarPages.has(topic.pillarPage!.id)
-                                    ? "rotate-90"
-                                    : ""
-                                }`}
-                              />
-                            </button>
-                            <div className="w-8 h-8 rounded-lg bg-green-50 flex items-center justify-center">
-                              <FileText className="h-4 w-4 text-green-600" />
-                            </div>
-                            <div className="flex-1">
-                              <div className="flex items-center gap-3">
-                              <h5 className="text-sm font-light text-black">{topic.pillarPage.title}</h5>
-                                {(() => {
-                                  const job = generationJobs.get(topic.pillarPage.id);
-                                  const updatedAtMs = job?.updatedAt ? new Date(job.updatedAt).getTime() : undefined;
-                                  const staleClient = updatedAtMs ? (Date.now() - updatedAtMs > 5 * 60 * 1000) : false;
-                                  const status = staleClient && !job?.hasHtml ? 'failed' : job?.status;
-                                  const isLoading = viewLoadingPageId === topic.pillarPage.id;
-                                  const isPublishing = publishLoadingPageId === topic.pillarPage.id;
-                                  const isPublished = status === 'published' && job?.wordpressUrl;
-                                  const canView = (status === 'completed' || status === 'published') && job?.draftId;
-                                  
-                                  if (canView) {
-                                    return (
-                                      <div className="flex items-center gap-2">
-                                        <button
-                                          onClick={(e) => {
-                                            e.preventDefault();
-                                            e.stopPropagation();
-                                            viewDraft(job.draftId, topic.pillarPage.id);
-                                          }}
-                                          disabled={isLoading || isPublishing}
-                                          className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-black text-white text-xs font-medium hover:bg-gray-800 transition-all disabled:opacity-60 disabled:cursor-not-allowed shadow-sm"
-                                        >
-                                          {isLoading ? (
-                                            <>
-                                              <Loader2 className="h-3 w-3 animate-spin" />
-                                              Opening...
-                                            </>
-                                          ) : (
-                                            'View'
-                                          )}
-                                        </button>
-                                        {isPublished && job.wordpressUrl && (
-                                          <a
-                                            href={job.wordpressUrl}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            onClick={(e) => e.stopPropagation()}
-                                            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple-600 text-white text-xs font-medium hover:bg-purple-700 transition-all shadow-sm"
-                                          >
-                                            View Live
-                                          </a>
-                                        )}
-                                        {!isPublished && (
-                                          <button
-                                            onClick={(e) => {
-                                              e.preventDefault();
-                                              e.stopPropagation();
-                                              publishDraft(job.draftId, topic.pillarPage.id);
-                                            }}
-                                            disabled={isLoading || isPublishing || !hasWordpressIntegration}
-                                            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-600 text-white text-xs font-medium hover:bg-blue-700 transition-all disabled:opacity-60 disabled:cursor-not-allowed shadow-sm"
-                                            title={!hasWordpressIntegration ? 'WordPress integration required' : ''}
-                                          >
-                                            {isPublishing ? (
-                                              <>
-                                                <Loader2 className="h-3 w-3 animate-spin" />
-                                                Publishing...
-                                              </>
-                                            ) : (
-                                              'Publish'
-                                            )}
-                                          </button>
-                                        )}
-                                      </div>
-                                    );
-                                  }
-                                  return null;
-                                })()}
-                              </div>
-                              <p className="text-xs font-light text-gray-500 mt-0.5">
-                                {topic.pillarPage.keywords.length} keyword
-                                {topic.pillarPage.keywords.length !== 1
-                                  ? "s"
-                                  : ""}
-                              </p>
-                                  <div className="mt-1">
-                                    {renderStatusPill(topic.pillarPage.id)}
-                                  </div>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <button
-                              onClick={() => handleDeletePillarPage(topic.id)}
-                              disabled={syncing}
-                              className="p-1.5 text-gray-400 hover:text-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                              title="Delete pillar page"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </button>
-                          </div>
-                        </div>
-
-                        {/* Pillar Page Keywords */}
-                        {expandedPillarPages.has(topic.pillarPage.id) && (
-                          <div className="ml-11 mt-3 space-y-4">
-                            {/* Primary Keywords Section */}
-                            <div>
-                              <div className="flex items-center justify-between mb-2">
-                                <label className="text-xs font-medium text-gray-700">
-                                  Primary Keywords <span className="text-red-500">*</span>
-                                </label>
-                            <div className="flex items-center gap-1">
-                              <button
-                                onClick={() => handleAddKeyword('pillar', topic.id, topic.pillarPage!.id, false)}
-                                  disabled={syncing}
-                                  className="px-2 py-1 text-xs font-light text-gray-600 hover:text-black hover:bg-gray-100 rounded-full transition-all flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
-                                    title="Add primary keyword manually"
-                              >
-                                <Plus className="h-3 w-3" />
-                              </button>
-                              <button
-                                    onClick={async () => {
-                                      if (aiLoading === `primary-keyword-${topic.pillarPage!.id}`) return;
-                                      setAiLoading(`primary-keyword-${topic.pillarPage!.id}`);
-                                      try {
-                                        const response = await fetch(`${CAMPAIGN_API_BASE}/pages/${topic.pillarPage!.id}/keywords/ai`, {
-                                          method: 'POST',
-                                          headers: getAuthHeaders(),
-                                          body: JSON.stringify({ count: 1, keywordType: 'primary' })
-                                        });
-                                        if (!response.ok) throw new Error('Failed to generate');
-                                        const data = await response.json();
-                                        if (data.success) {
-                                          fetchStructure(campaign.id);
-                                          toast({
-                                            title: 'Keyword generated',
-                                            description: 'Primary keyword generated successfully',
-                                          });
-                                        }
-                                      } catch (error) {
-                                        console.error('Error generating primary keyword:', error);
-                                        toast({
-                                          title: 'Generation failed',
-                                          description: 'Unable to generate primary keyword',
-                                          variant: 'destructive'
-                                        });
-                                      } finally {
-                                        setAiLoading(null);
-                                      }
-                                    }}
-                                    disabled={syncing || aiLoading === `primary-keyword-${topic.pillarPage!.id}`}
-                                  className="px-2 py-1 text-xs font-light text-white bg-black hover:bg-black/90 rounded-full transition-all flex items-center gap-1 disabled:opacity-60 disabled:cursor-not-allowed"
-                                    title="AI generate primary keyword"
-                              >
-                                    {aiLoading === `primary-keyword-${topic.pillarPage!.id}` ? <ButtonSpinner /> : <Sparkles className="h-3 w-3" />}
-                              </button>
-                                </div>
-                              </div>
-                              <div className="space-y-2">
-                                {(() => {
-                                  // Only show keywords that are actually marked as primary
-                                  const primaryKeywords = topic.pillarPage.keywords.filter(kw => {
-                                    const metadata = kw.aiMetadata as any;
-                                    return metadata && metadata.isPrimary === true;
-                                  });
-                                  
-                                  return primaryKeywords.length > 0 ? (
-                                    primaryKeywords.map((keyword) => (
-                                      <div
-                                        key={keyword.id}
-                                        className="flex items-center justify-between p-2 bg-white rounded-lg border border-gray-200 hover:border-gray-300 transition-colors"
-                                      >
-                                        <div className="flex items-center gap-3">
-                                          <div className="w-6 h-6 rounded bg-purple-50 flex items-center justify-center">
-                                            <span className="text-[10px] font-medium text-purple-600">P</span>
-                                          </div>
-                                          <div>
-                                            <p className="text-sm font-light text-black">{keyword.term}</p>
-                                            <p className="text-xs font-light text-gray-500">
-                                              Vol: {keyword.volume.toLocaleString()} • KD: {keyword.difficulty}
-                                            </p>
-                                          </div>
-                            </div>
-                            <button
-                                          onClick={() => handleDeleteKeyword({ type: 'pillar', topicId: topic.id, pageId: topic.pillarPage!.id }, keyword.id)}
-                              disabled={syncing}
-                                          className="p-1 text-gray-400 hover:text-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                                          title="Delete keyword"
-                            >
-                                          <X className="h-3.5 w-3.5" />
-                            </button>
-                                      </div>
-                                    ))
-                                  ) : (
-                                    <p className="text-xs font-light text-gray-500 italic py-2">No primary keywords yet</p>
-                                  );
-                                })()}
-                          </div>
-                        </div>
-
-                            {/* Longtail Keywords Section */}
-                            <div>
-                              <div className="flex items-center justify-between mb-2">
-                                <label className="text-xs font-medium text-gray-700">
-                                  Longtail Keywords
-                                </label>
-                                <div className="flex items-center gap-1">
-                                  <button
-                                    onClick={() => handleAddKeyword('pillar', topic.id, topic.pillarPage!.id, false, 'longtail')}
-                                    disabled={syncing}
-                                    className="px-2 py-1 text-xs font-light text-gray-600 hover:text-black hover:bg-gray-100 rounded-full transition-all flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
-                                    title="Add longtail keyword manually"
-                                  >
-                                    <Plus className="h-3 w-3" />
-                                  </button>
-                                  <button
-                                    onClick={async () => {
-                                      if (aiLoading === `longtail-keyword-${topic.pillarPage!.id}`) return;
-                                      setAiLoading(`longtail-keyword-${topic.pillarPage!.id}`);
-                                      try {
-                                        const response = await fetch(`${CAMPAIGN_API_BASE}/pages/${topic.pillarPage!.id}/keywords/ai`, {
-                                          method: 'POST',
-                                          headers: getAuthHeaders(),
-                                          body: JSON.stringify({ count: 3, keywordType: 'longtail' })
-                                        });
-                                        if (!response.ok) throw new Error('Failed to generate');
-                                        const data = await response.json();
-                                        if (data.success) {
-                                          fetchStructure(campaign.id);
-                                          toast({
-                                            title: 'Keywords generated',
-                                            description: 'Longtail keywords generated successfully',
-                                          });
-                                        }
-                                      } catch (error) {
-                                        console.error('Error generating longtail keywords:', error);
-                                        toast({
-                                          title: 'Generation failed',
-                                          description: 'Unable to generate longtail keywords',
-                                          variant: 'destructive'
-                                        });
-                                      } finally {
-                                        setAiLoading(null);
-                                      }
-                                    }}
-                                    disabled={syncing || aiLoading === `longtail-keyword-${topic.pillarPage!.id}`}
-                                    className="px-2 py-1 text-xs font-light text-white bg-black hover:bg-black/90 rounded-full transition-all flex items-center gap-1 disabled:opacity-60 disabled:cursor-not-allowed"
-                                    title="AI generate longtail keywords"
-                                  >
-                                    {aiLoading === `longtail-keyword-${topic.pillarPage!.id}` ? <ButtonSpinner /> : <Sparkles className="h-3 w-3" />}
-                                  </button>
-                                </div>
-                              </div>
-                              <div className="space-y-2">
-                                {(() => {
-                                  // Filter keywords marked as longtail (and exclude primary)
-                                  const longtailKeywords = topic.pillarPage.keywords.filter(kw => {
-                                    const metadata = kw.aiMetadata as any;
-                                    const isPrimary = metadata && metadata.isPrimary === true;
-                                    const isLongtail = metadata && metadata.isLongtail === true;
-                                    // Only show if marked as longtail and not primary
-                                    return isLongtail && !isPrimary;
-                                  });
-                                  
-                                  return longtailKeywords.length > 0 ? (
-                                    longtailKeywords.map((keyword) => (
-                                <div
-                                  key={keyword.id}
-                                  className="flex items-center justify-between p-2 bg-white rounded-lg border border-gray-200 hover:border-gray-300 transition-colors"
-                                >
-                                  <div className="flex items-center gap-3">
-                                          <div className="w-6 h-6 rounded bg-green-50 flex items-center justify-center">
-                                            <span className="text-[10px] font-medium text-green-600">L</span>
-                                    </div>
-                                    <div>
-                                      <p className="text-sm font-light text-black">
-                                        {keyword.term}
-                                      </p>
-                                      <p className="text-xs font-light text-gray-500">
-                                        Vol: {keyword.volume.toLocaleString()} •
-                                        KD: {keyword.difficulty}
-                                      </p>
-                                    </div>
-                                  </div>
-                                  <button
-                                    onClick={() => handleDeleteKeyword(keyword.id)}
-                                    disabled={syncing}
-                                    className="p-1 text-gray-400 hover:text-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                                    title="Delete keyword"
-                                  >
-                                    <X className="h-3.5 w-3.5" />
-                                  </button>
-                                </div>
-                              ))
-                            ) : (
-                                    <p className="text-xs font-light text-gray-500 italic py-2">No longtail keywords yet</p>
-                                  );
-                                })()}
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <p className="text-xs font-light text-gray-500 italic py-2">
-                        No pillar page created yet
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Sub Pages Section */}
-                  <div>
-                    <div className="flex items-center justify-between mb-3">
-                      <h4 className="text-sm font-medium text-gray-900">
-                        Sub Pages
-                      </h4>
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => handleAddSubPage(topic.id, false)}
-                          disabled={syncing}
-                          className="px-3 py-1.5 text-xs font-light text-gray-600 hover:text-black hover:bg-gray-100 rounded-full transition-all flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          <Plus className="h-3.5 w-3.5" />
-                          Manual
-                        </button>
-                        <button
-                          onClick={() => handleAddSubPage(topic.id, true)}
-                          disabled={
-                            syncing || aiLoading === `subpage-${topic.id}`
-                          }
-                          className="px-3 py-1.5 text-xs font-light text-white bg-black hover:bg-black/90 rounded-full transition-all flex items-center gap-1.5 disabled:opacity-60 disabled:cursor-not-allowed"
-                        >
-                          {aiLoading === `subpage-${topic.id}` ? (
-                            <ButtonSpinner />
-                          ) : (
-                            <Sparkles className="h-3.5 w-3.5" />
-                          )}
-                          {aiLoading === `subpage-${topic.id}`
-                            ? "Generating"
-                            : "AI"}
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="space-y-3">
-                      {topic.subPages.length > 0 ? (
-                        topic.subPages.map((subPage) => (
-                          <div
-                            key={subPage.id}
-                            className="bg-gray-50 rounded-xl border border-gray-200 p-4"
-                          >
-                            <div className="flex items-center justify-between mb-3">
-                              <div className="flex items-center gap-3 flex-1">
-                                <button
-                                  onClick={() => toggleSubPage(subPage.id)}
-                                  className="p-1 hover:bg-gray-200 rounded transition-colors"
-                                >
-                                  <ChevronRight
-                                    className={`h-4 w-4 text-gray-400 transition-transform duration-200 ${
-                                      expandedSubPages.has(subPage.id)
-                                        ? "rotate-90"
-                                        : ""
-                                    }`}
-                                  />
-                                </button>
-                                <div className="w-8 h-8 rounded-lg bg-orange-50 flex items-center justify-center">
-                                  <FileText className="h-4 w-4 text-orange-600" />
-                                </div>
-                                <div className="flex-1">
-                                  <div className="flex items-center gap-3">
-                                  <h5 className="text-sm font-light text-black">{subPage.title}</h5>
-                                    {(() => {
-                                      const job = generationJobs.get(subPage.id);
-                                      const updatedAtMs = job?.updatedAt ? new Date(job.updatedAt).getTime() : undefined;
-                                      const staleClient = updatedAtMs ? (Date.now() - updatedAtMs > 5 * 60 * 1000) : false;
-                                      const status = staleClient && !job?.hasHtml ? 'failed' : job?.status;
-                                      const isLoading = viewLoadingPageId === subPage.id;
-                                      const isPublishing = publishLoadingPageId === subPage.id;
-                                      const isPublished = status === 'published' && job?.wordpressUrl;
-                                      const canView = (status === 'completed' || status === 'published') && job?.draftId;
-                                      
-                                      if (canView) {
-                                        return (
-                                          <div className="flex items-center gap-2">
-                                            <button
-                                              onClick={(e) => {
-                                                e.preventDefault();
-                                                e.stopPropagation();
-                                                viewDraft(job.draftId, subPage.id);
-                                              }}
-                                              disabled={isLoading || isPublishing}
-                                              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-black text-white text-xs font-medium hover:bg-gray-800 transition-all disabled:opacity-60 disabled:cursor-not-allowed shadow-sm"
-                                            >
-                                              {isLoading ? (
-                                                <>
-                                                  <Loader2 className="h-3 w-3 animate-spin" />
-                                                  Opening...
-                                                </>
-                                              ) : (
-                                                'View'
-                                              )}
-                                            </button>
-                                            {isPublished && job.wordpressUrl && (
-                                              <a
-                                                href={job.wordpressUrl}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                onClick={(e) => e.stopPropagation()}
-                                                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple-600 text-white text-xs font-medium hover:bg-purple-700 transition-all shadow-sm"
-                                              >
-                                                View Live
-                                              </a>
-                                            )}
-                                            {!isPublished && (
-                                              <button
-                                                onClick={(e) => {
-                                                  e.preventDefault();
-                                                  e.stopPropagation();
-                                                  publishDraft(job.draftId, subPage.id);
-                                                }}
-                                                disabled={isLoading || isPublishing || !hasWordpressIntegration}
-                                                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-600 text-white text-xs font-medium hover:bg-blue-700 transition-all disabled:opacity-60 disabled:cursor-not-allowed shadow-sm"
-                                                title={!hasWordpressIntegration ? 'WordPress integration required' : ''}
-                                              >
-                                                {isPublishing ? (
-                                                  <>
-                                                    <Loader2 className="h-3 w-3 animate-spin" />
-                                                    Publishing...
-                                                  </>
-                                                ) : (
-                                                  'Publish'
-                                                )}
-                                              </button>
-                                            )}
-                                          </div>
-                                        );
-                                      }
-                                      return null;
-                                    })()}
-                                  </div>
-                                  <p className="text-xs font-light text-gray-500 mt-0.5">
-                                    {subPage.keywords.length} keyword
-                                    {subPage.keywords.length !== 1 ? "s" : ""}
-                                  </p>
-                                  <div className="mt-1">
-                                    {renderStatusPill(subPage.id)}
-                                  </div>
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <div className="flex items-center gap-1">
-                                  <button
-                                    onClick={() =>
-                                      handleAddKeyword(
-                                        "subpage",
-                                        topic.id,
-                                        subPage.id,
-                                        false
-                                      )
-                                    }
-                                    disabled={syncing}
-                                    className="px-2 py-1 text-xs font-light text-gray-600 hover:text-black hover:bg-gray-100 rounded-full transition-all flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
-                                    title="Add keyword manually"
-                                  >
-                                    <Plus className="h-3 w-3" />
-                                  </button>
-                                  <button
-                                    onClick={() =>
-                                      handleAddKeyword(
-                                        "subpage",
-                                        topic.id,
-                                        subPage.id,
-                                        true
-                                      )
-                                    }
-                                    disabled={
-                                      syncing ||
-                                      aiLoading === `keyword-${subPage.id}`
-                                    }
-                                    className="px-2 py-1 text-xs font-light text-white bg-black hover:bg-black/90 rounded-full transition-all flex items-center gap-1 disabled:opacity-60 disabled:cursor-not-allowed"
-                                    title="AI generate keywords"
-                                  >
-                                    {aiLoading === `keyword-${subPage.id}` ? (
-                                      <ButtonSpinner />
-                                    ) : (
-                                      <Sparkles className="h-3 w-3" />
-                                    )}
-                                  </button>
-                                </div>
-                                <button
-                                 onClick={() => handleDeleteSubPage(subPage.id)}
-
-                                  disabled={syncing}
-                                  className="p-1.5 text-gray-400 hover:text-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                                  title="Delete sub-page"
-                                >
-                                  <Trash2 className="h-3.5 w-3.5" />
-                            </button>
-                          </div>
-                        </div>
-
-                        {/* Sub Page Keywords */}
-                        {expandedSubPages.has(subPage.id) && (
-                          <div className="ml-11 mt-3 space-y-4">
-                            {/* Primary Keywords Section */}
-                            <div>
-                              <div className="flex items-center justify-between mb-2">
-                                <label className="text-xs font-medium text-gray-700">
-                                  Primary Keywords <span className="text-red-500">*</span>
-                                </label>
-                                <div className="flex items-center gap-1">
-                                  <button
-                                    onClick={() => handleAddKeyword('subpage', topic.id, subPage.id, false, 'primary')}
-                                    disabled={syncing}
-                                    className="px-2 py-1 text-xs font-light text-gray-600 hover:text-black hover:bg-gray-100 rounded-full transition-all flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
-                                    title="Add primary keyword manually"
-                                  >
-                                    <Plus className="h-3 w-3" />
-                                  </button>
-                                  <button
-                                    onClick={async () => {
-                                      if (aiLoading === `primary-keyword-${subPage.id}`) return;
-                                      setAiLoading(`primary-keyword-${subPage.id}`);
-                                      try {
-                                        const response = await fetch(`${CAMPAIGN_API_BASE}/pages/${subPage.id}/keywords/ai`, {
-                                          method: 'POST',
-                                          headers: getAuthHeaders(),
-                                          body: JSON.stringify({ count: 1, keywordType: 'primary' })
-                                        });
-                                        if (!response.ok) throw new Error('Failed to generate');
-                                        const data = await response.json();
-                                        if (data.success) {
-                                          fetchStructure(campaign.id);
-                                          toast({
-                                            title: 'Keyword generated',
-                                            description: 'Primary keyword generated successfully',
-                                          });
-                                        }
-                                      } catch (error) {
-                                        console.error('Error generating primary keyword:', error);
-                                        toast({
-                                          title: 'Generation failed',
-                                          description: 'Unable to generate primary keyword',
-                                          variant: 'destructive'
-                                        });
-                                      } finally {
-                                        setAiLoading(null);
-                                      }
-                                    }}
-                                    disabled={syncing || aiLoading === `primary-keyword-${subPage.id}`}
-                                    className="px-2 py-1 text-xs font-light text-white bg-black hover:bg-black/90 rounded-full transition-all flex items-center gap-1 disabled:opacity-60 disabled:cursor-not-allowed"
-                                    title="AI generate primary keyword"
-                                  >
-                                    {aiLoading === `primary-keyword-${subPage.id}` ? <ButtonSpinner /> : <Sparkles className="h-3 w-3" />}
-                                  </button>
-                                </div>
-                              </div>
-                              <div className="space-y-2">
-                                {(() => {
-                                  // Only show keywords that are actually marked as primary
-                                  const primaryKeywords = subPage.keywords.filter(kw => {
-                                    const metadata = kw.aiMetadata as any;
-                                    return metadata && metadata.isPrimary === true;
-                                  });
-                                  
-                                  return primaryKeywords.length > 0 ? (
-                                    primaryKeywords.map((keyword) => (
-                                    <div
-                                      key={keyword.id}
-                                      className="flex items-center justify-between p-2 bg-white rounded-lg border border-gray-200 hover:border-gray-300 transition-colors"
-                                    >
-                                      <div className="flex items-center gap-3">
-                                          <div className="w-6 h-6 rounded bg-purple-50 flex items-center justify-center">
-                                            <span className="text-[10px] font-medium text-purple-600">P</span>
-                                        </div>
-                                        <div>
-                                          <p className="text-sm font-light text-black">
-                                            {keyword.term}
-                                          </p>
-                                          <p className="text-xs font-light text-gray-500">
-                                            Vol:{" "}
-                                            {keyword.volume.toLocaleString()} •
-                                            KD: {keyword.difficulty}
-                                          </p>
-                                        </div>
-                                      </div>
-                                      <button
-                                        onClick={() => handleDeleteKeyword(keyword.id)}
-
-                                        disabled={syncing}
-                                        className="p-1 text-gray-400 hover:text-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                                        title="Delete keyword"
-                                      >
-                                        <X className="h-3.5 w-3.5" />
-                                      </button>
-                                    </div>
-                                  ))
-                                ) : (
-                                    <p className="text-xs font-light text-gray-500 italic py-2">No primary keywords yet</p>
-                                  );
-                                })()}
-                              </div>
-                            </div>
-
-                            {/* Longtail Keywords Section */}
-                            <div>
-                              <div className="flex items-center justify-between mb-2">
-                                <label className="text-xs font-medium text-gray-700">
-                                  Longtail Keywords
-                                </label>
-                                <div className="flex items-center gap-1">
-                                  <button
-                                    onClick={() => handleAddKeyword('subpage', topic.id, subPage.id, false, 'longtail')}
-                                    disabled={syncing}
-                                    className="px-2 py-1 text-xs font-light text-gray-600 hover:text-black hover:bg-gray-100 rounded-full transition-all flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
-                                    title="Add longtail keyword manually"
-                                  >
-                                    <Plus className="h-3 w-3" />
-                                  </button>
-                                  <button
-                                    onClick={async () => {
-                                      if (aiLoading === `longtail-keyword-${subPage.id}`) return;
-                                      setAiLoading(`longtail-keyword-${subPage.id}`);
-                                      try {
-                                        const response = await fetch(`${CAMPAIGN_API_BASE}/pages/${subPage.id}/keywords/ai`, {
-                                          method: 'POST',
-                                          headers: getAuthHeaders(),
-                                          body: JSON.stringify({ count: 3, keywordType: 'longtail' })
-                                        });
-                                        if (!response.ok) throw new Error('Failed to generate');
-                                        const data = await response.json();
-                                        if (data.success) {
-                                          fetchStructure(campaign.id);
-                                          toast({
-                                            title: 'Keywords generated',
-                                            description: 'Longtail keywords generated successfully',
-                                          });
-                                        }
-                                      } catch (error) {
-                                        console.error('Error generating longtail keywords:', error);
-                                        toast({
-                                          title: 'Generation failed',
-                                          description: 'Unable to generate longtail keywords',
-                                          variant: 'destructive'
-                                        });
-                                      } finally {
-                                        setAiLoading(null);
-                                      }
-                                    }}
-                                    disabled={syncing || aiLoading === `longtail-keyword-${subPage.id}`}
-                                    className="px-2 py-1 text-xs font-light text-white bg-black hover:bg-black/90 rounded-full transition-all flex items-center gap-1 disabled:opacity-60 disabled:cursor-not-allowed"
-                                    title="AI generate longtail keywords"
-                                  >
-                                    {aiLoading === `longtail-keyword-${subPage.id}` ? <ButtonSpinner /> : <Sparkles className="h-3 w-3" />}
-                                  </button>
-                                </div>
-                              </div>
-                              <div className="space-y-2">
-                                {(() => {
-                                  // Filter keywords marked as longtail (and exclude primary)
-                                  const longtailKeywords = subPage.keywords.filter(kw => {
-                                    const metadata = kw.aiMetadata as any;
-                                    const isPrimary = metadata && metadata.isPrimary === true;
-                                    const isLongtail = metadata && metadata.isLongtail === true;
-                                    // Only show if marked as longtail and not primary
-                                    return isLongtail && !isPrimary;
-                                  });
-                                  
-                                  return longtailKeywords.length > 0 ? (
-                                    longtailKeywords.map((keyword) => (
-                                      <div
-                                        key={keyword.id}
-                                        className="flex items-center justify-between p-2 bg-white rounded-lg border border-gray-200 hover:border-gray-300 transition-colors"
-                                      >
-                                        <div className="flex items-center gap-3">
-                                          <div className="w-6 h-6 rounded bg-green-50 flex items-center justify-center">
-                                            <span className="text-[10px] font-medium text-green-600">L</span>
-                                          </div>
-                                          <div>
-                                            <p className="text-sm font-light text-black">{keyword.term}</p>
-                                            <p className="text-xs font-light text-gray-500">
-                                              Vol: {keyword.volume.toLocaleString()} • KD: {keyword.difficulty}
-                                            </p>
-                                          </div>
-                                        </div>
-                                        <button
-                                          onClick={() => handleDeleteKeyword({ type: 'subpage', topicId: topic.id, pageId: subPage.id }, keyword.id)}
-                                          disabled={syncing}
-                                          className="p-1 text-gray-400 hover:text-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                                          title="Delete keyword"
-                                        >
-                                          <X className="h-3.5 w-3.5" />
-                                        </button>
-                                      </div>
-                                    ))
-                                  ) : (
-                                    <p className="text-xs font-light text-gray-500 italic py-2">No longtail keywords yet</p>
-                                  );
-                                })()}
-                              </div>
-                            </div>
-                              </div>
-                            )}
-                          </div>
-                        ))
-                      ) : (
-                        <p className="text-xs font-light text-gray-500 italic py-2">
-                          No sub-pages created yet
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-          );
-        })}
-
-        {campaignStructure.topics.length === 0 && (
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-12 text-center">
-            <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
-              <Sparkles className="h-8 w-8 text-gray-400" />
-            </div>
-            <h3 className="text-lg font-light text-black mb-2">
-              No Topics Yet
-            </h3>
-            <p className="text-sm font-light text-gray-600 mb-4">
-              Add your first topic to get started
-            </p>
-            <div className="flex items-center justify-center gap-2">
-              <button
-                onClick={() => handleAddTopic(false)}
-                className="px-4 py-2 bg-gray-100 text-gray-900 rounded-full hover:bg-gray-200 transition-all text-sm font-light flex items-center gap-2"
-              >
-                <Plus className="h-4 w-4" />
-                Add Manual
-              </button>
-              <button
-                onClick={() => handleAddTopic(true)}
-                className="px-4 py-2 bg-black text-white rounded-full hover:bg-black/90 transition-all text-sm font-medium flex items-center gap-2"
-              >
-                <Sparkles className="h-4 w-4" />
-                AI Generate
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Add Topic Modal */}
-      {showAddTopicModal && (
-        <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl border border-gray-200 shadow-xl p-8 max-w-md w-full">
-            <h3 className="text-xl font-light text-black tracking-tight mb-6">
-              Add New Topic
-            </h3>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-light text-gray-900 mb-2">
-                  Topic Title
-                </label>
-                <input
-                  type="text"
-                  value={newTopicTitle}
-                  onChange={(e) => setNewTopicTitle(e.target.value)}
-                  placeholder="Enter topic title"
-                  className="w-full px-4 py-3 text-base font-light rounded-2xl border border-gray-200 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all"
-                  autoFocus
-                />
-              </div>
-            </div>
-            <div className="flex items-center justify-end gap-3 mt-6">
-              <button
-                onClick={() => {
-                  setShowAddTopicModal(false);
-                  setNewTopicTitle("");
-                }}
-                className="px-6 py-3 bg-gray-100 text-gray-900 rounded-full hover:bg-gray-200 transition-all text-base font-light"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSubmitTopic}
-                className="px-6 py-3 bg-black text-white rounded-full hover:bg-black/90 transition-all text-base font-medium"
-              >
-                Add Topic
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Add Pillar Page Modal */}
-      {showAddPillarModal && (
-        <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl border border-gray-200 shadow-xl p-8 max-w-md w-full">
-            <h3 className="text-xl font-light text-black tracking-tight mb-6">
-              {targetTopicId &&
-              campaignStructure.topics.find((t) => t.id === targetTopicId)
-                ?.pillarPage
-                ? "Edit Pillar Page"
-                : "Add Pillar Page"}
-            </h3>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-light text-gray-900 mb-2">
-                  Pillar Page Title
-                </label>
-                <input
-                  type="text"
-                  value={newPillarTitle}
-                  onChange={(e) => setNewPillarTitle(e.target.value)}
-                  placeholder="Enter pillar page title"
-                  className="w-full px-4 py-3 text-base font-light rounded-2xl border border-gray-200 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all"
-                  autoFocus
-                />
-              </div>
-            </div>
-            <div className="flex items-center justify-end gap-3 mt-6">
-              <button
-                onClick={() => {
-                  setShowAddPillarModal(false);
-                  setNewPillarTitle("");
-                  setTargetTopicId(null);
-                }}
-                className="px-6 py-3 bg-gray-100 text-gray-900 rounded-full hover:bg-gray-200 transition-all text-base font-light"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSubmitPillarPage}
-                className="px-6 py-3 bg-black text-white rounded-full hover:bg-black/90 transition-all text-base font-medium"
-              >
-                {targetTopicId &&
-                campaignStructure.topics.find((t) => t.id === targetTopicId)
-                  ?.pillarPage
-                  ? "Update Pillar Page"
-                  : "Add Pillar Page"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Add Sub-Page Modal */}
-      {showAddSubPageModal && (
-        <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl border border-gray-200 shadow-xl p-8 max-w-md w-full">
-            <h3 className="text-xl font-light text-black tracking-tight mb-6">
-              Add New Sub-Page
-            </h3>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-light text-gray-900 mb-2">
-                  Sub-Page Title
-                </label>
-                <input
-                  type="text"
-                  value={newSubPageTitle}
-                  onChange={(e) => setNewSubPageTitle(e.target.value)}
-                  placeholder="Enter sub-page title"
-                  className="w-full px-4 py-3 text-base font-light rounded-2xl border border-gray-200 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all"
-                  autoFocus
-                />
-              </div>
-            </div>
-            <div className="flex items-center justify-end gap-3 mt-6">
-              <button
-                onClick={() => {
-                  setShowAddSubPageModal(false);
-                  setNewSubPageTitle("");
-                  setTargetTopicId(null);
-                }}
-                className="px-6 py-3 bg-gray-100 text-gray-900 rounded-full hover:bg-gray-200 transition-all text-base font-light"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSubmitSubPage}
-                className="px-6 py-3 bg-black text-white rounded-full hover:bg-black/90 transition-all text-base font-medium"
-              >
-                Add Sub-Page
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Add Keyword Modal */}
-      {showAddKeywordModal && (
-        <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl border border-gray-200 shadow-xl p-8 max-w-md w-full">
-            <h3 className="text-xl font-light text-black tracking-tight mb-6">
-              Add New Keyword
-            </h3>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-light text-gray-900 mb-2">
-                  Keyword Term
-                  {availableKeywords.length > 0 && (
-                    <span className="ml-2 text-xs text-gray-500">
-                      ({availableKeywords.length} keywords available)
-                    </span>
-                  )}
-                </label>
-                <Popover open={keywordSearchOpen} onOpenChange={setKeywordSearchOpen}>
-                  <PopoverTrigger asChild>
-                    <button
-                      type="button"
-                      role="combobox"
-                      aria-expanded={keywordSearchOpen}
-                      className="w-full px-4 py-3 text-base font-light rounded-2xl border border-gray-200 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all flex items-center justify-between text-left"
-                    >
-                      <span className={cn("truncate", !newKeywordTerm && "text-gray-400")}>
-                        {newKeywordTerm || "Search or type keyword..."}
-                      </span>
-                      <Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                    </button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-[calc(100vw-4rem)] max-w-md p-0" align="start">
-                    <Command shouldFilter={false}>
-                      <CommandInput
-                        placeholder="Search keywords..."
-                        value={keywordSearchValue}
-                        onValueChange={(value) => {
-                          console.log('Search value changed:', value);
-                          setKeywordSearchValue(value);
-                        }}
-                        className="h-9"
-                      />
-                      <CommandList>
-                        {loadingKeywords ? (
-                          <div className="py-6 text-center text-sm text-gray-500">Loading keywords...</div>
-                        ) : (
-                          <>
-                            <CommandEmpty>
-                              {availableKeywords.length === 0 
-                                ? "No keywords in domain yet. Type to create new."
-                                : "No keywords match your search. Type to create new."}
-                            </CommandEmpty>
-                            {availableKeywords.length > 0 && (
-                              <CommandGroup>
-                                {availableKeywords
-                                  .filter((kw) => {
-                                    if (!keywordSearchValue) return true;
-                                    return kw.term.toLowerCase().includes(keywordSearchValue.toLowerCase());
-                                  })
-                                  .map((keyword) => {
-                                    console.log('Rendering keyword item:', keyword.term, 'matches search:', !keywordSearchValue || keyword.term.toLowerCase().includes(keywordSearchValue.toLowerCase()));
-                                    return (
-                                    <CommandItem
-                                      key={keyword.id}
-                                      value={keyword.term}
-                                      onSelect={() => {
-                                        console.log('Keyword selected:', keyword.term);
-                                        setNewKeywordTerm(keyword.term);
-                                        setNewKeywordVolume(keyword.volume?.toString() || '');
-                                        setNewKeywordDifficulty(keyword.difficulty || 'Medium');
-                                        setKeywordSearchValue('');
-                                        setKeywordSearchOpen(false);
-                                      }}
-                                      className="cursor-pointer"
-                                    >
-                                      <Check
-                                        className={cn(
-                                          "mr-2 h-4 w-4",
-                                          newKeywordTerm === keyword.term ? "opacity-100" : "opacity-0"
-                                        )}
-                                      />
-                                      <div className="flex-1">
-                                        <div className="font-medium">{keyword.term}</div>
-                                        <div className="text-xs text-gray-500">
-                                          Volume: {keyword.volume?.toLocaleString() || 'N/A'} • 
-                                          Difficulty: {keyword.difficulty || 'N/A'}
-                                          {keyword.intent && ` • Intent: ${keyword.intent}`}
-                                        </div>
-                                      </div>
-                                    </CommandItem>
-                                    );
-                                  })}
-                              </CommandGroup>
-                            )}
-                          </>
-                        )}
-                      </CommandList>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
-                <input
-                  type="text"
-                  value={newKeywordTerm}
-                  onChange={(e) => {
-                    setNewKeywordTerm(e.target.value);
-                    setKeywordSearchValue(e.target.value);
-                    // Try to find matching keyword and auto-fill
-                    const matching = availableKeywords.find(
-                      kw => kw.term.toLowerCase() === e.target.value.toLowerCase()
-                    );
-                    if (matching) {
-                      setNewKeywordVolume(matching.volume?.toString() || '');
-                      setNewKeywordDifficulty(matching.difficulty || 'Medium');
-                    }
-                  }}
-                  placeholder="Or type a new keyword"
-                  className="w-full mt-2 px-4 py-3 text-base font-light rounded-2xl border border-gray-200 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-light text-gray-900 mb-2">Keyword Type</label>
-                <div className="flex gap-4">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="keywordType"
-                      value="primary"
-                      checked={newKeywordType === 'primary'}
-                      onChange={(e) => setNewKeywordType(e.target.value as 'primary' | 'longtail')}
-                      className="w-4 h-4 text-purple-600 focus:ring-purple-500"
-                    />
-                    <span className="text-sm font-light text-gray-900">Primary Keyword</span>
-                  </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="keywordType"
-                      value="longtail"
-                      checked={newKeywordType === 'longtail'}
-                      onChange={(e) => setNewKeywordType(e.target.value as 'primary' | 'longtail')}
-                      className="w-4 h-4 text-green-600 focus:ring-green-500"
-                    />
-                    <span className="text-sm font-light text-gray-900">Longtail Keyword</span>
-                  </label>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-light text-gray-900 mb-2">
-                    Volume
-                  </label>
-                  <input
-                    type="number"
-                    value={newKeywordVolume}
-                    onChange={(e) => setNewKeywordVolume(e.target.value)}
-                    placeholder="0"
-                    className="w-full px-4 py-3 text-base font-light rounded-2xl border border-gray-200 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-light text-gray-900 mb-2">
-                    Difficulty
-                  </label>
-                  <select
-                    value={newKeywordDifficulty}
-                    onChange={(e) => setNewKeywordDifficulty(e.target.value)}
-                    className="w-full px-4 py-3 text-base font-light rounded-2xl border border-gray-200 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all"
-                  >
-                    <option value="Low">Low</option>
-                    <option value="Medium">Medium</option>
-                    <option value="High">High</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-            <div className="flex items-center justify-end gap-3 mt-6">
-              <button
-                onClick={() => {
-                  setShowAddKeywordModal(false);
-                  setNewKeywordTerm('');
-                  setNewKeywordVolume('');
-                  setNewKeywordDifficulty('Medium');
-                  setKeywordSearchValue('');
-                  setKeywordSearchOpen(false);
-                  setAddKeywordContext(null);
-                }}
-                className="px-6 py-3 bg-gray-100 text-gray-900 rounded-full hover:bg-gray-200 transition-all text-base font-light"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSubmitKeyword}
-                className="px-6 py-3 bg-black text-white rounded-full hover:bg-black/90 transition-all text-base font-medium"
-              >
-                Add Keyword
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-      {/* Generation Drawer */}
-      <Sheet
-        open={generationDrawerOpen}
-        onOpenChange={(open) => {
-          setGenerationDrawerOpen(open);
-          if (!open) {
-            setCurrentGenerationTopicId(null);
-            setGenerationStep(1);
-          }
-        }}
-      >
-        <SheetContent
-          side="right"
-          className="w-full sm:max-w-3xl border-l border-[#e2e4ea] bg-[#f5f6fa] px-8 py-10 overflow-y-auto font-light"
-        >
-          <div className="space-y-8">
-            <div className="rounded-[32px] border border-white/80 bg-white/90 px-6 py-6 shadow-[0_30px_80px_rgba(15,23,42,0.10)] backdrop-blur flex flex-col gap-3">
-                  <div className="inline-flex items-center gap-2 rounded-full border border-black/10 px-4 py-1 text-[10px] tracking-[0.35em] uppercase text-gray-500">
-                Generation setup
-                  </div>
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                  <h3 className="text-[26px] font-light text-gray-900 tracking-tight">Configure content</h3>
-                  <p className="text-sm text-gray-500">Length, imagery, and brand—keywords are already chosen.</p>
-                  </div>
-                <div className="px-3 py-1.5 rounded-full bg-emerald-50 text-emerald-700 text-xs font-semibold border border-emerald-100">
-                  WordPress Connected
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                {generationSteps.map((step) => (
-                  <div key={step.id} className="flex items-center gap-2">
-                    <div
-                      className={`h-2 w-2 rounded-full ${
-                        generationStep >= step.id ? 'bg-black' : 'bg-gray-300'
-                        }`}
-                      />
-                    <span className={`text-xs font-medium ${generationStep >= step.id ? 'text-gray-900' : 'text-gray-400'}`}>
-                      {step.title}
-                    </span>
-                    {step.id !== generationSteps.length && (
-                      <div className="h-px w-6 bg-gray-200" />
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-
+            {/* Step 1: Word Count */}
             {generationStep === 1 && (
-              <section className="rounded-[32px] border border-white/80 bg-white/90 px-6 py-6 shadow-[0_30px_80px_rgba(15,23,42,0.10)] backdrop-blur flex flex-col gap-5">
+              <section className="rounded-[36px] border border-white/70 bg-white p-8 shadow-[0_30px_80px_rgba(15,23,42,0.08)] space-y-8">
+                <div className="space-y-2">
+                  <span className="text-[11px] uppercase tracking-[0.35em] text-gray-400">Word cadence</span>
+                  <h4 className="text-2xl font-light text-gray-900">Dial in the depth and pace.</h4>
+                  <p className="text-sm text-gray-500 max-w-2xl">
+                    Glide between quick reads and flagship editorials. Every notch subtly changes paragraph
+                    length, transitions, and how immersive the narration should feel.
+                  </p>
+                </div>
+                <div className="rounded-[28px] border border-gray-100 bg-gray-50/70 p-5 space-y-4">
                   <div className="flex items-center justify-between">
                     <div>
-                    <div className="text-xs uppercase tracking-[0.35em] text-gray-500">Word cadence</div>
-                    <h3 className="text-[24px] font-light text-gray-900">Dial in the depth</h3>
-                    <p className="text-sm text-gray-500">Tune the total word count for the generated pages.</p>
+                      <p className="text-sm font-semibold text-gray-800">Projected read time</p>
+                      <p className="text-xs text-gray-500">A calm slider tuned for editorial pacing.</p>
                     </div>
-                  <div className="inline-flex items-baseline gap-1 rounded-full bg-gray-50 px-4 py-1 shadow-inner border border-gray-100">
-                    <span className="text-xl font-light">{generationForm.wordCount}</span>
-                    <span className="text-[11px] uppercase tracking-[0.25em] text-gray-500">words</span>
-                    </div>
-                  </div>
-                <div className="rounded-2xl border border-gray-100 bg-gray-50/70 p-4 space-y-3">
-                    <input
-                      type="range"
-                      min={500}
-                      max={2000}
-                      step={50}
-                      value={generationForm.wordCount}
-                      onChange={(e) =>
-                      setGenerationForm((prev) => ({ ...prev, wordCount: Number(e.target.value) || 800 }))
-                      }
-                      className="w-full h-2 rounded-full bg-gradient-to-r from-gray-200 via-gray-300 to-gray-400 accent-black"
-                    />
-                  <div className="flex justify-between text-[11px] uppercase tracking-[0.3em] text-gray-400">
-                    <span>Brief</span>
-                    <span>Feature</span>
-                    <span>Chronicle</span>
+                    <div className="inline-flex items-baseline gap-2 rounded-full bg-white px-5 py-1.5 shadow-inner">
+                      <span className="text-2xl font-light">{generationConfig.wordCount}</span>
+                      <span className="text-xs uppercase tracking-[0.25em] text-gray-500">words</span>
                     </div>
                   </div>
-                <div className="flex items-center justify-between">
-                  <button
-                    onClick={() => {
-                      setGenerationDrawerOpen(false);
-                      setCurrentGenerationTopicId(null);
-                    }}
-                    className="px-4 py-2 rounded-full border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={() => setGenerationStep(2)}
-                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-gray-900 text-white text-sm font-semibold hover:bg-black/90"
-                  >
-                    Next
-                    <ChevronRight className="h-4 w-4" />
-                  </button>
+                  <Slider
+                    value={[generationConfig.wordCount]}
+                    min={400}
+                    max={3000}
+                    step={100}
+                    onValueChange={(vals) => setGenerationConfig(prev => ({ ...prev, wordCount: vals[0] }))}
+                    className="py-4"
+                  />
                 </div>
+               <div className="flex justify-end">
+  <button 
+    onClick={() => setGenerationStep(2)}
+    className="inline-flex items-center gap-2 px-6 py-3 bg-black text-white rounded-full text-sm font-medium hover:bg-gray-600 disabled:opacity-60 transition"
+  >
+    Continue to Imagery
+  </button>
+</div>
+
               </section>
             )}
 
+            {/* Step 2: Imagery */}
             {generationStep === 2 && (
-              <section className="rounded-[32px] border border-white/80 bg-white/90 px-6 py-6 shadow-[0_30px_80px_rgba(15,23,42,0.10)] backdrop-blur space-y-5">
-                <div className="flex items-center justify-between">
-                      <div>
-                    <div className="text-xs uppercase tracking-[0.35em] text-gray-500">Imagery</div>
-                    <h3 className="text-[24px] font-light text-gray-900">Compose the visuals</h3>
-                    <p className="text-sm text-gray-500">Control inline images and the featured banner.</p>
-                      </div>
-                  <div className="px-3 py-1.5 rounded-full bg-emerald-50 text-emerald-700 text-xs font-semibold border border-emerald-100">
-                    WordPress Connected
-                  </div>
+              <section className="rounded-[36px] border border-white/70 bg-white p-8 shadow-[0_30px_80px_rgba(15,23,42,0.08)] space-y-8">
+                <div className="space-y-2">
+                  <span className="text-[11px] uppercase tracking-[0.35em] text-gray-400">Visual elements</span>
+                  <h4 className="text-2xl font-light text-gray-900">Set the visual tone.</h4>
+                  <p className="text-sm text-gray-500 max-w-2xl">
+                    Choose how many images to generate and whether to include a featured hero image.
+                  </p>
                 </div>
-                <div className="rounded-2xl border border-gray-100 bg-gray-50/70 p-4 space-y-4">
+                <div className="rounded-[28px] border border-gray-100 bg-gray-50/70 p-5 space-y-4">
                   <div className="flex items-center justify-between">
-                    <div className="text-sm font-semibold text-gray-800">Inline images</div>
-                    <span className="text-sm text-gray-700">{generationForm.images}</span>
+                    <div>
+                      <p className="text-sm font-semibold text-gray-800">Images per article</p>
+                      <p className="text-xs text-gray-500">Inline images throughout the content.</p>
                     </div>
-                    <div className="flex items-center gap-3">
-                      <button
-                        onClick={() =>
-                          setGenerationForm((prev) => ({ ...prev, images: Math.max(0, prev.images - 1) }))
-                        }
-                      className="w-10 h-10 rounded-full border border-gray-200 text-lg leading-none flex items-center justify-center hover:border-gray-300 bg-white"
-                      >
-                        −
-                      </button>
-                      <div className="flex-1 h-2 rounded-full bg-gray-100">
-                        <div
-                          className="h-full rounded-full bg-gray-900 transition-all"
-                        style={{ width: `${Math.min(4, Math.max(0, generationForm.images)) / 4 * 100}%` }}
-                        />
-                      </div>
-                      <button
-                        onClick={() =>
-                          setGenerationForm((prev) => ({ ...prev, images: Math.min(4, prev.images + 1) }))
-                        }
-                      className="w-10 h-10 rounded-full border border-gray-200 text-lg leading-none flex items-center justify-center hover:border-gray-300 bg-white"
-                      >
-                        +
-                      </button>
+                    <div className="inline-flex items-baseline gap-2 rounded-full bg-white px-5 py-1.5 shadow-inner">
+                      <span className="text-2xl font-light">{generationConfig.images}</span>
+                      <span className="text-xs uppercase tracking-[0.25em] text-gray-500">images</span>
                     </div>
-                  <div className="rounded-2xl border border-gray-100 bg-white shadow-sm p-4 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <p className="text-sm font-semibold text-gray-900">Hero banner</p>
-                        <p className="text-xs text-gray-500">Ideal for previews and social sharing.</p>
                   </div>
-                      <span className="text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-700">Optional</span>
-                    </div>
-                    <button
-                      onClick={() =>
-                        setGenerationForm((prev) => ({ ...prev, featuredImage: !prev.featuredImage }))
-                      }
-                      className={`w-full px-4 py-3 rounded-[30px] border text-sm font-medium transition-all ${
-                        generationForm.featuredImage
-                          ? 'bg-black text-white border-black shadow-lg'
-                          : 'border-gray-200 text-gray-700 hover:bg-gray-100'
-                      }`}
-                    >
-                      {generationForm.featuredImage ? 'Use featured banner' : 'Skip featured banner'}
-                    </button>
-                  </div>
+                  <Slider
+                    value={[generationConfig.images]}
+                    min={0}
+                    max={5}
+                    step={1}
+                    onValueChange={(vals) => setGenerationConfig(prev => ({ ...prev, images: vals[0] }))}
+                    className="py-4"
+                  />
                 </div>
-                <div className="flex items-center justify-between">
-                  <button
+                <div className="flex items-center justify-between p-5 rounded-[28px] border border-gray-100 bg-gray-50/70">
+                  <div className="space-y-0.5">
+                    <p className="text-sm font-semibold text-gray-800">Featured Image</p>
+                    <p className="text-xs text-gray-500">Generate a high-quality hero banner</p>
+                  </div>
+                  <Switch
+                    checked={generationConfig.featuredImage}
+                    onCheckedChange={(checked) => setGenerationConfig(prev => ({ ...prev, featuredImage: checked }))}
+                  />
+                </div>
+                <div className="flex justify-end gap-3">
+                  <button 
                     onClick={() => setGenerationStep(1)}
-                    className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                    className="inline-flex items-center gap-2 px-6 py-3 bg-white text-gray-700 border border-gray-200 rounded-full text-sm hover:bg-gray-100 hover:text-gray-700 hover:shadow-lg transition"
                   >
-                    <ChevronLeft className="h-4 w-4" />
                     Back
                   </button>
-                  <button
+                  <button 
                     onClick={() => setGenerationStep(3)}
-                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-gray-900 text-white text-sm font-semibold hover:bg-black/90"
+                    className="inline-flex items-center gap-2 px-6 py-3 bg-black text-white rounded-full text-sm font-medium hover:bg-gray-600 disabled:opacity-60 transition"
                   >
-                    Next
-                    <ChevronRight className="h-4 w-4" />
+                    Continue to Brand
                   </button>
                 </div>
               </section>
             )}
 
+            {/* Step 3: Brand Voice */}
             {generationStep === 3 && (
-              <section className="rounded-[32px] border border-white/80 bg-white/90 px-6 py-6 shadow-[0_30px_80px_rgba(15,23,42,0.10)] backdrop-blur space-y-5">
-                <div className="space-y-1">
-                  <div className="text-xs uppercase tracking-[0.35em] text-gray-500">Brand</div>
-                  <h3 className="text-[24px] font-light text-gray-900">Align tone & voice</h3>
-                  <p className="text-sm text-gray-500">We’ll weave this into the generated pages.</p>
+              <section className="rounded-[36px] border border-white/70 bg-white p-8 shadow-[0_30px_80px_rgba(15,23,42,0.08)] space-y-8">
+                <div className="space-y-2">
+                  <span className="text-[11px] uppercase tracking-[0.35em] text-gray-400">Brand voice</span>
+                  <h4 className="text-2xl font-light text-gray-900">Define your brand's personality.</h4>
+                  <p className="text-sm text-gray-500 max-w-2xl">
+                    The AI will adapt its writing style to match your brand's tone and values.
+                  </p>
                 </div>
-                <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-4">
                   <div className="space-y-2">
-                    <label className="block text-xs uppercase tracking-[0.35em] text-gray-500">Brand name</label>
+                    <label className="text-xs uppercase tracking-[0.35em] text-gray-400">Brand Name</label>
                     <input
                       type="text"
-                      value={generationForm.brandName}
-                      onChange={(e) => setGenerationForm((f) => ({ ...f, brandName: e.target.value }))}
-                      className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm shadow-inner focus:ring-2 focus:ring-black/10"
+                      value={generationConfig.brandName}
+                      onChange={(e) => setGenerationConfig(prev => ({ ...prev, brandName: e.target.value }))}
+                      placeholder="e.g. Acme Corp"
+                      className="w-full px-5 py-4 rounded-[28px] border border-gray-200 bg-gradient-to-br from-white via-white to-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent text-base shadow-inner"
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="block text-xs uppercase tracking-[0.35em] text-gray-500">Brand description</label>
+                    <label className="text-xs uppercase tracking-[0.35em] text-gray-400">Tone & Description (Optional)</label>
                     <textarea
-                      value={generationForm.brandDescription}
-                      onChange={(e) => setGenerationForm((f) => ({ ...f, brandDescription: e.target.value }))}
-                      className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm shadow-inner focus:ring-2 focus:ring-black/10"
-                      rows={3}
+                      value={generationConfig.brandDescription}
+                      onChange={(e) => setGenerationConfig(prev => ({ ...prev, brandDescription: e.target.value }))}
+                      placeholder="e.g. Professional, authoritative, yet accessible. Focus on Enterprise solutions."
+                      rows={4}
+                      className="w-full px-5 py-4 rounded-[28px] border border-gray-200 bg-gradient-to-br from-white via-white to-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent text-base shadow-inner resize-none"
                     />
                   </div>
                 </div>
-                    <div className="flex items-center justify-between">
-              <button
+                <div className="flex justify-end gap-3">
+                  <button 
                     onClick={() => setGenerationStep(2)}
-                    className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50"
-              >
-                <ChevronLeft className="h-4 w-4" />
-                Back
-              </button>
-                  <button
-                    disabled={!currentTopic || generateTopicLoading === currentTopic?.id}
-                    onClick={() => currentTopic && handleGenerateTopic(currentTopic, generationForm)}
-                    className="px-6 py-2.5 rounded-full bg-black text-white text-sm font-semibold shadow-[0_20px_40px_rgba(0,0,0,0.12)] hover:bg-black/90 disabled:opacity-60 disabled:cursor-not-allowed"
+                    className="inline-flex items-center gap-2 px-6 py-3 bg-white text-gray-700 border border-gray-200 rounded-full text-sm hover:bg-gray-100 hover:text-gray-700 hover:shadow-lg transition"
                   >
-                    {generateTopicLoading === currentTopic?.id ? 'Starting…' : 'Start generation'}
+                    Back
+                  </button>
+                  <button 
+                    onClick={handleConfirmGeneration}
+                    disabled={generateTopicLoading === pendingGenerationTopic?.id}
+                    className="inline-flex items-center gap-2 px-6 py-3 bg-black text-white rounded-full text-sm font-medium hover:bg-gray-600 disabled:opacity-60 transition"
+                  >
+                    {generateTopicLoading === pendingGenerationTopic?.id ? (
+                      <>
+                        <ButtonSpinner /> Starting...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-4 h-4" /> Start Generation
+                      </>
+                    )}
                   </button>
                 </div>
               </section>
@@ -7512,114 +7986,54 @@ const CampaignStructureView: React.FC<CampaignStructureViewProps> = ({
         </SheetContent>
       </Sheet>
 
-      {/* Draft Preview Overlay (publish-style) */}
-      {previewDraft && (
+      {/* Preview Overlay - Fills content area beside sidebar */}
+      {previewPageId && (
         <div 
-          className="fixed inset-0 z-50 bg-white"
-          style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}
-          onClick={(e) => {
-            // Prevent clicks from propagating to parent elements that might cause tab navigation
-            e.stopPropagation();
-          }}
-          onMouseDown={(e) => {
-            // Prevent mousedown from propagating
-            e.stopPropagation();
-          }}
+          className="fixed top-0 right-0 bottom-0 z-[60] bg-[#f5f6fa] flex flex-col"
+          style={{ left: sidebarOpen ? '280px' : '96px' }}
         >
-          <PublishExperience
-            companyDomain={companyDomain}
-            domainContext={domainContext}
-            keywordsTableData={keywordsTableData}
-            hasWordpressIntegration={hasWordpressIntegration}
-            wpIntegration={wpIntegration}
-            onConfigureWordpress={onConfigureWordpress}
-            onRefreshWordpressIntegration={onRefreshWordpressIntegration}
-            isActive={true}
-            disablePreviewOverlay={true}
-            initialDraft={{
-              primaryKeyword: previewDraft?.primaryKeyword || '',
-              htmlContent: previewDraft?.htmlContent || '',
-              featuredImage: previewDraft?.featuredImage,
-              title: previewDraft?.title,
-              metaDescription: previewDraft?.metaDescription,
-              slug: previewDraft?.slug,
-              longtailKeywords: '', // not provided by API yet
-              wordpressUrl: undefined,
-            }}
-            initialDraftId={previewPageId}
-          />
-          <button
-            onClick={async () => {
-              setClosePreviewLoading(true);
-              try {
-                // Refresh draft status when closing to show any updates
-                if (campaignStructure.topics && campaignStructure.topics.length > 0) {
-                  try {
-                    // Rehydrate draft status to pick up any changes
-                    const rehydrateMap = new Map<number, GenerationPageStatus>();
-                    for (const topic of campaignStructure.topics) {
-                      try {
-                        const response = await fetch(
-                          `${API_BASE_URL}/api/campaigns/topics/${topic.id}/drafts-status`,
-                          { headers: getAuthHeaders() }
-                        );
-                        if (response.ok) {
-                          const data = await response.json();
-                          if (data.success && data.pages) {
-                            data.pages.forEach((p: DraftStatusRecord) => {
-                              if (p.draftId || p.jobId || p.hasHtml) {
-                                rehydrateMap.set(p.pageId, {
-                                  jobId: p.jobId || '',
-                                  pageId: p.pageId,
-                                  pageType: p.pageType === 'subpage' ? 'subpage' : 'pillar',
-                                  status: (p.status || 'pending') as GenerationPageStatus['status'],
-                                  draftId: p.draftId,
-                                  progress: typeof p.progress === 'number' ? p.progress : p.hasHtml ? 100 : 0,
-                                  primaryKeyword: p.primaryKeyword,
-                                  hasHtml: p.hasHtml,
-                                  updatedAt: p.updatedAt,
-                                  error: p.error || null,
-                                  wordpressUrl: p.wordpressUrl || null,
-                                });
-                              }
-                            });
-                          }
-                        }
-                      } catch (err) {
-                        // Silently fail for individual topics
-                      }
-                    }
-                    if (rehydrateMap.size > 0) {
-                      setGenerationJobs(rehydrateMap);
-                    }
-                  } catch (err) {
-                    // Silently fail refresh
-                  }
-                }
-              } finally {
-              setPreviewDraft(null);
-              setPreviewPageId(null);
-                setClosePreviewLoading(false);
-              }
-            }}
-            disabled={closePreviewLoading}
-            className="fixed top-4 right-4 z-[60] inline-flex items-center gap-2 px-4 py-2.5 rounded-full border border-gray-200 bg-white text-sm font-medium text-gray-900 hover:bg-gray-50 shadow-sm disabled:opacity-60 disabled:cursor-not-allowed transition-all"
-          >
-            {closePreviewLoading ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Closing...
-              </>
-            ) : (
-              'Close'
-            )}
-          </button>
+          {/* Header with prominent back button */}
+          <div className="sticky top-0 z-[70] flex items-center gap-4 px-6 py-4 border-b border-gray-200 bg-white/80 backdrop-blur-md shadow-sm supports-[backdrop-filter]:bg-white/60">
+            <button
+              onClick={() => { setPreviewPageId(null); setPreviewDraft(null); }}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all shadow-sm group"
+            >
+              <ChevronLeft className="h-4 w-4 text-gray-400 group-hover:text-gray-900 transition-colors" />
+              <span className="text-sm font-medium">Back</span>
+            </button>
+            <div className="h-6 w-px bg-gray-200" />
+            <span className="text-sm text-gray-900 font-medium">Draft Preview</span>
+            
+            <div className="flex-1" />
+            
+            <button
+              onClick={() => { setPreviewPageId(null); setPreviewDraft(null); }}
+              className="p-2 rounded-lg text-gray-400 hover:text-gray-900 hover:bg-gray-100 transition-colors"
+              aria-label="Close preview"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+          
+          {/* Content */}
+          <div className="relative flex-1 overflow-hidden bg-gray-50">
+            <PublishExperience
+              companyDomain={companyDomain}
+              domainContext={domainContext}
+              keywordsTableData={keywordsTableData}
+              hasWordpressIntegration={hasWordpressIntegration}
+              wpIntegration={wpIntegration}
+              onConfigureWordpress={onConfigureWordpress}
+              onRefreshWordpressIntegration={onRefreshWordpressIntegration}
+              isActive={true}
+              initialDraftId={previewPageId}
+              disablePreviewOverlay={true}
+            />
+          </div>
         </div>
       )}
-    </div>
+    </>
   );
 };
 
 export default SidebarDashboard;
-
-

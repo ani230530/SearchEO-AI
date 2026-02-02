@@ -221,7 +221,7 @@ const GSCAnalyticsView = () => {
           </div>
           <button
             onClick={handleConnectGSC}
-            className="h-10 px-6 bg-gray-900 text-white rounded-full hover:bg-gray-800 transition-all duration-200 text-sm font-normal tracking-tight inline-flex items-center gap-2"
+            className="inline-flex items-center gap-2 px-6 py-3 bg-black text-white rounded-full text-sm font-medium hover:bg-gray-600  disabled:opacity-60 transition"
           >
             <Plug className="h-4 w-4" />
             Connect Google Search Console
@@ -291,9 +291,9 @@ const GSCAnalyticsView = () => {
 
   // Pages list view - Hero style
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-12">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-12 ">
       {/* Hero Header */}
-      <div className="text-center mb-12 space-y-3">
+      <div className="text-center mb-12 space-y-3 ">
         <h1 className="text-5xl font-light text-gray-900 tracking-tight leading-none">
           GSC Analytics
         </h1>
@@ -315,7 +315,7 @@ const GSCAnalyticsView = () => {
         <select
           value={days}
           onChange={(e) => handleDateRangeChange(e.target.value)}
-          className="h-10 px-5 border border-gray-200 rounded-full focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent text-sm bg-white font-light tracking-tight transition-all duration-200 appearance-none cursor-pointer"
+          className="h-10 px-5 border border-gray-200 rounded-full focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent text-sm bg-white font-light tracking-tight transition-all duration-200 appearance-none cursor-pointer hover:shadow-lg"
         >
           <option value="7">Last 7 Days</option>
           <option value="28">Last 28 Days</option>
@@ -325,7 +325,7 @@ const GSCAnalyticsView = () => {
         <button
           onClick={handleRefresh}
           disabled={isRefreshing || isLoadingPages}
-          className="h-10 px-5 border border-gray-200 text-gray-700 rounded-full hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-light tracking-tight inline-flex items-center gap-2 transition-all duration-200"
+          className="h-10 px-5 border border-gray-200 text-gray-700 rounded-full hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-light tracking-tight inline-flex items-center gap-2 transition-all duration-200 hover:shadow-lg"
         >
           {isRefreshing || isLoadingPages ? (
             <Loader2 className="h-4 w-4 animate-spin" />
@@ -337,11 +337,11 @@ const GSCAnalyticsView = () => {
       </div>
 
       {/* Content */}
-      <div className="space-y-6">
+      <div className="space-y-6 ">
         {isLoadingPages ? (
           <PagesTable data={[]} onPageSelect={handlePageSelect} isLoading={true} loadingPageUrl={null} isQueriesLoading={false} />
         ) : pagesData?.success === false ? (
-          <div className="text-center py-16">
+          <div className="text-center py-16 ">
             <AlertCircle className="h-8 w-8 mx-auto mb-4 text-red-400" />
             <p className="text-sm font-light text-red-600">{pagesData.error || 'Failed to fetch pages data'}</p>
           </div>

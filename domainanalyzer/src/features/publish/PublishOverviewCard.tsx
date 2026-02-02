@@ -22,7 +22,7 @@ const PublishOverviewCard: React.FC<PublishOverviewCardProps> = ({
   onOpenComposeDrawer,
   onExitPreview,
 }) => (
-  <div className="rounded-[32px] border border-gray-100/80 bg-white/80 backdrop-blur-xl shadow-[0_20px_60px_rgba(15,23,42,0.08)] p-8">
+  <div className="rounded-[32px] border border-gray-100/80 bg-white/80 backdrop-blur-xl hover:shadow-lg p-8">
     <div className="grid gap-6 md:grid-cols-2">
       <div>
         <p className="text-xs uppercase tracking-[0.25em] text-gray-500 mb-2 font-light">WordPress status</p>
@@ -52,7 +52,7 @@ const PublishOverviewCard: React.FC<PublishOverviewCardProps> = ({
       <div className="flex flex-wrap items-center gap-3 mt-6">
         <button
           onClick={onOpenComposeDrawer}
-          className="px-6 py-3 rounded-full bg-black text-white text-sm font-semibold shadow-lg hover:bg-black/90 transition-colors"
+          className="inline-flex items-center gap-2 px-6 py-3 bg-black text-white rounded-full text-sm font-medium hover:bg-black/90  disabled:opacity-60 transition"
         >
           Publish a page
         </button>

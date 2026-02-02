@@ -36,8 +36,8 @@ interface NormalizedContent {
 
 const asyncHandler =
   (fn: (req: Request, res: Response, next: any) => Promise<any>) =>
-  (req: Request, res: Response, next: any) =>
-    Promise.resolve(fn(req, res, next)).catch(next);
+    (req: Request, res: Response, next: any) =>
+      Promise.resolve(fn(req, res, next)).catch(next);
 
 const callWebhook = async (url: string, payload: any) => {
   if (process.env.NODE_ENV !== 'production') {
@@ -74,7 +74,7 @@ const callWebhook = async (url: string, payload: any) => {
       status: response.status,
       statusText: response.statusText,
       data: response.data,
-  });
+    });
   }
 
   return response.data;
@@ -308,22 +308,22 @@ router.post(
         error: 'WordPress integration password cannot be decrypted. Please reconfigure your WordPress integration in settings.'
       });
     }
-    
-  const payload = {
-    'Primary Keyword': primaryKeyword,
-    'longtail keywords':
-      Array.isArray(longtailKeywords) && longtailKeywords.length
-        ? longtailKeywords.join(', ')
-        : longtailKeywords || '',
-    'Brand Name': normalizedBrandName,
-    'Brand description': normalizedBrandDescription,
-    Image: Number(images) || 0,
-    'Word Count': Number(wordCount) || 800,
-    'Featured Image': featuredImage ? 'yes' : 'no',
-    Username: integration.username,
-    Password: decryptedPassword,
-    'wordpress url': integration.siteUrl,
-  };
+
+    const payload = {
+      'Primary Keyword': primaryKeyword,
+      'longtail keywords':
+        Array.isArray(longtailKeywords) && longtailKeywords.length
+          ? longtailKeywords.join(', ')
+          : longtailKeywords || '',
+      'Brand Name': normalizedBrandName,
+      'Brand description': normalizedBrandDescription,
+      Image: Number(images) || 0,
+      'Word Count': Number(wordCount) || 800,
+      'Featured Image': featuredImage ? 'yes' : 'no',
+      Username: integration.username,
+      Password: decryptedPassword,
+      'wordpress url': integration.siteUrl,
+    };
 
     try {
       const response = await callWebhook(REVIEW_WEBHOOK_URL, payload);
@@ -450,8 +450,8 @@ router.post(
       });
     }
 
-    // If draftId is provided, check if draft exists and can be published
-    let existingDraft = null;
+    // If draftId is provided, check if draft exists
+    let existingDraft: any = null;
     if (draftId) {
       existingDraft = await prisma.wordpressPublishLog.findFirst({
         where: { id: Number(draftId), userId },
@@ -468,17 +468,16 @@ router.post(
     try {
       decryptedPassword = decryptToken(integration.password);
     } catch (error) {
-      console.error('Failed to decrypt WordPress password:', error);
       return res.status(400).json({
         success: false,
-        error: 'WordPress integration password cannot be decrypted. Please reconfigure your WordPress integration in settings.'
+        error: 'WordPress integration password cannot be decrypted.'
       });
     }
-    
+
     const payload = [
       {
-        username: integration.username,
-        password: decryptedPassword,
+        Username: integration.username,
+        Password: decryptedPassword,
         'wordpress url': integration.siteUrl,
         'Primary Keyword': primaryKeyword,
         'Html Content': htmlContent,
@@ -489,191 +488,58 @@ router.post(
       },
     ];
 
-    try {
-      const response = await callWebhook(PUBLISH_WEBHOOK_URL, payload);
-      
-      // Check if response is empty or invalid
-      const isResponseEmpty = 
-        !response || 
-        response === '' || 
-        (Array.isArray(response) && response.length === 0) ||
-        (typeof response === 'object' && Object.keys(response).length === 0);
-      
-      if (isResponseEmpty) {
-        // Empty response means publishing failed
-        const updateData = {
-          status: 'draft', // Keep as draft so View button still works, but don't mark as published
-          wordpressUrl: existingDraft?.wordpressUrl || 'draft://pending',
-          primaryKeyword,
-          title,
-          slug,
-          response: { error: 'Empty response from publishing service', originalResponse: response },
-          integrationId: integration.id,
-        };
+    // Create or Update Draft (Status: generating / queued)
+    // We use 'generating' so UI shows spinner
+    const updateData = {
+      wordpressUrl: existingDraft?.wordpressUrl || 'draft://generating',
+      primaryKeyword,
+      title,
+      slug,
+      status: 'generating',
+      integrationId: integration.id,
+    };
 
-        if (existingDraft) {
-          await prisma.$transaction([
-            prisma.wordpressPublishLog.update({
-              where: { id: existingDraft.id },
-              data: updateData,
-            }),
-          ]);
-
-          return res.status(500).json({
-            success: false,
-            error: 'Publishing failed: Empty response from publishing service',
-            draftId: existingDraft.id,
-            publishedUrl: null,
-            status: 'draft',
-          });
-        } else {
-          return res.status(500).json({
-            success: false,
-            error: 'Publishing failed: Empty response from publishing service',
-          });
+    let savedDraft;
+    if (existingDraft) {
+      savedDraft = await prisma.wordpressPublishLog.update({
+        where: { id: existingDraft.id },
+        data: updateData
+      });
+    } else {
+      savedDraft = await prisma.wordpressPublishLog.create({
+        data: {
+          userId,
+          ...updateData
         }
-      }
-      
-      const entry = Array.isArray(response) ? response[0] : response;
-
-      // Extract the published post URL - prioritize Link (actual post URL) over base WordPress URL
-      // Ensure we always get a string value, not a function or other type
-      const getStringValue = (val: any): string | undefined => {
-        if (typeof val === 'string' && val.trim()) return val.trim();
-        return undefined;
-      };
-
-      const publishedUrl =
-        getStringValue(entry?.Link) ??
-        getStringValue(entry?.link) ??
-        getStringValue(entry?.['wordpress url']) ??
-        getStringValue(entry?.wordpressUrl) ??
-        undefined;
-
-      // Determine status: published if we have a URL that's different from base siteUrl, otherwise keep as draft (failed)
-      const baseSiteUrl = typeof integration.siteUrl === 'string' ? integration.siteUrl.trim() : '';
-      const hasValidUrl = publishedUrl && publishedUrl !== baseSiteUrl && !publishedUrl.startsWith('draft://');
-      
-      // Only mark as published if we have a valid URL, otherwise treat as failed and keep as draft
-      // This ensures we only mark as published when publishing is truly successful
-      // Only mark as published if we have a valid URL - otherwise treat as failed
-      if (!hasValidUrl) {
-        // Publishing failed - no valid URL returned
-        const updateData = {
-          status: existingDraft?.status || 'draft', // Keep existing status (draft/completed) so View button still works
-          wordpressUrl: existingDraft?.wordpressUrl || 'draft://pending',
-          primaryKeyword,
-          title,
-          slug: entry?.slug ?? slug,
-          response,
-          integrationId: integration.id,
-        };
-
-        if (existingDraft) {
-          await prisma.wordpressPublishLog.update({
-            where: { id: existingDraft.id },
-            data: updateData,
-          });
-
-          return res.status(500).json({
-            success: false,
-            error: 'Publishing failed: No valid published URL returned from publishing service',
-            draftId: existingDraft.id,
-            publishedUrl: null,
-            status: updateData.status,
-          });
-        } else {
-          return res.status(500).json({
-            success: false,
-            error: 'Publishing failed: No valid published URL returned from publishing service',
-          });
-        }
-      }
-
-      // Publishing successful - we have a valid URL
-      const finalStatus = 'published';
-      const finalUrl = publishedUrl!;
-
-      const updateData = {
-        wordpressUrl: finalUrl,
-        primaryKeyword,
-        title,
-        slug: entry?.slug ?? slug,
-        status: finalStatus,
-        response,
-        integrationId: integration.id,
-      };
-
-      if (existingDraft) {
-        // Update existing draft to published status
-        await prisma.$transaction([
-          prisma.wordpressPublishLog.update({
-            where: { id: existingDraft.id },
-            data: updateData,
-          }),
-          prisma.wordpressIntegration.update({
-            where: { userId },
-            data: {
-              lastPublishedAt: new Date(),
-            },
-          }),
-        ]);
-
-        res.json({
-          success: true,
-          result: response,
-          draftId: existingDraft.id,
-          publishedUrl: finalUrl,
-          status: finalStatus,
-        });
-      } else {
-        // Create new entry (for backward compatibility)
-        const newEntry = await prisma.$transaction([
-          prisma.wordpressPublishLog.create({
-            data: {
-              userId,
-              ...updateData,
-            },
-          }),
-          prisma.wordpressIntegration.update({
-            where: { userId },
-            data: {
-              lastPublishedAt: new Date(),
-            },
-          }),
-        ]);
-
-        res.json({
-          success: true,
-          result: response,
-          draftId: newEntry[0].id,
-          publishedUrl: finalUrl,
-          status: finalStatus,
-        });
-      }
-    } catch (error: any) {
-      console.error('Error publishing content:', error?.response?.data || error);
-      
-      // If we have a draftId, keep it as draft (not failed) so View button still works
-      if (existingDraft) {
-        try {
-          await prisma.wordpressPublishLog.update({
-            where: { id: existingDraft.id },
-            data: {
-              status: 'draft', // Keep as draft so user can still view and retry
-            },
-          });
-        } catch (updateError) {
-          console.error('Error updating draft status:', updateError);
-        }
-      }
-      
-      res.status(500).json({
-        success: false,
-        error: 'Failed to publish content to WordPress',
-        details: error?.response?.data,
       });
     }
+
+    // Add to Queue
+    // We need to pass necessary meta info for the worker to update DB later
+    const { addN8nJob, JOB_TYPES } = await import('../services/queueService');
+    await addN8nJob(JOB_TYPES.PUBLISH, {
+      url: PUBLISH_WEBHOOK_URL,
+      payload,
+      headers: {
+        'Content-Type': 'application/json',
+        [N8N_API_KEY_HEADER]: N8N_API_KEY,
+      },
+      meta: {
+        draftId: savedDraft.id,
+        userId,
+        integrationId: integration.id,
+        primaryKeyword,
+        title,
+        slug
+      }
+    });
+
+    res.json({
+      success: true,
+      message: 'Publish job queued',
+      draftId: savedDraft.id,
+      status: 'generating' // UI will treat this as 'in progress'
+    });
   })
 );
 
@@ -966,7 +832,7 @@ router.get(
     }
 
     const response = draft.response as any;
-    
+
     res.json({
       success: true,
       draft: {
@@ -977,7 +843,8 @@ router.get(
         featuredImage: response.featuredImage || response['Featured Image'] || '',
         primaryKeyword: draft.primaryKeyword || '',
         longtailKeywords: response.longtailKeywords || response['longtail keywords'] || '',
-        wordpressUrl: draft.wordpressUrl
+        wordpressUrl: draft.wordpressUrl,
+        status: draft.status // Return status for polling
       }
     });
   })
@@ -1010,6 +877,78 @@ router.get(
       success: true,
       logs,
     });
+  })
+);
+
+// Webhook for async publish completion (n8n calls this when done)
+router.post(
+  '/publish-webhook',
+  asyncHandler(async (req: Request, res: Response) => {
+    const { draftId, link, wordpressUrl, error, response } = req.body;
+
+    if (!draftId) {
+      return res.status(400).json({ success: false, error: 'draftId is required' });
+    }
+
+    const draft = await prisma.wordpressPublishLog.findUnique({
+      where: { id: Number(draftId) }
+    });
+
+    if (!draft) {
+      return res.status(404).json({ success: false, error: 'Draft not found' });
+    }
+
+    // Determine success or failure
+    const finalUrl = link || wordpressUrl || (response && (response.link || response.wordpressUrl));
+
+    if (error || !finalUrl) {
+      // Handle Failure
+      await prisma.wordpressPublishLog.update({
+        where: { id: Number(draftId) },
+        data: {
+          status: 'draft',
+          response: { error: error || 'Async publish failed (no link returned)' },
+        }
+      });
+
+      // Broadcast Failure
+      const { broadcastToUser } = await import('../services/sseService');
+      broadcastToUser(draft.userId, {
+        type: 'publish_update',
+        draftId: Number(draftId),
+        status: 'failed',
+        error: error || 'Async publish returned no link'
+      });
+
+      return res.json({ success: true, status: 'marked_failed' });
+    }
+
+    // Handle Success
+    await prisma.$transaction([
+      prisma.wordpressPublishLog.update({
+        where: { id: Number(draftId) },
+        data: {
+          status: 'published',
+          wordpressUrl: finalUrl,
+          response: response || { link: finalUrl },
+        }
+      }),
+      ...(draft.integrationId ? [prisma.wordpressIntegration.update({
+        where: { id: draft.integrationId },
+        data: { lastPublishedAt: new Date() }
+      })] : [])
+    ]);
+
+    // Broadcast Success
+    const { broadcastToUser } = await import('../services/sseService');
+    broadcastToUser(draft.userId, {
+      type: 'publish_update',
+      draftId: Number(draftId),
+      status: 'published',
+      publishedUrl: finalUrl
+    });
+
+    res.json({ success: true, status: 'published' });
   })
 );
 

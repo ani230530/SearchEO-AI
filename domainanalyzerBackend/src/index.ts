@@ -14,10 +14,14 @@ import authRouter from './routes/auth';
 import userRouter from './routes/user';
 import googleSearchConsoleRouter, { handleOAuthCallback } from './routes/googleSearchConsole';
 import publishRouter from './routes/publish';
+import blogAnalyticsRouter from './routes/blogAnalytics';
 import campaignsRouter from './routes/campaigns';
 import { PrismaClient } from '../generated/prisma';
 import { authenticateToken, AuthenticatedRequest } from './middleware/auth';
 import auditRoutes from './routes/auditRoutes';
+import { addSSEClient, removeSSEClient } from './services/sseService';
+import { startTimeoutChecker } from './services/n8nTimeout';
+import { startCampaignTimeoutChecker } from './services/campaignJobTimeout';
 const app = express();
 const prisma = new PrismaClient();
 
@@ -61,7 +65,7 @@ app.get('/api/debug/domains', authenticateToken, async (req: Request, res: Respo
     if (process.env.NODE_ENV === 'production') {
       return res.status(403).json({ error: 'Debug endpoint not available in production' });
     }
-    
+
     const domains = await prisma.domain.findMany({
       select: {
         id: true,
@@ -88,7 +92,7 @@ app.get('/api/debug/domains', authenticateToken, async (req: Request, res: Respo
         createdAt: 'desc'
       }
     });
-    
+
     res.json({
       total: domains.length,
       domains: domains
@@ -99,6 +103,9 @@ app.get('/api/debug/domains', authenticateToken, async (req: Request, res: Respo
   }
 });
 
+import n8nErrorRouter from './routes/n8nError';
+import auditN8nRouter from './routes/auditN8n';
+
 // Routes
 app.use('/api/auth', authRouter);
 app.use('/api/user', userRouter);
@@ -106,6 +113,8 @@ app.use('/api/domain', domainRouter);
 app.use('/api/gsc', googleSearchConsoleRouter);
 app.use('/api/campaigns', campaignsRouter);
 app.use('/api/publish', publishRouter);
+app.use('/api/webhooks/n8n', n8nErrorRouter);
+app.use('/api/audit/n8n', auditN8nRouter);
 
 // OAuth callback route (must be at /api/auth/google/callback for Google redirect)
 app.get('/api/auth/google/callback', handleOAuthCallback);
@@ -117,7 +126,41 @@ app.use('/api/enhanced-phrases', enhancedPhrasesRouter);
 app.use('/api/ai-queries', aiQueriesRouter);
 app.use('/api/competitor', competitorRouter);
 app.use('/api/dashboard', dashboardRouter);
+app.use('/api/blog-analytics', blogAnalyticsRouter);
 app.use('/api/audit', auditRoutes);
+
+// SSE endpoint for real-time updates
+app.get('/api/sse', async (req: Request, res: Response) => {
+  // Get token from query parameter (EventSource doesn't support custom headers)
+  const token = req.query.token as string;
+  if (!token) {
+    return res.status(401).json({ error: 'Missing auth token' });
+  }
+
+  // Manually verify the token
+  const jwt = await import('jsonwebtoken');
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as { userId: number };
+    const userId = decoded.userId;
+
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.flushHeaders();
+
+    const client = { res };
+    addSSEClient(userId, client);
+
+    // Send initial connection event
+    res.write(`data: ${JSON.stringify({ type: 'connected', userId })}\n\n`);
+
+    req.on('close', () => {
+      removeSSEClient(userId, client);
+    });
+  } catch (error) {
+    return res.status(401).json({ error: 'Invalid token' });
+  }
+});
 // Onboarding routes removed
 
 // Health check endpoint
@@ -149,4 +192,14 @@ app.listen(PORT, () => {
   console.log(`Server running in ${NODE_ENV} mode on port ${PORT}`);
   console.log(`Health check available at http://localhost:${PORT}/api/health`);
   console.log(`Debug domains available at http://localhost:${PORT}/api/debug/domains`);
+
+  // Start n8n timeout checker
+  startTimeoutChecker();
+
+  // Start campaign generation timeout checker
+  startCampaignTimeoutChecker();
+
+  // Start publish timeout checker
+  const { startPublishTimeoutChecker } = require('./services/publishJobTimeout');
+  startPublishTimeoutChecker();
 }); 
