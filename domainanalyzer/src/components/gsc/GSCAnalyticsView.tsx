@@ -221,7 +221,7 @@ const GSCAnalyticsView = () => {
           </div>
           <button
             onClick={handleConnectGSC}
-            className="h-10 px-6 bg-gray-900 text-white rounded-full hover:bg-gray-800 transition-all duration-200 text-sm font-normal tracking-tight inline-flex items-center gap-2"
+            className="inline-flex items-center gap-2 px-6 py-3 bg-black text-white rounded-full text-sm font-medium hover:bg-gray-600  disabled:opacity-60 transition"
           >
             <Plug className="h-4 w-4" />
             Connect Google Search Console
