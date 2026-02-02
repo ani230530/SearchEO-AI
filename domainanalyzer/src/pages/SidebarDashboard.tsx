@@ -930,7 +930,6 @@ useEffect(() => {
     
     setCampaignTabDataLoading(true);
     try {
-    try {
       // Fetch all required data in parallel
       const [domainResponse, wpResponse] = await Promise.all([
         fetch(`${import.meta.env.VITE_API_URL}/api/user/company-domain?t=${Date.now()}`, {
