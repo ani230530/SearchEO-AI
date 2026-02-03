@@ -74,7 +74,7 @@ const callOpenAiJson = async <T>(prompt: string, fallback: () => T): Promise<T> 
   try {
     const completion = await openai.chat.completions.create({
       model: CAMPAIGN_AI_MODEL,
-      temperature: 0.15,
+      temperature: 0.7,
       messages: [
         {
           role: 'system',
