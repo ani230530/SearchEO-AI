@@ -50,6 +50,7 @@ interface PublishExperienceProps {
   isActive: boolean;
   initialDraft?: GeneratedArticleContent | null;
   initialDraftId?: number | null;
+  pageId?: number; // Context: CampaignPage ID to link the draft to
   disablePreviewOverlay?: boolean; // When true, don't render the preview overlay wrapper (for embedded use)
 }
 
@@ -110,6 +111,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
   isActive,
   initialDraft,
   initialDraftId,
+  pageId,
   disablePreviewOverlay = false,
 }) => {
   const { toast } = useToast();
@@ -763,6 +765,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
           slug: publishResult.slug,
           longtailKeywords: publishResult.longtailKeywords ?? publishForm.longtailKeywords,
           wordpressUrl: publishResult.wordpressUrl,
+          pageId: pageId, // Pass context to backend to link draft to CampaignPage
         }),
       });
       const data = await response.json();
