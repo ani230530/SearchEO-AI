@@ -78,7 +78,7 @@ const callOpenAiJson = async <T>(prompt: string, fallback: () => T): Promise<T> 
       messages: [
         {
           role: 'system',
-          content: 'You are an expert content marketing strategist. Always return valid JSON that matches the requested schema.'
+          content: 'You are an expert content marketing strategist. Generate creative, diverse, and unique ideas. Always return valid JSON that matches the requested schema.'
         },
         {
           role: 'user',
@@ -98,6 +98,7 @@ const callOpenAiJson = async <T>(prompt: string, fallback: () => T): Promise<T> 
     return parsed as T;
   } catch (error) {
     console.warn('Campaign AI generation failed, using fallback output.', error);
+    console.warn('Prompt context:', prompt);
     return fallback();
   }
 };
@@ -165,6 +166,7 @@ Create ${count} campaign topics for ${domainUrl}.
 Context: ${domainContext || 'Not provided'}
 Important keywords: ${keywords.slice(0, 8).join(', ') || 'none'}
 Focus: ${focus || 'balanced mix of awareness and consideration'}
+Random Seed: ${Date.now()}
 
 Return JSON matching:
 {
@@ -235,6 +237,7 @@ export async function generatePillarPageSuggestion(
 Create a single pillar page idea for the topic "${topicTitle}" for ${domainUrl}.
 Context: ${domainContext || 'Not provided'}
 Important keywords: ${keywords.slice(0, 8).join(', ') || 'none'}
+Random Seed: ${Date.now()}
 
 Return JSON:
 {
@@ -273,6 +276,7 @@ Suggest ${count} supporting sub-pages for the topic "${topicTitle}".
 Company: ${domainUrl}
 Context: ${domainContext || 'Not provided'}
 Important keywords: ${keywords.slice(0, 8).join(', ') || 'none'}
+Random Seed: ${Date.now()}
 
 Return JSON:
 {
@@ -319,6 +323,7 @@ export async function generateKeywordsSuggestion(
 Suggest ${count} SEO keywords for "${scope}".
 Company context: ${domainContext || 'Not provided'}
 Existing priority keywords: ${keywords.slice(0, 8).join(', ') || 'none'}
+Random Seed: ${Date.now()}
 
 Return JSON:
 {
