@@ -4639,6 +4639,37 @@ export namespace Prisma {
 
 
   /**
+   * Count Type WordpressPublishLogCountOutputType
+   */
+
+  export type WordpressPublishLogCountOutputType = {
+    campaignPages: number
+  }
+
+  export type WordpressPublishLogCountOutputTypeSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    campaignPages?: boolean | WordpressPublishLogCountOutputTypeCountCampaignPagesArgs
+  }
+
+  // Custom InputTypes
+  /**
+   * WordpressPublishLogCountOutputType without action
+   */
+  export type WordpressPublishLogCountOutputTypeDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the WordpressPublishLogCountOutputType
+     */
+    select?: WordpressPublishLogCountOutputTypeSelect<ExtArgs> | null
+  }
+
+  /**
+   * WordpressPublishLogCountOutputType without action
+   */
+  export type WordpressPublishLogCountOutputTypeCountCampaignPagesArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: CampaignPageWhereInput
+  }
+
+
+  /**
    * Count Type GenerationJobCountOutputType
    */
 
@@ -30495,6 +30526,8 @@ export namespace Prisma {
     integrationId?: boolean
     user?: boolean | UserDefaultArgs<ExtArgs>
     integration?: boolean | WordpressPublishLog$integrationArgs<ExtArgs>
+    campaignPages?: boolean | WordpressPublishLog$campaignPagesArgs<ExtArgs>
+    _count?: boolean | WordpressPublishLogCountOutputTypeDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["wordpressPublishLog"]>
 
   export type WordpressPublishLogSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
@@ -30532,6 +30565,8 @@ export namespace Prisma {
   export type WordpressPublishLogInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     user?: boolean | UserDefaultArgs<ExtArgs>
     integration?: boolean | WordpressPublishLog$integrationArgs<ExtArgs>
+    campaignPages?: boolean | WordpressPublishLog$campaignPagesArgs<ExtArgs>
+    _count?: boolean | WordpressPublishLogCountOutputTypeDefaultArgs<ExtArgs>
   }
   export type WordpressPublishLogIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     user?: boolean | UserDefaultArgs<ExtArgs>
@@ -30543,6 +30578,7 @@ export namespace Prisma {
     objects: {
       user: Prisma.$UserPayload<ExtArgs>
       integration: Prisma.$WordpressIntegrationPayload<ExtArgs> | null
+      campaignPages: Prisma.$CampaignPagePayload<ExtArgs>[]
     }
     scalars: $Extensions.GetPayloadResult<{
       id: number
@@ -30922,6 +30958,7 @@ export namespace Prisma {
     readonly [Symbol.toStringTag]: "PrismaPromise"
     user<T extends UserDefaultArgs<ExtArgs> = {}>(args?: Subset<T, UserDefaultArgs<ExtArgs>>): Prisma__UserClient<$Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
     integration<T extends WordpressPublishLog$integrationArgs<ExtArgs> = {}>(args?: Subset<T, WordpressPublishLog$integrationArgs<ExtArgs>>): Prisma__WordpressIntegrationClient<$Result.GetResult<Prisma.$WordpressIntegrationPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+    campaignPages<T extends WordpressPublishLog$campaignPagesArgs<ExtArgs> = {}>(args?: Subset<T, WordpressPublishLog$campaignPagesArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$CampaignPagePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     /**
      * Attaches callbacks for the resolution and/or rejection of the Promise.
      * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -31336,6 +31373,30 @@ export namespace Prisma {
      */
     include?: WordpressIntegrationInclude<ExtArgs> | null
     where?: WordpressIntegrationWhereInput
+  }
+
+  /**
+   * WordpressPublishLog.campaignPages
+   */
+  export type WordpressPublishLog$campaignPagesArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CampaignPage
+     */
+    select?: CampaignPageSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CampaignPage
+     */
+    omit?: CampaignPageOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CampaignPageInclude<ExtArgs> | null
+    where?: CampaignPageWhereInput
+    orderBy?: CampaignPageOrderByWithRelationInput | CampaignPageOrderByWithRelationInput[]
+    cursor?: CampaignPageWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: CampaignPageScalarFieldEnum | CampaignPageScalarFieldEnum[]
   }
 
   /**
@@ -44588,12 +44649,14 @@ export namespace Prisma {
     id: number | null
     topicId: number | null
     order: number | null
+    latestDraftId: number | null
   }
 
   export type CampaignPageSumAggregateOutputType = {
     id: number | null
     topicId: number | null
     order: number | null
+    latestDraftId: number | null
   }
 
   export type CampaignPageMinAggregateOutputType = {
@@ -44609,6 +44672,7 @@ export namespace Prisma {
     order: number | null
     createdAt: Date | null
     updatedAt: Date | null
+    latestDraftId: number | null
   }
 
   export type CampaignPageMaxAggregateOutputType = {
@@ -44624,6 +44688,7 @@ export namespace Prisma {
     order: number | null
     createdAt: Date | null
     updatedAt: Date | null
+    latestDraftId: number | null
   }
 
   export type CampaignPageCountAggregateOutputType = {
@@ -44640,6 +44705,7 @@ export namespace Prisma {
     aiMetadata: number
     createdAt: number
     updatedAt: number
+    latestDraftId: number
     _all: number
   }
 
@@ -44648,12 +44714,14 @@ export namespace Prisma {
     id?: true
     topicId?: true
     order?: true
+    latestDraftId?: true
   }
 
   export type CampaignPageSumAggregateInputType = {
     id?: true
     topicId?: true
     order?: true
+    latestDraftId?: true
   }
 
   export type CampaignPageMinAggregateInputType = {
@@ -44669,6 +44737,7 @@ export namespace Prisma {
     order?: true
     createdAt?: true
     updatedAt?: true
+    latestDraftId?: true
   }
 
   export type CampaignPageMaxAggregateInputType = {
@@ -44684,6 +44753,7 @@ export namespace Prisma {
     order?: true
     createdAt?: true
     updatedAt?: true
+    latestDraftId?: true
   }
 
   export type CampaignPageCountAggregateInputType = {
@@ -44700,6 +44770,7 @@ export namespace Prisma {
     aiMetadata?: true
     createdAt?: true
     updatedAt?: true
+    latestDraftId?: true
     _all?: true
   }
 
@@ -44803,6 +44874,7 @@ export namespace Prisma {
     aiMetadata: JsonValue | null
     createdAt: Date
     updatedAt: Date
+    latestDraftId: number | null
     _count: CampaignPageCountAggregateOutputType | null
     _avg: CampaignPageAvgAggregateOutputType | null
     _sum: CampaignPageSumAggregateOutputType | null
@@ -44838,8 +44910,10 @@ export namespace Prisma {
     aiMetadata?: boolean
     createdAt?: boolean
     updatedAt?: boolean
+    latestDraftId?: boolean
     topic?: boolean | CampaignTopicDefaultArgs<ExtArgs>
     keywords?: boolean | CampaignPage$keywordsArgs<ExtArgs>
+    latestDraft?: boolean | CampaignPage$latestDraftArgs<ExtArgs>
     _count?: boolean | CampaignPageCountOutputTypeDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["campaignPage"]>
 
@@ -44857,7 +44931,9 @@ export namespace Prisma {
     aiMetadata?: boolean
     createdAt?: boolean
     updatedAt?: boolean
+    latestDraftId?: boolean
     topic?: boolean | CampaignTopicDefaultArgs<ExtArgs>
+    latestDraft?: boolean | CampaignPage$latestDraftArgs<ExtArgs>
   }, ExtArgs["result"]["campaignPage"]>
 
 
@@ -44875,16 +44951,19 @@ export namespace Prisma {
     aiMetadata?: boolean
     createdAt?: boolean
     updatedAt?: boolean
+    latestDraftId?: boolean
   }
 
-  export type CampaignPageOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "topicId" | "pageType" | "title" | "description" | "summary" | "aiSummary" | "status" | "source" | "order" | "aiMetadata" | "createdAt" | "updatedAt", ExtArgs["result"]["campaignPage"]>
+  export type CampaignPageOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "topicId" | "pageType" | "title" | "description" | "summary" | "aiSummary" | "status" | "source" | "order" | "aiMetadata" | "createdAt" | "updatedAt" | "latestDraftId", ExtArgs["result"]["campaignPage"]>
   export type CampaignPageInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     topic?: boolean | CampaignTopicDefaultArgs<ExtArgs>
     keywords?: boolean | CampaignPage$keywordsArgs<ExtArgs>
+    latestDraft?: boolean | CampaignPage$latestDraftArgs<ExtArgs>
     _count?: boolean | CampaignPageCountOutputTypeDefaultArgs<ExtArgs>
   }
   export type CampaignPageIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     topic?: boolean | CampaignTopicDefaultArgs<ExtArgs>
+    latestDraft?: boolean | CampaignPage$latestDraftArgs<ExtArgs>
   }
 
   export type $CampaignPagePayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
@@ -44892,6 +44971,7 @@ export namespace Prisma {
     objects: {
       topic: Prisma.$CampaignTopicPayload<ExtArgs>
       keywords: Prisma.$CampaignKeywordPayload<ExtArgs>[]
+      latestDraft: Prisma.$WordpressPublishLogPayload<ExtArgs> | null
     }
     scalars: $Extensions.GetPayloadResult<{
       id: number
@@ -44907,6 +44987,7 @@ export namespace Prisma {
       aiMetadata: Prisma.JsonValue | null
       createdAt: Date
       updatedAt: Date
+      latestDraftId: number | null
     }, ExtArgs["result"]["campaignPage"]>
     composites: {}
   }
@@ -45273,6 +45354,7 @@ export namespace Prisma {
     readonly [Symbol.toStringTag]: "PrismaPromise"
     topic<T extends CampaignTopicDefaultArgs<ExtArgs> = {}>(args?: Subset<T, CampaignTopicDefaultArgs<ExtArgs>>): Prisma__CampaignTopicClient<$Result.GetResult<Prisma.$CampaignTopicPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
     keywords<T extends CampaignPage$keywordsArgs<ExtArgs> = {}>(args?: Subset<T, CampaignPage$keywordsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$CampaignKeywordPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+    latestDraft<T extends CampaignPage$latestDraftArgs<ExtArgs> = {}>(args?: Subset<T, CampaignPage$latestDraftArgs<ExtArgs>>): Prisma__WordpressPublishLogClient<$Result.GetResult<Prisma.$WordpressPublishLogPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
     /**
      * Attaches callbacks for the resolution and/or rejection of the Promise.
      * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -45315,6 +45397,7 @@ export namespace Prisma {
     readonly aiMetadata: FieldRef<"CampaignPage", 'Json'>
     readonly createdAt: FieldRef<"CampaignPage", 'DateTime'>
     readonly updatedAt: FieldRef<"CampaignPage", 'DateTime'>
+    readonly latestDraftId: FieldRef<"CampaignPage", 'Int'>
   }
     
 
@@ -45694,6 +45777,25 @@ export namespace Prisma {
     take?: number
     skip?: number
     distinct?: CampaignKeywordScalarFieldEnum | CampaignKeywordScalarFieldEnum[]
+  }
+
+  /**
+   * CampaignPage.latestDraft
+   */
+  export type CampaignPage$latestDraftArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the WordpressPublishLog
+     */
+    select?: WordpressPublishLogSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the WordpressPublishLog
+     */
+    omit?: WordpressPublishLogOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WordpressPublishLogInclude<ExtArgs> | null
+    where?: WordpressPublishLogWhereInput
   }
 
   /**
@@ -49642,7 +49744,8 @@ export namespace Prisma {
     order: 'order',
     aiMetadata: 'aiMetadata',
     createdAt: 'createdAt',
-    updatedAt: 'updatedAt'
+    updatedAt: 'updatedAt',
+    latestDraftId: 'latestDraftId'
   };
 
   export type CampaignPageScalarFieldEnum = (typeof CampaignPageScalarFieldEnum)[keyof typeof CampaignPageScalarFieldEnum]
@@ -51882,6 +51985,7 @@ export namespace Prisma {
     integrationId?: IntNullableFilter<"WordpressPublishLog"> | number | null
     user?: XOR<UserRelationFilter, UserWhereInput>
     integration?: XOR<WordpressIntegrationNullableRelationFilter, WordpressIntegrationWhereInput> | null
+    campaignPages?: CampaignPageListRelationFilter
   }
 
   export type WordpressPublishLogOrderByWithRelationInput = {
@@ -51898,6 +52002,7 @@ export namespace Prisma {
     integrationId?: SortOrderInput | SortOrder
     user?: UserOrderByWithRelationInput
     integration?: WordpressIntegrationOrderByWithRelationInput
+    campaignPages?: CampaignPageOrderByRelationAggregateInput
   }
 
   export type WordpressPublishLogWhereUniqueInput = Prisma.AtLeast<{
@@ -51917,6 +52022,7 @@ export namespace Prisma {
     integrationId?: IntNullableFilter<"WordpressPublishLog"> | number | null
     user?: XOR<UserRelationFilter, UserWhereInput>
     integration?: XOR<WordpressIntegrationNullableRelationFilter, WordpressIntegrationWhereInput> | null
+    campaignPages?: CampaignPageListRelationFilter
   }, "id">
 
   export type WordpressPublishLogOrderByWithAggregationInput = {
@@ -52960,8 +53066,10 @@ export namespace Prisma {
     aiMetadata?: JsonNullableFilter<"CampaignPage">
     createdAt?: DateTimeFilter<"CampaignPage"> | Date | string
     updatedAt?: DateTimeFilter<"CampaignPage"> | Date | string
+    latestDraftId?: IntNullableFilter<"CampaignPage"> | number | null
     topic?: XOR<CampaignTopicRelationFilter, CampaignTopicWhereInput>
     keywords?: CampaignKeywordListRelationFilter
+    latestDraft?: XOR<WordpressPublishLogNullableRelationFilter, WordpressPublishLogWhereInput> | null
   }
 
   export type CampaignPageOrderByWithRelationInput = {
@@ -52978,8 +53086,10 @@ export namespace Prisma {
     aiMetadata?: SortOrderInput | SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
+    latestDraftId?: SortOrderInput | SortOrder
     topic?: CampaignTopicOrderByWithRelationInput
     keywords?: CampaignKeywordOrderByRelationAggregateInput
+    latestDraft?: WordpressPublishLogOrderByWithRelationInput
   }
 
   export type CampaignPageWhereUniqueInput = Prisma.AtLeast<{
@@ -52999,8 +53109,10 @@ export namespace Prisma {
     aiMetadata?: JsonNullableFilter<"CampaignPage">
     createdAt?: DateTimeFilter<"CampaignPage"> | Date | string
     updatedAt?: DateTimeFilter<"CampaignPage"> | Date | string
+    latestDraftId?: IntNullableFilter<"CampaignPage"> | number | null
     topic?: XOR<CampaignTopicRelationFilter, CampaignTopicWhereInput>
     keywords?: CampaignKeywordListRelationFilter
+    latestDraft?: XOR<WordpressPublishLogNullableRelationFilter, WordpressPublishLogWhereInput> | null
   }, "id">
 
   export type CampaignPageOrderByWithAggregationInput = {
@@ -53017,6 +53129,7 @@ export namespace Prisma {
     aiMetadata?: SortOrderInput | SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
+    latestDraftId?: SortOrderInput | SortOrder
     _count?: CampaignPageCountOrderByAggregateInput
     _avg?: CampaignPageAvgOrderByAggregateInput
     _max?: CampaignPageMaxOrderByAggregateInput
@@ -53041,6 +53154,7 @@ export namespace Prisma {
     aiMetadata?: JsonNullableWithAggregatesFilter<"CampaignPage">
     createdAt?: DateTimeWithAggregatesFilter<"CampaignPage"> | Date | string
     updatedAt?: DateTimeWithAggregatesFilter<"CampaignPage"> | Date | string
+    latestDraftId?: IntNullableWithAggregatesFilter<"CampaignPage"> | number | null
   }
 
   export type CampaignKeywordWhereInput = {
@@ -55500,6 +55614,7 @@ export namespace Prisma {
     updatedAt?: Date | string
     user: UserCreateNestedOneWithoutPublishLogsInput
     integration?: WordpressIntegrationCreateNestedOneWithoutPublishLogsInput
+    campaignPages?: CampaignPageCreateNestedManyWithoutLatestDraftInput
   }
 
   export type WordpressPublishLogUncheckedCreateInput = {
@@ -55514,6 +55629,7 @@ export namespace Prisma {
     createdAt?: Date | string
     updatedAt?: Date | string
     integrationId?: number | null
+    campaignPages?: CampaignPageUncheckedCreateNestedManyWithoutLatestDraftInput
   }
 
   export type WordpressPublishLogUpdateInput = {
@@ -55527,6 +55643,7 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     user?: UserUpdateOneRequiredWithoutPublishLogsNestedInput
     integration?: WordpressIntegrationUpdateOneWithoutPublishLogsNestedInput
+    campaignPages?: CampaignPageUpdateManyWithoutLatestDraftNestedInput
   }
 
   export type WordpressPublishLogUncheckedUpdateInput = {
@@ -55541,6 +55658,7 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     integrationId?: NullableIntFieldUpdateOperationsInput | number | null
+    campaignPages?: CampaignPageUncheckedUpdateManyWithoutLatestDraftNestedInput
   }
 
   export type WordpressPublishLogCreateManyInput = {
@@ -56613,6 +56731,7 @@ export namespace Prisma {
     updatedAt?: Date | string
     topic: CampaignTopicCreateNestedOneWithoutPagesInput
     keywords?: CampaignKeywordCreateNestedManyWithoutPageInput
+    latestDraft?: WordpressPublishLogCreateNestedOneWithoutCampaignPagesInput
   }
 
   export type CampaignPageUncheckedCreateInput = {
@@ -56629,6 +56748,7 @@ export namespace Prisma {
     aiMetadata?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: Date | string
     updatedAt?: Date | string
+    latestDraftId?: number | null
     keywords?: CampaignKeywordUncheckedCreateNestedManyWithoutPageInput
   }
 
@@ -56646,6 +56766,7 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     topic?: CampaignTopicUpdateOneRequiredWithoutPagesNestedInput
     keywords?: CampaignKeywordUpdateManyWithoutPageNestedInput
+    latestDraft?: WordpressPublishLogUpdateOneWithoutCampaignPagesNestedInput
   }
 
   export type CampaignPageUncheckedUpdateInput = {
@@ -56662,6 +56783,7 @@ export namespace Prisma {
     aiMetadata?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    latestDraftId?: NullableIntFieldUpdateOperationsInput | number | null
     keywords?: CampaignKeywordUncheckedUpdateManyWithoutPageNestedInput
   }
 
@@ -56679,6 +56801,7 @@ export namespace Prisma {
     aiMetadata?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: Date | string
     updatedAt?: Date | string
+    latestDraftId?: number | null
   }
 
   export type CampaignPageUpdateManyMutationInput = {
@@ -56709,6 +56832,7 @@ export namespace Prisma {
     aiMetadata?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    latestDraftId?: NullableIntFieldUpdateOperationsInput | number | null
   }
 
   export type CampaignKeywordCreateInput = {
@@ -58835,6 +58959,16 @@ export namespace Prisma {
     userId?: SortOrder
   }
 
+  export type CampaignPageListRelationFilter = {
+    every?: CampaignPageWhereInput
+    some?: CampaignPageWhereInput
+    none?: CampaignPageWhereInput
+  }
+
+  export type CampaignPageOrderByRelationAggregateInput = {
+    _count?: SortOrder
+  }
+
   export type WordpressPublishLogCountOrderByAggregateInput = {
     id?: SortOrder
     userId?: SortOrder
@@ -59487,20 +59621,10 @@ export namespace Prisma {
     isNot?: CampaignWhereInput
   }
 
-  export type CampaignPageListRelationFilter = {
-    every?: CampaignPageWhereInput
-    some?: CampaignPageWhereInput
-    none?: CampaignPageWhereInput
-  }
-
   export type CampaignKeywordListRelationFilter = {
     every?: CampaignKeywordWhereInput
     some?: CampaignKeywordWhereInput
     none?: CampaignKeywordWhereInput
-  }
-
-  export type CampaignPageOrderByRelationAggregateInput = {
-    _count?: SortOrder
   }
 
   export type CampaignKeywordOrderByRelationAggregateInput = {
@@ -59573,6 +59697,11 @@ export namespace Prisma {
     not?: NestedEnumCampaignPageTypeFilter<$PrismaModel> | $Enums.CampaignPageType
   }
 
+  export type WordpressPublishLogNullableRelationFilter = {
+    is?: WordpressPublishLogWhereInput | null
+    isNot?: WordpressPublishLogWhereInput | null
+  }
+
   export type CampaignPageCountOrderByAggregateInput = {
     id?: SortOrder
     topicId?: SortOrder
@@ -59587,12 +59716,14 @@ export namespace Prisma {
     aiMetadata?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
+    latestDraftId?: SortOrder
   }
 
   export type CampaignPageAvgOrderByAggregateInput = {
     id?: SortOrder
     topicId?: SortOrder
     order?: SortOrder
+    latestDraftId?: SortOrder
   }
 
   export type CampaignPageMaxOrderByAggregateInput = {
@@ -59608,6 +59739,7 @@ export namespace Prisma {
     order?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
+    latestDraftId?: SortOrder
   }
 
   export type CampaignPageMinOrderByAggregateInput = {
@@ -59623,12 +59755,14 @@ export namespace Prisma {
     order?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
+    latestDraftId?: SortOrder
   }
 
   export type CampaignPageSumOrderByAggregateInput = {
     id?: SortOrder
     topicId?: SortOrder
     order?: SortOrder
+    latestDraftId?: SortOrder
   }
 
   export type EnumCampaignPageTypeWithAggregatesFilter<$PrismaModel = never> = {
@@ -61870,6 +62004,20 @@ export namespace Prisma {
     connect?: WordpressIntegrationWhereUniqueInput
   }
 
+  export type CampaignPageCreateNestedManyWithoutLatestDraftInput = {
+    create?: XOR<CampaignPageCreateWithoutLatestDraftInput, CampaignPageUncheckedCreateWithoutLatestDraftInput> | CampaignPageCreateWithoutLatestDraftInput[] | CampaignPageUncheckedCreateWithoutLatestDraftInput[]
+    connectOrCreate?: CampaignPageCreateOrConnectWithoutLatestDraftInput | CampaignPageCreateOrConnectWithoutLatestDraftInput[]
+    createMany?: CampaignPageCreateManyLatestDraftInputEnvelope
+    connect?: CampaignPageWhereUniqueInput | CampaignPageWhereUniqueInput[]
+  }
+
+  export type CampaignPageUncheckedCreateNestedManyWithoutLatestDraftInput = {
+    create?: XOR<CampaignPageCreateWithoutLatestDraftInput, CampaignPageUncheckedCreateWithoutLatestDraftInput> | CampaignPageCreateWithoutLatestDraftInput[] | CampaignPageUncheckedCreateWithoutLatestDraftInput[]
+    connectOrCreate?: CampaignPageCreateOrConnectWithoutLatestDraftInput | CampaignPageCreateOrConnectWithoutLatestDraftInput[]
+    createMany?: CampaignPageCreateManyLatestDraftInputEnvelope
+    connect?: CampaignPageWhereUniqueInput | CampaignPageWhereUniqueInput[]
+  }
+
   export type UserUpdateOneRequiredWithoutPublishLogsNestedInput = {
     create?: XOR<UserCreateWithoutPublishLogsInput, UserUncheckedCreateWithoutPublishLogsInput>
     connectOrCreate?: UserCreateOrConnectWithoutPublishLogsInput
@@ -61886,6 +62034,34 @@ export namespace Prisma {
     delete?: WordpressIntegrationWhereInput | boolean
     connect?: WordpressIntegrationWhereUniqueInput
     update?: XOR<XOR<WordpressIntegrationUpdateToOneWithWhereWithoutPublishLogsInput, WordpressIntegrationUpdateWithoutPublishLogsInput>, WordpressIntegrationUncheckedUpdateWithoutPublishLogsInput>
+  }
+
+  export type CampaignPageUpdateManyWithoutLatestDraftNestedInput = {
+    create?: XOR<CampaignPageCreateWithoutLatestDraftInput, CampaignPageUncheckedCreateWithoutLatestDraftInput> | CampaignPageCreateWithoutLatestDraftInput[] | CampaignPageUncheckedCreateWithoutLatestDraftInput[]
+    connectOrCreate?: CampaignPageCreateOrConnectWithoutLatestDraftInput | CampaignPageCreateOrConnectWithoutLatestDraftInput[]
+    upsert?: CampaignPageUpsertWithWhereUniqueWithoutLatestDraftInput | CampaignPageUpsertWithWhereUniqueWithoutLatestDraftInput[]
+    createMany?: CampaignPageCreateManyLatestDraftInputEnvelope
+    set?: CampaignPageWhereUniqueInput | CampaignPageWhereUniqueInput[]
+    disconnect?: CampaignPageWhereUniqueInput | CampaignPageWhereUniqueInput[]
+    delete?: CampaignPageWhereUniqueInput | CampaignPageWhereUniqueInput[]
+    connect?: CampaignPageWhereUniqueInput | CampaignPageWhereUniqueInput[]
+    update?: CampaignPageUpdateWithWhereUniqueWithoutLatestDraftInput | CampaignPageUpdateWithWhereUniqueWithoutLatestDraftInput[]
+    updateMany?: CampaignPageUpdateManyWithWhereWithoutLatestDraftInput | CampaignPageUpdateManyWithWhereWithoutLatestDraftInput[]
+    deleteMany?: CampaignPageScalarWhereInput | CampaignPageScalarWhereInput[]
+  }
+
+  export type CampaignPageUncheckedUpdateManyWithoutLatestDraftNestedInput = {
+    create?: XOR<CampaignPageCreateWithoutLatestDraftInput, CampaignPageUncheckedCreateWithoutLatestDraftInput> | CampaignPageCreateWithoutLatestDraftInput[] | CampaignPageUncheckedCreateWithoutLatestDraftInput[]
+    connectOrCreate?: CampaignPageCreateOrConnectWithoutLatestDraftInput | CampaignPageCreateOrConnectWithoutLatestDraftInput[]
+    upsert?: CampaignPageUpsertWithWhereUniqueWithoutLatestDraftInput | CampaignPageUpsertWithWhereUniqueWithoutLatestDraftInput[]
+    createMany?: CampaignPageCreateManyLatestDraftInputEnvelope
+    set?: CampaignPageWhereUniqueInput | CampaignPageWhereUniqueInput[]
+    disconnect?: CampaignPageWhereUniqueInput | CampaignPageWhereUniqueInput[]
+    delete?: CampaignPageWhereUniqueInput | CampaignPageWhereUniqueInput[]
+    connect?: CampaignPageWhereUniqueInput | CampaignPageWhereUniqueInput[]
+    update?: CampaignPageUpdateWithWhereUniqueWithoutLatestDraftInput | CampaignPageUpdateWithWhereUniqueWithoutLatestDraftInput[]
+    updateMany?: CampaignPageUpdateManyWithWhereWithoutLatestDraftInput | CampaignPageUpdateManyWithWhereWithoutLatestDraftInput[]
+    deleteMany?: CampaignPageScalarWhereInput | CampaignPageScalarWhereInput[]
   }
 
   export type CampaignTopicCreateNestedOneWithoutGenerationJobsInput = {
@@ -62461,6 +62637,12 @@ export namespace Prisma {
     connect?: CampaignKeywordWhereUniqueInput | CampaignKeywordWhereUniqueInput[]
   }
 
+  export type WordpressPublishLogCreateNestedOneWithoutCampaignPagesInput = {
+    create?: XOR<WordpressPublishLogCreateWithoutCampaignPagesInput, WordpressPublishLogUncheckedCreateWithoutCampaignPagesInput>
+    connectOrCreate?: WordpressPublishLogCreateOrConnectWithoutCampaignPagesInput
+    connect?: WordpressPublishLogWhereUniqueInput
+  }
+
   export type CampaignKeywordUncheckedCreateNestedManyWithoutPageInput = {
     create?: XOR<CampaignKeywordCreateWithoutPageInput, CampaignKeywordUncheckedCreateWithoutPageInput> | CampaignKeywordCreateWithoutPageInput[] | CampaignKeywordUncheckedCreateWithoutPageInput[]
     connectOrCreate?: CampaignKeywordCreateOrConnectWithoutPageInput | CampaignKeywordCreateOrConnectWithoutPageInput[]
@@ -62492,6 +62674,16 @@ export namespace Prisma {
     update?: CampaignKeywordUpdateWithWhereUniqueWithoutPageInput | CampaignKeywordUpdateWithWhereUniqueWithoutPageInput[]
     updateMany?: CampaignKeywordUpdateManyWithWhereWithoutPageInput | CampaignKeywordUpdateManyWithWhereWithoutPageInput[]
     deleteMany?: CampaignKeywordScalarWhereInput | CampaignKeywordScalarWhereInput[]
+  }
+
+  export type WordpressPublishLogUpdateOneWithoutCampaignPagesNestedInput = {
+    create?: XOR<WordpressPublishLogCreateWithoutCampaignPagesInput, WordpressPublishLogUncheckedCreateWithoutCampaignPagesInput>
+    connectOrCreate?: WordpressPublishLogCreateOrConnectWithoutCampaignPagesInput
+    upsert?: WordpressPublishLogUpsertWithoutCampaignPagesInput
+    disconnect?: WordpressPublishLogWhereInput | boolean
+    delete?: WordpressPublishLogWhereInput | boolean
+    connect?: WordpressPublishLogWhereUniqueInput
+    update?: XOR<XOR<WordpressPublishLogUpdateToOneWithWhereWithoutCampaignPagesInput, WordpressPublishLogUpdateWithoutCampaignPagesInput>, WordpressPublishLogUncheckedUpdateWithoutCampaignPagesInput>
   }
 
   export type CampaignKeywordUncheckedUpdateManyWithoutPageNestedInput = {
@@ -63078,6 +63270,7 @@ export namespace Prisma {
     createdAt?: Date | string
     updatedAt?: Date | string
     integration?: WordpressIntegrationCreateNestedOneWithoutPublishLogsInput
+    campaignPages?: CampaignPageCreateNestedManyWithoutLatestDraftInput
   }
 
   export type WordpressPublishLogUncheckedCreateWithoutUserInput = {
@@ -63091,6 +63284,7 @@ export namespace Prisma {
     createdAt?: Date | string
     updatedAt?: Date | string
     integrationId?: number | null
+    campaignPages?: CampaignPageUncheckedCreateNestedManyWithoutLatestDraftInput
   }
 
   export type WordpressPublishLogCreateOrConnectWithoutUserInput = {
@@ -68681,6 +68875,7 @@ export namespace Prisma {
     createdAt?: Date | string
     updatedAt?: Date | string
     user: UserCreateNestedOneWithoutPublishLogsInput
+    campaignPages?: CampaignPageCreateNestedManyWithoutLatestDraftInput
   }
 
   export type WordpressPublishLogUncheckedCreateWithoutIntegrationInput = {
@@ -68694,6 +68889,7 @@ export namespace Prisma {
     response?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: Date | string
     updatedAt?: Date | string
+    campaignPages?: CampaignPageUncheckedCreateNestedManyWithoutLatestDraftInput
   }
 
   export type WordpressPublishLogCreateOrConnectWithoutIntegrationInput = {
@@ -68834,6 +69030,49 @@ export namespace Prisma {
     create: XOR<WordpressIntegrationCreateWithoutPublishLogsInput, WordpressIntegrationUncheckedCreateWithoutPublishLogsInput>
   }
 
+  export type CampaignPageCreateWithoutLatestDraftInput = {
+    pageType?: $Enums.CampaignPageType
+    title: string
+    description?: string | null
+    summary?: string | null
+    aiSummary?: string | null
+    status?: string
+    source?: $Enums.CampaignNodeSource
+    order?: number
+    aiMetadata?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    topic: CampaignTopicCreateNestedOneWithoutPagesInput
+    keywords?: CampaignKeywordCreateNestedManyWithoutPageInput
+  }
+
+  export type CampaignPageUncheckedCreateWithoutLatestDraftInput = {
+    id?: number
+    topicId: number
+    pageType?: $Enums.CampaignPageType
+    title: string
+    description?: string | null
+    summary?: string | null
+    aiSummary?: string | null
+    status?: string
+    source?: $Enums.CampaignNodeSource
+    order?: number
+    aiMetadata?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    keywords?: CampaignKeywordUncheckedCreateNestedManyWithoutPageInput
+  }
+
+  export type CampaignPageCreateOrConnectWithoutLatestDraftInput = {
+    where: CampaignPageWhereUniqueInput
+    create: XOR<CampaignPageCreateWithoutLatestDraftInput, CampaignPageUncheckedCreateWithoutLatestDraftInput>
+  }
+
+  export type CampaignPageCreateManyLatestDraftInputEnvelope = {
+    data: CampaignPageCreateManyLatestDraftInput | CampaignPageCreateManyLatestDraftInput[]
+    skipDuplicates?: boolean
+  }
+
   export type UserUpsertWithoutPublishLogsInput = {
     update: XOR<UserUpdateWithoutPublishLogsInput, UserUncheckedUpdateWithoutPublishLogsInput>
     create: XOR<UserCreateWithoutPublishLogsInput, UserUncheckedCreateWithoutPublishLogsInput>
@@ -68910,6 +69149,42 @@ export namespace Prisma {
     lastPublishedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type CampaignPageUpsertWithWhereUniqueWithoutLatestDraftInput = {
+    where: CampaignPageWhereUniqueInput
+    update: XOR<CampaignPageUpdateWithoutLatestDraftInput, CampaignPageUncheckedUpdateWithoutLatestDraftInput>
+    create: XOR<CampaignPageCreateWithoutLatestDraftInput, CampaignPageUncheckedCreateWithoutLatestDraftInput>
+  }
+
+  export type CampaignPageUpdateWithWhereUniqueWithoutLatestDraftInput = {
+    where: CampaignPageWhereUniqueInput
+    data: XOR<CampaignPageUpdateWithoutLatestDraftInput, CampaignPageUncheckedUpdateWithoutLatestDraftInput>
+  }
+
+  export type CampaignPageUpdateManyWithWhereWithoutLatestDraftInput = {
+    where: CampaignPageScalarWhereInput
+    data: XOR<CampaignPageUpdateManyMutationInput, CampaignPageUncheckedUpdateManyWithoutLatestDraftInput>
+  }
+
+  export type CampaignPageScalarWhereInput = {
+    AND?: CampaignPageScalarWhereInput | CampaignPageScalarWhereInput[]
+    OR?: CampaignPageScalarWhereInput[]
+    NOT?: CampaignPageScalarWhereInput | CampaignPageScalarWhereInput[]
+    id?: IntFilter<"CampaignPage"> | number
+    topicId?: IntFilter<"CampaignPage"> | number
+    pageType?: EnumCampaignPageTypeFilter<"CampaignPage"> | $Enums.CampaignPageType
+    title?: StringFilter<"CampaignPage"> | string
+    description?: StringNullableFilter<"CampaignPage"> | string | null
+    summary?: StringNullableFilter<"CampaignPage"> | string | null
+    aiSummary?: StringNullableFilter<"CampaignPage"> | string | null
+    status?: StringFilter<"CampaignPage"> | string
+    source?: EnumCampaignNodeSourceFilter<"CampaignPage"> | $Enums.CampaignNodeSource
+    order?: IntFilter<"CampaignPage"> | number
+    aiMetadata?: JsonNullableFilter<"CampaignPage">
+    createdAt?: DateTimeFilter<"CampaignPage"> | Date | string
+    updatedAt?: DateTimeFilter<"CampaignPage"> | Date | string
+    latestDraftId?: IntNullableFilter<"CampaignPage"> | number | null
   }
 
   export type CampaignTopicCreateWithoutGenerationJobsInput = {
@@ -71332,6 +71607,7 @@ export namespace Prisma {
     createdAt?: Date | string
     updatedAt?: Date | string
     keywords?: CampaignKeywordCreateNestedManyWithoutPageInput
+    latestDraft?: WordpressPublishLogCreateNestedOneWithoutCampaignPagesInput
   }
 
   export type CampaignPageUncheckedCreateWithoutTopicInput = {
@@ -71347,6 +71623,7 @@ export namespace Prisma {
     aiMetadata?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: Date | string
     updatedAt?: Date | string
+    latestDraftId?: number | null
     keywords?: CampaignKeywordUncheckedCreateNestedManyWithoutPageInput
   }
 
@@ -71470,25 +71747,6 @@ export namespace Prisma {
     data: XOR<CampaignPageUpdateManyMutationInput, CampaignPageUncheckedUpdateManyWithoutTopicInput>
   }
 
-  export type CampaignPageScalarWhereInput = {
-    AND?: CampaignPageScalarWhereInput | CampaignPageScalarWhereInput[]
-    OR?: CampaignPageScalarWhereInput[]
-    NOT?: CampaignPageScalarWhereInput | CampaignPageScalarWhereInput[]
-    id?: IntFilter<"CampaignPage"> | number
-    topicId?: IntFilter<"CampaignPage"> | number
-    pageType?: EnumCampaignPageTypeFilter<"CampaignPage"> | $Enums.CampaignPageType
-    title?: StringFilter<"CampaignPage"> | string
-    description?: StringNullableFilter<"CampaignPage"> | string | null
-    summary?: StringNullableFilter<"CampaignPage"> | string | null
-    aiSummary?: StringNullableFilter<"CampaignPage"> | string | null
-    status?: StringFilter<"CampaignPage"> | string
-    source?: EnumCampaignNodeSourceFilter<"CampaignPage"> | $Enums.CampaignNodeSource
-    order?: IntFilter<"CampaignPage"> | number
-    aiMetadata?: JsonNullableFilter<"CampaignPage">
-    createdAt?: DateTimeFilter<"CampaignPage"> | Date | string
-    updatedAt?: DateTimeFilter<"CampaignPage"> | Date | string
-  }
-
   export type CampaignKeywordUpsertWithWhereUniqueWithoutTopicInput = {
     where: CampaignKeywordWhereUniqueInput
     update: XOR<CampaignKeywordUpdateWithoutTopicInput, CampaignKeywordUncheckedUpdateWithoutTopicInput>
@@ -71610,6 +71868,38 @@ export namespace Prisma {
     skipDuplicates?: boolean
   }
 
+  export type WordpressPublishLogCreateWithoutCampaignPagesInput = {
+    wordpressUrl: string
+    primaryKeyword?: string | null
+    title?: string | null
+    slug?: string | null
+    status?: string | null
+    response?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    user: UserCreateNestedOneWithoutPublishLogsInput
+    integration?: WordpressIntegrationCreateNestedOneWithoutPublishLogsInput
+  }
+
+  export type WordpressPublishLogUncheckedCreateWithoutCampaignPagesInput = {
+    id?: number
+    userId: number
+    wordpressUrl: string
+    primaryKeyword?: string | null
+    title?: string | null
+    slug?: string | null
+    status?: string | null
+    response?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    integrationId?: number | null
+  }
+
+  export type WordpressPublishLogCreateOrConnectWithoutCampaignPagesInput = {
+    where: WordpressPublishLogWhereUniqueInput
+    create: XOR<WordpressPublishLogCreateWithoutCampaignPagesInput, WordpressPublishLogUncheckedCreateWithoutCampaignPagesInput>
+  }
+
   export type CampaignTopicUpsertWithoutPagesInput = {
     update: XOR<CampaignTopicUpdateWithoutPagesInput, CampaignTopicUncheckedUpdateWithoutPagesInput>
     create: XOR<CampaignTopicCreateWithoutPagesInput, CampaignTopicUncheckedCreateWithoutPagesInput>
@@ -71666,6 +71956,44 @@ export namespace Prisma {
     data: XOR<CampaignKeywordUpdateManyMutationInput, CampaignKeywordUncheckedUpdateManyWithoutPageInput>
   }
 
+  export type WordpressPublishLogUpsertWithoutCampaignPagesInput = {
+    update: XOR<WordpressPublishLogUpdateWithoutCampaignPagesInput, WordpressPublishLogUncheckedUpdateWithoutCampaignPagesInput>
+    create: XOR<WordpressPublishLogCreateWithoutCampaignPagesInput, WordpressPublishLogUncheckedCreateWithoutCampaignPagesInput>
+    where?: WordpressPublishLogWhereInput
+  }
+
+  export type WordpressPublishLogUpdateToOneWithWhereWithoutCampaignPagesInput = {
+    where?: WordpressPublishLogWhereInput
+    data: XOR<WordpressPublishLogUpdateWithoutCampaignPagesInput, WordpressPublishLogUncheckedUpdateWithoutCampaignPagesInput>
+  }
+
+  export type WordpressPublishLogUpdateWithoutCampaignPagesInput = {
+    wordpressUrl?: StringFieldUpdateOperationsInput | string
+    primaryKeyword?: NullableStringFieldUpdateOperationsInput | string | null
+    title?: NullableStringFieldUpdateOperationsInput | string | null
+    slug?: NullableStringFieldUpdateOperationsInput | string | null
+    status?: NullableStringFieldUpdateOperationsInput | string | null
+    response?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    user?: UserUpdateOneRequiredWithoutPublishLogsNestedInput
+    integration?: WordpressIntegrationUpdateOneWithoutPublishLogsNestedInput
+  }
+
+  export type WordpressPublishLogUncheckedUpdateWithoutCampaignPagesInput = {
+    id?: IntFieldUpdateOperationsInput | number
+    userId?: IntFieldUpdateOperationsInput | number
+    wordpressUrl?: StringFieldUpdateOperationsInput | string
+    primaryKeyword?: NullableStringFieldUpdateOperationsInput | string | null
+    title?: NullableStringFieldUpdateOperationsInput | string | null
+    slug?: NullableStringFieldUpdateOperationsInput | string | null
+    status?: NullableStringFieldUpdateOperationsInput | string | null
+    response?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    integrationId?: NullableIntFieldUpdateOperationsInput | number | null
+  }
+
   export type CampaignTopicCreateWithoutKeywordsInput = {
     title: string
     description?: string | null
@@ -71713,6 +72041,7 @@ export namespace Prisma {
     createdAt?: Date | string
     updatedAt?: Date | string
     topic: CampaignTopicCreateNestedOneWithoutPagesInput
+    latestDraft?: WordpressPublishLogCreateNestedOneWithoutCampaignPagesInput
   }
 
   export type CampaignPageUncheckedCreateWithoutKeywordsInput = {
@@ -71729,6 +72058,7 @@ export namespace Prisma {
     aiMetadata?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: Date | string
     updatedAt?: Date | string
+    latestDraftId?: number | null
   }
 
   export type CampaignPageCreateOrConnectWithoutKeywordsInput = {
@@ -71800,6 +72130,7 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     topic?: CampaignTopicUpdateOneRequiredWithoutPagesNestedInput
+    latestDraft?: WordpressPublishLogUpdateOneWithoutCampaignPagesNestedInput
   }
 
   export type CampaignPageUncheckedUpdateWithoutKeywordsInput = {
@@ -71816,6 +72147,7 @@ export namespace Prisma {
     aiMetadata?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    latestDraftId?: NullableIntFieldUpdateOperationsInput | number | null
   }
 
   export type DomainCreateWithoutAuditResultsInput = {
@@ -72264,6 +72596,7 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     integration?: WordpressIntegrationUpdateOneWithoutPublishLogsNestedInput
+    campaignPages?: CampaignPageUpdateManyWithoutLatestDraftNestedInput
   }
 
   export type WordpressPublishLogUncheckedUpdateWithoutUserInput = {
@@ -72277,6 +72610,7 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     integrationId?: NullableIntFieldUpdateOperationsInput | number | null
+    campaignPages?: CampaignPageUncheckedUpdateManyWithoutLatestDraftNestedInput
   }
 
   export type WordpressPublishLogUncheckedUpdateManyWithoutUserInput = {
@@ -73832,6 +74166,7 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     user?: UserUpdateOneRequiredWithoutPublishLogsNestedInput
+    campaignPages?: CampaignPageUpdateManyWithoutLatestDraftNestedInput
   }
 
   export type WordpressPublishLogUncheckedUpdateWithoutIntegrationInput = {
@@ -73845,6 +74180,7 @@ export namespace Prisma {
     response?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    campaignPages?: CampaignPageUncheckedUpdateManyWithoutLatestDraftNestedInput
   }
 
   export type WordpressPublishLogUncheckedUpdateManyWithoutIntegrationInput = {
@@ -73856,6 +74192,71 @@ export namespace Prisma {
     slug?: NullableStringFieldUpdateOperationsInput | string | null
     status?: NullableStringFieldUpdateOperationsInput | string | null
     response?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type CampaignPageCreateManyLatestDraftInput = {
+    id?: number
+    topicId: number
+    pageType?: $Enums.CampaignPageType
+    title: string
+    description?: string | null
+    summary?: string | null
+    aiSummary?: string | null
+    status?: string
+    source?: $Enums.CampaignNodeSource
+    order?: number
+    aiMetadata?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type CampaignPageUpdateWithoutLatestDraftInput = {
+    pageType?: EnumCampaignPageTypeFieldUpdateOperationsInput | $Enums.CampaignPageType
+    title?: StringFieldUpdateOperationsInput | string
+    description?: NullableStringFieldUpdateOperationsInput | string | null
+    summary?: NullableStringFieldUpdateOperationsInput | string | null
+    aiSummary?: NullableStringFieldUpdateOperationsInput | string | null
+    status?: StringFieldUpdateOperationsInput | string
+    source?: EnumCampaignNodeSourceFieldUpdateOperationsInput | $Enums.CampaignNodeSource
+    order?: IntFieldUpdateOperationsInput | number
+    aiMetadata?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    topic?: CampaignTopicUpdateOneRequiredWithoutPagesNestedInput
+    keywords?: CampaignKeywordUpdateManyWithoutPageNestedInput
+  }
+
+  export type CampaignPageUncheckedUpdateWithoutLatestDraftInput = {
+    id?: IntFieldUpdateOperationsInput | number
+    topicId?: IntFieldUpdateOperationsInput | number
+    pageType?: EnumCampaignPageTypeFieldUpdateOperationsInput | $Enums.CampaignPageType
+    title?: StringFieldUpdateOperationsInput | string
+    description?: NullableStringFieldUpdateOperationsInput | string | null
+    summary?: NullableStringFieldUpdateOperationsInput | string | null
+    aiSummary?: NullableStringFieldUpdateOperationsInput | string | null
+    status?: StringFieldUpdateOperationsInput | string
+    source?: EnumCampaignNodeSourceFieldUpdateOperationsInput | $Enums.CampaignNodeSource
+    order?: IntFieldUpdateOperationsInput | number
+    aiMetadata?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    keywords?: CampaignKeywordUncheckedUpdateManyWithoutPageNestedInput
+  }
+
+  export type CampaignPageUncheckedUpdateManyWithoutLatestDraftInput = {
+    id?: IntFieldUpdateOperationsInput | number
+    topicId?: IntFieldUpdateOperationsInput | number
+    pageType?: EnumCampaignPageTypeFieldUpdateOperationsInput | $Enums.CampaignPageType
+    title?: StringFieldUpdateOperationsInput | string
+    description?: NullableStringFieldUpdateOperationsInput | string | null
+    summary?: NullableStringFieldUpdateOperationsInput | string | null
+    aiSummary?: NullableStringFieldUpdateOperationsInput | string | null
+    status?: StringFieldUpdateOperationsInput | string
+    source?: EnumCampaignNodeSourceFieldUpdateOperationsInput | $Enums.CampaignNodeSource
+    order?: IntFieldUpdateOperationsInput | number
+    aiMetadata?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -74167,6 +74568,7 @@ export namespace Prisma {
     aiMetadata?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: Date | string
     updatedAt?: Date | string
+    latestDraftId?: number | null
   }
 
   export type CampaignKeywordCreateManyTopicInput = {
@@ -74205,6 +74607,7 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     keywords?: CampaignKeywordUpdateManyWithoutPageNestedInput
+    latestDraft?: WordpressPublishLogUpdateOneWithoutCampaignPagesNestedInput
   }
 
   export type CampaignPageUncheckedUpdateWithoutTopicInput = {
@@ -74220,6 +74623,7 @@ export namespace Prisma {
     aiMetadata?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    latestDraftId?: NullableIntFieldUpdateOperationsInput | number | null
     keywords?: CampaignKeywordUncheckedUpdateManyWithoutPageNestedInput
   }
 
@@ -74236,6 +74640,7 @@ export namespace Prisma {
     aiMetadata?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    latestDraftId?: NullableIntFieldUpdateOperationsInput | number | null
   }
 
   export type CampaignKeywordUpdateWithoutTopicInput = {

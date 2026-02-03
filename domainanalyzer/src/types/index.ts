@@ -14,6 +14,9 @@ export interface SubPage {
     description?: string | null;
     summary?: string | null;
     keywords: Keyword[];
+    publishStatus?: string;
+    liveUrl?: string;
+    draftId?: number;
 }
 
 export interface PillarPage {
@@ -22,6 +25,9 @@ export interface PillarPage {
     description?: string | null;
     summary?: string | null;
     keywords: Keyword[];
+    publishStatus?: string;
+    liveUrl?: string;
+    draftId?: number;
 }
 
 export interface Topic {

@@ -107,6 +107,7 @@ type CampaignWithStructure = Prisma.CampaignGetPayload<{
         pages: {
           include: {
             keywords: true;
+            latestDraft: true;
           };
         };
         keywords: true;
@@ -134,6 +135,9 @@ interface SerializedPage {
   summary: string | null;
   pageType: CampaignPageType;
   keywords: SerializedKeyword[];
+  publishStatus?: string;
+  liveUrl?: string;
+  draftId?: number;
 }
 
 interface SerializedTopic {
@@ -190,7 +194,10 @@ const serializePage = (page: PageWithRelations): SerializedPage => {
     description: page.description || null,
     summary: page.summary || page.aiSummary || null,
     pageType: page.pageType,
-    keywords: serializedKeywords
+    keywords: serializedKeywords,
+    publishStatus: page.latestDraft?.status || undefined,
+    liveUrl: page.latestDraft?.wordpressUrl || undefined,
+    draftId: page.latestDraft?.id
   };
 };
 
@@ -235,7 +242,8 @@ const fetchCampaignStructure = async (campaignId: number, userId: number) => {
             include: {
               keywords: {
                 orderBy: { createdAt: 'asc' }
-              }
+              },
+              latestDraft: true
             },
             orderBy: {
               order: 'asc'

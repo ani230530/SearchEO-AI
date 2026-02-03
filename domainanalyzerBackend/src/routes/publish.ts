@@ -775,6 +775,14 @@ router.post(
           },
         });
 
+        // Link to Campaign Page if pageId is present
+        if (pageId) {
+          await prisma.campaignPage.update({
+            where: { id: Number(pageId) },
+            data: { latestDraftId: updated.id }
+          }).catch(e => console.error('Failed to link draft to page', e));
+        }
+
         return res.json({
           success: true,
           draftId: updated.id,
@@ -793,6 +801,14 @@ router.post(
           integrationId: integration?.id,
         },
       });
+
+      // Link to Campaign Page if pageId is present
+      if (pageId) {
+        await prisma.campaignPage.update({
+          where: { id: Number(pageId) },
+          data: { latestDraftId: draft.id }
+        }).catch(e => console.error('Failed to link draft to page', e));
+      }
 
       return res.json({
         success: true,

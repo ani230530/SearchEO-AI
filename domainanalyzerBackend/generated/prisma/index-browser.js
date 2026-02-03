@@ -599,7 +599,8 @@ exports.Prisma.CampaignPageScalarFieldEnum = {
   order: 'order',
   aiMetadata: 'aiMetadata',
   createdAt: 'createdAt',
-  updatedAt: 'updatedAt'
+  updatedAt: 'updatedAt',
+  latestDraftId: 'latestDraftId'
 };
 
 exports.Prisma.CampaignKeywordScalarFieldEnum = {

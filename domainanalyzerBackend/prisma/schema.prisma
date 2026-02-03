@@ -429,6 +429,7 @@ model WordpressPublishLog {
   user          User     @relation(fields: [userId], references: [id])
   integration   WordpressIntegration? @relation(fields: [integrationId], references: [id])
   integrationId Int?
+  campaignPages CampaignPage[] @relation("PageLatestDraft")
 
   @@index([userId])
 }
@@ -675,6 +676,8 @@ model CampaignPage {
   createdAt   DateTime           @default(now())
   updatedAt   DateTime           @updatedAt
   keywords    CampaignKeyword[]
+  latestDraftId Int?
+  latestDraft WordpressPublishLog? @relation("PageLatestDraft", fields: [latestDraftId], references: [id])
 
   @@index([topicId])
 }

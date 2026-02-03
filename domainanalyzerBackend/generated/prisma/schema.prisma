@@ -429,6 +429,7 @@ model WordpressPublishLog {
   user           User                  @relation(fields: [userId], references: [id])
   integration    WordpressIntegration? @relation(fields: [integrationId], references: [id])
   integrationId  Int?
+  campaignPages  CampaignPage[]        @relation("PageLatestDraft")
 
   @@index([userId])
 }
@@ -661,21 +662,23 @@ model CampaignTopic {
 }
 
 model CampaignPage {
-  id          Int                @id @default(autoincrement())
-  topicId     Int
-  topic       CampaignTopic      @relation(fields: [topicId], references: [id], onDelete: Cascade)
-  pageType    CampaignPageType   @default(PILLAR)
-  title       String
-  description String?
-  summary     String?
-  aiSummary   String?
-  status      String             @default("active")
-  source      CampaignNodeSource @default(MANUAL)
-  order       Int                @default(0)
-  aiMetadata  Json?
-  createdAt   DateTime           @default(now())
-  updatedAt   DateTime           @updatedAt
-  keywords    CampaignKeyword[]
+  id            Int                  @id @default(autoincrement())
+  topicId       Int
+  topic         CampaignTopic        @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  pageType      CampaignPageType     @default(PILLAR)
+  title         String
+  description   String?
+  summary       String?
+  aiSummary     String?
+  status        String               @default("active")
+  source        CampaignNodeSource   @default(MANUAL)
+  order         Int                  @default(0)
+  aiMetadata    Json?
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+  keywords      CampaignKeyword[]
+  latestDraftId Int?
+  latestDraft   WordpressPublishLog? @relation("PageLatestDraft", fields: [latestDraftId], references: [id])
 
   @@index([topicId])
 }
