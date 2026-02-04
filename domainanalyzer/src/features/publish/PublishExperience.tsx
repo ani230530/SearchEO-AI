@@ -17,6 +17,7 @@ import {
   Eye,
   Trash2,
   Image as ImageIcon,
+  Send,
 } from 'lucide-react';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
@@ -52,6 +53,14 @@ interface PublishExperienceProps {
   initialDraftId?: number | null;
   pageId?: number; // Context: CampaignPage ID to link the draft to
   disablePreviewOverlay?: boolean; // When true, don't render the preview overlay wrapper (for embedded use)
+  
+  // Shared sync states from parent
+  publishingPageIds?: Set<number>;
+  setPublishingPageIds?: React.Dispatch<React.SetStateAction<Set<number>>>;
+  draftToPageMap?: Map<number, number>;
+  setDraftToPageMap?: React.Dispatch<React.SetStateAction<Map<number, number>>>;
+  draftStatuses?: Map<number, { isPublished: boolean; isFailed?: boolean; publishedUrl?: string; draftId?: number; error?: string }>;
+  setDraftStatuses?: React.Dispatch<React.SetStateAction<Map<number, { isPublished: boolean; isFailed?: boolean; publishedUrl?: string; draftId?: number; error?: string }>>>;
 }
 
 interface PublishFormState {
@@ -113,6 +122,12 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
   initialDraftId,
   pageId,
   disablePreviewOverlay = false,
+  publishingPageIds,
+  setPublishingPageIds,
+  draftToPageMap,
+  setDraftToPageMap,
+  draftStatuses,
+  setDraftStatuses,
 }) => {
   const { toast } = useToast();
   const [publishForm, setPublishForm] = useState<PublishFormState>({
@@ -132,7 +147,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
   const [drawerStep, setDrawerStep] = useState(1);
   const totalDrawerSteps = 4;
   // savingDraft removed - using 'saving' state instead
-  const [currentDraftId, setCurrentDraftId] = useState<number | null>(null);
+  const [currentDraftId, setCurrentDraftId] = useState<number | null>(initialDraftId || null);
   const [selectedText, setSelectedText] = useState('');
   const [textEditNote, setTextEditNote] = useState('');
   const [textEditing, setTextEditing] = useState(false);
@@ -194,13 +209,18 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
   // Listen for real-time publish updates
   usePublishStatus({
     onUpdate: (data) => {
+      console.log('[Publish:SSE] Received update:', data);
+      
       // Refresh history to show updated status for everyone
       if (!initialDraft) {
         fetchPublishHistory();
       }
 
       // If this update is for the currently viewed draft, update the UI
-      if (currentDraftId && data.draftId === currentDraftId) {
+      // Use double equals or cast to match number vs string if needed, though they should be numbers
+      if (currentDraftId && Number(data.draftId) === Number(currentDraftId)) {
+        console.log('[Publish:SSE] Matching draft update found, status:', data.status);
+        
         // ALWAYS clear loading state on a terminal update
         if (data.status === 'published' || data.status === 'failed') {
           setPublishLoading(false);
@@ -220,6 +240,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
           // Also refresh integration stats
           onRefreshWordpressIntegration();
         } else if (data.status === 'failed') {
+          setPublishError(data.error || 'Publish failed');
           toast({
             title: 'Publish Failed',
             description: data.error || 'An error occurred while publishing',
@@ -1351,6 +1372,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
         },
         body: JSON.stringify({
           draftId: currentDraftId, // Pass draftId to update existing draft instead of creating new one
+          pageId, // Pass pageId context for campaign synchronization
           primaryKeyword: publishResult.primaryKeyword || publishForm.primaryKeyword,
           htmlContent: latestHtmlContent, // This is now synced with DB
           featuredImage: publishResult.featuredImage,
@@ -1365,7 +1387,15 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
         throw new Error(data.error || 'Publish request failed');
       }
 
-      // Update publishResult with published status and URL
+      // Sync with parent for Campaign tab real-time view
+      if (pageId && setPublishingPageIds && setDraftToPageMap) {
+        setPublishingPageIds(prev => new Set(prev).add(pageId));
+        if (data.draftId) {
+          setDraftToPageMap(prev => new Map(prev).set(data.draftId, pageId));
+        }
+      }
+
+      // Handle Immediate Success
       if (data.status === 'published' && data.publishedUrl) {
         const publishedUrl = data.publishedUrl;
         
@@ -1394,13 +1424,26 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
           }));
         }
         
-        // Also fetch to be sure
-        fetchDraftFromDb(currentDraftId!); // we know currentDraftId exists if we're here
+        fetchDraftFromDb(currentDraftId!);
         fetchPublishHistory();
         onRefreshWordpressIntegration();
+        setPublishLoading(false); // Stop loading on success
+      } 
+      // Handle Queued/Generating Status
+      else if (data.status === 'generating') {
+        console.log('[Publish:Debug] Job queued, setting currentDraftId:', data.draftId);
+        if (data.draftId) {
+          setCurrentDraftId(data.draftId);
+        }
         
-      } else {
-        // STRICT FAILURE HANDLING: If no URL, treat as failed even if status says published
+        toast({
+          title: 'Publish Queued',
+          description: 'Your article is being published to WordPress in the background.',
+        });
+        // We KEEP publishLoading(true) here!
+      }
+      else {
+        // STRICT FAILURE HANDLING: If no URL and not generating, treat as failed
         throw new Error('WordPress did not return a valid URL. The publish may have failed.');
       }
     } catch (error) {
@@ -1410,8 +1453,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
         description: error instanceof Error ? error.message : 'Unable to publish content',
         variant: 'destructive',
       });
-    } finally {
-      setPublishLoading(false);
+      setPublishLoading(false); // Stop loading on error
     }
   };
 
@@ -2801,13 +2843,50 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
                     >
                       {publishLoading ? 'Generating…' : publishResult ? 'Regenerate' : 'Generate'}
                     </button>
-                    <button
-                      onClick={handlePublishToWordpress}
-                      disabled={publishLoading || !publishResult}
-                      className="px-6 py-2.5 rounded-full bg-black text-white text-sm font-medium shadow-lg hover:bg-gray-600 disabled:opacity-60 transition-colors"
-                    >
-                      {publishLoading ? 'Working…' : 'Publish to WordPress'}
-                    </button>
+                    
+                    {publishResult?.wordpressUrl ? (
+                      <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-1.5 px-3 py-1.5 bg-green-50 text-green-700 rounded-full border border-green-200 shadow-sm animate-in fade-in slide-in-from-right-4 duration-500">
+                          <CheckCircle className="h-4 w-4" />
+                          <span className="text-xs font-semibold tracking-wide uppercase">Live</span>
+                        </div>
+                        <a
+                          href={publishResult.wordpressUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-6 py-2.5 rounded-full bg-black text-white text-sm font-medium shadow-lg hover:bg-gray-800 transition-all flex items-center gap-2"
+                        >
+                          <Eye className="h-4 w-4" />
+                          View Live Article
+                        </a>
+                        <button
+                          onClick={handlePublishToWordpress}
+                          disabled={publishLoading}
+                          className="p-2.5 rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors"
+                          title="Republish to WordPress"
+                        >
+                          <RotateCcw className={`h-4 w-4 ${publishLoading ? 'animate-spin' : ''}`} />
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={handlePublishToWordpress}
+                        disabled={publishLoading || !publishResult}
+                        className="px-6 py-2.5 rounded-full bg-black text-white text-sm font-medium shadow-lg hover:bg-gray-800 disabled:opacity-60 transition-all flex items-center gap-2"
+                      >
+                        {publishLoading ? (
+                          <>
+                            <ButtonSpinner />
+                            <span>Publishing…</span>
+                          </>
+                        ) : (
+                          <>
+                            <Send className="h-4 w-4" />
+                            <span>Publish to WordPress</span>
+                          </>
+                        )}
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>

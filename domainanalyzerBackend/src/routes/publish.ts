@@ -431,6 +431,7 @@ router.post(
       title,
       metaDescription,
       slug,
+      pageId // Extract pageId for campaign synchronization
     } = req.body;
 
     if (!primaryKeyword || !htmlContent) {
@@ -514,6 +515,21 @@ router.post(
       });
     }
 
+    // Link draft to CampaignPage if pageId is provided
+    if (pageId) {
+      console.log(`[Publish] Linking draft ${savedDraft.id} to page ${pageId}`);
+      await prisma.campaignPage.update({
+        where: { id: Number(pageId) },
+        data: { latestDraftId: savedDraft.id }
+      }).catch(err => console.error('[Publish] Failed to link draft to page:', err));
+    }
+
+    // Use the provided pageId if available, otherwise fallback to existing link
+    const finalPageId = pageId ? Number(pageId) : (await prisma.campaignPage.findFirst({
+      where: { latestDraftId: savedDraft.id },
+      select: { id: true }
+    }))?.id;
+
     // Add to Queue
     // We need to pass necessary meta info for the worker to update DB later
     const { addN8nJob, JOB_TYPES } = await import('../services/queueService');
@@ -530,7 +546,8 @@ router.post(
         integrationId: integration.id,
         primaryKeyword,
         title,
-        slug
+        slug,
+        pageId: finalPageId // Include pageId for global sync
       }
     });
 
@@ -549,7 +566,17 @@ router.post(
   asyncHandler(async (req: Request, res: Response) => {
     const authReq = req as AuthenticatedRequest;
     const userId = authReq.user.userId;
-    const { primaryKeyword, title, wordCount, images } = req.body;
+    const { primaryKeyword, wordCount, images, title, pageId } = req.body;
+
+    // Link to page immediately if context provided
+    const linkToPage = async (draftId: number) => {
+      if (pageId) {
+        await prisma.campaignPage.update({
+          where: { id: Number(pageId) },
+          data: { latestDraftId: draftId }
+        }).catch(err => console.error('[Generating] Failed to link draft to page:', err));
+      }
+    };
 
     if (!primaryKeyword) {
       return res.status(400).json({
@@ -586,6 +613,8 @@ router.post(
           integrationId: integration?.id,
         },
       });
+
+      await linkToPage(draft.id);
 
       res.json({
         success: true,
@@ -917,6 +946,13 @@ router.post(
     // Determine success or failure
     const finalUrl = link || wordpressUrl || (response && (response.link || response.wordpressUrl));
 
+    // Find associated pageId for SSE update
+    const linkedPage = await prisma.campaignPage.findFirst({
+      where: { latestDraftId: Number(draftId) },
+      select: { id: true }
+    });
+    const pageId = linkedPage?.id;
+
     if (error || !finalUrl) {
       // Handle Failure
       await prisma.wordpressPublishLog.update({
@@ -932,6 +968,7 @@ router.post(
       broadcastToUser(draft.userId, {
         type: 'publish_update',
         draftId: Number(draftId),
+        pageId, // Include pageId for Campaign tab sync
         status: 'failed',
         error: error || 'Async publish returned no link'
       });
@@ -960,6 +997,7 @@ router.post(
     broadcastToUser(draft.userId, {
       type: 'publish_update',
       draftId: Number(draftId),
+      pageId, // Include pageId for Campaign tab sync
       status: 'published',
       publishedUrl: finalUrl
     });
@@ -969,4 +1007,3 @@ router.post(
 );
 
 export default router;
-

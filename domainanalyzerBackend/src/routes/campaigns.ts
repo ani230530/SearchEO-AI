@@ -1820,6 +1820,15 @@ router.post('/topics/:topicId/generate-content', authenticateToken, asyncHandler
 
   const drafts = await Promise.all(draftPromises);
 
+  // Link drafts to pages immediately for global sync
+  await Promise.all(drafts.map((draft, idx) => {
+    const pageId = idx === 0 ? pillarPage.id : subPages[idx - 1].id;
+    return prisma.campaignPage.update({
+      where: { id: pageId },
+      data: { latestDraftId: draft.id }
+    });
+  }));
+
   // Create generation job and page rows
   await prisma.generationJob.create({
     data: {

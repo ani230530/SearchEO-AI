@@ -286,6 +286,9 @@ const sseRef = useRef<EventSource | null>(null);
   const [draftStatuses, setDraftStatuses] = useState<Map<number, { isPublished: boolean; isFailed?: boolean; publishedUrl?: string; draftId?: number; error?: string }>>(new Map());
   // Track generation job statuses
   const [generationJobs, setGenerationJobs] = useState<Map<number, GenerationPageStatus>>(new Map());
+  // Lifted context from CampaignStructureView
+  const [campaignPageIdContext, setCampaignPageIdContext] = useState<number | null>(null);
+  const [currentGenerationTopicId, setCurrentGenerationTopicId] = useState<number | null>(null);
 const [improvedContent, setImprovedContent] = useState("");
   const [gscEmail, setGscEmail] = useState<string>("");
   const [gscSelectedProperty, setGscSelectedProperty] = useState<string>("");
@@ -397,56 +400,86 @@ const [editDescription, setEditDescription] = useState('');
   // Listen for real-time publish updates via SSE
   usePublishStatus({
     onUpdate: (data) => {
-      // Find which page this draftId corresponds to
-      const pageId = draftToPageMap.get(data.draftId);
+      console.log('[Dashboard:SSE] Received update:', data);
       
-      // Always clear publishing state for this draft
+      const incomingDraftId = data.draftId ? Number(data.draftId) : null;
+      const incomingPageId = data.pageId ? Number(data.pageId) : null;
+      
+      let targetPageId: number | null = incomingPageId;
+      
+      if (!targetPageId && incomingDraftId) {
+        // Fallback: look in local mapping
+        for (const [dId, pId] of draftToPageMap.entries()) {
+          if (Number(dId) === incomingDraftId) {
+            targetPageId = Number(pId);
+            break;
+          }
+        }
+      }
+      
+      console.log('[Dashboard:SSE] Match attempt:', { incomingDraftId, incomingPageId, resolvedPageId: targetPageId });
+
+      // Terminal states: Clear loading and mapping
       if (data.status === 'published' || data.status === 'failed') {
-        if (pageId) {
+        if (targetPageId) {
+          console.log('[Dashboard:SSE] Clearing loading state for page:', targetPageId);
           setPublishingPageIds(prev => {
             const next = new Set(prev);
-            next.delete(pageId);
+            for (const val of Array.from(next)) {
+              if (Number(val) === Number(targetPageId)) {
+                next.delete(val);
+              }
+            }
             return next;
           });
         }
-        // Clean up the mapping
-        setDraftToPageMap(prev => {
-          const next = new Map(prev);
-          next.delete(data.draftId);
-          return next;
-        });
-      }
-
-      if (data.status === 'published' && data.publishedUrl) {
-        // Update generationJobs with the published URL
-        if (pageId) {
-          setGenerationJobs(prev => {
-            const existing = prev.get(pageId);
-            if (existing) {
-              const updated = new Map(prev);
-              updated.set(pageId, {
-                ...existing,
-                wordpressUrl: data.publishedUrl || null,
-              });
-              return updated;
+        
+        if (incomingDraftId) {
+          setDraftToPageMap(prev => {
+            const next = new Map(prev);
+            for (const [dId] of next.entries()) {
+              if (Number(dId) === incomingDraftId) {
+                next.delete(dId);
+              }
             }
-            return prev;
+            return next;
           });
         }
+      }
 
-        // Also update draftStatuses for the View Live button
+      // Handle specific statuses
+      if (data.status === 'published' && data.publishedUrl && targetPageId) {
+        // Update generationJobs
+        setGenerationJobs(prev => {
+          const updated = new Map(prev);
+          const existing = updated.get(targetPageId!);
+          if (existing) {
+            updated.set(targetPageId!, {
+              ...existing,
+              wordpressUrl: data.publishedUrl || null,
+            });
+          }
+          return updated;
+        });
+
+        // Update draftStatuses
         setDraftStatuses(prev => {
           const updated = new Map(prev);
-          // Find entry by draftId
-          for (const [pid, status] of updated.entries()) {
-            if (status.draftId === data.draftId) {
-              updated.set(pid, {
-                ...status,
-                isPublished: true,
-                publishedUrl: data.publishedUrl,
-              });
-              break;
-            }
+          const existing = updated.get(targetPageId!);
+          if (existing) {
+            updated.set(targetPageId!, {
+              ...existing,
+              isPublished: true,
+              publishedUrl: data.publishedUrl,
+              draftId: incomingDraftId || undefined
+            });
+          } else {
+            // Add new entry even if it wasn't there before
+            updated.set(targetPageId!, {
+              isPublished: true,
+              publishedUrl: data.publishedUrl,
+              draftId: incomingDraftId || undefined
+            });
           }
           return updated;
         });
@@ -456,38 +489,33 @@ const [editDescription, setEditDescription] = useState('');
           description: `Your content is live! View it at: ${data.publishedUrl}`,
         });
       } else if (data.status === 'failed') {
-        // Update draftStatuses to show failed state with View/Retry buttons
+        // Update draftStatuses for failure
         setDraftStatuses(prev => {
           const updated = new Map(prev);
-          for (const [pid, status] of updated.entries()) {
-            if (status.draftId === data.draftId) {
-              updated.set(pid, {
-                ...status,
-                isFailed: true,
-                isPublished: false,
-                error: data.error,
-              });
-              break;
+          if (targetPageId && updated.has(targetPageId)) {
+            const existing = updated.get(targetPageId)!;
+            updated.set(targetPageId, {
+              ...existing,
+              isFailed: true,
+              isPublished: false,
+              error: data.error,
+              draftId: incomingDraftId || existing.draftId
+            });
+          } else if (incomingDraftId) {
+            for (const [pid, status] of updated.entries()) {
+              if (Number(status.draftId) === incomingDraftId) {
+                updated.set(pid, {
+                  ...status,
+                  isFailed: true,
+                  isPublished: false,
+                  error: data.error,
+                });
+                break;
+              }
             }
           }
           return updated;
         });
-
-        // Also update via pageId if we have the mapping
-        if (pageId) {
-          setDraftStatuses(prev => {
-            const updated = new Map(prev);
-            const existing = updated.get(pageId);
-            updated.set(pageId, {
-              ...existing,
-              isFailed: true,
-              isPublished: false,
-              draftId: data.draftId,
-              error: data.error,
-            });
-            return updated;
-          });
-        }
 
         toast({
           title: 'Publish Failed',
@@ -4704,6 +4732,19 @@ const rightSections = sections.slice(4, 8);
                       viewMode={campaignViewMode}
                       onViewModeChange={setCampaignViewMode}
                       sidebarOpen={sidebarOpen}
+                      // Pass sync states from parent
+                      publishingPageIds={publishingPageIds}
+                      setPublishingPageIds={setPublishingPageIds}
+                      draftToPageMap={draftToPageMap}
+                      setDraftToPageMap={setDraftToPageMap}
+                      draftStatuses={draftStatuses}
+                      setDraftStatuses={setDraftStatuses}
+                      generationJobs={generationJobs}
+                      setGenerationJobs={setGenerationJobs}
+                      campaignPageIdContext={campaignPageIdContext}
+                      setCampaignPageIdContext={setCampaignPageIdContext}
+                      currentGenerationTopicId={currentGenerationTopicId}
+                      setCurrentGenerationTopicId={setCurrentGenerationTopicId}
                     />
                   );
               }
@@ -4979,18 +5020,26 @@ const rightSections = sections.slice(4, 8);
               <CompanyInfoSkeleton />
                 ) : (
                   <div className="max-w-6xl mx-auto px-4 sm:px-6 py-12 sm:py-16">
-                  <PublishExperience
-                  companyDomain={companyDomain}
-                  domainContext={domainContext}
-                  keywordsTableData={keywordsTableData}
-                  hasWordpressIntegration={hasWordpressIntegration}
-                  wpIntegration={wpIntegration}
-                  onConfigureWordpress={handleConfigureWordpress}
-                  onRefreshWordpressIntegration={async () => {
-                    await fetchWordpressIntegration();
-                  }}
-                  isActive={activeTab === 'publish'}
-                />
+                   <PublishExperience
+                   companyDomain={companyDomain}
+                   domainContext={domainContext}
+                   keywordsTableData={keywordsTableData}
+                   hasWordpressIntegration={hasWordpressIntegration}
+                   wpIntegration={wpIntegration}
+                   onConfigureWordpress={handleConfigureWordpress}
+                   onRefreshWordpressIntegration={async () => {
+                     await fetchWordpressIntegration();
+                   }}
+                   isActive={activeTab === 'publish'}
+                   pageId={campaignPageIdContext || undefined}
+                   // Pass shared sync states
+                   publishingPageIds={publishingPageIds}
+                   setPublishingPageIds={setPublishingPageIds}
+                   draftToPageMap={draftToPageMap}
+                   setDraftToPageMap={setDraftToPageMap}
+                   draftStatuses={draftStatuses}
+                   setDraftStatuses={setDraftStatuses}
+                 />
                                     </div>
             )
           ) : activeTab === 'audit' ? (
@@ -5590,6 +5639,19 @@ interface CampaignStructureViewProps {
   viewMode: 'split' | 'graph';
   onViewModeChange: (mode: 'split' | 'graph') => void;
   sidebarOpen: boolean;
+  // Sync states passed from SidebarDashboard
+  publishingPageIds: Set<number>;
+  setPublishingPageIds: React.Dispatch<React.SetStateAction<Set<number>>>;
+  draftToPageMap: Map<number, number>;
+  setDraftToPageMap: React.Dispatch<React.SetStateAction<Map<number, number>>>;
+  draftStatuses: Map<number, { isPublished: boolean; isFailed?: boolean; publishedUrl?: string; draftId?: number; error?: string }>;
+  setDraftStatuses: React.Dispatch<React.SetStateAction<Map<number, { isPublished: boolean; isFailed?: boolean; publishedUrl?: string; draftId?: number; error?: string }>>>;
+  generationJobs: Map<number, GenerationPageStatus>;
+  setGenerationJobs: React.Dispatch<React.SetStateAction<Map<number, GenerationPageStatus>>>;
+  campaignPageIdContext: number | null;
+  setCampaignPageIdContext: React.Dispatch<React.SetStateAction<number | null>>;
+  currentGenerationTopicId: number | null;
+  setCurrentGenerationTopicId: React.Dispatch<React.SetStateAction<number | null>>;
 }
 
 function CampaignStructureView({ 
@@ -5604,9 +5666,22 @@ function CampaignStructureView({
   onRefreshWordpressIntegration,
   viewMode,
   onViewModeChange,
-  sidebarOpen
+  sidebarOpen,
+  publishingPageIds,
+  setPublishingPageIds,
+  draftToPageMap,
+  setDraftToPageMap,
+  draftStatuses,
+  setDraftStatuses,
+  generationJobs,
+  setGenerationJobs,
+  campaignPageIdContext,
+  setCampaignPageIdContext,
+  currentGenerationTopicId,
+  setCurrentGenerationTopicId
 }: CampaignStructureViewProps) {
-  const [campaignPageIdContext, setCampaignPageIdContext] = useState<number | null>(null);
+  // campaignPageIdContext lifted to props
+
   const CAMPAIGN_API_BASE = `${API_BASE_URL}/api/campaigns`;
   // campaignViewMode state lifted to parent
   const [selectedTopicId, setSelectedTopicId] = useState<number | null>(null);
@@ -5627,8 +5702,8 @@ function CampaignStructureView({
   );
   const [selectedTopics, setSelectedTopics] = useState<Set<number>>(new Set());
 
-  // Track generation job statuses
-  const [generationJobs, setGenerationJobs] = useState<Map<number, GenerationPageStatus>>(new Map());
+  // Track generation job statuses moved to props
+
 
   // Modal states
   const [showAddTopicModal, setShowAddTopicModal] = useState(false);
@@ -5804,13 +5879,12 @@ function CampaignStructureView({
   const [pollingInterval, setPollingInterval] = useState<NodeJS.Timeout | null>(null);
   const [previewPageId, setPreviewPageId] = useState<number | null>(null);
   const [previewDraft, setPreviewDraft] = useState<DraftPreview | null>(null);
-  const [currentGenerationTopicId, setCurrentGenerationTopicId] = useState<number | null>(null);
+  // currentGenerationTopicId lifted to props
+
   const [viewLoadingPageId, setViewLoadingPageId] = useState<number | null>(null);
   const [closePreviewLoading, setClosePreviewLoading] = useState(false);
   const [publishLoadingPageId, setPublishLoadingPageId] = useState<number | null>(null);
-  const [publishingPageIds, setPublishingPageIds] = useState<Set<number>>(new Set());
-  const [draftToPageMap, setDraftToPageMap] = useState<Map<number, number>>(new Map());
-  const [draftStatuses, setDraftStatuses] = useState<Map<number, { isPublished: boolean; isFailed?: boolean; publishedUrl?: string; draftId?: number; error?: string }>>(new Map());
+  // States now lifted to parent props: publishingPageIds, draftToPageMap, draftStatuses, generationJobs
   
   // Streaming progress state
   const [streamingMessages, setStreamingMessages] = useState<Map<string, Array<{
@@ -6123,10 +6197,10 @@ function CampaignStructureView({
           };
 
           data.pages.forEach((p: DraftStatusRecord) => {
-            // Populate draftStatuses map if published
-            if (p.draftId && (p.status === 'published' || (p.wordpressUrl && p.wordpressUrl.startsWith('http')))) {
+            // Populate draftStatuses map if we have a draftId
+            if (p.draftId) {
                 newDraftStatuses.set(p.pageId, {
-                    isPublished: true,
+                    isPublished: p.status === 'published' || (p.wordpressUrl && p.wordpressUrl.startsWith('http')),
                     publishedUrl: p.wordpressUrl || undefined,
                     draftId: p.draftId
                 });
@@ -6671,6 +6745,7 @@ function CampaignStructureView({
         },
         body: JSON.stringify({
           draftId: draftId,
+          pageId: pageId, // Pass pageId context for campaign synchronization
           primaryKeyword: draft.primaryKeyword,
           htmlContent: draft.htmlContent,
           featuredImage: draft.featuredImage,
@@ -6753,55 +6828,9 @@ function CampaignStructureView({
       );
     }
 
-    if (job?.hasHtml) {
-      return (
-        <div className="flex items-center gap-1.5">
-           <button 
-             onClick={() => viewDraft(job.draftId, pageId)}
-             className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors"
-           >
-              <Eye className="h-3 w-3" />
-              View
-           </button>
-           <button 
-             onClick={() => publishDraft(job.draftId, pageId)}
-             className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-md transition-colors"
-           >
-              <Send className="h-3 w-3" />
-              Publish
-           </button>
-        </div>
-      );
-    }
-    
-    // Check if publish failed via draft status
     const draftStatus = draftStatuses.get(pageId);
-    if (draftStatus?.isFailed || job?.status === 'failed') {
-      const failedDraftId = draftStatus?.draftId || job?.draftId;
-      return (
-        <div className="flex items-center gap-1.5">
-           <button 
-             onClick={() => viewDraft(failedDraftId, pageId)}
-             className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors"
-           >
-              <Eye className="h-3 w-3" />
-              View
-           </button>
-           <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-red-50 text-red-700 border border-red-100/50">
-             Failed
-           </span>
-           <button 
-             onClick={() => publishDraft(failedDraftId, pageId)}
-             className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-md transition-colors"
-           >
-              <RefreshCw className="h-3 w-3" />
-              Retry
-           </button>
-        </div>
-      );
-    }
-
-    // Check if published via draft status
+    
+    // 3. Published State
     if (draftStatus?.isPublished) {
          return (
             <div className="flex items-center gap-1.5">
@@ -6828,6 +6857,54 @@ function CampaignStructureView({
          );
     }
 
+    // 4. Failed State
+    if (draftStatus?.isFailed || job?.status === 'failed') {
+      const failedDraftId = draftStatus?.draftId || job?.draftId;
+      return (
+        <div className="flex items-center gap-1.5">
+           <button 
+             onClick={() => viewDraft(failedDraftId, pageId)}
+             className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors"
+           >
+              <Eye className="h-3 w-3" />
+              View
+           </button>
+           <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-red-50 text-red-700 border border-red-100/50">
+             Failed
+           </span>
+           <button 
+             onClick={() => publishDraft(failedDraftId, pageId)}
+             className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-md transition-colors"
+           >
+              <RefreshCw className="h-3 w-3" />
+              Retry
+           </button>
+        </div>
+      );
+    }
+
+    // 5. Draft Ready to Publish
+    if (job?.hasHtml) {
+      return (
+        <div className="flex items-center gap-1.5">
+           <button 
+             onClick={() => viewDraft(job.draftId, pageId)}
+             className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors"
+           >
+              <Eye className="h-3 w-3" />
+              View
+           </button>
+           <button 
+             onClick={() => publishDraft(job.draftId, pageId)}
+             className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-md transition-colors"
+           >
+              <Send className="h-3 w-3" />
+              Publish
+           </button>
+        </div>
+      );
+    }
+    
     return null;
   };
 

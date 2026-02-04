@@ -175,6 +175,7 @@ async function handlePublishCompletion(job: Job, responseData: any, meta: any) {
     broadcastToUser(userId, {
         type: 'publish_update',
         draftId,
+        pageId: meta.pageId, // Include pageId for global sync
         status: finalStatus,
         publishedUrl: finalUrl
     });
@@ -203,6 +204,7 @@ async function handlePublishFailure(job: Job, error: any, meta: any) {
     broadcastToUser(userId, {
         type: 'publish_update',
         draftId,
+        pageId: meta.pageId, // Include pageId for global sync
         status: 'failed',
         error: error.message
     });
