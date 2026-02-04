@@ -321,7 +321,6 @@ const [brandDescription, setBrandDescription] = useState("");
 const [image, setImage] = useState(1);
 const [wordCount, setWordCount] = useState(1500);
 const [featuredImage, setFeaturedImage] = useState("");
-const [activePageContextId, setActivePageContextId] = useState<number | null>(null);
 
 // UI STATES
 const [publishLoading, setPublishLoading] = useState(false);
@@ -5607,6 +5606,7 @@ function CampaignStructureView({
   onViewModeChange,
   sidebarOpen
 }: CampaignStructureViewProps) {
+  const [campaignPageIdContext, setCampaignPageIdContext] = useState<number | null>(null);
   const CAMPAIGN_API_BASE = `${API_BASE_URL}/api/campaigns`;
   // campaignViewMode state lifted to parent
   const [selectedTopicId, setSelectedTopicId] = useState<number | null>(null);
@@ -6602,9 +6602,8 @@ function CampaignStructureView({
       }
       // Set draft data and ID - PublishExperience will fetch from DB using initialDraftId
       setPreviewDraft(data.draft);
-      setPreviewDraft(data.draft);
       setPreviewPageId(draftId); // This will trigger PublishExperience to fetch from DB
-      if (pageId) setActivePageContextId(pageId);
+      if (pageId) setCampaignPageIdContext(pageId);
     } catch (error) {
       toast({
         title: 'Error',
@@ -8068,7 +8067,7 @@ const handleUpdatePillar = async (topicId: number, updates: { title?: string; re
               onRefreshWordpressIntegration={onRefreshWordpressIntegration}
               isActive={true}
               initialDraftId={previewPageId}
-              pageId={activePageContextId || undefined}
+              pageId={campaignPageIdContext || undefined}
               disablePreviewOverlay={true}
             />
           </div>
