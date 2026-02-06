@@ -509,7 +509,7 @@ onSelect={(date) => {
 
 
                   <Field
-                    label="GSC Property ID (Optional)"
+                    label="Google Analytics ID (Optional)"
                     // helper="Leave blank to use your domain"
                     icon={<BarChart3 className="h-4 w-4" />}
                     placeholder="e.g. 485147447"

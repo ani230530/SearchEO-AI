@@ -106,10 +106,10 @@ const Profile: React.FC = () => {
       </div>
 
       {/* Content Layer */}
-      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 py-16 sm:py-24">
+      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 py-2 sm:py-2">
         {/* Hero Section */}
         <div className="text-center mb-20 relative">
-          <button
+          {/* <button
             type="button"
             onClick={() => {
               logout();
@@ -120,7 +120,7 @@ const Profile: React.FC = () => {
           >
             <LogOut className="h-4 w-4" />
             Sign out
-          </button>
+          </button> */}
 
           <div className="text-xs font-light uppercase tracking-wider text-gray-500 mb-4" style={{ letterSpacing: '0.083em' }}>
             Account Settings

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, Sparkles } from 'lucide-react';
 import { Topic, GenerationPageStatus } from '@/types';
 import { ButtonSpinner } from '@/components/ui/button-spinner';
 
@@ -32,7 +32,7 @@ export const CampaignTopicSidebar: React.FC<CampaignTopicSidebarProps> = ({
           disabled={syncing || aiLoading === "topic"}
           className="w-full py-2.5 inline-flex items-center gap-2 px-6 py-3 bg-black text-white rounded-full text-sm font-medium hover:bg-gray-600 justify-center disabled:opacity-60 transition"
         >
-          {aiLoading === "topic" ? <ButtonSpinner /> : <Plus className="h-3.5 w-3.5" />}
+          {aiLoading === "topic" ? <ButtonSpinner /> : <Sparkles className="h-3 w-3" />}
           {aiLoading === "topic" ? "Generating..." : "Generate Topic"}
         </button>
         

@@ -3684,8 +3684,8 @@ const rightSections = sections.slice(4, 8);
 
                               {/* View Mode Toggle + Rows per page */}
                               <div className="flex items-center gap-3">
-                                <div className="flex items-center bg-gray-100 rounded-2xl p-1">
-                                  <button
+                                <div className="flex items-center rounded-2xl p-1">
+                                  {/* <button
                                     onClick={() => setViewMode("cards")}
                                     className={`flex items-center space-x-2 px-4 py-2 rounded-xl transition-all duration-200 text-sm font-medium ${
                                       viewMode === "cards"
@@ -3695,18 +3695,18 @@ const rightSections = sections.slice(4, 8);
                                   >
                                     <Grid3X3 className="w-4 h-4" />
                                     <span>Cards</span>
-                                  </button>
-                                  <button
+                                  </button> */}
+                                  <div
                                     onClick={() => setViewMode("table")}
                                     className={`flex items-center space-x-2 px-4 py-2 rounded-xl transition-all duration-200 text-sm font-medium ${
                                       viewMode === "table"
-                                        ? "bg-white text-gray-900 shadow-sm"
+                                        ? "bg-white text-gray-900 border"
                                         : "text-gray-600 hover:text-gray-900"
                                     }`}
                                   >
                                     <List className="w-4 h-4" />
                                     <span>Table</span>
-                                  </button>
+                                  </div>
                                 </div>
 
                                 {/* Rows per page control */}
