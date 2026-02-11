@@ -2874,4 +2874,35 @@ router.get('/drafts/:draftId', authenticateToken, asyncHandler(async (req: Reque
   });
 }));
 
+/**
+ * PATCH /api/campaigns/pages/:id
+ * Update a campaign page's title and summary
+ */
+router.patch('/pages/:id', authenticateToken, asyncHandler(async (req: Request, res: Response) => {
+  const authReq = req as AuthenticatedRequest;
+  const userId = authReq.user.userId;
+  const pageId = parseInt(req.params.id, 10);
+  const { title, summary, description } = req.body;
+
+  if (isNaN(pageId)) {
+    return res.status(400).json({ success: false, error: 'Invalid page ID' });
+  }
+
+  const page = await ensurePageOwnership(pageId, userId);
+  if (!page) {
+    return res.status(404).json({ success: false, error: 'Page not found' });
+  }
+
+  const updatedPage = await prisma.campaignPage.update({
+    where: { id: pageId },
+    data: {
+      title: title?.trim() ?? page.title,
+      summary: summary?.trim() ?? page.summary,
+      description: description?.trim() ?? page.description
+    }
+  });
+
+  return respondWithStructure(res, page.topic.campaignId, userId);
+}));
+
 export default router;
