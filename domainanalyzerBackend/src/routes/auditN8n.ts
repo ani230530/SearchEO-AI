@@ -23,6 +23,13 @@ router.post('/send', authenticateToken, async (req: Request, res: Response) => {
     const userId = authReq.user.userId;
     const { reportMonth, analyticsProperty, orgName, name } = req.body;
 
+    if (!reportMonth || !analyticsProperty) {
+        return res.status(400).json({
+            success: false,
+            error: 'Missing required fields: reportMonth and analyticsProperty are required'
+        });
+    }
+
     try {
         // Find the user's company domain and latest audit
         const companyDomain = await prisma.domain.findFirst({

@@ -688,12 +688,22 @@ router.post('/:id/topics/ai', authenticateToken, asyncHandler(async (req: Reques
     return res.status(400).json({ success: false, error: 'Company domain not found for this campaign' });
   }
 
+  const existingTopics = await prisma.campaignTopic.findMany({
+    where: { campaignId },
+    select: { title: true }
+  });
+
+  const excludeTopics = existingTopics.map(t => t.title);
+
   const generatedTopics = await generateCampaignTopics({
     domainUrl: domain.url,
     domainContext: domain.context,
     keywords: extractDomainKeywords(domain),
     count,
-    focus
+    focus,
+    excludeTopics,
+    campaignTitle: campaign.title,
+    campaignDescription: campaign.description || undefined
   });
 
   await prisma.$transaction(async (tx) => {

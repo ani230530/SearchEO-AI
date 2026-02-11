@@ -74,9 +74,9 @@ export class AuthService {
         email: normalizedEmail,
         password: hashedPassword,
         name,
-        emailVerified: false,
-        emailVerificationToken: verificationToken,
-        emailVerificationTokenExpiry: verificationTokenExpiry
+        emailVerified: true, // Auto-verify
+        emailVerificationToken: null, // No token needed
+        emailVerificationTokenExpiry: null
       },
       select: {
         id: true,
@@ -85,16 +85,36 @@ export class AuthService {
       }
     });
 
-    // Send verification email
-    try {
-      await this.sendVerificationEmail(user.email, verificationToken, user.name || undefined);
-    } catch (err) {
-      // Continue even if email fails; user can request resend later
-      console.error('Failed to send verification email:', err);
-    }
+    // Generate tokens for auto-login
+    const token = this.generateToken(user.id, user.email);
+    const refreshToken = this.generateRefreshToken(user.id, user.email);
+    const refreshTokenExpiry = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+
+    // Store refresh token
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        refreshToken,
+        refreshTokenExpiry
+      }
+    });
+
+    // Send verification email (Optional - skipping for now as per request)
+    // try {
+    //   await this.sendVerificationEmail(user.email, verificationToken, user.name || undefined);
+    // } catch (err) {
+    //   console.error('Failed to send verification email:', err);
+    // }
 
     return {
-      message: 'Registration successful. Please check your email to verify your account.'
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name === null ? undefined : user.name
+      },
+      token,
+      refreshToken,
+      message: 'Registration successful.'
     };
   }
 
@@ -241,7 +261,7 @@ export class AuthService {
   async verifyToken(token: string): Promise<JWTPayload> {
     try {
       const decoded = jwt.verify(token, JWT_SECRET) as JWTPayload;
-      
+
       // Check if user still exists
       const user = await prisma.user.findUnique({
         where: { id: decoded.userId }
@@ -264,7 +284,7 @@ export class AuthService {
   async verifyRefreshToken(refreshToken: string): Promise<RefreshTokenPayload> {
     try {
       const decoded = jwt.verify(refreshToken, REFRESH_TOKEN_SECRET) as RefreshTokenPayload;
-      
+
       // Check if user exists and refresh token matches
       const user = await prisma.user.findUnique({
         where: { id: decoded.userId }
@@ -295,7 +315,7 @@ export class AuthService {
   // Refresh access token
   async refreshAccessToken(refreshToken: string): Promise<AuthResponse> {
     const decoded = await this.verifyRefreshToken(refreshToken);
-    
+
     // Get user
     const user = await prisma.user.findUnique({
       where: { id: decoded.userId },

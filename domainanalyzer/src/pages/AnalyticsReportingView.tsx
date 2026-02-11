@@ -188,6 +188,15 @@ const AnalyticsReportingSetup = () => {
       return;
     }
 
+    if (!form.analyticsPropertyId) {
+      toast({
+        title: "Validation Error",
+        description: "Google Analytics ID is required.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsGenerating(true);
     setReportStatus(null);
     setReportResults(null);
@@ -509,12 +518,13 @@ onSelect={(date) => {
 
 
                   <Field
-                    label="Google Analytics ID (Optional)"
-                    // helper="Leave blank to use your domain"
+                    label="Google Analytics ID"
+                    helper="Find this in GA4 Admin > Property Settings"
                     icon={<BarChart3 className="h-4 w-4" />}
                     placeholder="e.g. 485147447"
                     value={form.analyticsPropertyId}
                     onChange={(v) => handleChange("analyticsPropertyId", v)}
+                    required
                   />
                 </div>
 

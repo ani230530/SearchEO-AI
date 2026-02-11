@@ -50,12 +50,11 @@ const Register: React.FC<RegisterProps> = ({ onSwitchToLogin }) => {
       return;
     }
 
-  try {
+    try {
       await register(email, password, name || undefined);
       localStorage.setItem('lastLoginEmail', email);
-      onSwitchToLogin();
-      navigate(`/auth?registered=1&email=${encodeURIComponent(email)}`);
-      setSuccess(true);
+      // Auto-login successful, redirect to dashboard
+      navigate('/');
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Registration failed';
       

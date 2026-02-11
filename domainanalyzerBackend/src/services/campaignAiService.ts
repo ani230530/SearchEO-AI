@@ -158,14 +158,19 @@ const buildTopic = (topic: any, fallbackSeed: string): GeneratedTopic => {
 };
 
 export async function generateCampaignTopics(
-  context: BaseAiContext & { count?: number; focus?: string }
+  context: BaseAiContext & { count?: number; focus?: string; excludeTopics?: string[] }
 ): Promise<GeneratedTopic[]> {
-  const { domainUrl, domainContext, keywords = [], count = 1, focus } = context;
+  const { domainUrl, domainContext, keywords = [], count = 1, focus, excludeTopics = [] } = context;
+
+  const exclusionPrompt = excludeTopics.length > 0
+    ? `\nDO NOT generate these topics (they already exist): ${excludeTopics.join(', ')}`
+    : '';
+
   const prompt = `
-Create ${count} campaign topics for ${domainUrl}.
-Context: ${domainContext || 'Not provided'}
-Important keywords: ${keywords.slice(0, 8).join(', ') || 'none'}
-Focus: ${focus || 'balanced mix of awareness and consideration'}
+Create ${count} UNIQUE and NEW campaign topics for ${domainUrl}. These topics will be used to generate high-quality BLOG POSTS and ARTICLES.
+Context: ${domainContext || 'Not provided'}. Use this to align topics with the brand's voice and expertise.
+Important keywords: ${keywords.slice(0, 8).join(', ') || 'none'}. Ensure topics are relevant to these keywords.
+Focus: ${focus || 'balanced mix of awareness and consideration'}${exclusionPrompt}
 Random Seed: ${Date.now()}
 
 Return JSON matching:
@@ -193,15 +198,15 @@ Return JSON matching:
     }
   ]
 }
-Only return JSON.`;
+Only return JSON.Ensure titles are distinct from the excluded list.`;
 
   const fallback = () => ({
     topics: Array.from({ length: count }).map((_, index) =>
       buildTopic(
         {
           title: focus
-            ? `${focus} Topic ${index + 1}`
-            : keywords[index] || `Campaign Topic ${index + 1}`,
+            ? `${focus} Topic ${index + 1} (v${Date.now()})`
+            : keywords[index] || `Campaign Topic ${index + 1} (v${Date.now()})`,
           description: `Content angle inspired by ${keywords[index] || 'brand narrative'}.`,
           pillarPage: {
             title: `Ultimate Guide to ${keywords[index] || 'Brand Strategy'}`,

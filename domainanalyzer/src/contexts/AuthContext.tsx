@@ -246,10 +246,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         throw new Error(data.error || 'Registration failed');
       }
 
-      // Do not auto-login on signup. Show UI feedback in Register component.
-      // Keep user unauthenticated until email verification is complete.
-      setUser(null);
-      setToken(null);
+      if (data.token && data.user) {
+        setUser(data.user);
+        setToken(data.token);
+        tokenManager.setTokens(data.token, data.refreshToken);
+      } else {
+        setUser(null);
+        setToken(null);
+      }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Registration failed';
       setError(errorMessage);
