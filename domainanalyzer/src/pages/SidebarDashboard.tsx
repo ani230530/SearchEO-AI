@@ -7386,6 +7386,21 @@ function CampaignStructureView({
     }
   };
 
+  const handleUpdatePageTitle = async (pageId: number, title: string) => {
+    try {
+      await mutateStructure(
+        `${CAMPAIGN_API_BASE}/pages/${pageId}`,
+        {
+          method: 'PATCH',
+          body: JSON.stringify({ title }),
+        },
+        { successMessage: 'Page title updated' }
+      );
+    } catch {
+      // handled upstream
+    }
+  };
+
   const handleDeleteSubPage = (subPageId: number) => {
   confirmDelete("Sub-page", () =>
     mutateStructure(
@@ -7600,6 +7615,7 @@ function CampaignStructureView({
                       onAddSubPage={(tid) => { setTargetTopicId(tid); setShowAddSubPageModal(true); }}
                       onGenerateAiSubPage={triggerAiSubPage}
                       onDeleteSubPage={handleDeleteSubPage}
+                      onUpdatePageTitle={handleUpdatePageTitle}
                      renderStatusPill={renderStatusPill}
                      onAddKeyword={handleAddKeyword}
                      onDeleteKeyword={handleDeleteKeyword}

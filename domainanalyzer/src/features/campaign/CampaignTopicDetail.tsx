@@ -1,8 +1,9 @@
 import React from 'react';
 import { Topic, GenerationPageStatus } from '../../types';
-import { Target, FileText, Sparkles, Plus, Trash2, Search, Zap } from 'lucide-react';
+import { Target, FileText, Sparkles, Plus, Trash2, Search, Zap, Pencil, Check, X } from 'lucide-react';
 import { ButtonSpinner } from '@/components/ui/button-spinner';
 import { StreamingOverlay } from './StreamingOverlay';
+import { useState } from 'react';
 
 interface CampaignTopicDetailProps {
   topic: Topic;
@@ -14,6 +15,7 @@ interface CampaignTopicDetailProps {
   onReferenceUrlChange: (topicId: number, url: string) => void;
   onDeletePillar: (topicId: number) => void;
   onDeleteSubPage: (subPageId: number) => void;
+  onUpdatePageTitle: (pageId: number, title: string) => void;
   renderStatusPill: (pageId?: number) => React.ReactNode;
   onAddSubPage: (topicId: number) => void;
   onCreatePillar: (topicId: number) => void;
@@ -37,6 +39,7 @@ export const CampaignTopicDetail: React.FC<CampaignTopicDetailProps> = ({
   onReferenceUrlChange,
   onDeletePillar,
   onDeleteSubPage,
+  onUpdatePageTitle,
   renderStatusPill,
   onAddSubPage,
   onGenerateAiSubPage,
@@ -49,6 +52,25 @@ export const CampaignTopicDetail: React.FC<CampaignTopicDetailProps> = ({
   onDeselectKeyword,
   aiLoading
 }) => {
+  const [editingPageId, setEditingPageId] = useState<number | null>(null);
+  const [editingTitle, setEditingTitle] = useState("");
+
+  const startEditing = (pageId: number, currentTitle: string) => {
+    setEditingPageId(pageId);
+    setEditingTitle(currentTitle);
+  };
+
+  const cancelEditing = () => {
+    setEditingPageId(null);
+    setEditingTitle("");
+  };
+
+  const handleSaveTitle = (pageId: number) => {
+    if (editingTitle.trim()) {
+      onUpdatePageTitle(pageId, editingTitle.trim());
+      setEditingPageId(null);
+    }
+  };
 
 const renderKeywords = (
   keywords: any[],
@@ -218,7 +240,43 @@ const renderKeywords = (
                     <div className="flex items-center gap-3 mb-3">
                          <span className="bg-gray-100 text-gray-600 px-3 py-1 rounded-full text-[10px] font-semibold tracking-wide uppercase">Pillar Page</span>
                     </div>
-                    <h4 className="text-xl font-medium text-[#1d1d1f] mb-2 tracking-tight">{topic.pillarPage.title}</h4>
+                    {editingPageId === topic.pillarPage.id ? (
+                      <div className="flex items-center gap-2 mb-2">
+                        <input
+                          type="text"
+                          value={editingTitle}
+                          onChange={(e) => setEditingTitle(e.target.value)}
+                          className="flex-1 bg-white border border-gray-200 rounded-lg px-3 py-1 text-lg font-medium focus:outline-none focus:ring-2 focus:ring-black/5"
+                          autoFocus
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') handleSaveTitle(topic.pillarPage!.id);
+                            if (e.key === 'Escape') cancelEditing();
+                          }}
+                        />
+                        <button
+                          onClick={() => handleSaveTitle(topic.pillarPage!.id)}
+                          className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-full transition-all"
+                        >
+                          <Check className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={cancelEditing}
+                          className="p-1.5 text-gray-400 hover:bg-gray-100 rounded-full transition-all"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2 group/title mb-2">
+                        <h4 className="text-xl font-medium text-[#1d1d1f] tracking-tight">{topic.pillarPage.title}</h4>
+                        <button
+                          onClick={() => startEditing(topic.pillarPage!.id, topic.pillarPage!.title)}
+                          className="opacity-0 group-hover/title:opacity-100 p-1 text-gray-400 hover:text-black transition-all"
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    )}
                     <div className="flex items-center gap-2">
                          {renderStatusPill(topic.pillarPage.id)}
                          {topic.pillarPage.publishStatus === 'published' && topic.pillarPage.liveUrl && (
@@ -299,22 +357,58 @@ const renderKeywords = (
             {topic.subPages?.map((subPage) => (
                 <div key={subPage.id} className="bg-white rounded-2xl border border-gray-100 p-6 hover:border-gray-200 shadow-sm hover:shadow-md transition-all group relative">
                     <div className="flex items-start justify-between gap-3 mb-2">
-                        <div>
-                             <h5 className="font-medium text-[#1d1d1f] text-[15px] mb-1">{subPage.title}</h5>
-                             <div className="flex items-center gap-2 mt-2">
-                               {renderStatusPill(subPage.id)}
-                               {subPage.publishStatus === 'published' && subPage.liveUrl && (
-                                  <a 
-                                      href={subPage.liveUrl} 
-                                      target="_blank" 
-                                      rel="noopener noreferrer"
-                                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-100 hover:bg-emerald-100 transition-colors"
-                                  >
-                                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                                      Live
-                                  </a>
-                               )}
-                             </div>
+                        <div className="flex-1 min-w-0">
+                          {editingPageId === subPage.id ? (
+                            <div className="flex items-center gap-2 mb-1">
+                              <input
+                                type="text"
+                                value={editingTitle}
+                                onChange={(e) => setEditingTitle(e.target.value)}
+                                className="flex-1 bg-gray-50 border border-gray-200 rounded-lg px-2 py-0.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-black/5"
+                                autoFocus
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') handleSaveTitle(subPage.id);
+                                  if (e.key === 'Escape') cancelEditing();
+                                }}
+                              />
+                              <button
+                                onClick={() => handleSaveTitle(subPage.id)}
+                                className="p-1 text-emerald-600 hover:bg-emerald-50 rounded-md transition-all"
+                              >
+                                <Check className="h-3.5 w-3.5" />
+                              </button>
+                              <button
+                                onClick={cancelEditing}
+                                className="p-1 text-gray-400 hover:bg-gray-100 rounded-md transition-all"
+                              >
+                                <X className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-2 group/subtitle mb-1">
+                              <h5 className="font-medium text-[#1d1d1f] text-[15px]">{subPage.title}</h5>
+                              <button
+                                onClick={() => startEditing(subPage.id, subPage.title)}
+                                className="opacity-0 group-hover/subtitle:opacity-100 p-1 text-gray-400 hover:text-black transition-all"
+                              >
+                                <Pencil className="h-3 w-3" />
+                              </button>
+                            </div>
+                          )}
+                          <div className="flex items-center gap-2 mt-2">
+                             {renderStatusPill(subPage.id)}
+                             {subPage.publishStatus === 'published' && subPage.liveUrl && (
+                                <a 
+                                    href={subPage.liveUrl} 
+                                    target="_blank" 
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-100 hover:bg-emerald-100 transition-colors"
+                                >
+                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                    Live
+                                </a>
+                             )}
+                          </div>
                         </div>
                         <button 
                             onClick={() => onDeleteSubPage(subPage.id)}
