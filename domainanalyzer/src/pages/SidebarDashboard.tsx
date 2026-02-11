@@ -7626,7 +7626,7 @@ function CampaignStructureView({
                    />
                  ) : (
                    <div className="h-full flex flex-col items-center justify-center text-gray-400">
-                     <img className="mt-4 h-50 w-50 mb-4" src="/public/Campaign.png" alt="Campaign" />
+                     <img className="mt-4 h-50 w-50 mb-4" src="https://res.cloudinary.com/dyxsai3xf/image/upload/v1770815473/WhatsApp_Image_2026-02-11_at_11.48.44_hopxes.jpg" alt="Campaign" />
                      <p>Create/Select your topic to get started.</p>
                    </div>
                  )}
