@@ -29,6 +29,10 @@ type BaseAiContext = {
   domainUrl: string;
   domainContext?: string | null;
   keywords?: string[];
+  location?: string | null;
+  locationContext?: string | null;
+  brandVoice?: any;
+  targetAudience?: any;
 };
 
 const DEFAULT_DIFFICULTY = 'Medium';
@@ -74,7 +78,7 @@ const callOpenAiJson = async <T>(prompt: string, fallback: () => T): Promise<T> 
   try {
     const completion = await openai.chat.completions.create({
       model: CAMPAIGN_AI_MODEL,
-      temperature: 0.7,
+      temperature: 0.8,
       messages: [
         {
           role: 'system',
@@ -174,11 +178,27 @@ export async function generateCampaignTopics(
     focus,
     excludeTopics = [],
     campaignTitle,
-    campaignDescription
+    campaignDescription,
+    location,
+    locationContext,
+    brandVoice,
+    targetAudience
   } = context;
 
   const exclusionPrompt = excludeTopics.length > 0
-    ? `\nDO NOT generate these topics (they already exist): ${excludeTopics.join(', ')}`
+    ? `\nCRITICAL: DO NOT generate topics that overlap with these existing ones (avoid these themes entirely): ${excludeTopics.join(', ')}`
+    : '';
+
+  const geoContext = location
+    ? `\nTarget Location: ${location}${locationContext ? `\nLocation Context: ${locationContext}` : ''}`
+    : '';
+
+  const voiceContext = brandVoice
+    ? `\nBrand Voice: ${typeof brandVoice === 'object' ? JSON.stringify(brandVoice) : brandVoice}`
+    : '';
+
+  const audienceContext = targetAudience
+    ? `\nTarget Audience: ${typeof targetAudience === 'object' ? JSON.stringify(targetAudience) : targetAudience}`
     : '';
 
   const campaignContext = campaignTitle
@@ -187,9 +207,15 @@ export async function generateCampaignTopics(
 
   const prompt = `
 Create ${count} UNIQUE and NEW campaign topics for ${domainUrl}. These topics will be used to generate high-quality BLOG POSTS and ARTICLES.
-Context: ${domainContext || 'Not provided'}. Use this to align topics with the brand's voice and expertise.${campaignContext}
-Important keywords: ${keywords.slice(0, 8).join(', ') || 'none'}. Ensure topics are relevant to these keywords.
+Context: ${domainContext || 'Not provided'}. Use this to align topics with the brand's voice and expertise.${geoContext}${voiceContext}${audienceContext}${campaignContext}
+Important keywords: ${keywords.join(', ') || 'none'}. Ensure topics are relevant to these keywords.
 Focus: ${focus || 'balanced mix of awareness and consideration'}${exclusionPrompt}
+
+GUIDELINES for VARIETY:
+- Explore different content angles: Technical/Deep-Dive, Strategic/Management, Trend/Future-focused, Beginners Guide, or Contrarian/Opinion.
+- DON'T just stick to "How to" guides. Mix in "Why X is the future", "The state of Y", or "Strategic approach to Z".
+- Ensure each topic has a distinct "hook".
+
 Random Seed: ${Date.now()}
 
 Return JSON matching:
@@ -260,7 +286,30 @@ export async function generatePillarPageSuggestion(
     campaignDescription?: string;
   }
 ): Promise<GeneratedPage> {
-  const { domainUrl, domainContext, keywords = [], topicTitle, campaignTitle, campaignDescription } = context;
+  const {
+    domainUrl,
+    domainContext,
+    keywords = [],
+    topicTitle,
+    campaignTitle,
+    campaignDescription,
+    location,
+    locationContext,
+    brandVoice,
+    targetAudience
+  } = context;
+
+  const geoContext = location
+    ? `\nTarget Location: ${location}${locationContext ? `\nLocation Context: ${locationContext}` : ''}`
+    : '';
+
+  const voiceContext = brandVoice
+    ? `\nBrand Voice: ${typeof brandVoice === 'object' ? JSON.stringify(brandVoice) : brandVoice}`
+    : '';
+
+  const audienceContext = targetAudience
+    ? `\nTarget Audience: ${typeof targetAudience === 'object' ? JSON.stringify(targetAudience) : targetAudience}`
+    : '';
 
   const campaignContext = campaignTitle
     ? `\nCampaign Name: ${campaignTitle}\nCampaign Goal: ${campaignDescription || 'Not provided'}`
@@ -268,7 +317,7 @@ export async function generatePillarPageSuggestion(
 
   const prompt = `
 Create a single pillar page idea for the topic "${topicTitle}" for ${domainUrl}.
-Context: ${domainContext || 'Not provided'}${campaignContext}
+Context: ${domainContext || 'Not provided'}${geoContext}${voiceContext}${audienceContext}${campaignContext}
 Important keywords: ${keywords.slice(0, 8).join(', ') || 'none'}
 Random Seed: ${Date.now()}
 
@@ -309,7 +358,32 @@ export async function generateSubPagesSuggestion(
     campaignDescription?: string;
   }
 ): Promise<GeneratedPage[]> {
-  const { domainUrl, domainContext, keywords = [], topicTitle, count = 2, excludeTitles = [], campaignTitle, campaignDescription } = context;
+  const {
+    domainUrl,
+    domainContext,
+    keywords = [],
+    topicTitle,
+    count = 2,
+    excludeTitles = [],
+    campaignTitle,
+    campaignDescription,
+    location,
+    locationContext,
+    brandVoice,
+    targetAudience
+  } = context;
+
+  const geoContext = location
+    ? `\nTarget Location: ${location}${locationContext ? `\nLocation Context: ${locationContext}` : ''}`
+    : '';
+
+  const voiceContext = brandVoice
+    ? `\nBrand Voice: ${typeof brandVoice === 'object' ? JSON.stringify(brandVoice) : brandVoice}`
+    : '';
+
+  const audienceContext = targetAudience
+    ? `\nTarget Audience: ${typeof targetAudience === 'object' ? JSON.stringify(targetAudience) : targetAudience}`
+    : '';
 
   const exclusionPrompt = excludeTitles.length > 0
     ? `\nDO NOT generate these sub-page titles (they already exist): ${excludeTitles.join(', ')}`
@@ -322,7 +396,7 @@ export async function generateSubPagesSuggestion(
   const prompt = `
 Suggest ${count} UNIQUE and NEW supporting sub-pages for the topic "${topicTitle}".
 Company: ${domainUrl}
-Context: ${domainContext || 'Not provided'}${campaignContext}
+Context: ${domainContext || 'Not provided'}${geoContext}${voiceContext}${audienceContext}${campaignContext}
 Important keywords: ${keywords.slice(0, 8).join(', ') || 'none'}${exclusionPrompt}
 Random Seed: ${Date.now()}
 
@@ -344,10 +418,10 @@ Only return JSON.`;
     subPages: Array.from({ length: count }).map((_, index) =>
       buildPage(
         {
-          title: `${topicTitle} Sub Topic ${index + 1}`,
+          title: `${topicTitle} Sub Topic ${index + 1} `,
           summary: `Supporting article for ${topicTitle}.`
         },
-        `${topicTitle} sub ${index + 1}`
+        `${topicTitle} sub ${index + 1} `
       )
     )
   });
@@ -358,7 +432,7 @@ Only return JSON.`;
     : fallback().subPages;
 
   return subPages.map((page: any, index: number) =>
-    buildPage(page, `${topicTitle} sub ${index + 1}`)
+    buildPage(page, `${topicTitle} sub ${index + 1} `)
   );
 }
 
@@ -374,22 +448,22 @@ Existing priority keywords: ${keywords.slice(0, 8).join(', ') || 'none'}
 Random Seed: ${Date.now()}
 
 Return JSON:
-{
-  "keywords": [
-    { "term": "string", "volume": 1200, "difficulty": "Medium", "intent": "informational" }
-  ]
-}
+  {
+    "keywords": [
+      { "term": "string", "volume": 1200, "difficulty": "Medium", "intent": "informational" }
+    ]
+  }
 Only return JSON.`;
 
   const fallback = () => ({
     keywords: Array.from({ length: count }).map((_, index) =>
       buildKeyword(
         {
-          term: `${scope} keyword ${index + 1}`,
+          term: `${scope} keyword ${index + 1} `,
           volume: Math.floor(800 + Math.random() * 1400),
           difficulty: difficultyBuckets[index % difficultyBuckets.length]
         },
-        `${scope} keyword ${index + 1}`
+        `${scope} keyword ${index + 1} `
       )
     )
   });
@@ -400,6 +474,6 @@ Only return JSON.`;
     : fallback().keywords;
 
   return keywordList.map((kw: any, index: number) =>
-    buildKeyword(kw, `${scope} keyword ${index + 1}`)
+    buildKeyword(kw, `${scope} keyword ${index + 1} `)
   );
 }

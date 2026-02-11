@@ -290,6 +290,8 @@ const ensureCampaignOwnership = async (campaignId: number, userId: number) => {
           userId: true,
           isCompanyDomain: true,
           context: true,
+          location: true,
+          locationContext: true,
           keywords: {
             select: {
               term: true
@@ -688,22 +690,51 @@ router.post('/:id/topics/ai', authenticateToken, asyncHandler(async (req: Reques
     return res.status(400).json({ success: false, error: 'Company domain not found for this campaign' });
   }
 
-  const existingTopics = await prisma.campaignTopic.findMany({
-    where: { campaignId },
+  const allExistingTopics = await prisma.campaignTopic.findMany({
+    where: { campaign: { domainId: domain.id } },
     select: { title: true }
   });
 
-  const excludeTopics = existingTopics.map(t => t.title);
+  const excludeTopics = allExistingTopics.map(t => t.title);
+
+  // Fetch semantic analysis for richer context
+  const semanticAnalysis = await prisma.semanticAnalysis.findFirst({
+    where: { domainId: domain.id },
+    orderBy: { createdAt: 'desc' },
+    select: { contentSummary: true }
+  });
+
+  let brandVoice, targetAudience;
+  if (semanticAnalysis?.contentSummary) {
+    try {
+      const parsed = JSON.parse(semanticAnalysis.contentSummary);
+      brandVoice = parsed.brandVoice;
+      targetAudience = parsed.targetAudience;
+    } catch (e) {
+      // ignore parsing errors
+    }
+  }
+
+  // Keyword Rotation: Fetch top 25, pick 12 at random for variety
+  const domainKeywords = extractDomainKeywords(domain) || [];
+  const topKeywords = domainKeywords.slice(0, 25);
+  const selectedKeywords = topKeywords
+    .sort(() => 0.5 - Math.random())
+    .slice(0, 12);
 
   const generatedTopics = await generateCampaignTopics({
     domainUrl: domain.url,
     domainContext: domain.context,
-    keywords: extractDomainKeywords(domain),
+    keywords: selectedKeywords,
     count,
     focus,
     excludeTopics,
     campaignTitle: campaign.title,
-    campaignDescription: campaign.description || undefined
+    campaignDescription: campaign.description || undefined,
+    location: (domain as any).location,
+    locationContext: (domain as any).locationContext,
+    brandVoice,
+    targetAudience
   });
 
   await prisma.$transaction(async (tx) => {
@@ -902,13 +933,35 @@ router.post('/topics/:topicId/pillar/ai', authenticateToken, asyncHandler(async 
     return res.status(400).json({ success: false, error: 'Company domain missing for this topic' });
   }
 
+  // Fetch semantic analysis for richer context
+  const semanticAnalysis = await prisma.semanticAnalysis.findFirst({
+    where: { domainId: domain.id },
+    orderBy: { createdAt: 'desc' },
+    select: { contentSummary: true }
+  });
+
+  let brandVoice, targetAudience;
+  if (semanticAnalysis?.contentSummary) {
+    try {
+      const parsed = JSON.parse(semanticAnalysis.contentSummary);
+      brandVoice = parsed.brandVoice;
+      targetAudience = parsed.targetAudience;
+    } catch (e) {
+      // ignore
+    }
+  }
+
   const suggestion = await generatePillarPageSuggestion({
     domainUrl: domain.url,
     domainContext: domain.context,
     keywords: extractDomainKeywords(domain),
     topicTitle: topic.title,
     campaignTitle: campaign.title,
-    campaignDescription: campaign.description || undefined
+    campaignDescription: campaign.description || undefined,
+    location: (domain as any).location,
+    locationContext: (domain as any).locationContext,
+    brandVoice,
+    targetAudience
   });
 
   const existingPillar = await prisma.campaignPage.findFirst({
@@ -1102,6 +1155,24 @@ router.post('/topics/:topicId/subpages/ai', authenticateToken, asyncHandler(asyn
   });
   const excludeTitles = existingPages.map(p => p.title);
 
+  // Fetch semantic analysis for richer context
+  const semanticAnalysis = await prisma.semanticAnalysis.findFirst({
+    where: { domainId: domain.id },
+    orderBy: { createdAt: 'desc' },
+    select: { contentSummary: true }
+  });
+
+  let brandVoice, targetAudience;
+  if (semanticAnalysis?.contentSummary) {
+    try {
+      const parsed = JSON.parse(semanticAnalysis.contentSummary);
+      brandVoice = parsed.brandVoice;
+      targetAudience = parsed.targetAudience;
+    } catch (e) {
+      // ignore
+    }
+  }
+
   const suggestions = await generateSubPagesSuggestion({
     domainUrl: domain.url,
     domainContext: domain.context,
@@ -1110,7 +1181,11 @@ router.post('/topics/:topicId/subpages/ai', authenticateToken, asyncHandler(asyn
     count,
     excludeTitles,
     campaignTitle: campaign.title,
-    campaignDescription: campaign.description || undefined
+    campaignDescription: campaign.description || undefined,
+    location: (domain as any).location,
+    locationContext: (domain as any).locationContext,
+    brandVoice,
+    targetAudience
   });
 
   await prisma.$transaction(async (tx) => {
@@ -1300,7 +1375,7 @@ router.post('/pages/:pageId/keywords/ai', authenticateToken, asyncHandler(async 
   });
 
   // Prepare metadata for each keyword based on type
-  const keywordsToCreate = suggestions.map((kw, index) => {
+  const keywordsToCreate = suggestions.map((kw: any, index: number) => {
     let aiMetadata: any = { generatedAt: new Date().toISOString(), origin: 'keyword_ai' };
 
     if (shouldMarkAsPrimary) {
@@ -1334,7 +1409,7 @@ router.post('/pages/:pageId/keywords/ai', authenticateToken, asyncHandler(async 
       where: {
         pageId,
         topicId: page.topicId,
-        term: { in: suggestions.map(s => s.term) }
+        term: { in: suggestions.map((s: any) => s.term) }
       },
       orderBy: { createdAt: 'desc' },
       take: suggestions.length
