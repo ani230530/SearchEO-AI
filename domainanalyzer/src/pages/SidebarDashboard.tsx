@@ -3750,8 +3750,8 @@ const rightSections = sections.slice(4, 8);
 
                               {/* View Mode Toggle + Rows per page */}
                               <div className="flex items-center gap-3">
-                                <div className="flex items-center bg-gray-100 rounded-2xl p-1">
-                                  <button
+                                <div className="flex items-center rounded-2xl p-1">
+                                  {/* <button
                                     onClick={() => setViewMode("cards")}
                                     className={`flex items-center space-x-2 px-4 py-2 rounded-xl transition-all duration-200 text-sm font-medium ${
                                       viewMode === "cards"
@@ -3761,18 +3761,18 @@ const rightSections = sections.slice(4, 8);
                                   >
                                     <Grid3X3 className="w-4 h-4" />
                                     <span>Cards</span>
-                                  </button>
-                                  <button
+                                  </button> */}
+                                  <div
                                     onClick={() => setViewMode("table")}
                                     className={`flex items-center space-x-2 px-4 py-2 rounded-xl transition-all duration-200 text-sm font-medium ${
                                       viewMode === "table"
-                                        ? "bg-white text-gray-900 shadow-sm"
+                                        ? "bg-white text-gray-900 border"
                                         : "text-gray-600 hover:text-gray-900"
                                     }`}
                                   >
                                     <List className="w-4 h-4" />
                                     <span>Table</span>
-                                  </button>
+                                  </div>
                                 </div>
 
                                 {/* Rows per page control */}
@@ -4751,6 +4751,75 @@ const rightSections = sections.slice(4, 8);
 
               // Default Campaign List View (Centered)
               return (
+                <div className="relative w-full">
+    {/* Create Campaign Form */}
+                {showCreateCampaign && (
+  <div className="fixed inset-0 z-50 flex items-center justify-center">
+    {/* Overlay */}
+    <div
+      className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+      onClick={() => setShowCreateCampaign(false)}
+    />
+
+    {/* Modal */}
+    <div className="relative w-full max-w-xl mx-4 bg-white rounded-3xl p-8 border border-gray-100 shadow-xl">
+      <h3 className="text-xl font-light text-black tracking-tight mb-6">
+        Create New Campaign
+      </h3>
+
+      <form onSubmit={handleCreateCampaign} className="space-y-6">
+        <div>
+          <label className="block text-base font-light text-black mb-2">
+            Title
+          </label>
+          <input
+            type="text"
+            value={newCampaignTitle}
+            onChange={(e) => setNewCampaignTitle(e.target.value)}
+            placeholder="Enter campaign title"
+            className="w-full px-4 py-3 rounded-2xl border border-gray-200 bg-gray-50 focus:ring-2 focus:ring-black focus:outline-none"
+            required
+          />
+        </div>
+
+        <div>
+          <label className="block text-base font-light text-black mb-2">
+            Description
+          </label>
+          <textarea
+            value={newCampaignDescription}
+            onChange={(e) => setNewCampaignDescription(e.target.value)}
+            rows={4}
+            placeholder="Enter campaign description (optional)"
+            className="w-full px-4 py-3 rounded-2xl border border-gray-200 bg-gray-50 focus:ring-2 focus:ring-black focus:outline-none resize-none"
+          />
+        </div>
+
+        <div className="flex items-center justify-end gap-4">
+          <button
+            type="button"
+            onClick={() => {
+              setShowCreateCampaign(false);
+              setNewCampaignTitle("");
+              setNewCampaignDescription("");
+            }}
+            className="px-6 py-3 rounded-full border border-gray-200 text-gray-700 hover:bg-gray-100"
+          >
+            Cancel
+          </button>
+
+          <button
+            type="submit"
+            className="px-6 py-3 bg-black text-white rounded-full hover:bg-gray-600"
+          >
+            Create Campaign
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+)}
+
               <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
 
                 <div className='p-4 sm:p-6 bg-white rounded-3xl border border-gray-100 hover:shadow-lg overflow-hidden backdrop-blur-sm'>
@@ -4772,69 +4841,7 @@ const rightSections = sections.slice(4, 8);
                       {showCreateCampaign ? "Cancel" : "New Campaign"}
                     </button>
                   </div>
-
-                  {/* Create Campaign Form */}
-                  {showCreateCampaign && (
-                    <div className="mb-8 bg-white rounded-3xl p-8 border border-gray-100 shadow-sm">
-                      <h3 className="text-xl font-light text-black tracking-tight mb-6">
-                        Create New Campaign
-                      </h3>
-                      <form
-                        onSubmit={handleCreateCampaign}
-                        className="space-y-6"
-                      >
-                        <div>
-                          <label className="block text-base font-light text-black mb-2">
-                            Title
-                          </label>
-                          <input
-                            type="text"
-                            value={newCampaignTitle}
-                            onChange={(e) =>
-                              setNewCampaignTitle(e.target.value)
-                            }
-                            placeholder="Enter campaign title"
-                            className="w-full px-4 py-3 text-base font-light rounded-2xl border border-gray-200 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all"
-                            required
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-base font-light text-black mb-2">
-                            Description
-                          </label>
-                          <textarea
-                            value={newCampaignDescription}
-                            onChange={(e) =>
-                              setNewCampaignDescription(e.target.value)
-                            }
-                            placeholder="Enter campaign description (optional)"
-                            rows={4}
-                            className="w-full px-4 py-3 text-base font-light rounded-2xl border border-gray-200 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all resize-none"
-                          />
-                        </div>
-                        <div className="flex items-center justify-end gap-4">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setShowCreateCampaign(false);
-                              setNewCampaignTitle("");
-                              setNewCampaignDescription("");
-                            }}
-                            className="px-6 py-3 rounded-full border text-gray-700 border-gray-200 bg-white text-sm hover:bg-gray-100 hover:text-gray-700 hover:shadow-lg transition"
-                          >
-                            Cancel
-                          </button>
-                          <button
-                            type="submit"
-                            className="px-6 py-3 inline-flex items-center gap-2 px-6 py-3 bg-black text-white rounded-full text-sm font-medium hover:bg-gray-600  disabled:opacity-60 transition"
-                          >
-                            Create Campaign
-                          </button>
-                        </div>
-                      </form>
-                    </div>
-                  )}
-                
+                </div>
 
               {/* Campaigns List */}
               {(() => {
@@ -7480,9 +7487,8 @@ const handleUpdatePillar = async (topicId: number, updates: { title?: string; re
                    />
                  ) : (
                    <div className="h-full flex flex-col items-center justify-center text-gray-400">
-                     <Layout className="h-12 w-12 mb-4 opacity-20" />
+                     <img className="mt-4 h-50 w-50 mb-4" src="/public/Campaign.png" alt="Campaign" />
                      <p>Create/Select your topic to get started.</p>
-                     <img className="mt-4 h-40 w-40" src="/public/Campaign.png" alt="Campaign" />
                    </div>
                  )}
                </div>

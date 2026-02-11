@@ -172,7 +172,7 @@ const renderKeywords = (
       <StreamingOverlay isVisible={isGenerating} messages={streamingMessages} jobId={jobId} />
 
       {/* Modern Header */}
-      <div className="flex items-end justify-between mb-8 pb-6 border-b border-gray-100">
+      <div className="flex items-center justify-between mb-8 pb-6 border-b border-gray-100">
         <div>
           <div className="flex items-center gap-2 mb-2">
              <span className="px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 text-[10px] font-bold uppercase tracking-wider">Topic Cluster</span>
