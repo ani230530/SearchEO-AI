@@ -43,8 +43,11 @@ import {
   Pencil,
   RefreshCw,
   ArrowRight,
-  Database
+  Database,
+  Table
 } from 'lucide-react';
+import { CampaignTableView } from '@/features/campaign/CampaignTableView';
+
 import { cn } from '@/lib/utils';
 import { maskDomainId } from '@/lib/domainUtils';
 import { useAuth } from '@/contexts/AuthContext';
@@ -389,7 +392,8 @@ const toggleSection = (idx: number) => {
   const { toast } = useToast();
   const isSidebarExpanded = sidebarOpen || isSidebarHovered;
 // Campaign States
-const [campaignViewMode, setCampaignViewMode] = useState<'split' | 'graph'>('split');
+  const [campaignViewMode, setCampaignViewMode] = useState<'split' | 'graph' | 'table'>('split');
+
 const [selectedTopicId, setSelectedTopicId] = useState<number | null>(null);
 const [campaignStructure, setCampaignStructure] = useState<CampaignStructure>({
   topics: []
@@ -2797,7 +2801,19 @@ useEffect(() => {
                     <Network className="h-4 w-4" />
                     <span>Map</span>
                   </button>
+                  <button
+                    onClick={() => setCampaignViewMode('table')}
+                    className={`p-1.5 rounded-md transition-all flex items-center gap-2 text-xs font-medium ${
+                      campaignViewMode === 'table' 
+                        ? 'bg-white text-black shadow-sm' 
+                        : 'text-gray-500 hover:text-gray-700'
+                    }`}
+                  >
+                    <Table className="h-4 w-4" />
+                    <span>Inventory</span>
+                  </button>
                </div>
+
             )}
 
             {user && (
@@ -5749,8 +5765,9 @@ interface CampaignStructureViewProps {
   wpIntegration: WordpressIntegration | null;
   onConfigureWordpress: () => void;
   onRefreshWordpressIntegration: () => void;
-  viewMode: 'split' | 'graph';
-  onViewModeChange: (mode: 'split' | 'graph') => void;
+  viewMode: 'split' | 'graph' | 'table';
+  onViewModeChange: (mode: 'split' | 'graph' | 'table') => void;
+
   sidebarOpen: boolean;
   // Sync states passed from SidebarDashboard
   publishingPageIds: Set<number>;
@@ -7642,6 +7659,33 @@ function CampaignStructureView({
                 />
                </div>
             </div>
+
+            {/* Table View: Full Screen */}
+            <div className={`absolute inset-0 bg-white transition-opacity duration-300 ${viewMode === 'table' ? 'opacity-100 z-10 font-light' : 'opacity-0 z-0 pointer-events-none'}`}>
+               <div className="w-full h-full">
+                <CampaignTableView
+                  campaignStructure={campaignStructure}
+                  selectedTopicId={selectedTopicId}
+                  onSelectTopic={(tid) => {
+                    setSelectedTopicId(tid);
+                    onViewModeChange('split');
+                  }}
+                  renderStatusPill={renderStatusPill}
+                  generationJobs={generationJobs}
+                  onGenerateTopic={handleGenerateTopic}
+                  onUpdatePageTitle={handleUpdatePageTitle}
+                  onDeleteSubPage={handleDeleteSubPage}
+                  onDeletePillarPage={handleDeletePillarPage}
+                  onAddKeyword={handleAddKeyword}
+                  onDeleteKeyword={handleDeleteKeyword}
+                  onSelectPrimaryKeyword={handleSelectPrimaryKeyword}
+                  onSelectLongtailKeyword={handleSelectLongtailKeyword}
+                  aiLoading={aiLoading}
+                />
+
+               </div>
+            </div>
+
 
         </div>
       </div>
