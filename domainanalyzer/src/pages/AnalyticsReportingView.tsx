@@ -1,4 +1,3 @@
-/* eslint-disable react/jsx-no-undef */
 import { useState , useEffect} from "react";
 import {
   Calendar,
@@ -146,14 +145,19 @@ const Step = ({
 
 /*MAIN VIEW COMPONENT*/
 
-const AnalyticsReportingSetup = () => {
+interface AnalyticsReportingProps {
+  initialGaId?: string;
+  initialOrgName?: string;
+}
+
+const AnalyticsReportingSetup = ({ initialGaId = "", initialOrgName = "" }: AnalyticsReportingProps) => {
   const { toast } = useToast();
   
   const [form, setForm] = useState({
     name: "",
     reportMonth: "",
-    analyticsPropertyId: "",
-    orgName: "",
+    analyticsPropertyId: initialGaId,
+    orgName: initialOrgName,
   });
 
   const [reportId, setReportId] = useState<string | null>(null);
@@ -320,9 +324,13 @@ const AnalyticsReportingSetup = () => {
   }, []);
 
   useEffect(() => {
-    return () => {
-    };
-  }, []);
+    if (initialGaId) {
+      setForm(prev => ({ ...prev, analyticsPropertyId: initialGaId }));
+    }
+    if (initialOrgName) {
+      setForm(prev => ({ ...prev, orgName: initialOrgName }));
+    }
+  }, [initialGaId, initialOrgName]);
 
   return (
     <div className="relative min-h-screen w-full overflow-hidden">
@@ -345,39 +353,28 @@ const AnalyticsReportingSetup = () => {
             Analytics Reports
           </h1>
 
-          <p className="text-xl font-light text-neutral-500 max-w-3xl mx-auto">
-            Generate complete monthly analytics reports with trends and comparisons. <br />
-            Quickly review key metrics and track performance across all channels.
-          </p>
         </header>
- {/* Main Action Trigger */}
-        <section className="flex flex-col items-center gap-6 py6">
+
+        {/* Main Action Trigger */}
+        <section className="flex flex-col items-center gap-6 py-10">
           <Drawer open={isDrawerOpen} onOpenChange={setIsDrawerOpen}>
-           <DrawerTrigger asChild>
-  <button
-    className={cn(
-      "group relative h-5 px-4 py-6 rounded-full",
-      "text-white font-light text-sm",
-      "flex items-center gap-1",
-      "shadow-2xl transition-all",
-      "hover:scale-105 active:scale-95",
-      "focus:outline-none focus:ring-4 focus:ring-black/20",
-      gradients.primary
-    )}
-  >
-    
-
-    <div className="h-7 w-7 rounded-full  flex items-center justify-center group-hover:bg-white/10 transition">
-      <Plus className="h-6 w-6" />
-    </div>
-
-    <span className="whitespace-nowrap">
-      Generate Report
-    </span>
-
-    <ChevronRight className="h-6 w-6 opacity-50 group-hover:translate-x-1 transition" />
-  </button>
-</DrawerTrigger>
+            <DrawerTrigger asChild>
+              <button
+                className={cn(
+                  "group relative px-8 py-4 rounded-full",
+                  "text-white font-medium text-base",
+                  "flex items-center gap-2",
+                  "shadow-xl transition-all",
+                  "hover:scale-105 active:scale-95",
+                  "focus:outline-none focus:ring-4 focus:ring-black/10",
+                  gradients.primary
+                )}
+              >
+                <Plus className="h-5 w-5" />
+                <span className="whitespace-nowrap">Generate New Report</span>
+                <ChevronRight className="h-5 w-5 opacity-50 group-hover:translate-x-1 transition" />
+              </button>
+            </DrawerTrigger>
 
             <DrawerContent className="max-w-4xl mx-auto rounded-t-[32px] shadow-2xl">
               <div className="mx-auto w-full max-w-2xl px-6 py-10 space-y-8">
@@ -388,176 +385,125 @@ const AnalyticsReportingSetup = () => {
                   </DrawerDescription>
                 </DrawerHeader>
 
-                <div className="bg-white/60  rounded-2xl p-6 border border-neutral-200">
-                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <Field
-                    label="Report Name"
-                    icon={<FileText className="h-4 w-4" />}
-                    placeholder="e.g. BOGT OCT 2025"
-                    value={form.name}
-                    onChange={(v) => handleChange("name", v)}
-                    required
-                  />
+                <div className="bg-white/60 rounded-3xl p-8 border border-neutral-100 space-y-8">
+                  {!initialGaId ? (
+                    <div className="p-8 text-center space-y-4">
+                      <div className="w-16 h-16 rounded-full bg-neutral-100 flex items-center justify-center mx-auto text-neutral-400">
+                        <BarChart3 className="h-8 w-8" />
+                      </div>
+                      <div className="space-y-2">
+                        <h4 className="text-xl font-light text-neutral-900">Analytics Connection Required</h4>
+                        <p className="text-sm text-neutral-500 font-light max-w-xs mx-auto leading-relaxed">
+                          Please go to the <strong>Integration</strong> tab and add your Google Analytics Property ID to enable report generation.
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                      <Field
+                        label="Report Name"
+                        icon={<FileText className="h-4 w-4" />}
+                        placeholder="e.g. October 2025 Review"
+                        value={form.name}
+                        onChange={(v) => handleChange("name", v)}
+                        required
+                      />
 
-                  <Field
-                    label="Organization Name"
-                    helper="Leave blank to use your domain"
-                    icon={<Building2 className="h-4 w-4" />}
-                    placeholder="e.g. Blue Ocean Global Tech"
-                    value={form.orgName}
-                    onChange={(v) => handleChange("orgName", v)}
-                  />
+                      <Field
+                        label="Organization Name"
+                        icon={<Building2 className="h-4 w-4" />}
+                        placeholder="e.g. Blue Ocean Global Tech"
+                        value={form.orgName}
+                        onChange={(v) => handleChange("orgName", v)}
+                        required
+                      />
 
-                 <div className="space-y-2">
-  <label className="flex items-center gap-2 text-sm font-light text-neutral-700">
-    Report Month
-    <span className="text-xs text-neutral-400">(required)</span>
-  </label>
+                      <div className="space-y-2">
+                        <label className="flex items-center gap-2 text-sm font-light text-neutral-700">
+                          Report Month
+                          <span className="text-xs text-neutral-400">(required)</span>
+                        </label>
 
-  <Popover>
-    <PopoverTrigger asChild>
-      <button
-        className={cn(
-          "h-12 w-full rounded-full border border-neutral-200",
-          "bg-white/70 px-6 text-left",
-          "flex items-center justify-between",
-          "hover:border-neutral-400 transition",
-          !form.reportMonth && "text-neutral-400"
-        )}
-      >
-        <span>
-          {form.reportMonth
-            ? format(new Date(form.reportMonth), "MMMM yyyy")
-            : "Select report month"}
-        </span>
-        <Calendar className="h-4 w-4 text-neutral-400" />
-      </button>
-    </PopoverTrigger>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <button
+                              className={cn(
+                                "h-12 w-full rounded-full border border-neutral-200",
+                                "bg-white/70 px-6 text-left",
+                                "flex items-center justify-between",
+                                "hover:border-neutral-400 transition",
+                                !form.reportMonth && "text-neutral-400"
+                              )}
+                            >
+                              <span className="text-sm font-light">
+                                {form.reportMonth
+                                  ? format(new Date(form.reportMonth), "MMMM yyyy")
+                                  : "Select report month"}
+                              </span>
+                              <Calendar className="h-4 w-4 text-neutral-400" />
+                            </button>
+                          </PopoverTrigger>
 
-    <PopoverContent className="w-auto p-0" align="start">
-   <CalendarUI
-  mode="single"
- selected={
-  form.reportMonth
-    ? (() => {
-        const [y, m, d] = form.reportMonth.split("-").map(Number);
-        return new Date(y, m - 1, d);
-      })()
-    : undefined
-}
-
-onSelect={(date) => {
-  if (!date) return;
-
-  const localDate = new Date(
-    date.getFullYear(),
-    date.getMonth(),
-    date.getDate()
-  );
-
-  handleChange(
-    "reportMonth",
-    localDate.toLocaleDateString("en-CA")
-  );
-}}
-
-  initialFocus
-  captionLayout="dropdown"
-  fromYear={2000}
-  toYear={new Date().getFullYear() + 1}
-  showOutsideDays
-  fixedWeeks
-  classNames={{
-    /* Header */
-    caption: "flex flex-col gap-2 px-3 pt-3",
-    caption_label: "hidden",
-    caption_dropdowns:
-      "flex justify-center gap-3 border-b pb-3",
-
-    /* Dropdowns */
-    dropdown_month:
-      "w-[130px] rounded-md border border-neutral-200 px-2 py-1 text-sm",
-    dropdown_year:
-      "w-[90px] rounded-md border border-neutral-200 px-2 py-1 text-sm",
-
-    /* Grid */
-    months: "px-3 pb-3",
-    table: "w-full border-collapse",
-
-    head_row: "flex justify-between",
-    head_cell:
-      "w-9 text-xs font-medium text-neutral-500 text-center",
-
-    row: "flex justify-between mt-1",
-
-    cell:
-      "relative w-9 h-9 text-center",
-
-    /* Day buttons */
-    day:
-      "h-9 w-9 rounded-full flex items-center justify-center text-sm transition",
-    day_today:
-      "border border-neutral-300 font-medium",
-    day_selected:
-      "bg-black text-white hover:bg-black focus:bg-black",
-    day_outside:
-      "text-neutral-300 opacity-50",
-    day_disabled:
-      "text-neutral-300 opacity-30",
-  }}
-/>
-
-
-    </PopoverContent>
-  </Popover>
-
-  <p className="text-xs font-light text-neutral-500">
-    Used to calculate month-over-month analytics performance
-  </p>
-</div>
-
-
-                  <Field
-                    label="Google Analytics ID"
-                    helper="Find this in GA4 Admin > Property Settings"
-                    icon={<BarChart3 className="h-4 w-4" />}
-                    placeholder="e.g. 485147447"
-                    value={form.analyticsPropertyId}
-                    onChange={(v) => handleChange("analyticsPropertyId", v)}
-                    required
-                  />
+                          <PopoverContent className="w-auto p-0" align="start">
+                            <CalendarUI
+                              mode="single"
+                              selected={
+                                form.reportMonth
+                                  ? (() => {
+                                      const [y, m, d] = form.reportMonth.split("-").map(Number);
+                                      return new Date(y, m - 1, d);
+                                    })()
+                                  : undefined
+                              }
+                              onSelect={(date) => {
+                                if (!date) return;
+                                const localDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+                                handleChange("reportMonth", localDate.toLocaleDateString("en-CA"));
+                              }}
+                              initialFocus
+                              captionLayout="dropdown"
+                              fromYear={2000}
+                              toYear={new Date().getFullYear() + 1}
+                              showOutsideDays
+                              fixedWeeks
+                              className="rounded-3xl border-none shadow-2xl"
+                            />
+                          </PopoverContent>
+                        </Popover>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <DrawerFooter className="px-0 pt-10">
                   <button
                     onClick={handleSubmit}
-                    disabled={isGenerating}
+                    disabled={isGenerating || !initialGaId}
                     className={cn(
-                      "h-16 w-full rounded-full text-white font-light text-lg flex items-center justify-center gap-4 transition-all",
-                      !isGenerating
-                        ? "bg-black hover:bg-neutral-800 active:scale-[0.98]"
-                        : "bg-neutral-400 cursor-not-allowed"
+                      "h-16 w-full rounded-full text-white font-medium text-lg flex items-center justify-center gap-4 transition-all shadow-xl",
+                      !isGenerating && initialGaId
+                        ? "bg-black hover:bg-black/90 active:scale-[0.98] shadow-black/10"
+                        : "bg-neutral-200 text-neutral-400 cursor-not-allowed shadow-none"
                     )}
                   >
                     {isGenerating ? (
-                      <>
-                        <div className="h-5 w-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                        Generating Your Report...
-                      </>
+                      <div className="flex items-center gap-3">
+                        <div className="h-5 w-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        <span>Generating...</span>
+                      </div>
                     ) : (
-                      <>
+                      <div className="flex items-center gap-3">
                         <Play className="h-5 w-5" />
-                        Start Generation Process
-                      </>
+                        <span>Start Generation</span>
+                      </div>
                     )}
                   </button>
                   <DrawerClose asChild>
                     <button className="h-12 w-full text-sm font-light text-neutral-500 hover:text-black transition-colors">
-                      Cancel and Return
+                      Cancel
                     </button>
                   </DrawerClose>
                 </DrawerFooter>
-                </div>
               </div>
             </DrawerContent>
           </Drawer>
@@ -621,26 +567,6 @@ onSelect={(date) => {
             </div>
           )}
         </section>
-        {/* Context Cards */}
-        {/* <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-6xl mx-auto mb-16">
-          <NarrativeCard
-            icon={<Zap />}
-            title="Zero manual work"
-            description="Reports are generated automatically from your latest audit data."
-          />
-          <NarrativeCard
-            icon={<Database />}
-            title="Uses your audit data"
-            description="Pulls performance metrics from your company domain audit results."
-          />
-          <NarrativeCard
-            icon={<CheckCircle2 />}
-            title="Real-time updates"
-            description="Get notified instantly when your report is ready via live updates."
-          />
-        </div> */}
-
-     
 
         {/* History Table */}
         <section className="max-w-6xl mx-auto space-y-8 ">
@@ -775,4 +701,3 @@ const NarrativeCard = ({
     </p>
   </div>
 );
-

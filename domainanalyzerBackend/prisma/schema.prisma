@@ -67,6 +67,8 @@ model Domain {
   suggestedCompetitors        SuggestedCompetitor[]
   campaigns                   Campaign[]
   auditResults                AuditResult[]
+  googleAnalyticsId           String?
+
 
   @@unique([url, userId])
   @@index([userId])

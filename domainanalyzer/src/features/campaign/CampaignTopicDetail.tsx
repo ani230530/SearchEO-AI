@@ -16,6 +16,9 @@ interface CampaignTopicDetailProps {
   onDeleteSubPage: (subPageId: number) => void;
   renderStatusPill: (pageId?: number) => React.ReactNode;
   onAddSubPage: (topicId: number) => void;
+  onCreatePillar: (topicId: number) => void;
+  onGenerateAiPillar: (topicId: number) => void;
+  onGenerateAiSubPage: (topicId: number) => void;
   onAddKeyword: (type: 'pillar' | 'subpage', topicId: number, pageId: number, isAi: boolean, keywordSection?: 'primary' | 'longtail') => void;
   onDeleteKeyword: (context: { type: 'pillar' | 'subpage'; topicId: number; pageId: number }, keywordId: number) => void;
   onSelectPrimaryKeyword: (keywordId: number) => void;
@@ -36,6 +39,9 @@ export const CampaignTopicDetail: React.FC<CampaignTopicDetailProps> = ({
   onDeleteSubPage,
   renderStatusPill,
   onAddSubPage,
+  onGenerateAiSubPage,
+  onCreatePillar,
+  onGenerateAiPillar,
   onAddKeyword,
   onDeleteKeyword,
   onSelectPrimaryKeyword,
@@ -200,7 +206,7 @@ const renderKeywords = (
 
       <div className="flex-1 overflow-y-auto space-y-10 pb-24 pr-2">
         {/* Pillar Page Card (Hero) */}
-        {topic.pillarPage && (
+        {topic.pillarPage ? (
           <section>
             <div className="bg-white rounded-3xl shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-gray-100/50 p-8 relative overflow-hidden group transition-all duration-300 hover:shadow-[0_4px_20px_rgba(0,0,0,0.04)]">
                
@@ -248,6 +254,37 @@ const renderKeywords = (
                {renderKeywords(topic.pillarPage.keywords || [], 'pillar', topic.pillarPage.id)}
             </div>
           </section>
+        ) : (
+          <section>
+            <div className="bg-gray-50 rounded-3xl border border-dashed border-gray-300 p-8 flex flex-col items-center justify-center text-center space-y-4">
+              <div className="p-3 bg-white rounded-full shadow-sm">
+                <FileText className="h-6 w-6 text-gray-400" />
+              </div>
+              <div>
+                <h4 className="text-lg font-medium text-gray-900">Missing Pillar Page</h4>
+                <p className="text-sm text-gray-500 max-w-md mx-auto mt-1">
+                  This topic doesn't have a pillar page. You need one to structure your content cluster.
+                </p>
+              </div>
+              <div className="flex flex-col sm:flex-row gap-3 w-full max-w-sm mx-auto">
+                <button
+                  onClick={() => onCreatePillar(topic.id)}
+                  className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2 bg-white border border-gray-300 shadow-sm rounded-full text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                >
+                  <Plus className="h-4 w-4" />
+                  Manual Create
+                </button>
+                <button
+                  onClick={() => onGenerateAiPillar(topic.id)}
+                  disabled={aiLoading === `pillar-${topic.id}`}
+                  className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2 bg-black text-white shadow-sm rounded-full text-sm font-medium hover:bg-gray-800 transition-all disabled:opacity-50"
+                >
+                  {aiLoading === `pillar-${topic.id}` ? <ButtonSpinner /> : <Sparkles className="h-4 w-4" />}
+                  Generate with AI
+                </button>
+              </div>
+            </div>
+          </section>
         )}
 
         {/* Sub Pages Grid */}
@@ -290,16 +327,32 @@ const renderKeywords = (
                 </div>
             ))}
             
-            {/* Elegant Add Button */}
-            <button
-               onClick={() => onAddSubPage(topic.id)}
-               className="group flex flex-col items-center justify-center p-6 rounded-2xl border border-dashed border-gray-200 hover:border-gray-300 hover:bg-gray-50/30 transition-all min-h-[200px]"
-            >
-               <div className="h-10 w-10 rounded-full bg-gray-50 group-hover:bg-white border border-gray-100 flex items-center justify-center mb-3 transition-colors shadow-sm">
-                 <Plus className="h-5 w-5 text-gray-400 group-hover:text-black transition-colors" />
-               </div>
-               <span className="text-xs font-medium text-gray-500 group-hover:text-gray-900 transition-colors">Add New Sub Page</span>
-            </button>
+            {/* Compact Add Buttons */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <button
+                 onClick={() => onAddSubPage(topic.id)}
+                 className="group flex flex-col items-center justify-center p-4 rounded-xl border border-dashed border-gray-200 hover:border-gray-300 hover:bg-gray-50/50 transition-all min-h-[140px]"
+              >
+                 <div className="h-8 w-8 rounded-full bg-gray-50 group-hover:bg-white border border-gray-100 flex items-center justify-center mb-2 transition-colors shadow-sm">
+                   <Plus className="h-4 w-4 text-gray-400 group-hover:text-black transition-colors" />
+                 </div>
+                 <span className="text-xs font-semibold text-gray-500 group-hover:text-gray-900 transition-colors">Add Manually</span>
+              </button>
+
+              <button
+                 onClick={() => {
+                   console.log('Generate with AI clicked for topic:', topic.id);
+                   onGenerateAiSubPage(topic.id);
+                 }}
+                 disabled={aiLoading === `subpage-${topic.id}`}
+                 className="group flex flex-col items-center justify-center p-4 rounded-xl border border-gray-200 bg-black hover:bg-black/90 transition-all disabled:opacity-50 min-h-[140px]"
+              >
+                 <div className="h-8 w-8 rounded-full bg-white/10 group-hover:bg-white/20 flex items-center justify-center mb-2 transition-colors shadow-sm">
+                   {aiLoading === `subpage-${topic.id}` ? <ButtonSpinner /> : <Sparkles className="h-4 w-4 text-white" />}
+                 </div>
+                 <span className="text-xs font-semibold text-white transition-colors">Generate with AI</span>
+              </button>
+            </div>
           </div>
         </section>
       </div>

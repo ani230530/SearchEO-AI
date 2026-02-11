@@ -6131,6 +6131,7 @@ export namespace Prisma {
     locationContext: string | null
     currentStep: number | null
     isCompanyDomain: boolean | null
+    googleAnalyticsId: string | null
   }
 
   export type DomainMaxAggregateOutputType = {
@@ -6148,6 +6149,7 @@ export namespace Prisma {
     locationContext: string | null
     currentStep: number | null
     isCompanyDomain: boolean | null
+    googleAnalyticsId: string | null
   }
 
   export type DomainCountAggregateOutputType = {
@@ -6165,6 +6167,7 @@ export namespace Prisma {
     locationContext: number
     currentStep: number
     isCompanyDomain: number
+    googleAnalyticsId: number
     _all: number
   }
 
@@ -6196,6 +6199,7 @@ export namespace Prisma {
     locationContext?: true
     currentStep?: true
     isCompanyDomain?: true
+    googleAnalyticsId?: true
   }
 
   export type DomainMaxAggregateInputType = {
@@ -6213,6 +6217,7 @@ export namespace Prisma {
     locationContext?: true
     currentStep?: true
     isCompanyDomain?: true
+    googleAnalyticsId?: true
   }
 
   export type DomainCountAggregateInputType = {
@@ -6230,6 +6235,7 @@ export namespace Prisma {
     locationContext?: true
     currentStep?: true
     isCompanyDomain?: true
+    googleAnalyticsId?: true
     _all?: true
   }
 
@@ -6334,6 +6340,7 @@ export namespace Prisma {
     locationContext: string | null
     currentStep: number
     isCompanyDomain: boolean
+    googleAnalyticsId: string | null
     _count: DomainCountAggregateOutputType | null
     _avg: DomainAvgAggregateOutputType | null
     _sum: DomainSumAggregateOutputType | null
@@ -6370,6 +6377,7 @@ export namespace Prisma {
     locationContext?: boolean
     currentStep?: boolean
     isCompanyDomain?: boolean
+    googleAnalyticsId?: boolean
     analysisPhases?: boolean | Domain$analysisPhasesArgs<ExtArgs>
     analysisReports?: boolean | Domain$analysisReportsArgs<ExtArgs>
     communityInsights?: boolean | Domain$communityInsightsArgs<ExtArgs>
@@ -6413,6 +6421,7 @@ export namespace Prisma {
     locationContext?: boolean
     currentStep?: boolean
     isCompanyDomain?: boolean
+    googleAnalyticsId?: boolean
     user?: boolean | Domain$userArgs<ExtArgs>
   }, ExtArgs["result"]["domain"]>
 
@@ -6432,9 +6441,10 @@ export namespace Prisma {
     locationContext?: boolean
     currentStep?: boolean
     isCompanyDomain?: boolean
+    googleAnalyticsId?: boolean
   }
 
-  export type DomainOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "url" | "context" | "createdAt" | "updatedAt" | "userId" | "location" | "chatModel" | "customKeywords" | "intentPhrases" | "runAllModels" | "locationContext" | "currentStep" | "isCompanyDomain", ExtArgs["result"]["domain"]>
+  export type DomainOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "url" | "context" | "createdAt" | "updatedAt" | "userId" | "location" | "chatModel" | "customKeywords" | "intentPhrases" | "runAllModels" | "locationContext" | "currentStep" | "isCompanyDomain" | "googleAnalyticsId", ExtArgs["result"]["domain"]>
   export type DomainInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     analysisPhases?: boolean | Domain$analysisPhasesArgs<ExtArgs>
     analysisReports?: boolean | Domain$analysisReportsArgs<ExtArgs>
@@ -6511,6 +6521,7 @@ export namespace Prisma {
       locationContext: string | null
       currentStep: number
       isCompanyDomain: boolean
+      googleAnalyticsId: string | null
     }, ExtArgs["result"]["domain"]>
     composites: {}
   }
@@ -6943,6 +6954,7 @@ export namespace Prisma {
     readonly locationContext: FieldRef<"Domain", 'String'>
     readonly currentStep: FieldRef<"Domain", 'Int'>
     readonly isCompanyDomain: FieldRef<"Domain", 'Boolean'>
+    readonly googleAnalyticsId: FieldRef<"Domain", 'String'>
   }
     
 
@@ -49191,7 +49203,8 @@ export namespace Prisma {
     runAllModels: 'runAllModels',
     locationContext: 'locationContext',
     currentStep: 'currentStep',
-    isCompanyDomain: 'isCompanyDomain'
+    isCompanyDomain: 'isCompanyDomain',
+    googleAnalyticsId: 'googleAnalyticsId'
   };
 
   export type DomainScalarFieldEnum = (typeof DomainScalarFieldEnum)[keyof typeof DomainScalarFieldEnum]
@@ -50071,6 +50084,7 @@ export namespace Prisma {
     locationContext?: StringNullableFilter<"Domain"> | string | null
     currentStep?: IntFilter<"Domain"> | number
     isCompanyDomain?: BoolFilter<"Domain"> | boolean
+    googleAnalyticsId?: StringNullableFilter<"Domain"> | string | null
     analysisPhases?: AnalysisPhaseListRelationFilter
     analysisReports?: AnalysisReportListRelationFilter
     communityInsights?: CommunityInsightListRelationFilter
@@ -50113,6 +50127,7 @@ export namespace Prisma {
     locationContext?: SortOrderInput | SortOrder
     currentStep?: SortOrder
     isCompanyDomain?: SortOrder
+    googleAnalyticsId?: SortOrderInput | SortOrder
     analysisPhases?: AnalysisPhaseOrderByRelationAggregateInput
     analysisReports?: AnalysisReportOrderByRelationAggregateInput
     communityInsights?: CommunityInsightOrderByRelationAggregateInput
@@ -50159,6 +50174,7 @@ export namespace Prisma {
     locationContext?: StringNullableFilter<"Domain"> | string | null
     currentStep?: IntFilter<"Domain"> | number
     isCompanyDomain?: BoolFilter<"Domain"> | boolean
+    googleAnalyticsId?: StringNullableFilter<"Domain"> | string | null
     analysisPhases?: AnalysisPhaseListRelationFilter
     analysisReports?: AnalysisReportListRelationFilter
     communityInsights?: CommunityInsightListRelationFilter
@@ -50201,6 +50217,7 @@ export namespace Prisma {
     locationContext?: SortOrderInput | SortOrder
     currentStep?: SortOrder
     isCompanyDomain?: SortOrder
+    googleAnalyticsId?: SortOrderInput | SortOrder
     _count?: DomainCountOrderByAggregateInput
     _avg?: DomainAvgOrderByAggregateInput
     _max?: DomainMaxOrderByAggregateInput
@@ -50226,6 +50243,7 @@ export namespace Prisma {
     locationContext?: StringNullableWithAggregatesFilter<"Domain"> | string | null
     currentStep?: IntWithAggregatesFilter<"Domain"> | number
     isCompanyDomain?: BoolWithAggregatesFilter<"Domain"> | boolean
+    googleAnalyticsId?: StringNullableWithAggregatesFilter<"Domain"> | string | null
   }
 
   export type CrawlResultWhereInput = {
@@ -53543,6 +53561,7 @@ export namespace Prisma {
     locationContext?: string | null
     currentStep?: number
     isCompanyDomain?: boolean
+    googleAnalyticsId?: string | null
     analysisPhases?: AnalysisPhaseCreateNestedManyWithoutDomainInput
     analysisReports?: AnalysisReportCreateNestedManyWithoutDomainInput
     communityInsights?: CommunityInsightCreateNestedManyWithoutDomainInput
@@ -53585,6 +53604,7 @@ export namespace Prisma {
     locationContext?: string | null
     currentStep?: number
     isCompanyDomain?: boolean
+    googleAnalyticsId?: string | null
     analysisPhases?: AnalysisPhaseUncheckedCreateNestedManyWithoutDomainInput
     analysisReports?: AnalysisReportUncheckedCreateNestedManyWithoutDomainInput
     communityInsights?: CommunityInsightUncheckedCreateNestedManyWithoutDomainInput
@@ -53624,6 +53644,7 @@ export namespace Prisma {
     locationContext?: NullableStringFieldUpdateOperationsInput | string | null
     currentStep?: IntFieldUpdateOperationsInput | number
     isCompanyDomain?: BoolFieldUpdateOperationsInput | boolean
+    googleAnalyticsId?: NullableStringFieldUpdateOperationsInput | string | null
     analysisPhases?: AnalysisPhaseUpdateManyWithoutDomainNestedInput
     analysisReports?: AnalysisReportUpdateManyWithoutDomainNestedInput
     communityInsights?: CommunityInsightUpdateManyWithoutDomainNestedInput
@@ -53666,6 +53687,7 @@ export namespace Prisma {
     locationContext?: NullableStringFieldUpdateOperationsInput | string | null
     currentStep?: IntFieldUpdateOperationsInput | number
     isCompanyDomain?: BoolFieldUpdateOperationsInput | boolean
+    googleAnalyticsId?: NullableStringFieldUpdateOperationsInput | string | null
     analysisPhases?: AnalysisPhaseUncheckedUpdateManyWithoutDomainNestedInput
     analysisReports?: AnalysisReportUncheckedUpdateManyWithoutDomainNestedInput
     communityInsights?: CommunityInsightUncheckedUpdateManyWithoutDomainNestedInput
@@ -53707,6 +53729,7 @@ export namespace Prisma {
     locationContext?: string | null
     currentStep?: number
     isCompanyDomain?: boolean
+    googleAnalyticsId?: string | null
   }
 
   export type DomainUpdateManyMutationInput = {
@@ -53722,6 +53745,7 @@ export namespace Prisma {
     locationContext?: NullableStringFieldUpdateOperationsInput | string | null
     currentStep?: IntFieldUpdateOperationsInput | number
     isCompanyDomain?: BoolFieldUpdateOperationsInput | boolean
+    googleAnalyticsId?: NullableStringFieldUpdateOperationsInput | string | null
   }
 
   export type DomainUncheckedUpdateManyInput = {
@@ -53739,6 +53763,7 @@ export namespace Prisma {
     locationContext?: NullableStringFieldUpdateOperationsInput | string | null
     currentStep?: IntFieldUpdateOperationsInput | number
     isCompanyDomain?: BoolFieldUpdateOperationsInput | boolean
+    googleAnalyticsId?: NullableStringFieldUpdateOperationsInput | string | null
   }
 
   export type CrawlResultCreateInput = {
@@ -57633,6 +57658,7 @@ export namespace Prisma {
     locationContext?: SortOrder
     currentStep?: SortOrder
     isCompanyDomain?: SortOrder
+    googleAnalyticsId?: SortOrder
   }
 
   export type DomainAvgOrderByAggregateInput = {
@@ -57656,6 +57682,7 @@ export namespace Prisma {
     locationContext?: SortOrder
     currentStep?: SortOrder
     isCompanyDomain?: SortOrder
+    googleAnalyticsId?: SortOrder
   }
 
   export type DomainMinOrderByAggregateInput = {
@@ -57673,6 +57700,7 @@ export namespace Prisma {
     locationContext?: SortOrder
     currentStep?: SortOrder
     isCompanyDomain?: SortOrder
+    googleAnalyticsId?: SortOrder
   }
 
   export type DomainSumOrderByAggregateInput = {
@@ -63126,6 +63154,7 @@ export namespace Prisma {
     locationContext?: string | null
     currentStep?: number
     isCompanyDomain?: boolean
+    googleAnalyticsId?: string | null
     analysisPhases?: AnalysisPhaseCreateNestedManyWithoutDomainInput
     analysisReports?: AnalysisReportCreateNestedManyWithoutDomainInput
     communityInsights?: CommunityInsightCreateNestedManyWithoutDomainInput
@@ -63166,6 +63195,7 @@ export namespace Prisma {
     locationContext?: string | null
     currentStep?: number
     isCompanyDomain?: boolean
+    googleAnalyticsId?: string | null
     analysisPhases?: AnalysisPhaseUncheckedCreateNestedManyWithoutDomainInput
     analysisReports?: AnalysisReportUncheckedCreateNestedManyWithoutDomainInput
     communityInsights?: CommunityInsightUncheckedCreateNestedManyWithoutDomainInput
@@ -63360,6 +63390,7 @@ export namespace Prisma {
     locationContext?: StringNullableFilter<"Domain"> | string | null
     currentStep?: IntFilter<"Domain"> | number
     isCompanyDomain?: BoolFilter<"Domain"> | boolean
+    googleAnalyticsId?: StringNullableFilter<"Domain"> | string | null
   }
 
   export type GoogleSearchConsoleConnectionUpsertWithoutUserInput = {
@@ -65148,6 +65179,7 @@ export namespace Prisma {
     locationContext?: string | null
     currentStep?: number
     isCompanyDomain?: boolean
+    googleAnalyticsId?: string | null
     analysisPhases?: AnalysisPhaseCreateNestedManyWithoutDomainInput
     analysisReports?: AnalysisReportCreateNestedManyWithoutDomainInput
     communityInsights?: CommunityInsightCreateNestedManyWithoutDomainInput
@@ -65189,6 +65221,7 @@ export namespace Prisma {
     locationContext?: string | null
     currentStep?: number
     isCompanyDomain?: boolean
+    googleAnalyticsId?: string | null
     analysisPhases?: AnalysisPhaseUncheckedCreateNestedManyWithoutDomainInput
     analysisReports?: AnalysisReportUncheckedCreateNestedManyWithoutDomainInput
     communityInsights?: CommunityInsightUncheckedCreateNestedManyWithoutDomainInput
@@ -65243,6 +65276,7 @@ export namespace Prisma {
     locationContext?: NullableStringFieldUpdateOperationsInput | string | null
     currentStep?: IntFieldUpdateOperationsInput | number
     isCompanyDomain?: BoolFieldUpdateOperationsInput | boolean
+    googleAnalyticsId?: NullableStringFieldUpdateOperationsInput | string | null
     analysisPhases?: AnalysisPhaseUpdateManyWithoutDomainNestedInput
     analysisReports?: AnalysisReportUpdateManyWithoutDomainNestedInput
     communityInsights?: CommunityInsightUpdateManyWithoutDomainNestedInput
@@ -65284,6 +65318,7 @@ export namespace Prisma {
     locationContext?: NullableStringFieldUpdateOperationsInput | string | null
     currentStep?: IntFieldUpdateOperationsInput | number
     isCompanyDomain?: BoolFieldUpdateOperationsInput | boolean
+    googleAnalyticsId?: NullableStringFieldUpdateOperationsInput | string | null
     analysisPhases?: AnalysisPhaseUncheckedUpdateManyWithoutDomainNestedInput
     analysisReports?: AnalysisReportUncheckedUpdateManyWithoutDomainNestedInput
     communityInsights?: CommunityInsightUncheckedUpdateManyWithoutDomainNestedInput
@@ -65456,6 +65491,7 @@ export namespace Prisma {
     locationContext?: string | null
     currentStep?: number
     isCompanyDomain?: boolean
+    googleAnalyticsId?: string | null
     analysisPhases?: AnalysisPhaseCreateNestedManyWithoutDomainInput
     analysisReports?: AnalysisReportCreateNestedManyWithoutDomainInput
     communityInsights?: CommunityInsightCreateNestedManyWithoutDomainInput
@@ -65497,6 +65533,7 @@ export namespace Prisma {
     locationContext?: string | null
     currentStep?: number
     isCompanyDomain?: boolean
+    googleAnalyticsId?: string | null
     analysisPhases?: AnalysisPhaseUncheckedCreateNestedManyWithoutDomainInput
     analysisReports?: AnalysisReportUncheckedCreateNestedManyWithoutDomainInput
     communityInsights?: CommunityInsightUncheckedCreateNestedManyWithoutDomainInput
@@ -65712,6 +65749,7 @@ export namespace Prisma {
     locationContext?: NullableStringFieldUpdateOperationsInput | string | null
     currentStep?: IntFieldUpdateOperationsInput | number
     isCompanyDomain?: BoolFieldUpdateOperationsInput | boolean
+    googleAnalyticsId?: NullableStringFieldUpdateOperationsInput | string | null
     analysisPhases?: AnalysisPhaseUpdateManyWithoutDomainNestedInput
     analysisReports?: AnalysisReportUpdateManyWithoutDomainNestedInput
     communityInsights?: CommunityInsightUpdateManyWithoutDomainNestedInput
@@ -65753,6 +65791,7 @@ export namespace Prisma {
     locationContext?: NullableStringFieldUpdateOperationsInput | string | null
     currentStep?: IntFieldUpdateOperationsInput | number
     isCompanyDomain?: BoolFieldUpdateOperationsInput | boolean
+    googleAnalyticsId?: NullableStringFieldUpdateOperationsInput | string | null
     analysisPhases?: AnalysisPhaseUncheckedUpdateManyWithoutDomainNestedInput
     analysisReports?: AnalysisReportUncheckedUpdateManyWithoutDomainNestedInput
     communityInsights?: CommunityInsightUncheckedUpdateManyWithoutDomainNestedInput
@@ -66140,6 +66179,7 @@ export namespace Prisma {
     locationContext?: string | null
     currentStep?: number
     isCompanyDomain?: boolean
+    googleAnalyticsId?: string | null
     analysisPhases?: AnalysisPhaseCreateNestedManyWithoutDomainInput
     communityInsights?: CommunityInsightCreateNestedManyWithoutDomainInput
     communityMiningResults?: CommunityMiningResultCreateNestedManyWithoutDomainInput
@@ -66181,6 +66221,7 @@ export namespace Prisma {
     locationContext?: string | null
     currentStep?: number
     isCompanyDomain?: boolean
+    googleAnalyticsId?: string | null
     analysisPhases?: AnalysisPhaseUncheckedCreateNestedManyWithoutDomainInput
     communityInsights?: CommunityInsightUncheckedCreateNestedManyWithoutDomainInput
     communityMiningResults?: CommunityMiningResultUncheckedCreateNestedManyWithoutDomainInput
@@ -66235,6 +66276,7 @@ export namespace Prisma {
     locationContext?: NullableStringFieldUpdateOperationsInput | string | null
     currentStep?: IntFieldUpdateOperationsInput | number
     isCompanyDomain?: BoolFieldUpdateOperationsInput | boolean
+    googleAnalyticsId?: NullableStringFieldUpdateOperationsInput | string | null
     analysisPhases?: AnalysisPhaseUpdateManyWithoutDomainNestedInput
     communityInsights?: CommunityInsightUpdateManyWithoutDomainNestedInput
     communityMiningResults?: CommunityMiningResultUpdateManyWithoutDomainNestedInput
@@ -66276,6 +66318,7 @@ export namespace Prisma {
     locationContext?: NullableStringFieldUpdateOperationsInput | string | null
     currentStep?: IntFieldUpdateOperationsInput | number
     isCompanyDomain?: BoolFieldUpdateOperationsInput | boolean
+    googleAnalyticsId?: NullableStringFieldUpdateOperationsInput | string | null
     analysisPhases?: AnalysisPhaseUncheckedUpdateManyWithoutDomainNestedInput
     communityInsights?: CommunityInsightUncheckedUpdateManyWithoutDomainNestedInput
     communityMiningResults?: CommunityMiningResultUncheckedUpdateManyWithoutDomainNestedInput
@@ -66314,6 +66357,7 @@ export namespace Prisma {
     locationContext?: string | null
     currentStep?: number
     isCompanyDomain?: boolean
+    googleAnalyticsId?: string | null
     analysisPhases?: AnalysisPhaseCreateNestedManyWithoutDomainInput
     analysisReports?: AnalysisReportCreateNestedManyWithoutDomainInput
     communityInsights?: CommunityInsightCreateNestedManyWithoutDomainInput
@@ -66355,6 +66399,7 @@ export namespace Prisma {
     locationContext?: string | null
     currentStep?: number
     isCompanyDomain?: boolean
+    googleAnalyticsId?: string | null
     analysisPhases?: AnalysisPhaseUncheckedCreateNestedManyWithoutDomainInput
     analysisReports?: AnalysisReportUncheckedCreateNestedManyWithoutDomainInput
     communityInsights?: CommunityInsightUncheckedCreateNestedManyWithoutDomainInput
@@ -66409,6 +66454,7 @@ export namespace Prisma {
     locationContext?: NullableStringFieldUpdateOperationsInput | string | null
     currentStep?: IntFieldUpdateOperationsInput | number
     isCompanyDomain?: BoolFieldUpdateOperationsInput | boolean
+    googleAnalyticsId?: NullableStringFieldUpdateOperationsInput | string | null
     analysisPhases?: AnalysisPhaseUpdateManyWithoutDomainNestedInput
     analysisReports?: AnalysisReportUpdateManyWithoutDomainNestedInput
     communityInsights?: CommunityInsightUpdateManyWithoutDomainNestedInput
@@ -66450,6 +66496,7 @@ export namespace Prisma {
     locationContext?: NullableStringFieldUpdateOperationsInput | string | null
     currentStep?: IntFieldUpdateOperationsInput | number
     isCompanyDomain?: BoolFieldUpdateOperationsInput | boolean
+    googleAnalyticsId?: NullableStringFieldUpdateOperationsInput | string | null
     analysisPhases?: AnalysisPhaseUncheckedUpdateManyWithoutDomainNestedInput
     analysisReports?: AnalysisReportUncheckedUpdateManyWithoutDomainNestedInput
     communityInsights?: CommunityInsightUncheckedUpdateManyWithoutDomainNestedInput
@@ -66488,6 +66535,7 @@ export namespace Prisma {
     locationContext?: string | null
     currentStep?: number
     isCompanyDomain?: boolean
+    googleAnalyticsId?: string | null
     analysisPhases?: AnalysisPhaseCreateNestedManyWithoutDomainInput
     analysisReports?: AnalysisReportCreateNestedManyWithoutDomainInput
     communityInsights?: CommunityInsightCreateNestedManyWithoutDomainInput
@@ -66529,6 +66577,7 @@ export namespace Prisma {
     locationContext?: string | null
     currentStep?: number
     isCompanyDomain?: boolean
+    googleAnalyticsId?: string | null
     analysisPhases?: AnalysisPhaseUncheckedCreateNestedManyWithoutDomainInput
     analysisReports?: AnalysisReportUncheckedCreateNestedManyWithoutDomainInput
     communityInsights?: CommunityInsightUncheckedCreateNestedManyWithoutDomainInput
@@ -66583,6 +66632,7 @@ export namespace Prisma {
     locationContext?: NullableStringFieldUpdateOperationsInput | string | null
     currentStep?: IntFieldUpdateOperationsInput | number
     isCompanyDomain?: BoolFieldUpdateOperationsInput | boolean
+    googleAnalyticsId?: NullableStringFieldUpdateOperationsInput | string | null
     analysisPhases?: AnalysisPhaseUpdateManyWithoutDomainNestedInput
     analysisReports?: AnalysisReportUpdateManyWithoutDomainNestedInput
     communityInsights?: CommunityInsightUpdateManyWithoutDomainNestedInput
@@ -66624,6 +66674,7 @@ export namespace Prisma {
     locationContext?: NullableStringFieldUpdateOperationsInput | string | null
     currentStep?: IntFieldUpdateOperationsInput | number
     isCompanyDomain?: BoolFieldUpdateOperationsInput | boolean
+    googleAnalyticsId?: NullableStringFieldUpdateOperationsInput | string | null
     analysisPhases?: AnalysisPhaseUncheckedUpdateManyWithoutDomainNestedInput
     analysisReports?: AnalysisReportUncheckedUpdateManyWithoutDomainNestedInput
     communityInsights?: CommunityInsightUncheckedUpdateManyWithoutDomainNestedInput
@@ -66662,6 +66713,7 @@ export namespace Prisma {
     locationContext?: string | null
     currentStep?: number
     isCompanyDomain?: boolean
+    googleAnalyticsId?: string | null
     analysisPhases?: AnalysisPhaseCreateNestedManyWithoutDomainInput
     analysisReports?: AnalysisReportCreateNestedManyWithoutDomainInput
     communityInsights?: CommunityInsightCreateNestedManyWithoutDomainInput
@@ -66703,6 +66755,7 @@ export namespace Prisma {
     locationContext?: string | null
     currentStep?: number
     isCompanyDomain?: boolean
+    googleAnalyticsId?: string | null
     analysisPhases?: AnalysisPhaseUncheckedCreateNestedManyWithoutDomainInput
     analysisReports?: AnalysisReportUncheckedCreateNestedManyWithoutDomainInput
     communityInsights?: CommunityInsightUncheckedCreateNestedManyWithoutDomainInput
@@ -66757,6 +66810,7 @@ export namespace Prisma {
     locationContext?: NullableStringFieldUpdateOperationsInput | string | null
     currentStep?: IntFieldUpdateOperationsInput | number
     isCompanyDomain?: BoolFieldUpdateOperationsInput | boolean
+    googleAnalyticsId?: NullableStringFieldUpdateOperationsInput | string | null
     analysisPhases?: AnalysisPhaseUpdateManyWithoutDomainNestedInput
     analysisReports?: AnalysisReportUpdateManyWithoutDomainNestedInput
     communityInsights?: CommunityInsightUpdateManyWithoutDomainNestedInput
@@ -66798,6 +66852,7 @@ export namespace Prisma {
     locationContext?: NullableStringFieldUpdateOperationsInput | string | null
     currentStep?: IntFieldUpdateOperationsInput | number
     isCompanyDomain?: BoolFieldUpdateOperationsInput | boolean
+    googleAnalyticsId?: NullableStringFieldUpdateOperationsInput | string | null
     analysisPhases?: AnalysisPhaseUncheckedUpdateManyWithoutDomainNestedInput
     analysisReports?: AnalysisReportUncheckedUpdateManyWithoutDomainNestedInput
     communityInsights?: CommunityInsightUncheckedUpdateManyWithoutDomainNestedInput
@@ -66836,6 +66891,7 @@ export namespace Prisma {
     locationContext?: string | null
     currentStep?: number
     isCompanyDomain?: boolean
+    googleAnalyticsId?: string | null
     analysisPhases?: AnalysisPhaseCreateNestedManyWithoutDomainInput
     analysisReports?: AnalysisReportCreateNestedManyWithoutDomainInput
     communityInsights?: CommunityInsightCreateNestedManyWithoutDomainInput
@@ -66877,6 +66933,7 @@ export namespace Prisma {
     locationContext?: string | null
     currentStep?: number
     isCompanyDomain?: boolean
+    googleAnalyticsId?: string | null
     analysisPhases?: AnalysisPhaseUncheckedCreateNestedManyWithoutDomainInput
     analysisReports?: AnalysisReportUncheckedCreateNestedManyWithoutDomainInput
     communityInsights?: CommunityInsightUncheckedCreateNestedManyWithoutDomainInput
@@ -66931,6 +66988,7 @@ export namespace Prisma {
     locationContext?: NullableStringFieldUpdateOperationsInput | string | null
     currentStep?: IntFieldUpdateOperationsInput | number
     isCompanyDomain?: BoolFieldUpdateOperationsInput | boolean
+    googleAnalyticsId?: NullableStringFieldUpdateOperationsInput | string | null
     analysisPhases?: AnalysisPhaseUpdateManyWithoutDomainNestedInput
     analysisReports?: AnalysisReportUpdateManyWithoutDomainNestedInput
     communityInsights?: CommunityInsightUpdateManyWithoutDomainNestedInput
@@ -66972,6 +67030,7 @@ export namespace Prisma {
     locationContext?: NullableStringFieldUpdateOperationsInput | string | null
     currentStep?: IntFieldUpdateOperationsInput | number
     isCompanyDomain?: BoolFieldUpdateOperationsInput | boolean
+    googleAnalyticsId?: NullableStringFieldUpdateOperationsInput | string | null
     analysisPhases?: AnalysisPhaseUncheckedUpdateManyWithoutDomainNestedInput
     analysisReports?: AnalysisReportUncheckedUpdateManyWithoutDomainNestedInput
     communityInsights?: CommunityInsightUncheckedUpdateManyWithoutDomainNestedInput
@@ -67010,6 +67069,7 @@ export namespace Prisma {
     locationContext?: string | null
     currentStep?: number
     isCompanyDomain?: boolean
+    googleAnalyticsId?: string | null
     analysisPhases?: AnalysisPhaseCreateNestedManyWithoutDomainInput
     analysisReports?: AnalysisReportCreateNestedManyWithoutDomainInput
     communityInsights?: CommunityInsightCreateNestedManyWithoutDomainInput
@@ -67051,6 +67111,7 @@ export namespace Prisma {
     locationContext?: string | null
     currentStep?: number
     isCompanyDomain?: boolean
+    googleAnalyticsId?: string | null
     analysisPhases?: AnalysisPhaseUncheckedCreateNestedManyWithoutDomainInput
     analysisReports?: AnalysisReportUncheckedCreateNestedManyWithoutDomainInput
     communityInsights?: CommunityInsightUncheckedCreateNestedManyWithoutDomainInput
@@ -67105,6 +67166,7 @@ export namespace Prisma {
     locationContext?: NullableStringFieldUpdateOperationsInput | string | null
     currentStep?: IntFieldUpdateOperationsInput | number
     isCompanyDomain?: BoolFieldUpdateOperationsInput | boolean
+    googleAnalyticsId?: NullableStringFieldUpdateOperationsInput | string | null
     analysisPhases?: AnalysisPhaseUpdateManyWithoutDomainNestedInput
     analysisReports?: AnalysisReportUpdateManyWithoutDomainNestedInput
     communityInsights?: CommunityInsightUpdateManyWithoutDomainNestedInput
@@ -67146,6 +67208,7 @@ export namespace Prisma {
     locationContext?: NullableStringFieldUpdateOperationsInput | string | null
     currentStep?: IntFieldUpdateOperationsInput | number
     isCompanyDomain?: BoolFieldUpdateOperationsInput | boolean
+    googleAnalyticsId?: NullableStringFieldUpdateOperationsInput | string | null
     analysisPhases?: AnalysisPhaseUncheckedUpdateManyWithoutDomainNestedInput
     analysisReports?: AnalysisReportUncheckedUpdateManyWithoutDomainNestedInput
     communityInsights?: CommunityInsightUncheckedUpdateManyWithoutDomainNestedInput
@@ -67184,6 +67247,7 @@ export namespace Prisma {
     locationContext?: string | null
     currentStep?: number
     isCompanyDomain?: boolean
+    googleAnalyticsId?: string | null
     analysisPhases?: AnalysisPhaseCreateNestedManyWithoutDomainInput
     analysisReports?: AnalysisReportCreateNestedManyWithoutDomainInput
     communityInsights?: CommunityInsightCreateNestedManyWithoutDomainInput
@@ -67225,6 +67289,7 @@ export namespace Prisma {
     locationContext?: string | null
     currentStep?: number
     isCompanyDomain?: boolean
+    googleAnalyticsId?: string | null
     analysisPhases?: AnalysisPhaseUncheckedCreateNestedManyWithoutDomainInput
     analysisReports?: AnalysisReportUncheckedCreateNestedManyWithoutDomainInput
     communityInsights?: CommunityInsightUncheckedCreateNestedManyWithoutDomainInput
@@ -67279,6 +67344,7 @@ export namespace Prisma {
     locationContext?: NullableStringFieldUpdateOperationsInput | string | null
     currentStep?: IntFieldUpdateOperationsInput | number
     isCompanyDomain?: BoolFieldUpdateOperationsInput | boolean
+    googleAnalyticsId?: NullableStringFieldUpdateOperationsInput | string | null
     analysisPhases?: AnalysisPhaseUpdateManyWithoutDomainNestedInput
     analysisReports?: AnalysisReportUpdateManyWithoutDomainNestedInput
     communityInsights?: CommunityInsightUpdateManyWithoutDomainNestedInput
@@ -67320,6 +67386,7 @@ export namespace Prisma {
     locationContext?: NullableStringFieldUpdateOperationsInput | string | null
     currentStep?: IntFieldUpdateOperationsInput | number
     isCompanyDomain?: BoolFieldUpdateOperationsInput | boolean
+    googleAnalyticsId?: NullableStringFieldUpdateOperationsInput | string | null
     analysisPhases?: AnalysisPhaseUncheckedUpdateManyWithoutDomainNestedInput
     analysisReports?: AnalysisReportUncheckedUpdateManyWithoutDomainNestedInput
     communityInsights?: CommunityInsightUncheckedUpdateManyWithoutDomainNestedInput
@@ -67358,6 +67425,7 @@ export namespace Prisma {
     locationContext?: string | null
     currentStep?: number
     isCompanyDomain?: boolean
+    googleAnalyticsId?: string | null
     analysisReports?: AnalysisReportCreateNestedManyWithoutDomainInput
     communityInsights?: CommunityInsightCreateNestedManyWithoutDomainInput
     communityMiningResults?: CommunityMiningResultCreateNestedManyWithoutDomainInput
@@ -67399,6 +67467,7 @@ export namespace Prisma {
     locationContext?: string | null
     currentStep?: number
     isCompanyDomain?: boolean
+    googleAnalyticsId?: string | null
     analysisReports?: AnalysisReportUncheckedCreateNestedManyWithoutDomainInput
     communityInsights?: CommunityInsightUncheckedCreateNestedManyWithoutDomainInput
     communityMiningResults?: CommunityMiningResultUncheckedCreateNestedManyWithoutDomainInput
@@ -67453,6 +67522,7 @@ export namespace Prisma {
     locationContext?: NullableStringFieldUpdateOperationsInput | string | null
     currentStep?: IntFieldUpdateOperationsInput | number
     isCompanyDomain?: BoolFieldUpdateOperationsInput | boolean
+    googleAnalyticsId?: NullableStringFieldUpdateOperationsInput | string | null
     analysisReports?: AnalysisReportUpdateManyWithoutDomainNestedInput
     communityInsights?: CommunityInsightUpdateManyWithoutDomainNestedInput
     communityMiningResults?: CommunityMiningResultUpdateManyWithoutDomainNestedInput
@@ -67494,6 +67564,7 @@ export namespace Prisma {
     locationContext?: NullableStringFieldUpdateOperationsInput | string | null
     currentStep?: IntFieldUpdateOperationsInput | number
     isCompanyDomain?: BoolFieldUpdateOperationsInput | boolean
+    googleAnalyticsId?: NullableStringFieldUpdateOperationsInput | string | null
     analysisReports?: AnalysisReportUncheckedUpdateManyWithoutDomainNestedInput
     communityInsights?: CommunityInsightUncheckedUpdateManyWithoutDomainNestedInput
     communityMiningResults?: CommunityMiningResultUncheckedUpdateManyWithoutDomainNestedInput
@@ -67532,6 +67603,7 @@ export namespace Prisma {
     locationContext?: string | null
     currentStep?: number
     isCompanyDomain?: boolean
+    googleAnalyticsId?: string | null
     analysisPhases?: AnalysisPhaseCreateNestedManyWithoutDomainInput
     analysisReports?: AnalysisReportCreateNestedManyWithoutDomainInput
     communityInsights?: CommunityInsightCreateNestedManyWithoutDomainInput
@@ -67573,6 +67645,7 @@ export namespace Prisma {
     locationContext?: string | null
     currentStep?: number
     isCompanyDomain?: boolean
+    googleAnalyticsId?: string | null
     analysisPhases?: AnalysisPhaseUncheckedCreateNestedManyWithoutDomainInput
     analysisReports?: AnalysisReportUncheckedCreateNestedManyWithoutDomainInput
     communityInsights?: CommunityInsightUncheckedCreateNestedManyWithoutDomainInput
@@ -67627,6 +67700,7 @@ export namespace Prisma {
     locationContext?: NullableStringFieldUpdateOperationsInput | string | null
     currentStep?: IntFieldUpdateOperationsInput | number
     isCompanyDomain?: BoolFieldUpdateOperationsInput | boolean
+    googleAnalyticsId?: NullableStringFieldUpdateOperationsInput | string | null
     analysisPhases?: AnalysisPhaseUpdateManyWithoutDomainNestedInput
     analysisReports?: AnalysisReportUpdateManyWithoutDomainNestedInput
     communityInsights?: CommunityInsightUpdateManyWithoutDomainNestedInput
@@ -67668,6 +67742,7 @@ export namespace Prisma {
     locationContext?: NullableStringFieldUpdateOperationsInput | string | null
     currentStep?: IntFieldUpdateOperationsInput | number
     isCompanyDomain?: BoolFieldUpdateOperationsInput | boolean
+    googleAnalyticsId?: NullableStringFieldUpdateOperationsInput | string | null
     analysisPhases?: AnalysisPhaseUncheckedUpdateManyWithoutDomainNestedInput
     analysisReports?: AnalysisReportUncheckedUpdateManyWithoutDomainNestedInput
     communityInsights?: CommunityInsightUncheckedUpdateManyWithoutDomainNestedInput
@@ -67706,6 +67781,7 @@ export namespace Prisma {
     locationContext?: string | null
     currentStep?: number
     isCompanyDomain?: boolean
+    googleAnalyticsId?: string | null
     analysisPhases?: AnalysisPhaseCreateNestedManyWithoutDomainInput
     analysisReports?: AnalysisReportCreateNestedManyWithoutDomainInput
     communityInsights?: CommunityInsightCreateNestedManyWithoutDomainInput
@@ -67747,6 +67823,7 @@ export namespace Prisma {
     locationContext?: string | null
     currentStep?: number
     isCompanyDomain?: boolean
+    googleAnalyticsId?: string | null
     analysisPhases?: AnalysisPhaseUncheckedCreateNestedManyWithoutDomainInput
     analysisReports?: AnalysisReportUncheckedCreateNestedManyWithoutDomainInput
     communityInsights?: CommunityInsightUncheckedCreateNestedManyWithoutDomainInput
@@ -67801,6 +67878,7 @@ export namespace Prisma {
     locationContext?: NullableStringFieldUpdateOperationsInput | string | null
     currentStep?: IntFieldUpdateOperationsInput | number
     isCompanyDomain?: BoolFieldUpdateOperationsInput | boolean
+    googleAnalyticsId?: NullableStringFieldUpdateOperationsInput | string | null
     analysisPhases?: AnalysisPhaseUpdateManyWithoutDomainNestedInput
     analysisReports?: AnalysisReportUpdateManyWithoutDomainNestedInput
     communityInsights?: CommunityInsightUpdateManyWithoutDomainNestedInput
@@ -67842,6 +67920,7 @@ export namespace Prisma {
     locationContext?: NullableStringFieldUpdateOperationsInput | string | null
     currentStep?: IntFieldUpdateOperationsInput | number
     isCompanyDomain?: BoolFieldUpdateOperationsInput | boolean
+    googleAnalyticsId?: NullableStringFieldUpdateOperationsInput | string | null
     analysisPhases?: AnalysisPhaseUncheckedUpdateManyWithoutDomainNestedInput
     analysisReports?: AnalysisReportUncheckedUpdateManyWithoutDomainNestedInput
     communityInsights?: CommunityInsightUncheckedUpdateManyWithoutDomainNestedInput
@@ -67880,6 +67959,7 @@ export namespace Prisma {
     locationContext?: string | null
     currentStep?: number
     isCompanyDomain?: boolean
+    googleAnalyticsId?: string | null
     analysisPhases?: AnalysisPhaseCreateNestedManyWithoutDomainInput
     analysisReports?: AnalysisReportCreateNestedManyWithoutDomainInput
     communityInsights?: CommunityInsightCreateNestedManyWithoutDomainInput
@@ -67921,6 +68001,7 @@ export namespace Prisma {
     locationContext?: string | null
     currentStep?: number
     isCompanyDomain?: boolean
+    googleAnalyticsId?: string | null
     analysisPhases?: AnalysisPhaseUncheckedCreateNestedManyWithoutDomainInput
     analysisReports?: AnalysisReportUncheckedCreateNestedManyWithoutDomainInput
     communityInsights?: CommunityInsightUncheckedCreateNestedManyWithoutDomainInput
@@ -67975,6 +68056,7 @@ export namespace Prisma {
     locationContext?: NullableStringFieldUpdateOperationsInput | string | null
     currentStep?: IntFieldUpdateOperationsInput | number
     isCompanyDomain?: BoolFieldUpdateOperationsInput | boolean
+    googleAnalyticsId?: NullableStringFieldUpdateOperationsInput | string | null
     analysisPhases?: AnalysisPhaseUpdateManyWithoutDomainNestedInput
     analysisReports?: AnalysisReportUpdateManyWithoutDomainNestedInput
     communityInsights?: CommunityInsightUpdateManyWithoutDomainNestedInput
@@ -68016,6 +68098,7 @@ export namespace Prisma {
     locationContext?: NullableStringFieldUpdateOperationsInput | string | null
     currentStep?: IntFieldUpdateOperationsInput | number
     isCompanyDomain?: BoolFieldUpdateOperationsInput | boolean
+    googleAnalyticsId?: NullableStringFieldUpdateOperationsInput | string | null
     analysisPhases?: AnalysisPhaseUncheckedUpdateManyWithoutDomainNestedInput
     analysisReports?: AnalysisReportUncheckedUpdateManyWithoutDomainNestedInput
     communityInsights?: CommunityInsightUncheckedUpdateManyWithoutDomainNestedInput
@@ -68054,6 +68137,7 @@ export namespace Prisma {
     locationContext?: string | null
     currentStep?: number
     isCompanyDomain?: boolean
+    googleAnalyticsId?: string | null
     analysisPhases?: AnalysisPhaseCreateNestedManyWithoutDomainInput
     analysisReports?: AnalysisReportCreateNestedManyWithoutDomainInput
     communityInsights?: CommunityInsightCreateNestedManyWithoutDomainInput
@@ -68095,6 +68179,7 @@ export namespace Prisma {
     locationContext?: string | null
     currentStep?: number
     isCompanyDomain?: boolean
+    googleAnalyticsId?: string | null
     analysisPhases?: AnalysisPhaseUncheckedCreateNestedManyWithoutDomainInput
     analysisReports?: AnalysisReportUncheckedCreateNestedManyWithoutDomainInput
     communityInsights?: CommunityInsightUncheckedCreateNestedManyWithoutDomainInput
@@ -68149,6 +68234,7 @@ export namespace Prisma {
     locationContext?: NullableStringFieldUpdateOperationsInput | string | null
     currentStep?: IntFieldUpdateOperationsInput | number
     isCompanyDomain?: BoolFieldUpdateOperationsInput | boolean
+    googleAnalyticsId?: NullableStringFieldUpdateOperationsInput | string | null
     analysisPhases?: AnalysisPhaseUpdateManyWithoutDomainNestedInput
     analysisReports?: AnalysisReportUpdateManyWithoutDomainNestedInput
     communityInsights?: CommunityInsightUpdateManyWithoutDomainNestedInput
@@ -68190,6 +68276,7 @@ export namespace Prisma {
     locationContext?: NullableStringFieldUpdateOperationsInput | string | null
     currentStep?: IntFieldUpdateOperationsInput | number
     isCompanyDomain?: BoolFieldUpdateOperationsInput | boolean
+    googleAnalyticsId?: NullableStringFieldUpdateOperationsInput | string | null
     analysisPhases?: AnalysisPhaseUncheckedUpdateManyWithoutDomainNestedInput
     analysisReports?: AnalysisReportUncheckedUpdateManyWithoutDomainNestedInput
     communityInsights?: CommunityInsightUncheckedUpdateManyWithoutDomainNestedInput
@@ -68228,6 +68315,7 @@ export namespace Prisma {
     locationContext?: string | null
     currentStep?: number
     isCompanyDomain?: boolean
+    googleAnalyticsId?: string | null
     analysisPhases?: AnalysisPhaseCreateNestedManyWithoutDomainInput
     analysisReports?: AnalysisReportCreateNestedManyWithoutDomainInput
     communityMiningResults?: CommunityMiningResultCreateNestedManyWithoutDomainInput
@@ -68269,6 +68357,7 @@ export namespace Prisma {
     locationContext?: string | null
     currentStep?: number
     isCompanyDomain?: boolean
+    googleAnalyticsId?: string | null
     analysisPhases?: AnalysisPhaseUncheckedCreateNestedManyWithoutDomainInput
     analysisReports?: AnalysisReportUncheckedCreateNestedManyWithoutDomainInput
     communityMiningResults?: CommunityMiningResultUncheckedCreateNestedManyWithoutDomainInput
@@ -68367,6 +68456,7 @@ export namespace Prisma {
     locationContext?: NullableStringFieldUpdateOperationsInput | string | null
     currentStep?: IntFieldUpdateOperationsInput | number
     isCompanyDomain?: BoolFieldUpdateOperationsInput | boolean
+    googleAnalyticsId?: NullableStringFieldUpdateOperationsInput | string | null
     analysisPhases?: AnalysisPhaseUpdateManyWithoutDomainNestedInput
     analysisReports?: AnalysisReportUpdateManyWithoutDomainNestedInput
     communityMiningResults?: CommunityMiningResultUpdateManyWithoutDomainNestedInput
@@ -68408,6 +68498,7 @@ export namespace Prisma {
     locationContext?: NullableStringFieldUpdateOperationsInput | string | null
     currentStep?: IntFieldUpdateOperationsInput | number
     isCompanyDomain?: BoolFieldUpdateOperationsInput | boolean
+    googleAnalyticsId?: NullableStringFieldUpdateOperationsInput | string | null
     analysisPhases?: AnalysisPhaseUncheckedUpdateManyWithoutDomainNestedInput
     analysisReports?: AnalysisReportUncheckedUpdateManyWithoutDomainNestedInput
     communityMiningResults?: CommunityMiningResultUncheckedUpdateManyWithoutDomainNestedInput
@@ -68496,6 +68587,7 @@ export namespace Prisma {
     locationContext?: string | null
     currentStep?: number
     isCompanyDomain?: boolean
+    googleAnalyticsId?: string | null
     analysisPhases?: AnalysisPhaseCreateNestedManyWithoutDomainInput
     analysisReports?: AnalysisReportCreateNestedManyWithoutDomainInput
     communityInsights?: CommunityInsightCreateNestedManyWithoutDomainInput
@@ -68537,6 +68629,7 @@ export namespace Prisma {
     locationContext?: string | null
     currentStep?: number
     isCompanyDomain?: boolean
+    googleAnalyticsId?: string | null
     analysisPhases?: AnalysisPhaseUncheckedCreateNestedManyWithoutDomainInput
     analysisReports?: AnalysisReportUncheckedCreateNestedManyWithoutDomainInput
     communityInsights?: CommunityInsightUncheckedCreateNestedManyWithoutDomainInput
@@ -68635,6 +68728,7 @@ export namespace Prisma {
     locationContext?: NullableStringFieldUpdateOperationsInput | string | null
     currentStep?: IntFieldUpdateOperationsInput | number
     isCompanyDomain?: BoolFieldUpdateOperationsInput | boolean
+    googleAnalyticsId?: NullableStringFieldUpdateOperationsInput | string | null
     analysisPhases?: AnalysisPhaseUpdateManyWithoutDomainNestedInput
     analysisReports?: AnalysisReportUpdateManyWithoutDomainNestedInput
     communityInsights?: CommunityInsightUpdateManyWithoutDomainNestedInput
@@ -68676,6 +68770,7 @@ export namespace Prisma {
     locationContext?: NullableStringFieldUpdateOperationsInput | string | null
     currentStep?: IntFieldUpdateOperationsInput | number
     isCompanyDomain?: BoolFieldUpdateOperationsInput | boolean
+    googleAnalyticsId?: NullableStringFieldUpdateOperationsInput | string | null
     analysisPhases?: AnalysisPhaseUncheckedUpdateManyWithoutDomainNestedInput
     analysisReports?: AnalysisReportUncheckedUpdateManyWithoutDomainNestedInput
     communityInsights?: CommunityInsightUncheckedUpdateManyWithoutDomainNestedInput
@@ -69559,6 +69654,7 @@ export namespace Prisma {
     locationContext?: string | null
     currentStep?: number
     isCompanyDomain?: boolean
+    googleAnalyticsId?: string | null
     analysisPhases?: AnalysisPhaseCreateNestedManyWithoutDomainInput
     analysisReports?: AnalysisReportCreateNestedManyWithoutDomainInput
     communityInsights?: CommunityInsightCreateNestedManyWithoutDomainInput
@@ -69600,6 +69696,7 @@ export namespace Prisma {
     locationContext?: string | null
     currentStep?: number
     isCompanyDomain?: boolean
+    googleAnalyticsId?: string | null
     analysisPhases?: AnalysisPhaseUncheckedCreateNestedManyWithoutDomainInput
     analysisReports?: AnalysisReportUncheckedCreateNestedManyWithoutDomainInput
     communityInsights?: CommunityInsightUncheckedCreateNestedManyWithoutDomainInput
@@ -69654,6 +69751,7 @@ export namespace Prisma {
     locationContext?: NullableStringFieldUpdateOperationsInput | string | null
     currentStep?: IntFieldUpdateOperationsInput | number
     isCompanyDomain?: BoolFieldUpdateOperationsInput | boolean
+    googleAnalyticsId?: NullableStringFieldUpdateOperationsInput | string | null
     analysisPhases?: AnalysisPhaseUpdateManyWithoutDomainNestedInput
     analysisReports?: AnalysisReportUpdateManyWithoutDomainNestedInput
     communityInsights?: CommunityInsightUpdateManyWithoutDomainNestedInput
@@ -69695,6 +69793,7 @@ export namespace Prisma {
     locationContext?: NullableStringFieldUpdateOperationsInput | string | null
     currentStep?: IntFieldUpdateOperationsInput | number
     isCompanyDomain?: BoolFieldUpdateOperationsInput | boolean
+    googleAnalyticsId?: NullableStringFieldUpdateOperationsInput | string | null
     analysisPhases?: AnalysisPhaseUncheckedUpdateManyWithoutDomainNestedInput
     analysisReports?: AnalysisReportUncheckedUpdateManyWithoutDomainNestedInput
     communityInsights?: CommunityInsightUncheckedUpdateManyWithoutDomainNestedInput
@@ -69733,6 +69832,7 @@ export namespace Prisma {
     locationContext?: string | null
     currentStep?: number
     isCompanyDomain?: boolean
+    googleAnalyticsId?: string | null
     analysisPhases?: AnalysisPhaseCreateNestedManyWithoutDomainInput
     analysisReports?: AnalysisReportCreateNestedManyWithoutDomainInput
     communityInsights?: CommunityInsightCreateNestedManyWithoutDomainInput
@@ -69774,6 +69874,7 @@ export namespace Prisma {
     locationContext?: string | null
     currentStep?: number
     isCompanyDomain?: boolean
+    googleAnalyticsId?: string | null
     analysisPhases?: AnalysisPhaseUncheckedCreateNestedManyWithoutDomainInput
     analysisReports?: AnalysisReportUncheckedCreateNestedManyWithoutDomainInput
     communityInsights?: CommunityInsightUncheckedCreateNestedManyWithoutDomainInput
@@ -69872,6 +69973,7 @@ export namespace Prisma {
     locationContext?: NullableStringFieldUpdateOperationsInput | string | null
     currentStep?: IntFieldUpdateOperationsInput | number
     isCompanyDomain?: BoolFieldUpdateOperationsInput | boolean
+    googleAnalyticsId?: NullableStringFieldUpdateOperationsInput | string | null
     analysisPhases?: AnalysisPhaseUpdateManyWithoutDomainNestedInput
     analysisReports?: AnalysisReportUpdateManyWithoutDomainNestedInput
     communityInsights?: CommunityInsightUpdateManyWithoutDomainNestedInput
@@ -69913,6 +70015,7 @@ export namespace Prisma {
     locationContext?: NullableStringFieldUpdateOperationsInput | string | null
     currentStep?: IntFieldUpdateOperationsInput | number
     isCompanyDomain?: BoolFieldUpdateOperationsInput | boolean
+    googleAnalyticsId?: NullableStringFieldUpdateOperationsInput | string | null
     analysisPhases?: AnalysisPhaseUncheckedUpdateManyWithoutDomainNestedInput
     analysisReports?: AnalysisReportUncheckedUpdateManyWithoutDomainNestedInput
     communityInsights?: CommunityInsightUncheckedUpdateManyWithoutDomainNestedInput
@@ -70001,6 +70104,7 @@ export namespace Prisma {
     locationContext?: string | null
     currentStep?: number
     isCompanyDomain?: boolean
+    googleAnalyticsId?: string | null
     analysisPhases?: AnalysisPhaseCreateNestedManyWithoutDomainInput
     analysisReports?: AnalysisReportCreateNestedManyWithoutDomainInput
     communityInsights?: CommunityInsightCreateNestedManyWithoutDomainInput
@@ -70042,6 +70146,7 @@ export namespace Prisma {
     locationContext?: string | null
     currentStep?: number
     isCompanyDomain?: boolean
+    googleAnalyticsId?: string | null
     analysisPhases?: AnalysisPhaseUncheckedCreateNestedManyWithoutDomainInput
     analysisReports?: AnalysisReportUncheckedCreateNestedManyWithoutDomainInput
     communityInsights?: CommunityInsightUncheckedCreateNestedManyWithoutDomainInput
@@ -70140,6 +70245,7 @@ export namespace Prisma {
     locationContext?: NullableStringFieldUpdateOperationsInput | string | null
     currentStep?: IntFieldUpdateOperationsInput | number
     isCompanyDomain?: BoolFieldUpdateOperationsInput | boolean
+    googleAnalyticsId?: NullableStringFieldUpdateOperationsInput | string | null
     analysisPhases?: AnalysisPhaseUpdateManyWithoutDomainNestedInput
     analysisReports?: AnalysisReportUpdateManyWithoutDomainNestedInput
     communityInsights?: CommunityInsightUpdateManyWithoutDomainNestedInput
@@ -70181,6 +70287,7 @@ export namespace Prisma {
     locationContext?: NullableStringFieldUpdateOperationsInput | string | null
     currentStep?: IntFieldUpdateOperationsInput | number
     isCompanyDomain?: BoolFieldUpdateOperationsInput | boolean
+    googleAnalyticsId?: NullableStringFieldUpdateOperationsInput | string | null
     analysisPhases?: AnalysisPhaseUncheckedUpdateManyWithoutDomainNestedInput
     analysisReports?: AnalysisReportUncheckedUpdateManyWithoutDomainNestedInput
     communityInsights?: CommunityInsightUncheckedUpdateManyWithoutDomainNestedInput
@@ -70269,6 +70376,7 @@ export namespace Prisma {
     locationContext?: string | null
     currentStep?: number
     isCompanyDomain?: boolean
+    googleAnalyticsId?: string | null
     analysisPhases?: AnalysisPhaseCreateNestedManyWithoutDomainInput
     analysisReports?: AnalysisReportCreateNestedManyWithoutDomainInput
     communityInsights?: CommunityInsightCreateNestedManyWithoutDomainInput
@@ -70310,6 +70418,7 @@ export namespace Prisma {
     locationContext?: string | null
     currentStep?: number
     isCompanyDomain?: boolean
+    googleAnalyticsId?: string | null
     analysisPhases?: AnalysisPhaseUncheckedCreateNestedManyWithoutDomainInput
     analysisReports?: AnalysisReportUncheckedCreateNestedManyWithoutDomainInput
     communityInsights?: CommunityInsightUncheckedCreateNestedManyWithoutDomainInput
@@ -70408,6 +70517,7 @@ export namespace Prisma {
     locationContext?: NullableStringFieldUpdateOperationsInput | string | null
     currentStep?: IntFieldUpdateOperationsInput | number
     isCompanyDomain?: BoolFieldUpdateOperationsInput | boolean
+    googleAnalyticsId?: NullableStringFieldUpdateOperationsInput | string | null
     analysisPhases?: AnalysisPhaseUpdateManyWithoutDomainNestedInput
     analysisReports?: AnalysisReportUpdateManyWithoutDomainNestedInput
     communityInsights?: CommunityInsightUpdateManyWithoutDomainNestedInput
@@ -70449,6 +70559,7 @@ export namespace Prisma {
     locationContext?: NullableStringFieldUpdateOperationsInput | string | null
     currentStep?: IntFieldUpdateOperationsInput | number
     isCompanyDomain?: BoolFieldUpdateOperationsInput | boolean
+    googleAnalyticsId?: NullableStringFieldUpdateOperationsInput | string | null
     analysisPhases?: AnalysisPhaseUncheckedUpdateManyWithoutDomainNestedInput
     analysisReports?: AnalysisReportUncheckedUpdateManyWithoutDomainNestedInput
     communityInsights?: CommunityInsightUncheckedUpdateManyWithoutDomainNestedInput
@@ -70620,6 +70731,7 @@ export namespace Prisma {
     locationContext?: string | null
     currentStep?: number
     isCompanyDomain?: boolean
+    googleAnalyticsId?: string | null
     analysisPhases?: AnalysisPhaseCreateNestedManyWithoutDomainInput
     analysisReports?: AnalysisReportCreateNestedManyWithoutDomainInput
     communityInsights?: CommunityInsightCreateNestedManyWithoutDomainInput
@@ -70661,6 +70773,7 @@ export namespace Prisma {
     locationContext?: string | null
     currentStep?: number
     isCompanyDomain?: boolean
+    googleAnalyticsId?: string | null
     analysisPhases?: AnalysisPhaseUncheckedCreateNestedManyWithoutDomainInput
     analysisReports?: AnalysisReportUncheckedCreateNestedManyWithoutDomainInput
     communityInsights?: CommunityInsightUncheckedCreateNestedManyWithoutDomainInput
@@ -70845,6 +70958,7 @@ export namespace Prisma {
     locationContext?: NullableStringFieldUpdateOperationsInput | string | null
     currentStep?: IntFieldUpdateOperationsInput | number
     isCompanyDomain?: BoolFieldUpdateOperationsInput | boolean
+    googleAnalyticsId?: NullableStringFieldUpdateOperationsInput | string | null
     analysisPhases?: AnalysisPhaseUpdateManyWithoutDomainNestedInput
     analysisReports?: AnalysisReportUpdateManyWithoutDomainNestedInput
     communityInsights?: CommunityInsightUpdateManyWithoutDomainNestedInput
@@ -70886,6 +71000,7 @@ export namespace Prisma {
     locationContext?: NullableStringFieldUpdateOperationsInput | string | null
     currentStep?: IntFieldUpdateOperationsInput | number
     isCompanyDomain?: BoolFieldUpdateOperationsInput | boolean
+    googleAnalyticsId?: NullableStringFieldUpdateOperationsInput | string | null
     analysisPhases?: AnalysisPhaseUncheckedUpdateManyWithoutDomainNestedInput
     analysisReports?: AnalysisReportUncheckedUpdateManyWithoutDomainNestedInput
     communityInsights?: CommunityInsightUncheckedUpdateManyWithoutDomainNestedInput
@@ -70990,6 +71105,7 @@ export namespace Prisma {
     locationContext?: string | null
     currentStep?: number
     isCompanyDomain?: boolean
+    googleAnalyticsId?: string | null
     analysisPhases?: AnalysisPhaseCreateNestedManyWithoutDomainInput
     analysisReports?: AnalysisReportCreateNestedManyWithoutDomainInput
     communityInsights?: CommunityInsightCreateNestedManyWithoutDomainInput
@@ -71031,6 +71147,7 @@ export namespace Prisma {
     locationContext?: string | null
     currentStep?: number
     isCompanyDomain?: boolean
+    googleAnalyticsId?: string | null
     analysisPhases?: AnalysisPhaseUncheckedCreateNestedManyWithoutDomainInput
     analysisReports?: AnalysisReportUncheckedCreateNestedManyWithoutDomainInput
     communityInsights?: CommunityInsightUncheckedCreateNestedManyWithoutDomainInput
@@ -71127,6 +71244,7 @@ export namespace Prisma {
     locationContext?: NullableStringFieldUpdateOperationsInput | string | null
     currentStep?: IntFieldUpdateOperationsInput | number
     isCompanyDomain?: BoolFieldUpdateOperationsInput | boolean
+    googleAnalyticsId?: NullableStringFieldUpdateOperationsInput | string | null
     analysisPhases?: AnalysisPhaseUpdateManyWithoutDomainNestedInput
     analysisReports?: AnalysisReportUpdateManyWithoutDomainNestedInput
     communityInsights?: CommunityInsightUpdateManyWithoutDomainNestedInput
@@ -71168,6 +71286,7 @@ export namespace Prisma {
     locationContext?: NullableStringFieldUpdateOperationsInput | string | null
     currentStep?: IntFieldUpdateOperationsInput | number
     isCompanyDomain?: BoolFieldUpdateOperationsInput | boolean
+    googleAnalyticsId?: NullableStringFieldUpdateOperationsInput | string | null
     analysisPhases?: AnalysisPhaseUncheckedUpdateManyWithoutDomainNestedInput
     analysisReports?: AnalysisReportUncheckedUpdateManyWithoutDomainNestedInput
     communityInsights?: CommunityInsightUncheckedUpdateManyWithoutDomainNestedInput
@@ -71340,6 +71459,7 @@ export namespace Prisma {
     locationContext?: string | null
     currentStep?: number
     isCompanyDomain?: boolean
+    googleAnalyticsId?: string | null
     analysisPhases?: AnalysisPhaseCreateNestedManyWithoutDomainInput
     analysisReports?: AnalysisReportCreateNestedManyWithoutDomainInput
     communityInsights?: CommunityInsightCreateNestedManyWithoutDomainInput
@@ -71381,6 +71501,7 @@ export namespace Prisma {
     locationContext?: string | null
     currentStep?: number
     isCompanyDomain?: boolean
+    googleAnalyticsId?: string | null
     analysisPhases?: AnalysisPhaseUncheckedCreateNestedManyWithoutDomainInput
     analysisReports?: AnalysisReportUncheckedCreateNestedManyWithoutDomainInput
     communityInsights?: CommunityInsightUncheckedCreateNestedManyWithoutDomainInput
@@ -71474,6 +71595,7 @@ export namespace Prisma {
     locationContext?: NullableStringFieldUpdateOperationsInput | string | null
     currentStep?: IntFieldUpdateOperationsInput | number
     isCompanyDomain?: BoolFieldUpdateOperationsInput | boolean
+    googleAnalyticsId?: NullableStringFieldUpdateOperationsInput | string | null
     analysisPhases?: AnalysisPhaseUpdateManyWithoutDomainNestedInput
     analysisReports?: AnalysisReportUpdateManyWithoutDomainNestedInput
     communityInsights?: CommunityInsightUpdateManyWithoutDomainNestedInput
@@ -71515,6 +71637,7 @@ export namespace Prisma {
     locationContext?: NullableStringFieldUpdateOperationsInput | string | null
     currentStep?: IntFieldUpdateOperationsInput | number
     isCompanyDomain?: BoolFieldUpdateOperationsInput | boolean
+    googleAnalyticsId?: NullableStringFieldUpdateOperationsInput | string | null
     analysisPhases?: AnalysisPhaseUncheckedUpdateManyWithoutDomainNestedInput
     analysisReports?: AnalysisReportUncheckedUpdateManyWithoutDomainNestedInput
     communityInsights?: CommunityInsightUncheckedUpdateManyWithoutDomainNestedInput
@@ -72163,6 +72286,7 @@ export namespace Prisma {
     locationContext?: string | null
     currentStep?: number
     isCompanyDomain?: boolean
+    googleAnalyticsId?: string | null
     analysisPhases?: AnalysisPhaseCreateNestedManyWithoutDomainInput
     analysisReports?: AnalysisReportCreateNestedManyWithoutDomainInput
     communityInsights?: CommunityInsightCreateNestedManyWithoutDomainInput
@@ -72204,6 +72328,7 @@ export namespace Prisma {
     locationContext?: string | null
     currentStep?: number
     isCompanyDomain?: boolean
+    googleAnalyticsId?: string | null
     analysisPhases?: AnalysisPhaseUncheckedCreateNestedManyWithoutDomainInput
     analysisReports?: AnalysisReportUncheckedCreateNestedManyWithoutDomainInput
     communityInsights?: CommunityInsightUncheckedCreateNestedManyWithoutDomainInput
@@ -72287,6 +72412,7 @@ export namespace Prisma {
     locationContext?: NullableStringFieldUpdateOperationsInput | string | null
     currentStep?: IntFieldUpdateOperationsInput | number
     isCompanyDomain?: BoolFieldUpdateOperationsInput | boolean
+    googleAnalyticsId?: NullableStringFieldUpdateOperationsInput | string | null
     analysisPhases?: AnalysisPhaseUpdateManyWithoutDomainNestedInput
     analysisReports?: AnalysisReportUpdateManyWithoutDomainNestedInput
     communityInsights?: CommunityInsightUpdateManyWithoutDomainNestedInput
@@ -72328,6 +72454,7 @@ export namespace Prisma {
     locationContext?: NullableStringFieldUpdateOperationsInput | string | null
     currentStep?: IntFieldUpdateOperationsInput | number
     isCompanyDomain?: BoolFieldUpdateOperationsInput | boolean
+    googleAnalyticsId?: NullableStringFieldUpdateOperationsInput | string | null
     analysisPhases?: AnalysisPhaseUncheckedUpdateManyWithoutDomainNestedInput
     analysisReports?: AnalysisReportUncheckedUpdateManyWithoutDomainNestedInput
     communityInsights?: CommunityInsightUncheckedUpdateManyWithoutDomainNestedInput
@@ -72467,6 +72594,7 @@ export namespace Prisma {
     locationContext?: string | null
     currentStep?: number
     isCompanyDomain?: boolean
+    googleAnalyticsId?: string | null
   }
 
   export type WordpressPublishLogCreateManyUserInput = {
@@ -72504,6 +72632,7 @@ export namespace Prisma {
     locationContext?: NullableStringFieldUpdateOperationsInput | string | null
     currentStep?: IntFieldUpdateOperationsInput | number
     isCompanyDomain?: BoolFieldUpdateOperationsInput | boolean
+    googleAnalyticsId?: NullableStringFieldUpdateOperationsInput | string | null
     analysisPhases?: AnalysisPhaseUpdateManyWithoutDomainNestedInput
     analysisReports?: AnalysisReportUpdateManyWithoutDomainNestedInput
     communityInsights?: CommunityInsightUpdateManyWithoutDomainNestedInput
@@ -72544,6 +72673,7 @@ export namespace Prisma {
     locationContext?: NullableStringFieldUpdateOperationsInput | string | null
     currentStep?: IntFieldUpdateOperationsInput | number
     isCompanyDomain?: BoolFieldUpdateOperationsInput | boolean
+    googleAnalyticsId?: NullableStringFieldUpdateOperationsInput | string | null
     analysisPhases?: AnalysisPhaseUncheckedUpdateManyWithoutDomainNestedInput
     analysisReports?: AnalysisReportUncheckedUpdateManyWithoutDomainNestedInput
     communityInsights?: CommunityInsightUncheckedUpdateManyWithoutDomainNestedInput
@@ -72584,6 +72714,7 @@ export namespace Prisma {
     locationContext?: NullableStringFieldUpdateOperationsInput | string | null
     currentStep?: IntFieldUpdateOperationsInput | number
     isCompanyDomain?: BoolFieldUpdateOperationsInput | boolean
+    googleAnalyticsId?: NullableStringFieldUpdateOperationsInput | string | null
   }
 
   export type WordpressPublishLogUpdateWithoutUserInput = {

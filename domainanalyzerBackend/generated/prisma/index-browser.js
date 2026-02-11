@@ -148,7 +148,8 @@ exports.Prisma.DomainScalarFieldEnum = {
   runAllModels: 'runAllModels',
   locationContext: 'locationContext',
   currentStep: 'currentStep',
-  isCompanyDomain: 'isCompanyDomain'
+  isCompanyDomain: 'isCompanyDomain',
+  googleAnalyticsId: 'googleAnalyticsId'
 };
 
 exports.Prisma.CrawlResultScalarFieldEnum = {

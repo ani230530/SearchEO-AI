@@ -42,7 +42,8 @@ import {
   ExternalLink,
   Pencil,
   RefreshCw,
-  ArrowRight
+  ArrowRight,
+  Database
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { maskDomainId } from '@/lib/domainUtils';
@@ -298,6 +299,8 @@ const [improvedContent, setImprovedContent] = useState("");
   const [gscLoading, setGscLoading] = useState(false);
   const [gscStatusLoading, setGscStatusLoading] = useState(false);
   const [gscLastSynced, setGscLastSynced] = useState<Date | null>(null);
+  const [googleAnalyticsId, setGoogleAnalyticsId] = useState("");
+  const [gaSaving, setGaSaving] = useState(false);
   const [wpIntegration, setWpIntegration] = useState<WordpressIntegration | null>(null);
   const [wpIntegrationLoading, setWpIntegrationLoading] = useState(false);
   const [wpIntegrationSaving, setWpIntegrationSaving] = useState(false);
@@ -341,6 +344,20 @@ const toggleSection = (idx: number) => {
   const companyCarouselRef = useRef<HTMLDivElement | null>(null);
   const [companyCurrentIndex, setCompanyCurrentIndex] = useState(0);
   const [companySectionsCount, setCompanySectionsCount] = useState(0);
+  
+  const extractOrgName = (context: string) => {
+    if (!context) return "";
+    const lines = context.split('\n');
+    for (const line of lines) {
+      const match = line.match(/(?:Organization|Company|Brand)\s*:\s*([^\n]+)/i) || 
+                    line.match(/###\s*(?:Brand Analysis for|Company Profile:)\s*([^\n]+)/i);
+      if (match && match[1]) {
+        return match[1].trim().replace(/\*+/g, '');
+      }
+    }
+    return "";
+  };
+  
   const companyCarouselCleanupRef = useRef<(() => void) | null>(null);
   const setCompanyCarouselRef = useCallback((el: HTMLDivElement | null) => {
     if (companyCarouselCleanupRef.current) {
@@ -934,6 +951,7 @@ useEffect(() => {
         }
         
         setCreatedDomainId(data.domain.id);
+        setGoogleAnalyticsId(data.domain.googleAnalyticsId || "");
         setShowResults(true);
       } else {
         // No company domain - show form
@@ -986,6 +1004,7 @@ useEffect(() => {
              setKeywords(domainData.keywords);
           }
           setCreatedDomainId(domainData.domain.id);
+          setGoogleAnalyticsId(domainData.domain.googleAnalyticsId || "");
         }
         // If domain missing, we might want to clear, but let's be careful not to break UI
       }
@@ -4394,6 +4413,90 @@ const rightSections = sections.slice(4, 8);
                             </p>
                           </div>
                         )}
+
+                        {/* Google Analytics Section */}
+                        <div className="bg-white rounded-[32px] p-10 border border-gray-100 hover:shadow-xl transition-all duration-300">
+                          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-8">
+                            <div className="flex items-center gap-6">
+                              <div className="w-16 h-16 rounded-3xl bg-neutral-900 flex items-center justify-center shadow-xl shadow-neutral-200">
+                                <BarChart3 className="h-8 w-8 text-white" />
+                              </div>
+                              <div className="space-y-1">
+                                <div className="flex items-center gap-3">
+                                  <h3 className="text-2xl font-light text-black tracking-tight">Google Analytics 4</h3>
+                                  {googleAnalyticsId && (
+                                    <div className="flex items-center gap-1.5 bg-green-50 text-green-700 px-3 py-1 rounded-full text-[10px] font-medium border border-green-100 uppercase tracking-wider">
+                                      <CheckCircle className="h-3 w-3" />
+                                      Connected
+                                    </div>
+                                  )}
+                                </div>
+                                <p className="text-sm text-neutral-400 font-light max-w-xs">Link your Property ID for automated reporting and advanced audit insights.</p>
+                              </div>
+                            </div>
+
+                            <div className="flex flex-col sm:flex-row items-center gap-4 w-full lg:w-auto">
+                              <div className="relative flex-1 lg:w-80 w-full group">
+                                <div className="absolute left-6 top-1/2 -translate-y-1/2 text-neutral-400 group-focus-within:text-black transition">
+                                  <Database className="h-4 w-4" />
+                                </div>
+                                <input
+                                  type="text"
+                                  value={googleAnalyticsId}
+                                  onChange={(e) => setGoogleAnalyticsId(e.target.value)}
+                                  placeholder="GA4 Property ID (e.g. 123456789)"
+                                  className="w-full h-14 pl-14 pr-6 text-sm rounded-full border border-neutral-100 bg-neutral-50 focus:bg-white focus:border-black/10 focus:ring-4 focus:ring-black/5 outline-none transition-all placeholder:text-neutral-300 font-light"
+                                />
+                              </div>
+                              <button
+                                onClick={async () => {
+                                  if (!createdDomainId) return;
+                                  try {
+                                    setGaSaving(true);
+                                    const res = await fetch(`${import.meta.env.VITE_API_URL}/api/domain/${createdDomainId}`, {
+                                      method: 'PATCH',
+                                      headers: {
+                                        'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+                                        'Content-Type': 'application/json',
+                                      },
+                                      body: JSON.stringify({ googleAnalyticsId }),
+                                    });
+                                    if (res.ok) {
+                                      toast({
+                                        title: "Connection Successful",
+                                        description: "Your Google Analytics Property ID has been securely linked.",
+                                      });
+                                    } else {
+                                      throw new Error("Failed to update");
+                                    }
+                                  } catch (err) {
+                                    toast({
+                                      title: "Connection Failed",
+                                      description: "Unable to save Property ID. Please try again.",
+                                      variant: "destructive",
+                                    });
+                                  } finally {
+                                    setGaSaving(false);
+                                  }
+                                }}
+                                disabled={gaSaving || !googleAnalyticsId}
+                                className={cn(
+                                  "h-14 px-10 rounded-full text-sm font-medium transition-all shadow-xl",
+                                  googleAnalyticsId && !gaSaving
+                                    ? "bg-black text-white hover:bg-neutral-800 hover:-translate-y-0.5 active:scale-95 shadow-black/10"
+                                    : "bg-neutral-100 text-neutral-400 cursor-not-allowed shadow-none"
+                                )}
+                              >
+                                {gaSaving ? (
+                                  <div className="flex items-center gap-2 justify-center">
+                                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                    <span>Syncing</span>
+                                  </div>
+                                ) : "Update Connection"}
+                              </button>
+                            </div>
+                          </div>
+                        </div>
                       </div>
                     )}
 
@@ -5423,7 +5526,10 @@ const rightSections = sections.slice(4, 8);
               </div>
             </div>
           ) : activeTab === 'analytics-report' ? (
-            <AnalyticsReportingView />
+            <AnalyticsReportingView 
+              initialGaId={googleAnalyticsId}
+              initialOrgName={extractOrgName(domainContext)}
+            />
           ): activeTab === 'gsc-analytics' ? (
             <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
               {/* GSC Sub-tabs */}
@@ -6443,9 +6549,11 @@ function CampaignStructureView({
 
   const triggerAiSubPage = useCallback(
     async (topicId: number) => {
+      console.log('triggerAiSubPage triggered for topicId:', topicId);
       const key = `subpage-${topicId}`;
       setAiLoading(key);
       try {
+        console.log('Calling API:', `${CAMPAIGN_API_BASE}/topics/${topicId}/subpages/ai`);
         await mutateStructure(
           `${CAMPAIGN_API_BASE}/topics/${topicId}/subpages/ai`,
           {
@@ -7251,7 +7359,19 @@ function CampaignStructureView({
   );
 };
 
-const handleUpdatePillar = async (topicId: number, updates: { title?: string; referenceUrl?: string }) => {
+  const handleCreatePillarPage = async (topicId: number) => {
+    try {
+      await mutateStructure(
+        `${CAMPAIGN_API_BASE}/topics/${topicId}/pillar`,
+        { method: 'POST' },
+        { successMessage: 'Pillar page created' }
+      );
+    } catch {
+      // handled upstream
+    }
+  };
+
+  const handleUpdatePillar = async (topicId: number, updates: { title?: string; referenceUrl?: string }) => {
     try {
       await mutateStructure(
         `${CAMPAIGN_API_BASE}/topics/${topicId}/pillar`,
@@ -7474,10 +7594,13 @@ const handleUpdatePillar = async (topicId: number, updates: { title?: string; re
                         const t = campaignStructure.topics.find(t => t.id === tid);
                         if(t) handleUpdatePillar(t.pillarPage!.id, { referenceUrl: url });
                      }}
-                     onDeletePillar={handleDeletePillarPage}
-                     onDeleteSubPage={handleDeleteSubPage}
+                      onDeletePillar={handleDeletePillarPage}
+                      onCreatePillar={handleCreatePillarPage}
+                      onGenerateAiPillar={triggerAiPillar}
+                      onAddSubPage={(tid) => { setTargetTopicId(tid); setShowAddSubPageModal(true); }}
+                      onGenerateAiSubPage={triggerAiSubPage}
+                      onDeleteSubPage={handleDeleteSubPage}
                      renderStatusPill={renderStatusPill}
-                     onAddSubPage={(tid) => { setTargetTopicId(tid); setShowAddSubPageModal(true); }}
                      onAddKeyword={handleAddKeyword}
                      onDeleteKeyword={handleDeleteKeyword}
                      onSelectPrimaryKeyword={handleSelectPrimaryKeyword}
@@ -7683,7 +7806,58 @@ const handleUpdatePillar = async (topicId: number, updates: { title?: string; re
             )}
           </div>
         </SheetContent>
+
       </Sheet>
+
+      {/* Manual Add Topic Modal */}
+      {showAddTopicModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[60]">
+           <div className="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-md border border-gray-100 transform transition-all scale-100">
+             <div className="flex items-center justify-between mb-6">
+                <h2 className="text-xl font-light text-gray-900">Add New Topic</h2>
+                <button 
+                  onClick={() => setShowAddTopicModal(false)}
+                  className="p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-400 hover:text-gray-600"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+             </div>
+             
+             <div className="space-y-4">
+               <div>
+                 <label htmlFor="topic-title" className="block text-xs uppercase tracking-wider text-gray-500 font-medium mb-1.5">
+                   Topic Title
+                 </label>
+                 <input
+                   id="topic-title"
+                   type="text"
+                   value={newTopicTitle}
+                   onChange={(e) => setNewTopicTitle(e.target.value)}
+                   onKeyDown={(e) => e.key === 'Enter' && handleSubmitTopic()}
+                   className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-black/5 focus:border-black transition-all text-gray-900 placeholder:text-gray-300"
+                   placeholder="e.g. Sustainable Fashion Trends"
+                   autoFocus
+                 />
+               </div>
+               
+               <div className="pt-2 flex justify-end gap-3">
+                 <button
+                   onClick={() => setShowAddTopicModal(false)}
+                   className="px-5 py-2.5 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors"
+                 >
+                   Cancel
+                 </button>
+                 <button
+                   onClick={handleSubmitTopic}
+                   className="px-6 py-2.5 rounded-xl text-sm font-medium bg-black text-white hover:bg-gray-800 transition-all shadow-lg shadow-gray-200"
+                 >
+                   Create Topic
+                 </button>
+               </div>
+             </div>
+           </div>
+        </div>
+      )}
 
       {showAddKeywordModal && addKeywordContext && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[60]">

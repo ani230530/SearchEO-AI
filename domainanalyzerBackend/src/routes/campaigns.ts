@@ -906,7 +906,9 @@ router.post('/topics/:topicId/pillar/ai', authenticateToken, asyncHandler(async 
     domainUrl: domain.url,
     domainContext: domain.context,
     keywords: extractDomainKeywords(domain),
-    topicTitle: topic.title
+    topicTitle: topic.title,
+    campaignTitle: campaign.title,
+    campaignDescription: campaign.description || undefined
   });
 
   const existingPillar = await prisma.campaignPage.findFirst({
@@ -983,6 +985,51 @@ router.delete('/topics/:topicId/pillar', authenticateToken, asyncHandler(async (
 }));
 
 /**
+ * POST /api/campaigns/topics/:topicId/pillar
+ * Create manual pillar page (if missing)
+ */
+router.post('/topics/:topicId/pillar', authenticateToken, asyncHandler(async (req: Request, res: Response) => {
+  const authReq = req as AuthenticatedRequest;
+  const userId = authReq.user.userId;
+  const topicId = parseInt(req.params.topicId, 10);
+
+  if (isNaN(topicId)) {
+    return res.status(400).json({ success: false, error: 'Invalid topic ID' });
+  }
+
+  const topic = await ensureTopicOwnership(topicId, userId);
+  if (!topic) {
+    return res.status(404).json({ success: false, error: 'Topic not found' });
+  }
+
+  // Check if pillar page already exists
+  const existingPillar = await prisma.campaignPage.findFirst({
+    where: {
+      topicId,
+      pageType: CampaignPageType.PILLAR
+    }
+  });
+
+  if (existingPillar) {
+    return res.status(400).json({ success: false, error: 'Pillar page already exists for this topic' });
+  }
+
+  // Create pillar page
+  await prisma.campaignPage.create({
+    data: {
+      topicId,
+      pageType: CampaignPageType.PILLAR,
+      title: topic.title, // Default to topic title
+      summary: `Pillar page for ${topic.title}`,
+      order: 0,
+      source: CampaignNodeSource.MANUAL
+    }
+  });
+
+  return respondWithStructure(res, topic.campaignId, userId, 201);
+}));
+
+/**
  * POST /api/campaigns/topics/:topicId/subpages
  * Create manual sub-page
  */
@@ -1049,12 +1096,21 @@ router.post('/topics/:topicId/subpages/ai', authenticateToken, asyncHandler(asyn
     return res.status(400).json({ success: false, error: 'Company domain missing for this topic' });
   }
 
+  const existingPages = await prisma.campaignPage.findMany({
+    where: { topicId, pageType: CampaignPageType.SUBPAGE },
+    select: { title: true }
+  });
+  const excludeTitles = existingPages.map(p => p.title);
+
   const suggestions = await generateSubPagesSuggestion({
     domainUrl: domain.url,
     domainContext: domain.context,
     keywords: extractDomainKeywords(domain),
     topicTitle: topic.title,
-    count
+    count,
+    excludeTitles,
+    campaignTitle: campaign.title,
+    campaignDescription: campaign.description || undefined
   });
 
   await prisma.$transaction(async (tx) => {

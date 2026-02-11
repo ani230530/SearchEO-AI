@@ -158,17 +158,36 @@ const buildTopic = (topic: any, fallbackSeed: string): GeneratedTopic => {
 };
 
 export async function generateCampaignTopics(
-  context: BaseAiContext & { count?: number; focus?: string; excludeTopics?: string[] }
+  context: BaseAiContext & {
+    count?: number;
+    focus?: string;
+    excludeTopics?: string[];
+    campaignTitle?: string;
+    campaignDescription?: string;
+  }
 ): Promise<GeneratedTopic[]> {
-  const { domainUrl, domainContext, keywords = [], count = 1, focus, excludeTopics = [] } = context;
+  const {
+    domainUrl,
+    domainContext,
+    keywords = [],
+    count = 1,
+    focus,
+    excludeTopics = [],
+    campaignTitle,
+    campaignDescription
+  } = context;
 
   const exclusionPrompt = excludeTopics.length > 0
     ? `\nDO NOT generate these topics (they already exist): ${excludeTopics.join(', ')}`
     : '';
 
+  const campaignContext = campaignTitle
+    ? `\nCampaign Name: ${campaignTitle}\nCampaign Goal: ${campaignDescription || 'Not provided'}`
+    : '';
+
   const prompt = `
 Create ${count} UNIQUE and NEW campaign topics for ${domainUrl}. These topics will be used to generate high-quality BLOG POSTS and ARTICLES.
-Context: ${domainContext || 'Not provided'}. Use this to align topics with the brand's voice and expertise.
+Context: ${domainContext || 'Not provided'}. Use this to align topics with the brand's voice and expertise.${campaignContext}
 Important keywords: ${keywords.slice(0, 8).join(', ') || 'none'}. Ensure topics are relevant to these keywords.
 Focus: ${focus || 'balanced mix of awareness and consideration'}${exclusionPrompt}
 Random Seed: ${Date.now()}
@@ -235,12 +254,21 @@ Only return JSON.Ensure titles are distinct from the excluded list.`;
 }
 
 export async function generatePillarPageSuggestion(
-  context: BaseAiContext & { topicTitle: string }
+  context: BaseAiContext & {
+    topicTitle: string;
+    campaignTitle?: string;
+    campaignDescription?: string;
+  }
 ): Promise<GeneratedPage> {
-  const { domainUrl, domainContext, keywords = [], topicTitle } = context;
+  const { domainUrl, domainContext, keywords = [], topicTitle, campaignTitle, campaignDescription } = context;
+
+  const campaignContext = campaignTitle
+    ? `\nCampaign Name: ${campaignTitle}\nCampaign Goal: ${campaignDescription || 'Not provided'}`
+    : '';
+
   const prompt = `
 Create a single pillar page idea for the topic "${topicTitle}" for ${domainUrl}.
-Context: ${domainContext || 'Not provided'}
+Context: ${domainContext || 'Not provided'}${campaignContext}
 Important keywords: ${keywords.slice(0, 8).join(', ') || 'none'}
 Random Seed: ${Date.now()}
 
@@ -273,14 +301,29 @@ Only return JSON.`;
 }
 
 export async function generateSubPagesSuggestion(
-  context: BaseAiContext & { topicTitle: string; count?: number }
+  context: BaseAiContext & {
+    topicTitle: string;
+    count?: number;
+    excludeTitles?: string[];
+    campaignTitle?: string;
+    campaignDescription?: string;
+  }
 ): Promise<GeneratedPage[]> {
-  const { domainUrl, domainContext, keywords = [], topicTitle, count = 2 } = context;
+  const { domainUrl, domainContext, keywords = [], topicTitle, count = 2, excludeTitles = [], campaignTitle, campaignDescription } = context;
+
+  const exclusionPrompt = excludeTitles.length > 0
+    ? `\nDO NOT generate these sub-page titles (they already exist): ${excludeTitles.join(', ')}`
+    : '';
+
+  const campaignContext = campaignTitle
+    ? `\nCampaign Name: ${campaignTitle}\nCampaign Goal: ${campaignDescription || 'Not provided'}`
+    : '';
+
   const prompt = `
-Suggest ${count} supporting sub-pages for the topic "${topicTitle}".
+Suggest ${count} UNIQUE and NEW supporting sub-pages for the topic "${topicTitle}".
 Company: ${domainUrl}
-Context: ${domainContext || 'Not provided'}
-Important keywords: ${keywords.slice(0, 8).join(', ') || 'none'}
+Context: ${domainContext || 'Not provided'}${campaignContext}
+Important keywords: ${keywords.slice(0, 8).join(', ') || 'none'}${exclusionPrompt}
 Random Seed: ${Date.now()}
 
 Return JSON:
@@ -360,4 +403,3 @@ Only return JSON.`;
     buildKeyword(kw, `${scope} keyword ${index + 1}`)
   );
 }
-

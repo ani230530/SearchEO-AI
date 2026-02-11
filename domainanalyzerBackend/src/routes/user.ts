@@ -46,6 +46,7 @@ router.get('/company-domain', authenticateToken, asyncHandler(async (req: Reques
         url: companyDomain.url,
         context: companyDomain.context,
         location: companyDomain.location,
+        googleAnalyticsId: companyDomain.googleAnalyticsId,
         createdAt: companyDomain.createdAt,
         updatedAt: companyDomain.updatedAt
       },

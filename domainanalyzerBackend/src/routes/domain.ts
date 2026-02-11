@@ -106,7 +106,7 @@ router.get('/check/:url', authenticateToken, asyncHandler(async (req: Request, r
   try {
     const { url } = req.params;
     const authReq = req as AuthenticatedRequest;
-    
+
     // Try multiple URL formats to find the domain
     const possibleUrls = [
       url, // Original URL as provided
@@ -114,13 +114,13 @@ router.get('/check/:url', authenticateToken, asyncHandler(async (req: Request, r
       url.startsWith('http') ? url : `http://${url}`, // With http://
       url.replace(/^https?:\/\//, '') // Without protocol
     ];
-    
+
     let domain: any = null;
-    
+
     // Try to find the domain with any of the possible URL formats for this user
     for (const possibleUrl of possibleUrls) {
       domain = await prisma.domain.findFirst({
-        where: { 
+        where: {
           url: possibleUrl,
           userId: authReq.user.userId
         },
@@ -129,7 +129,7 @@ router.get('/check/:url', authenticateToken, asyncHandler(async (req: Request, r
           crawlResults: { orderBy: { createdAt: 'desc' }, take: 1 }
         }
       });
-      
+
       if (domain) {
         break; // Found the domain, stop searching
       }
@@ -159,7 +159,7 @@ router.get('/check/:url', authenticateToken, asyncHandler(async (req: Request, r
 router.post('/', authenticateToken, asyncHandler(async (req: Request, res: Response) => {
   const authReq = req as AuthenticatedRequest;
   const { url, subdomains, customPaths, priorityUrls, location } = req.body;
-  
+
   // Validate input before setting SSE headers
   if (!url) {
     res.status(400).json({ error: 'URL is required' });
@@ -219,7 +219,7 @@ router.post('/', authenticateToken, asyncHandler(async (req: Request, res: Respo
 
     // Check if domain already exists for this user
     let domain = await prisma.domain.findFirst({
-      where: { 
+      where: {
         url: normalizedUrl,
         userId: authReq.user.userId
       }
@@ -239,7 +239,7 @@ router.post('/', authenticateToken, asyncHandler(async (req: Request, res: Respo
       });
       isNewDomain = true;
     }
-    
+
     sendEvent({ type: 'domain_created', domainId: domain.id, isNewDomain });
 
     // Initialize only domain extraction and keyword generation phases
@@ -257,7 +257,7 @@ router.post('/', authenticateToken, asyncHandler(async (req: Request, res: Respo
 
     const onProgress: ProgressCallback = (progressData) => {
       let enhancedMessage = progressData.step;
-      
+
       if (progressData.phase === 'discovery') {
         if (progressData.step.includes('Validating')) {
           enhancedMessage = 'Validating domain accessibility and technical requirements...';
@@ -289,7 +289,7 @@ router.post('/', authenticateToken, asyncHandler(async (req: Request, res: Respo
           enhancedMessage = 'Finalizing comprehensive brand analysis and preparing insights...';
         }
       }
-      
+
       const phaseProgress = Math.min(90, 10 + (progressData.progress * 0.8)); // Domain extraction gets 10-90%
       sendEvent({ type: 'progress', phase: 'domain_extraction', step: enhancedMessage, progress: phaseProgress, stats: progressData.stats });
     };
@@ -298,9 +298,9 @@ router.post('/', authenticateToken, asyncHandler(async (req: Request, res: Respo
     const hasPriorityUrls = Array.isArray(priorityUrls) && priorityUrls.length > 0;
     const hasCustomPaths = Array.isArray(customPaths) && customPaths.length > 0;
     let extraction;
-    
+
     const domainName = domain.url.replace(/^https?:\/\//, '').replace(/^www\./, '');
-    
+
     try {
       if (!hasPriorityUrls && !hasCustomPaths) {
         extraction = await crawlAndExtractWithGpt4o(domainName, onProgress, undefined, undefined, location);
@@ -314,10 +314,10 @@ router.post('/', authenticateToken, asyncHandler(async (req: Request, res: Respo
       sendErrorAndEnd('Extraction failed', extractionError instanceof Error ? extractionError.message : 'Unknown extraction error');
       return;
     }
-    
+
     // Save crawl result
     sendEvent({ type: 'progress', phase: 'domain_extraction', step: 'Saving domain extraction results...', progress: 95 });
-    
+
     const crawlResult = await prisma.crawlResult.create({
       data: {
         domainId: domain.id,
@@ -345,7 +345,7 @@ router.post('/', authenticateToken, asyncHandler(async (req: Request, res: Respo
 
     try {
       sendEvent({ type: 'progress', phase: 'keyword_generation', step: 'Analyzing domain context for keyword generation...', progress: 30 });
-      
+
       // Use enhanced AI keyword generation with location context
       let keywords = [];
       try {
@@ -358,7 +358,7 @@ router.post('/', authenticateToken, asyncHandler(async (req: Request, res: Respo
           intent: kw.intent || 'Commercial',
         }));
         totalTokenUsage += aiKeywordResult.tokenUsage || 0;
-        
+
         console.log(`✅ AI generated ${keywords.length} keywords with intent classification`);
       } catch (aiError) {
         console.error('AI keyword generation failed:', aiError);
@@ -405,14 +405,14 @@ router.post('/', authenticateToken, asyncHandler(async (req: Request, res: Respo
 
     // Final completion
     sendEvent({ type: 'progress', step: 'Finalizing comprehensive analysis...', progress: 98 });
-    
+
     // Send final result and close connection
     await syncDomainCurrentStep(domain.id);
 
-    sendEvent({ 
-      type: 'complete', 
-      result: { 
-        domain, 
+    sendEvent({
+      type: 'complete',
+      result: {
+        domain,
         extraction: crawlResult,
         isNewDomain,
         tokenUsage: totalTokenUsage,
@@ -420,7 +420,7 @@ router.post('/', authenticateToken, asyncHandler(async (req: Request, res: Respo
           domain_extraction: 'completed',
           keyword_generation: keywordResult ? 'completed' : 'failed'
         }
-      } 
+      }
     });
     res.end();
 
@@ -592,4 +592,46 @@ router.delete('/:id', authenticateToken, asyncHandler(async (req: Request, res: 
   res.json({ success: true });
 }));
 
-export default router; 
+// PATCH /api/domain/:id - Update domain fields
+router.patch('/:id', authenticateToken, asyncHandler(async (req: Request, res: Response) => {
+  const authReq = req as AuthenticatedRequest;
+  const domainId = Number(req.params.id);
+  const { googleAnalyticsId } = req.body;
+
+  if (!domainId || isNaN(domainId)) {
+    return res.status(400).json({ error: 'Invalid domain ID' });
+  }
+
+  try {
+    // Verify domain access
+    const domain = await prisma.domain.findFirst({
+      where: {
+        id: domainId,
+        userId: authReq.user.userId
+      }
+    });
+
+    if (!domain) {
+      return res.status(404).json({ error: 'Domain not found' });
+    }
+
+    // Update the domain
+    const updatedDomain = await prisma.domain.update({
+      where: { id: domainId },
+      data: {
+        googleAnalyticsId: googleAnalyticsId !== undefined ? googleAnalyticsId : undefined
+      }
+    });
+
+    res.json({
+      success: true,
+      domain: updatedDomain
+    });
+
+  } catch (error) {
+    console.error('Error updating domain:', error);
+    res.status(500).json({ error: 'Failed to update domain' });
+  }
+}));
+
+export default router;
