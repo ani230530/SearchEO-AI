@@ -44,8 +44,11 @@ import {
   Pencil,
   RefreshCw,
   ArrowRight,
-  Database
+  Database,
+  Table
 } from 'lucide-react';
+import { CampaignTableView } from '@/features/campaign/CampaignTableView';
+
 import { cn } from '@/lib/utils';
 import { maskDomainId } from '@/lib/domainUtils';
 import { useAuth } from '@/contexts/AuthContext';
@@ -390,7 +393,8 @@ const toggleSection = (idx: number) => {
   const { toast } = useToast();
   const isSidebarExpanded = sidebarOpen || isSidebarHovered;
 // Campaign States
-const [campaignViewMode, setCampaignViewMode] = useState<'split' | 'graph'>('split');
+  const [campaignViewMode, setCampaignViewMode] = useState<'split' | 'graph' | 'table'>('split');
+
 const [selectedTopicId, setSelectedTopicId] = useState<number | null>(null);
 const [campaignStructure, setCampaignStructure] = useState<CampaignStructure>({
   topics: []
@@ -2798,7 +2802,19 @@ useEffect(() => {
                     <Network className="h-4 w-4" />
                     <span>Map</span>
                   </button>
+                  <button
+                    onClick={() => setCampaignViewMode('table')}
+                    className={`p-1.5 rounded-md transition-all flex items-center gap-2 text-xs font-medium ${
+                      campaignViewMode === 'table' 
+                        ? 'bg-white text-black shadow-sm' 
+                        : 'text-gray-500 hover:text-gray-700'
+                    }`}
+                  >
+                    <Table className="h-4 w-4" />
+                    <span>Inventory</span>
+                  </button>
                </div>
+
             )}
 
             {user && (
@@ -5751,8 +5767,9 @@ interface CampaignStructureViewProps {
   wpIntegration: WordpressIntegration | null;
   onConfigureWordpress: () => void;
   onRefreshWordpressIntegration: () => void;
-  viewMode: 'split' | 'graph';
-  onViewModeChange: (mode: 'split' | 'graph') => void;
+  viewMode: 'split' | 'graph' | 'table';
+  onViewModeChange: (mode: 'split' | 'graph' | 'table') => void;
+
   sidebarOpen: boolean;
   // Sync states passed from SidebarDashboard
   publishingPageIds: Set<number>;
@@ -7388,6 +7405,21 @@ function CampaignStructureView({
     }
   };
 
+  const handleUpdatePageTitle = async (pageId: number, title: string) => {
+    try {
+      await mutateStructure(
+        `${CAMPAIGN_API_BASE}/pages/${pageId}`,
+        {
+          method: 'PATCH',
+          body: JSON.stringify({ title }),
+        },
+        { successMessage: 'Page title updated' }
+      );
+    } catch {
+      // handled upstream
+    }
+  };
+
   const handleDeleteSubPage = (subPageId: number) => {
   confirmDelete("Sub-page", () =>
     mutateStructure(
@@ -7602,6 +7634,7 @@ function CampaignStructureView({
                       onAddSubPage={(tid) => { setTargetTopicId(tid); setShowAddSubPageModal(true); }}
                       onGenerateAiSubPage={triggerAiSubPage}
                       onDeleteSubPage={handleDeleteSubPage}
+                      onUpdatePageTitle={handleUpdatePageTitle}
                      renderStatusPill={renderStatusPill}
                      onAddKeyword={handleAddKeyword}
                      onDeleteKeyword={handleDeleteKeyword}
@@ -7612,7 +7645,7 @@ function CampaignStructureView({
                    />
                  ) : (
                    <div className="h-full flex flex-col items-center justify-center text-gray-400">
-                     <img className="mt-4 h-40 w-40 mb-4" src="https://res.cloudinary.com/dyxsai3xf/image/upload/v1770815473/WhatsApp_Image_2026-02-11_at_11.48.44_hopxes.jpg" alt="Campaign" />
+                     <img className="mt-4 h-50 w-50 mb-4" src="https://res.cloudinary.com/dyxsai3xf/image/upload/v1770815473/WhatsApp_Image_2026-02-11_at_11.48.44_hopxes.jpg" alt="Campaign" />
                      <p>Create/Select your topic to get started.</p>
                    </div>
                  )}
@@ -7628,6 +7661,33 @@ function CampaignStructureView({
                 />
                </div>
             </div>
+
+            {/* Table View: Full Screen */}
+            <div className={`absolute inset-0 bg-white transition-opacity duration-300 ${viewMode === 'table' ? 'opacity-100 z-10 font-light' : 'opacity-0 z-0 pointer-events-none'}`}>
+               <div className="w-full h-full">
+                <CampaignTableView
+                  campaignStructure={campaignStructure}
+                  selectedTopicId={selectedTopicId}
+                  onSelectTopic={(tid) => {
+                    setSelectedTopicId(tid);
+                    onViewModeChange('split');
+                  }}
+                  renderStatusPill={renderStatusPill}
+                  generationJobs={generationJobs}
+                  onGenerateTopic={handleGenerateTopic}
+                  onUpdatePageTitle={handleUpdatePageTitle}
+                  onDeleteSubPage={handleDeleteSubPage}
+                  onDeletePillarPage={handleDeletePillarPage}
+                  onAddKeyword={handleAddKeyword}
+                  onDeleteKeyword={handleDeleteKeyword}
+                  onSelectPrimaryKeyword={handleSelectPrimaryKeyword}
+                  onSelectLongtailKeyword={handleSelectLongtailKeyword}
+                  aiLoading={aiLoading}
+                />
+
+               </div>
+            </div>
+
 
         </div>
       </div>
