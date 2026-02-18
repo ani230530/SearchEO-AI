@@ -1,3 +1,4 @@
+"use client";
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -551,7 +552,7 @@ const [editDescription, setEditDescription] = useState('');
     { id: 'publish', label: 'Publish', icon: <Send className="h-5 w-5" /> },
     { id: 'gsc-analytics', label: 'GSC Analytics', icon: <BarChart3 className="h-5 w-5" /> },
     { id: 'audit', label: 'Audit', icon: <ClipboardList className="h-5 w-5" /> },
-    { id: 'analytics-report', label: 'Analytics Reporting', icon: <FileChartColumnIncreasing className="h-5 w-5" /> },
+    { id: 'analytics-report', label: 'Analytics Report', icon: <FileChartColumnIncreasing className="h-5 w-5" /> },
     { id: 'settings', label: 'Settings', icon: <Settings className="h-5 w-5" /> },
     { id: 'profile', label: 'Profile', icon: <User className="h-5 w-5" /> },
   ];
@@ -689,7 +690,6 @@ const handleRunAudit = async (url?: string) => {
     const data = await resp.json();
     if (data.success) {
       setAuditResult(data.normalized);
-      // setAuditData(data.audit);
       setAuditComplete(true);
       setShowAuditModal(true);
       setTimeout(() => setAuditComplete(false), 3500);
@@ -856,6 +856,7 @@ useEffect(() => {
 
 
   const handleDomainChange = (value: string) => {
+    console.log('handleDomainChange', value);
     setCompanyDomain(value);
     if (value) validateDomain(value);
   };
@@ -1039,15 +1040,15 @@ useEffect(() => {
   useEffect(() => {
       // We always want to fetch on initial mount (handled by the other useEffect below) or if we are on tabs that assume data presence.
       // But we shouldn't re-fetch on *every* tab switch if we already have data, to prevent flickering.
-      const shouldFetch = 
-        activeTab === 'overview' || 
+      const shouldFetch =
+        activeTab === 'overview' ||
         activeTab === 'analytics' ||
-        (activeTab === 'publish' && !companyDomain); // Fetch on publish if we don't know the domain yet
+        activeTab === 'publish';
 
       if (shouldFetch) {
           fetchCompanyDomain();
       }
-  }, [activeTab, fetchCompanyDomain, companyDomain]); 
+  }, [activeTab, fetchCompanyDomain]); 
 
   // Fetch audit when audit tab is active
   useEffect(() => {
@@ -2923,7 +2924,7 @@ useEffect(() => {
     </div>
 
     {/* ===================== KPI GRID ===================== */}
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
 
       {/* Opportunities Card */}
 <div className="rounded-3xl bg-white border border-gray-100 p-6 hover:shadow-lg transition">
@@ -4731,6 +4732,7 @@ const rightSections = sections.slice(4, 8);
                           type="text"
                           value={companyDomain}
                           onChange={(e) => handleDomainChange(e.target.value)}
+                          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); } }}
                           placeholder="example.com"
                           className={`w-full px-4 py-3 text-base font-light rounded-2xl border ${
                             domainError ? "border-red-300" : "border-gray-200"
@@ -4925,7 +4927,7 @@ const rightSections = sections.slice(4, 8);
 
               <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
 
-                <div className='p-4 sm:p-6 bg-white rounded-3xl border border-gray-100 hover:shadow-lg overflow-hidden backdrop-blur-sm'>
+                <div className='p-4 mb-6 sm:p-6 bg-white rounded-3xl border border-gray-100 hover:shadow-lg overflow-hidden backdrop-blur-sm'>
                   {/* Header */}
                   <div className="flex items-center justify-between mb-8">
                     <div>
@@ -4992,7 +4994,7 @@ const rightSections = sections.slice(4, 8);
     return (
       <div
         key={campaign.id}
-        className="bg-gray-50/60 rounded-3xl border border-gray-100 hover:shadow-lg shadow-sm p-6 flex flex-col min-h-[180px]"
+        className="bg-white rounded-3xl border border-gray-100 hover:shadow-lg shadow-sm mt-6 p-6 flex flex-col min-h-[180px]"
       >
           <div className="flex flex-col flex-1">
             {/* Top row: Title & View */}
@@ -5575,7 +5577,7 @@ const rightSections = sections.slice(4, 8);
             </div>
           ) : activeTab === 'settings' ? (
             <div className="max-w-6xl mx-auto px-4 sm:px-6 py-12 sm:py-16">
-              <div className="bg-white rounded-3xl p-12 border border-gray-100 hover:shadow-lg text-center">
+              <div className="bg-white rounded-3xl p-12 border border-gray-200 hover:shadow-lg text-center">
                 <h2 className="text-2xl font-light text-black tracking-tight mb-3">
                   Domain Settings
                 </h2>
@@ -7610,7 +7612,7 @@ function CampaignStructureView({
                    />
                  ) : (
                    <div className="h-full flex flex-col items-center justify-center text-gray-400">
-                     <img className="mt-4 h-50 w-50 mb-4" src="/public/Campaign.png" alt="Campaign" />
+                     <img className="mt-4 h-40 w-40 mb-4" src="https://res.cloudinary.com/dyxsai3xf/image/upload/v1770815473/WhatsApp_Image_2026-02-11_at_11.48.44_hopxes.jpg" alt="Campaign" />
                      <p>Create/Select your topic to get started.</p>
                    </div>
                  )}
