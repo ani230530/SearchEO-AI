@@ -3131,18 +3131,21 @@ useEffect(() => {
   </div>
 
   {/* Overall score on the right, vertically centered */}
+  {auditResult && auditComplete && (
   <div className="flex items-center justify-center">
     <OverallScoreGauge
       size={150}
       score={
-        ((auditResult.performance || 0) +
-          (auditResult.seo || 0) +
-          (auditResult.accessibility || 0) +
-          (auditResult.bestPractices || 0)) /
-        4
+        (
+          auditResult.performance +
+          auditResult.seo +
+          auditResult.accessibility +
+          auditResult.bestPractices
+        ) / 4
       }
     />
   </div>
+)}
 </div>
 
 )}
