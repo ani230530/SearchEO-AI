@@ -6,8 +6,8 @@ import crypto from 'crypto';
 
 const prisma = new PrismaClient();
 const JWT_SECRET = process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-in-production';
-const JWT_EXPIRES_IN = '30m'; // Short-lived access token
-const REFRESH_TOKEN_EXPIRES_IN = '7d'; // Long-lived refresh token
+const JWT_EXPIRES_IN = '7d'; 
+const REFRESH_TOKEN_EXPIRES_IN = '7d';
 const REFRESH_TOKEN_SECRET = process.env.REFRESH_TOKEN_SECRET || JWT_SECRET + '-refresh';
 
 export interface UserRegistrationData {
