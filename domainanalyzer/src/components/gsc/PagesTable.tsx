@@ -8,13 +8,14 @@ import {
   SortingState,
   useReactTable,
 } from "@tanstack/react-table";
-import { ArrowDown, ArrowUp, ChevronRight, ChevronUp, ExternalLink, Copy, Check, Search, Download, Loader2, ChevronDown, Filter, X } from "lucide-react";
+import { ArrowDown, ArrowUp, ChevronRight, ChevronUp, ExternalLink, Calendar, Copy, Check, Search, Download, Loader2, ChevronDown, Filter, RefreshCw, X , BarChart3, ChartNoAxesCombined} from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { formatDateForDisplay, getDateRangeDescription } from "@/lib/gsc/dateUtils";
 import { toast } from "sonner";
 
 export interface PageData {
@@ -31,9 +32,19 @@ interface PagesTableProps {
   isLoading?: boolean;
   loadingPageUrl?: string | null;
   isQueriesLoading?: boolean;
+  dateRange?: {
+    startDate: string;
+    endDate: string;
+    filterType: string;
+    daysRequested: number; 
+  };
+  days: string;
+  onDateChange: (value: string) => void;
+  onRefresh: () => void;
+  isRefreshing: boolean;
+ 
 }
-
-const PagesTable = ({ data, onPageSelect, isLoading = false, loadingPageUrl = null, isQueriesLoading = false }: PagesTableProps) => {
+const PagesTable = ({ data, onPageSelect, isLoading = false, loadingPageUrl = null, isQueriesLoading = false, dateRange, days, onDateChange, onRefresh, isRefreshing }: PagesTableProps) => {
   const [sorting, setSorting] = useState<SortingState>([
     { id: "impressions", desc: true },
   ]);
@@ -41,7 +52,7 @@ const PagesTable = ({ data, onPageSelect, isLoading = false, loadingPageUrl = nu
   const [currentPage, setCurrentPage] = useState(0);
   const [copiedUrl, setCopiedUrl] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>("");
-
+const [activeGscSubTab, setActiveGscSubTab] = useState<'whole-analytics' | 'blog-performance'>('whole-analytics');
   // Filter states
   const [clicksRange, setClicksRange] = useState<{ min: string; max: string }>({ min: "", max: "" });
   const [impressionsRange, setImpressionsRange] = useState<{ min: string; max: string }>({ min: "", max: "" });
@@ -299,35 +310,44 @@ const PagesTable = ({ data, onPageSelect, isLoading = false, loadingPageUrl = nu
       <div className="space-y-4">
         
         {/* Search and Filters */}
-        <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
-          <div className="relative w-full sm:w-72">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <Input 
-              placeholder="Search pages..." 
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 bg-white border-gray-200 rounded-full text-sm font-light focus-visible:ring-gray-900"
-            />
-          </div>
+       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6 mb-6">
 
-          <div className="flex items-center gap-2 w-full sm:w-auto">
-            {activeFilterCount > 0 && (
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={clearFilters}
-                className="text-gray-500 hover:text-gray-900 h-9 hidden sm:flex"
-              >
-                Clear Filters
-                <X className="ml-2 h-3.5 w-3.5" />
-              </Button>
-            )}
+  {/* LEFT SIDE — Title + Date */}
+  <div className="flex flex-col">
+    <h1 className="text-3xl font-light text-gray-900 tracking-tight">
+      GSC Analytics
+    </h1>
 
-            <Popover>
+    {dateRange && (
+      <div className="flex items-center gap-2 mt-2 text-sm font-light text-gray-600">
+        <Calendar className="h-4 w-4" />
+        <span>
+          {formatDateForDisplay(dateRange.startDate)} –{" "}
+          {formatDateForDisplay(dateRange.endDate)}
+        </span>
+      </div>
+    )}
+  </div>
+
+  {/* RIGHT SIDE — ALL CONTROLS */}
+  <div className="flex flex-wrap items-center gap-3">
+
+
+    {/* Search */}
+    <div className="relative w-64">
+      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+      <Input
+        placeholder="Search pages..."
+        value={searchQuery}
+        onChange={(e) => setSearchQuery(e.target.value)}
+        className="pl-9 "
+      />
+    </div>
+
+      <Popover>
               <PopoverTrigger asChild>
-                <Button variant="outline" className="gap-2 rounded-full border-gray-200 h-10 w-full sm:w-auto">
+                <Button variant="outline" className="gap-2  border-gray-200 h-10 w-full sm:w-auto">
                   <Filter className="h-4 w-4" />
-                  Filters
                   {activeFilterCount > 0 && (
                     <Badge variant="secondary" className="ml-1 px-1.5 h-5 min-w-[1.25rem] flex items-center justify-center bg-gray-100 text-gray-900">
                       {activeFilterCount}
@@ -434,8 +454,33 @@ const PagesTable = ({ data, onPageSelect, isLoading = false, loadingPageUrl = nu
                 </div>
               </PopoverContent>
             </Popover>
-          </div>
-        </div>
+            {/* Refresh */}
+    <button
+      onClick={onRefresh}
+      disabled={isRefreshing}
+      className="h-10 px-5 border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 disabled:opacity-50 text-sm font-light tracking-tight inline-flex items-center gap-2"
+    >
+      {isRefreshing ? (
+        <Loader2 className="h-4 w-4 animate-spin" />
+      ) : (
+        <RefreshCw className="h-4 w-4" />
+      )}
+    </button>
+            {/* Date Select */}
+    <select
+  value={days}
+  onChange={(e) => onDateChange(e.target.value)}
+  className="h-10 px-4  border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-gray-900 text-sm bg-white justify-center font-light tracking-tight appearance-none hover:cursor-pointer"
+>
+  <option value="7">Last 7 Days</option>
+  <option value="28">Last 28 Days</option>
+  <option value="90">Last 90 Days</option>
+  <option value="custom">Custom Range</option>
+</select>
+
+    
+  </div>
+</div>
 
       {/* Table */}
       <div className="bg-white rounded-3xl border border-gray-200 overflow-hidden shadow-sm">

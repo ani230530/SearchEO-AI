@@ -475,12 +475,12 @@ const AnalyticsReportingSetup = ({ initialGaId = "", initialOrgName = "" }: Anal
                   )}
                 </div>
 
-                <DrawerFooter className="px-0 pt-10">
+                <DrawerFooter className="px-0 pt-10 flex flex-col sm:flex-row items-center gap-4 justify-end">
                   <button
                     onClick={handleSubmit}
                     disabled={isGenerating || !initialGaId}
                     className={cn(
-                      "h-16 w-full rounded-full text-white font-medium text-lg flex items-center justify-center gap-4 transition-all shadow-xl",
+                      "h-14 w-full rounded-full text-white font-medium text-lg flex items-center justify-center gap-4 transition-all shadow-xl",
                       !isGenerating && initialGaId
                         ? "bg-black hover:bg-black/90 active:scale-[0.98] shadow-black/10"
                         : "bg-neutral-200 text-neutral-400 cursor-not-allowed shadow-none"
@@ -499,7 +499,7 @@ const AnalyticsReportingSetup = ({ initialGaId = "", initialOrgName = "" }: Anal
                     )}
                   </button>
                   <DrawerClose asChild>
-                    <button className="h-12 w-full text-sm font-light text-neutral-500 hover:text-black transition-colors">
+                    <button className="h-14  w-full text-sm font-light text-neutral-500 hover:text-black transition-colors border border-neutral-200 rounded-full   ">
                       Cancel
                     </button>
                   </DrawerClose>

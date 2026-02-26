@@ -5,6 +5,7 @@ import { useToast } from "@/components/ui/use-toast";
 import PagesTable from "./PagesTable";
 import PageQueriesTable from "./PageQueriesTable";
 import { getDefaultDateRange, formatDateForDisplay, getDateRangeDescription } from "@/lib/gsc/dateUtils";
+import GSCBlogAnalytics from '@/features/analytics/GSCBlogAnalytics';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3002';
 
@@ -35,6 +36,7 @@ const GSCAnalyticsView = () => {
   const [gscConnected, setGscConnected] = useState(false);
   const [gscStatusLoading, setGscStatusLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [activeGscSubTab, setActiveGscSubTab] = useState<'whole-analytics' | 'blog-performance'>('whole-analytics');
 
   // Check GSC connection status
   useEffect(() => {
@@ -273,7 +275,7 @@ const GSCAnalyticsView = () => {
   // Queries view
   if (selectedPage) {
     return (
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-12">
+      <div className="min-w-7xl">
         <PageQueriesTable
           data={queriesData?.queries || []}
           pageUrl={selectedPage}
@@ -290,78 +292,85 @@ const GSCAnalyticsView = () => {
   }
 
   // Pages list view - Hero style
-  return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-12 ">
-      {/* Hero Header */}
-      <div className="text-center mb-12 space-y-3 ">
-        <h1 className="text-5xl font-light text-gray-900 tracking-tight leading-none">
-          GSC Analytics
-        </h1>
-        {pagesData?.dateRange && (
-          <div className="flex items-center justify-center gap-2 text-sm font-light text-gray-600">
-            <Calendar className="h-4 w-4" />
-            <span>
-              {formatDateForDisplay(pagesData.dateRange.startDate)} - {formatDateForDisplay(pagesData.dateRange.endDate)}
-            </span>
-            <span className="text-xs text-gray-500">
-              ({getDateRangeDescription(pagesData.dateRange.filterType === 'custom' ? 'custom' : pagesData.dateRange.daysRequested)})
-            </span>
-          </div>
-        )}
-      </div>
+ return (
+  <div className="min-w-7xl">
 
-      {/* Controls */}
-      <div className="flex items-center justify-center gap-3 mb-8">
-        <select
-          value={days}
-          onChange={(e) => handleDateRangeChange(e.target.value)}
-          className="h-10 px-5 border border-gray-200 rounded-full focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent text-sm bg-white font-light tracking-tight transition-all duration-200 appearance-none cursor-pointer hover:shadow-lg"
-        >
-          <option value="7">Last 7 Days</option>
-          <option value="28">Last 28 Days</option>
-          <option value="90">Last 90 Days</option>
-          <option value="custom">Custom Range</option>
-        </select>
+    <div className="space-y-6">
+
+      {/* ✅ Toggle (NOW IN CORRECT PLACE) */}
+      <div className="flex items-center gap-2 border-b border-gray-200 pb-4">
         <button
-          onClick={handleRefresh}
-          disabled={isRefreshing || isLoadingPages}
-          className="h-10 px-5 border border-gray-200 text-gray-700 rounded-full hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-light tracking-tight inline-flex items-center gap-2 transition-all duration-200 hover:shadow-lg"
+          onClick={() => setActiveGscSubTab('whole-analytics')}
+          className={`px-5 py-2.5 rounded-full text-sm font-medium transition-all duration-200 ${
+            activeGscSubTab === 'whole-analytics'
+              ? 'bg-gray-900 text-white shadow-lg'
+              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+          }`}
         >
-          {isRefreshing || isLoadingPages ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <RefreshCw className="h-4 w-4" />
-          )}
-          Refresh
+          Whole Analytics
+        </button>
+
+        <button
+          onClick={() => setActiveGscSubTab('blog-performance')}
+          className={`px-5 py-2.5 rounded-full text-sm font-medium transition-all duration-200 ${
+            activeGscSubTab === 'blog-performance'
+              ? 'bg-gray-900 text-white shadow-lg'
+              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+          }`}
+        >
+          Our Blog Performance
         </button>
       </div>
 
-      {/* Content */}
-      <div className="space-y-6 ">
-        {isLoadingPages ? (
-          <PagesTable data={[]} onPageSelect={handlePageSelect} isLoading={true} loadingPageUrl={null} isQueriesLoading={false} />
-        ) : pagesData?.success === false ? (
-          <div className="text-center py-16 ">
-            <AlertCircle className="h-8 w-8 mx-auto mb-4 text-red-400" />
-            <p className="text-sm font-light text-red-600">{pagesData.error || 'Failed to fetch pages data'}</p>
-          </div>
-        ) : pagesData?.pages && pagesData.pages.length > 0 ? (
-          <PagesTable
-            data={pagesData.pages}
-            onPageSelect={handlePageSelect}
-            isLoading={false}
-            loadingPageUrl={loadingPageUrl}
-            isQueriesLoading={isLoadingQueries && !!selectedPage}
-          />
-        ) : (
-          <div className="text-center py-16">
-            <AlertCircle className="h-8 w-8 mx-auto mb-4 text-gray-400" />
-            <p className="text-sm font-light text-gray-600">No pages data available for the selected date range.</p>
-          </div>
-        )}
-      </div>
+      {/* ✅ Conditional Rendering */}
+      {activeGscSubTab === 'whole-analytics' && (
+        <>
+          {isLoadingPages ? (
+            <PagesTable
+              data={[]}
+              onPageSelect={handlePageSelect}
+              isLoading={true}
+              loadingPageUrl={null}
+              isQueriesLoading={false}
+            />
+          ) : pagesData?.success === false ? (
+            <div className="text-center py-16">
+              <AlertCircle className="h-8 w-8 mx-auto mb-4 text-red-400" />
+              <p className="text-sm font-light text-red-600">
+                {pagesData.error || 'Failed to fetch pages data'}
+              </p>
+            </div>
+          ) : pagesData?.pages && pagesData.pages.length > 0 ? (
+            <PagesTable
+              data={pagesData.pages}
+              onPageSelect={handlePageSelect}
+              isLoading={false}
+              loadingPageUrl={loadingPageUrl}
+              isQueriesLoading={isLoadingQueries && !!selectedPage}
+              dateRange={pagesData?.dateRange}
+              days={days}
+              onDateChange={handleDateRangeChange}
+              onRefresh={handleRefresh}
+              isRefreshing={isRefreshing || isLoadingPages}
+            />
+          ) : (
+            <div className="text-center py-16">
+              <AlertCircle className="h-8 w-8 mx-auto mb-4 text-gray-400" />
+              <p className="text-sm font-light text-gray-600">
+                No pages data available for the selected date range.
+              </p>
+            </div>
+          )}
+        </>
+      )}
+
+      {activeGscSubTab === 'blog-performance' && (
+        <GSCBlogAnalytics />
+      )}
+
     </div>
-  );
+  </div>
+);
 };
 
 export default GSCAnalyticsView;

@@ -17,6 +17,7 @@ import {
   Network,
   LayoutDashboard,
   Building,
+  BriefcaseBusiness,
   Megaphone,
   Send,
   BarChart3,
@@ -336,13 +337,10 @@ const [featuredImage, setFeaturedImage] = useState("");
 const [publishLoading, setPublishLoading] = useState(false);
 const [publishSuccess, setPublishSuccess] = useState(false);
 const [publishError, setPublishError] = useState("");
-const [openSections, setOpenSections] = useState<number[]>([]);
+const [openIndex, setOpenIndex] = useState<number | null>(null);
+
 const toggleSection = (idx: number) => {
-  setOpenSections((prev) =>
-    prev.includes(idx)
-      ? prev.filter((i) => i !== idx)
-      : [...prev, idx]
-  );
+  setOpenIndex(prev => (prev === idx ? null : idx));
 };
   // Company info carousel: track index and count to show arrows conditionally
   const companyCarouselRef = useRef<HTMLDivElement | null>(null);
@@ -3232,7 +3230,7 @@ useEffect(() => {
             companyDomainLoading ? (
               <CompanyInfoSkeleton />
             ) : showResults ? (
-              <div className="max-w-6xl mx-auto px-4 sm:px-6 py-12 sm:py-16">
+              <div className="min-w-6xl mx-auto px-4 sm:px-6 py-12 sm:py-16">
                 {/* Company Domain Heading */}
                 {/* <div className="text-center mb-12 flex flex-col items-center gap-4">
                 
@@ -3246,16 +3244,58 @@ useEffect(() => {
                       <div className="mb-16">
                         {(() => {
                           const full = domainContext;
-                          const headers = [
-                            "Business Model Analysis",
-                            "Target Audience Profiling",
-                            "Value Proposition & Positioning",
-                            "SEO & Content Strategy Insights",
-                            "Competitive Intelligence",
-                            "Market Dynamics",
-                            "Location-Based SEO Analysis",
-                            "SEO Opportunity Analysis",
-                          ];
+                        const iconMap: Record<string, JSX.Element> = {
+  "Business Model Analysis": <img
+    src="https://res.cloudinary.com/dgfzjdi68/image/upload/v1772020198/Group_1_vvjxuz.svg"
+    alt="Target Audience Profiling"
+    width={20}
+    height={20}
+  />,
+  "Target Audience Profiling": (
+  <img
+    src="https://res.cloudinary.com/dgfzjdi68/image/upload/v1772020378/Group_2_t45oi4.svg"
+    alt="Target Audience Profiling"
+    width={20}
+    height={20}
+  />
+),
+  "Value Proposition & Positioning": <img
+    src="https://res.cloudinary.com/dgfzjdi68/image/upload/v1772020608/streamline-plump_target-3_zf59wp.svg"
+    alt="Target Audience Profiling"
+    width={25}
+    height={25}
+  />,
+  "SEO & Content Strategy Insights": <img
+    src="https://res.cloudinary.com/dgfzjdi68/image/upload/v1772020608/hugeicons_seo_itfmdp.svg"
+    alt="Target Audience Profiling"
+    width={25}
+    height={25}
+  />,
+  "Competitive Intelligence": <img
+    src="https://res.cloudinary.com/dgfzjdi68/image/upload/v1772020606/Group_ho0bh5.svg"
+    alt="Target Audience Profiling"
+    width={20}
+    height={20}
+  />,
+  "Market Dynamics": <img
+    src="https://res.cloudinary.com/dgfzjdi68/image/upload/v1772020608/market-analysis_svgrepo.com_wjuzuv.svg"
+    alt="Target Audience Profiling"
+    width={20}
+    height={20}
+  />,
+  "Location-Based SEO Analysis": <img
+    src="https://res.cloudinary.com/dgfzjdi68/image/upload/v1772020608/location-med-2_svgrepo.com_y5xuuh.svg"
+    alt="Target Audience Profiling"
+    width={25}
+    height={25}
+  />,
+  "SEO Opportunity Analysis": <img
+    src="https://res.cloudinary.com/dgfzjdi68/image/upload/v1772020609/seo_svgrepo.com_wwqcub.svg"
+    alt="Target Audience Profiling"
+    width={20}
+    height={20}
+  />,
+};
                           const normalize = (s: string) =>
                             s
                               .replace(/\*\*/g, "")
@@ -3263,7 +3303,7 @@ useEffect(() => {
                               .replace(/[:]+$/, "")
                               .trim()
                               .toUpperCase();
-                          const target = headers.map((h) => normalize(h));
+                          const target = Object.keys(iconMap).map((h) => normalize(h));
                           const lines = full.split(/\r?\n/);
                           const contentMap: Record<string, string[]> = {};
                           target.forEach((t) => (contentMap[t] = []));
@@ -3279,7 +3319,7 @@ useEffect(() => {
                               contentMap[current].push(line);
                             }
                           }
-                          const sections = headers.map((h) => {
+                          const sections = Object.keys(iconMap).map((h) => {
                             const key = normalize(h);
                             return {
                               title: h,
@@ -3288,7 +3328,7 @@ useEffect(() => {
                           });
                                                     const leftSections = sections.slice(0, 4);
 const rightSections = sections.slice(4, 8);
-
+const allSections = [...leftSections, ...rightSections];
                        if (sections.some((s) => s.content.length > 0)) {
   return (
     <div className="p-4 sm:p-6 bg-white rounded-3xl border border-gray-100 hover:shadow-lg overflow-hidden backdrop-blur-sm">
@@ -3306,7 +3346,7 @@ const rightSections = sections.slice(4, 8);
           </div>
 
           <div className="flex items-center gap-3">
-            <div className="inline-flex items-center gap-5 bg-blue-50 border border-blue-200 text-blue-700 px-5 py-3 rounded-3xl shadow-sm">
+            <div className="inline-flex items-center gap-5 bg-blue-50 border border-blue-200 text-blue-700 px-5 py-3 rounded-xl shadow-sm">
                    <img
   src={`https://img.logo.dev/${normalizedDomain}?token=pk_DTdFFG1JT9WOCjATvZEzIA&size=128`}
   alt="Company logo"
@@ -3338,88 +3378,90 @@ const rightSections = sections.slice(4, 8);
         </div>
 
         {/* Body */}
-       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-6">
-        <div className="space-y-4 ">
-  {leftSections.map((sec, idx) => {
-    const globalIdx = idx; 
-    const isOpen = openSections.includes(globalIdx);
+ {/* Top Row */}
+<div className="flex flex-wrap gap-6 py-8">
+  {allSections.slice(0, 4).map((sec, idx) => {
+    const isOpen = openIndex === idx;
+    const isOtherOpen = openIndex !== null && openIndex !== idx && idx < 4;
 
     return (
-      <motion.div
-        key={globalIdx}
-        className="rounded-xl border border-gray-200/60 bg-white overflow-hidden hover:shadow-lg"
+      <div
+        key={idx}
+        className={`rounded-3xl border overflow-hidden ${
+          isOpen ? " bg-blue-50" : " bg-white"
+        }`}
+        style={{
+          flex: isOpen ? "2 1 0%" : isOtherOpen ? "0.9 1 0%" : "1 1 0%",
+          minWidth: 0,
+        }}
       >
+        {/* Header */}
         <button
-          onClick={() => toggleSection(globalIdx)}
-          className="flex w-full items-center justify-between px-6 py-4 text-left"
+          onClick={() => toggleSection(idx)}
+          className="flex w-full items-center justify-between px-6 py-6 text-left"
         >
-          <h3 className="text-lg font-light text-gray-900">{sec.title}</h3>
-
-          <motion.div animate={{ rotate: isOpen ? 180 : 0 }}>
-            <ChevronDown size={20} />
-          </motion.div>
+          <div className="flex items-center gap-3">
+            <div className="text-blue-600">{iconMap[sec.title]}</div>
+            <h3 className="text-xl font-light text-gray-900">{sec.title}</h3>
+          </div>
+          <div style={{ transform: isOpen ? "rotate(180deg)" : "rotate(0deg)" }}>
+            <ChevronDown size={22} />
+          </div>
         </button>
-
-        <AnimatePresence initial={false}>
-          {isOpen && (
-            <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: "auto", opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              className="overflow-hidden px-6 pb-6"
-            >
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                {sec.content}
-              </ReactMarkdown>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </motion.div>
-    );
-  })}
-</div>
-
-          <div className="space-y-4">
-  {rightSections.map((sec, idx) => {
-    const globalIdx = idx + 4; // 4–7
-    const isOpen = openSections.includes(globalIdx);
-
-    return (
-      <motion.div
-        key={globalIdx}
-        className="rounded-xl border border-gray-200/60 bg-white overflow-hidden hover:shadow-lg"
-      >
-        <button
-          onClick={() => toggleSection(globalIdx)}
-          className="flex w-full items-center justify-between px-6 py-4 text-left"
-        >
-          <h3 className="text-lg font-light text-gray-900">{sec.title}</h3>
-
-          <motion.div animate={{ rotate: isOpen ? 180 : 0 }}>
-            <ChevronDown size={20} />
-          </motion.div>
-        </button>
-
-        <AnimatePresence initial={false}>
-          {isOpen && (
-            <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: "auto", opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              className="overflow-hidden px-6 pb-6"
-            >
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                {sec.content}
-              </ReactMarkdown>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </motion.div>
-    );
-  })}
-</div>
-
+<div className="mt-2 mb-4 mx-4 border-t border-gray-200 w-[calc(100%-2rem)]" />
+        {/* Content */}
+        <div className={`px-6 mb-2 text-gray-600 break-words relative ${!isOpen ? "line-clamp-4" : ""}`}>
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>
+            {sec.content}
+          </ReactMarkdown>
         </div>
+      </div>
+    );
+  })}
+</div>
+
+{/* Bottom Row */}
+<div className="flex flex-wrap gap-6 py-8">
+  {allSections.slice(4, 8).map((sec, idx) => {
+    const realIdx = idx + 4;
+    const isOpen = openIndex === realIdx;
+    const isOtherOpen = openIndex !== null && openIndex !== realIdx;
+
+    return (
+      <div
+        key={realIdx}
+        className={`rounded-3xl border overflow-hidden ${
+          isOpen ? " bg-blue-50" : " bg-white"
+        }`}
+        style={{
+          flex: isOpen ? "2 1 0%" : isOtherOpen ? "0.9 1 0%" : "1 1 0%",
+          minWidth: 0,
+        }}
+      >
+        {/* Header */}
+        <button
+          onClick={() => toggleSection(realIdx)}
+          className="flex w-full items-center justify-between px-6 py-6 text-left"
+        >
+          <div className="flex items-center gap-3">
+            <div className="text-blue-600">{iconMap[sec.title]}</div>
+            <h3 className="text-xl font-light text-gray-900">{sec.title}</h3>
+          </div>
+          <div style={{ transform: isOpen ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.2s ease" }}>
+            <ChevronDown size={22} />
+          </div>
+        </button>
+<div className="mt-2 mb-4 mx-4 border-t border-gray-200 w-[calc(100%-2rem)]" />
+        {/* Content */}
+        <div className={`px-6 mb-2 text-gray-600 break-words relative ${!isOpen ? "line-clamp-4" : ""}`}>
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>
+            {sec.content}
+          </ReactMarkdown>
+        </div>
+      </div>
+    );
+  })}
+</div>
       </div>
     </div>
   );
@@ -4279,7 +4321,7 @@ const rightSections = sections.slice(4, 8);
                     )}
 
                     {/* Action Buttons */}
-                    <div className="flex items-center justify-center gap-4 mt-12">
+                    {/* <div className="flex items-center justify-center gap-4 mt-12">
                       {createdDomainId && (
                         <button
                           onClick={() => {
@@ -4291,7 +4333,7 @@ const rightSections = sections.slice(4, 8);
                           View Full Dashboard
                         </button>
                       )}
-                    </div>
+                    </div> */}
                   </div>
                 )}
 
@@ -5552,36 +5594,8 @@ const rightSections = sections.slice(4, 8);
               initialOrgName={extractOrgName(domainContext)}
             />
           ): activeTab === 'gsc-analytics' ? (
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
-              {/* GSC Sub-tabs */}
-              <div className="flex items-center gap-2 mb-8 border-b border-gray-100 pb-4">
-                <button
-                  onClick={() => setActiveGscSubTab('whole-analytics')}
-                  className={`px-5 py-2.5 rounded-full text-sm font-medium transition-all duration-200 ${
-                    activeGscSubTab === 'whole-analytics'
-                      ? 'bg-purple-600 text-white shadow-lg shadow-purple-200'
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                  }`}
-                >
-                  <span className="flex items-center gap-2">
-                    <ChartNoAxesCombined className="h-4 w-4" />
-                    Whole Analytics
-                  </span>
-                </button>
-                <button
-                  onClick={() => setActiveGscSubTab('blog-performance')}
-                  className={`px-5 py-2.5 rounded-full text-sm font-medium transition-all duration-200 ${
-                    activeGscSubTab === 'blog-performance'
-                      ? 'bg-purple-600 text-white shadow-lg shadow-purple-200'
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                  }`}
-                >
-                  <span className="flex items-center gap-2">
-                    <BarChart3 className="h-4 w-4" />
-                    Our Blog Performance
-                  </span>
-                </button>
-              </div>
+            <div className="min-w-8xl mx-auto px-4 sm:px-6 py-8">
+            
 
               {/* GSC Sub-tab Content */}
               {activeGscSubTab === 'whole-analytics' ? (
