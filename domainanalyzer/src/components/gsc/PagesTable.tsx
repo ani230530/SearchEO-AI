@@ -315,7 +315,7 @@ const [activeGscSubTab, setActiveGscSubTab] = useState<'whole-analytics' | 'blog
   {/* LEFT SIDE — Title + Date */}
   <div className="flex flex-col">
     <h1 className="text-3xl font-light text-gray-900 tracking-tight">
-      GSC Analytics
+      Domain Analytics
     </h1>
 
     {dateRange && (
@@ -572,22 +572,22 @@ const [activeGscSubTab, setActiveGscSubTab] = useState<'whole-analytics' | 'blog
                 </Tooltip>
               </div>
               <div className="flex items-center justify-center">
-                <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-100">
+                <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ">
                   {page.clicks.toLocaleString()}
                 </span>
               </div>
               <div className="flex items-center justify-center">
-                <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-purple-50 text-purple-700 border border-purple-100">
+                <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ">
                   {page.impressions.toLocaleString()}
                 </span>
               </div>
               <div className="flex items-center justify-center">
-                <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-100">
+                <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium">
                   {page.position.toFixed(1)}
                 </span>
               </div>
               <div className="flex items-center justify-center">
-                <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-green-50 text-green-700 border border-green-100">
+                <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-100">
                   {(page.ctr * 100).toFixed(1)}%
                 </span>
               </div>

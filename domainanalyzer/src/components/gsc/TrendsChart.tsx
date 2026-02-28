@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import {
   LineChart,
   Line,
@@ -11,7 +11,13 @@ import {
   ResponsiveContainer,
   Legend,
 } from "recharts";
-import { format, parseISO } from "date-fns";
+import {
+  format,
+  parseISO,
+  differenceInDays,
+  startOfWeek,
+  startOfMonth,
+} from "date-fns";
 
 export interface TrendDataPoint {
   date: string;
@@ -34,16 +40,103 @@ const TrendsChart = ({
   chartType = "line",
   height = 300,
 }: TrendsChartProps) => {
+
+const [selectedMetricsState, setSelectedMetricsState] = useState<("clicks" | "impressions" | "ctr" | "position")[]>(selectedMetrics);
+
   // Format data for chart
   const chartData = useMemo(() => {
-    return data
-      .map((point) => ({
-        ...point,
-        dateFormatted: format(parseISO(point.date), "MMM d"),
-        ctrPercent: point.ctr ? point.ctr * 100 : undefined,
-      }))
-      .sort((a, b) => (a.date < b.date ? -1 : 1));
-  }, [data]);
+    if (!data || data.length === 0) return [];
+    
+    const sorted = [...data].sort((a, b) =>
+      a.date < b.date ? -1 : 1
+  );
+
+  const firstDate = parseISO(sorted[0].date);
+  const lastDate = parseISO(sorted[sorted.length - 1].date);
+
+  const totalDays = differenceInDays(lastDate, firstDate);
+  
+  let mode: "daily" | "weekly" | "monthly";
+
+  if (totalDays <= 14) mode = "daily";
+  else if (totalDays <= 90) mode = "weekly";
+  else mode = "monthly";
+
+  if (mode === "daily") {
+  const grouped: Record<string, TrendDataPoint[]> = {};
+  sorted.forEach((point) => {
+    if (!grouped[point.date]) grouped[point.date] = [];
+    grouped[point.date].push(point);
+  });
+
+  return Object.entries(grouped).map(([date, points]) => {
+    const totalClicks = points.reduce((sum, p) => sum + (p.clicks || 0), 0);
+    const totalImpressions = points.reduce((sum, p) => sum + (p.impressions || 0), 0);
+    const avgPosition = points.reduce((sum, p) => sum + (p.position || 0), 0) / points.length;
+    const ctr = totalImpressions > 0 ? totalClicks / totalImpressions : 0;
+
+    return {
+      dateKey: date,
+      dateFormatted: format(parseISO(date), "MMM d"),
+      clicks: totalClicks,
+      impressions: totalImpressions,
+      position: avgPosition,
+      ctrPercent: ctr * 100,
+    };
+  });
+}
+
+  const grouped: Record<string, TrendDataPoint[]> = {};
+
+  sorted.forEach((point) => {
+    const dateObj = parseISO(point.date);
+
+    const keyDate =
+      mode === "weekly"
+        ? startOfWeek(dateObj, { weekStartsOn: 1 })
+        : startOfMonth(dateObj);
+
+    const key = format(keyDate, "yyyy-MM-dd");
+
+    if (!grouped[key]) grouped[key] = [];
+    grouped[key].push(point);
+  });
+
+  return Object.entries(grouped)
+    .map(([key, points]) => {
+      const totalClicks = points.reduce(
+        (sum, p) => sum + (p.clicks || 0),
+        0
+      );
+
+      const totalImpressions = points.reduce(
+        (sum, p) => sum + (p.impressions || 0),
+        0
+      );
+
+      const avgPosition =
+        points.reduce((sum, p) => sum + (p.position || 0), 0) /
+        points.length;
+
+      const ctr =
+        totalImpressions > 0
+          ? totalClicks / totalImpressions
+          : 0;
+
+      return {
+        dateKey: key,
+        dateFormatted:
+          mode === "weekly"
+            ? ` ${format(parseISO(key), "MMM d")}`
+            : format(parseISO(key), "MMM yyyy"),
+        clicks: totalClicks,
+        impressions: totalImpressions,
+        position: avgPosition,
+        ctrPercent: ctr * 100,
+      };
+    })
+    .sort((a, b) => (a.dateKey < b.dateKey ? -1 : 1));
+}, [data]);
 
   // Custom tooltip formatter
   const formatTooltipValue = (value: number, name: string) => {
@@ -73,8 +166,8 @@ const TrendsChart = ({
   }
 
   const colors = {
-    clicks: "#1d1d1f",
-    impressions: "#86868b",
+    clicks: "#2d994d",
+    impressions: "#000000",
     ctr: "#007aff",
     position: "#ff9500",
   };
@@ -82,7 +175,29 @@ const TrendsChart = ({
   const ChartComponent = chartType === "area" ? AreaChart : LineChart;
 
   return (
-    <div className="w-full bg-white rounded-2xl border border-gray-200 p-4">
+    <div className="w-full bg-white rounded-2xl border border-gray-200 p-4 h-full pt-16 relative">
+      
+  {/* Metrics Selection – top-right overlay */}
+  <div className="absolute top-4 right-4  rounded-xl  p-3 shadow-sm z-10">
+    <div className="flex items-center justify-center gap-2 flex-wrap">
+      {(['clicks', 'impressions', 'ctr', 'position'] as const).map((metric) => (
+        <label key={metric} className="flex items-center gap-1 cursor-pointer">
+          <input
+  type="checkbox"
+  checked={selectedMetricsState.includes(metric)}
+  onChange={(e) => {
+    if (e.target.checked) {
+      setSelectedMetricsState([...selectedMetricsState, metric]);
+    } else {
+      setSelectedMetricsState(selectedMetricsState.filter((m) => m !== metric));
+    }
+  }}
+/>
+          <span className="text-xs font-light text-gray-700 capitalize tracking-tight">{metric}</span>
+        </label>
+      ))}
+    </div>
+  </div>
       <ResponsiveContainer width="100%" height={height}>
         <ChartComponent data={chartData} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
@@ -115,7 +230,7 @@ const TrendsChart = ({
             wrapperStyle={{ fontSize: "12px", paddingTop: "10px" }}
             iconType="line"
           />
-          {selectedMetrics.includes("clicks") && (
+          {selectedMetricsState.includes("clicks") && (
             chartType === "area" ? (
               <Area
                 type="monotone"
@@ -137,7 +252,7 @@ const TrendsChart = ({
               />
             )
           )}
-          {selectedMetrics.includes("impressions") && (
+          {selectedMetricsState.includes("impressions") && (
             chartType === "area" ? (
               <Area
                 type="monotone"
@@ -159,7 +274,7 @@ const TrendsChart = ({
               />
             )
           )}
-          {selectedMetrics.includes("ctr") && (
+          {selectedMetricsState.includes("ctr") && (
             chartType === "area" ? (
               <Area
                 type="monotone"
@@ -183,7 +298,7 @@ const TrendsChart = ({
               />
             )
           )}
-          {selectedMetrics.includes("position") && (
+          {selectedMetricsState.includes("position") && (
             chartType === "area" ? (
               <Area
                 type="monotone"
@@ -207,7 +322,7 @@ const TrendsChart = ({
               />
             )
           )}
-          {(selectedMetrics.includes("ctr") || selectedMetrics.includes("position")) && (
+          {(selectedMetricsState.includes("ctr") || selectedMetricsState.includes("position")) && (
             <YAxis
               yAxisId="right"
               orientation="right"

@@ -15,6 +15,7 @@ import {
   Database,
   ChevronRight,
   Plus,
+  Loader2,
   RefreshCw,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -341,7 +342,7 @@ const AnalyticsReportingSetup = ({ initialGaId = "", initialOrgName = "" }: Anal
         <div className="absolute bottom-0 right-1/4 w-[500px] h-[500px] bg-neutral-300 rounded-full blur-3xl opacity-30" />
       </div>
 
-      <div className="max-w-7xl mx-auto px-6 py-4 space-y-10">
+      <div className="min-w-7xl mx-auto px-6 py-4 space-y-10">
         {/* Header */}
         <header className="text-center space-y-8">
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gray-200 text-black text-xs font-light">
@@ -569,7 +570,7 @@ const AnalyticsReportingSetup = ({ initialGaId = "", initialOrgName = "" }: Anal
         </section>
 
         {/* History Table */}
-        <section className="max-w-6xl mx-auto space-y-8 ">
+        <section className="min-w-6xl mx-auto space-y-8 ">
           <div className="flex items-center justify-between ">
             <div className="space-y-1 ">
               <h2 className="mx-3 text-3xl font-light tracking-tight">Recent Reports</h2>
@@ -587,11 +588,11 @@ const AnalyticsReportingSetup = ({ initialGaId = "", initialOrgName = "" }: Anal
             </button>
           </div>
 
-          <div className="bg-white/80 backdrop-blur-xl rounded-[32px] border border-neutral-200 overflow-hidden hover:shadow-lg ">
+          <div className="bg-white/80 backdrop-blur-xl rounded-xl border border-neutral-200 overflow-hidden hover:shadow-lg ">
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="border-b border-neutral-100 text-sm font-light text-neutral-500 bg-neutral-50/50">
+                  <tr className="border-b border-neutral-100 text-sm font-light text-neutral-500 bg-gray-200">
                     <th className="px-8 py-5 font-light">Report Name</th>
                     <th className="px-8 py-5 font-light">Month</th>
                     <th className="px-8 py-5 font-light">Status</th>
@@ -600,71 +601,88 @@ const AnalyticsReportingSetup = ({ initialGaId = "", initialOrgName = "" }: Anal
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-neutral-50">
-                  {reportHistory.length > 0 ? (
-                    reportHistory.map((report) => (
-                      <tr key={report.id} className="group hover:bg-neutral-50/50 transition-colors">
-                        <td className="px-8 py-5">
-                          <div className="text-sm font-medium text-neutral-900">
-                            {report.payload?.name || "Unnamed Report"}
-                          </div>
-                        </td>
-                        <td className="px-8 py-5">
-                          <div className="text-sm font-light text-neutral-500">
-                            {report.payload?.['Report Month'] || "N/A"}
-                          </div>
-                        </td>
-                        <td className="px-8 py-5">
-                          <div className={cn(
-                            "inline-flex px-3 py-1 rounded-full text-[10px] uppercase tracking-wider font-light",
-                            report.status === "completed" && "bg-green-50 text-green-700 border border-green-100",
-                            report.status === "processing" && "bg-blue-50 text-blue-700 border border-blue-100",
-                            report.status === "failed" && "bg-red-50 text-red-700 border border-red-100"
-                          )}>
-                            {report.status}
-                          </div>
-                        </td>
-                        <td className="px-8 py-5 text-sm font-light text-neutral-400">
-                          {new Date(report.createdAt).toLocaleDateString()}
-                        </td>
-                        <td className="px-8 py-5 text-right">
-                          <div className="flex items-center justify-end gap-3 transition-opacity">
-                            {report.results?.googleSheetsUrl && (
-                              <a
-                                href={report.results.googleSheetsUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-green-600 hover:bg-green-700 text-white text-xs font-light transition shadow-sm hover:shadow-md"
-                              >
-                                <FileSpreadsheet className="h-3 w-3" />
-                                Sheets
-                              </a>
-                            )}
-                            {report.results?.googleSlidesUrl && (
-                              <a
-                                href={report.results.googleSlidesUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-blue-600 hover:bg-blue-700 text-white text-xs font-light transition shadow-sm hover:shadow-md"
-                              >
-                                <Presentation className="h-3 w-3" />
-                                Slides
-                              </a>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan={6} className="px-8 py-16 text-center">
-                        <div className="flex flex-col items-center gap-3 text-neutral-400">
-                          <Database className="h-10 w-10 opacity-20" />
-                          <p className="text-sm font-light">No reports generated yet.</p>
-                        </div>
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
+  {isLoadingHistory ? (
+    <tr>
+      <td colSpan={6} className="px-8 py-16 text-center">
+        <div className="text-center space-y-4">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto text-gray-400" />
+          <p className="text-sm font-light text-gray-600">Loading Reports...</p>
+        </div>
+      </td>
+    </tr>
+  ) : reportHistory.length > 0 ? (
+    reportHistory.map((report) => (
+      <tr key={report.id} className="group hover:bg-neutral-50/50 transition-colors">
+        <td className="px-8 py-5">
+          <div className="text-sm font-medium text-neutral-900">
+            {report.payload?.name || "Unnamed Report"}
+          </div>
+        </td>
+        <td className="px-8 py-5">
+          <div className="text-sm font-light text-neutral-500">
+            {report.payload?.['Report Month'] || "N/A"}
+          </div>
+        </td>
+        <td className="px-8 py-5">
+          <div
+            className={cn(
+              "inline-flex px-3 py-1 rounded-full text-[10px] uppercase tracking-wider font-light",
+              report.status === "completed" && "bg-green-50 text-green-700 border border-green-400",
+              report.status === "processing" && "bg-blue-50 text-blue-700 border border-blue-400",
+              report.status === "failed" && "bg-red-50 text-red-700 border border-red-400"
+            )}
+          >
+            {report.status}
+          </div>
+        </td>
+        <td className="px-8 py-5 text-sm font-light text-neutral-400">
+          {new Date(report.createdAt).toLocaleDateString()}
+        </td>
+        <td className="px-8 py-5 text-right">
+          <div className="flex items-center justify-end gap-3 transition-opacity">
+            {report.results?.googleSheetsUrl && (
+              <a
+                href={report.results.googleSheetsUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-gray-300 text-gray-600 hover:bg-gray-200 text-sm font-light transition shadow-sm hover:shadow-md"
+              >
+                <img
+                  src="https://res.cloudinary.com/dgfzjdi68/image/upload/v1772280291/mdi_google-spreadsheet_hzqebn.svg"
+                  alt="Sheets"
+                />
+                Sheets
+              </a>
+            )}
+            {report.results?.googleSlidesUrl && (
+              <a
+                href={report.results.googleSlidesUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-gray-300 text-gray-600 hover:bg-gray-200 text-sm font-light transition shadow-sm hover:shadow-md"
+              >
+                <img
+                  src="https://res.cloudinary.com/dgfzjdi68/image/upload/v1772280290/icon-park-outline_slide_mkpvc4.svg"
+                  alt="Slides"
+                />
+                Slides
+              </a>
+            )}
+          </div>
+        </td>
+      </tr>
+    ))
+  ) : (
+    <tr>
+      <td colSpan={6} className="px-8 py-16 text-center">
+        <div className="flex flex-col items-center gap-3 text-neutral-400">
+          <Database className="h-10 w-10 opacity-20" />
+          <p className="text-sm font-light">No reports generated yet.</p>
+        </div>
+      </td>
+    </tr>
+  )}
+</tbody>
               </table>
             </div>
           </div>
