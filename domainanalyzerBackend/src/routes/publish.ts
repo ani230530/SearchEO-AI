@@ -958,8 +958,12 @@ router.post(
       await prisma.wordpressPublishLog.update({
         where: { id: Number(draftId) },
         data: {
-          status: 'draft',
-          response: { error: error || 'Async publish failed (no link returned)' },
+          status: 'failed',
+          response: {
+            error: error || 'Async publish failed (no link returned)',
+            status: 'failed',
+            failedAt: new Date().toISOString()
+          },
         }
       });
 

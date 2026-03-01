@@ -422,6 +422,9 @@ model WordpressPublishLog {
   userId        Int
   wordpressUrl  String
   primaryKeyword String?
+  normalizedPrimaryKeyword String?
+  generationJobId String?
+  generationPageId Int?
   title         String?
   slug          String?
   status        String?
@@ -434,6 +437,9 @@ model WordpressPublishLog {
   campaignPages CampaignPage[] @relation("PageLatestDraft")
 
   @@index([userId])
+  @@index([generationJobId])
+  @@index([generationJobId, normalizedPrimaryKeyword])
+  @@index([generationPageId])
 }
 
 model GenerationJob {

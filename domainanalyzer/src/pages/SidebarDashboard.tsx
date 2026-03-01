@@ -6039,6 +6039,11 @@ function CampaignStructureView({
     status: 'pending' | 'generating' | 'completed' | 'failed';
     pages: Array<{ pageId: number; status: string; progress: number }>;
   }>>(new Map());
+  const generationJobsRef = useRef(generationJobs);
+  const jobIdToTopicIdRef = useRef(jobIdToTopicId);
+  const campaignEventSourceRef = useRef<EventSource | null>(null);
+  const campaignReconnectTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const campaignReconnectAttemptRef = useRef(0);
   
   // Helper to check if generation is active (streaming received within last 10 minutes)
   const isGenerationActive = useCallback((jobId: string): boolean => {
@@ -6061,6 +6066,102 @@ function CampaignStructureView({
     window.location.href = "/auth";
   }, []);
 
+  useEffect(() => {
+    generationJobsRef.current = generationJobs;
+  }, [generationJobs]);
+
+  useEffect(() => {
+    jobIdToTopicIdRef.current = jobIdToTopicId;
+  }, [jobIdToTopicId]);
+
+  // Helper function to extract topicId from jobId pattern
+  const extractTopicIdFromJobId = useCallback((jobId: string): number | null => {
+    // JobId format: job_{topicId}_{timestamp}
+    const match = jobId.match(/^job_(\d+)_/);
+    return match ? parseInt(match[1], 10) : null;
+  }, []);
+
+  const resolveTopicIdForJobId = useCallback((jobId: string): number | null => {
+    const mappedTopicId = jobIdToTopicIdRef.current.get(jobId);
+    if (typeof mappedTopicId === 'number') return mappedTopicId;
+    return extractTopicIdFromJobId(jobId);
+  }, [extractTopicIdFromJobId]);
+
+  const reconcileTopicDraftStatus = useCallback(async (topicId: number) => {
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/campaigns/topics/${topicId}/drafts-status`,
+        { headers: getAuthHeaders() }
+      );
+
+      if (response.status === 401 || response.status === 403) {
+        handleUnauthorized();
+        return;
+      }
+
+      if (!response.ok) return;
+      const data = await response.json();
+      if (!data.success || !Array.isArray(data.pages)) return;
+
+      const topicPages = data.pages as DraftStatusRecord[];
+      if (!topicPages.length) return;
+
+      setGenerationJobs(prev => {
+        const updated = new Map(prev);
+        topicPages.forEach((p) => {
+          const existing = updated.get(p.pageId);
+          let finalStatus = (p.status || existing?.status || 'pending') as GenerationPageStatus['status'];
+          if (p.hasHtml && finalStatus !== 'published') {
+            finalStatus = 'completed';
+          }
+          updated.set(p.pageId, {
+            jobId: p.jobId || existing?.jobId || '',
+            pageId: p.pageId,
+            pageType: p.pageType === 'subpage' ? 'subpage' : 'pillar',
+            status: finalStatus,
+            draftId: p.draftId ?? existing?.draftId,
+            progress: typeof p.progress === 'number' ? p.progress : p.hasHtml ? 100 : existing?.progress ?? 0,
+            primaryKeyword: p.primaryKeyword ?? existing?.primaryKeyword,
+            hasHtml: p.hasHtml ?? existing?.hasHtml,
+            updatedAt: p.updatedAt || existing?.updatedAt || new Date().toISOString(),
+            error: p.error ?? existing?.error ?? null,
+            wordpressUrl: p.wordpressUrl ?? existing?.wordpressUrl ?? null,
+          });
+        });
+        return updated;
+      });
+
+      setDraftStatuses(prev => {
+        const updated = new Map(prev);
+        topicPages.forEach((p) => {
+          const existing = updated.get(p.pageId);
+          if (p.draftId) {
+            const isPublished = p.status === 'published' || Boolean(p.wordpressUrl && p.wordpressUrl.startsWith('http'));
+            updated.set(p.pageId, {
+              isPublished,
+              isFailed: p.status === 'failed',
+              publishedUrl: p.wordpressUrl || undefined,
+              draftId: p.draftId,
+              error: p.error || existing?.error
+            });
+            return;
+          }
+          if (p.status === 'failed' && existing) {
+            updated.set(p.pageId, {
+              ...existing,
+              isPublished: false,
+              isFailed: true,
+              error: p.error || existing.error
+            });
+          }
+        });
+        return updated;
+      });
+    } catch (err) {
+      console.error('Failed to reconcile topic drafts-status', { topicId, err });
+    }
+  }, [getAuthHeaders, handleUnauthorized, setDraftStatuses, setGenerationJobs]);
+
   // Hydrate active jobs on mount
   const fetchActiveJobs = useCallback(async () => {
     try {
@@ -6077,56 +6178,67 @@ function CampaignStructureView({
       
       const data = await response.json();
       if (data.success && data.jobs) {
+        const activeJobIds = new Set<string>(data.jobs.map((job: any) => String(job.jobId)));
+        const staleJobIds = new Set<string>();
+        generationJobsRef.current.forEach((job) => {
+          if (!job.jobId) return;
+          if ((job.status === 'generating' || job.status === 'pending') && !activeJobIds.has(job.jobId)) {
+            staleJobIds.add(job.jobId);
+          }
+        });
+
         // Update generationJobs
         setGenerationJobs(prev => {
-             const updated = new Map(prev);
-             // First mark all existing generating jobs as potentially stale/checked by backend
-             // If a job is NOT in the backend active list, it might have finished or failed silently
-             // But we don't want to remove it aggressively unless we know for sure.
-             // For now, we just update/upsert what the backend tells us.
-             
-             data.jobs.forEach((job: any) => {
-                 job.pages.forEach((p: any) => {
-                     updated.set(p.pageId, {
-                        jobId: job.jobId,
-                        pageId: p.pageId,
-                        pageType: p.pageType,
-                        status: p.status,
-                        draftId: p.draftId, // draftId from DB response
-                        progress: p.progress || 0,
-                        primaryKeyword: p.primaryKeyword,
-                        hasHtml: false, // We'll rely on draft status mostly
-                        updatedAt: new Date().toISOString(),
-                        error: null
-                     });
-                 });
-             });
-             return updated;
+          const updated = new Map(prev);
+
+          data.jobs.forEach((job: any) => {
+            job.pages.forEach((p: any) => {
+              updated.set(p.pageId, {
+                jobId: job.jobId,
+                pageId: p.pageId,
+                pageType: p.pageType,
+                status: p.status,
+                draftId: p.draftId,
+                progress: p.progress || 0,
+                primaryKeyword: p.primaryKeyword,
+                hasHtml: false,
+                updatedAt: new Date().toISOString(),
+                error: null
+              });
+            });
+          });
+          return updated;
         });
         
         // Update streaming messages
         setStreamingMessages(prev => {
-            const updated = new Map(prev);
-            data.jobs.forEach((job: any) => {
-                if (job.messages && job.messages.length > 0) {
-                    updated.set(job.jobId, job.messages);
-                }
-            });
-            return updated;
+          const updated = new Map(prev);
+          for (const key of Array.from(updated.keys())) {
+            if (!activeJobIds.has(key)) updated.delete(key);
+          }
+          data.jobs.forEach((job: any) => {
+            if (job.messages && job.messages.length > 0) {
+              updated.set(job.jobId, job.messages);
+            }
+          });
+          return updated;
         });
         
         // Update jobId mapping
         setJobIdToTopicId(prev => {
-           const updated = new Map(prev);
-           data.jobs.forEach((job: any) => {
-               updated.set(job.jobId, job.topicId);
-           });
-           return updated;
+          const updated = new Map(prev);
+          data.jobs.forEach((job: any) => {
+            updated.set(job.jobId, job.topicId);
+          });
+          return updated;
         });
 
         // Sync backend job status for consistency
         setBackendJobStatus(prev => {
           const updated = new Map(prev);
+          for (const key of Array.from(updated.keys())) {
+            if (!activeJobIds.has(key)) updated.delete(key);
+          }
           data.jobs.forEach((job: any) => {
             updated.set(job.jobId, {
               status: job.status,
@@ -6135,22 +6247,36 @@ function CampaignStructureView({
           });
           return updated;
         });
+
+        setLastStreamingTimestamp(prev => {
+          const updated = new Map(prev);
+          for (const key of Array.from(updated.keys())) {
+            if (!activeJobIds.has(key)) updated.delete(key);
+          }
+          return updated;
+        });
+
+        if (staleJobIds.size > 0) {
+          const topicIds = new Set<number>();
+          staleJobIds.forEach((jobId) => {
+            const topicId = resolveTopicIdForJobId(jobId);
+            if (typeof topicId === 'number') {
+              topicIds.add(topicId);
+            }
+          });
+          if (topicIds.size > 0) {
+            await Promise.all(Array.from(topicIds).map((topicId) => reconcileTopicDraftStatus(topicId)));
+          }
+        }
       }
     } catch (err) {
       console.error("Failed to hydrate active jobs", err);
     }
-  }, [CAMPAIGN_API_BASE, getAuthHeaders, handleUnauthorized]);
+  }, [CAMPAIGN_API_BASE, getAuthHeaders, handleUnauthorized, reconcileTopicDraftStatus, resolveTopicIdForJobId]);
 
   React.useEffect(() => {
     fetchActiveJobs();
   }, [fetchActiveJobs]);
-
-  // Helper function to extract topicId from jobId pattern
-  const extractTopicIdFromJobId = useCallback((jobId: string): number | null => {
-    // JobId format: job_{topicId}_{timestamp}
-    const match = jobId.match(/^job_(\d+)_/);
-    return match ? parseInt(match[1], 10) : null;
-  }, []);
 
   // Handle streaming progress updates
   const handleStreamingUpdate = useCallback((jobId: string | undefined, message: string | undefined, timestamp: string | undefined) => {
@@ -6193,92 +6319,129 @@ function CampaignStructureView({
     const token = localStorage.getItem('authToken');
     if (!token) return;
 
-    const eventSource = new EventSource(
-      `${API_BASE_URL}/api/campaigns/events?token=${encodeURIComponent(token)}`
-    );
+    let isUnmounted = false;
 
-    eventSource.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data) as {
-          type?: string;
-          jobId?: string;
-          message?: string;
-          timestamp?: string;
-          pages?: Partial<GenerationPageStatus & { pageType: string; hasHtml?: boolean; error?: string | null }>[];
-          error?: string;
-        };
-        
-        // Handle streaming progress updates
-        if (data.type === 'streaming') {
-          handleStreamingUpdate(data.jobId, data.message, data.timestamp);
-          return;
-        }
-
-        // Handle n8n critical errors
-        if (data.type === 'n8n_error') {
-          console.error('Received n8n error:', data);
-          toast({
-            title: 'Generation Failed',
-            description: data.error || 'An external error occurred during processing',
-            variant: 'destructive',
-          });
-          // We don't return here, allowing the 'drafts' update (if triggered) to also process
-        }
-        
-        // Handle draft updates
-        if (data.type === 'drafts' && data.pages) {
-          setGenerationJobs((prev) => {
-            const updated = new Map(prev);
-            data.pages!.forEach((p) => {
-              const pageId = p.pageId;
-              if (!pageId) return;
-              const existing = updated.get(pageId);
-              const jobId = data.jobId || existing?.jobId || '';
-              
-              // Clear streaming messages and timestamps when generation completes
-              if (p.status === 'completed' && jobId) {
-                setStreamingMessages(prevMsgs => {
-                  const updatedMsgs = new Map(prevMsgs);
-                  updatedMsgs.delete(jobId);
-                  return updatedMsgs;
-                });
-                setLastStreamingTimestamp(prev => {
-                  const updated = new Map(prev);
-                  updated.delete(jobId);
-                  return updated;
-                });
-              }
-              
-              updated.set(pageId, {
-                jobId,
-                pageId,
-                pageType: p.pageType === 'subpage' ? 'subpage' : 'pillar',
-                status: (p.status || existing?.status || 'generating') as GenerationPageStatus['status'],
-                draftId: p.draftId ?? existing?.draftId,
-                progress: typeof p.progress === 'number' ? p.progress : p.hasHtml ? 100 : existing?.progress,
-                primaryKeyword: p.primaryKeyword ?? existing?.primaryKeyword,
-                hasHtml: p.hasHtml ?? existing?.hasHtml,
-                updatedAt: new Date().toISOString(),
-                error: p.error ?? existing?.error ?? null,
-              });
-            });
-            return updated;
-          });
-        }
-      } catch (err) {
-        console.error('Failed to parse SSE payload', err);
+    const connect = () => {
+      if (isUnmounted) return;
+      if (campaignEventSourceRef.current) {
+        campaignEventSourceRef.current.close();
       }
+
+      const eventSource = new EventSource(
+        `${API_BASE_URL}/api/campaigns/events?token=${encodeURIComponent(token)}`
+      );
+      campaignEventSourceRef.current = eventSource;
+
+      eventSource.onopen = () => {
+        campaignReconnectAttemptRef.current = 0;
+      };
+
+      eventSource.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data) as {
+            type?: string;
+            jobId?: string;
+            message?: string;
+            timestamp?: string;
+            pages?: Partial<GenerationPageStatus & { pageType: string; hasHtml?: boolean; error?: string | null }>[];
+            error?: string;
+          };
+          
+          // Handle streaming progress updates
+          if (data.type === 'streaming') {
+            handleStreamingUpdate(data.jobId, data.message, data.timestamp);
+            return;
+          }
+
+          // Handle n8n critical errors
+          if (data.type === 'n8n_error') {
+            console.error('Received n8n error:', data);
+            toast({
+              title: 'Generation Failed',
+              description: data.error || 'An external error occurred during processing',
+              variant: 'destructive',
+            });
+            // We don't return here, allowing the 'drafts' update (if triggered) to also process
+          }
+          
+          // Handle draft updates
+          if (data.type === 'drafts' && data.pages) {
+            setGenerationJobs((prev) => {
+              const updated = new Map(prev);
+              data.pages!.forEach((p) => {
+                const pageId = p.pageId;
+                if (!pageId) return;
+                const existing = updated.get(pageId);
+                const jobId = data.jobId || existing?.jobId || '';
+                
+                // Clear streaming messages and timestamps when generation completes
+                if (p.status === 'completed' && jobId) {
+                  setStreamingMessages(prevMsgs => {
+                    const updatedMsgs = new Map(prevMsgs);
+                    updatedMsgs.delete(jobId);
+                    return updatedMsgs;
+                  });
+                  setLastStreamingTimestamp(prev => {
+                    const updated = new Map(prev);
+                    updated.delete(jobId);
+                    return updated;
+                  });
+                }
+                
+                updated.set(pageId, {
+                  jobId,
+                  pageId,
+                  pageType: p.pageType === 'subpage' ? 'subpage' : 'pillar',
+                  status: (p.status || existing?.status || 'generating') as GenerationPageStatus['status'],
+                  draftId: p.draftId ?? existing?.draftId,
+                  progress: typeof p.progress === 'number' ? p.progress : p.hasHtml ? 100 : existing?.progress,
+                  primaryKeyword: p.primaryKeyword ?? existing?.primaryKeyword,
+                  hasHtml: p.hasHtml ?? existing?.hasHtml,
+                  updatedAt: new Date().toISOString(),
+                  error: p.error ?? existing?.error ?? null,
+                });
+              });
+              return updated;
+            });
+          }
+        } catch (err) {
+          console.error('Failed to parse SSE payload', err);
+        }
+      };
+
+      eventSource.onerror = (err) => {
+        console.error('SSE connection error', err);
+        eventSource.close();
+        if (campaignEventSourceRef.current === eventSource) {
+          campaignEventSourceRef.current = null;
+        }
+        if (isUnmounted) return;
+        const attempt = campaignReconnectAttemptRef.current + 1;
+        campaignReconnectAttemptRef.current = attempt;
+        const delayMs = Math.min(30000, 1000 * Math.pow(2, Math.min(attempt, 5)));
+        if (campaignReconnectTimerRef.current) {
+          clearTimeout(campaignReconnectTimerRef.current);
+        }
+        campaignReconnectTimerRef.current = setTimeout(() => {
+          connect();
+        }, delayMs);
+      };
     };
 
-    eventSource.onerror = (err) => {
-      console.error('SSE connection error', err);
-      eventSource.close();
-    };
+    connect();
 
     return () => {
-      eventSource.close();
+      isUnmounted = true;
+      if (campaignReconnectTimerRef.current) {
+        clearTimeout(campaignReconnectTimerRef.current);
+        campaignReconnectTimerRef.current = null;
+      }
+      if (campaignEventSourceRef.current) {
+        campaignEventSourceRef.current.close();
+        campaignEventSourceRef.current = null;
+      }
     };
-  }, [handleStreamingUpdate]);
+  }, [handleStreamingUpdate, toast]);
 
   // Periodic polling for active generation jobs using the bulk endpoint
   // This serves as a fallback if SSE events are missed or not supported
@@ -6307,7 +6470,13 @@ function CampaignStructureView({
     const rehydrate = async () => {
       if (!campaignStructure.topics || campaignStructure.topics.length === 0) return;
       const newMap = new Map<number, GenerationPageStatus>();
-      const newDraftStatuses = new Map<number, { isPublished: boolean; publishedUrl?: string; draftId?: number }>();
+      const newDraftStatuses = new Map<number, {
+        isPublished: boolean;
+        isFailed?: boolean;
+        publishedUrl?: string;
+        draftId?: number;
+        error?: string;
+      }>();
 
       for (const topic of campaignStructure.topics) {
         try {
@@ -6336,8 +6505,10 @@ function CampaignStructureView({
             if (p.draftId) {
                 newDraftStatuses.set(p.pageId, {
                     isPublished: p.status === 'published' || (p.wordpressUrl && p.wordpressUrl.startsWith('http')),
+                    isFailed: p.status === 'failed',
                     publishedUrl: p.wordpressUrl || undefined,
-                    draftId: p.draftId
+                    draftId: p.draftId,
+                    error: p.error || undefined
                 });
             }
 
@@ -6784,11 +6955,10 @@ function CampaignStructureView({
         if (backendStatus?.status === 'generating' || backendStatus?.status === 'pending') {
           return true;
         }
-        return true; // Fallback: if in generationJobs map and no HTML, assume generating
+        return false;
       }
       
-      // If no jobId but in map and no HTML, assume initial generating state
-      return true; 
+      return false;
     });
   }, [generationJobs, backendJobStatus, generateTopicLoading, isGenerationActive]);
 
@@ -6827,6 +6997,141 @@ function CampaignStructureView({
       }
     }
   };
+
+  // Poll publish status as fallback when SSE terminal event is missed
+  useEffect(() => {
+    if (publishingPageIds.size === 0 || draftToPageMap.size === 0) return;
+
+    let cancelled = false;
+
+    const pollPublishStatuses = async () => {
+      const mappings = Array.from(draftToPageMap.entries());
+      if (!mappings.length) return;
+
+      type TerminalPublishStatus = {
+        draftId: number;
+        pageId: number;
+        status: 'published' | 'failed';
+        wordpressUrl?: string | null;
+        error?: string | null;
+      };
+
+      try {
+        const results = await Promise.all(
+          mappings.map(async ([draftId, pageId]): Promise<TerminalPublishStatus | null> => {
+            const draftHeaders = getAuthHeaders();
+            let response = await fetch(`${API_BASE_URL}/api/publish/drafts/${draftId}`, {
+              headers: draftHeaders,
+            });
+
+            if (response.status === 401 || response.status === 403) {
+              handleUnauthorized();
+              return null;
+            }
+
+            if (!response.ok) {
+              response = await fetch(`${API_BASE_URL}/api/campaigns/drafts/${draftId}`, {
+                headers: draftHeaders,
+              });
+              if (response.status === 401 || response.status === 403) {
+                handleUnauthorized();
+                return null;
+              }
+            }
+
+            if (!response.ok) return null;
+
+            const data = await response.json();
+            if (!data.success || !data.draft) return null;
+
+            const status = String(data.draft.status || '').toLowerCase();
+            if (status !== 'published' && status !== 'failed') return null;
+
+            return {
+              draftId,
+              pageId,
+              status,
+              wordpressUrl: data.draft.wordpressUrl ?? null,
+              error: data.draft.error ?? null
+            };
+          })
+        );
+
+        if (cancelled) return;
+
+        const terminalResults = results.filter(Boolean) as TerminalPublishStatus[];
+        if (!terminalResults.length) return;
+
+        const terminalDraftIds = new Set<number>(terminalResults.map((r) => r.draftId));
+        const terminalPageIds = new Set<number>(terminalResults.map((r) => r.pageId));
+
+        setPublishingPageIds(prev => {
+          const updated = new Set(prev);
+          terminalPageIds.forEach((pageId) => updated.delete(pageId));
+          return updated;
+        });
+
+        setDraftToPageMap(prev => {
+          const updated = new Map(prev);
+          terminalDraftIds.forEach((draftId) => updated.delete(draftId));
+          return updated;
+        });
+
+        setDraftStatuses(prev => {
+          const updated = new Map(prev);
+          terminalResults.forEach((result) => {
+            const existing = updated.get(result.pageId);
+            if (result.status === 'published') {
+              updated.set(result.pageId, {
+                isPublished: true,
+                isFailed: false,
+                publishedUrl: result.wordpressUrl || undefined,
+                draftId: result.draftId,
+                error: undefined
+              });
+              return;
+            }
+            updated.set(result.pageId, {
+              isPublished: false,
+              isFailed: true,
+              publishedUrl: existing?.publishedUrl,
+              draftId: result.draftId,
+              error: result.error || existing?.error
+            });
+          });
+          return updated;
+        });
+
+        setGenerationJobs(prev => {
+          const updated = new Map(prev);
+          terminalResults.forEach((result) => {
+            const existing = updated.get(result.pageId);
+            if (!existing) return;
+            updated.set(result.pageId, {
+              ...existing,
+              wordpressUrl: result.status === 'published'
+                ? (result.wordpressUrl || existing.wordpressUrl || null)
+                : existing.wordpressUrl,
+              error: result.status === 'failed'
+                ? (result.error || existing.error || null)
+                : null
+            });
+          });
+          return updated;
+        });
+      } catch (err) {
+        console.error('Publish polling fallback failed', err);
+      }
+    };
+
+    pollPublishStatuses();
+    const interval = setInterval(pollPublishStatuses, 15000);
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [draftToPageMap, getAuthHeaders, handleUnauthorized, publishingPageIds, setDraftStatuses, setGenerationJobs, setDraftToPageMap, setPublishingPageIds]);
 
   const publishDraft = async (draftId?: number, pageId?: number) => {
     if (!draftId) return;
@@ -6899,8 +7204,9 @@ function CampaignStructureView({
 
       // Job queued successfully - store mapping for SSE handler
       // The actual publishedUrl will come via SSE when n8n responds
-      if (publishData.draftId && pageId) {
-        setDraftToPageMap(prev => new Map(prev).set(publishData.draftId, pageId));
+      const mappedDraftId = publishData.draftId || draftId;
+      if (mappedDraftId && pageId) {
+        setDraftToPageMap(prev => new Map(prev).set(Number(mappedDraftId), pageId));
       }
 
       // Show "Publishing..." toast - success toast will come from SSE handler

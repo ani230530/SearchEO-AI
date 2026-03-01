@@ -67,6 +67,11 @@ export type DraftPreview = {
     slug?: string;
     featuredImage?: string;
     primaryKeyword?: string;
+    longtailKeywords?: string;
+    status?: string;
+    wordpressUrl?: string | null;
+    error?: string | null;
+    updatedAt?: string;
 };
 
 export type DraftStatusRecord = {

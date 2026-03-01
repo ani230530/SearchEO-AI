@@ -152,10 +152,16 @@ app.get('/api/sse', async (req: Request, res: Response) => {
     addSSEClient(userId, client);
 
     // Send initial connection event
+    res.write(`: connected\n\n`);
     res.write(`data: ${JSON.stringify({ type: 'connected', userId })}\n\n`);
+    const keepAlive = setInterval(() => {
+      res.write(': keep-alive\n\n');
+    }, 25000);
 
     req.on('close', () => {
+      clearInterval(keepAlive);
       removeSSEClient(userId, client);
+      res.end();
     });
   } catch (error) {
     return res.status(401).json({ error: 'Invalid token' });
@@ -187,6 +193,16 @@ app.use((req: Request, res: Response) => {
 
 const PORT = Number(process.env?.PORT) || 3002;
 const NODE_ENV = process.env.NODE_ENV || 'development';
+
+if (NODE_ENV === 'production') {
+  const requiredEnvVars = ['CALLBACK_BASE_URL', 'STREAMING_BASE_URL'];
+  const missingEnvVars = requiredEnvVars.filter((name) => !process.env[name]);
+  if (missingEnvVars.length > 0) {
+    throw new Error(
+      `[startup] Missing required environment variables in production: ${missingEnvVars.join(', ')}`
+    );
+  }
+}
 
 app.listen(PORT, () => {
   console.log(`Server running in ${NODE_ENV} mode on port ${PORT}`);

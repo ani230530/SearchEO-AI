@@ -257,13 +257,13 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
 
     const pollInterval = setInterval(async () => {
       try {
-        // Try campaign endpoint first, then publish endpoint
-        let response = await fetch(`${API_BASE_URL}/api/campaigns/drafts/${currentDraftId}`, {
+        // Prefer publish endpoint (status-capable), then fallback to campaign endpoint
+        let response = await fetch(`${API_BASE_URL}/api/publish/drafts/${currentDraftId}`, {
           headers: { Authorization: `Bearer ${localStorage.getItem('authToken')}` },
         });
 
         if (!response.ok) {
-           response = await fetch(`${API_BASE_URL}/api/publish/drafts/${currentDraftId}`, {
+           response = await fetch(`${API_BASE_URL}/api/campaigns/drafts/${currentDraftId}`, {
              headers: { Authorization: `Bearer ${localStorage.getItem('authToken')}` },
            });
         }

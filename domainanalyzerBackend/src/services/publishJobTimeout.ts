@@ -37,7 +37,9 @@ export async function checkPublishJobTimeouts() {
                     status: 'failed', // Explicitly use failed status
                     response: {
                         ...currentResponse,
-                        error: errorMsg
+                        error: errorMsg,
+                        status: 'failed',
+                        failedAt: new Date().toISOString()
                     }
                 }
             });

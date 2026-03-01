@@ -192,7 +192,11 @@ async function handlePublishFailure(job: Job, error: any, meta: any) {
             where: { id: draftId },
             data: {
                 status: 'failed',
-                response: { error: error.message || 'Publish job failed' }
+                response: {
+                    error: error.message || 'Publish job failed',
+                    status: 'failed',
+                    failedAt: new Date().toISOString()
+                }
             }
         });
     } catch (dbError) {
