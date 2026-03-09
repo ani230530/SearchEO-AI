@@ -17,6 +17,7 @@ import {
   Network,
   LayoutDashboard,
   Building,
+  BriefcaseBusiness,
   Megaphone,
   Send,
   BarChart3,
@@ -205,6 +206,7 @@ const [auditLoading, setAuditLoading] = useState(false);
 const [auditError, setAuditError] = useState<string | null>(null);
 const [auditResult, setAuditResult] = useState<any>(null);
 const [auditComplete, setAuditComplete] = useState(false);
+const [selectedMetric, setSelectedMetric] = useState<string | undefined>();
 const [showAuditModal, setShowAuditModal] = useState(false);
 const resultsRef = useRef<HTMLDivElement | null>(null);
 const [activeChartTab, setActiveChartTab] = useState<'overview' | 'comparison' | 'distribution'>('overview');
@@ -336,13 +338,10 @@ const [featuredImage, setFeaturedImage] = useState("");
 const [publishLoading, setPublishLoading] = useState(false);
 const [publishSuccess, setPublishSuccess] = useState(false);
 const [publishError, setPublishError] = useState("");
-const [openSections, setOpenSections] = useState<number[]>([]);
+const [openIndex, setOpenIndex] = useState<number | null>(null);
+
 const toggleSection = (idx: number) => {
-  setOpenSections((prev) =>
-    prev.includes(idx)
-      ? prev.filter((i) => i !== idx)
-      : [...prev, idx]
-  );
+  setOpenIndex(prev => (prev === idx ? null : idx));
 };
   // Company info carousel: track index and count to show arrows conditionally
   const companyCarouselRef = useRef<HTMLDivElement | null>(null);
@@ -2357,6 +2356,9 @@ useEffect(() => {
           border-bottom: 0.5px solid rgba(0, 0, 0, 0.1);
         }
 
+        .sidebar.closed .sidebar-header {
+  padding: 4px 24px;
+}
         .sidebar-content {
           padding: 20px 12px;
         }
@@ -2461,7 +2463,7 @@ useEffect(() => {
         }
 
         .main-content.sidebar-closed {
-          margin-left: 96px;
+          margin-left: 78px;
         }
 
         .content-header {
@@ -3232,7 +3234,7 @@ useEffect(() => {
             companyDomainLoading ? (
               <CompanyInfoSkeleton />
             ) : showResults ? (
-              <div className="max-w-6xl mx-auto px-4 sm:px-6 py-12 sm:py-16">
+              <div className="min-w-6xl mx-auto px-4 sm:px-6 py-12 sm:py-16">
                 {/* Company Domain Heading */}
                 {/* <div className="text-center mb-12 flex flex-col items-center gap-4">
                 
@@ -3246,16 +3248,58 @@ useEffect(() => {
                       <div className="mb-16">
                         {(() => {
                           const full = domainContext;
-                          const headers = [
-                            "Business Model Analysis",
-                            "Target Audience Profiling",
-                            "Value Proposition & Positioning",
-                            "SEO & Content Strategy Insights",
-                            "Competitive Intelligence",
-                            "Market Dynamics",
-                            "Location-Based SEO Analysis",
-                            "SEO Opportunity Analysis",
-                          ];
+                        const iconMap: Record<string, JSX.Element> = {
+  "Business Model Analysis": <img
+    src="https://res.cloudinary.com/dgfzjdi68/image/upload/v1772020198/Group_1_vvjxuz.svg"
+    alt="Target Audience Profiling"
+    width={20}
+    height={20}
+  />,
+  "Target Audience Profiling": (
+  <img
+    src="https://res.cloudinary.com/dgfzjdi68/image/upload/v1772020378/Group_2_t45oi4.svg"
+    alt="Target Audience Profiling"
+    width={20}
+    height={20}
+  />
+),
+  "Value Proposition & Positioning": <img
+    src="https://res.cloudinary.com/dgfzjdi68/image/upload/v1772020608/streamline-plump_target-3_zf59wp.svg"
+    alt="Target Audience Profiling"
+    width={25}
+    height={25}
+  />,
+  "SEO & Content Strategy Insights": <img
+    src="https://res.cloudinary.com/dgfzjdi68/image/upload/v1772020608/hugeicons_seo_itfmdp.svg"
+    alt="Target Audience Profiling"
+    width={25}
+    height={25}
+  />,
+  "Competitive Intelligence": <img
+    src="https://res.cloudinary.com/dgfzjdi68/image/upload/v1772020606/Group_ho0bh5.svg"
+    alt="Target Audience Profiling"
+    width={20}
+    height={20}
+  />,
+  "Market Dynamics": <img
+    src="https://res.cloudinary.com/dgfzjdi68/image/upload/v1772020608/market-analysis_svgrepo.com_wjuzuv.svg"
+    alt="Target Audience Profiling"
+    width={20}
+    height={20}
+  />,
+  "Location-Based SEO Analysis": <img
+    src="https://res.cloudinary.com/dgfzjdi68/image/upload/v1772020608/location-med-2_svgrepo.com_y5xuuh.svg"
+    alt="Target Audience Profiling"
+    width={25}
+    height={25}
+  />,
+  "SEO Opportunity Analysis": <img
+    src="https://res.cloudinary.com/dgfzjdi68/image/upload/v1772020609/seo_svgrepo.com_wwqcub.svg"
+    alt="Target Audience Profiling"
+    width={20}
+    height={20}
+  />,
+};
                           const normalize = (s: string) =>
                             s
                               .replace(/\*\*/g, "")
@@ -3263,7 +3307,7 @@ useEffect(() => {
                               .replace(/[:]+$/, "")
                               .trim()
                               .toUpperCase();
-                          const target = headers.map((h) => normalize(h));
+                          const target = Object.keys(iconMap).map((h) => normalize(h));
                           const lines = full.split(/\r?\n/);
                           const contentMap: Record<string, string[]> = {};
                           target.forEach((t) => (contentMap[t] = []));
@@ -3279,7 +3323,7 @@ useEffect(() => {
                               contentMap[current].push(line);
                             }
                           }
-                          const sections = headers.map((h) => {
+                          const sections = Object.keys(iconMap).map((h) => {
                             const key = normalize(h);
                             return {
                               title: h,
@@ -3288,7 +3332,7 @@ useEffect(() => {
                           });
                                                     const leftSections = sections.slice(0, 4);
 const rightSections = sections.slice(4, 8);
-
+const allSections = [...leftSections, ...rightSections];
                        if (sections.some((s) => s.content.length > 0)) {
   return (
     <div className="p-4 sm:p-6 bg-white rounded-3xl border border-gray-100 hover:shadow-lg overflow-hidden backdrop-blur-sm">
@@ -3306,7 +3350,7 @@ const rightSections = sections.slice(4, 8);
           </div>
 
           <div className="flex items-center gap-3">
-            <div className="inline-flex items-center gap-5 bg-blue-50 border border-blue-200 text-blue-700 px-5 py-3 rounded-3xl shadow-sm">
+            <div className="inline-flex items-center gap-5 bg-blue-50 border border-blue-200 text-blue-700 px-5 py-3 rounded-xl shadow-sm">
                    <img
   src={`https://img.logo.dev/${normalizedDomain}?token=pk_DTdFFG1JT9WOCjATvZEzIA&size=128`}
   alt="Company logo"
@@ -3338,88 +3382,90 @@ const rightSections = sections.slice(4, 8);
         </div>
 
         {/* Body */}
-       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-6">
-        <div className="space-y-4 ">
-  {leftSections.map((sec, idx) => {
-    const globalIdx = idx; 
-    const isOpen = openSections.includes(globalIdx);
+ {/* Top Row */}
+<div className="flex flex-wrap gap-6 py-8">
+  {allSections.slice(0, 4).map((sec, idx) => {
+    const isOpen = openIndex === idx;
+    const isOtherOpen = openIndex !== null && openIndex !== idx && idx < 4;
 
     return (
-      <motion.div
-        key={globalIdx}
-        className="rounded-xl border border-gray-200/60 bg-white overflow-hidden hover:shadow-lg"
+      <div
+        key={idx}
+        className={`rounded-3xl border overflow-hidden ${
+          isOpen ? " bg-blue-50" : " bg-white"
+        }`}
+        style={{
+          flex: isOpen ? "2 1 0%" : isOtherOpen ? "0.9 1 0%" : "1 1 0%",
+          minWidth: 0,
+        }}
       >
+        {/* Header */}
         <button
-          onClick={() => toggleSection(globalIdx)}
-          className="flex w-full items-center justify-between px-6 py-4 text-left"
+          onClick={() => toggleSection(idx)}
+          className="flex w-full items-center justify-between px-6 py-6 text-left"
         >
-          <h3 className="text-lg font-light text-gray-900">{sec.title}</h3>
-
-          <motion.div animate={{ rotate: isOpen ? 180 : 0 }}>
-            <ChevronDown size={20} />
-          </motion.div>
+          <div className="flex items-center gap-3">
+            <div className="text-blue-600">{iconMap[sec.title]}</div>
+            <h3 className="text-xl font-light text-gray-900">{sec.title}</h3>
+          </div>
+          <div style={{ transform: isOpen ? "rotate(180deg)" : "rotate(0deg)" }}>
+            <ChevronDown size={22} />
+          </div>
         </button>
-
-        <AnimatePresence initial={false}>
-          {isOpen && (
-            <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: "auto", opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              className="overflow-hidden px-6 pb-6"
-            >
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                {sec.content}
-              </ReactMarkdown>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </motion.div>
-    );
-  })}
-</div>
-
-          <div className="space-y-4">
-  {rightSections.map((sec, idx) => {
-    const globalIdx = idx + 4; // 4–7
-    const isOpen = openSections.includes(globalIdx);
-
-    return (
-      <motion.div
-        key={globalIdx}
-        className="rounded-xl border border-gray-200/60 bg-white overflow-hidden hover:shadow-lg"
-      >
-        <button
-          onClick={() => toggleSection(globalIdx)}
-          className="flex w-full items-center justify-between px-6 py-4 text-left"
-        >
-          <h3 className="text-lg font-light text-gray-900">{sec.title}</h3>
-
-          <motion.div animate={{ rotate: isOpen ? 180 : 0 }}>
-            <ChevronDown size={20} />
-          </motion.div>
-        </button>
-
-        <AnimatePresence initial={false}>
-          {isOpen && (
-            <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: "auto", opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              className="overflow-hidden px-6 pb-6"
-            >
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                {sec.content}
-              </ReactMarkdown>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </motion.div>
-    );
-  })}
-</div>
-
+<div className="mt-2 mb-4 mx-4 border-t border-gray-200 w-[calc(100%-2rem)]" />
+        {/* Content */}
+        <div className={`px-6 mb-2 text-gray-600 break-words relative ${!isOpen ? "line-clamp-4" : ""}`}>
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>
+            {sec.content}
+          </ReactMarkdown>
         </div>
+      </div>
+    );
+  })}
+</div>
+
+{/* Bottom Row */}
+<div className="flex flex-wrap gap-6 py-8">
+  {allSections.slice(4, 8).map((sec, idx) => {
+    const realIdx = idx + 4;
+    const isOpen = openIndex === realIdx;
+    const isOtherOpen = openIndex !== null && openIndex !== realIdx;
+
+    return (
+      <div
+        key={realIdx}
+        className={`rounded-3xl border overflow-hidden ${
+          isOpen ? " bg-blue-50" : " bg-white"
+        }`}
+        style={{
+          flex: isOpen ? "2 1 0%" : isOtherOpen ? "0.9 1 0%" : "1 1 0%",
+          minWidth: 0,
+        }}
+      >
+        {/* Header */}
+        <button
+          onClick={() => toggleSection(realIdx)}
+          className="flex w-full items-center justify-between px-6 py-6 text-left"
+        >
+          <div className="flex items-center gap-3">
+            <div className="text-blue-600">{iconMap[sec.title]}</div>
+            <h3 className="text-xl font-light text-gray-900">{sec.title}</h3>
+          </div>
+          <div style={{ transform: isOpen ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.2s ease" }}>
+            <ChevronDown size={22} />
+          </div>
+        </button>
+<div className="mt-2 mb-4 mx-4 border-t border-gray-200 w-[calc(100%-2rem)]" />
+        {/* Content */}
+        <div className={`px-6 mb-2 text-gray-600 break-words relative ${!isOpen ? "line-clamp-4" : ""}`}>
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>
+            {sec.content}
+          </ReactMarkdown>
+        </div>
+      </div>
+    );
+  })}
+</div>
       </div>
     </div>
   );
@@ -4002,14 +4048,7 @@ const rightSections = sections.slice(4, 8);
                                       {/* Intent Column */}
                                       <div className="col-span-1 flex items-center justify-center">
                                         <span
-                                          className={`px-2 py-1 rounded-full text-xs font-medium ${
-                                            keyword.intent === "Commercial"
-                                              ? "bg-blue-100 text-blue-800"
-                                              : keyword.intent ===
-                                                "Transactional"
-                                              ? "bg-green-100 text-green-800"
-                                              : "bg-gray-100 text-gray-800"
-                                          }`}
+                                          className={`px-2 py-1 rounded-full text-sm font-medium `}
                                         >
                                           {keyword.intent}
                                         </span>
@@ -4279,7 +4318,7 @@ const rightSections = sections.slice(4, 8);
                     )}
 
                     {/* Action Buttons */}
-                    <div className="flex items-center justify-center gap-4 mt-12">
+                    {/* <div className="flex items-center justify-center gap-4 mt-12">
                       {createdDomainId && (
                         <button
                           onClick={() => {
@@ -4291,7 +4330,7 @@ const rightSections = sections.slice(4, 8);
                           View Full Dashboard
                         </button>
                       )}
-                    </div>
+                    </div> */}
                   </div>
                 )}
 
@@ -5146,7 +5185,8 @@ const rightSections = sections.slice(4, 8);
             </div>
             );
             })()
-          ) : activeTab === 'publish' ? (
+          ) : activeTab === 'publish' ?
+           (
             companyDomainLoading ? (
               <CompanyInfoSkeleton />
                 ) : (
@@ -5183,67 +5223,80 @@ const rightSections = sections.slice(4, 8);
               </div>
 
               {/* Content Layer */}
-              <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 py-16 sm:py-24">
+              <div className="relative z-10 min-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-4">
 
                 {/* Hero Section */}
-                <div className="text-center mb-20">
-                  <div className="text-xs font-light uppercase tracking-wider text-gray-500 mb-4" style={{ letterSpacing: '0.083em' }}>
-                    Domain Performance Audit
-                  </div>
-                  <h1
-                    className="text-5xl sm:text-6xl md:text-7xl font-extralight mb-6 text-gray-900 "
-                    style={{ letterSpacing: '-0.003em', lineHeight: 1.05 }}
-                  >
+                <div className="text-left mb-2">
+                  <h1 className="text-4xl font-thin text-black tracking-tight mb-4">
                     Audit Your Domain
                   </h1>
-                  <p
-                    className="text-lg sm:text-xl md:text-2xl font-light text-gray-500 max-w-2xl mx-auto mb-12"
-                    style={{ letterSpacing: '0.011em', lineHeight: 1.4 }}
-                  >
-                    Get comprehensive Lighthouse metrics, SEO insights, accessibility scores, and performance data.
-                  </p>
+                  <p className='text-gray-600 mb-3'>Get comprehensive Lighthouse metrics, SEO insights, accessibility scores, and performance data.</p>
 
-                  {/* Action Section */}
-                  <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-8">
-                    <div
-                      className="flex-1 max-w-md bg-white/70 backdrop-blur-md border border-gray-200 rounded-full px-6 py-3 flex items-center justify-between shadow-sm"
-                      style={{ borderWidth: '0.5px' }}
-                    >
-                      <span className="text-gray-700 font-light truncate " style={{ letterSpacing: '0.011em' }}>
-                        {companyDomain || "No domain available"}
-                      </span>
-                    </div>
+                 {/* Action Section */}
+<div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-8">
+  <div
+    className="flex-1 min-w-md bg-white/70 backdrop-blur-md border border-gray-200  px-6 py-3 flex items-center justify-between shadow-sm rounded-md"
+    style={{ borderWidth: '0.5px' }}
+  >
+    <span className="text-gray-700 font-light truncate " style={{ letterSpacing: '0.011em' }}>
+      {companyDomain || "No domain available"}
+    </span>
+  </div>
 
-                    <div className="flex gap-3 ">
-                      <button
-                        onClick={() => handleRunAudit(companyDomain)}
-                        disabled={auditLoading || !companyDomain}
-                        className={cn(
-                          "inline-flex items-center gap-2 px-6 py-3 bg-black text-white rounded-full text-sm font-medium hover:bg-black/90  disabled:opacity-60 transition",
-                          "bg-black hover:bg-gray-800 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed",
-                          auditLoading && "cursor-not-allowed"
-                        )}
-                        style={{ letterSpacing: '-0.022em' }}
-                      >
-                        {auditLoading ? (
-                          <>
-                            <Loader2 className="h-5 w-5 animate-spin" />
-                            <span>Running Audit…</span>
-                          </>
-                        ) : (
-                          "Start Audit"
-                        )}
-                      </button>
-                       <PDFDownloadLink
-                            document={<AuditPDF data={auditResult} domain={companyDomain} />}
-                            fileName={`audit-${companyDomain}-${new Date().toISOString().split('T')[0]}.pdf`}
-                            className="px-4 py-2 rounded-full border border-gray-200 text-sm font-light bg-white hover:bg-gray-50 flex items-center justify-center"
-                          >
-                            {({ loading }) => (loading ? 'Preparing...' : 'Export PDF')}
-                          </PDFDownloadLink>
-                    </div>
-                  </div>
+  <div className="flex gap-3 ">
+    <button
+      onClick={() => handleRunAudit(companyDomain)}
+      disabled={auditLoading || !companyDomain}
+      className={cn(
+    "inline-flex items-center gap-2 px-6 py-3 text-white rounded-xl text-sm font-medium hover:opacity-90 disabled:opacity-60 transition",
+    auditLoading && "cursor-not-allowed"
+  )}
+  style={{
+    background: "linear-gradient(90deg, #2D4059 0%, #4E76C7 100%)",
+  }}
 
+    >
+      Run Audit
+    </button>
+    <PDFDownloadLink
+      document={<AuditPDF data={auditResult} domain={companyDomain} />}
+      fileName={`audit-${companyDomain}-${new Date().toISOString().split('T')[0]}.pdf`}
+      className="px-4 py-2 rounded-xl border border-gray-200 text-sm font-light bg-white hover:bg-gray-50 flex items-center justify-center"
+    >
+      {({ loading }) => (loading ? 'Preparing...' : 'Export PDF')}
+    </PDFDownloadLink>
+  </div>
+</div>
+
+{/* Loader  */}
+{auditLoading && (
+  <div className="w-full flex flex-col items-center justify-center mt-56">
+    <svg
+      className="animate-spin text-blue-600"
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 120 120"
+      width={120}
+      height={120}
+    >
+      <circle
+        className="opacity-75"
+        cx="60"
+        cy="60"
+        r="50"
+        stroke="currentColor"
+        strokeWidth="20"
+        strokeLinecap="round"
+        fill="none"
+        strokeDasharray="250 320"
+        strokeDashoffset="18"      
+      />
+    </svg>
+
+    <span className="mt-4 mb-24 text-blue-600 font-medium text-lg text-center">
+      Running Audit
+    </span>
+  </div>
+)}
                   {/* N8n Results Display */}
                   {(n8nStatus || n8nResults) && (
                     <div className="mt-6 p-6 bg-white/70 backdrop-blur-md rounded-2xl border border-gray-200 shadow-sm" style={{ borderWidth: '0.5px' }}>
@@ -5307,243 +5360,226 @@ const rightSections = sections.slice(4, 8);
                     </div>
                   )}
 
-                  {auditData && auditData.updatedAt && (
-                    <p className="text-sm font-light text-gray-400" style={{ letterSpacing: '0.011em' }}>
+                  {/* {auditData && auditData.updatedAt && (
+                    <p className="text-sm font-light text-gray-400 pt-6" style={{ letterSpacing: '0.011em' }}>
                       Last audited: {new Date(auditData.updatedAt).toLocaleString()}
                     </p>
-                  )}
+                  )} */}
                 </div>
 
                 {/* Audit Results */}
-                {auditResult && (() => {
-                  const categories = [
-                    { label: "Performance", value: auditResult.performance },
-                    { label: "SEO", value: auditResult.seo },
-                    { label: "Accessibility", value: auditResult.accessibility },
-                    { label: "Best Practices", value: auditResult.bestPractices },
-                  ];
+               {/* Audit Results */}
+{auditResult && (() => {
+  const categories = [
+    { label: "Performance", value: auditResult.performance },
+    { label: "SEO", value: auditResult.seo },
+    { label: "Accessibility", value: auditResult.accessibility },
+    { label: "Best Practices", value: auditResult.bestPractices },
+  ];
 
-                  const scored = categories.map(c => ({ ...c, score: Math.round((c.value || 0) * 100) }));
-                  const avg = scored.reduce((a, b) => a + b.score, 0) / scored.length;
-                  const best = scored.reduce((a, b) => (b.score > a.score ? b : a));
-                  const worst = scored.reduce((a, b) => (b.score < a.score ? b : a));
-                  
-                  return (
-                    <div ref={resultsRef} className="space-y-16">
-                      {/* Overall Score Section */}
-                      <div className="flex flex-col items-center justify-center py-12">
-                        <div className="mb-8">
-                          <OverallScoreGauge score={overallScore} />
-                        </div>
-                        <div className="flex gap-8 text-center">
-                          <div>
-                            <div className="text-xs font-light uppercase tracking-wider text-gray-400 mb-2" style={{ letterSpacing: '0.083em' }}>
-                              Strongest
-                            </div>
-                            <div className="text-2xl font-light text-gray-900" style={{ letterSpacing: '-0.003em' }}>
-                              {best.label}
-                            </div>
-                            <div className="text-sm font-light text-gray-500 mt-1" style={{ letterSpacing: '0.011em' }}>
-                              {best.score}%
-                            </div>
-                          </div>
-                          <div className="w-px bg-gray-200" />
-                          <div>
-                            <div className="text-xs font-light uppercase tracking-wider text-gray-400 mb-2" style={{ letterSpacing: '0.083em' }}>
-                              Needs Work
-                            </div>
-                            <div className="text-2xl font-light text-gray-900" style={{ letterSpacing: '-0.003em' }}>
-                              {worst.label}
-                            </div>
-                            <div className="text-sm font-light text-gray-500 mt-1" style={{ letterSpacing: '0.011em' }}>
-                              {worst.score}%
-                            </div>
-                          </div>
-                        </div>
-                      </div>
+  const scored = categories.map(c => ({ ...c, score: Math.round((c.value || 0) * 100) }));
+  const avg = scored.reduce((a, b) => a + b.score, 0) / scored.length;
+  const best = scored.reduce((a, b) => (b.score > a.score ? b : a));
+  const worst = scored.reduce((a, b) => (b.score < a.score ? b : a));
+  
+  return (
+    <div ref={resultsRef} className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+     
+      {/* Overall Score Section */}
+      <div className="flex justify-between bg-white/70 py-8 px-8 rounded-2xl border border-gray-200 shadow-sm" style={{ borderWidth: '0.5px', minHeight: '367px' }}>
+        {/* Overall Score on the left */}
+        <div className="flex-shrink-0 flex flex-col items-center justify-center pr-8">
+          <h3 className="text-2xl font-light text-gray-900 p-6" style={{ letterSpacing: '-0.003em' }}>
+        Domain Audit
+      </h3>
+          <OverallScoreGauge score={overallScore} />
+        </div>
 
-                      {/* Charts Section */}
-                      <div className="space-y-12">
-                        {/* Chart Tabs */}
-                        <div className="flex flex-wrap gap-4 justify-center border-b border-gray-200 pb-4" style={{ borderWidth: '0.5px' }}>
-                          {[
-                            { id: 'overview' as const, label: 'Overview' },
-                            { id: 'comparison' as const, label: 'Comparison' },
-                            { id: 'distribution' as const, label: 'Distribution' },
-                          ].map((tab) => (
-                            <button
-                              key={tab.id}
-                              onClick={() => setActiveChartTab(tab.id)}
-                              className={cn(
-                                "px-6 py-2 text-sm font-light transition-colors border-b-2",
-                                activeChartTab === tab.id
-                                  ? "text-gray-900 border-gray-900"
-                                  : "text-gray-500 border-transparent hover:text-gray-700 hover:border-gray-300"
-                              )}
-                              style={{ letterSpacing: '0.011em' }}
-                            >
-                              {tab.label}
-                            </button>
-                          ))}
-                        </div>
+        {/* Strongest / Needs Work on the right */}
+        <div className="flex flex-col items-center justify-center gap-6 text-center">
+          {/* Strongest */}
+          <div>
+            <div className="text-xs font-light uppercase tracking-wider text-green-700 mb-1" style={{ letterSpacing: '0.083em' }}>
+              Strongest
+            </div>
+            <div className="text-2xl font-light text-gray-900" style={{ letterSpacing: '-0.003em' }}>
+              {best.label}
+            </div>
+            <div className="text-sm font-light text-gray-500 mt-1" style={{ letterSpacing: '0.011em' }}>
+              {best.score}%
+            </div>
+          </div>
 
-                        {/* Chart Content */}
-                        {activeChartTab === 'overview' && (
-                          <div
-                            className="bg-white/70 backdrop-blur-md rounded-2xl border border-gray-200 p-8 shadow-sm animate-in fade-in duration-300"
-                            style={{ borderWidth: '0.5px' }}
-                          >
-                            <h3
-                              className="text-2xl font-light text-gray-900 mb-6 text-center"
-                              style={{ letterSpacing: '-0.003em' }}
-                            >
-                              Performance Overview
-                            </h3>
-                            <AuditRadarChart data={auditResult} />
-                          </div>
-                        )}
-
-                        {activeChartTab === 'comparison' && (
-                          <div
-                            className="bg-white/70 backdrop-blur-md rounded-2xl border border-gray-200 p-8 shadow-sm animate-in fade-in duration-300"
-                            style={{ borderWidth: '0.5px' }}
-                          >
-                            <h3
-                              className="text-2xl font-light text-gray-900 mb-6 text-center"
-                              style={{ letterSpacing: '-0.003em' }}
-                            >
-                              Metrics Comparison
-                            </h3>
-                            <AuditBarChart data={auditResult} />
-                          </div>
-                        )}
-
-                        {activeChartTab === 'distribution' && (
-                          <div
-                            className="bg-white/70 backdrop-blur-md rounded-2xl border border-gray-200 p-8 shadow-sm animate-in fade-in duration-300"
-                            style={{ borderWidth: '0.5px' }}
-                          >
-                            <h3
-                              className="text-2xl font-light text-gray-900 mb-6 text-center"
-                              style={{ letterSpacing: '-0.003em' }}
-                            >
-                              Score Distribution
-                            </h3>
-                            <AuditScoreDistribution data={auditResult} />
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Individual Metrics Grid */}
-                      <div>
-                        <h3
-                          className="text-2xl font-light text-gray-900 mb-8 text-center"
-                          style={{ letterSpacing: '-0.003em' }}
-                        >
-                          Individual Metrics
-                        </h3>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-6">
-  {categories.map(({ label, value }) => (
-    <div
-      key={label}
-      className="bg-white/70 backdrop-blur-md rounded-2xl border border-gray-200 p-6 shadow-sm hover:shadow-md transition-all"
-      style={{ borderWidth: '0.5px' }}
-    >
-      {/* Metric Title + Tooltip */}
-      <div className="flex items-center justify-center gap-1 mb-4">
-        <span
-          className="text-sm font-light text-gray-700"
-          style={{ letterSpacing: '0.011em' }}
-        >
-          {label}
-        </span>
-
-        {categoryDescriptions[label] && (
-          <InfoTooltip text={categoryDescriptions[label]} />
-        )}
+          {/* Needs Work */}
+          <div>
+            <div className="text-xs font-light uppercase tracking-wider text-orange-700 mb-1" style={{ letterSpacing: '0.083em' }}>
+              Needs Work
+            </div>
+            <div className="text-2xl font-light text-gray-900" style={{ letterSpacing: '-0.003em' }}>
+              {worst.label}
+            </div>
+            <div className="text-sm font-light text-gray-500 mt-1" style={{ letterSpacing: '0.011em' }}>
+              {worst.score}%
+            </div>
+          </div>
+        </div>
       </div>
 
-      {/* Gauge */}
-      <AuditGaugeChart label={null} score={value} size={140} />
+      {/* Individual Metric */}
+  <div className="bg-white/70 backdrop-blur-md rounded-2xl border border-gray-200 p-12 shadow-sm" style={{ borderWidth: '0.5px' }}>
+    <div className="flex items-center justify-between mb-6">
+      <h3 className="text-2xl font-light text-gray-900" style={{ letterSpacing: '-0.003em' }}>
+        Individual Metric
+      </h3>
+
+      <div className="relative w-[180px] pl-6">
+        <label htmlFor="metric-select" className="sr-only">Select Metric</label>
+        <select
+          id="metric-select"
+          value={selectedMetric || "Performance"} 
+          onChange={(e) => setSelectedMetric(e.target.value)}
+          className="appearance-none w-full px-4 py-3 pr-10 rounded-xl border border-gray-200 bg-white text-sm font-light focus:outline-none focus:ring-1 focus:ring-gray-600"
+        >
+          {categories.map(({ label }) => (
+            <option key={label} value={label}>{label}</option>
+          ))}
+        </select>
+
+        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3">
+          <svg className="h-4 w-4 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+            <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.24a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.06z" clipRule="evenodd"/>
+          </svg>
+        </div>
+      </div>
     </div>
-  ))}
+
+    {/* Display default selected metric immediately */}
+    {categories
+      .filter(c => c.label === (selectedMetric || "Performance"))
+      .map(({ label, value }) => (
+        <div key={label} className="flex items-center gap-8">
+  {/* Score on the left */}
+  <div className="flex-shrink-0">
+    <AuditGaugeChart label={null} score={value} size={180} />
+  </div>
+
+  {/* Description on the right, vertically centered */}
+  {categoryDescriptions[label] && (
+    <div className="flex-1 text-sm text-gray-500 flex items-center">
+      {categoryDescriptions[label]}
+    </div>
+  )}
+</div>
+      ))}
+  </div>
+
+      {/* Screenshot Section */}
+      {auditResult?.screenshot && (
+        <div className="bg-white/70 backdrop-blur-md rounded-2xl border border-gray-200 p-6 shadow-sm overflow-hidden" style={{ borderWidth: '0.5px' }}>
+          <h3 className="text-2xl font-light text-gray-900 mb-3 text-center" style={{ letterSpacing: '-0.003em' }}>Website Preview</h3>
+          <div className="rounded-xl overflow-hidden border border-gray-200" style={{ borderWidth: '0.5px' }}>
+            <img src={auditResult.screenshot} alt="Website Screenshot" className="w-full h-auto" />
+          </div>
+        </div>
+      )}
+
+      
+
+      {/* Charts Section – Full Width */}
+<div className="col-span-1 lg:col-span-2 bg-white/70">
+  <div
+    className="bg-white/70 backdrop-blur-md rounded-2xl border border-gray-200 p-8 shadow-sm animate-in fade-in duration-300"
+    style={{ borderWidth: '0.5px', minHeight: '520px' }} 
+  >
+
+    {/* Top Bar (Title + Dropdown) */}
+    <div className="flex justify-between items-center mb-2">
+      <h3 className="text-2xl font-light text-gray-900" style={{ letterSpacing: '-0.003em' }}>
+        {activeChartTab === 'overview' && 'Performance Overview'}
+        {activeChartTab === 'comparison' && 'Metrics Comparison'}
+        {activeChartTab === 'distribution' && 'Score Distribution'}
+      </h3>
+
+     <div className="relative w-[190px]">
+  <select
+    value={activeChartTab}
+    onChange={(e) =>
+      setActiveChartTab(e.target.value as "overview" | "comparison" | "distribution")
+    }
+    className="appearance-none w-full px-4 py-3 pr-10 rounded-xl border border-gray-300 bg-white text-sm font-light text-gray-900 shadow-sm hover:border-gray-400 focus:outline-none focus:border-gray-500 transition-colors duration-150"
+  >
+    <option value="overview">Overview</option>
+    <option value="comparison">Comparison</option>
+    <option value="distribution">Distribution</option>
+  </select>
+
+  {/* Custom arrow */}
+  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3">
+    <svg
+      className="h-4 w-4 text-gray-400"
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 20 20"
+      fill="currentColor"
+    >
+      <path
+        fillRule="evenodd"
+        d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.24a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.06z"
+        clipRule="evenodd"
+      />
+    </svg>
+  </div>
+</div>
+    </div>
+
+    {/* Chart Content: always rendered, hidden if not active */}
+    <div className={activeChartTab === 'overview' ? 'block' : 'hidden'}>
+      <AuditRadarChart data={auditResult} />
+    </div>
+    <div className={`pt-12 ${activeChartTab === 'comparison' ? 'block' : 'hidden'}`}>
+      <AuditBarChart data={auditResult} />
+    </div>
+    <div className={`pt-2 ${activeChartTab === 'distribution' ? 'block' : 'hidden'}`}>
+      <AuditScoreDistribution data={auditResult} />
+    </div>
+
+  </div>
 </div>
 
-                      </div>
 
-                      {/* Screenshot Section */}
-                      {auditResult?.screenshot && (
-                        <div
-                          className="bg-white/70 backdrop-blur-md rounded-2xl border border-gray-200 p-8 shadow-sm overflow-hidden"
-                          style={{ borderWidth: '0.5px' }}
-                        >
-                          <h3
-                            className="text-2xl font-light text-gray-900 mb-6 text-center"
-                            style={{ letterSpacing: '-0.003em' }}
-                          >
-                            Website Preview
-                          </h3>
-                          <div className="rounded-xl overflow-hidden border border-gray-200" style={{ borderWidth: '0.5px' }}>
-                            <img
-                              src={auditResult.screenshot}
-                              alt="Website Screenshot"
-                              className="w-full h-auto"
-                            />
-                          </div>
-                        </div>
-                      )}
+{/* Advanced Metrics */}
+      {auditResult.audits && (
+        
+  <div className="col-span-1 bg-white/70 backdrop-blur-md rounded-2xl border border-gray-200 p-8 shadow-sm overflow-hidden " style={{ borderWidth: '0.5px' }}>
+    <h3 className="text-2xl font-light text-gray-900 mb-6 text-center" style={{ letterSpacing: '-0.003em' }}>Advanced Performance Metrics</h3>
+    <div className="space-y-7">
+      {Object.entries(auditResult.audits).map(([key, value]) => {
+        const fullForms: { [key: string]: string } = {
+          fcp: "First Contentful Paint",
+          lcp: "Largest Contentful Paint",
+          cls: "Cumulative Layout Shift",
+          tbt: "Total Blocking Time",
+          speedIndex: "Speed Index", 
+        };
 
-                      {/* Advanced Metrics */}
-                      {auditResult.audits && (
-                        <details className="group">
-                          <summary
-                            className="cursor-pointer flex justify-between items-center px-6 py-4 bg-white/70 backdrop-blur-md rounded-2xl border border-gray-200 shadow-sm text-gray-900 font-light hover:bg-white/90 transition-all"
-                            style={{ borderWidth: '0.5px', letterSpacing: '0.011em' }}
-                          >
-                            <span>Advanced Performance Metrics</span>
-                            <span className="transition-transform group-open:rotate-90 text-gray-400">▶</span>
-                          </summary>
-
-                          <div className="mt-6 p-6 bg-white/70 backdrop-blur-md rounded-2xl border border-gray-200 space-y-3" style={{ borderWidth: '0.5px' }}>
-                            {Object.entries(auditResult.audits).map(([key, value]) => {
-                              const fullForms: { [key: string]: string } = {
-                                fcp: "First Contentful Paint",
-                                lcp: "Largest Contentful Paint",
-                                cls: "Cumulative Layout Shift",
-                                tbt: "Total Blocking Time",
-                                speedIndex: "Speed Index",
-                              };
-
-                              return (
-                                <div
-                                  key={key}
-                                  className="flex justify-between items-center px-4 py-3 rounded-xl bg-gray-50/50 border border-gray-200 hover:bg-gray-50 transition-all"
-                                  style={{ borderWidth: '0.5px' }}
-                                >
-                                  <span
-  className="font-light text-gray-900 flex items-center gap-1"
-  style={{ letterSpacing: '0.011em' }}
->
-  {key.toUpperCase()}
-  <span className="text-gray-500">({fullForms[key] || key})</span>
-
-  {metricDescriptions[key] && (
-    <InfoTooltip text={metricDescriptions[key]} />
-  )}
-</span>
-
-                                  <span className="font-mono text-sm font-light text-gray-700 bg-white px-3 py-1 rounded-lg border border-gray-200" style={{ borderWidth: '0.5px' }}>
-                                    {String(value)}
-                                  </span>
-                                </div>
-                              );
-                            })}
-                          </div> 
-                        </details>
-                      )}
-                    </div>
-                  );
-                })()}
+        return (
+          <div key={key} className="flex justify-between items-center px-4 py-3 rounded-xl bg-gray-50 border border-gray-200 hover:bg-gray-50 transition-all" style={{ borderWidth: '0.5px' }}>
+            <span className="font-light text-gray-900 flex items-center gap-1" style={{ letterSpacing: '0.011em' }}>
+              {key.toUpperCase()}
+              <span className="text-gray-500">({fullForms[key] || key})</span>
+              {metricDescriptions[key] && <InfoTooltip text={metricDescriptions[key]} />}
+            </span>
+            <span className="font-mono text-sm font-light text-gray-700 bg-white px-3 py-1 rounded-lg border border-gray-200" style={{ borderWidth: '0.5px' }}>
+              {String(value)}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  </div>
+)}
+    </div>
+  );
+})()}
               </div>
             </div>
           ) : activeTab === 'analytics-report' ? (
@@ -5552,36 +5588,8 @@ const rightSections = sections.slice(4, 8);
               initialOrgName={extractOrgName(domainContext)}
             />
           ): activeTab === 'gsc-analytics' ? (
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
-              {/* GSC Sub-tabs */}
-              <div className="flex items-center gap-2 mb-8 border-b border-gray-100 pb-4">
-                <button
-                  onClick={() => setActiveGscSubTab('whole-analytics')}
-                  className={`px-5 py-2.5 rounded-full text-sm font-medium transition-all duration-200 ${
-                    activeGscSubTab === 'whole-analytics'
-                      ? 'bg-purple-600 text-white shadow-lg shadow-purple-200'
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                  }`}
-                >
-                  <span className="flex items-center gap-2">
-                    <ChartNoAxesCombined className="h-4 w-4" />
-                    Whole Analytics
-                  </span>
-                </button>
-                <button
-                  onClick={() => setActiveGscSubTab('blog-performance')}
-                  className={`px-5 py-2.5 rounded-full text-sm font-medium transition-all duration-200 ${
-                    activeGscSubTab === 'blog-performance'
-                      ? 'bg-purple-600 text-white shadow-lg shadow-purple-200'
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                  }`}
-                >
-                  <span className="flex items-center gap-2">
-                    <BarChart3 className="h-4 w-4" />
-                    Our Blog Performance
-                  </span>
-                </button>
-              </div>
+            <div className="min-w-8xl mx-auto px-4 sm:px-6 py-8">
+            
 
               {/* GSC Sub-tab Content */}
               {activeGscSubTab === 'whole-analytics' ? (

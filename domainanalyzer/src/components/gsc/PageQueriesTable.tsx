@@ -288,79 +288,9 @@ const PageQueriesTable = ({
         differenceInDays(parseISO(dateRange.endDate), parseISO(dateRange.startDate)) + 1;
 
       return (
-        <div className="mb-6 p-4 rounded-2xl bg-gray-50/50 border border-gray-200 text-center">
-          <div className="text-xs font-light text-gray-600 tracking-tight">
-            <span className="font-medium text-gray-900">
-              GSC data from {startDateFormatted} to {endDateFormatted}
-            </span>
-            <span className="ml-2">
-              ({rangeLabel} • {actualDaysInRange} days)
-            </span>
-          </div>
-        </div>
-      );
-    } catch (error) {
-      console.error("Error formatting date range info:", error);
-      return null;
-    }
-  };
-
-  if (isLoading) {
-    return (
-      <div className="space-y-6">
-        {/* Header skeleton */}
-        <div className="flex items-center justify-between">
-          <div className="h-10 w-40 bg-gray-100 rounded-full animate-pulse" />
-          <div className="flex gap-3">
-            <div className="h-10 w-32 bg-gray-100 rounded-full animate-pulse" />
-            <div className="h-10 w-32 bg-gray-100 rounded-full animate-pulse" />
-          </div>
-        </div>
-        {/* Table skeleton */}
-        <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
-          <div className="border-b border-gray-200 bg-gray-50/50">
-            <div className="grid grid-cols-5 gap-4 px-6 py-3">
-              {Array(5).fill(0).map((_, i) => (
-                <div key={i} className="h-4 bg-gray-200 rounded animate-pulse" />
-              ))}
-            </div>
-          </div>
-          <div className="divide-y divide-gray-100">
-            {Array(8).fill(0).map((_, i) => (
-              <div key={i} className="grid grid-cols-5 gap-4 px-6 py-4">
-                {Array(5).fill(0).map((_, j) => (
-                  <div key={j} className="h-5 bg-gray-100 rounded animate-pulse" />
-                ))}
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  const currentQueries = sortedData.slice(startIndex, endIndex);
-
-  return (
-    <div className="space-y-4">
-      {/* Header */}
-      <div className="text-center mb-8 space-y-2">
-        <button
-          onClick={onBack}
-          className="h-10 px-5 border border-gray-200 text-gray-700 rounded-full hover:bg-gray-50 text-sm font-light tracking-tight transition-all duration-200 inline-flex items-center gap-2 mb-4"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Back to Pages
-        </button>
-        <h2 className="text-4xl font-light text-gray-900 tracking-tight">Page Queries</h2>
-        <p className="text-sm font-light text-gray-600 truncate max-w-2xl mx-auto" title={pageUrl}>
-          {pageUrl}
-        </p>
-      </div>
-
-      {/* Controls */}
       <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center mb-6">
         <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
+          <h2 className="text-4xl font-light text-gray-900 tracking-tight">Page Queries</h2>
           <div className="relative w-full sm:w-72">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
             <Input 
@@ -516,44 +446,79 @@ const PageQueriesTable = ({
           onClick={handleExport}
           className="h-10 px-5 border border-gray-200 text-gray-700 rounded-full hover:bg-gray-50 text-sm font-light tracking-tight transition-all duration-200 inline-flex items-center gap-2"
         >
-          <Download className="h-4 w-4" />
+          <img src="https://res.cloudinary.com/dgfzjdi68/image/upload/v1772183203/vscode-icons_file-type-excel_t2sqbh.svg" alt="Export" />
           Export CSV
         </button>
       </div>
       </div>
+      );
+    } catch (error) {
+      console.error("Error formatting date range info:", error);
+      return null;
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        {/* Header skeleton */}
+        <div className="flex items-center justify-between">
+          <div className="h-10 w-40 bg-gray-100 rounded-full animate-pulse" />
+          <div className="flex gap-3">
+            <div className="h-10 w-32 bg-gray-100 rounded-full animate-pulse" />
+            <div className="h-10 w-32 bg-gray-100 rounded-full animate-pulse" />
+          </div>
+        </div>
+        {/* Table skeleton */}
+        <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+          <div className="border-b border-gray-200 bg-gray-50/50">
+            <div className="grid grid-cols-5 gap-4 px-6 py-3">
+              {Array(5).fill(0).map((_, i) => (
+                <div key={i} className="h-4 bg-gray-200 rounded animate-pulse" />
+              ))}
+            </div>
+          </div>
+          <div className="divide-y divide-gray-100">
+            {Array(8).fill(0).map((_, i) => (
+              <div key={i} className="grid grid-cols-5 gap-4 px-6 py-4">
+                {Array(5).fill(0).map((_, j) => (
+                  <div key={j} className="h-5 bg-gray-100 rounded animate-pulse" />
+                ))}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const currentQueries = sortedData.slice(startIndex, endIndex);
+
+  return (
+    <div className="space-y-0 min">
+        <button
+          onClick={onBack}
+          className="h-10 px-5 border border-gray-200 text-gray-700 rounded-full hover:bg-gray-50 text-sm font-light tracking-tight transition-all duration-200 inline-flex items-center gap-2 mb-4"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Back 
+        </button>
+      {/* Header */}
+      <div className="text-center mb-8 space-y-2">
+        
+      
+      </div>
+
+      
 
       {renderDateRangeInfo()}
 
       {/* Trends Chart */}
       {showTrends && (
         <div className="space-y-4 mb-8">
-          {/* Metrics Selection */}
-          <div className="bg-white rounded-2xl border border-gray-200 p-4">
-            <div className="flex items-center justify-center gap-4 flex-wrap">
-              <span className="text-xs font-light text-gray-600 uppercase tracking-wider">Metrics:</span>
-              {(['clicks', 'impressions', 'ctr', 'position'] as const).map((metric) => (
-                <label key={metric} className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={selectedMetrics.includes(metric)}
-                    onChange={(e) => {
-                      if (e.target.checked) {
-                        setSelectedMetrics([...selectedMetrics, metric]);
-                      } else {
-                        setSelectedMetrics(selectedMetrics.filter((m) => m !== metric));
-                      }
-                    }}
-                    className="w-4 h-4 text-gray-900 border-gray-300 rounded focus:ring-gray-900"
-                  />
-                  <span className="text-xs font-light text-gray-700 capitalize tracking-tight">{metric}</span>
-                </label>
-              ))}
-            </div>
-          </div>
-
           {/* Chart */}
           {isLoadingTrends ? (
-            <div className="bg-white rounded-2xl border border-gray-200 p-16 flex items-center justify-center">
+            <div className="bg-white rounded-xl border border-gray-200 p-16 flex items-center justify-center">
               <div className="text-center space-y-3">
                 <Loader2 className="h-8 w-8 animate-spin mx-auto text-gray-400" />
                 <p className="text-sm font-light text-gray-600">Loading trends data...</p>
@@ -614,20 +579,26 @@ const PageQueriesTable = ({
               );
             }
 
-            return (
-              <TrendsChart
-                data={chartData}
-                selectedMetrics={selectedMetrics}
-                chartType="line"
-                height={350}
-              />
-            );
+            
           })()}
         </div>
       )}
-
+      {/* Blog URL */}
+      <a
+    href={pageUrl}
+    target="_blank"
+    rel="noopener noreferrer"
+    className="text-sm font-light text-blue-600 truncate max-w-2xl block hover:underline py-3 pl-2"
+    title={pageUrl}
+  >
+    <span className="text-gray-700 font-medium">Blog: </span>
+    {pageUrl}
+  </a>
+<div className="flex flex-col lg:flex-row gap-6">
+  <div className="flex-[1] min-w-[300px]">
+     
       {/* Table */}
-      <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         {/* Table Header */}
         <div className="border-b border-gray-200 bg-gray-50/50">
           <div className="grid grid-cols-5 gap-4 px-6 py-3 text-xs font-medium text-gray-600 uppercase tracking-wider">
@@ -711,7 +682,7 @@ const PageQueriesTable = ({
                   </span>
                 </div>
                 <div className="flex items-center justify-center">
-                  <span className="text-gray-700 text-sm">
+                  <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-100">
                     {(query.ctr * 100).toFixed(1)}%
                   </span>
                 </div>
@@ -798,9 +769,39 @@ const PageQueriesTable = ({
           </div>
         )}
       </div>
+      </div>
+{/* Right column for the chart */}
+<div className="flex-1 min-w-[300px] h-full">
+  {showTrends && trendsData ? (
+   <div className="w-full h-[600px] overflow-x-auto">
+  <div className="min-w-[600px] h-full">
+    <TrendsChart
+  data={Object.entries(trendsData)
+    .filter(([query]) => selectedQueries.length === 0 || selectedQueries.includes(query))
+    .map(([query, dates]) =>
+      Object.entries(dates).map(([date, metrics]) => ({
+        query,
+        date,
+        ...metrics,
+      }))
+    )
+    .flat()}
+  selectedMetrics={selectedMetrics}
+  chartType="line"
+  height={500}
+/>
+  </div>
+</div>
+  ) : (
+    <div className="text-center text-gray-500 h-[350px] flex items-center justify-center">
+      No trends data available
+    </div>
+  )}
+</div>
+      </div>
 
       {/* Rows per page control */}
-      <div className="flex items-center justify-end gap-2 mt-4">
+      {/* <div className="flex items-center justify-end gap-2 mt-4">
         <span className="text-xs font-light text-gray-600 tracking-tight">Rows per page</span>
         <select
           value={pageSize}
@@ -816,7 +817,7 @@ const PageQueriesTable = ({
           <option value="50">50</option>
           <option value="100">100</option>
         </select>
-      </div>
+      </div> */}
     </div>
   );
 };

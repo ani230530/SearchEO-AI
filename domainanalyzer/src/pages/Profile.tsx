@@ -108,36 +108,7 @@ const Profile: React.FC = () => {
       {/* Content Layer */}
       <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 py-2 sm:py-2">
         {/* Hero Section */}
-        <div className="text-center mb-20 relative">
-          {/* <button
-            type="button"
-            onClick={() => {
-              logout();
-              navigate("/");
-            }}
-            className="absolute top-0 right-0 inline-flex items-center gap-2 px-4 py-2 text-sm font-light text-gray-700 hover:text-red-500 rounded-full transition-colors"
-            style={{ letterSpacing: '0.011em' }}
-          >
-            <LogOut className="h-4 w-4" />
-            Sign out
-          </button> */}
-
-          <div className="text-xs font-light uppercase tracking-wider text-gray-500 mb-4" style={{ letterSpacing: '0.083em' }}>
-            Account Settings
-          </div>
-          <h1
-            className="text-5xl sm:text-6xl md:text-7xl font-extralight mb-6 text-gray-900"
-            style={{ letterSpacing: '-0.003em', lineHeight: 1.05 }}
-          >
-            Your Profile
-          </h1>
-          <p
-            className="text-lg sm:text-xl md:text-2xl font-light text-gray-500 max-w-2xl mx-auto"
-            style={{ letterSpacing: '0.011em', lineHeight: 1.4 }}
-          >
-            Manage your account information and security settings.
-          </p>
-        </div>
+        
 
         {/* Profile and Security Cards */}
         <div className="space-y-16">

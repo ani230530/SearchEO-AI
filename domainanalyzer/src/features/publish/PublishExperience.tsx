@@ -646,7 +646,6 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
   const handleOpenComposeDrawer = useCallback(() => {
     setPublishStage('compose');
     setDrawerStep(1);
-    setPublishDrawerOpen(true);
   }, []);
 
   const handleDrawerNext = () => {
@@ -1896,7 +1895,9 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
                           : 'border-gray-200 text-gray-700 hover:bg-gray-100'
                       }`}
                     >
-                      {publishForm.featuredImage ? 'Use banner imagery' : 'Skip banner imagery'}
+                      {publishForm.featuredImage 
+  ? 'Skip banner imagery' 
+  : 'Use banner imagery'}
                     </button>
                   </div>
                 </div>
@@ -2755,7 +2756,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
           // Render with full-screen overlay wrapper (for standalone use in publish tab)
           // Only render if active (to prevent showing when viewing from campaign)
           isActive ? (
-            <div className="fixed inset-0 z-0 bg-white  space-x-[280px]">
+            <div className="fixed inset-0 z-0 bg-white ">
             <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-xl border-b border-gray-100 shadow-sm">
               <div className="max-w-7xl mx-auto px-6 py-4">
                 <div className="flex items-center justify-between gap-4">

@@ -32,13 +32,13 @@ interface AuditChartsProps {
 }
 
 const getScoreColor = (score: number) => {
-  if (score >= 0.9) return '#16A34A'; // green
-  if (score >= 0.5) return '#F59E0B'; // yellow
+  if (score >= 0.8) return '#16A34A'; // green
+  if (score >= 0.5) return '#F59E0B'; 
   return '#DC2626'; // red
 };
 
 const getScoreColorLight = (score: number) => {
-  if (score >= 0.9) return '#4ADE80';
+  if (score >= 0.8) return '#4ADE80';
   if (score >= 0.5) return '#FBBF24';
   return '#F87171';
 };
@@ -172,7 +172,7 @@ export const AuditGaugeChart: React.FC<{ label: string; score: number; size?: nu
             cy={size / 2}
             r={radius}
             stroke="#e5e7eb"
-            strokeWidth="8"
+            strokeWidth="12"
             fill="transparent"
           />
           {/* Progress circle */}
@@ -181,7 +181,7 @@ export const AuditGaugeChart: React.FC<{ label: string; score: number; size?: nu
             cy={size / 2}
             r={radius}
             stroke={color}
-            strokeWidth="8"
+            strokeWidth="12"
             fill="transparent"
             strokeDasharray={circumference}
             strokeDashoffset={offset}
@@ -192,17 +192,15 @@ export const AuditGaugeChart: React.FC<{ label: string; score: number; size?: nu
           />
         </svg>
         <div className="absolute inset-0 flex items-center justify-center">
-          <div className="text-center">
-            <div
-              className="text-2xl font-light"
-              style={{ color: '#1d1d1f', letterSpacing: '-0.003em' }}
-            >
-              {percent}
-            </div>
-            <div className="text-xs text-gray-500" style={{ letterSpacing: '0.011em' }}>
-              %
-            </div>
-          </div>
+          <div className="flex items-center gap-1">
+  <div
+    className="text-2xl font-bold"
+    style={{ color: '#1d1d1f', letterSpacing: '-0.003em' }}
+  >
+    {percent} %
+  </div>
+
+</div>
         </div>
       </div>
       <div
@@ -218,8 +216,8 @@ export const AuditGaugeChart: React.FC<{ label: string; score: number; size?: nu
 // Score Distribution Pie Chart
 export const AuditScoreDistribution: React.FC<AuditChartsProps> = ({ data }) => {
   const categories = [
-    { name: 'Excellent (90-100)', value: 0, color: '#16A34A' },
-    { name: 'Good (50-89)', value: 0, color: '#F59E0B' },
+    { name: 'Excellent (80-100)', value: 0, color: '#16A34A' },
+    { name: 'Good (50-79)', value: 0, color: '#F59E0B' },
     { name: 'Needs Work (<50)', value: 0, color: '#DC2626' },
   ];
 
@@ -332,7 +330,7 @@ export const OverallScoreGauge: React.FC<{ score: number; size?: number }> = ({ 
   const offset = circumference - (percent / 100) * circumference;
 
   return (
-    <div className="flex flex-col items-center justify-center">
+    <div className="justify-center px-6">
       <div className="relative" style={{ width: size, height: size }}>
         <svg width={size} height={size} className="transform -rotate-90">
           <circle
@@ -340,7 +338,7 @@ export const OverallScoreGauge: React.FC<{ score: number; size?: number }> = ({ 
             cy={size / 2}
             r={radius}
             stroke="#e5e7eb"
-            strokeWidth="7"
+            strokeWidth="12"
             fill="transparent"
           />
           <circle
@@ -348,7 +346,7 @@ export const OverallScoreGauge: React.FC<{ score: number; size?: number }> = ({ 
             cy={size / 2}
             r={radius}
             stroke={color}
-            strokeWidth="7"
+            strokeWidth="12"
             fill="transparent"
             strokeDasharray={circumference}
             strokeDashoffset={offset}
