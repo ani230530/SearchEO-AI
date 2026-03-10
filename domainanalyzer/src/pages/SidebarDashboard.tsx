@@ -6414,6 +6414,41 @@ function CampaignStructureView({
             });
             return;
           }
+
+          if (data.type === 'generation_update' && data.jobId) {
+            setBackendJobStatus((prev) => {
+              const updated = new Map(prev);
+              updated.set(data.jobId!, {
+                status: data.status === 'failed' ? 'failed' : 'generating',
+                pages: [],
+              });
+              return updated;
+            });
+
+            if (data.status === 'failed') {
+              setGenerationJobs((prev) => {
+                const updated = new Map(prev);
+                updated.forEach((job, pageId) => {
+                  if (job.jobId === data.jobId && (job.status === 'pending' || job.status === 'generating')) {
+                    updated.set(pageId, {
+                      ...job,
+                      status: 'failed',
+                      error: data.error || 'Generation failed before n8n returned content.',
+                      updatedAt: data.timestamp || new Date().toISOString(),
+                    });
+                  }
+                });
+                return updated;
+              });
+
+              toast({
+                title: 'Generation Failed',
+                description: data.error || 'The generation request was rejected.',
+                variant: 'destructive',
+              });
+            }
+            return;
+          }
           
           // Handle streaming progress updates
           if (data.type === 'streaming') {
@@ -7623,7 +7658,7 @@ function CampaignStructureView({
 
       toast({
         title: 'Generation started',
-        description: `Job ${jobId} is generating ${pages.length} page(s).`,
+        description: `Generating ${pages.length} page(s).`,
       });
     } catch (error) {
       toast({

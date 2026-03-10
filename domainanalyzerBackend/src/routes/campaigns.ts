@@ -2045,6 +2045,8 @@ router.post('/topics/:topicId/generate-content', authenticateToken, asyncHandler
   const canonicalPayload = buildCanonicalGenerationPayload({
     requestBody: req.body as Record<string, unknown>,
     jobId,
+    userId,
+    campaignName: topic.title,
     campaignId: topic.campaignId,
     topicId,
     callbackUrl,

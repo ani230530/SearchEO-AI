@@ -1,6 +1,6 @@
 import React from 'react';
 import { Topic, GenerationPageStatus, GenerationStreamingEvent } from '../../types';
-import { Target, FileText, Sparkles, Plus, Trash2, Search, Zap, Pencil, Check, X } from 'lucide-react';
+import { Target, FileText, Sparkles, Plus, Trash2, Search, Zap, Pencil, Check, X, AlertCircle, CheckCircle2, LoaderCircle } from 'lucide-react';
 import { ButtonSpinner } from '@/components/ui/button-spinner';
 import { StreamingOverlay } from './StreamingOverlay';
 import { useState } from 'react';
@@ -9,7 +9,6 @@ interface CampaignTopicDetailProps {
   topic: Topic;
   isGenerating: boolean;
   streamingEvents: GenerationStreamingEvent[];
-  jobId?: string;
   generationJobs: Map<number, GenerationPageStatus>;
   onGenerateTopic: (topic: Topic) => void;
   onReferenceUrlChange: (topicId: number, url: string) => void;
@@ -33,7 +32,6 @@ export const CampaignTopicDetail: React.FC<CampaignTopicDetailProps> = ({
   topic,
   isGenerating,
   streamingEvents,
-  jobId,
   generationJobs,
   onGenerateTopic,
   onReferenceUrlChange,
@@ -55,6 +53,39 @@ export const CampaignTopicDetail: React.FC<CampaignTopicDetailProps> = ({
   const [editingPageId, setEditingPageId] = useState<number | null>(null);
   const [editingTitle, setEditingTitle] = useState("");
 
+  const getPageTone = (status: string) => {
+    if (status === 'failed') {
+      return {
+        shell: 'border-red-200 bg-[linear-gradient(180deg,#fff8f8_0%,#ffffff_100%)]',
+        badge: 'bg-red-50 text-red-700 border border-red-200',
+        progress: 'bg-red-500',
+        icon: <AlertCircle className="h-4 w-4 text-red-500" />,
+      };
+    }
+    if (status === 'completed' || status === 'published') {
+      return {
+        shell: 'border-emerald-200 bg-[linear-gradient(180deg,#f7fffb_0%,#ffffff_100%)]',
+        badge: 'bg-emerald-50 text-emerald-700 border border-emerald-200',
+        progress: 'bg-emerald-500',
+        icon: <CheckCircle2 className="h-4 w-4 text-emerald-500" />,
+      };
+    }
+    return {
+      shell: 'border-gray-200 bg-[linear-gradient(180deg,#fbfbfb_0%,#ffffff_100%)]',
+      badge: 'bg-black text-white border border-black/90',
+      progress: 'bg-black',
+      icon: <LoaderCircle className="h-4 w-4 text-black animate-spin" />,
+    };
+  };
+
+  const getPageStatusLabel = (status: string) => {
+    if (status === 'completed') return 'Draft Ready';
+    if (status === 'published') return 'Published';
+    if (status === 'failed') return 'Failed';
+    if (status === 'pending') return 'Queued';
+    return 'Generating';
+  };
+
   const pageProgressCards = React.useMemo(() => {
     const pages = [
       ...(topic.pillarPage ? [{ id: topic.pillarPage.id, title: topic.pillarPage.title, pageType: 'pillar' as const }] : []),
@@ -75,7 +106,19 @@ export const CampaignTopicDetail: React.FC<CampaignTopicDetailProps> = ({
           status: latestEvent?.status || pageJob?.status || 'pending',
           phase: latestEvent?.phase || pageJob?.phase || null,
           progress: typeof latestEvent?.progress === 'number' ? latestEvent.progress : pageJob?.progress || 0,
-          message: latestEvent?.message || (pageJob?.status === 'completed' ? 'Draft ready for review.' : 'Queued for generation.'),
+          message:
+            latestEvent?.message ||
+            pageJob?.error ||
+            (pageJob?.status === 'failed'
+              ? 'Generation stopped before content was returned.'
+              : pageJob?.status === 'completed'
+              ? 'Draft ready for review.'
+              : pageJob?.status === 'generating'
+              ? 'Preparing your content generation...'
+              : 'Queued for generation.'),
+          updatedAt: latestEvent?.timestamp || pageJob?.updatedAt || null,
+          draftId: pageJob?.draftId,
+          wordpressUrl: pageJob?.wordpressUrl || null,
         };
       })
       .filter(Boolean) as Array<{
@@ -86,6 +129,9 @@ export const CampaignTopicDetail: React.FC<CampaignTopicDetailProps> = ({
         phase: string | null;
         progress: number;
         message: string;
+        updatedAt: string | null;
+        draftId?: number;
+        wordpressUrl?: string | null;
       }>;
   }, [generationJobs, streamingEvents, topic.pillarPage, topic.subPages]);
 
@@ -231,7 +277,7 @@ const renderKeywords = (
 
   return (
     <div className="relative h-full flex flex-col min-w-0">
-      <StreamingOverlay isVisible={isGenerating} events={streamingEvents} jobId={jobId} />
+      <StreamingOverlay isVisible={isGenerating} events={streamingEvents} />
 
       {/* Modern Header */}
       <div className="flex items-center justify-between mb-8 pb-6 border-b border-gray-100">
@@ -262,36 +308,101 @@ const renderKeywords = (
 
       <div className="flex-1 overflow-y-auto space-y-10 pb-24 pr-2">
         {pageProgressCards.length > 0 && (
-          <section className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {pageProgressCards.map((card) => (
-              <div key={card.id} className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <p className="text-[10px] uppercase tracking-[0.2em] text-gray-400">
-                      {card.pageType === 'pillar' ? 'Pillar Page' : 'Sub-page'}
-                    </p>
-                    <h4 className="mt-2 text-sm font-semibold text-gray-900">{card.title}</h4>
-                    <p className="mt-1 text-xs text-gray-500">{card.phase || card.status}</p>
-                  </div>
-                  <span className="rounded-full bg-gray-100 px-2.5 py-1 text-[11px] font-medium text-gray-700">
-                    {card.progress}%
-                  </span>
-                </div>
-                <div className="mt-4 h-2 rounded-full bg-gray-100">
-                  <div
-                    className={`h-2 rounded-full transition-all ${
-                      card.status === 'failed'
-                        ? 'bg-red-500'
-                        : card.status === 'completed' || card.status === 'published'
-                        ? 'bg-emerald-500'
-                        : 'bg-black'
-                    }`}
-                    style={{ width: `${Math.max(6, Math.min(card.progress || 0, 100))}%` }}
-                  />
-                </div>
-                <p className="mt-3 text-sm text-gray-600">{card.message}</p>
+          <section className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-[10px] uppercase tracking-[0.22em] text-gray-400">Live Generation Feed</p>
+                <h3 className="mt-1 text-lg font-medium tracking-tight text-[#1d1d1f]">Page-by-page progress</h3>
               </div>
-            ))}
+              {isGenerating && (
+                <div className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white/90 px-3 py-1.5 text-xs text-gray-600 shadow-sm">
+                  <span className="relative flex h-2.5 w-2.5">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-black/30"></span>
+                    <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-black"></span>
+                  </span>
+                  Live progress updates
+                </div>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {pageProgressCards.map((card) => {
+                const tone = getPageTone(card.status);
+                const normalizedProgress =
+                  card.status === 'failed' ? Math.max(card.progress || 0, 10) : Math.max(card.progress || 0, card.status === 'completed' || card.status === 'published' ? 100 : 6);
+
+                return (
+                  <div
+                    key={card.id}
+                    className={`rounded-[26px] border p-5 shadow-[0_12px_30px_rgba(15,23,42,0.05)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_18px_40px_rgba(15,23,42,0.08)] ${tone.shell}`}
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          {tone.icon}
+                          <p className="text-[10px] uppercase tracking-[0.2em] text-gray-400">
+                            {card.pageType === 'pillar' ? 'Pillar Page' : 'Sub-page'}
+                          </p>
+                        </div>
+                        <h4 className="mt-2 text-sm font-semibold text-gray-900">{card.title}</h4>
+                        <div className="mt-3 flex flex-wrap items-center gap-2">
+                          <span className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${tone.badge}`}>
+                            {getPageStatusLabel(card.status)}
+                          </span>
+                          {card.phase && (
+                            <span className="rounded-full border border-gray-200 bg-white/80 px-2.5 py-1 text-[11px] font-medium text-gray-600">
+                              {card.phase}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <span className="rounded-full bg-white/90 px-2.5 py-1 text-[11px] font-medium text-gray-700 shadow-sm border border-gray-200">
+                        {Math.min(100, normalizedProgress)}%
+                      </span>
+                    </div>
+
+                    <div className="mt-4 h-2.5 overflow-hidden rounded-full bg-gray-200/70">
+                      <div
+                        className={`h-full rounded-full transition-all duration-500 ease-out ${tone.progress} ${card.status === 'generating' ? 'animate-pulse' : ''}`}
+                        style={{ width: `${Math.min(100, normalizedProgress)}%` }}
+                      />
+                    </div>
+
+                    <div className="mt-4 rounded-2xl border border-white/80 bg-white/70 px-4 py-3 backdrop-blur-sm">
+                      <p className="text-[11px] uppercase tracking-[0.16em] text-gray-400">Latest SSE update</p>
+                      <p className="mt-1 text-sm leading-6 text-gray-700">{card.message}</p>
+                    </div>
+
+                    <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-xs text-gray-500">
+                      <span>
+                        {card.updatedAt
+                          ? `Updated ${new Date(card.updatedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`
+                          : card.status === 'generating'
+                          ? 'Waiting for the first progress update'
+                          : 'No update yet'}
+                      </span>
+                      <div className="flex items-center gap-2">
+                        {card.draftId && (
+                          <span className="rounded-full border border-gray-200 bg-white px-2.5 py-1 text-[11px] font-medium text-gray-600">
+                            Draft #{card.draftId}
+                          </span>
+                        )}
+                        {card.wordpressUrl && (
+                          <a
+                            href={card.wordpressUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-medium text-emerald-700 transition-colors hover:bg-emerald-100"
+                          >
+                            Live page
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </section>
         )}
 

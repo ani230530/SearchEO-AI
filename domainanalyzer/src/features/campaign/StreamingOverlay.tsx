@@ -5,52 +5,49 @@ import { GenerationStreamingEvent } from '@/types';
 interface StreamingOverlayProps {
   isVisible: boolean;
   events: GenerationStreamingEvent[];
-  jobId?: string;
 }
 
 export const StreamingOverlay: React.FC<StreamingOverlayProps> = ({
   isVisible,
   events,
-  jobId
 }) => {
   const [activeMessage, setActiveMessage] = useState<string>('Initializing...');
 
   useEffect(() => {
     if (events.length > 0) {
       setActiveMessage(events[events.length - 1].message);
+    } else if (isVisible) {
+      setActiveMessage('Preparing your content generation...');
     }
-  }, [events]);
+  }, [events, isVisible]);
 
   const pageCount = new Set(events.map((event) => event.pageId).filter((pageId) => typeof pageId === 'number')).size;
 
   if (!isVisible) return null;
 
   return (
-    <div className="absolute inset-0 z-50 bg-white/90 backdrop-blur-sm flex flex-col items-center justify-center p-8 transition-all duration-500">
-      <div className="max-w-md w-full text-center space-y-6">
-        <div className="relative mx-auto w-16 h-16">
-            <div className="absolute inset-0 border-4 border-gray-100 rounded-full"></div>
-            <div className="absolute inset-0 border-4 border-black border-t-transparent rounded-full animate-spin"></div>
-            <div className="absolute inset-0 flex items-center justify-center">
-                <Loader2 className="h-6 w-6 text-gray-400 animate-pulse" />
-            </div>
-        </div>
-        
-        <div className="space-y-2">
-            <h3 className="text-xl font-light tracking-tight text-gray-900">
-                Generating Content
-            </h3>
-            <p className="text-sm text-gray-500 font-light">
-                {jobId ? `Job ID: ${jobId}${pageCount ? ` • ${pageCount} page${pageCount === 1 ? '' : 's'}` : ''}` : 'Preparing your campaign...'}
-            </p>
-        </div>
+    <div className="pointer-events-none absolute right-4 top-4 z-30 w-full max-w-sm">
+      <div className="ml-auto rounded-[24px] border border-gray-200/80 bg-white/88 p-4 shadow-[0_20px_50px_rgba(15,23,42,0.12)] backdrop-blur-md transition-all duration-500 animate-in slide-in-from-top-3 fade-in">
+        <div className="flex items-start gap-3">
+          <div className="relative mt-0.5 flex h-10 w-10 items-center justify-center rounded-2xl bg-black text-white shadow-sm">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-emerald-400 ring-2 ring-white" />
+          </div>
 
-        <div className="h-12 overflow-hidden relative">
-            <div className="animate-in slide-in-from-bottom-4 fade-in duration-300 absolute inset-0 flex items-center justify-center">
-                <p className="text-sm font-medium text-black bg-gray-50 px-4 py-2 rounded-full border border-gray-100 shadow-sm">
-                    {activeMessage}
-                </p>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-[10px] uppercase tracking-[0.22em] text-gray-400">Generation Live</p>
+                <h3 className="mt-1 text-sm font-semibold text-gray-900">Content is generating in the background</h3>
+              </div>
+              <span className="rounded-full border border-gray-200 bg-gray-50 px-2 py-1 text-[10px] font-medium text-gray-600">
+                {pageCount || 0} page{pageCount === 1 ? '' : 's'}
+              </span>
             </div>
+
+            <p className="mt-3 text-sm leading-6 text-gray-700">{activeMessage}</p>
+            <p className="mt-2 text-[11px] text-gray-400">Live updates will appear here as each page progresses.</p>
+          </div>
         </div>
       </div>
     </div>

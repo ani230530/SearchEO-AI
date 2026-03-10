@@ -37,6 +37,17 @@ export interface CanonicalGenerationRequestPage {
   };
 }
 
+export interface LegacyGenerationRequestPage {
+  primary_keyword: string;
+  longtail_keywords: string[];
+  options: {
+    image: number;
+    image_count: number;
+    word_count: number;
+    featured_image: 'yes' | 'no';
+  };
+}
+
 export interface CanonicalGenerationRequestPayload {
   job_id: string;
   campaign_id: number;
@@ -53,6 +64,13 @@ export interface CanonicalGenerationRequestPayload {
     url: string;
   };
   pages: CanonicalGenerationRequestPage[];
+}
+
+export interface CompatibleGenerationRequestPayload extends CanonicalGenerationRequestPayload {
+  user_id: string | number;
+  campaign_name: string;
+  pillar_page: LegacyGenerationRequestPage | null;
+  sub_pillar_pages: LegacyGenerationRequestPage[];
 }
 
 export interface CanonicalStreamingEvent {
@@ -91,6 +109,8 @@ interface GenerationSourcePage {
 interface BuildGenerationPayloadInput {
   requestBody: UnknownRecord;
   jobId: string;
+  userId: string | number;
+  campaignName: string;
   campaignId: number;
   topicId: number;
   callbackUrl: string;
@@ -183,6 +203,8 @@ const toCanonicalPageType = (value: unknown, fallback: 'pillar' | 'subpage'): 'p
 export const buildCanonicalGenerationPayload = ({
   requestBody,
   jobId,
+  userId,
+  campaignName,
   campaignId,
   topicId,
   callbackUrl,
@@ -191,14 +213,67 @@ export const buildCanonicalGenerationPayload = ({
   brandDescription,
   wordpress,
   pages,
-}: BuildGenerationPayloadInput): CanonicalGenerationRequestPayload => {
+}: BuildGenerationPayloadInput): CompatibleGenerationRequestPayload => {
   const canonicalInputPages = Array.isArray(requestBody.pages) ? (requestBody.pages as UnknownRecord[]) : [];
   const legacyPillar = typeof requestBody.pillar_page === 'object' && requestBody.pillar_page ? (requestBody.pillar_page as UnknownRecord) : null;
   const legacySubpages = Array.isArray(requestBody.sub_pillar_pages)
     ? (requestBody.sub_pillar_pages as UnknownRecord[])
     : [];
 
+  const mappedPages = pages.map((page, index) => {
+    const inputPage =
+      canonicalInputPages.find((candidate) => firstNumber(candidate.page_id, candidate.pageId) === page.id) ||
+      canonicalInputPages.find((candidate) => toCanonicalPageType(candidate.page_type ?? candidate.pageType, page.pageType) === page.pageType) ||
+      (page.pageType === 'pillar' ? legacyPillar : legacySubpages[index - 1]) ||
+      {};
+
+    const options = typeof inputPage.options === 'object' && inputPage.options ? (inputPage.options as UnknownRecord) : {};
+    const primaryKeyword =
+      firstString(
+        inputPage.primary_keyword,
+        inputPage.primaryKeyword,
+        inputPage['Primary Keyword'],
+        page.title
+      ) || getPrimaryKeywordFromSourcePage(page);
+
+    const longtailKeywords = firstArray(
+      inputPage.longtail_keywords,
+      inputPage.longtailKeywords,
+      inputPage['longtail keywords'],
+      inputPage['Longtail Keywords']
+    );
+
+    const imageCount = firstNumber(options.image_count, options.imageCount, options.image, requestBody.images) ?? 0;
+    const wordCount = firstNumber(options.word_count, options.wordCount, requestBody.wordCount) ?? 800;
+    const featuredImage: 'yes' | 'no' = normalizeFeaturedImageEnabled(
+      options.featured_image ?? options.featuredImage ?? requestBody.featuredImageEnabled ?? requestBody.featuredImage,
+      true
+    )
+      ? 'yes'
+      : 'no';
+
+    return {
+      page_id: page.id,
+      page_type: page.pageType,
+      primary_keyword: primaryKeyword || getPrimaryKeywordFromSourcePage(page),
+      longtail_keywords: longtailKeywords.length ? longtailKeywords : getLongtailKeywordsFromSourcePage(page),
+      options: {
+        image_count: imageCount,
+        word_count: wordCount,
+        featured_image: featuredImage,
+      },
+      legacy_options: {
+        image: imageCount,
+        image_count: imageCount,
+        word_count: wordCount,
+        featured_image: featuredImage,
+      },
+    };
+  });
+
   return {
+    user_id: userId,
+    campaign_name: campaignName,
     job_id: jobId,
     campaign_id: campaignId,
     topic_id: topicId,
@@ -209,46 +284,19 @@ export const buildCanonicalGenerationPayload = ({
       brand_description: brandDescription,
     },
     wordpress,
-    pages: pages.map((page, index) => {
-      const inputPage =
-        canonicalInputPages.find((candidate) => firstNumber(candidate.page_id, candidate.pageId) === page.id) ||
-        canonicalInputPages.find((candidate) => toCanonicalPageType(candidate.page_type ?? candidate.pageType, page.pageType) === page.pageType) ||
-        (page.pageType === 'pillar' ? legacyPillar : legacySubpages[index - 1]) ||
-        {};
-
-      const options = typeof inputPage.options === 'object' && inputPage.options ? (inputPage.options as UnknownRecord) : {};
-      const primaryKeyword =
-        firstString(
-          inputPage.primary_keyword,
-          inputPage.primaryKeyword,
-          inputPage['Primary Keyword'],
-          page.title
-        ) || getPrimaryKeywordFromSourcePage(page);
-
-      const longtailKeywords = firstArray(
-        inputPage.longtail_keywords,
-        inputPage.longtailKeywords,
-        inputPage['longtail keywords'],
-        inputPage['Longtail Keywords']
-      );
-
-      return {
-        page_id: page.id,
-        page_type: page.pageType,
-        primary_keyword: primaryKeyword || getPrimaryKeywordFromSourcePage(page),
-        longtail_keywords: longtailKeywords.length ? longtailKeywords : getLongtailKeywordsFromSourcePage(page),
-        options: {
-          image_count: firstNumber(options.image_count, options.imageCount, options.image, requestBody.images) ?? 0,
-          word_count: firstNumber(options.word_count, options.wordCount, requestBody.wordCount) ?? 800,
-          featured_image: normalizeFeaturedImageEnabled(
-            options.featured_image ?? options.featuredImage ?? requestBody.featuredImageEnabled ?? requestBody.featuredImage,
-            true
-          )
-            ? 'yes'
-            : 'no',
-        },
-      };
-    }),
+    pages: mappedPages.map(({ legacy_options: _legacyOptions, ...page }) => page),
+    pillar_page: mappedPages[0]
+      ? {
+          primary_keyword: mappedPages[0].primary_keyword,
+          longtail_keywords: mappedPages[0].longtail_keywords,
+          options: mappedPages[0].legacy_options,
+        }
+      : null,
+    sub_pillar_pages: mappedPages.slice(1).map((page) => ({
+      primary_keyword: page.primary_keyword,
+      longtail_keywords: page.longtail_keywords,
+      options: page.legacy_options,
+    })),
   };
 };
 
