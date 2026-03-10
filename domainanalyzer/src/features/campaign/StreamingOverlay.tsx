@@ -1,25 +1,27 @@
 import React, { useEffect, useState } from 'react';
 import { Loader2 } from 'lucide-react';
+import { GenerationStreamingEvent } from '@/types';
 
 interface StreamingOverlayProps {
   isVisible: boolean;
-  messages: Array<{ message: string; timestamp: string }>;
+  events: GenerationStreamingEvent[];
   jobId?: string;
 }
 
 export const StreamingOverlay: React.FC<StreamingOverlayProps> = ({
   isVisible,
-  messages,
+  events,
   jobId
 }) => {
   const [activeMessage, setActiveMessage] = useState<string>('Initializing...');
 
-  // Auto-scroll messages or show latest
   useEffect(() => {
-    if (messages.length > 0) {
-      setActiveMessage(messages[messages.length - 1].message);
+    if (events.length > 0) {
+      setActiveMessage(events[events.length - 1].message);
     }
-  }, [messages]);
+  }, [events]);
+
+  const pageCount = new Set(events.map((event) => event.pageId).filter((pageId) => typeof pageId === 'number')).size;
 
   if (!isVisible) return null;
 
@@ -39,7 +41,7 @@ export const StreamingOverlay: React.FC<StreamingOverlayProps> = ({
                 Generating Content
             </h3>
             <p className="text-sm text-gray-500 font-light">
-                {jobId ? `Job ID: ${jobId}` : 'Preparing your campaign...'}
+                {jobId ? `Job ID: ${jobId}${pageCount ? ` • ${pageCount} page${pageCount === 1 ? '' : 's'}` : ''}` : 'Preparing your campaign...'}
             </p>
         </div>
 

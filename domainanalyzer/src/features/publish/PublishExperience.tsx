@@ -36,7 +36,6 @@ import {
 } from '@/types/publish';
 import type { Instance } from 'tippy.js';
 import parse from 'html-react-parser';
-import { usePublishStatus } from '@/hooks/usePublishStatus';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3002';
 
@@ -61,6 +60,12 @@ interface PublishExperienceProps {
   setDraftToPageMap?: React.Dispatch<React.SetStateAction<Map<number, number>>>;
   draftStatuses?: Map<number, { isPublished: boolean; isFailed?: boolean; publishedUrl?: string; draftId?: number; error?: string }>;
   setDraftStatuses?: React.Dispatch<React.SetStateAction<Map<number, { isPublished: boolean; isFailed?: boolean; publishedUrl?: string; draftId?: number; error?: string }>>>;
+  sharedPublishStatuses?: Map<number, {
+    status: 'generating' | 'published' | 'failed';
+    publishedUrl?: string;
+    error?: string;
+    updatedAt?: string;
+  }>;
 }
 
 interface PublishFormState {
@@ -70,7 +75,7 @@ interface PublishFormState {
   brandDescription: string;
   images: number;
   wordCount: number;
-  featuredImage: boolean;
+  featuredImageEnabled: boolean;
 }
 
 const summarizeDomainContext = (input: string, maxLines = 6, maxChars = 800) => {
@@ -128,6 +133,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
   setDraftToPageMap,
   draftStatuses,
   setDraftStatuses,
+  sharedPublishStatuses,
 }) => {
   const { toast } = useToast();
   const [publishForm, setPublishForm] = useState<PublishFormState>({
@@ -137,7 +143,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
     brandDescription: '',
     images: 2,
     wordCount: 800,
-    featuredImage: true,
+    featuredImageEnabled: true,
   });
   const [publishLoading, setPublishLoading] = useState(false);
   const [publishResult, setPublishResult] = useState<GeneratedArticleContent | null>(null);
@@ -206,50 +212,31 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
     }
   }, []);
 
-  // Listen for real-time publish updates
-  usePublishStatus({
-    onUpdate: (data) => {
-      console.log('[Publish:SSE] Received update:', data);
-      
-      // Refresh history to show updated status for everyone
+  useEffect(() => {
+    if (!currentDraftId || !sharedPublishStatuses) return;
+    const update = sharedPublishStatuses.get(Number(currentDraftId));
+    if (!update) return;
+
+    if (update.status === 'published') {
+      setPublishLoading(false);
+      if (update.publishedUrl) {
+        setPublishResult((prev) => prev ? { ...prev, wordpressUrl: update.publishedUrl } : null);
+        onRefreshWordpressIntegration();
+      }
       if (!initialDraft) {
         fetchPublishHistory();
       }
+      return;
+    }
 
-      // If this update is for the currently viewed draft, update the UI
-      // Use double equals or cast to match number vs string if needed, though they should be numbers
-      if (currentDraftId && Number(data.draftId) === Number(currentDraftId)) {
-        console.log('[Publish:SSE] Matching draft update found, status:', data.status);
-        
-        // ALWAYS clear loading state on a terminal update
-        if (data.status === 'published' || data.status === 'failed') {
-          setPublishLoading(false);
-        }
-
-        if (data.status === 'published' && data.publishedUrl) {
-          setPublishResult((prev) => prev ? {
-            ...prev,
-            wordpressUrl: data.publishedUrl,
-          } : null);
-          
-          toast({
-            title: 'Published Successfully',
-            description: `Your content is live! View it here: ${data.publishedUrl}`,
-          });
-
-          // Also refresh integration stats
-          onRefreshWordpressIntegration();
-        } else if (data.status === 'failed') {
-          setPublishError(data.error || 'Publish failed');
-          toast({
-            title: 'Publish Failed',
-            description: data.error || 'An error occurred while publishing',
-            variant: 'destructive',
-          });
-        }
+    if (update.status === 'failed') {
+      setPublishLoading(false);
+      setPublishError(update.error || 'Publish failed');
+      if (!initialDraft) {
+        fetchPublishHistory();
       }
     }
-  });
+  }, [currentDraftId, sharedPublishStatuses, onRefreshWordpressIntegration, initialDraft, fetchPublishHistory]);
 
   // Polling fallback to ensure we don't get stuck in loading state if SSE fails
   useEffect(() => {
@@ -465,7 +452,8 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
       const draftContent: GeneratedArticleContent = {
         primaryKeyword: draft.primaryKeyword || '',
         htmlContent: draft.htmlContent || '',
-        featuredImage: draft.featuredImage,
+        featuredImageEnabled: Boolean(draft.featuredImageEnabled),
+        featuredImageUrl: draft.featuredImageUrl || null,
         title: draft.title,
         metaDescription: draft.metaDescription,
         slug: draft.slug,
@@ -488,6 +476,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
         ...prev,
         primaryKeyword: draftContent.primaryKeyword || prev.primaryKeyword,
         longtailKeywords: draftContent.longtailKeywords || prev.longtailKeywords,
+        featuredImageEnabled: draftContent.featuredImageEnabled,
       }));
       setSelectedLongtailKeywords(
         (draftContent.longtailKeywords || '')
@@ -538,6 +527,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
         ...prev,
         primaryKeyword: initialDraft.primaryKeyword || prev.primaryKeyword,
         longtailKeywords: initialDraft.longtailKeywords || prev.longtailKeywords,
+        featuredImageEnabled: initialDraft.featuredImageEnabled,
       }));
       setSelectedLongtailKeywords(
         (initialDraft.longtailKeywords || '')
@@ -779,7 +769,8 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
           draftId: currentDraftId || undefined, // Updates existing draft if we have ID
           primaryKeyword: publishResult.primaryKeyword || publishForm.primaryKeyword,
           htmlContent: latestHtml, // The actual content to save
-          featuredImage: publishResult.featuredImage,
+          featuredImageEnabled: publishResult.featuredImageEnabled,
+          featuredImageUrl: publishResult.featuredImageUrl,
           title: publishResult.title,
           metaDescription: publishResult.metaDescription,
           slug: publishResult.slug,
@@ -879,10 +870,16 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
           (payload.primaryKeyword as string) ??
           (entry.primaryKeyword ?? publishForm.primaryKeyword),
         htmlContent,
-        featuredImage:
+        featuredImageEnabled:
+          Boolean(payload.featuredImageEnabled ?? payload['Featured Image Enabled']) ||
+          Boolean(payload.featuredImageUrl ?? payload.featuredImage ?? payload['Featured Image']) ||
+          publishResult?.featuredImageEnabled ||
+          false,
+        featuredImageUrl:
+          (payload.featuredImageUrl as string) ??
           (payload.featuredImage as string) ??
           (payload['Featured Image'] as string | undefined) ??
-          publishResult?.featuredImage,
+          publishResult?.featuredImageUrl,
         title:
           (payload.title as string) ??
           (payload['Title'] as string | undefined) ??
@@ -917,6 +914,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
         ...prev,
         primaryKeyword: nextResult.primaryKeyword || prev.primaryKeyword,
         longtailKeywords: payloadLongtail || prev.longtailKeywords,
+        featuredImageEnabled: nextResult.featuredImageEnabled,
       }));
       setSelectedLongtailKeywords(normalizedLongtail);
       setPublishStage('preview');
@@ -999,7 +997,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
       brandDescription: publishForm.brandDescription,
       images: publishForm.images,
       wordCount: publishForm.wordCount,
-      featuredImage: publishForm.featuredImage,
+      featuredImageEnabled: publishForm.featuredImageEnabled,
     };
 
     try {
@@ -1020,7 +1018,8 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
       const normalized: GeneratedArticleContent = {
         primaryKeyword: data.content?.primaryKeyword || publishForm.primaryKeyword,
         htmlContent: data.content?.htmlContent || '',
-        featuredImage: data.content?.featuredImage,
+        featuredImageEnabled: Boolean(data.content?.featuredImageEnabled),
+        featuredImageUrl: data.content?.featuredImageUrl || null,
         title: data.content?.title,
         metaDescription: data.content?.metaDescription,
         slug: data.content?.slug,
@@ -1062,7 +1061,8 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
               title: normalized.title,
               metaDescription: normalized.metaDescription,
               slug: normalized.slug,
-              featuredImage: normalized.featuredImage,
+              featuredImageEnabled: normalized.featuredImageEnabled,
+              featuredImageUrl: normalized.featuredImageUrl,
               longtailKeywords: normalized.longtailKeywords,
               wordpressUrl: normalized.wordpressUrl,
             }),
@@ -1374,7 +1374,8 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
           pageId, // Pass pageId context for campaign synchronization
           primaryKeyword: publishResult.primaryKeyword || publishForm.primaryKeyword,
           htmlContent: latestHtmlContent, // This is now synced with DB
-          featuredImage: publishResult.featuredImage,
+          featuredImageEnabled: publishResult.featuredImageEnabled,
+          featuredImageUrl: publishResult.featuredImageUrl,
           title: publishResult.title,
           metaDescription: publishResult.metaDescription,
           slug: publishResult.slug,
@@ -1887,15 +1888,15 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
                     </p>
                     <button
                       onClick={() =>
-                        setPublishForm((prev) => ({ ...prev, featuredImage: !prev.featuredImage }))
+                        setPublishForm((prev) => ({ ...prev, featuredImageEnabled: !prev.featuredImageEnabled }))
                       }
                       className={`w-full px-4 py-3 rounded-[30px] border text-sm font-medium transition-all ${
-                        publishForm.featuredImage
+                        publishForm.featuredImageEnabled
                           ? 'bg-black text-white border-black shadow-lg'
                           : 'border-gray-200 text-gray-700 hover:bg-gray-100'
                       }`}
                     >
-                      {publishForm.featuredImage 
+                      {publishForm.featuredImageEnabled 
   ? 'Skip banner imagery' 
   : 'Use banner imagery'}
                     </button>
@@ -3639,5 +3640,3 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
 };
 
 export default PublishExperience;
-
-

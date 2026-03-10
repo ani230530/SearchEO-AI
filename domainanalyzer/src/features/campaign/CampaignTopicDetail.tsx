@@ -1,5 +1,5 @@
 import React from 'react';
-import { Topic, GenerationPageStatus } from '../../types';
+import { Topic, GenerationPageStatus, GenerationStreamingEvent } from '../../types';
 import { Target, FileText, Sparkles, Plus, Trash2, Search, Zap, Pencil, Check, X } from 'lucide-react';
 import { ButtonSpinner } from '@/components/ui/button-spinner';
 import { StreamingOverlay } from './StreamingOverlay';
@@ -8,7 +8,7 @@ import { useState } from 'react';
 interface CampaignTopicDetailProps {
   topic: Topic;
   isGenerating: boolean;
-  streamingMessages: Array<{ message: string; timestamp: string }>;
+  streamingEvents: GenerationStreamingEvent[];
   jobId?: string;
   generationJobs: Map<number, GenerationPageStatus>;
   onGenerateTopic: (topic: Topic) => void;
@@ -32,7 +32,7 @@ interface CampaignTopicDetailProps {
 export const CampaignTopicDetail: React.FC<CampaignTopicDetailProps> = ({
   topic,
   isGenerating,
-  streamingMessages,
+  streamingEvents,
   jobId,
   generationJobs,
   onGenerateTopic,
@@ -54,6 +54,40 @@ export const CampaignTopicDetail: React.FC<CampaignTopicDetailProps> = ({
 }) => {
   const [editingPageId, setEditingPageId] = useState<number | null>(null);
   const [editingTitle, setEditingTitle] = useState("");
+
+  const pageProgressCards = React.useMemo(() => {
+    const pages = [
+      ...(topic.pillarPage ? [{ id: topic.pillarPage.id, title: topic.pillarPage.title, pageType: 'pillar' as const }] : []),
+      ...(topic.subPages || []).map((page) => ({ id: page.id, title: page.title, pageType: 'subpage' as const })),
+    ];
+
+    return pages
+      .map((page) => {
+        const pageEvents = streamingEvents.filter((event) => event.pageId === page.id);
+        const latestEvent = pageEvents[pageEvents.length - 1];
+        const pageJob = generationJobs.get(page.id);
+        if (!latestEvent && !pageJob) {
+          return null;
+        }
+
+        return {
+          ...page,
+          status: latestEvent?.status || pageJob?.status || 'pending',
+          phase: latestEvent?.phase || pageJob?.phase || null,
+          progress: typeof latestEvent?.progress === 'number' ? latestEvent.progress : pageJob?.progress || 0,
+          message: latestEvent?.message || (pageJob?.status === 'completed' ? 'Draft ready for review.' : 'Queued for generation.'),
+        };
+      })
+      .filter(Boolean) as Array<{
+        id: number;
+        title: string;
+        pageType: 'pillar' | 'subpage';
+        status: string;
+        phase: string | null;
+        progress: number;
+        message: string;
+      }>;
+  }, [generationJobs, streamingEvents, topic.pillarPage, topic.subPages]);
 
   const startEditing = (pageId: number, currentTitle: string) => {
     setEditingPageId(pageId);
@@ -197,7 +231,7 @@ const renderKeywords = (
 
   return (
     <div className="relative h-full flex flex-col min-w-0">
-      <StreamingOverlay isVisible={isGenerating} messages={streamingMessages} jobId={jobId} />
+      <StreamingOverlay isVisible={isGenerating} events={streamingEvents} jobId={jobId} />
 
       {/* Modern Header */}
       <div className="flex items-center justify-between mb-8 pb-6 border-b border-gray-100">
@@ -227,6 +261,40 @@ const renderKeywords = (
       </div>
 
       <div className="flex-1 overflow-y-auto space-y-10 pb-24 pr-2">
+        {pageProgressCards.length > 0 && (
+          <section className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {pageProgressCards.map((card) => (
+              <div key={card.id} className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-[10px] uppercase tracking-[0.2em] text-gray-400">
+                      {card.pageType === 'pillar' ? 'Pillar Page' : 'Sub-page'}
+                    </p>
+                    <h4 className="mt-2 text-sm font-semibold text-gray-900">{card.title}</h4>
+                    <p className="mt-1 text-xs text-gray-500">{card.phase || card.status}</p>
+                  </div>
+                  <span className="rounded-full bg-gray-100 px-2.5 py-1 text-[11px] font-medium text-gray-700">
+                    {card.progress}%
+                  </span>
+                </div>
+                <div className="mt-4 h-2 rounded-full bg-gray-100">
+                  <div
+                    className={`h-2 rounded-full transition-all ${
+                      card.status === 'failed'
+                        ? 'bg-red-500'
+                        : card.status === 'completed' || card.status === 'published'
+                        ? 'bg-emerald-500'
+                        : 'bg-black'
+                    }`}
+                    style={{ width: `${Math.max(6, Math.min(card.progress || 0, 100))}%` }}
+                  />
+                </div>
+                <p className="mt-3 text-sm text-gray-600">{card.message}</p>
+              </div>
+            ))}
+          </section>
+        )}
+
         {/* Pillar Page Card (Hero) */}
         {topic.pillarPage ? (
           <section>

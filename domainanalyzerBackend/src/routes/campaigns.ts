@@ -10,16 +10,16 @@ import {
 import axios from 'axios';
 import { decryptToken } from '../services/tokenEncryption';
 import { authService } from '../services/authService';
-import { saveStreamingMessage, getStreamingMessages } from '../services/streamingService';
+import { getStreamingEvents, saveStreamingEvent } from '../services/streamingService';
 import {
   normalizeKeyword,
-  extractFeaturedImage,
-  extractHtmlContent,
-  extractMetaDescription,
-  extractPrimaryKeyword,
-  extractSlug,
-  extractTitle
 } from '../utils/payloadNormalization';
+import {
+  buildCanonicalGenerationPayload,
+  normalizeGenerationCallbackPayload,
+  normalizeGenerationStreamingPayload,
+  serializeDraftContent,
+} from '../services/contentFlowService';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -1060,51 +1060,6 @@ router.delete('/topics/:topicId/pillar', authenticateToken, asyncHandler(async (
 }));
 
 /**
- * POST /api/campaigns/topics/:topicId/pillar
- * Create manual pillar page (if missing)
- */
-router.post('/topics/:topicId/pillar', authenticateToken, asyncHandler(async (req: Request, res: Response) => {
-  const authReq = req as AuthenticatedRequest;
-  const userId = authReq.user.userId;
-  const topicId = parseInt(req.params.topicId, 10);
-
-  if (isNaN(topicId)) {
-    return res.status(400).json({ success: false, error: 'Invalid topic ID' });
-  }
-
-  const topic = await ensureTopicOwnership(topicId, userId);
-  if (!topic) {
-    return res.status(404).json({ success: false, error: 'Topic not found' });
-  }
-
-  // Check if pillar page already exists
-  const existingPillar = await prisma.campaignPage.findFirst({
-    where: {
-      topicId,
-      pageType: CampaignPageType.PILLAR
-    }
-  });
-
-  if (existingPillar) {
-    return res.status(400).json({ success: false, error: 'Pillar page already exists for this topic' });
-  }
-
-  // Create pillar page
-  await prisma.campaignPage.create({
-    data: {
-      topicId,
-      pageType: CampaignPageType.PILLAR,
-      title: topic.title, // Default to topic title
-      summary: `Pillar page for ${topic.title}`,
-      order: 0,
-      source: CampaignNodeSource.MANUAL
-    }
-  });
-
-  return respondWithStructure(res, topic.campaignId, userId, 201);
-}));
-
-/**
  * POST /api/campaigns/topics/:topicId/subpages
  * Create manual sub-page
  */
@@ -1765,7 +1720,7 @@ router.get('/active-jobs', authenticateToken, asyncHandler(async (req: Request, 
   const STALE_THRESHOLD_MS = 15 * 60 * 1000; // 15 minutes
   const now = new Date().getTime();
 
-  // 2. Hydrate with Redis streaming messages AND check for staleness
+  // 2. Hydrate with Redis streaming events AND check for staleness
   const hydratedJobs = await Promise.all(activeJobs.map(async (job) => {
     // Check staleness
     const jobModTime = new Date(job.updatedAt).getTime();
@@ -1786,14 +1741,11 @@ router.get('/active-jobs', authenticateToken, asyncHandler(async (req: Request, 
         status: 'failed', // Return failed status
         startTime: job.startedAt,
         pages: job.pages,
-        messages: [] // No need for logs on stale failure, or maybe fetch them? fetch them is better context.
+        events: []
       };
     }
 
-    const messages = await getStreamingMessages(job.jobId);
-
-    // Sort messages by timestamp if needed, though active push usually keeps them ordered.
-    // Ensure we send back a clean history.
+    const events = await getStreamingEvents(job.jobId);
 
     return {
       jobId: job.jobId,
@@ -1802,8 +1754,7 @@ router.get('/active-jobs', authenticateToken, asyncHandler(async (req: Request, 
       status: job.status,
       startTime: job.startedAt,
       pages: job.pages,
-      // Only send the last 50 messages to avoid payload bloat if it's been running long
-      messages: messages.slice(-50)
+      events: events.slice(-100)
     };
   }));
 
@@ -2091,19 +2042,46 @@ router.post('/topics/:topicId/generate-content', authenticateToken, asyncHandler
   const streamingBaseUrl = process.env.STREAMING_BASE_URL || callbackBaseUrl;
   const streamingUrl = `${streamingBaseUrl}/api/campaigns/streaming-webhook`;
 
-  const payload = {
-    ...req.body,
-    // Include job_id so n8n can return it in the callback
-    // job_id is unique and sufficient to identify the request
-    job_id: jobId,
-    callback_url: callbackUrl, // Environment-based callback URL for n8n to call back
-    streaming_url: streamingUrl, // Environment-based streaming URL for n8n to send progress updates
+  const canonicalPayload = buildCanonicalGenerationPayload({
+    requestBody: req.body as Record<string, unknown>,
+    jobId,
+    campaignId: topic.campaignId,
+    topicId,
+    callbackUrl,
+    streamingUrl,
+    brandName: String(
+      (req.body?.brand as { brand_name?: string; brandName?: string } | undefined)?.brand_name ||
+      (req.body?.brand as { brand_name?: string; brandName?: string } | undefined)?.brandName ||
+      req.body?.brandName ||
+      sanitizedDomainName
+    ),
+    brandDescription: String(
+      (req.body?.brand as { brand_description?: string; brandDescription?: string } | undefined)?.brand_description ||
+      (req.body?.brand as { brand_description?: string; brandDescription?: string } | undefined)?.brandDescription ||
+      req.body?.brandDescription ||
+      topic.campaign.domain.context ||
+      ''
+    ),
     wordpress: {
       username: integration.username,
       password: decryptedPassword,
       url: integration.siteUrl,
-    }
-  };
+    },
+    pages: [
+      {
+        id: pillarPage.id,
+        pageType: 'pillar',
+        title: pillarPage.title,
+        keywords: pillarPage.keywords
+      },
+      ...subPages.map((page) => ({
+        id: page.id,
+        pageType: 'subpage' as const,
+        title: page.title,
+        keywords: page.keywords
+      }))
+    ]
+  });
 
   // Log sanitized payload details for debugging (avoid logging passwords)
   console.log('[generation-init] Sending payload to n8n', {
@@ -2112,11 +2090,11 @@ router.post('/topics/:topicId/generate-content', authenticateToken, asyncHandler
     campaignId: topic.campaignId,
     pillarKeyword: getPrimaryKeyword(pillarPage.keywords) || pillarPage.title,
     subPageCount: subPages.length,
-    callbackUrl: payload.callback_url,
+    callbackUrl: canonicalPayload.callback_url,
     callbackBaseUrl: callbackBaseUrl, // Log the base URL used
-    streamingUrl: payload.streaming_url,
+    streamingUrl: canonicalPayload.streaming_url,
     streamingBaseUrl: streamingBaseUrl, // Log the streaming base URL used
-    wordpressUrl: payload.wordpress?.url,
+    wordpressUrl: canonicalPayload.wordpress.url,
     usingEnvCallbackUrl: !!process.env.CALLBACK_BASE_URL, // Indicate if env var is set
     usingEnvStreamingUrl: !!process.env.STREAMING_BASE_URL, // Indicate if streaming env var is set
   });
@@ -2131,7 +2109,7 @@ router.post('/topics/:topicId/generate-content', authenticateToken, asyncHandler
   const { addN8nJob, JOB_TYPES } = await import('../services/queueService');
   await addN8nJob(JOB_TYPES.CAMPAIGN_GENERATION, {
     url: PILLAR_WEBHOOK_URL,
-    payload,
+    payload: canonicalPayload,
     headers: {
       'Content-Type': 'application/json',
       [N8N_API_KEY_HEADER]: N8N_API_KEY,
@@ -2169,39 +2147,33 @@ router.get('/generation-status/:jobId', authenticateToken, asyncHandler(async (r
   const userId = authReq.user.userId;
   const jobId = req.params.jobId;
 
-  const drafts = await prisma.wordpressPublishLog.findMany({
-    where: {
-      userId,
-      generationJobId: jobId
+  const generationJob = await prisma.generationJob.findFirst({
+    where: { jobId, userId },
+    include: {
+      pages: {
+        select: {
+          pageId: true,
+          pageType: true,
+          status: true,
+          progress: true,
+          draftId: true,
+          hasHtml: true,
+        }
+      }
     }
   });
 
-  const pages = drafts.map(draft => {
-    const response = draft.response as any;
-    // Check if draft has htmlContent in response - that means it's completed
-    const hasContent = response?.htmlContent || response?.['Html Content'];
-    const statusFromResponse = response?.status;
+  if (!generationJob) {
+    return res.status(404).json({ success: false, error: 'Generation job not found' });
+  }
 
-    // Determine status: if has content or status is 'completed', it's done
-    let status = 'generating';
-    if (hasContent || statusFromResponse === 'completed') {
-      status = 'completed';
-    } else if (statusFromResponse === 'failed') {
-      status = 'failed';
-    } else if (statusFromResponse === 'pending') {
-      status = 'pending';
-    } else if (draft.status === 'generating') {
-      status = 'generating';
-    }
-
-    return {
-      pageId: draft.generationPageId ?? response.pageId,
-      pageType: response.pageType,
-      status,
-      progress: hasContent ? 100 : (response.progress || 0),
-      draftId: draft.id
-    };
-  });
+  const pages = generationJob.pages.map((page) => ({
+    pageId: page.pageId,
+    pageType: page.pageType,
+    status: page.hasHtml && page.status !== 'published' ? 'completed' : page.status,
+    progress: page.hasHtml ? 100 : (page.progress || 0),
+    draftId: page.draftId
+  }));
 
   const allCompleted = pages.every(p => p.status === 'completed');
   const allFailed = pages.every(p => p.status === 'failed');
@@ -2380,23 +2352,7 @@ router.post('/generation-webhook', asyncHandler(async (req: Request, res: Respon
       remote: req.headers['x-forwarded-for'],
     });
 
-    let pages: Record<string, unknown>[] = [];
-    let jobId: string | null = null;
-
-    if (Array.isArray(req.body)) {
-      pages = req.body as Record<string, unknown>[];
-      jobId =
-        (pages[0]?.['Job Id'] as string) ||
-        (pages[0]?.job_id as string) ||
-        (pages[0]?.jobId as string) ||
-        null;
-    } else if (req.body?.pages && Array.isArray(req.body.pages)) {
-      pages = req.body.pages as Record<string, unknown>[];
-      jobId = req.body.job_id || req.body.jobId || req.body['Job Id'] || null;
-    } else {
-      pages = [req.body as Record<string, unknown>];
-      jobId = req.body?.job_id || req.body?.jobId || req.body?.['Job Id'] || null;
-    }
+    const { jobId, pages } = normalizeGenerationCallbackPayload(req.body);
 
     if (!jobId) {
       return res.status(400).json({ success: false, error: 'Invalid payload: job_id is required' });
@@ -2506,15 +2462,23 @@ router.post('/generation-webhook', asyncHandler(async (req: Request, res: Respon
 
     for (let index = 0; index < pages.length; index++) {
       const page = pages[index];
-      const primaryKeyword = extractPrimaryKeyword(page);
+      const primaryKeyword = page.primaryKeyword;
       const normalizedPrimaryKeyword = normalizeKeyword(primaryKeyword);
-      const htmlContent = extractHtmlContent(page);
-      const payloadPageId = extractPayloadPageId(page) ?? generationJob.pages[index]?.pageId ?? null;
+      const htmlContent = page.htmlContent;
+      const payloadPageId = page.pageId ?? generationJob.pages[index]?.pageId ?? null;
 
       let matchedDraft: (typeof allDrafts)[number] | undefined;
       let matchMethod = 'none';
 
-      if (normalizedPrimaryKeyword) {
+      if (typeof payloadPageId === 'number') {
+        const byPageId = draftsByPageId.get(payloadPageId);
+        if (byPageId && !claimedDraftIds.has(byPageId.id)) {
+          matchedDraft = byPageId;
+          matchMethod = 'page_id';
+        }
+      }
+
+      if (!matchedDraft && normalizedPrimaryKeyword) {
         const candidateIds = draftsByNormalizedKeyword.get(normalizedPrimaryKeyword) || [];
         for (const draftId of candidateIds) {
           if (!claimedDraftIds.has(draftId)) {
@@ -2522,14 +2486,6 @@ router.post('/generation-webhook', asyncHandler(async (req: Request, res: Respon
             matchMethod = 'normalized_keyword';
             break;
           }
-        }
-      }
-
-      if (!matchedDraft && typeof payloadPageId === 'number') {
-        const byPageId = draftsByPageId.get(payloadPageId);
-        if (byPageId && !claimedDraftIds.has(byPageId.id)) {
-          matchedDraft = byPageId;
-          matchMethod = 'page_id';
         }
       }
 
@@ -2563,6 +2519,17 @@ router.post('/generation-webhook', asyncHandler(async (req: Request, res: Respon
       }
 
       if (!htmlContent) {
+        if (page.status === 'failed') {
+          const reason = page.error || `Generation failed for "${primaryKeyword}"`;
+          skippedPages.push(`${primaryKeyword} (failed)`);
+          await markJobPageFailed({
+            pageId: resolvedPageId,
+            draftId: matchedDraft?.id,
+            reason,
+            normalizedKeyword: normalizedPrimaryKeyword
+          });
+          continue;
+        }
         const reason = `Missing Html Content for "${primaryKeyword}"`;
         skippedPages.push(`${primaryKeyword} (missing Html Content)`);
         await markJobPageFailed({
@@ -2611,15 +2578,16 @@ router.post('/generation-webhook', asyncHandler(async (req: Request, res: Respon
           generationPageId: resolvedPageId,
           primaryKeyword,
           normalizedPrimaryKeyword,
-          title: extractTitle(page) || matchedDraft.title,
-          slug: extractSlug(page) || matchedDraft.slug || null,
+          title: page.title || matchedDraft.title,
+          slug: page.slug || matchedDraft.slug || null,
           response: {
             ...currentResponse,
             htmlContent,
-            title: extractTitle(page) || matchedDraft.title,
-            metaDescription: extractMetaDescription(page) || currentResponse?.metaDescription,
-            slug: extractSlug(page) || matchedDraft.slug || null,
-            featuredImage: extractFeaturedImage(page) || currentResponse?.featuredImage,
+            title: page.title || matchedDraft.title,
+            metaDescription: page.metaDescription || currentResponse?.metaDescription,
+            slug: page.slug || matchedDraft.slug || null,
+            featuredImageEnabled: page.featuredImageUrl ? true : currentResponse?.featuredImageEnabled ?? false,
+            featuredImageUrl: page.featuredImageUrl || currentResponse?.featuredImageUrl || currentResponse?.featuredImage || null,
             status: 'completed',
             completedAt: new Date().toISOString()
           }
@@ -2771,10 +2739,17 @@ router.post('/generation-webhook', asyncHandler(async (req: Request, res: Respon
  */
 router.post('/streaming-webhook', asyncHandler(async (req: Request, res: Response) => {
   try {
-    const { job_id, message } = req.body;
+    const rawJobId = (req.body?.job_id || req.body?.jobId || req.body?.['Job Id']) as string | undefined;
+    const generationJob = rawJobId
+      ? await prisma.generationJob.findUnique({
+          where: { jobId: rawJobId },
+          select: { jobId: true, topicId: true, userId: true }
+        })
+      : null;
+    const event = normalizeGenerationStreamingPayload(req.body as Record<string, unknown>, generationJob?.topicId ?? null);
 
     // Validate required fields
-    if (!job_id) {
+    if (!event?.jobId) {
       console.error('[streaming-webhook] REJECTED: Missing job_id in payload');
       return res.status(400).json({
         success: false,
@@ -2782,7 +2757,7 @@ router.post('/streaming-webhook', asyncHandler(async (req: Request, res: Respons
       });
     }
 
-    if (!message) {
+    if (!event.message) {
       console.error('[streaming-webhook] REJECTED: Missing message in payload');
       return res.status(400).json({
         success: false,
@@ -2790,25 +2765,17 @@ router.post('/streaming-webhook', asyncHandler(async (req: Request, res: Respons
       });
     }
 
-    console.log(`[streaming-webhook] Received progress update for job_id: ${job_id}`, {
-      message: message.substring(0, 100), // Log first 100 chars
-      messageLength: message.length
+    console.log(`[streaming-webhook] Received progress update for job_id: ${event.jobId}`, {
+      message: event.message.substring(0, 100),
+      pageId: event.pageId,
+      status: event.status,
+      progress: event.progress
     });
 
-    const matchingDraft = await prisma.wordpressPublishLog.findFirst({
-      where: {
-        generationJobId: job_id
-      },
-      orderBy: { id: 'asc' }
-    });
+    await saveStreamingEvent(event.jobId, event);
 
-    // 1. Persist the message for reliability (page reloads)
-    // We save it even if we can't find the user immediately, so history is preserved
-    const timestamp = new Date().toISOString();
-    await saveStreamingMessage(job_id, message, timestamp);
-
-    if (!matchingDraft) {
-      console.warn(`[streaming-webhook] No draft found with job_id: ${job_id}`);
+    if (!generationJob) {
+      console.warn(`[streaming-webhook] No generation job found with job_id: ${event.jobId}`);
       // Return 200 to avoid n8n retries, but log the issue
       return res.status(200).json({
         success: false,
@@ -2816,17 +2783,38 @@ router.post('/streaming-webhook', asyncHandler(async (req: Request, res: Respons
       });
     }
 
-    const userId = matchingDraft.userId;
+    if (typeof event.pageId === 'number') {
+      await prisma.generationJobPage.updateMany({
+        where: { jobId: event.jobId, pageId: event.pageId },
+        data: {
+          status: event.status === 'pending' ? 'pending' : event.status === 'failed' ? 'failed' : event.status === 'completed' ? 'completed' : 'generating',
+          progress: event.progress ?? undefined,
+          error: event.status === 'failed' ? event.message : null
+        }
+      });
+    }
 
-    // Broadcast streaming update to user via SSE
-    broadcastToUser(userId, {
-      type: 'streaming',
-      jobId: job_id,
-      message: message,
-      timestamp
+    await prisma.generationJob.update({
+      where: { jobId: event.jobId },
+      data: { status: event.status === 'failed' ? 'failed' : event.status === 'completed' ? 'generating' : 'generating' }
     });
 
-    console.log(`[streaming-webhook] ✅ Broadcasted progress update to user ${userId} for job ${job_id}`);
+    // Broadcast streaming update to user via SSE
+    broadcastToUser(generationJob.userId, {
+      type: 'streaming',
+      jobId: event.jobId,
+      topicId: generationJob.topicId,
+      pageId: event.pageId,
+      pageType: event.pageType,
+      status: event.status,
+      phase: event.phase,
+      progress: event.progress,
+      message: event.message,
+      sequence: event.sequence,
+      timestamp: event.timestamp
+    });
+
+    console.log(`[streaming-webhook] ✅ Broadcasted progress update to user ${generationJob.userId} for job ${event.jobId}`);
 
     res.json({
       success: true,
@@ -2930,14 +2918,14 @@ router.get('/topics/:topicId/drafts-status', authenticateToken, asyncHandler(asy
         updatedAt: null,
         wordpressUrl: null,
       })),
-      messages: []
+      events: []
     });
   }
 
   const jobId = latestJob.jobId;
 
-  // Fetch persisted streaming messages
-  const streamingMessages = await getStreamingMessages(jobId);
+  // Fetch persisted streaming events
+  const streamingEvents = await getStreamingEvents(jobId);
 
   // Map job pages - use Promise.all for async draft fetching
   const pages = await Promise.all(
@@ -3006,7 +2994,7 @@ router.get('/topics/:topicId/drafts-status', authenticateToken, asyncHandler(asy
     success: true,
     pages,
     job: { jobId: latestJob.jobId, status: latestJob.status },
-    messages: streamingMessages
+    events: streamingEvents
   });
 
 }));
@@ -3035,23 +3023,9 @@ router.get('/drafts/:draftId', authenticateToken, asyncHandler(async (req: Reque
     return res.status(404).json({ success: false, error: 'Draft not found' });
   }
 
-  const response = draft.response as any;
-
   res.json({
     success: true,
-    draft: {
-      htmlContent: response.htmlContent || response['Html Content'] || '',
-      title: response.title || response.Title || draft.title,
-      metaDescription: response.metaDescription || response['Meta Description'] || '',
-      slug: response.slug || response.Slug || draft.slug,
-      featuredImage: response.featuredImage || response['Featured Image'] || '',
-      primaryKeyword: draft.primaryKeyword,
-      longtailKeywords: response.longtailKeywords || response['longtail keywords'] || '',
-      status: draft.status || response.status || 'draft',
-      wordpressUrl: draft.wordpressUrl,
-      error: response.error || null,
-      updatedAt: draft.updatedAt.toISOString()
-    }
+    draft: serializeDraftContent(draft)
   });
 }));
 
@@ -3087,4 +3061,3 @@ router.patch('/pages/:id', authenticateToken, asyncHandler(async (req: Request, 
 }));
 
 export default router;
-

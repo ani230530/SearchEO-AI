@@ -53,6 +53,19 @@ const worker = new Worker(
 
             console.log('[Queue] Payload:', JSON.stringify(maskSecrets(payload), null, 2));
 
+            if (job.name === JOB_TYPES.CAMPAIGN_GENERATION) {
+                const kickoffResponse = await axios.post(url, payload, {
+                    headers,
+                    timeout: Math.min(timeout || 30000, 30000),
+                });
+
+                console.log(`[Queue] Campaign kickoff ${job.id} accepted. Status: ${kickoffResponse.status}`);
+                return {
+                    accepted: true,
+                    status: kickoffResponse.status,
+                };
+            }
+
             // Perform the actual n8n call
             const response = await axios.post(url, payload, {
                 headers,
@@ -151,6 +164,8 @@ async function handlePublishCompletion(job: Job, responseData: any, meta: any) {
         // Ensure we don't lose the content if n8n doesn't return it
         htmlContent: currentResponse.htmlContent || entry.htmlContent,
         title: currentResponse.title || entry.title,
+        featuredImageEnabled: currentResponse.featuredImageEnabled ?? false,
+        featuredImageUrl: currentResponse.featuredImageUrl || currentResponse.featuredImage || null,
         status: finalStatus
     };
 

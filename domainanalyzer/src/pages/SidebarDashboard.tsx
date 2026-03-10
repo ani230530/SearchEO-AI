@@ -57,7 +57,7 @@ import { useToast } from '@/hooks/use-toast';
 import { ButtonSpinner } from '@/components/ui/button-spinner';
 import { CampaignTopicSidebar } from '@/features/campaign/CampaignTopicSidebar';
 import { CampaignTopicDetail } from '@/features/campaign/CampaignTopicDetail';
-import { Topic, CampaignStructure, GenerationPageStatus, DraftStatusRecord, KeywordTableItem, DraftPreview, Keyword } from '@/types';
+import { Topic, CampaignStructure, GenerationPageStatus, DraftStatusRecord, KeywordTableItem, DraftPreview, Keyword, GenerationStreamingEvent } from '@/types';
 import CampaignGraph from '@/components/CampaignGraph';
 import { AuditBarChart, AuditGaugeChart, AuditRadarChart, AuditScoreDistribution, OverallScoreGauge } from '@/components/audit/AuditCharts';
 import { WordpressIntegration } from '@/types/publish';
@@ -75,7 +75,6 @@ import Profile from './Profile';
 import {AnimatePresence, motion} from 'framer-motion'
 import GSCAnalyticsView from '@/components/gsc/GSCAnalyticsView';
 import GSCBlogAnalytics from '@/features/analytics/GSCBlogAnalytics';
-import { usePublishStatus } from '@/hooks/usePublishStatus';
 import {
   Sheet,
   SheetContent,
@@ -291,6 +290,12 @@ const sseRef = useRef<EventSource | null>(null);
   const [draftToPageMap, setDraftToPageMap] = useState<Map<number, number>>(new Map());
   // Track draft statuses (published/local drafts/failed)
   const [draftStatuses, setDraftStatuses] = useState<Map<number, { isPublished: boolean; isFailed?: boolean; publishedUrl?: string; draftId?: number; error?: string }>>(new Map());
+  const [sharedPublishStatuses, setSharedPublishStatuses] = useState<Map<number, {
+    status: 'generating' | 'published' | 'failed';
+    publishedUrl?: string;
+    error?: string;
+    updatedAt?: string;
+  }>>(new Map());
   // Track generation job statuses
   const [generationJobs, setGenerationJobs] = useState<Map<number, GenerationPageStatus>>(new Map());
   // Lifted context from CampaignStructureView
@@ -418,134 +423,128 @@ const [editDescription, setEditDescription] = useState('');
     }
   }, [sidebarOpen]);
 
-  // Listen for real-time publish updates via SSE
-  usePublishStatus({
-    onUpdate: (data) => {
-      console.log('[Dashboard:SSE] Received update:', data);
-      
-      const incomingDraftId = data.draftId ? Number(data.draftId) : null;
-      const incomingPageId = data.pageId ? Number(data.pageId) : null;
-      
-      let targetPageId: number | null = incomingPageId;
-      
-      if (!targetPageId && incomingDraftId) {
-        // Fallback: look in local mapping
-        for (const [dId, pId] of draftToPageMap.entries()) {
-          if (Number(dId) === incomingDraftId) {
-            targetPageId = Number(pId);
-            break;
-          }
+  const handlePublishUpdate = useCallback((data: {
+    draftId?: number;
+    pageId?: number;
+    status: 'published' | 'failed' | 'generating';
+    publishedUrl?: string;
+    error?: string;
+  }) => {
+    console.log('[Dashboard:SSE] Received update:', data);
+
+    const incomingDraftId = data.draftId ? Number(data.draftId) : null;
+    const incomingPageId = data.pageId ? Number(data.pageId) : null;
+
+    if (incomingDraftId) {
+      setSharedPublishStatuses((prev) => {
+        const updated = new Map(prev);
+        updated.set(incomingDraftId, {
+          status: data.status,
+          publishedUrl: data.publishedUrl,
+          error: data.error,
+          updatedAt: new Date().toISOString()
+        });
+        return updated;
+      });
+    }
+
+    let targetPageId: number | null = incomingPageId;
+
+    if (!targetPageId && incomingDraftId) {
+      for (const [dId, pId] of draftToPageMapRef.current.entries()) {
+        if (Number(dId) === incomingDraftId) {
+          targetPageId = Number(pId);
+          break;
         }
       }
-      
-      console.log('[Dashboard:SSE] Match attempt:', { incomingDraftId, incomingPageId, resolvedPageId: targetPageId });
+    }
 
-      // Terminal states: Clear loading and mapping
-      if (data.status === 'published' || data.status === 'failed') {
-        if (targetPageId) {
-          console.log('[Dashboard:SSE] Clearing loading state for page:', targetPageId);
-          setPublishingPageIds(prev => {
-            const next = new Set(prev);
-            for (const val of Array.from(next)) {
-              if (Number(val) === Number(targetPageId)) {
-                next.delete(val);
-              }
-            }
-            return next;
-          });
-        }
-        
-        if (incomingDraftId) {
-          setDraftToPageMap(prev => {
-            const next = new Map(prev);
-            for (const [dId] of next.entries()) {
-              if (Number(dId) === incomingDraftId) {
-                next.delete(dId);
-              }
-            }
-            return next;
-          });
-        }
+    if (data.status === 'published' || data.status === 'failed') {
+      if (targetPageId) {
+        setPublishingPageIds(prev => {
+          const next = new Set(prev);
+          next.delete(targetPageId!);
+          return next;
+        });
       }
 
-      // Handle specific statuses
-      if (data.status === 'published' && data.publishedUrl && targetPageId) {
-        // Update generationJobs
-        setGenerationJobs(prev => {
-          const updated = new Map(prev);
-          const existing = updated.get(targetPageId!);
-          if (existing) {
-            updated.set(targetPageId!, {
-              ...existing,
-              wordpressUrl: data.publishedUrl || null,
-            });
-          }
-          return updated;
-        });
-
-        // Update draftStatuses
-        setDraftStatuses(prev => {
-          const updated = new Map(prev);
-          const existing = updated.get(targetPageId!);
-          if (existing) {
-            updated.set(targetPageId!, {
-              ...existing,
-              isPublished: true,
-              publishedUrl: data.publishedUrl,
-              draftId: incomingDraftId || undefined
-            });
-          } else {
-            // Add new entry even if it wasn't there before
-            updated.set(targetPageId!, {
-              isPublished: true,
-              publishedUrl: data.publishedUrl,
-              draftId: incomingDraftId || undefined
-            });
-          }
-          return updated;
-        });
-
-        toast({
-          title: 'Published Successfully',
-          description: `Your content is live! View it at: ${data.publishedUrl}`,
-        });
-      } else if (data.status === 'failed') {
-        // Update draftStatuses for failure
-        setDraftStatuses(prev => {
-          const updated = new Map(prev);
-          if (targetPageId && updated.has(targetPageId)) {
-            const existing = updated.get(targetPageId)!;
-            updated.set(targetPageId, {
-              ...existing,
-              isFailed: true,
-              isPublished: false,
-              error: data.error,
-              draftId: incomingDraftId || existing.draftId
-            });
-          } else if (incomingDraftId) {
-            for (const [pid, status] of updated.entries()) {
-              if (Number(status.draftId) === incomingDraftId) {
-                updated.set(pid, {
-                  ...status,
-                  isFailed: true,
-                  isPublished: false,
-                  error: data.error,
-                });
-                break;
-              }
-            }
-          }
-          return updated;
-        });
-
-        toast({
-          title: 'Publish Failed',
-          description: data.error || 'An error occurred while publishing to WordPress',
-          variant: 'destructive',
+      if (incomingDraftId) {
+        setDraftToPageMap(prev => {
+          const next = new Map(prev);
+          next.delete(incomingDraftId);
+          return next;
         });
       }
     }
-  });
+
+    if (data.status === 'published' && data.publishedUrl && targetPageId) {
+      setGenerationJobs(prev => {
+        const updated = new Map(prev);
+        const existing = updated.get(targetPageId!);
+        if (existing) {
+          updated.set(targetPageId!, {
+            ...existing,
+            wordpressUrl: data.publishedUrl || null,
+            status: 'published',
+          });
+        }
+        return updated;
+      });
+
+      setDraftStatuses(prev => {
+        const updated = new Map(prev);
+        const existing = updated.get(targetPageId!);
+        updated.set(targetPageId!, {
+          ...(existing || {}),
+          isPublished: true,
+          publishedUrl: data.publishedUrl,
+          draftId: incomingDraftId || existing?.draftId
+        });
+        return updated;
+      });
+
+      toast({
+        title: 'Published Successfully',
+        description: `Your content is live! View it at: ${data.publishedUrl}`,
+      });
+      return;
+    }
+
+    if (data.status === 'failed') {
+      setDraftStatuses(prev => {
+        const updated = new Map(prev);
+        if (targetPageId && updated.has(targetPageId)) {
+          const existing = updated.get(targetPageId)!;
+          updated.set(targetPageId, {
+            ...existing,
+            isFailed: true,
+            isPublished: false,
+            error: data.error,
+            draftId: incomingDraftId || existing.draftId
+          });
+        } else if (incomingDraftId) {
+          for (const [pid, status] of updated.entries()) {
+            if (Number(status.draftId) === incomingDraftId) {
+              updated.set(pid, {
+                ...status,
+                isFailed: true,
+                isPublished: false,
+                error: data.error,
+              });
+              break;
+            }
+          }
+        }
+        return updated;
+      });
+
+      toast({
+        title: 'Publish Failed',
+        description: data.error || 'An error occurred while publishing to WordPress',
+        variant: 'destructive',
+      });
+    }
+  }, [draftToPageMap, toast]);
 
   const tabs: Tab[] = [
     { id: 'ai-checker', label: 'AI Checker', icon: <Sparkles className="h-5 w-5" /> },
@@ -4902,6 +4901,7 @@ const allSections = [...leftSections, ...rightSections];
                       setDraftToPageMap={setDraftToPageMap}
                       draftStatuses={draftStatuses}
                       setDraftStatuses={setDraftStatuses}
+                      sharedPublishStatuses={sharedPublishStatuses}
                       generationJobs={generationJobs}
                       setGenerationJobs={setGenerationJobs}
                       campaignPageIdContext={campaignPageIdContext}
@@ -5192,8 +5192,8 @@ const allSections = [...leftSections, ...rightSections];
                 ) : (
                   <div className="max-w-6xl mx-auto px-4 sm:px-6 py-12 sm:py-16">
                    <PublishExperience
-                   companyDomain={companyDomain}
-                   domainContext={domainContext}
+                     companyDomain={companyDomain}
+                     domainContext={domainContext}
                    keywordsTableData={keywordsTableData}
                    hasWordpressIntegration={hasWordpressIntegration}
                    wpIntegration={wpIntegration}
@@ -5206,11 +5206,12 @@ const allSections = [...leftSections, ...rightSections];
                    // Pass shared sync states
                    publishingPageIds={publishingPageIds}
                    setPublishingPageIds={setPublishingPageIds}
-                   draftToPageMap={draftToPageMap}
-                   setDraftToPageMap={setDraftToPageMap}
-                   draftStatuses={draftStatuses}
-                   setDraftStatuses={setDraftStatuses}
-                 />
+                     draftToPageMap={draftToPageMap}
+                     setDraftToPageMap={setDraftToPageMap}
+                     draftStatuses={draftStatuses}
+                     setDraftStatuses={setDraftStatuses}
+                     sharedPublishStatuses={sharedPublishStatuses}
+                   />
                                     </div>
             )
           ) : activeTab === 'audit' ? (
@@ -5789,6 +5790,12 @@ interface CampaignStructureViewProps {
   setDraftToPageMap: React.Dispatch<React.SetStateAction<Map<number, number>>>;
   draftStatuses: Map<number, { isPublished: boolean; isFailed?: boolean; publishedUrl?: string; draftId?: number; error?: string }>;
   setDraftStatuses: React.Dispatch<React.SetStateAction<Map<number, { isPublished: boolean; isFailed?: boolean; publishedUrl?: string; draftId?: number; error?: string }>>>;
+  sharedPublishStatuses: Map<number, {
+    status: 'generating' | 'published' | 'failed';
+    publishedUrl?: string;
+    error?: string;
+    updatedAt?: string;
+  }>;
   generationJobs: Map<number, GenerationPageStatus>;
   setGenerationJobs: React.Dispatch<React.SetStateAction<Map<number, GenerationPageStatus>>>;
   campaignPageIdContext: number | null;
@@ -5816,6 +5823,7 @@ function CampaignStructureView({
   setDraftToPageMap,
   draftStatuses,
   setDraftStatuses,
+  sharedPublishStatuses,
   generationJobs,
   setGenerationJobs,
   campaignPageIdContext,
@@ -5892,7 +5900,7 @@ function CampaignStructureView({
   const [generationConfig, setGenerationConfig] = useState({
     wordCount: 800,
     images: 0,
-    featuredImage: false,
+    featuredImageEnabled: true,
     brandName: '',
     brandDescription: ''
   });
@@ -6030,10 +6038,7 @@ function CampaignStructureView({
   // States now lifted to parent props: publishingPageIds, draftToPageMap, draftStatuses, generationJobs
   
   // Streaming progress state
-  const [streamingMessages, setStreamingMessages] = useState<Map<string, Array<{
-    message: string;
-    timestamp: string;
-  }>>>(new Map());
+  const [streamingMessages, setStreamingMessages] = useState<Map<string, GenerationStreamingEvent[]>>(new Map());
   const [jobIdToTopicId, setJobIdToTopicId] = useState<Map<string, number>>(new Map());
   
   // Active generation tracking - track last streaming timestamp per jobId
@@ -6049,6 +6054,7 @@ function CampaignStructureView({
   }>>(new Map());
   const generationJobsRef = useRef(generationJobs);
   const jobIdToTopicIdRef = useRef(jobIdToTopicId);
+  const draftToPageMapRef = useRef(draftToPageMap);
   const campaignEventSourceRef = useRef<EventSource | null>(null);
   const campaignReconnectTimerRef = useRef<NodeJS.Timeout | null>(null);
   const campaignReconnectAttemptRef = useRef(0);
@@ -6082,18 +6088,15 @@ function CampaignStructureView({
     jobIdToTopicIdRef.current = jobIdToTopicId;
   }, [jobIdToTopicId]);
 
-  // Helper function to extract topicId from jobId pattern
-  const extractTopicIdFromJobId = useCallback((jobId: string): number | null => {
-    // JobId format: job_{topicId}_{timestamp}
-    const match = jobId.match(/^job_(\d+)_/);
-    return match ? parseInt(match[1], 10) : null;
-  }, []);
+  useEffect(() => {
+    draftToPageMapRef.current = draftToPageMap;
+  }, [draftToPageMap]);
 
   const resolveTopicIdForJobId = useCallback((jobId: string): number | null => {
     const mappedTopicId = jobIdToTopicIdRef.current.get(jobId);
     if (typeof mappedTopicId === 'number') return mappedTopicId;
-    return extractTopicIdFromJobId(jobId);
-  }, [extractTopicIdFromJobId]);
+    return null;
+  }, []);
 
   const reconcileTopicDraftStatus = useCallback(async (topicId: number) => {
     try {
@@ -6124,6 +6127,7 @@ function CampaignStructureView({
           }
           updated.set(p.pageId, {
             jobId: p.jobId || existing?.jobId || '',
+            topicId,
             pageId: p.pageId,
             pageType: p.pageType === 'subpage' ? 'subpage' : 'pillar',
             status: finalStatus,
@@ -6165,6 +6169,19 @@ function CampaignStructureView({
         });
         return updated;
       });
+
+      if (data.job?.jobId && Array.isArray(data.events)) {
+        setJobIdToTopicId(prev => {
+          const updated = new Map(prev);
+          updated.set(data.job.jobId, topicId);
+          return updated;
+        });
+        setStreamingMessages(prev => {
+          const updated = new Map(prev);
+          updated.set(data.job.jobId, data.events);
+          return updated;
+        });
+      }
     } catch (err) {
       console.error('Failed to reconcile topic drafts-status', { topicId, err });
     }
@@ -6203,6 +6220,7 @@ function CampaignStructureView({
             job.pages.forEach((p: any) => {
               updated.set(p.pageId, {
                 jobId: job.jobId,
+                topicId: job.topicId,
                 pageId: p.pageId,
                 pageType: p.pageType,
                 status: p.status,
@@ -6225,8 +6243,8 @@ function CampaignStructureView({
             if (!activeJobIds.has(key)) updated.delete(key);
           }
           data.jobs.forEach((job: any) => {
-            if (job.messages && job.messages.length > 0) {
-              updated.set(job.jobId, job.messages);
+            if (job.events && job.events.length > 0) {
+              updated.set(job.jobId, job.events);
             }
           });
           return updated;
@@ -6287,42 +6305,57 @@ function CampaignStructureView({
   }, [fetchActiveJobs]);
 
   // Handle streaming progress updates
-  const handleStreamingUpdate = useCallback((jobId: string | undefined, message: string | undefined, timestamp: string | undefined) => {
-    if (!jobId || !message) return;
-    
-    const topicId = extractTopicIdFromJobId(jobId);
-    if (!topicId) return;
-    
-    // Store jobId -> topicId mapping
-    setJobIdToTopicId(prev => {
-      const updated = new Map(prev);
-      updated.set(jobId, topicId);
-      return updated;
-    });
-    
+  const handleStreamingUpdate = useCallback((event: GenerationStreamingEvent) => {
+    if (!event.jobId || !event.message) return;
+
+    if (typeof event.topicId === 'number') {
+      setJobIdToTopicId(prev => {
+        const updated = new Map(prev);
+        updated.set(event.jobId, event.topicId!);
+        return updated;
+      });
+    }
+
     // Update last streaming timestamp (marks generation as active)
     const now = Date.now();
     setLastStreamingTimestamp(prev => {
       const updated = new Map(prev);
-      updated.set(jobId, now);
+      updated.set(event.jobId, now);
       return updated;
     });
-    
-    // Add message to streaming messages
+
     setStreamingMessages(prev => {
       const updated = new Map(prev);
-      const messages = updated.get(jobId) || [];
-      const newMessages = [
-        ...messages,
-        { message, timestamp: timestamp || new Date().toISOString() }
-      ];
-      // Keep last 10 messages per job
-      updated.set(jobId, newMessages.slice(-10));
+      const messages = updated.get(event.jobId) || [];
+      updated.set(event.jobId, [...messages, event].slice(-100));
       return updated;
     });
-  }, [extractTopicIdFromJobId]);
 
-  // Subscribe to server-sent events for generation status (replaces polling)
+    if (typeof event.pageId === 'number') {
+      setGenerationJobs((prev) => {
+        const updated = new Map(prev);
+        const existing = updated.get(event.pageId!);
+        updated.set(event.pageId!, {
+          jobId: event.jobId,
+          topicId: event.topicId ?? existing?.topicId ?? null,
+          pageId: event.pageId!,
+          pageType: event.pageType === 'subpage' ? 'subpage' : 'pillar',
+          status: (event.status || existing?.status || 'generating') as GenerationPageStatus['status'],
+          draftId: existing?.draftId,
+          progress: typeof event.progress === 'number' ? event.progress : existing?.progress,
+          primaryKeyword: existing?.primaryKeyword,
+          hasHtml: existing?.hasHtml,
+          updatedAt: event.timestamp,
+          error: event.status === 'failed' ? event.message : existing?.error ?? null,
+          wordpressUrl: existing?.wordpressUrl || null,
+          phase: event.phase ?? existing?.phase ?? null,
+        });
+        return updated;
+      });
+    }
+  }, []);
+
+  // Subscribe to one SSE stream for campaign + publish state.
   useEffect(() => {
     const token = localStorage.getItem('authToken');
     if (!token) return;
@@ -6335,9 +6368,7 @@ function CampaignStructureView({
         campaignEventSourceRef.current.close();
       }
 
-      const eventSource = new EventSource(
-        `${API_BASE_URL}/api/campaigns/events?token=${encodeURIComponent(token)}`
-      );
+      const eventSource = new EventSource(`${API_BASE_URL}/api/sse?token=${encodeURIComponent(token)}`);
       campaignEventSourceRef.current = eventSource;
 
       eventSource.onopen = () => {
@@ -6349,15 +6380,46 @@ function CampaignStructureView({
           const data = JSON.parse(event.data) as {
             type?: string;
             jobId?: string;
+            topicId?: number;
+            pageId?: number;
+            pageType?: 'pillar' | 'subpage';
+            status?: 'pending' | 'generating' | 'completed' | 'failed' | 'published';
+            phase?: string;
+            progress?: number;
             message?: string;
             timestamp?: string;
+            sequence?: number;
+            draftId?: number;
+            publishedUrl?: string;
             pages?: Partial<GenerationPageStatus & { pageType: string; hasHtml?: boolean; error?: string | null }>[];
             error?: string;
           };
+
+          if (data.type === 'publish_update' && data.status) {
+            handlePublishUpdate({
+              draftId: data.draftId,
+              pageId: data.pageId,
+              status: data.status === 'published' || data.status === 'failed' ? data.status : 'generating',
+              publishedUrl: data.publishedUrl,
+              error: data.error,
+            });
+            return;
+          }
           
           // Handle streaming progress updates
           if (data.type === 'streaming') {
-            handleStreamingUpdate(data.jobId, data.message, data.timestamp);
+            handleStreamingUpdate({
+              jobId: data.jobId || '',
+              topicId: data.topicId,
+              pageId: data.pageId,
+              pageType: data.pageType,
+              status: data.status,
+              phase: data.phase,
+              progress: data.progress,
+              message: data.message || '',
+              sequence: data.sequence,
+              timestamp: data.timestamp || new Date().toISOString(),
+            });
             return;
           }
 
@@ -6398,6 +6460,7 @@ function CampaignStructureView({
                 
                 updated.set(pageId, {
                   jobId,
+                  topicId: data.topicId ?? existing?.topicId ?? null,
                   pageId,
                   pageType: p.pageType === 'subpage' ? 'subpage' : 'pillar',
                   status: (p.status || existing?.status || 'generating') as GenerationPageStatus['status'],
@@ -6407,6 +6470,8 @@ function CampaignStructureView({
                   hasHtml: p.hasHtml ?? existing?.hasHtml,
                   updatedAt: new Date().toISOString(),
                   error: p.error ?? existing?.error ?? null,
+                  wordpressUrl: existing?.wordpressUrl ?? null,
+                  phase: existing?.phase ?? null,
                 });
               });
               return updated;
@@ -6449,7 +6514,7 @@ function CampaignStructureView({
         campaignEventSourceRef.current = null;
       }
     };
-  }, [handleStreamingUpdate, toast]);
+  }, [handlePublishUpdate, handleStreamingUpdate, toast]);
 
   // Periodic polling for active generation jobs using the bulk endpoint
   // This serves as a fallback if SSE events are missed or not supported
@@ -6571,6 +6636,7 @@ function CampaignStructureView({
             
             newMap.set(p.pageId, {
               jobId: p.jobId || '',
+              topicId: topic.id,
               pageId: p.pageId,
               pageType: p.pageType === 'subpage' ? 'subpage' : 'pillar',
               status: finalStatus,
@@ -6583,6 +6649,18 @@ function CampaignStructureView({
               wordpressUrl: p.wordpressUrl || null,
             });
           });
+          if (data.job?.jobId && Array.isArray(data.events)) {
+            setJobIdToTopicId((prev) => {
+              const updated = new Map(prev);
+              updated.set(data.job.jobId, topic.id);
+              return updated;
+            });
+            setStreamingMessages((prev) => {
+              const updated = new Map(prev);
+              updated.set(data.job.jobId, data.events);
+              return updated;
+            });
+          }
         } catch (err) {
           console.error('Failed to rehydrate drafts-status', err);
         }
@@ -7085,6 +7163,19 @@ function CampaignStructureView({
           return updated;
         });
 
+        setSharedPublishStatuses(prev => {
+          const updated = new Map(prev);
+          terminalResults.forEach((result) => {
+            updated.set(result.draftId, {
+              status: result.status,
+              publishedUrl: result.wordpressUrl || undefined,
+              error: result.error || undefined,
+              updatedAt: new Date().toISOString()
+            });
+          });
+          return updated;
+        });
+
         setDraftStatuses(prev => {
           const updated = new Map(prev);
           terminalResults.forEach((result) => {
@@ -7198,7 +7289,8 @@ function CampaignStructureView({
           pageId: pageId, // Pass pageId context for campaign synchronization
           primaryKeyword: draft.primaryKeyword,
           htmlContent: draft.htmlContent,
-          featuredImage: draft.featuredImage,
+          featuredImageEnabled: draft.featuredImageEnabled,
+          featuredImageUrl: draft.featuredImageUrl,
           title: draft.title,
           metaDescription: draft.metaDescription,
           slug: draft.slug,
@@ -7381,7 +7473,7 @@ function CampaignStructureView({
     setGenerationConfig({
       wordCount: 800,
       images: 0,
-      featuredImage: false,
+      featuredImageEnabled: true,
       brandName: derivedBrandName || 'Brand',
       brandDescription: derivedBrandDescription || '',
     });
@@ -7435,29 +7527,34 @@ function CampaignStructureView({
       const pillarKeywords = getKeywordSelections(pillar.keywords);
 
       const payload = {
-        user_id: 'user', // backend uses authenticated user
-        campaign_name: campaign.title,
-        pillar_page: {
-          primary_keyword: pillarKeywords.primary || pillar.title,
-          longtail_keywords: pillarKeywords.longtail,
-          options: {
-            image: generationConfig.images,
-            word_count: generationConfig.wordCount,
-            featured_image: generationConfig.featuredImage ? 'yes' : 'no',
+        campaign_id: campaign.id,
+        topic_id: topic.id,
+        pages: [
+          {
+            page_id: pillar.id,
+            page_type: 'pillar',
+            primary_keyword: pillarKeywords.primary || pillar.title,
+            longtail_keywords: pillarKeywords.longtail,
+            options: {
+              image_count: generationConfig.images,
+              word_count: generationConfig.wordCount,
+              featured_image: generationConfig.featuredImageEnabled ? 'yes' : 'no',
+            },
           },
-        },
-        sub_pillar_pages: topic.subPages.map((sp) => {
+          ...topic.subPages.map((sp) => {
           const subPageKeywords = getKeywordSelections(sp.keywords);
           return {
+            page_id: sp.id,
+            page_type: 'subpage',
             primary_keyword: subPageKeywords.primary || sp.title,
             longtail_keywords: subPageKeywords.longtail,
             options: {
-              image: generationConfig.images,
+              image_count: generationConfig.images,
               word_count: generationConfig.wordCount,
-              featured_image: generationConfig.featuredImage ? 'yes' : 'no',
+              featured_image: generationConfig.featuredImageEnabled ? 'yes' : 'no',
             },
           };
-        }),
+        })],
         brand: {
           brand_name: generationConfig.brandName,
           brand_description: generationConfig.brandDescription,
@@ -7500,6 +7597,7 @@ function CampaignStructureView({
         pages.forEach((p) => {
           updated.set(p.pageId, {
             jobId,
+            topicId: topic.id,
             pageId: p.pageId,
             pageType: p.pageType === 'subpage' ? 'subpage' : 'pillar',
             status: 'generating',
@@ -7929,7 +8027,7 @@ function CampaignStructureView({
                    <CampaignTopicDetail
                      topic={selectedTopic}
                      isGenerating={isTopicGenerating(selectedTopic)}
-                     streamingMessages={
+                     streamingEvents={
                        (jobIdToTopicId.size > 0 
                          ? Array.from(jobIdToTopicId.entries()).find(([_, tid]) => tid === selectedTopicId)?.[0] 
                          : undefined) 
@@ -8110,8 +8208,8 @@ function CampaignStructureView({
                     <p className="text-xs text-gray-500">Generate a high-quality hero image</p>
                   </div>
                   <Switch
-                    checked={generationConfig.featuredImage}
-                    onCheckedChange={(checked) => setGenerationConfig(prev => ({ ...prev, featuredImage: checked }))}
+                    checked={generationConfig.featuredImageEnabled}
+                    onCheckedChange={(checked) => setGenerationConfig(prev => ({ ...prev, featuredImageEnabled: checked }))}
                   />
                 </div>
 
@@ -8580,8 +8678,8 @@ function CampaignStructureView({
                     <p className="text-xs text-gray-500">Generate a high-quality hero banner</p>
                   </div>
                   <Switch
-                    checked={generationConfig.featuredImage}
-                    onCheckedChange={(checked) => setGenerationConfig(prev => ({ ...prev, featuredImage: checked }))}
+                    checked={generationConfig.featuredImageEnabled}
+                    onCheckedChange={(checked) => setGenerationConfig(prev => ({ ...prev, featuredImageEnabled: checked }))}
                   />
                 </div>
                 <div className="flex justify-end gap-3">
@@ -8705,6 +8803,7 @@ function CampaignStructureView({
               initialDraftId={previewPageId}
               pageId={campaignPageIdContext || undefined}
               disablePreviewOverlay={true}
+              sharedPublishStatuses={sharedPublishStatuses}
             />
           </div>
         </div>

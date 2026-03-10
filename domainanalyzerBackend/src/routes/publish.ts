@@ -3,6 +3,12 @@ import axios from 'axios';
 import { PrismaClient } from '../../generated/prisma';
 import { authenticateToken, AuthenticatedRequest } from '../middleware/auth';
 import { encryptToken, decryptToken } from '../services/tokenEncryption';
+import {
+  normalizeFeaturedImageEnabled,
+  normalizeFeaturedImageUrl,
+  normalizePublishGenerateResponse,
+  serializeDraftContent,
+} from '../services/contentFlowService';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -22,17 +28,6 @@ const EDIT_IMAGE_WEBHOOK_URL =
 const N8N_API_KEY = process.env.N8N_API_KEY || '1234';
 const N8N_API_KEY_HEADER = process.env.N8N_API_KEY_HEADER || 'key';
 const N8N_TIMEOUT_MS = Number(process.env.N8N_TIMEOUT_MS) || 300000;
-
-interface NormalizedContent {
-  primaryKeyword: string;
-  htmlContent: string;
-  featuredImage?: string;
-  title?: string;
-  metaDescription?: string;
-  slug?: string;
-  wordpressUrl: string;
-  longtailKeywords?: string;
-}
 
 const asyncHandler =
   (fn: (req: Request, res: Response, next: any) => Promise<any>) =>
@@ -78,40 +73,6 @@ const callWebhook = async (url: string, payload: any) => {
   }
 
   return response.data;
-};
-
-const normalizeGenerateResponse = (
-  response: any,
-  integration: { siteUrl: string; username: string }
-): NormalizedContent => {
-  const entry = Array.isArray(response) ? response[0] : response;
-
-  const htmlContent =
-    entry?.['Html Content'] ?? entry?.htmlContent ?? entry?.content ?? '';
-  const featuredImage =
-    entry?.['Featured Image'] ?? entry?.featuredImage ?? entry?.image ?? '';
-  const title = entry?.Title ?? entry?.title ?? 'Generated Article';
-  const metaDescription =
-    entry?.['Meta Description'] ?? entry?.metaDescription ?? '';
-  const slug = entry?.slug ?? entry?.Slug ?? '';
-  const primaryKeyword =
-    entry?.['Primary Keyword'] ?? entry?.primaryKeyword ?? '';
-  const longtailKeywords =
-    entry?.['longtail keywords'] ?? entry?.longtailKeywords ?? '';
-
-  return {
-    primaryKeyword,
-    htmlContent,
-    featuredImage,
-    title,
-    metaDescription,
-    slug,
-    wordpressUrl:
-      entry?.['wordpress url '] ??
-      entry?.['wordpress url'] ??
-      integration.siteUrl,
-    longtailKeywords,
-  };
 };
 
 const getIntegrationOrThrow = async (userId: number) => {
@@ -263,7 +224,7 @@ router.post(
       brandDescription = '',
       images = 1,
       wordCount = 800,
-      featuredImage = true,
+      featuredImageEnabled = true,
     } = req.body;
 
     if (!primaryKeyword) {
@@ -319,7 +280,7 @@ router.post(
       'Brand description': normalizedBrandDescription,
       Image: Number(images) || 0,
       'Word Count': Number(wordCount) || 800,
-      'Featured Image': featuredImage ? 'yes' : 'no',
+      'Featured Image': normalizeFeaturedImageEnabled(featuredImageEnabled, true) ? 'yes' : 'no',
       Username: integration.username,
       Password: decryptedPassword,
       'wordpress url': integration.siteUrl,
@@ -327,7 +288,7 @@ router.post(
 
     try {
       const response = await callWebhook(REVIEW_WEBHOOK_URL, payload);
-      const normalized = normalizeGenerateResponse(response, integration);
+      const normalized = normalizePublishGenerateResponse(response, integration);
 
       res.json({
         success: true,
@@ -427,7 +388,8 @@ router.post(
       draftId,
       primaryKeyword,
       htmlContent,
-      featuredImage,
+      featuredImageEnabled = true,
+      featuredImageUrl,
       title,
       metaDescription,
       slug,
@@ -482,7 +444,7 @@ router.post(
         'wordpress url': integration.siteUrl,
         'Primary Keyword': primaryKeyword,
         'Html Content': htmlContent,
-        'Featured Image': featuredImage,
+        'Featured Image': normalizeFeaturedImageUrl(featuredImageUrl) || (normalizeFeaturedImageEnabled(featuredImageEnabled, true) ? 'yes' : 'no'),
         Title: title,
         'Meta Description': metaDescription,
         slug,
@@ -639,6 +601,8 @@ router.put(
     const userId = authReq.user.userId;
     const draftId = Number(req.params.id);
     const { htmlContent, title, metaDescription, slug, featuredImage, longtailKeywords, wordpressUrl } = req.body;
+    const featuredImageEnabled = normalizeFeaturedImageEnabled(req.body.featuredImageEnabled, Boolean(req.body.featuredImageUrl));
+    const featuredImageUrl = normalizeFeaturedImageUrl(req.body.featuredImageUrl ?? featuredImage);
 
     if (!htmlContent) {
       return res.status(400).json({
@@ -661,7 +625,8 @@ router.put(
     const responsePayload = {
       primaryKeyword: existing.primaryKeyword,
       htmlContent,
-      featuredImage,
+      featuredImageEnabled,
+      featuredImageUrl,
       title: title || existing.title,
       metaDescription,
       slug,
@@ -728,7 +693,8 @@ router.post(
       draftId,
       primaryKeyword,
       htmlContent,
-      featuredImage,
+      featuredImageEnabled = true,
+      featuredImageUrl,
       title,
       metaDescription,
       slug,
@@ -763,7 +729,8 @@ router.post(
     const responsePayload = {
       primaryKeyword,
       htmlContent,
-      featuredImage,
+      featuredImageEnabled: normalizeFeaturedImageEnabled(featuredImageEnabled, true),
+      featuredImageUrl: normalizeFeaturedImageUrl(featuredImageUrl),
       title,
       metaDescription,
       slug,
@@ -876,21 +843,9 @@ router.get(
       return res.status(404).json({ success: false, error: 'Draft not found' });
     }
 
-    const response = draft.response as any;
-
     res.json({
       success: true,
-      draft: {
-        htmlContent: response.htmlContent || response['Html Content'] || '',
-        title: response.title || response.Title || draft.title,
-        metaDescription: response.metaDescription || response['Meta Description'] || '',
-        slug: response.slug || response.Slug || draft.slug,
-        featuredImage: response.featuredImage || response['Featured Image'] || '',
-        primaryKeyword: draft.primaryKeyword || '',
-        longtailKeywords: response.longtailKeywords || response['longtail keywords'] || '',
-        wordpressUrl: draft.wordpressUrl,
-        status: draft.status // Return status for polling
-      }
+      draft: serializeDraftContent(draft)
     });
   })
 );
