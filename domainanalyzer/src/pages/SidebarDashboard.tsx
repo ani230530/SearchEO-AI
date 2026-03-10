@@ -302,22 +302,6 @@ const sseRef = useRef<EventSource | null>(null);
   const [campaignPageIdContext, setCampaignPageIdContext] = useState<number | null>(null);
   const [currentGenerationTopicId, setCurrentGenerationTopicId] = useState<number | null>(null);
   const notifiedReadyPageIdsRef = useRef<Set<number>>(new Set());
-
-  const getCampaignPageDisplayName = useCallback((pageId?: number, fallback?: string | null) => {
-    if (!pageId) return fallback || 'Your draft';
-
-    for (const topic of campaignStructure.topics) {
-      if (topic.pillarPage?.id === pageId) {
-        return topic.pillarPage.title || fallback || 'Your draft';
-      }
-      const subPage = topic.subPages.find((page) => page.id === pageId);
-      if (subPage) {
-        return subPage.title || fallback || 'Your draft';
-      }
-    }
-
-    return fallback || 'Your draft';
-  }, [campaignStructure.topics]);
 const [improvedContent, setImprovedContent] = useState("");
   const [gscEmail, setGscEmail] = useState<string>("");
   const [gscSelectedProperty, setGscSelectedProperty] = useState<string>("");
@@ -420,6 +404,23 @@ const [selectedTopicId, setSelectedTopicId] = useState<number | null>(null);
 const [campaignStructure, setCampaignStructure] = useState<CampaignStructure>({
   topics: []
 });
+
+  const getCampaignPageDisplayName = useCallback((pageId?: number, fallback?: string | null) => {
+    if (!pageId) return fallback || 'Your draft';
+
+    for (const topic of campaignStructure.topics) {
+      if (topic.pillarPage?.id === pageId) {
+        return topic.pillarPage.title || fallback || 'Your draft';
+      }
+      const subPage = topic.subPages.find((page) => page.id === pageId);
+      if (subPage) {
+        return subPage.title || fallback || 'Your draft';
+      }
+    }
+
+    return fallback || 'Your draft';
+  }, [campaignStructure.topics]);
+
 // For inline editing of campaigns
 const [showEditModal, setShowEditModal] = useState(false);
 const [editingCampaignId, setEditingCampaignId] = useState<number | null>(null);
