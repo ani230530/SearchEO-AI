@@ -4902,6 +4902,7 @@ const allSections = [...leftSections, ...rightSections];
                       draftStatuses={draftStatuses}
                       setDraftStatuses={setDraftStatuses}
                       sharedPublishStatuses={sharedPublishStatuses}
+                      onPublishUpdate={handlePublishUpdate}
                       generationJobs={generationJobs}
                       setGenerationJobs={setGenerationJobs}
                       campaignPageIdContext={campaignPageIdContext}
@@ -5796,6 +5797,13 @@ interface CampaignStructureViewProps {
     error?: string;
     updatedAt?: string;
   }>;
+  onPublishUpdate: (data: {
+    draftId?: number;
+    pageId?: number;
+    status: 'published' | 'failed' | 'generating';
+    publishedUrl?: string;
+    error?: string;
+  }) => void;
   generationJobs: Map<number, GenerationPageStatus>;
   setGenerationJobs: React.Dispatch<React.SetStateAction<Map<number, GenerationPageStatus>>>;
   campaignPageIdContext: number | null;
@@ -5824,6 +5832,7 @@ function CampaignStructureView({
   draftStatuses,
   setDraftStatuses,
   sharedPublishStatuses,
+  onPublishUpdate,
   generationJobs,
   setGenerationJobs,
   campaignPageIdContext,
@@ -6396,7 +6405,7 @@ function CampaignStructureView({
           };
 
           if (data.type === 'publish_update' && data.status) {
-            handlePublishUpdate({
+            onPublishUpdate({
               draftId: data.draftId,
               pageId: data.pageId,
               status: data.status === 'published' || data.status === 'failed' ? data.status : 'generating',
@@ -6514,7 +6523,7 @@ function CampaignStructureView({
         campaignEventSourceRef.current = null;
       }
     };
-  }, [handlePublishUpdate, handleStreamingUpdate, toast]);
+  }, [onPublishUpdate, handleStreamingUpdate, toast]);
 
   // Periodic polling for active generation jobs using the bulk endpoint
   // This serves as a fallback if SSE events are missed or not supported
