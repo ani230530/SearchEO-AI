@@ -494,20 +494,24 @@ const renderKeywords = (
                   This topic doesn't have a pillar page. You need one to structure your content cluster.
                 </p>
               </div>
-              <div className="flex flex-col sm:flex-row gap-3 w-full max-w-sm mx-auto">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-xl mx-auto auto-rows-fr">
                 <button
                   onClick={() => onCreatePillar(topic.id)}
-                  className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2 bg-white border border-gray-300 shadow-sm rounded-full text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                  className="min-h-[132px] inline-flex flex-col items-center justify-center gap-3 px-4 py-4 bg-white border border-gray-300 shadow-sm rounded-[24px] text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
                 >
-                  <Plus className="h-4 w-4" />
+                  <span className="flex h-10 w-10 items-center justify-center rounded-full border border-gray-200 bg-gray-50">
+                    <Plus className="h-4 w-4" />
+                  </span>
                   Manual Create
                 </button>
                 <button
                   onClick={() => onGenerateAiPillar(topic.id)}
                   disabled={aiLoading === `pillar-${topic.id}`}
-                  className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2 bg-black text-white shadow-sm rounded-full text-sm font-medium hover:bg-gray-800 transition-all disabled:opacity-50"
+                  className="min-h-[132px] inline-flex flex-col items-center justify-center gap-3 px-4 py-4 bg-black text-white shadow-sm rounded-[24px] text-sm font-medium hover:bg-gray-800 transition-all disabled:opacity-50"
                 >
-                  {aiLoading === `pillar-${topic.id}` ? <ButtonSpinner /> : <Sparkles className="h-4 w-4" />}
+                  <span className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10">
+                    {aiLoading === `pillar-${topic.id}` ? <ButtonSpinner /> : <Sparkles className="h-4 w-4" />}
+                  </span>
                   Generate with AI
                 </button>
               </div>
@@ -582,10 +586,10 @@ const renderKeywords = (
             ))}
             
             {/* Compact Add Buttons */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 auto-rows-fr">
               <button
                  onClick={() => onAddSubPage(topic.id)}
-                 className="group flex flex-col items-center justify-center p-4 rounded-xl border border-dashed border-gray-200 hover:border-gray-300 hover:bg-gray-50/50 transition-all min-h-[140px]"
+                 className="group flex h-full min-h-[180px] flex-col items-center justify-center rounded-[24px] border border-dashed border-gray-200 p-5 transition-all hover:border-gray-300 hover:bg-gray-50/50"
               >
                  <div className="h-8 w-8 rounded-full bg-gray-50 group-hover:bg-white border border-gray-100 flex items-center justify-center mb-2 transition-colors shadow-sm">
                    <Plus className="h-4 w-4 text-gray-400 group-hover:text-black transition-colors" />
@@ -599,7 +603,7 @@ const renderKeywords = (
                    onGenerateAiSubPage(topic.id);
                  }}
                  disabled={aiLoading === `subpage-${topic.id}`}
-                 className="group flex flex-col items-center justify-center p-4 rounded-xl border border-gray-200 bg-black hover:bg-black/90 transition-all disabled:opacity-50 min-h-[140px]"
+                 className="group flex h-full min-h-[180px] flex-col items-center justify-center rounded-[24px] border border-gray-200 bg-black p-5 transition-all hover:bg-black/90 disabled:opacity-50"
               >
                  <div className="h-8 w-8 rounded-full bg-white/10 group-hover:bg-white/20 flex items-center justify-center mb-2 transition-colors shadow-sm">
                    {aiLoading === `subpage-${topic.id}` ? <ButtonSpinner /> : <Sparkles className="h-4 w-4 text-white" />}

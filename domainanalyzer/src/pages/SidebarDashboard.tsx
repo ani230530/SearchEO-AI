@@ -8140,9 +8140,9 @@ function CampaignStructureView({
                         if(t) handleUpdatePillar(t.pillarPage!.id, { referenceUrl: url });
                      }}
                       onDeletePillar={handleDeletePillarPage}
-                      onCreatePillar={handleCreatePillarPage}
+                      onCreatePillar={(tid) => handleAddPillarPage(tid, false)}
                       onGenerateAiPillar={triggerAiPillar}
-                      onAddSubPage={(tid) => { setTargetTopicId(tid); setShowAddSubPageModal(true); }}
+                      onAddSubPage={(tid) => handleAddSubPage(tid, false)}
                       onGenerateAiSubPage={triggerAiSubPage}
                       onDeleteSubPage={handleDeleteSubPage}
                       onUpdatePageTitle={handleUpdatePageTitle}

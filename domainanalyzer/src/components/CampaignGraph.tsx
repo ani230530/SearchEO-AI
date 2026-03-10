@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import * as d3 from 'd3';
-import { Sparkles } from 'lucide-react';
+import { Sparkles, X } from 'lucide-react';
 
 interface Keyword {
   id: number;
@@ -79,6 +79,7 @@ const CampaignGraph: React.FC<CampaignGraphProps> = ({ campaignStructure, select
   const svgRef = useRef<SVGSVGElement>(null);
   const [dimensions, setDimensions] = useState({ width: 1280, height: 860 });
   const [hoveredNode, setHoveredNode] = useState<GraphNode | null>(null);
+  const [focusedTopicId, setFocusedTopicId] = useState<number | null>(null);
 
   useLayoutEffect(() => {
     const container = containerRef.current;
@@ -205,13 +206,23 @@ const CampaignGraph: React.FC<CampaignGraphProps> = ({ campaignStructure, select
 
     const dedupedNodes = Array.from(new Map(nodes.map((node) => [node.id, node])).values());
 
+    const visibleNodes = focusedTopicId
+      ? dedupedNodes.filter((node) => node.id === 'campaign-root' || node.topicId === focusedTopicId || (node.type === 'topic' && node.topicId === focusedTopicId))
+      : dedupedNodes;
+    const visibleNodeIds = new Set(visibleNodes.map((node) => node.id));
+    const visibleLinks = links.filter((link) => {
+      const sourceId = typeof link.source === 'string' ? link.source : link.source.id;
+      const targetId = typeof link.target === 'string' ? link.target : link.target.id;
+      return visibleNodeIds.has(sourceId) && visibleNodeIds.has(targetId);
+    });
+
     return {
-      nodes: dedupedNodes,
-      links,
+      nodes: visibleNodes,
+      links: visibleLinks,
       topicCount: filteredTopics.length,
       hasRenderableTopics: filteredTopics.length > 0,
     };
-  }, [campaignStructure, selectedTopics]);
+  }, [campaignStructure, selectedTopics, focusedTopicId]);
 
   useEffect(() => {
     if (!svgRef.current) return;
@@ -253,7 +264,7 @@ const CampaignGraph: React.FC<CampaignGraphProps> = ({ campaignStructure, select
       });
 
     svg.call(zoom as any);
-    svg.call(zoom.transform as any, d3.zoomIdentity.translate(width * 0.44, height / 2));
+    svg.on('click', () => setFocusedTopicId(null));
 
     const ringLayer = scene.append('g');
     [180, 330, 500].forEach((radius) => {
@@ -343,7 +354,15 @@ const CampaignGraph: React.FC<CampaignGraphProps> = ({ campaignStructure, select
           }) as any
       )
       .on('mouseenter', (_, node) => setHoveredNode(node))
-      .on('mouseleave', () => setHoveredNode(null));
+      .on('mouseleave', () => setHoveredNode(null))
+      .on('click', (event, node) => {
+        event.stopPropagation();
+        if (!node.topicId) {
+          setFocusedTopicId(null);
+          return;
+        }
+        setFocusedTopicId((prev) => (prev === node.topicId ? null : node.topicId));
+      });
 
     nodeSelection
       .append('circle')
@@ -383,10 +402,53 @@ const CampaignGraph: React.FC<CampaignGraphProps> = ({ campaignStructure, select
       nodeSelection.attr('transform', (node) => `translate(${node.x ?? 0},${node.y ?? 0})`);
     });
 
+    const fitGraphToViewport = (animate = true) => {
+      if (!nodes.length) return;
+
+      const leftPadding = 40;
+      const topPadding = 96;
+      const bottomPadding = 120;
+      const rightHudWidth = 336;
+
+      const minX = d3.min(nodes, (node) => (node.x ?? 0) - NODE_STYLE[node.type].radius) ?? -1;
+      const maxX = d3.max(nodes, (node) => (node.x ?? 0) + NODE_STYLE[node.type].radius) ?? 1;
+      const minY = d3.min(nodes, (node) => (node.y ?? 0) - NODE_STYLE[node.type].radius) ?? -1;
+      const maxY = d3.max(nodes, (node) => (node.y ?? 0) + NODE_STYLE[node.type].radius) ?? 1;
+
+      const graphWidth = Math.max(1, maxX - minX);
+      const graphHeight = Math.max(1, maxY - minY);
+      const availableWidth = Math.max(420, width - leftPadding - rightHudWidth);
+      const availableHeight = Math.max(320, height - topPadding - bottomPadding);
+      const scale = Math.max(0.55, Math.min(1.2, Math.min(availableWidth / graphWidth, availableHeight / graphHeight)));
+
+      const targetCenterX = leftPadding + availableWidth / 2;
+      const targetCenterY = topPadding + availableHeight / 2;
+      const graphCenterX = minX + graphWidth / 2;
+      const graphCenterY = minY + graphHeight / 2;
+      const transform = d3.zoomIdentity
+        .translate(targetCenterX - graphCenterX * scale, targetCenterY - graphCenterY * scale)
+        .scale(scale);
+
+      const selection = animate ? svg.transition().duration(700).ease(d3.easeCubicOut) : svg;
+      selection.call(zoom.transform as any, transform);
+    };
+
+    const fitTimer = window.setTimeout(() => fitGraphToViewport(true), 900);
+    simulation.on('end', () => fitGraphToViewport(true));
+
     return () => {
+      window.clearTimeout(fitTimer);
       simulation.stop();
     };
   }, [dimensions, graphData]);
+
+  const isNodeDimmed = (node: GraphNode) => {
+    if (!focusedTopicId) return false;
+    if (!node.topicId) return false;
+    return node.topicId !== focusedTopicId;
+  };
+
+  const isFocusedTopicActive = focusedTopicId !== null;
 
   const activeNode = hoveredNode;
   const legendItems = ['Topic', 'Pillar Page', 'Sub-page', 'Keyword'].map((label) => {
@@ -413,16 +475,25 @@ const CampaignGraph: React.FC<CampaignGraphProps> = ({ campaignStructure, select
         </div>
       )}
 
-      <div className="pointer-events-none absolute left-6 top-6 flex flex-wrap gap-2">
+      <div className="absolute left-6 top-6 flex flex-wrap gap-2">
         {legendItems.map((item) => (
           <span
             key={item.label}
-            className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white/95 px-3 py-1.5 text-[11px] font-medium text-gray-600 shadow-sm backdrop-blur-sm"
+            className="pointer-events-none inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white/95 px-3 py-1.5 text-[11px] font-medium text-gray-600 shadow-sm backdrop-blur-sm"
           >
             <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: item.color }} />
             {item.label}
           </span>
         ))}
+        {isFocusedTopicActive && (
+          <button
+            onClick={() => setFocusedTopicId(null)}
+            className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white/95 px-3 py-1.5 text-[11px] font-medium text-gray-700 shadow-sm backdrop-blur-sm transition-colors hover:bg-gray-50"
+          >
+            <X className="h-3.5 w-3.5" />
+            Clear focus
+          </button>
+        )}
       </div>
 
       <div className="pointer-events-none absolute right-5 top-5 max-w-[320px] rounded-[22px] border border-gray-200 bg-white/95 p-4 shadow-[0_16px_40px_rgba(15,23,42,0.06)] backdrop-blur-sm">
@@ -438,7 +509,7 @@ const CampaignGraph: React.FC<CampaignGraphProps> = ({ campaignStructure, select
         {activeNode?.meta?.difficulty ? <p className="mt-1 text-sm text-gray-500">Difficulty: {activeNode.meta.difficulty}</p> : null}
         {!activeNode && (
           <p className="mt-2 text-sm leading-6 text-gray-500">
-            Topics sit closest to the center, pages spread outward, and keywords form the outer discovery layer. Drag nodes, pan, or zoom to explore.
+            Topics anchor the map, pages branch outward, and keywords form the outer discovery layer. Click a node to focus that cluster, then drag, pan, or zoom to explore.
           </p>
         )}
       </div>
