@@ -135,6 +135,87 @@ export const CampaignTopicDetail: React.FC<CampaignTopicDetailProps> = ({
       }>;
   }, [generationJobs, streamingEvents, topic.pillarPage, topic.subPages]);
 
+  const pageProgressById = React.useMemo(
+    () => new Map(pageProgressCards.map((card) => [card.id, card])),
+    [pageProgressCards]
+  );
+
+  const renderInlineProgressPanel = (pageId: number) => {
+    const card = pageProgressById.get(pageId);
+    if (!card) return null;
+
+    const tone = getPageTone(card.status);
+    const normalizedProgress =
+      card.status === 'failed'
+        ? Math.max(card.progress || 0, 10)
+        : Math.max(card.progress || 0, card.status === 'completed' || card.status === 'published' ? 100 : 6);
+
+    return (
+      <div className={`mt-5 rounded-[22px] border px-4 py-4 shadow-[0_10px_24px_rgba(15,23,42,0.05)] transition-all duration-300 ${tone.shell}`}>
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              {tone.icon}
+              <p className="text-[10px] uppercase tracking-[0.2em] text-gray-400">Live progress</p>
+            </div>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <span className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${tone.badge}`}>
+                {getPageStatusLabel(card.status)}
+              </span>
+              {card.phase && (
+                <span className="rounded-full border border-gray-200 bg-white/80 px-2.5 py-1 text-[11px] font-medium text-gray-600">
+                  {card.phase}
+                </span>
+              )}
+            </div>
+          </div>
+          <span className="rounded-full bg-white/90 px-2.5 py-1 text-[11px] font-medium text-gray-700 shadow-sm border border-gray-200">
+            {Math.min(100, normalizedProgress)}%
+          </span>
+        </div>
+
+        <div className="mt-4 h-2.5 overflow-hidden rounded-full bg-gray-200/70">
+          <div
+            className={`h-full rounded-full transition-all duration-500 ease-out ${tone.progress} ${card.status === 'generating' ? 'animate-pulse' : ''}`}
+            style={{ width: `${Math.min(100, normalizedProgress)}%` }}
+          />
+        </div>
+
+        <div className="mt-4 rounded-2xl border border-white/80 bg-white/70 px-4 py-3 backdrop-blur-sm">
+          <p className="text-[11px] uppercase tracking-[0.16em] text-gray-400">Latest update</p>
+          <p className="mt-1 text-sm leading-6 text-gray-700">{card.message}</p>
+        </div>
+
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-xs text-gray-500">
+          <span>
+            {card.updatedAt
+              ? `Updated ${new Date(card.updatedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`
+              : card.status === 'generating'
+              ? 'Waiting for the first progress update'
+              : 'No update yet'}
+          </span>
+          <div className="flex items-center gap-2">
+            {card.draftId && (
+              <span className="rounded-full border border-gray-200 bg-white px-2.5 py-1 text-[11px] font-medium text-gray-600">
+                Draft #{card.draftId}
+              </span>
+            )}
+            {card.wordpressUrl && (
+              <a
+                href={card.wordpressUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-medium text-emerald-700 transition-colors hover:bg-emerald-100"
+              >
+                Live page
+              </a>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   const startEditing = (pageId: number, currentTitle: string) => {
     setEditingPageId(pageId);
     setEditingTitle(currentTitle);
@@ -307,105 +388,6 @@ const renderKeywords = (
       </div>
 
       <div className="flex-1 overflow-y-auto space-y-10 pb-24 pr-2">
-        {pageProgressCards.length > 0 && (
-          <section className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-[10px] uppercase tracking-[0.22em] text-gray-400">Live Generation Feed</p>
-                <h3 className="mt-1 text-lg font-medium tracking-tight text-[#1d1d1f]">Page-by-page progress</h3>
-              </div>
-              {isGenerating && (
-                <div className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white/90 px-3 py-1.5 text-xs text-gray-600 shadow-sm">
-                  <span className="relative flex h-2.5 w-2.5">
-                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-black/30"></span>
-                    <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-black"></span>
-                  </span>
-                  Live progress updates
-                </div>
-              )}
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {pageProgressCards.map((card) => {
-                const tone = getPageTone(card.status);
-                const normalizedProgress =
-                  card.status === 'failed' ? Math.max(card.progress || 0, 10) : Math.max(card.progress || 0, card.status === 'completed' || card.status === 'published' ? 100 : 6);
-
-                return (
-                  <div
-                    key={card.id}
-                    className={`rounded-[26px] border p-5 shadow-[0_12px_30px_rgba(15,23,42,0.05)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_18px_40px_rgba(15,23,42,0.08)] ${tone.shell}`}
-                  >
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          {tone.icon}
-                          <p className="text-[10px] uppercase tracking-[0.2em] text-gray-400">
-                            {card.pageType === 'pillar' ? 'Pillar Page' : 'Sub-page'}
-                          </p>
-                        </div>
-                        <h4 className="mt-2 text-sm font-semibold text-gray-900">{card.title}</h4>
-                        <div className="mt-3 flex flex-wrap items-center gap-2">
-                          <span className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${tone.badge}`}>
-                            {getPageStatusLabel(card.status)}
-                          </span>
-                          {card.phase && (
-                            <span className="rounded-full border border-gray-200 bg-white/80 px-2.5 py-1 text-[11px] font-medium text-gray-600">
-                              {card.phase}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      <span className="rounded-full bg-white/90 px-2.5 py-1 text-[11px] font-medium text-gray-700 shadow-sm border border-gray-200">
-                        {Math.min(100, normalizedProgress)}%
-                      </span>
-                    </div>
-
-                    <div className="mt-4 h-2.5 overflow-hidden rounded-full bg-gray-200/70">
-                      <div
-                        className={`h-full rounded-full transition-all duration-500 ease-out ${tone.progress} ${card.status === 'generating' ? 'animate-pulse' : ''}`}
-                        style={{ width: `${Math.min(100, normalizedProgress)}%` }}
-                      />
-                    </div>
-
-                    <div className="mt-4 rounded-2xl border border-white/80 bg-white/70 px-4 py-3 backdrop-blur-sm">
-                      <p className="text-[11px] uppercase tracking-[0.16em] text-gray-400">Latest SSE update</p>
-                      <p className="mt-1 text-sm leading-6 text-gray-700">{card.message}</p>
-                    </div>
-
-                    <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-xs text-gray-500">
-                      <span>
-                        {card.updatedAt
-                          ? `Updated ${new Date(card.updatedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`
-                          : card.status === 'generating'
-                          ? 'Waiting for the first progress update'
-                          : 'No update yet'}
-                      </span>
-                      <div className="flex items-center gap-2">
-                        {card.draftId && (
-                          <span className="rounded-full border border-gray-200 bg-white px-2.5 py-1 text-[11px] font-medium text-gray-600">
-                            Draft #{card.draftId}
-                          </span>
-                        )}
-                        {card.wordpressUrl && (
-                          <a
-                            href={card.wordpressUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-medium text-emerald-700 transition-colors hover:bg-emerald-100"
-                          >
-                            Live page
-                          </a>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </section>
-        )}
-
         {/* Pillar Page Card (Hero) */}
         {topic.pillarPage ? (
           <section>
@@ -488,6 +470,7 @@ const renderKeywords = (
                  </button>
                </div>
                
+               {renderInlineProgressPanel(topic.pillarPage.id)}
                {renderKeywords(topic.pillarPage.keywords || [], 'pillar', topic.pillarPage.id)}
             </div>
           </section>
@@ -596,6 +579,7 @@ const renderKeywords = (
                             <Trash2 className="h-3.5 w-3.5" />
                         </button>
                     </div>
+                    {renderInlineProgressPanel(subPage.id)}
                     {renderKeywords(subPage.keywords || [], 'subpage', subPage.id)}
                 </div>
             ))}
