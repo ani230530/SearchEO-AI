@@ -586,15 +586,15 @@ const renderKeywords = (
             ))}
             
             {/* Compact Add Buttons */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 auto-rows-fr">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <button
                  onClick={() => onAddSubPage(topic.id)}
-                 className="group flex h-full min-h-[180px] flex-col items-center justify-center rounded-[24px] border border-dashed border-gray-200 p-5 transition-all hover:border-gray-300 hover:bg-gray-50/50"
+                 className="group inline-flex min-h-[112px] items-center justify-center gap-3 rounded-[20px] border border-dashed border-gray-200 px-5 py-4 transition-all hover:border-gray-300 hover:bg-gray-50/50"
               >
-                 <div className="h-8 w-8 rounded-full bg-gray-50 group-hover:bg-white border border-gray-100 flex items-center justify-center mb-2 transition-colors shadow-sm">
+                 <div className="flex h-9 w-9 items-center justify-center rounded-full border border-gray-100 bg-gray-50 transition-colors shadow-sm group-hover:bg-white">
                    <Plus className="h-4 w-4 text-gray-400 group-hover:text-black transition-colors" />
                  </div>
-                 <span className="text-xs font-semibold text-gray-500 group-hover:text-gray-900 transition-colors">Add Manually</span>
+                 <span className="text-sm font-medium text-gray-600 transition-colors group-hover:text-gray-900">Add Manually</span>
               </button>
 
               <button
@@ -603,12 +603,12 @@ const renderKeywords = (
                    onGenerateAiSubPage(topic.id);
                  }}
                  disabled={aiLoading === `subpage-${topic.id}`}
-                 className="group flex h-full min-h-[180px] flex-col items-center justify-center rounded-[24px] border border-gray-200 bg-black p-5 transition-all hover:bg-black/90 disabled:opacity-50"
+                 className="group inline-flex min-h-[112px] items-center justify-center gap-3 rounded-[20px] border border-gray-200 bg-black px-5 py-4 transition-all hover:bg-black/90 disabled:opacity-50"
               >
-                 <div className="h-8 w-8 rounded-full bg-white/10 group-hover:bg-white/20 flex items-center justify-center mb-2 transition-colors shadow-sm">
+                 <div className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 transition-colors shadow-sm group-hover:bg-white/20">
                    {aiLoading === `subpage-${topic.id}` ? <ButtonSpinner /> : <Sparkles className="h-4 w-4 text-white" />}
                  </div>
-                 <span className="text-xs font-semibold text-white transition-colors">Generate with AI</span>
+                 <span className="text-sm font-medium text-white transition-colors">Generate with AI</span>
               </button>
             </div>
           </div>

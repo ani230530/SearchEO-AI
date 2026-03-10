@@ -8075,40 +8075,42 @@ function CampaignStructureView({
     <>
     <div className="flex h-[calc(100vh-4rem)] w-full bg-white overflow-hidden">
       {/* 2. Secondary Sidebar: Topic List */}
-      <div 
-        className={`w-[280px] border-r border-[#0000001a] flex-shrink-0 transition-all duration-300 ${viewMode === 'graph' ? 'w-0 opacity-0 overflow-hidden border-none' : ''}`}
-        style={{
-          background: 'rgba(255, 255, 255, 0.72)',
-          backdropFilter: 'saturate(180%) blur(20px)',
-          WebkitBackdropFilter: 'saturate(180%) blur(20px)',
-        }}
-      >
-        <div className="h-full flex flex-col">
-          {/* Header */}
-          <div className="h-16 flex items-center px-5 border-b border-[#0000001a] flex-shrink-0 z-10">
-             <button
-                onClick={onBack}
-                className="mr-3 p-1.5 hover:bg-gray-100 rounded-full text-gray-400 hover:text-gray-600 transition-colors"
-             >
-               <ArrowLeft className="h-4 w-4" />
-             </button>
-             <h1 className="font-medium text-gray-900 truncate text-sm" title={campaign.title}>
-               {campaign.title}
-             </h1>
-          </div>
+      {viewMode !== 'graph' && (
+        <div 
+          className="w-[280px] border-r border-[#0000001a] flex-shrink-0"
+          style={{
+            background: 'rgba(255, 255, 255, 0.72)',
+            backdropFilter: 'saturate(180%) blur(20px)',
+            WebkitBackdropFilter: 'saturate(180%) blur(20px)',
+          }}
+        >
+          <div className="h-full flex flex-col">
+            {/* Header */}
+            <div className="h-16 flex items-center px-5 border-b border-[#0000001a] flex-shrink-0 z-10">
+               <button
+                  onClick={onBack}
+                  className="mr-3 p-1.5 hover:bg-gray-100 rounded-full text-gray-400 hover:text-gray-600 transition-colors"
+               >
+                 <ArrowLeft className="h-4 w-4" />
+               </button>
+               <h1 className="font-medium text-gray-900 truncate text-sm" title={campaign.title}>
+                 {campaign.title}
+               </h1>
+            </div>
 
-          <CampaignTopicSidebar
-            topics={campaignStructure.topics}
-            selectedTopicId={selectedTopicId}
-            onSelectTopic={setSelectedTopicId}
-            onAddTopic={(isAi) => isAi ? handleAddTopic(true) : handleAddTopic(false)}
-            onDeleteTopic={handleDeleteTopic}
-            aiLoading={aiLoading}
-            syncing={syncing}
-            isTopicGenerating={isTopicGenerating}
-          />
+            <CampaignTopicSidebar
+              topics={campaignStructure.topics}
+              selectedTopicId={selectedTopicId}
+              onSelectTopic={setSelectedTopicId}
+              onAddTopic={(isAi) => isAi ? handleAddTopic(true) : handleAddTopic(false)}
+              onDeleteTopic={handleDeleteTopic}
+              aiLoading={aiLoading}
+              syncing={syncing}
+              isTopicGenerating={isTopicGenerating}
+            />
+          </div>
         </div>
-      </div>
+      )}
 
       {/* 3. Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0 bg-gray-50/50 relative">

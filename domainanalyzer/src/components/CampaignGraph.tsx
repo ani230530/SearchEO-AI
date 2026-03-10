@@ -405,10 +405,10 @@ const CampaignGraph: React.FC<CampaignGraphProps> = ({ campaignStructure, select
     const fitGraphToViewport = (animate = true) => {
       if (!nodes.length) return;
 
-      const leftPadding = 40;
-      const topPadding = 96;
-      const bottomPadding = 120;
-      const rightHudWidth = 336;
+      const leftPadding = 12;
+      const rightPadding = 12;
+      const topPadding = 88;
+      const bottomPadding = 104;
 
       const minX = d3.min(nodes, (node) => (node.x ?? 0) - NODE_STYLE[node.type].radius) ?? -1;
       const maxX = d3.max(nodes, (node) => (node.x ?? 0) + NODE_STYLE[node.type].radius) ?? 1;
@@ -417,9 +417,9 @@ const CampaignGraph: React.FC<CampaignGraphProps> = ({ campaignStructure, select
 
       const graphWidth = Math.max(1, maxX - minX);
       const graphHeight = Math.max(1, maxY - minY);
-      const availableWidth = Math.max(420, width - leftPadding - rightHudWidth);
+      const availableWidth = Math.max(640, width - leftPadding - rightPadding);
       const availableHeight = Math.max(320, height - topPadding - bottomPadding);
-      const scale = Math.max(0.55, Math.min(1.2, Math.min(availableWidth / graphWidth, availableHeight / graphHeight)));
+      const scale = Math.max(0.9, Math.min(1.75, Math.min(availableWidth / graphWidth, availableHeight / graphHeight)));
 
       const targetCenterX = leftPadding + availableWidth / 2;
       const targetCenterY = topPadding + availableHeight / 2;
@@ -496,7 +496,7 @@ const CampaignGraph: React.FC<CampaignGraphProps> = ({ campaignStructure, select
         )}
       </div>
 
-      <div className="pointer-events-none absolute right-5 top-5 max-w-[320px] rounded-[22px] border border-gray-200 bg-white/95 p-4 shadow-[0_16px_40px_rgba(15,23,42,0.06)] backdrop-blur-sm">
+      <div className="pointer-events-none absolute right-5 top-5 max-w-[280px] rounded-[22px] border border-gray-200 bg-white/92 p-4 shadow-[0_16px_40px_rgba(15,23,42,0.06)] backdrop-blur-sm">
         <p className="text-[10px] uppercase tracking-[0.18em] text-gray-400">
           {activeNode ? NODE_STYLE[activeNode.type].label : 'Campaign Map'}
         </p>
