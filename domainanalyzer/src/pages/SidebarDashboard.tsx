@@ -4937,6 +4937,7 @@ const allSections = [...leftSections, ...rightSections];
                       setDraftStatuses={setDraftStatuses}
                       sharedPublishStatuses={sharedPublishStatuses}
                       onPublishUpdate={handlePublishUpdate}
+                      getCampaignPageDisplayName={getCampaignPageDisplayName}
                       generationJobs={generationJobs}
                       setGenerationJobs={setGenerationJobs}
                       campaignPageIdContext={campaignPageIdContext}
@@ -5838,6 +5839,7 @@ interface CampaignStructureViewProps {
     publishedUrl?: string;
     error?: string;
   }) => void;
+  getCampaignPageDisplayName: (pageId?: number, fallback?: string | null) => string;
   generationJobs: Map<number, GenerationPageStatus>;
   setGenerationJobs: React.Dispatch<React.SetStateAction<Map<number, GenerationPageStatus>>>;
   campaignPageIdContext: number | null;
@@ -5867,6 +5869,7 @@ function CampaignStructureView({
   setDraftStatuses,
   sharedPublishStatuses,
   onPublishUpdate,
+  getCampaignPageDisplayName,
   generationJobs,
   setGenerationJobs,
   campaignPageIdContext,
