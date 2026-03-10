@@ -151,42 +151,40 @@ export const CampaignTopicDetail: React.FC<CampaignTopicDetailProps> = ({
         : Math.max(card.progress || 0, card.status === 'completed' || card.status === 'published' ? 100 : 6);
 
     return (
-      <div className={`mt-5 rounded-[22px] border px-4 py-4 shadow-[0_10px_24px_rgba(15,23,42,0.05)] transition-all duration-300 ${tone.shell}`}>
-        <div className="flex items-start justify-between gap-4">
+      <div className={`mt-4 rounded-[18px] border px-3.5 py-3 shadow-[0_6px_18px_rgba(15,23,42,0.04)] transition-all duration-300 ${tone.shell}`}>
+        <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
             <div className="flex items-center gap-2">
               {tone.icon}
-              <p className="text-[10px] uppercase tracking-[0.2em] text-gray-400">Live progress</p>
-            </div>
-            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <p className="text-[10px] uppercase tracking-[0.16em] text-gray-400">Progress</p>
               <span className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${tone.badge}`}>
                 {getPageStatusLabel(card.status)}
               </span>
               {card.phase && (
-                <span className="rounded-full border border-gray-200 bg-white/80 px-2.5 py-1 text-[11px] font-medium text-gray-600">
+                <span className="rounded-full border border-gray-200 bg-white/80 px-2 py-0.5 text-[10px] font-medium text-gray-600">
                   {card.phase}
                 </span>
               )}
             </div>
           </div>
-          <span className="rounded-full bg-white/90 px-2.5 py-1 text-[11px] font-medium text-gray-700 shadow-sm border border-gray-200">
+          <span className="rounded-full bg-white/90 px-2 py-0.5 text-[10px] font-medium text-gray-700 shadow-sm border border-gray-200">
             {Math.min(100, normalizedProgress)}%
           </span>
         </div>
 
-        <div className="mt-4 h-2.5 overflow-hidden rounded-full bg-gray-200/70">
+        <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-gray-200/70">
           <div
             className={`h-full rounded-full transition-all duration-500 ease-out ${tone.progress} ${card.status === 'generating' ? 'animate-pulse' : ''}`}
             style={{ width: `${Math.min(100, normalizedProgress)}%` }}
           />
         </div>
 
-        <div className="mt-4 rounded-2xl border border-white/80 bg-white/70 px-4 py-3 backdrop-blur-sm">
-          <p className="text-[11px] uppercase tracking-[0.16em] text-gray-400">Latest update</p>
-          <p className="mt-1 text-sm leading-6 text-gray-700">{card.message}</p>
+        <div className="mt-3 flex items-start gap-2">
+          <div className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-gray-300" />
+          <p className="min-w-0 text-[12px] leading-5 text-gray-600">{card.message}</p>
         </div>
 
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-xs text-gray-500">
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-[11px] text-gray-500">
           <span>
             {card.updatedAt
               ? `Updated ${new Date(card.updatedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`
@@ -196,7 +194,7 @@ export const CampaignTopicDetail: React.FC<CampaignTopicDetailProps> = ({
           </span>
           <div className="flex items-center gap-2">
             {card.draftId && (
-              <span className="rounded-full border border-gray-200 bg-white px-2.5 py-1 text-[11px] font-medium text-gray-600">
+              <span className="rounded-full border border-gray-200 bg-white px-2 py-0.5 text-[10px] font-medium text-gray-600">
                 Draft #{card.draftId}
               </span>
             )}
@@ -205,7 +203,7 @@ export const CampaignTopicDetail: React.FC<CampaignTopicDetailProps> = ({
                 href={card.wordpressUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-medium text-emerald-700 transition-colors hover:bg-emerald-100"
+                className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-700 transition-colors hover:bg-emerald-100"
               >
                 Live page
               </a>
