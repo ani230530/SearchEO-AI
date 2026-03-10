@@ -2,7 +2,6 @@ import React from 'react';
 import { Topic, GenerationPageStatus, GenerationStreamingEvent } from '../../types';
 import { Target, FileText, Sparkles, Plus, Trash2, Search, Zap, Pencil, Check, X, AlertCircle, CheckCircle2, LoaderCircle } from 'lucide-react';
 import { ButtonSpinner } from '@/components/ui/button-spinner';
-import { StreamingOverlay } from './StreamingOverlay';
 import { useState } from 'react';
 
 interface CampaignTopicDetailProps {
@@ -56,25 +55,25 @@ export const CampaignTopicDetail: React.FC<CampaignTopicDetailProps> = ({
   const getPageTone = (status: string) => {
     if (status === 'failed') {
       return {
-        shell: 'border-red-200 bg-[linear-gradient(180deg,#fff8f8_0%,#ffffff_100%)]',
-        badge: 'bg-red-50 text-red-700 border border-red-200',
-        progress: 'bg-red-500',
-        icon: <AlertCircle className="h-4 w-4 text-red-500" />,
+        shell: 'border-gray-200 bg-white',
+        badge: 'bg-white text-gray-700 border border-gray-200',
+        progress: 'bg-gray-700',
+        icon: <AlertCircle className="h-3.5 w-3.5 text-gray-500" />,
       };
     }
     if (status === 'completed' || status === 'published') {
       return {
-        shell: 'border-emerald-200 bg-[linear-gradient(180deg,#f7fffb_0%,#ffffff_100%)]',
-        badge: 'bg-emerald-50 text-emerald-700 border border-emerald-200',
-        progress: 'bg-emerald-500',
-        icon: <CheckCircle2 className="h-4 w-4 text-emerald-500" />,
+        shell: 'border-gray-200 bg-white',
+        badge: 'bg-white text-gray-700 border border-gray-200',
+        progress: 'bg-gray-900',
+        icon: <CheckCircle2 className="h-3.5 w-3.5 text-gray-700" />,
       };
     }
     return {
-      shell: 'border-gray-200 bg-[linear-gradient(180deg,#fbfbfb_0%,#ffffff_100%)]',
-      badge: 'bg-black text-white border border-black/90',
+      shell: 'border-gray-200 bg-white',
+      badge: 'bg-white text-gray-700 border border-gray-200',
       progress: 'bg-black',
-      icon: <LoaderCircle className="h-4 w-4 text-black animate-spin" />,
+      icon: <LoaderCircle className="h-3.5 w-3.5 text-gray-700 animate-spin" />,
     };
   };
 
@@ -151,40 +150,40 @@ export const CampaignTopicDetail: React.FC<CampaignTopicDetailProps> = ({
         : Math.max(card.progress || 0, card.status === 'completed' || card.status === 'published' ? 100 : 6);
 
     return (
-      <div className={`mt-4 rounded-[18px] border px-3.5 py-3 shadow-[0_6px_18px_rgba(15,23,42,0.04)] transition-all duration-300 ${tone.shell}`}>
+      <div className={`mt-4 rounded-[16px] border px-3 py-2.5 shadow-[0_4px_14px_rgba(15,23,42,0.03)] transition-all duration-300 ${tone.shell}`}>
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
             <div className="flex items-center gap-2">
               {tone.icon}
-              <p className="text-[10px] uppercase tracking-[0.16em] text-gray-400">Progress</p>
-              <span className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${tone.badge}`}>
+              <p className="text-[10px] uppercase tracking-[0.14em] text-gray-400">Progress</p>
+              <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${tone.badge}`}>
                 {getPageStatusLabel(card.status)}
               </span>
               {card.phase && (
-                <span className="rounded-full border border-gray-200 bg-white/80 px-2 py-0.5 text-[10px] font-medium text-gray-600">
+                <span className="rounded-full border border-gray-200 bg-white px-2 py-0.5 text-[10px] font-medium text-gray-500">
                   {card.phase}
                 </span>
               )}
             </div>
           </div>
-          <span className="rounded-full bg-white/90 px-2 py-0.5 text-[10px] font-medium text-gray-700 shadow-sm border border-gray-200">
+          <span className="rounded-full border border-gray-200 bg-white px-2 py-0.5 text-[10px] font-medium text-gray-500">
             {Math.min(100, normalizedProgress)}%
           </span>
         </div>
 
-        <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-gray-200/70">
+        <div className="mt-2.5 h-1 overflow-hidden rounded-full bg-gray-200">
           <div
             className={`h-full rounded-full transition-all duration-500 ease-out ${tone.progress} ${card.status === 'generating' ? 'animate-pulse' : ''}`}
             style={{ width: `${Math.min(100, normalizedProgress)}%` }}
           />
         </div>
 
-        <div className="mt-3 flex items-start gap-2">
-          <div className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-gray-300" />
-          <p className="min-w-0 text-[12px] leading-5 text-gray-600">{card.message}</p>
+        <div className="mt-2.5 flex items-start gap-2">
+          <div className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-gray-300" />
+          <p className="min-w-0 text-[12px] leading-5 text-gray-500">{card.message}</p>
         </div>
 
-        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-[11px] text-gray-500">
+        <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2 text-[10px] text-gray-400">
           <span>
             {card.updatedAt
               ? `Updated ${new Date(card.updatedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`
@@ -194,7 +193,7 @@ export const CampaignTopicDetail: React.FC<CampaignTopicDetailProps> = ({
           </span>
           <div className="flex items-center gap-2">
             {card.draftId && (
-              <span className="rounded-full border border-gray-200 bg-white px-2 py-0.5 text-[10px] font-medium text-gray-600">
+              <span className="rounded-full border border-gray-200 bg-white px-2 py-0.5 text-[10px] font-medium text-gray-500">
                 Draft #{card.draftId}
               </span>
             )}
@@ -203,7 +202,7 @@ export const CampaignTopicDetail: React.FC<CampaignTopicDetailProps> = ({
                 href={card.wordpressUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-700 transition-colors hover:bg-emerald-100"
+                className="rounded-full border border-gray-200 bg-white px-2 py-0.5 text-[10px] font-medium text-gray-600 transition-colors hover:bg-gray-50"
               >
                 Live page
               </a>
@@ -356,8 +355,6 @@ const renderKeywords = (
 
   return (
     <div className="relative h-full flex flex-col min-w-0">
-      <StreamingOverlay isVisible={isGenerating} events={streamingEvents} />
-
       {/* Modern Header */}
       <div className="flex items-center justify-between mb-8 pb-6 border-b border-gray-100">
         <div>
