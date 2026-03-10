@@ -7439,6 +7439,11 @@ function CampaignStructureView({
   const renderStatusPill = (pageId?: number) => {
     if (!pageId) return null;
     const job = generationJobs.get(pageId);
+    const draftStatus = draftStatuses.get(pageId);
+    const resolvedPublishedUrl =
+      draftStatus?.publishedUrl ||
+      (job?.status === 'published' ? job.wordpressUrl || undefined : undefined);
+    const resolvedDraftId = draftStatus?.draftId || job?.draftId;
 
     // Check if currently publishing (waiting for SSE confirmation)
     if (publishingPageIds.has(pageId)) {
@@ -7467,14 +7472,12 @@ function CampaignStructureView({
       );
     }
 
-    const draftStatus = draftStatuses.get(pageId);
-    
     // 3. Published State
-    if (draftStatus?.isPublished && draftStatus.publishedUrl) {
+    if ((draftStatus?.isPublished || job?.status === 'published') && resolvedPublishedUrl) {
          return (
             <div className="flex items-center gap-1.5">
                <button 
-                 onClick={() => viewDraft(draftStatus.draftId!, pageId)}
+                 onClick={() => viewDraft(resolvedDraftId!, pageId)}
                  className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors"
                >
                   <Pencil className="h-3 w-3" />
@@ -7484,7 +7487,7 @@ function CampaignStructureView({
                  Published
                </span>
                <a 
-                 href={draftStatus.publishedUrl} 
+                 href={resolvedPublishedUrl} 
                  target="_blank" 
                  rel="noopener noreferrer"
                  className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors"

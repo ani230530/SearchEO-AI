@@ -167,9 +167,12 @@ export const CampaignTableView: React.FC<CampaignTableViewProps> = ({
     const updatedAt = draftStatus?.isPublished ? jobStatus?.updatedAt ?? null : jobStatus?.updatedAt ?? null;
     const lastUpdatedAt = updatedAt ? new Date(updatedAt).getTime() : null;
     const isDelayed = (jobStatus?.status === 'generating' || jobStatus?.status === 'pending') && lastUpdatedAt !== null && now - lastUpdatedAt >= 7 * 60 * 1000;
-    const liveUrl = draftStatus?.isPublished ? draftStatus.publishedUrl || jobStatus?.wordpressUrl || row.liveUrl || null : null;
+    const liveUrl =
+      draftStatus?.publishedUrl ||
+      (jobStatus?.status === 'published' ? jobStatus.wordpressUrl || null : null) ||
+      (row.publishStatus === 'published' ? row.liveUrl || null : null);
 
-    if (draftStatus?.isPublished || row.publishStatus === 'published') {
+    if ((draftStatus?.isPublished || jobStatus?.status === 'published' || row.publishStatus === 'published') && liveUrl) {
       return {
         key: 'published',
         label: 'Published',

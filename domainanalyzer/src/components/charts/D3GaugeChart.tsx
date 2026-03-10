@@ -40,8 +40,8 @@ const D3GaugeChart: React.FC<D3GaugeChartProps> = ({
 
     const radius = size * 0.4;
     const thickness = radius * 0.25;
-    const startAngle = -Math.PI / 2 - Math.PI / 3;
-    const endAngle = Math.PI / 2 + Math.PI / 3;
+    const startAngle = -Math.PI / 2 - Math.PI / 6;
+    const endAngle = Math.PI / 2 + Math.PI / 6;
     const angleRange = endAngle - startAngle;
 
     // Create arc generator
@@ -117,8 +117,8 @@ const D3GaugeChart: React.FC<D3GaugeChartProps> = ({
 
     // Animate needle rotation
     if (animate) {
-      const startRotation = (startAngle * 180) / Math.PI + 90;
-      const endRotation = (valueAngle * 180) / Math.PI + 90;
+      const startRotation = (startAngle * 180) / Math.PI;
+      const endRotation = (valueAngle * 180) / Math.PI;
 
       needleGroup
         .attr('transform', `rotate(${startRotation})`)
@@ -127,7 +127,7 @@ const D3GaugeChart: React.FC<D3GaugeChartProps> = ({
         .ease(d3.easeQuadOut)
         .attr('transform', `rotate(${endRotation})`);
     } else {
-      const rotation = (valueAngle * 180) / Math.PI + 90;
+      const rotation = (valueAngle * 180) / Math.PI;
       needleGroup.attr('transform', `rotate(${rotation})`);
     }
 
