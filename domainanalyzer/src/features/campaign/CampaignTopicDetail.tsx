@@ -51,6 +51,17 @@ export const CampaignTopicDetail: React.FC<CampaignTopicDetailProps> = ({
 }) => {
   const [editingPageId, setEditingPageId] = useState<number | null>(null);
   const [editingTitle, setEditingTitle] = useState("");
+  const [now, setNow] = useState(() => Date.now());
+
+  React.useEffect(() => {
+    if (!isGenerating) return;
+
+    const intervalId = window.setInterval(() => {
+      setNow(Date.now());
+    }, 60000);
+
+    return () => window.clearInterval(intervalId);
+  }, [isGenerating]);
 
   const getPageTone = (status: string) => {
     if (status === 'failed') {
@@ -144,10 +155,15 @@ export const CampaignTopicDetail: React.FC<CampaignTopicDetailProps> = ({
     if (!card) return null;
 
     const tone = getPageTone(card.status);
+    const lastUpdatedAt = card.updatedAt ? new Date(card.updatedAt).getTime() : null;
+    const isDelayed = card.status === 'generating' && lastUpdatedAt !== null && now - lastUpdatedAt >= 7 * 60 * 1000;
     const normalizedProgress =
       card.status === 'failed'
         ? Math.max(card.progress || 0, 10)
         : Math.max(card.progress || 0, card.status === 'completed' || card.status === 'published' ? 100 : 6);
+    const visibleMessage = isDelayed
+      ? 'Still working. Updates are taking longer than usual.'
+      : card.message;
 
     return (
       <div className={`mt-4 rounded-[16px] border px-3 py-2.5 shadow-[0_4px_14px_rgba(15,23,42,0.03)] transition-all duration-300 ${tone.shell}`}>
@@ -159,6 +175,11 @@ export const CampaignTopicDetail: React.FC<CampaignTopicDetailProps> = ({
               <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${tone.badge}`}>
                 {getPageStatusLabel(card.status)}
               </span>
+              {isDelayed && (
+                <span className="rounded-full border border-gray-200 bg-white px-2 py-0.5 text-[10px] font-medium text-gray-500">
+                  Delayed
+                </span>
+              )}
               {card.phase && (
                 <span className="rounded-full border border-gray-200 bg-white px-2 py-0.5 text-[10px] font-medium text-gray-500">
                   {card.phase}
@@ -180,7 +201,7 @@ export const CampaignTopicDetail: React.FC<CampaignTopicDetailProps> = ({
 
         <div className="mt-2.5 flex items-start gap-2">
           <div className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-gray-300" />
-          <p className="min-w-0 text-[12px] leading-5 text-gray-500">{card.message}</p>
+          <p className="min-w-0 text-[12px] leading-5 text-gray-500">{visibleMessage}</p>
         </div>
 
         <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2 text-[10px] text-gray-400">
