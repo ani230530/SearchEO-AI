@@ -54,16 +54,28 @@ const worker = new Worker(
             console.log('[Queue] Payload:', JSON.stringify(maskSecrets(payload), null, 2));
 
             if (job.name === JOB_TYPES.CAMPAIGN_GENERATION) {
-                const kickoffResponse = await axios.post(url, payload, {
-                    headers,
-                    timeout: Math.min(timeout || 30000, 30000),
-                });
+                try {
+                    const kickoffResponse = await axios.post(url, payload, {
+                        headers,
+                        timeout: Math.min(timeout || 30000, 30000),
+                    });
 
-                console.log(`[Queue] Campaign kickoff ${job.id} accepted. Status: ${kickoffResponse.status}`);
-                return {
-                    accepted: true,
-                    status: kickoffResponse.status,
-                };
+                    console.log(`[Queue] Campaign kickoff ${job.id} accepted. Status: ${kickoffResponse.status}`);
+                    return {
+                        accepted: true,
+                        status: kickoffResponse.status,
+                    };
+                } catch (error: any) {
+                    const isTimeout = axios.isAxiosError(error) && (error.code === 'ECONNABORTED' || error.message?.includes('timeout'));
+                    if (isTimeout) {
+                        console.warn(`[Queue] Campaign kickoff ${job.id} timed out waiting for HTTP response; keeping job active because completion is callback-driven.`);
+                        return {
+                            accepted: true,
+                            status: 'timeout_waiting_for_ack',
+                        };
+                    }
+                    throw error;
+                }
             }
 
             // Perform the actual n8n call

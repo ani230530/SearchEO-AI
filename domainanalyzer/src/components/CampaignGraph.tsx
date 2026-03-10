@@ -253,7 +253,7 @@ const CampaignGraph: React.FC<CampaignGraphProps> = ({ campaignStructure, select
       });
 
     svg.call(zoom as any);
-    svg.call(zoom.transform as any, d3.zoomIdentity.translate(width / 2, height / 2));
+    svg.call(zoom.transform as any, d3.zoomIdentity.translate(width * 0.44, height / 2));
 
     const ringLayer = scene.append('g');
     [180, 330, 500].forEach((radius) => {
@@ -425,7 +425,7 @@ const CampaignGraph: React.FC<CampaignGraphProps> = ({ campaignStructure, select
         ))}
       </div>
 
-      <div className="pointer-events-none absolute right-6 top-6 max-w-sm rounded-[24px] border border-gray-200 bg-white/95 p-5 shadow-[0_18px_50px_rgba(15,23,42,0.08)] backdrop-blur-sm">
+      <div className="pointer-events-none absolute right-5 top-5 max-w-[320px] rounded-[22px] border border-gray-200 bg-white/95 p-4 shadow-[0_16px_40px_rgba(15,23,42,0.06)] backdrop-blur-sm">
         <p className="text-[10px] uppercase tracking-[0.18em] text-gray-400">
           {activeNode ? NODE_STYLE[activeNode.type].label : 'Campaign Map'}
         </p>
@@ -443,11 +443,11 @@ const CampaignGraph: React.FC<CampaignGraphProps> = ({ campaignStructure, select
         )}
       </div>
 
-      <div className="pointer-events-none absolute bottom-6 left-1/2 -translate-x-1/2 rounded-full border border-gray-200 bg-white/95 px-4 py-2 text-[11px] font-medium text-gray-500 shadow-sm backdrop-blur-sm">
+      <div className="pointer-events-none absolute bottom-5 left-1/2 -translate-x-1/2 rounded-full border border-gray-200 bg-white/95 px-4 py-2 text-[11px] font-medium text-gray-500 shadow-sm backdrop-blur-sm">
         Drag nodes • Scroll to zoom • Drag canvas to pan
       </div>
 
-      <div className="pointer-events-none absolute bottom-6 right-6 rounded-[22px] border border-gray-200 bg-white/95 px-4 py-3 text-right shadow-sm backdrop-blur-sm">
+      <div className="pointer-events-none absolute bottom-5 right-5 rounded-[20px] border border-gray-200 bg-white/95 px-4 py-3 text-right shadow-sm backdrop-blur-sm">
         <p className="text-[10px] uppercase tracking-[0.16em] text-gray-400">Overview</p>
         <p className="mt-1 text-sm text-gray-700">{graphData.topicCount} topic{graphData.topicCount === 1 ? '' : 's'} in view</p>
       </div>

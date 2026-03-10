@@ -157,6 +157,7 @@ export const CampaignTopicDetail: React.FC<CampaignTopicDetailProps> = ({
     const tone = getPageTone(card.status);
     const lastUpdatedAt = card.updatedAt ? new Date(card.updatedAt).getTime() : null;
     const isDelayed = card.status === 'generating' && lastUpdatedAt !== null && now - lastUpdatedAt >= 7 * 60 * 1000;
+    const showProgressBar = card.status === 'generating' || card.status === 'pending';
     const normalizedProgress =
       card.status === 'failed'
         ? Math.max(card.progress || 0, 10)
@@ -192,12 +193,14 @@ export const CampaignTopicDetail: React.FC<CampaignTopicDetailProps> = ({
           </span>
         </div>
 
-        <div className="mt-2.5 h-1 overflow-hidden rounded-full bg-gray-200">
-          <div
-            className={`h-full rounded-full transition-all duration-500 ease-out ${tone.progress} ${card.status === 'generating' ? 'animate-pulse' : ''}`}
-            style={{ width: `${Math.min(100, normalizedProgress)}%` }}
-          />
-        </div>
+        {showProgressBar && (
+          <div className="mt-2.5 h-1 overflow-hidden rounded-full bg-gray-200">
+            <div
+              className={`h-full rounded-full transition-all duration-500 ease-out ${tone.progress} ${card.status === 'generating' ? 'animate-pulse' : ''}`}
+              style={{ width: `${Math.min(100, normalizedProgress)}%` }}
+            />
+          </div>
+        )}
 
         <div className="mt-2.5 flex items-start gap-2">
           <div className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-gray-300" />
