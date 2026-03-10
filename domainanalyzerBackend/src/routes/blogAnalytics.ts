@@ -31,6 +31,30 @@ const extractDomain = (url: string): string => {
     }
 };
 
+const normalizePageUrl = (url: string | null | undefined): string | null => {
+    if (!url) return null;
+
+    try {
+        let normalizedUrl = url.trim();
+        if (!/^https?:\/\//i.test(normalizedUrl)) {
+            normalizedUrl = `https://${normalizedUrl}`;
+        }
+
+        const urlObj = new URL(normalizedUrl);
+        const normalizedPath = urlObj.pathname.replace(/\/+$/, '') || '/';
+        const normalizedHost = urlObj.hostname.replace(/^www\./, '').toLowerCase();
+        return `${normalizedHost}${normalizedPath}`.toLowerCase();
+    } catch (error) {
+        return url
+            .trim()
+            .replace(/^https?:\/\//i, '')
+            .replace(/^www\./i, '')
+            .replace(/[?#].*$/, '')
+            .replace(/\/+$/, '')
+            .toLowerCase();
+    }
+};
+
 /**
  * Helper: Calculate date range for GSC queries
  */
@@ -289,18 +313,6 @@ router.get('/aggregate', authenticateToken, asyncHandler(async (req: Request, re
         }
     });
 
-    if (publishedBlogs.length === 0) {
-        return res.json({
-            success: true,
-            totalClicks: 0,
-            totalImpressions: 0,
-            avgCTR: 0,
-            avgPosition: 0,
-            blogs: [],
-            dateRange: calculateDateRange(28)
-        });
-    }
-
     const { days } = req.query;
     const daysNum = days ? parseInt(days as string, 10) : 28;
     const dateRange = calculateDateRange(daysNum);
@@ -328,32 +340,42 @@ router.get('/aggregate', authenticateToken, asyncHandler(async (req: Request, re
 
         const rows = response.data.rows || [];
 
-        // Filter to only include our published blogs
-        const publishedUrls = new Set(publishedBlogs.map(b => b.wordpressUrl));
-        const filteredRows = rows.filter((row: any) => publishedUrls.has(row.keys[0]));
+        // Filter to only include our published blogs using canonical URL matching.
+        const publishedBlogsByUrl = new Map(
+            publishedBlogs
+                .map((blog) => [normalizePageUrl(blog.wordpressUrl), blog] as const)
+                .filter((entry): entry is [string, typeof publishedBlogs[number]] => Boolean(entry[0]))
+        );
+        const filteredRows = rows.filter((row: any) => {
+            const rowUrl = normalizePageUrl(row.keys?.[0]);
+            return rowUrl ? publishedBlogsByUrl.has(rowUrl) : false;
+        });
+        const metricsByUrl = new Map(
+            filteredRows.map((row: any) => [normalizePageUrl(row.keys?.[0]) || '', row] as const)
+        );
 
         // Aggregate totals
         let totalClicks = 0;
         let totalImpressions = 0;
         let positionSum = 0;
 
-        const blogPerformance = filteredRows.map((row: any) => {
-            const url = row.keys[0];
-            const blogInfo = publishedBlogs.find(b => b.wordpressUrl === url);
+        const blogPerformance = publishedBlogs.map((blog) => {
+            const normalizedUrl = normalizePageUrl(blog.wordpressUrl);
+            const metrics = normalizedUrl ? metricsByUrl.get(normalizedUrl) : null;
 
-            totalClicks += row.clicks || 0;
-            totalImpressions += row.impressions || 0;
-            positionSum += (row.position || 0) * (row.impressions || 1);
+            totalClicks += metrics?.clicks || 0;
+            totalImpressions += metrics?.impressions || 0;
+            positionSum += (metrics?.position || 0) * (metrics?.impressions || 0);
 
             return {
-                id: blogInfo?.id,
-                url,
-                title: blogInfo?.title || url,
-                primaryKeyword: blogInfo?.primaryKeyword,
-                clicks: row.clicks || 0,
-                impressions: row.impressions || 0,
-                ctr: row.ctr || 0,
-                position: row.position || 0
+                id: blog.id,
+                url: blog.wordpressUrl,
+                title: blog.title || blog.wordpressUrl,
+                primaryKeyword: blog.primaryKeyword,
+                clicks: metrics?.clicks || 0,
+                impressions: metrics?.impressions || 0,
+                ctr: metrics?.ctr || 0,
+                position: metrics?.position || 0
             };
         });
 

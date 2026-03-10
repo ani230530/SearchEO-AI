@@ -2846,7 +2846,7 @@ useEffect(() => {
                     }`}
                   >
                     <Table className="h-4 w-4" />
-                    <span>Inventory</span>
+                    <span>Table</span>
                   </button>
                </div>
 
@@ -8075,7 +8075,7 @@ function CampaignStructureView({
     <>
     <div className="flex h-[calc(100vh-4rem)] w-full bg-white overflow-hidden">
       {/* 2. Secondary Sidebar: Topic List */}
-      {viewMode !== 'graph' && (
+      {viewMode === 'split' && (
         <div 
           className="w-[280px] border-r border-[#0000001a] flex-shrink-0"
           style={{
@@ -8171,6 +8171,8 @@ function CampaignStructureView({
                 <CampaignGraph
                   campaignStructure={campaignStructure}
                   selectedTopics={selectedTopics}
+                  generationJobs={generationJobs}
+                  draftStatuses={draftStatuses}
                 />
                </div>
             </div>
@@ -8187,14 +8189,21 @@ function CampaignStructureView({
                   }}
                   renderStatusPill={renderStatusPill}
                   generationJobs={generationJobs}
+                  draftStatuses={draftStatuses}
                   onGenerateTopic={handleGenerateTopic}
                   onUpdatePageTitle={handleUpdatePageTitle}
                   onDeleteSubPage={handleDeleteSubPage}
                   onDeletePillarPage={handleDeletePillarPage}
+                  onDeleteTopic={handleDeleteTopic}
+                  onCreatePillar={(tid) => handleAddPillarPage(tid, false)}
+                  onGenerateAiPillar={triggerAiPillar}
+                  onAddSubPage={(tid) => handleAddSubPage(tid, false)}
+                  onGenerateAiSubPage={triggerAiSubPage}
                   onAddKeyword={handleAddKeyword}
                   onDeleteKeyword={handleDeleteKeyword}
                   onSelectPrimaryKeyword={handleSelectPrimaryKeyword}
                   onSelectLongtailKeyword={handleSelectLongtailKeyword}
+                  onDeselectKeyword={handleDeselectKeyword}
                   aiLoading={aiLoading}
                 />
 
