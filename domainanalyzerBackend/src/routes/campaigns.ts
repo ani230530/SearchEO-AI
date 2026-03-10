@@ -218,7 +218,7 @@ const serializePage = (page: PageWithRelations): SerializedPage => {
     pageType: page.pageType,
     keywords: serializedKeywords,
     publishStatus: page.latestDraft?.status || undefined,
-    liveUrl: page.latestDraft?.wordpressUrl || undefined,
+    liveUrl: page.latestDraft?.status === 'published' ? page.latestDraft?.wordpressUrl || undefined : undefined,
     draftId: page.latestDraft?.id
   };
 };
@@ -2987,7 +2987,7 @@ router.get('/topics/:topicId/drafts-status', authenticateToken, asyncHandler(asy
         hasHtml,
         updatedAt: pageStatus.updatedAt.toISOString(),
         error: pageStatus.error || null,
-        wordpressUrl: wordpressUrl || null,
+        wordpressUrl: finalStatus === 'published' ? wordpressUrl || null : null,
       };
     })
   );

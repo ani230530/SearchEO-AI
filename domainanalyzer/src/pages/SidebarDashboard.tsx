@@ -519,6 +519,7 @@ const [editDescription, setEditDescription] = useState('');
             ...existing,
             isFailed: true,
             isPublished: false,
+            publishedUrl: undefined,
             error: data.error,
             draftId: incomingDraftId || existing.draftId
           });
@@ -529,6 +530,7 @@ const [editDescription, setEditDescription] = useState('');
                 ...status,
                 isFailed: true,
                 isPublished: false,
+                publishedUrl: undefined,
                 error: data.error,
               });
               break;
@@ -537,6 +539,20 @@ const [editDescription, setEditDescription] = useState('');
         }
         return updated;
       });
+
+      if (targetPageId) {
+        setGenerationJobs(prev => {
+          const updated = new Map(prev);
+          const existing = updated.get(targetPageId);
+          if (existing) {
+            updated.set(targetPageId, {
+              ...existing,
+              wordpressUrl: null,
+            });
+          }
+          return updated;
+        });
+      }
 
       toast({
         title: 'Publish Failed',
@@ -6152,16 +6168,16 @@ function CampaignStructureView({
         return updated;
       });
 
-      setDraftStatuses(prev => {
-        const updated = new Map(prev);
-        topicPages.forEach((p) => {
-          const existing = updated.get(p.pageId);
-          if (p.draftId) {
-            const isPublished = p.status === 'published' || Boolean(p.wordpressUrl && p.wordpressUrl.startsWith('http'));
+        setDraftStatuses(prev => {
+          const updated = new Map(prev);
+          topicPages.forEach((p) => {
+            const existing = updated.get(p.pageId);
+            if (p.draftId) {
+            const isPublished = p.status === 'published';
             updated.set(p.pageId, {
               isPublished,
               isFailed: p.status === 'failed',
-              publishedUrl: p.wordpressUrl || undefined,
+              publishedUrl: isPublished ? p.wordpressUrl || undefined : undefined,
               draftId: p.draftId,
               error: p.error || existing?.error
             });
@@ -6621,9 +6637,9 @@ function CampaignStructureView({
             // Populate draftStatuses map if we have a draftId
             if (p.draftId) {
                 newDraftStatuses.set(p.pageId, {
-                    isPublished: p.status === 'published' || (p.wordpressUrl && p.wordpressUrl.startsWith('http')),
+                    isPublished: p.status === 'published',
                     isFailed: p.status === 'failed',
-                    publishedUrl: p.wordpressUrl || undefined,
+                    publishedUrl: p.status === 'published' ? p.wordpressUrl || undefined : undefined,
                     draftId: p.draftId,
                     error: p.error || undefined
                 });
@@ -7237,7 +7253,7 @@ function CampaignStructureView({
             updated.set(result.pageId, {
               isPublished: false,
               isFailed: true,
-              publishedUrl: existing?.publishedUrl,
+              publishedUrl: undefined,
               draftId: result.draftId,
               error: result.error || existing?.error
             });
@@ -7254,7 +7270,7 @@ function CampaignStructureView({
               ...existing,
               wordpressUrl: result.status === 'published'
                 ? (result.wordpressUrl || existing.wordpressUrl || null)
-                : existing.wordpressUrl,
+                : null,
               error: result.status === 'failed'
                 ? (result.error || existing.error || null)
                 : null
@@ -7418,7 +7434,7 @@ function CampaignStructureView({
     const draftStatus = draftStatuses.get(pageId);
     
     // 3. Published State
-    if (draftStatus?.isPublished) {
+    if (draftStatus?.isPublished && draftStatus.publishedUrl) {
          return (
             <div className="flex items-center gap-1.5">
                <button 
