@@ -10,6 +10,7 @@ interface CampaignTopicDetailProps {
   streamingEvents: GenerationStreamingEvent[];
   generationJobs: Map<number, GenerationPageStatus>;
   onGenerateTopic: (topic: Topic) => void;
+  onUpdateTopicTitle: (topicId: number, title: string) => void;
   onReferenceUrlChange: (topicId: number, url: string) => void;
   onDeletePillar: (topicId: number) => void;
   onDeleteSubPage: (subPageId: number) => void;
@@ -33,6 +34,7 @@ export const CampaignTopicDetail: React.FC<CampaignTopicDetailProps> = ({
   streamingEvents,
   generationJobs,
   onGenerateTopic,
+  onUpdateTopicTitle,
   onReferenceUrlChange,
   onDeletePillar,
   onDeleteSubPage,
@@ -51,6 +53,8 @@ export const CampaignTopicDetail: React.FC<CampaignTopicDetailProps> = ({
 }) => {
   const [editingPageId, setEditingPageId] = useState<number | null>(null);
   const [editingTitle, setEditingTitle] = useState("");
+  const [isEditingTopicTitle, setIsEditingTopicTitle] = useState(false);
+  const [editingTopicTitle, setEditingTopicTitle] = useState("");
   const [now, setNow] = useState(() => Date.now());
 
   React.useEffect(() => {
@@ -247,6 +251,26 @@ export const CampaignTopicDetail: React.FC<CampaignTopicDetailProps> = ({
     setEditingTitle("");
   };
 
+  const startEditingTopicTitle = () => {
+    setEditingTopicTitle(topic.title);
+    setIsEditingTopicTitle(true);
+  };
+
+  const cancelTopicTitleEditing = () => {
+    setIsEditingTopicTitle(false);
+    setEditingTopicTitle(topic.title);
+  };
+
+  const handleSaveTopicTitle = () => {
+    const nextTitle = editingTopicTitle.trim();
+    if (!nextTitle || nextTitle === topic.title) {
+      cancelTopicTitleEditing();
+      return;
+    }
+    onUpdateTopicTitle(topic.id, nextTitle);
+    setIsEditingTopicTitle(false);
+  };
+
   const handleSaveTitle = (pageId: number) => {
     if (editingTitle.trim()) {
       onUpdatePageTitle(pageId, editingTitle.trim());
@@ -385,7 +409,46 @@ const renderKeywords = (
           <div className="flex items-center gap-2 mb-2">
              <span className="px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 text-[10px] font-bold uppercase tracking-wider">Topic Cluster</span>
           </div>
-          <h2 className="text-3xl font-light text-[#1d1d1f] tracking-tight leading-tight">{topic.title}</h2>
+          {isEditingTopicTitle ? (
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                value={editingTopicTitle}
+                onChange={(e) => setEditingTopicTitle(e.target.value)}
+                className="min-w-[320px] max-w-3xl bg-white border border-gray-200 rounded-xl px-4 py-2 text-3xl font-light text-[#1d1d1f] tracking-tight leading-tight focus:outline-none focus:ring-2 focus:ring-black/5"
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleSaveTopicTitle();
+                  if (e.key === 'Escape') cancelTopicTitleEditing();
+                }}
+              />
+              <button
+                onClick={handleSaveTopicTitle}
+                className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-full transition-all"
+                aria-label="Save topic title"
+              >
+                <Check className="h-4 w-4" />
+              </button>
+              <button
+                onClick={cancelTopicTitleEditing}
+                className="p-2 text-gray-400 hover:bg-gray-100 rounded-full transition-all"
+                aria-label="Cancel topic title edit"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          ) : (
+            <div className="group/topic-title flex items-center gap-2">
+              <h2 className="text-3xl font-light text-[#1d1d1f] tracking-tight leading-tight">{topic.title}</h2>
+              <button
+                onClick={startEditingTopicTitle}
+                className="opacity-0 group-hover/topic-title:opacity-100 p-1.5 text-gray-400 hover:text-black transition-all"
+                aria-label="Edit topic cluster title"
+              >
+                <Pencil className="h-4 w-4" />
+              </button>
+            </div>
+          )}
           <p className="text-sm text-gray-400 mt-1 font-light tracking-wide">{topic.subPages?.length || 0} sub-pages configured</p>
         </div>
         <button

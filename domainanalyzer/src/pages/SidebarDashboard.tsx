@@ -7904,6 +7904,21 @@ function CampaignStructureView({
     }
   };
 
+  const handleUpdateTopicTitle = async (topicId: number, title: string) => {
+    try {
+      await mutateStructure(
+        `${CAMPAIGN_API_BASE}/topics/${topicId}`,
+        {
+          method: 'PUT',
+          body: JSON.stringify({ title }),
+        },
+        { successMessage: 'Topic title updated' }
+      );
+    } catch {
+      // handled upstream
+    }
+  };
+
   const handleUpdatePillar = async (topicId: number, updates: { title?: string; referenceUrl?: string }) => {
     try {
       await mutateStructure(
@@ -8140,6 +8155,7 @@ function CampaignStructureView({
                      }
                      generationJobs={generationJobs}
                      onGenerateTopic={handleGenerateTopic}
+                     onUpdateTopicTitle={handleUpdateTopicTitle}
                      onReferenceUrlChange={(tid, url) => {
                         const t = campaignStructure.topics.find(t => t.id === tid);
                         if(t) handleUpdatePillar(t.pillarPage!.id, { referenceUrl: url });
@@ -8214,8 +8230,42 @@ function CampaignStructureView({
             </div>
 
 
-        </div>
       </div>
+      </div>
+{showAddPillarModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md border border-gray-100">
+            <h2 className="text-xl font-light text-gray-900 mb-6">Create Pillar Page</h2>
+            <input
+              type="text"
+              placeholder="Pillar Page Title"
+              className="w-full p-4 border border-gray-200 rounded-xl mb-6 text-sm focus:ring-2 focus:ring-black/5 focus:border-black outline-none transition-all"
+              value={newPillarTitle}
+              onChange={(e) => setNewPillarTitle(e.target.value)}
+              autoFocus
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleSubmitPillarPage();
+                if (e.key === 'Escape') setShowAddPillarModal(false);
+              }}
+            />
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setShowAddPillarModal(false)}
+                className="px-6 py-2.5 rounded-full text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSubmitPillarPage}
+                disabled={!newPillarTitle.trim()}
+                className="px-6 py-2.5 bg-black text-white rounded-full hover:bg-black/90 disabled:opacity-50 disabled:cursor-not-allowed transition-all text-sm font-medium shadow-lg shadow-black/10"
+              >
+                Create Pillar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 {showAddSubPageModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
           <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md border border-gray-100">

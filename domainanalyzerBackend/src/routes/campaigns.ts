@@ -880,6 +880,40 @@ router.delete('/topics/:topicId', authenticateToken, asyncHandler(async (req: Re
 }));
 
 /**
+ * PUT /api/campaigns/topics/:topicId
+ * Update topic metadata
+ */
+router.put('/topics/:topicId', authenticateToken, asyncHandler(async (req: Request, res: Response) => {
+  const authReq = req as AuthenticatedRequest;
+  const userId = authReq.user.userId;
+  const topicId = parseInt(req.params.topicId, 10);
+  const { title } = req.body || {};
+
+  if (isNaN(topicId)) {
+    return res.status(400).json({ success: false, error: 'Invalid topic ID' });
+  }
+
+  if (!title || !String(title).trim()) {
+    return res.status(400).json({ success: false, error: 'Topic title is required' });
+  }
+
+  const topic = await ensureTopicOwnership(topicId, userId);
+  if (!topic) {
+    return res.status(404).json({ success: false, error: 'Topic not found' });
+  }
+
+  await prisma.campaignTopic.update({
+    where: { id: topicId },
+    data: {
+      title: String(title).trim(),
+      source: CampaignNodeSource.MANUAL,
+    },
+  });
+
+  return respondWithStructure(res, topic.campaignId, userId);
+}));
+
+/**
  * POST /api/campaigns/topics/:topicId/pillar
  * Upsert manual pillar page
  */
