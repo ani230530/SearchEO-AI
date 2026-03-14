@@ -6162,6 +6162,17 @@ function CampaignStructureView({
 
       const topicPages = data.pages as DraftStatusRecord[];
       if (!topicPages.length) return;
+      const terminalPageIds = new Set<number>();
+      const terminalDraftIds = new Set<number>();
+
+      topicPages.forEach((p) => {
+        if (p.status === 'published' || p.status === 'failed') {
+          terminalPageIds.add(p.pageId);
+          if (p.draftId) {
+            terminalDraftIds.add(p.draftId);
+          }
+        }
+      });
 
       setGenerationJobs(prev => {
         const updated = new Map(prev);
@@ -6216,6 +6227,22 @@ function CampaignStructureView({
         return updated;
       });
 
+      if (terminalPageIds.size > 0) {
+        setPublishingPageIds((prev) => {
+          const updated = new Set(prev);
+          terminalPageIds.forEach((pageId) => updated.delete(pageId));
+          return updated;
+        });
+      }
+
+      if (terminalDraftIds.size > 0) {
+        setDraftToPageMap((prev) => {
+          const updated = new Map(prev);
+          terminalDraftIds.forEach((draftId) => updated.delete(draftId));
+          return updated;
+        });
+      }
+
       if (data.job?.jobId && Array.isArray(data.events)) {
         setJobIdToTopicId(prev => {
           const updated = new Map(prev);
@@ -6231,7 +6258,7 @@ function CampaignStructureView({
     } catch (err) {
       console.error('Failed to reconcile topic drafts-status', { topicId, err });
     }
-  }, [getAuthHeaders, handleUnauthorized, setDraftStatuses, setGenerationJobs]);
+  }, [getAuthHeaders, handleUnauthorized, setDraftStatuses, setGenerationJobs, setDraftToPageMap, setPublishingPageIds]);
 
   // Hydrate active jobs on mount
   const fetchActiveJobs = useCallback(async () => {
@@ -7182,13 +7209,22 @@ function CampaignStructureView({
 
   // Poll publish status as fallback when SSE terminal event is missed
   useEffect(() => {
-    if (publishingPageIds.size === 0 || draftToPageMap.size === 0) return;
+    if (publishingPageIds.size === 0) return;
 
     let cancelled = false;
 
     const pollPublishStatuses = async () => {
       const mappings = Array.from(draftToPageMap.entries());
-      if (!mappings.length) return;
+      const publishingTopicIds = new Set<number>();
+      publishingPageIds.forEach((pageId) => {
+        const topicId = generationJobs.get(pageId)?.topicId
+          || campaignStructure.topics.find((topic) =>
+            topic.pillarPage?.id === pageId || topic.subPages?.some((page) => page.id === pageId)
+          )?.id;
+        if (typeof topicId === 'number') {
+          publishingTopicIds.add(topicId);
+        }
+      });
 
       type TerminalPublishStatus = {
         draftId: number;
@@ -7199,121 +7235,128 @@ function CampaignStructureView({
       };
 
       try {
-        const results = await Promise.all(
-          mappings.map(async ([draftId, pageId]): Promise<TerminalPublishStatus | null> => {
-            const draftHeaders = getAuthHeaders();
-            let response = await fetch(`${API_BASE_URL}/api/publish/drafts/${draftId}`, {
-              headers: draftHeaders,
-            });
-
-            if (response.status === 401 || response.status === 403) {
-              handleUnauthorized();
-              return null;
-            }
-
-            if (!response.ok) {
-              response = await fetch(`${API_BASE_URL}/api/campaigns/drafts/${draftId}`, {
+        if (mappings.length > 0) {
+          const results = await Promise.all(
+            mappings.map(async ([draftId, pageId]): Promise<TerminalPublishStatus | null> => {
+              const draftHeaders = getAuthHeaders();
+              let response = await fetch(`${API_BASE_URL}/api/publish/drafts/${draftId}`, {
                 headers: draftHeaders,
               });
+
               if (response.status === 401 || response.status === 403) {
                 handleUnauthorized();
                 return null;
               }
-            }
 
-            if (!response.ok) return null;
+              if (!response.ok) {
+                response = await fetch(`${API_BASE_URL}/api/campaigns/drafts/${draftId}`, {
+                  headers: draftHeaders,
+                });
+                if (response.status === 401 || response.status === 403) {
+                  handleUnauthorized();
+                  return null;
+                }
+              }
 
-            const data = await response.json();
-            if (!data.success || !data.draft) return null;
+              if (!response.ok) return null;
 
-            const status = String(data.draft.status || '').toLowerCase();
-            if (status !== 'published' && status !== 'failed') return null;
+              const data = await response.json();
+              if (!data.success || !data.draft) return null;
 
-            return {
-              draftId,
-              pageId,
-              status,
-              wordpressUrl: data.draft.wordpressUrl ?? null,
-              error: data.draft.error ?? null
-            };
-          })
-        );
+              const status = String(data.draft.status || '').toLowerCase();
+              if (status !== 'published' && status !== 'failed') return null;
 
-        if (cancelled) return;
+              return {
+                draftId,
+                pageId,
+                status,
+                wordpressUrl: data.draft.wordpressUrl ?? null,
+                error: data.draft.error ?? null
+              };
+            })
+          );
 
-        const terminalResults = results.filter(Boolean) as TerminalPublishStatus[];
-        if (!terminalResults.length) return;
+          if (cancelled) return;
 
-        const terminalDraftIds = new Set<number>(terminalResults.map((r) => r.draftId));
-        const terminalPageIds = new Set<number>(terminalResults.map((r) => r.pageId));
+          const terminalResults = results.filter(Boolean) as TerminalPublishStatus[];
+          if (terminalResults.length > 0) {
+            const terminalDraftIds = new Set<number>(terminalResults.map((r) => r.draftId));
+            const terminalPageIds = new Set<number>(terminalResults.map((r) => r.pageId));
 
-        setPublishingPageIds(prev => {
-          const updated = new Set(prev);
-          terminalPageIds.forEach((pageId) => updated.delete(pageId));
-          return updated;
-        });
-
-        setDraftToPageMap(prev => {
-          const updated = new Map(prev);
-          terminalDraftIds.forEach((draftId) => updated.delete(draftId));
-          return updated;
-        });
-
-        setSharedPublishStatuses(prev => {
-          const updated = new Map(prev);
-          terminalResults.forEach((result) => {
-            updated.set(result.draftId, {
-              status: result.status,
-              publishedUrl: result.wordpressUrl || undefined,
-              error: result.error || undefined,
-              updatedAt: new Date().toISOString()
+            setPublishingPageIds(prev => {
+              const updated = new Set(prev);
+              terminalPageIds.forEach((pageId) => updated.delete(pageId));
+              return updated;
             });
-          });
-          return updated;
-        });
 
-        setDraftStatuses(prev => {
-          const updated = new Map(prev);
-          terminalResults.forEach((result) => {
-            const existing = updated.get(result.pageId);
-            if (result.status === 'published') {
-              updated.set(result.pageId, {
-                isPublished: true,
-                isFailed: false,
-                publishedUrl: result.wordpressUrl || undefined,
-                draftId: result.draftId,
-                error: undefined
+            setDraftToPageMap(prev => {
+              const updated = new Map(prev);
+              terminalDraftIds.forEach((draftId) => updated.delete(draftId));
+              return updated;
+            });
+
+            setSharedPublishStatuses(prev => {
+              const updated = new Map(prev);
+              terminalResults.forEach((result) => {
+                updated.set(result.draftId, {
+                  status: result.status,
+                  publishedUrl: result.wordpressUrl || undefined,
+                  error: result.error || undefined,
+                  updatedAt: new Date().toISOString()
+                });
               });
-              return;
-            }
-            updated.set(result.pageId, {
-              isPublished: false,
-              isFailed: true,
-              publishedUrl: undefined,
-              draftId: result.draftId,
-              error: result.error || existing?.error
+              return updated;
             });
-          });
-          return updated;
-        });
 
-        setGenerationJobs(prev => {
-          const updated = new Map(prev);
-          terminalResults.forEach((result) => {
-            const existing = updated.get(result.pageId);
-            if (!existing) return;
-            updated.set(result.pageId, {
-              ...existing,
-              wordpressUrl: result.status === 'published'
-                ? (result.wordpressUrl || existing.wordpressUrl || null)
-                : null,
-              error: result.status === 'failed'
-                ? (result.error || existing.error || null)
-                : null
+            setDraftStatuses(prev => {
+              const updated = new Map(prev);
+              terminalResults.forEach((result) => {
+                const existing = updated.get(result.pageId);
+                if (result.status === 'published') {
+                  updated.set(result.pageId, {
+                    isPublished: true,
+                    isFailed: false,
+                    publishedUrl: result.wordpressUrl || undefined,
+                    draftId: result.draftId,
+                    error: undefined
+                  });
+                  return;
+                }
+                updated.set(result.pageId, {
+                  isPublished: false,
+                  isFailed: true,
+                  publishedUrl: undefined,
+                  draftId: result.draftId,
+                  error: result.error || existing?.error
+                });
+              });
+              return updated;
             });
-          });
-          return updated;
-        });
+
+            setGenerationJobs(prev => {
+              const updated = new Map(prev);
+              terminalResults.forEach((result) => {
+                const existing = updated.get(result.pageId);
+                if (!existing) return;
+                updated.set(result.pageId, {
+                  ...existing,
+                  status: result.status,
+                  wordpressUrl: result.status === 'published'
+                    ? (result.wordpressUrl || existing.wordpressUrl || null)
+                    : null,
+                  error: result.status === 'failed'
+                    ? (result.error || existing.error || null)
+                    : null
+                });
+              });
+              return updated;
+            });
+          }
+        }
+
+        if (publishingTopicIds.size > 0) {
+          await Promise.all(Array.from(publishingTopicIds).map((topicId) => reconcileTopicDraftStatus(topicId)));
+        }
       } catch (err) {
         console.error('Publish polling fallback failed', err);
       }
@@ -7326,7 +7369,7 @@ function CampaignStructureView({
       cancelled = true;
       clearInterval(interval);
     };
-  }, [draftToPageMap, getAuthHeaders, handleUnauthorized, publishingPageIds, setDraftStatuses, setGenerationJobs, setDraftToPageMap, setPublishingPageIds]);
+  }, [campaignStructure.topics, draftToPageMap, generationJobs, getAuthHeaders, handleUnauthorized, publishingPageIds, reconcileTopicDraftStatus, setDraftStatuses, setGenerationJobs, setDraftToPageMap, setPublishingPageIds]);
 
   const publishDraft = async (draftId?: number, pageId?: number) => {
     if (!draftId) return;
