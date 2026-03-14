@@ -192,6 +192,115 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
   const [saving, setSaving] = useState(false);
 
+  const applyTerminalPublishState = useCallback((params: {
+    status: 'published' | 'failed';
+    draftId?: number | null;
+    publishedUrl?: string | null;
+    error?: string | null;
+    notify?: boolean;
+  }) => {
+    const { status, draftId, publishedUrl, error, notify = false } = params;
+
+    setPublishLoading(false);
+
+    if (status === 'published') {
+      setPublishError('');
+      if (publishedUrl) {
+        setPublishResult((prev) => prev ? { ...prev, wordpressUrl: publishedUrl } : null);
+      }
+      if (pageId && setPublishingPageIds) {
+        setPublishingPageIds((prev) => {
+          const updated = new Set(prev);
+          updated.delete(pageId);
+          return updated;
+        });
+      }
+      if (pageId && setDraftStatuses) {
+        setDraftStatuses((prev) => {
+          const updated = new Map(prev);
+          const existing = updated.get(pageId);
+          updated.set(pageId, {
+            ...(existing || {}),
+            isPublished: true,
+            isFailed: false,
+            publishedUrl: publishedUrl || undefined,
+            draftId: draftId || existing?.draftId,
+            error: undefined,
+          });
+          return updated;
+        });
+      }
+      if (draftId && setDraftToPageMap) {
+        setDraftToPageMap((prev) => {
+          const updated = new Map(prev);
+          updated.delete(Number(draftId));
+          return updated;
+        });
+      }
+      onRefreshWordpressIntegration();
+      if (!initialDraft) {
+        fetchPublishHistory();
+      }
+      if (notify && publishedUrl) {
+        toast({
+          title: 'Published Successfully',
+          description: `Your content is live! View it here: ${publishedUrl}`,
+        });
+      }
+      return;
+    }
+
+    setPublishError(error || 'Publish failed');
+    if (pageId && setPublishingPageIds) {
+      setPublishingPageIds((prev) => {
+        const updated = new Set(prev);
+        updated.delete(pageId);
+        return updated;
+      });
+    }
+    if (pageId && setDraftStatuses) {
+      setDraftStatuses((prev) => {
+        const updated = new Map(prev);
+        const existing = updated.get(pageId);
+        updated.set(pageId, {
+          ...(existing || {}),
+          isPublished: false,
+          isFailed: true,
+          publishedUrl: undefined,
+          draftId: draftId || existing?.draftId,
+          error: error || existing?.error,
+        });
+        return updated;
+      });
+    }
+    if (draftId && setDraftToPageMap) {
+      setDraftToPageMap((prev) => {
+        const updated = new Map(prev);
+        updated.delete(Number(draftId));
+        return updated;
+      });
+    }
+    if (!initialDraft) {
+      fetchPublishHistory();
+    }
+    if (notify) {
+      toast({
+        title: 'Publish Failed',
+        description: error || 'The publish job failed.',
+        variant: 'destructive',
+      });
+    }
+  }, [
+    fetchPublishHistory,
+    initialDraft,
+    onRefreshWordpressIntegration,
+    pageId,
+    setDraftStatuses,
+    setDraftToPageMap,
+    setPublishingPageIds,
+    toast,
+  ]);
+
    const fetchPublishHistory = useCallback(async () => {
     try {
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/publish/history`, {
@@ -218,25 +327,22 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
     if (!update) return;
 
     if (update.status === 'published') {
-      setPublishLoading(false);
-      if (update.publishedUrl) {
-        setPublishResult((prev) => prev ? { ...prev, wordpressUrl: update.publishedUrl } : null);
-        onRefreshWordpressIntegration();
-      }
-      if (!initialDraft) {
-        fetchPublishHistory();
-      }
+      applyTerminalPublishState({
+        status: 'published',
+        draftId: currentDraftId,
+        publishedUrl: update.publishedUrl,
+      });
       return;
     }
 
     if (update.status === 'failed') {
-      setPublishLoading(false);
-      setPublishError(update.error || 'Publish failed');
-      if (!initialDraft) {
-        fetchPublishHistory();
-      }
+      applyTerminalPublishState({
+        status: 'failed',
+        draftId: currentDraftId,
+        error: update.error,
+      });
     }
-  }, [currentDraftId, sharedPublishStatuses, onRefreshWordpressIntegration, initialDraft, fetchPublishHistory]);
+  }, [applyTerminalPublishState, currentDraftId, sharedPublishStatuses]);
 
   // Polling fallback to ensure we don't get stuck in loading state if SSE fails
   useEffect(() => {
@@ -262,24 +368,19 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
              
              // If terminal state reached, update UI
              if (status === 'published') {
-                setPublishLoading(false);
-                if (data.draft.wordpressUrl) {
-                    setPublishResult((prev) => prev ? { ...prev, wordpressUrl: data.draft.wordpressUrl } : null);
-                    toast({
-                        title: 'Published Successfully',
-                        description: `Your content is live! View it here: ${data.draft.wordpressUrl}`,
-                    });
-                    onRefreshWordpressIntegration();
-                    fetchPublishHistory();
-                }
-             } else if (status === 'failed') {
-                setPublishLoading(false);
-                toast({
-                    title: 'Publish Failed',
-                    description: 'The publish job failed (detected via polling).',
-                    variant: 'destructive',
+                applyTerminalPublishState({
+                  status: 'published',
+                  draftId: currentDraftId,
+                  publishedUrl: data.draft.wordpressUrl,
+                  notify: true,
                 });
-                fetchPublishHistory();
+             } else if (status === 'failed') {
+                applyTerminalPublishState({
+                  status: 'failed',
+                  draftId: currentDraftId,
+                  error: data.draft.error || 'The publish job failed.',
+                  notify: true,
+                });
              }
           }
         }
@@ -289,7 +390,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
     }, 15000); // 15 seconds
 
     return () => clearInterval(pollInterval);
-  }, [publishLoading, currentDraftId, toast, onRefreshWordpressIntegration, fetchPublishHistory]);
+  }, [applyTerminalPublishState, publishLoading, currentDraftId]);
 
   const showPreviewStage = publishStage === 'preview';
 
