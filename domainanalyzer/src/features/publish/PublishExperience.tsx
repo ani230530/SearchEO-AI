@@ -191,6 +191,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
   const [textEditNote, setTextEditNote] = useState('');
   const [textEditing, setTextEditing] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string>('');
+  const [selectedImageAlt, setSelectedImageAlt] = useState('');
   const [imageEditNote, setImageEditNote] = useState('');
   const [imageEditing, setImageEditing] = useState(false);
   const [selectedRange, setSelectedRange] = useState<Range | null>(null);
@@ -493,6 +494,11 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
       return [];
     }
   }, [currentHtmlContent]);
+
+  const selectedImageDetails = useMemo(
+    () => publishImages.find((image) => image.src === selectedImage) ?? null,
+    [publishImages, selectedImage]
+  );
 
   const filteredPublishKeywords = useMemo(() => {
     if (!publishKeywordQuery) {
@@ -1729,13 +1735,16 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
   const handleImageSelect = useCallback(
     (imageSrc: string) => {
       setSelectedImage(imageSrc);
+      setSelectedImageAlt(
+        publishImages.find((image) => image.src === imageSrc)?.alt || ''
+      );
       setImageEditNote((prev) => (selectedImage === imageSrc ? prev : ''));
       imageTooltipInstanceRef.current?.show();
       setTimeout(() => {
         imageEditTextareaRef.current?.focus();
       }, 100);
     },
-    [selectedImage]
+    [publishImages, selectedImage]
   );
 
   const handleResetDraft = useCallback(() => {
@@ -1743,6 +1752,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
     setCurrentDraftId(null);
     setSelectedText('');
     setSelectedImage('');
+    setSelectedImageAlt('');
     setTextEditNote('');
     setImageEditNote('');
     setPublishStage('compose');
@@ -1804,6 +1814,46 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
     });
   }, [publishResult, isEditMode, currentHtmlContent, handleHtmlEditorChange, toast]);
 
+  const updateImageAltText = useCallback(() => {
+    if (!publishResult || !selectedImage) return;
+
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(currentHtmlContent, 'text/html');
+    const image = Array.from(doc.querySelectorAll('img')).find(
+      (item) => item.getAttribute('src') === selectedImage
+    );
+
+    if (!image) {
+      toast({
+        title: 'Image Not Found',
+        description: 'The selected image could not be updated.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    image.setAttribute('alt', selectedImageAlt.trim());
+    const updatedHtml = doc.body.innerHTML;
+
+    setEditedHtmlContent(updatedHtml);
+    if (isEditMode) {
+      handleHtmlEditorChange(updatedHtml);
+    }
+
+    toast({
+      title: 'Alt Text Updated',
+      description: 'Image alt text was updated. Save to persist changes.',
+    });
+  }, [
+    currentHtmlContent,
+    handleHtmlEditorChange,
+    isEditMode,
+    publishResult,
+    selectedImage,
+    selectedImageAlt,
+    toast,
+  ]);
+
   const handleAddImage = useCallback(() => {
     if (!newImageUrl.trim()) {
       toast({
@@ -1856,6 +1906,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
   const closeImageTooltip = useCallback(() => {
     imageTooltipInstanceRef.current?.hide();
     setSelectedImage('');
+    setSelectedImageAlt('');
     setImageEditNote('');
   }, []);
 
@@ -2909,6 +2960,25 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
                               <img src={selectedImage} alt="Selected for editing" className="w-full h-24 object-cover" />
                               <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
                             </div>
+                            <div className="space-y-2">
+                              <label className="text-xs uppercase tracking-[0.2em] text-gray-500 font-medium">
+                                Alt text
+                              </label>
+                              <input
+                                type="text"
+                                value={selectedImageAlt}
+                                onChange={(e) => setSelectedImageAlt(e.target.value)}
+                                placeholder="Describe this image"
+                                className="w-full px-3 py-2.5 text-sm rounded-2xl border border-gray-200/80 bg-white focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent transition-all"
+                              />
+                              <button
+                                onClick={updateImageAltText}
+                                disabled={!selectedImage || selectedImageAlt === (selectedImageDetails?.alt || '')}
+                                className="w-full px-4 py-2.5 rounded-full border border-gray-200 bg-white text-sm font-semibold hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                              >
+                                Save Alt Text
+                              </button>
+                            </div>
                             <textarea
                               ref={imageEditTextareaRef}
                               value={imageEditNote}
@@ -3514,6 +3584,25 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
                             <div className="relative rounded-xl overflow-hidden border border-gray-200/50">
                               <img src={selectedImage} alt="Selected for editing" className="w-full h-24 object-cover" />
                               <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
+                            </div>
+                            <div className="space-y-2">
+                              <label className="text-xs uppercase tracking-[0.2em] text-gray-500 font-medium">
+                                Alt text
+                              </label>
+                              <input
+                                type="text"
+                                value={selectedImageAlt}
+                                onChange={(e) => setSelectedImageAlt(e.target.value)}
+                                placeholder="Describe this image"
+                                className="w-full px-3 py-2.5 text-sm rounded-2xl border border-gray-200/80 bg-white focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent transition-all"
+                              />
+                              <button
+                                onClick={updateImageAltText}
+                                disabled={!selectedImage || selectedImageAlt === (selectedImageDetails?.alt || '')}
+                                className="w-full px-4 py-2.5 rounded-full border border-gray-200 bg-white text-sm font-semibold hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                              >
+                                Save Alt Text
+                              </button>
                             </div>
                             <textarea
                               ref={imageEditTextareaRef}
