@@ -78,6 +78,17 @@ interface PublishFormState {
   featuredImageEnabled: boolean;
 }
 
+interface DraftSnapshot {
+  htmlContent: string;
+  title: string;
+  metaDescription: string;
+  slug: string;
+  longtailKeywords: string;
+  featuredImageEnabled: boolean;
+  featuredImageUrl: string;
+  primaryKeyword: string;
+}
+
 const summarizeDomainContext = (input: string, maxLines = 6, maxChars = 800) => {
   if (!input) return '';
   const normalized = input.replace(/\r\n/g, '\n');
@@ -113,6 +124,28 @@ const calculateWordCount = (html: string): number => {
     return 0;
   }
 };
+
+const slugifyText = (value: string): string =>
+  value
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9\s-]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-');
+
+const createDraftSnapshot = (
+  content: GeneratedArticleContent | null,
+  htmlContent?: string
+): DraftSnapshot => ({
+  htmlContent: htmlContent ?? content?.htmlContent ?? '',
+  title: content?.title ?? '',
+  metaDescription: content?.metaDescription ?? '',
+  slug: content?.slug ?? '',
+  longtailKeywords: content?.longtailKeywords ?? '',
+  featuredImageEnabled: Boolean(content?.featuredImageEnabled),
+  featuredImageUrl: content?.featuredImageUrl ?? '',
+  primaryKeyword: content?.primaryKeyword ?? '',
+});
 
 const PublishExperience: React.FC<PublishExperienceProps> = ({
   companyDomain,
@@ -191,6 +224,9 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
   const [isDirty, setIsDirty] = useState(false);
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
   const [saving, setSaving] = useState(false);
+  const [originalDraftSnapshot, setOriginalDraftSnapshot] = useState<DraftSnapshot>(() =>
+    createDraftSnapshot(initialDraft ?? null, initialDraft?.htmlContent ?? '')
+  );
 
   const fetchPublishHistory = useCallback(async () => {
     try {
@@ -411,11 +447,18 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
   }, [currentHtmlContent]);
 
   const hasUnsavedChanges = useMemo(() => {
-    // Check if current content differs from what was last saved (originalHtmlContent)
     if (!publishResult) return false;
-    const currentContent = currentHtmlContent;
-    return currentContent !== originalHtmlContent;
-  }, [currentHtmlContent, originalHtmlContent, publishResult]);
+    return (
+      currentHtmlContent !== originalDraftSnapshot.htmlContent ||
+      (publishResult.title ?? '') !== originalDraftSnapshot.title ||
+      (publishResult.metaDescription ?? '') !== originalDraftSnapshot.metaDescription ||
+      (publishResult.slug ?? '') !== originalDraftSnapshot.slug ||
+      (publishResult.longtailKeywords ?? '') !== originalDraftSnapshot.longtailKeywords ||
+      Boolean(publishResult.featuredImageEnabled) !== originalDraftSnapshot.featuredImageEnabled ||
+      (publishResult.featuredImageUrl ?? '') !== originalDraftSnapshot.featuredImageUrl ||
+      (publishResult.primaryKeyword ?? '') !== originalDraftSnapshot.primaryKeyword
+    );
+  }, [currentHtmlContent, originalDraftSnapshot, publishResult]);
   
   // Sync dirty state
   useEffect(() => {
@@ -566,6 +609,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
       setPublishResult(draftContent);
       setEditedHtmlContent(draftContent.htmlContent || '');
       setOriginalHtmlContent(draftContent.htmlContent || ''); // This is what we'll compare against for dirty state
+      setOriginalDraftSnapshot(createDraftSnapshot(draftContent, draftContent.htmlContent || ''));
       setCurrentDraftId(draftId);
       setPublishStage('preview');
       setIsEditMode(false);
@@ -639,6 +683,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
       const initialHtml = initialDraft.htmlContent || '';
       setEditedHtmlContent(initialHtml);
       setOriginalHtmlContent(initialHtml);
+      setOriginalDraftSnapshot(createDraftSnapshot(initialDraft, initialHtml));
       setIsEditMode(false);
       setIsDirty(false);
       // Clear edit UI state
@@ -842,6 +887,75 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
     setPublishStage('compose');
   }, []);
 
+  const updatePublishMetadata = useCallback(
+    (field: 'title' | 'metaDescription' | 'slug', value: string) => {
+      setPublishResult((prev) => (prev ? { ...prev, [field]: value } : prev));
+    },
+    []
+  );
+
+  const syncSlugFromTitle = useCallback(() => {
+    setPublishResult((prev) => {
+      if (!prev) return prev;
+      return { ...prev, slug: slugifyText(prev.title || prev.primaryKeyword || '') };
+    });
+  }, []);
+
+  const renderMetadataEditor = () => {
+    if (!publishResult || !isEditMode) return null;
+
+    return (
+      <div className="rounded-2xl border border-gray-200 bg-white p-4 space-y-4">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-xs text-gray-500 mb-1">Draft metadata</p>
+            <p className="text-sm font-medium text-gray-900">Title, description, and slug</p>
+          </div>
+          <button
+            type="button"
+            onClick={syncSlugFromTitle}
+            className="rounded-full border border-gray-200 px-3 py-1 text-[11px] font-medium text-gray-600 hover:bg-gray-50"
+          >
+            Use title for slug
+          </button>
+        </div>
+
+        <div className="space-y-2">
+          <label className="text-xs font-medium uppercase tracking-[0.2em] text-gray-500">Title</label>
+          <input
+            type="text"
+            value={publishResult.title ?? ''}
+            onChange={(event) => updatePublishMetadata('title', event.target.value)}
+            placeholder="Draft title"
+            className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-900 outline-none transition focus:border-gray-900"
+          />
+        </div>
+
+        <div className="space-y-2">
+          <label className="text-xs font-medium uppercase tracking-[0.2em] text-gray-500">Meta Description</label>
+          <textarea
+            value={publishResult.metaDescription ?? ''}
+            onChange={(event) => updatePublishMetadata('metaDescription', event.target.value)}
+            placeholder="Search snippet description"
+            rows={3}
+            className="w-full resize-none rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-900 outline-none transition focus:border-gray-900"
+          />
+        </div>
+
+        <div className="space-y-2">
+          <label className="text-xs font-medium uppercase tracking-[0.2em] text-gray-500">Slug</label>
+          <input
+            type="text"
+            value={publishResult.slug ?? ''}
+            onChange={(event) => updatePublishMetadata('slug', slugifyText(event.target.value))}
+            placeholder="url-slug"
+            className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-900 outline-none transition focus:border-gray-900"
+          />
+        </div>
+      </div>
+    );
+  };
+
   // SIMPLE SAVE FUNCTION - Only called by Save button
   const saveDraftToDatabase = useCallback(async (silent = false) => {
     if (!publishResult) {
@@ -890,16 +1004,19 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
         setCurrentDraftId(data.draftId);
       }
       
+      const savedResult = {
+        ...publishResult,
+        htmlContent: latestHtml,
+      };
+
       // SIMPLE: After saving, update state to reflect what was saved
       setOriginalHtmlContent(latestHtml); // This is what we compare against for dirty state
+      setOriginalDraftSnapshot(createDraftSnapshot(savedResult, latestHtml));
       setIsDirty(false);
       setLastSavedAt(new Date());
       
       // Update publishResult with saved HTML (for metadata consistency)
-      setPublishResult({
-        ...publishResult,
-        htmlContent: latestHtml,
-      });
+      setPublishResult(savedResult);
       // editedHtmlContent already has latestHtml, so preview stays correct
       
       if (!silent) {
@@ -1011,6 +1128,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
       const initialHtml = nextResult.htmlContent || '';
       setEditedHtmlContent(initialHtml);
       setOriginalHtmlContent(initialHtml);
+      setOriginalDraftSnapshot(createDraftSnapshot(nextResult, initialHtml));
       setPublishForm((prev) => ({
         ...prev,
         primaryKeyword: nextResult.primaryKeyword || prev.primaryKeyword,
@@ -1137,6 +1255,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
       const initialHtml = normalized.htmlContent || '';
       setEditedHtmlContent(initialHtml);
       setOriginalHtmlContent(initialHtml);
+      setOriginalDraftSnapshot(createDraftSnapshot(normalized, initialHtml));
       setPublishStage('preview');
       setIsEditMode(false);
       setIsDirty(false);
@@ -1635,6 +1754,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
       tooltipAnchorRef.current.style.display = 'none';
     }
     setSelectedRange(null);
+    setOriginalDraftSnapshot(createDraftSnapshot(null, ''));
   }, []);
 
   const handleToggleEditMode = useCallback(() => {
@@ -2420,6 +2540,8 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
                           {publishResult.primaryKeyword || publishForm.primaryKeyword || 'Not set'}
                         </p>
                       </div>
+
+                      {renderMetadataEditor()}
                       
                       <div className="rounded-2xl border border-gray-200 bg-white p-4">
                         <p className="text-xs text-gray-500 mb-2">Secondary Keywords</p>
@@ -3024,6 +3146,8 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
                             {publishResult.primaryKeyword || publishForm.primaryKeyword || 'Not set'}
                           </p>
                         </div>
+
+                        {renderMetadataEditor()}
                         
                         <div className="rounded-2xl border border-gray-200 bg-white p-4">
                           <p className="text-xs text-gray-500 mb-2">Secondary Keywords</p>
