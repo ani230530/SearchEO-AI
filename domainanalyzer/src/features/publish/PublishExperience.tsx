@@ -192,6 +192,26 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
   const [saving, setSaving] = useState(false);
 
+  const fetchPublishHistory = useCallback(async () => {
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/publish/history`, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('authToken')}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      if (!response.ok) {
+        throw new Error('Failed to fetch publish history');
+      }
+      const data = await response.json();
+      if (data.success) {
+        setPublishHistory(data.logs || []);
+      }
+    } catch (error) {
+      console.error('Error fetching publish history:', error);
+    }
+  }, []);
+
   const applyTerminalPublishState = useCallback((params: {
     status: 'published' | 'failed';
     draftId?: number | null;
@@ -300,26 +320,6 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
     setPublishingPageIds,
     toast,
   ]);
-
-   const fetchPublishHistory = useCallback(async () => {
-    try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/publish/history`, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem('authToken')}`,
-          'Content-Type': 'application/json',
-        },
-      });
-      if (!response.ok) {
-        throw new Error('Failed to fetch publish history');
-      }
-      const data = await response.json();
-      if (data.success) {
-        setPublishHistory(data.logs || []);
-      }
-    } catch (error) {
-      console.error('Error fetching publish history:', error);
-    }
-  }, []);
 
   useEffect(() => {
     if (!currentDraftId || !sharedPublishStatuses) return;

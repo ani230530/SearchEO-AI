@@ -598,7 +598,7 @@ const CampaignGraph: React.FC<CampaignGraphProps> = ({
       .duration(320)
       .ease(d3.easeCubicOut)
       .attr('transform', (node) => `translate(${node.targetX},${node.targetY})`)
-      .on('end', function (_, node) {
+      .on('end', function (node) {
         node.currentX = node.targetX;
         node.currentY = node.targetY;
         node.x = node.targetX;
