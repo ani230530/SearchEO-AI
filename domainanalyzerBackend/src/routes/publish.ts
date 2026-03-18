@@ -25,6 +25,9 @@ const EDIT_TEXT_WEBHOOK_URL =
 const EDIT_IMAGE_WEBHOOK_URL =
   process.env.N8N_EDIT_IMAGE_WEBHOOK_URL ||
   'https://n8n.srv891599.hstgr.cloud/webhook/d73f8808-4c87-42bb-b52e-49c25396ab49';
+const EDIT_AFTER_PUBLISH_WEBHOOK_URL =
+  process.env.N8N_EDIT_AFTER_PUBLISH_WEBHOOK_URL ||
+  'https://n8n.srv891599.hstgr.cloud/webhook/edit-after-publish';
 const N8N_API_KEY = process.env.N8N_API_KEY || '1234';
 const N8N_API_KEY_HEADER = process.env.N8N_API_KEY_HEADER || 'key';
 const N8N_TIMEOUT_MS = Number(process.env.N8N_TIMEOUT_MS) || 300000;
@@ -372,6 +375,158 @@ router.post(
       res.status(500).json({
         success: false,
         error: 'Failed to edit image with automation service',
+        details: error?.response?.data,
+      });
+    }
+  })
+);
+
+router.post(
+  '/published-edit',
+  authenticateToken,
+  asyncHandler(async (req: Request, res: Response) => {
+    const authReq = req as AuthenticatedRequest;
+    const userId = authReq.user.userId;
+    const {
+      draftId,
+      pageId,
+      primaryKeyword,
+      htmlContent,
+      featuredImageEnabled = true,
+      featuredImageUrl,
+      title,
+      metaDescription,
+      slug,
+      longtailKeywords,
+      wordpressUrl,
+    } = req.body;
+
+    if (!draftId || !htmlContent || !title) {
+      return res.status(400).json({
+        success: false,
+        error: 'Draft ID, title, and HTML content are required',
+      });
+    }
+
+    const draft = await prisma.wordpressPublishLog.findFirst({
+      where: { id: Number(draftId), userId },
+    });
+
+    if (!draft) {
+      return res.status(404).json({
+        success: false,
+        error: 'Published draft not found',
+      });
+    }
+
+    if (draft.status !== 'published') {
+      return res.status(400).json({
+        success: false,
+        error: 'Only published blogs can use the published edit workflow',
+      });
+    }
+
+    let integration;
+    try {
+      integration = await getIntegrationOrThrow(userId);
+    } catch (error: any) {
+      return res.status(400).json({
+        success: false,
+        error: error.message,
+      });
+    }
+
+    let decryptedPassword: string;
+    try {
+      decryptedPassword = decryptToken(integration.password);
+    } catch (error) {
+      return res.status(400).json({
+        success: false,
+        error: 'WordPress integration password cannot be decrypted.',
+      });
+    }
+
+    const currentStored = serializeDraftContent(draft);
+    const normalizedFeaturedImageUrl = normalizeFeaturedImageUrl(featuredImageUrl);
+    const resolvedWordpressUrl =
+      (typeof wordpressUrl === 'string' && wordpressUrl.trim()) ||
+      draft.wordpressUrl ||
+      currentStored.wordpressUrl ||
+      integration.siteUrl;
+
+    const mergedStoredData = {
+      ...(((draft.response as Record<string, unknown> | null) || {}) as Record<string, unknown>),
+      primaryKeyword:
+        primaryKeyword || draft.primaryKeyword || currentStored.primaryKeyword || null,
+      htmlContent,
+      featuredImageEnabled: normalizeFeaturedImageEnabled(
+        featuredImageEnabled,
+        Boolean(normalizedFeaturedImageUrl || currentStored.featuredImageUrl)
+      ),
+      featuredImageUrl: normalizedFeaturedImageUrl || currentStored.featuredImageUrl || null,
+      title,
+      metaDescription: metaDescription ?? currentStored.metaDescription ?? null,
+      slug: slug ?? draft.slug ?? currentStored.slug ?? null,
+      longtailKeywords: longtailKeywords ?? currentStored.longtailKeywords ?? null,
+      wordpressUrl: resolvedWordpressUrl,
+      status: 'published',
+      lastEditedAt: new Date().toISOString(),
+    };
+
+    const webhookPayload = {
+      draftId: draft.id,
+      pageId: pageId ? Number(pageId) : null,
+      wordpress: {
+        url: integration.siteUrl,
+        username: integration.username,
+        password: decryptedPassword,
+        liveUrl: resolvedWordpressUrl,
+      },
+      draft: {
+        id: draft.id,
+        userId: draft.userId,
+        status: draft.status,
+        createdAt: draft.createdAt.toISOString(),
+        updatedAt: draft.updatedAt.toISOString(),
+        wordpressUrl: resolvedWordpressUrl,
+        primaryKeyword: mergedStoredData.primaryKeyword,
+        title,
+        metaDescription: mergedStoredData.metaDescription,
+        slug: mergedStoredData.slug,
+        longtailKeywords: mergedStoredData.longtailKeywords,
+        response: mergedStoredData,
+      },
+      article: mergedStoredData,
+    };
+
+    try {
+      const webhookResponse = await callWebhook(EDIT_AFTER_PUBLISH_WEBHOOK_URL, webhookPayload);
+
+      await prisma.wordpressPublishLog.update({
+        where: { id: draft.id },
+        data: {
+          title,
+          slug: (mergedStoredData.slug as string | null) ?? draft.slug,
+          wordpressUrl: resolvedWordpressUrl,
+          status: 'published',
+          response: {
+            ...mergedStoredData,
+            editAfterPublishResponse: webhookResponse,
+          },
+        },
+      });
+
+      return res.json({
+        success: true,
+        draftId: draft.id,
+        wordpressUrl: resolvedWordpressUrl,
+        result: webhookResponse,
+      });
+    } catch (error: any) {
+      console.error('Error editing published blog:', error?.response?.data || error);
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to update published blog',
         details: error?.response?.data,
       });
     }

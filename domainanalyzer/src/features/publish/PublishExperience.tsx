@@ -187,6 +187,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
   const totalDrawerSteps = 4;
   // savingDraft removed - using 'saving' state instead
   const [currentDraftId, setCurrentDraftId] = useState<number | null>(initialDraftId || null);
+  const [currentDraftStatus, setCurrentDraftStatus] = useState<string | null>(null);
   const [selectedText, setSelectedText] = useState('');
   const [textEditNote, setTextEditNote] = useState('');
   const [textEditing, setTextEditing] = useState(false);
@@ -262,6 +263,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
 
     if (status === 'published') {
       setPublishError('');
+      setCurrentDraftStatus('published');
       if (publishedUrl) {
         setPublishResult((prev) => prev ? { ...prev, wordpressUrl: publishedUrl } : null);
       }
@@ -307,6 +309,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
       return;
     }
 
+    setCurrentDraftStatus('failed');
     setPublishError(error || 'Publish failed');
     if (pageId && setPublishingPageIds) {
       setPublishingPageIds((prev) => {
@@ -617,6 +620,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
       setOriginalHtmlContent(draftContent.htmlContent || ''); // This is what we'll compare against for dirty state
       setOriginalDraftSnapshot(createDraftSnapshot(draftContent, draftContent.htmlContent || ''));
       setCurrentDraftId(draftId);
+      setCurrentDraftStatus(draft.status || 'draft');
       setPublishStage('preview');
       setIsEditMode(false);
       setIsDirty(false);
@@ -962,6 +966,90 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
     );
   };
 
+  const savePublishedEdits = useCallback(async () => {
+    if (!publishResult) {
+      toast({
+        title: 'Nothing to Save',
+        description: 'No content to update',
+        variant: 'destructive',
+      });
+      return false;
+    }
+
+    if (!currentDraftId) {
+      toast({
+        title: 'Missing Draft',
+        description: 'Published edit requires a draft ID.',
+        variant: 'destructive',
+      });
+      return false;
+    }
+
+    setSaving(true);
+    try {
+      const latestHtml = currentHtmlContent;
+      const response = await fetch(`${API_BASE_URL}/api/publish/published-edit`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('authToken')}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          draftId: currentDraftId,
+          pageId,
+          primaryKeyword: publishResult.primaryKeyword || publishForm.primaryKeyword,
+          htmlContent: latestHtml,
+          featuredImageEnabled: publishResult.featuredImageEnabled,
+          featuredImageUrl: publishResult.featuredImageUrl,
+          title: publishResult.title,
+          metaDescription: publishResult.metaDescription,
+          slug: publishResult.slug,
+          longtailKeywords: publishResult.longtailKeywords ?? publishForm.longtailKeywords,
+          wordpressUrl: publishResult.wordpressUrl,
+        }),
+      });
+
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || 'Failed to update published blog');
+      }
+
+      const savedResult = {
+        ...publishResult,
+        htmlContent: latestHtml,
+        wordpressUrl: data.wordpressUrl || publishResult.wordpressUrl,
+      };
+
+      setOriginalHtmlContent(latestHtml);
+      setOriginalDraftSnapshot(createDraftSnapshot(savedResult, latestHtml));
+      setIsDirty(false);
+      setLastSavedAt(new Date());
+      setPublishResult(savedResult);
+      setCurrentDraftStatus('published');
+
+      if (!initialDraft) {
+        fetchPublishHistory();
+      }
+
+      toast({
+        title: 'Published Blog Updated',
+        description: 'Changes were sent to WordPress automation.',
+      });
+
+      return true;
+    } catch (error) {
+      console.error('Error updating published blog:', error);
+      toast({
+        title: 'Update Failed',
+        description: error instanceof Error ? error.message : 'Failed to update published blog',
+        variant: 'destructive',
+      });
+      return false;
+    } finally {
+      setSaving(false);
+    }
+  }, [toast, publishResult, currentDraftId, currentHtmlContent, pageId, publishForm.primaryKeyword, publishForm.longtailKeywords, initialDraft, fetchPublishHistory]);
+
   // SIMPLE SAVE FUNCTION - Only called by Save button
   const saveDraftToDatabase = useCallback(async (silent = false) => {
     if (!publishResult) {
@@ -1067,8 +1155,13 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
 
   // SIMPLE: Save button handler
   const handleSaveDraft = useCallback(async () => {
+    if (currentDraftStatus === 'published') {
+      await savePublishedEdits();
+      return;
+    }
+
     await saveDraftToDatabase(false);
-  }, [saveDraftToDatabase]);
+  }, [currentDraftStatus, savePublishedEdits, saveDraftToDatabase]);
 
   const handleResumeDraft = useCallback(
     (entry: PublishHistoryEntry) => {
@@ -1131,6 +1224,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
       // Initialize all state from the draft
       setPublishResult(nextResult);
       setCurrentDraftId(entry.id);
+      setCurrentDraftStatus(entry.status ?? 'draft');
       const initialHtml = nextResult.htmlContent || '';
       setEditedHtmlContent(initialHtml);
       setOriginalHtmlContent(initialHtml);
@@ -1624,6 +1718,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
       // Handle Immediate Success
       if (data.status === 'published' && data.publishedUrl) {
         const publishedUrl = data.publishedUrl;
+        setCurrentDraftStatus('published');
         
         setPublishResult((prev) => prev ? {
           ...prev,
@@ -1658,6 +1753,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
       // Handle Queued/Generating Status
       else if (data.status === 'generating') {
         console.log('[Publish:Debug] Job queued, setting currentDraftId:', data.draftId);
+        setCurrentDraftStatus('generating');
         if (data.draftId) {
           setCurrentDraftId(data.draftId);
         }
@@ -2550,13 +2646,25 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
                   >
                     {publishLoading ? 'Generating…' : publishResult ? 'Regenerate' : 'Generate'}
                   </button>
-                  <button
-                    onClick={handlePublishToWordpress}
-                    disabled={publishLoading || !publishResult}
-                    className="px-6 py-2.5 rounded-full bg-black text-white text-sm font-medium shadow-lg hover:bg-black/90 disabled:opacity-60 transition-colors"
-                  >
-                    {publishLoading ? 'Working…' : (publishResult?.wordpressUrl?.startsWith('http') ? 'Re-publish to WordPress' : 'Publish to WordPress')}
-                  </button>
+                  {currentDraftStatus === 'published' && publishResult?.wordpressUrl ? (
+                    <a
+                      href={publishResult.wordpressUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-6 py-2.5 rounded-full bg-black text-white text-sm font-medium shadow-lg hover:bg-black/90 transition-colors inline-flex items-center gap-2"
+                    >
+                      <Eye className="h-4 w-4" />
+                      Live URL
+                    </a>
+                  ) : (
+                    <button
+                      onClick={handlePublishToWordpress}
+                      disabled={publishLoading || !publishResult}
+                      className="px-6 py-2.5 rounded-full bg-black text-white text-sm font-medium shadow-lg hover:bg-black/90 disabled:opacity-60 transition-colors"
+                    >
+                      {publishLoading ? 'Working…' : 'Publish to WordPress'}
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -3139,7 +3247,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
                       {publishLoading ? 'Generating…' : publishResult ? 'Regenerate' : 'Generate'}
                     </button>
                     
-                    {publishResult?.wordpressUrl ? (
+                    {currentDraftStatus === 'published' && publishResult?.wordpressUrl ? (
                       <div className="flex items-center gap-3">
                         <div className="flex items-center gap-1.5 px-3 py-1.5 bg-green-50 text-green-700 rounded-full border border-green-200 shadow-sm animate-in fade-in slide-in-from-right-4 duration-500">
                           <CheckCircle className="h-4 w-4" />
@@ -3152,16 +3260,8 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
                           className="px-6 py-2.5 rounded-full bg-black text-white text-sm font-medium shadow-lg hover:bg-gray-800 transition-all flex items-center gap-2"
                         >
                           <Eye className="h-4 w-4" />
-                          View Live Article
+                          Live URL
                         </a>
-                        <button
-                          onClick={handlePublishToWordpress}
-                          disabled={publishLoading}
-                          className="p-2.5 rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors"
-                          title="Republish to WordPress"
-                        >
-                          <RotateCcw className={`h-4 w-4 ${publishLoading ? 'animate-spin' : ''}`} />
-                        </button>
                       </div>
                     ) : (
                       <button
