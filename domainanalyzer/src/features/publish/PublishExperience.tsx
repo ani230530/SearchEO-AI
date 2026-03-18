@@ -63,6 +63,7 @@ interface PublishExperienceProps {
   sharedPublishStatuses?: Map<number, {
     status: 'generating' | 'published' | 'failed';
     publishedUrl?: string;
+    wordpressPostId?: number | null;
     error?: string;
     updatedAt?: string;
   }>;
@@ -254,18 +255,28 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
     status: 'published' | 'failed';
     draftId?: number | null;
     publishedUrl?: string | null;
+    wordpressPostId?: number | null;
     error?: string | null;
     notify?: boolean;
   }) => {
-    const { status, draftId, publishedUrl, error, notify = false } = params;
+    const { status, draftId, publishedUrl, wordpressPostId, error, notify = false } = params;
 
     setPublishLoading(false);
 
     if (status === 'published') {
       setPublishError('');
       setCurrentDraftStatus('published');
-      if (publishedUrl) {
-        setPublishResult((prev) => prev ? { ...prev, wordpressUrl: publishedUrl } : null);
+      if (publishedUrl || wordpressPostId !== undefined) {
+        setPublishResult((prev) =>
+          prev
+            ? {
+                ...prev,
+                wordpressUrl: publishedUrl || prev.wordpressUrl,
+                wordpressPostId:
+                  wordpressPostId !== undefined ? wordpressPostId : prev.wordpressPostId,
+              }
+            : null
+        );
       }
       if (pageId && setPublishingPageIds) {
         setPublishingPageIds((prev) => {
@@ -371,6 +382,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
         status: 'published',
         draftId: currentDraftId,
         publishedUrl: update.publishedUrl,
+        wordpressPostId: update.wordpressPostId,
       });
       return;
     }
@@ -607,6 +619,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
         htmlContent: draft.htmlContent || '',
         featuredImageEnabled: Boolean(draft.featuredImageEnabled),
         featuredImageUrl: draft.featuredImageUrl || null,
+        wordpressPostId: draft.wordpressPostId ?? null,
         title: draft.title,
         metaDescription: draft.metaDescription,
         slug: draft.slug,
@@ -1206,6 +1219,12 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
           (payload.metaDescription as string) ??
           (payload['Meta Description'] as string | undefined) ??
           publishResult?.metaDescription,
+        wordpressPostId:
+          typeof payload.wordpressPostId === 'number'
+            ? payload.wordpressPostId
+            : typeof payload.id === 'number'
+            ? payload.id
+            : entry.wordpressPostId ?? publishResult?.wordpressPostId ?? null,
         slug: (payload.slug as string) ?? (entry.slug ?? publishResult?.slug),
         wordpressUrl:
           (payload.wordpressUrl as string) ?? entry.wordpressUrl ?? publishResult?.wordpressUrl,
@@ -1723,6 +1742,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
         setPublishResult((prev) => prev ? {
           ...prev,
           wordpressUrl: publishedUrl,
+          wordpressPostId: typeof data.wordpressPostId === 'number' ? data.wordpressPostId : prev.wordpressPostId,
         } : null);
         
         toast({
@@ -1738,6 +1758,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
                 ...entry,
                 status: 'published',
                 wordpressUrl: publishedUrl,
+                wordpressPostId: typeof data.wordpressPostId === 'number' ? data.wordpressPostId : entry.wordpressPostId,
                 updatedAt: new Date().toISOString()
               };
             }

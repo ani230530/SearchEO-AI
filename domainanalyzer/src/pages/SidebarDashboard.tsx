@@ -293,6 +293,7 @@ const sseRef = useRef<EventSource | null>(null);
   const [sharedPublishStatuses, setSharedPublishStatuses] = useState<Map<number, {
     status: 'generating' | 'published' | 'failed';
     publishedUrl?: string;
+    wordpressPostId?: number | null;
     error?: string;
     updatedAt?: string;
   }>>(new Map());
@@ -446,6 +447,7 @@ const [editDescription, setEditDescription] = useState('');
     pageId?: number;
     status: 'published' | 'failed' | 'generating';
     publishedUrl?: string;
+    wordpressPostId?: number | null;
     error?: string;
   }) => {
     console.log('[Dashboard:SSE] Received update:', data);
@@ -459,6 +461,7 @@ const [editDescription, setEditDescription] = useState('');
         updated.set(incomingDraftId, {
           status: data.status,
           publishedUrl: data.publishedUrl,
+          wordpressPostId: data.wordpressPostId,
           error: data.error,
           updatedAt: new Date().toISOString()
         });
@@ -5829,6 +5832,7 @@ interface CampaignStructureViewProps {
   sharedPublishStatuses: Map<number, {
     status: 'generating' | 'published' | 'failed';
     publishedUrl?: string;
+    wordpressPostId?: number | null;
     error?: string;
     updatedAt?: string;
   }>;
@@ -5837,6 +5841,7 @@ interface CampaignStructureViewProps {
     pageId?: number;
     status: 'published' | 'failed' | 'generating';
     publishedUrl?: string;
+    wordpressPostId?: number | null;
     error?: string;
   }) => void;
   getCampaignPageDisplayName: (pageId?: number, fallback?: string | null) => string;
@@ -6464,6 +6469,7 @@ function CampaignStructureView({
             sequence?: number;
             draftId?: number;
             publishedUrl?: string;
+            wordpressPostId?: number | null;
             pages?: Partial<GenerationPageStatus & { pageType: string; hasHtml?: boolean; error?: string | null }>[];
             error?: string;
           };
@@ -6474,6 +6480,7 @@ function CampaignStructureView({
               pageId: data.pageId,
               status: data.status === 'published' || data.status === 'failed' ? data.status : 'generating',
               publishedUrl: data.publishedUrl,
+              wordpressPostId: data.wordpressPostId,
               error: data.error,
             });
             return;

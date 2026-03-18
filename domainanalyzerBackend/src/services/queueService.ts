@@ -220,7 +220,8 @@ async function handlePublishCompletion(job: Job, responseData: any, meta: any) {
         draftId,
         pageId: meta.pageId, // Include pageId for global sync
         status: finalStatus,
-        publishedUrl: finalUrl
+        publishedUrl: finalUrl,
+        wordpressPostId: wordpressPostId ?? null,
     });
 }
 

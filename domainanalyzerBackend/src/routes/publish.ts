@@ -1022,6 +1022,7 @@ router.get(
       select: {
         id: true,
         wordpressUrl: true,
+        wordpressPostId: true,
         primaryKeyword: true,
         title: true,
         slug: true,
@@ -1123,7 +1124,8 @@ router.post(
       draftId: Number(draftId),
       pageId, // Include pageId for Campaign tab sync
       status: 'published',
-      publishedUrl: finalUrl
+      publishedUrl: finalUrl,
+      wordpressPostId: finalPostId,
     });
 
     res.json({ success: true, status: 'published' });
