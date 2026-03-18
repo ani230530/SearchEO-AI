@@ -421,6 +421,7 @@ model WordpressPublishLog {
   id            Int      @id @default(autoincrement())
   userId        Int
   wordpressUrl  String
+  wordpressPostId Int?
   primaryKeyword String?
   normalizedPrimaryKeyword String?
   generationJobId String?
@@ -743,4 +744,3 @@ model N8nRequest {
   @@index([auditResultId])
   @@index([requestId])
 }
-

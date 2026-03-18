@@ -15,6 +15,7 @@ export interface CanonicalDraftContent {
   title: string;
   metaDescription: string;
   slug: string;
+  wordpressPostId: number | null;
   featuredImageEnabled: boolean;
   featuredImageUrl: string | null;
   primaryKeyword: string;
@@ -398,6 +399,7 @@ export const serializeDraftContent = (draft: WordpressPublishLog): CanonicalDraf
     title: firstString(response.title, response.Title, draft.title),
     metaDescription: firstString(response.metaDescription, response['Meta Description']),
     slug: firstString(response.slug, response.Slug, draft.slug),
+    wordpressPostId: firstNumber(draft.wordpressPostId, response.wordpressPostId, response['WordPress Post ID'], response.id),
     featuredImageEnabled,
     featuredImageUrl,
     primaryKeyword: firstString(draft.primaryKeyword, response.primaryKeyword, response['Primary Keyword']),
@@ -429,6 +431,7 @@ export const normalizePublishGenerateResponse = (
     title: firstString(entry.Title, entry.title) || 'Generated Article',
     metaDescription: firstString(entry['Meta Description'], entry.metaDescription),
     slug: firstString(entry.slug, entry.Slug),
+    wordpressPostId: firstNumber(entry.wordpressPostId, entry['WordPress Post ID'], entry.id),
     wordpressUrl:
       firstString(entry['wordpress url '], entry['wordpress url'], entry.wordpressUrl, integration.siteUrl) ||
       integration.siteUrl,

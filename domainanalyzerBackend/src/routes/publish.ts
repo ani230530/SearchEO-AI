@@ -467,6 +467,7 @@ router.post(
       title,
       metaDescription: metaDescription ?? currentStored.metaDescription ?? null,
       slug: slug ?? draft.slug ?? currentStored.slug ?? null,
+      wordpressPostId: draft.wordpressPostId ?? currentStored.wordpressPostId ?? null,
       longtailKeywords: longtailKeywords ?? currentStored.longtailKeywords ?? null,
       wordpressUrl: resolvedWordpressUrl,
       status: 'published',
@@ -489,6 +490,7 @@ router.post(
         createdAt: draft.createdAt.toISOString(),
         updatedAt: draft.updatedAt.toISOString(),
         wordpressUrl: resolvedWordpressUrl,
+        wordpressPostId: mergedStoredData.wordpressPostId,
         primaryKeyword: mergedStoredData.primaryKeyword,
         title,
         metaDescription: mergedStoredData.metaDescription,
@@ -508,6 +510,7 @@ router.post(
           title,
           slug: (mergedStoredData.slug as string | null) ?? draft.slug,
           wordpressUrl: resolvedWordpressUrl,
+          wordpressPostId: (mergedStoredData.wordpressPostId as number | null) ?? draft.wordpressPostId,
           status: 'published',
           response: {
             ...mergedStoredData,
@@ -1055,6 +1058,12 @@ router.post(
 
     // Determine success or failure
     const finalUrl = link || wordpressUrl || (response && (response.link || response.wordpressUrl));
+    const finalPostId =
+      (typeof response?.id === 'number' && Number.isFinite(response.id) ? Math.trunc(response.id) : null) ||
+      (typeof response?.id === 'string' && response.id.trim() && !Number.isNaN(Number(response.id.trim()))
+        ? Math.trunc(Number(response.id.trim()))
+        : null) ||
+      null;
 
     // Find associated pageId for SSE update
     const linkedPage = await prisma.campaignPage.findFirst({
@@ -1097,7 +1106,8 @@ router.post(
         data: {
           status: 'published',
           wordpressUrl: finalUrl,
-          response: response || { link: finalUrl },
+          wordpressPostId: finalPostId,
+          response: response || { link: finalUrl, wordpressPostId: finalPostId },
         }
       }),
       ...(draft.integrationId ? [prisma.wordpressIntegration.update({

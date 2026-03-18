@@ -129,12 +129,26 @@ async function handlePublishCompletion(job: Job, responseData: any, meta: any) {
         if (typeof val === 'string' && val.trim()) return val.trim();
         return undefined;
     };
+    const getNumberValue = (val: any): number | undefined => {
+        if (typeof val === 'number' && Number.isFinite(val)) return Math.trunc(val);
+        if (typeof val === 'string' && val.trim()) {
+            const parsed = Number(val.trim());
+            if (!Number.isNaN(parsed)) return Math.trunc(parsed);
+        }
+        return undefined;
+    };
 
     const publishedUrl =
         getStringValue(entry?.Link) ??
         getStringValue(entry?.link) ??
         getStringValue(entry?.['wordpress url']) ??
         getStringValue(entry?.wordpressUrl) ??
+        undefined;
+    const wordpressPostId =
+        getNumberValue(entry?.id) ??
+        getNumberValue(entry?.postId) ??
+        getNumberValue(entry?.wordpressPostId) ??
+        getNumberValue(entry?.['WordPress Post ID']) ??
         undefined;
 
     // Get base site URL to compare
@@ -178,6 +192,7 @@ async function handlePublishCompletion(job: Job, responseData: any, meta: any) {
         title: currentResponse.title || entry.title,
         featuredImageEnabled: currentResponse.featuredImageEnabled ?? false,
         featuredImageUrl: currentResponse.featuredImageUrl || currentResponse.featuredImage || null,
+        wordpressPostId: wordpressPostId ?? currentResponse.wordpressPostId ?? currentResponse.id ?? null,
         status: finalStatus
     };
 
@@ -186,6 +201,7 @@ async function handlePublishCompletion(job: Job, responseData: any, meta: any) {
             where: { id: draftId },
             data: {
                 wordpressUrl: finalUrl,
+                wordpressPostId: wordpressPostId ?? null,
                 status: finalStatus,
                 response: mergedResponse,
                 slug: entry?.slug ?? slug,
