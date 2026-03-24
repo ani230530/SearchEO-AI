@@ -6,7 +6,7 @@ import { decryptToken } from '../services/tokenEncryption';
 const router = express.Router();
 const prisma = new PrismaClient();
 
-const N8N_WEBHOOK_URL = 'https://n8n.srv891599.hstgr.cloud/webhook/96e19249-8f7f-407e-b981-3d4e410cb2d7';
+const N8N_WEBHOOK_URL = process.env.N8N_ANALYTICS_REPORTING_WEBHOOK_URL || 'https://n8n.srv891599.hstgr.cloud/webhook/analytics-reporting';
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
 
