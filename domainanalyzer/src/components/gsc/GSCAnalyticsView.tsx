@@ -298,29 +298,35 @@ const GSCAnalyticsView = () => {
     <div className="space-y-6">
 
       {/* ✅ Toggle (NOW IN CORRECT PLACE) */}
-      <div className="flex items-center gap-2 border-b border-gray-200 pb-4">
-        <button
-          onClick={() => setActiveGscSubTab('whole-analytics')}
-          className={`px-5 py-2.5 rounded-full text-sm font-medium transition-all duration-200 ${
-            activeGscSubTab === 'whole-analytics'
-              ? 'bg-gray-900 text-white shadow-lg'
-              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-          }`}
-        >
-          Whole Analytics
-        </button>
+      <div className="flex items-center gap-6 border-b border-gray-200 pb-0">
+  <button
+    onClick={() => setActiveGscSubTab('whole-analytics')}
+    className={`relative pb-3 text-sm font-medium transition-all duration-200 ${
+      activeGscSubTab === 'whole-analytics'
+        ? 'text-black'
+        : 'text-gray-500 hover:text-black'
+    }`}
+  >
+    Overall Performance
+    {activeGscSubTab === 'whole-analytics' && (
+      <span className="absolute left-0 bottom-0 h-[2px] w-full bg-black rounded-full"></span>
+    )}
+  </button>
 
-        <button
-          onClick={() => setActiveGscSubTab('blog-performance')}
-          className={`px-5 py-2.5 rounded-full text-sm font-medium transition-all duration-200 ${
-            activeGscSubTab === 'blog-performance'
-              ? 'bg-gray-900 text-white shadow-lg'
-              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-          }`}
-        >
-          Our Blog Performance
-        </button>
-      </div>
+  <button
+    onClick={() => setActiveGscSubTab('blog-performance')}
+    className={`relative pb-3 text-sm font-medium transition-all duration-200 ${
+      activeGscSubTab === 'blog-performance'
+        ? 'text-black'
+        : 'text-gray-500 hover:text-black'
+    }`}
+  >
+    Our Blog Performance
+    {activeGscSubTab === 'blog-performance' && (
+      <span className="absolute left-0 bottom-0 h-[2px] w-full bg-black rounded-full"></span>
+    )}
+  </button>
+</div>
 
       {/* ✅ Conditional Rendering */}
       {activeGscSubTab === 'whole-analytics' && (
