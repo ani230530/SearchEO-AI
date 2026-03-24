@@ -8,7 +8,7 @@ import {
   SortingState,
   useReactTable,
 } from "@tanstack/react-table";
-import { ArrowDown, ArrowUp, ChevronRight, ChevronUp, ExternalLink, Calendar, Copy, Check, Search, Download, Loader2, ChevronDown, Filter, RefreshCw, X , BarChart3, ChartNoAxesCombined} from "lucide-react";
+import { ArrowDown, ArrowUp, ChevronRight, ChevronUp, ExternalLink, Calendar, Copy, Check, Search, Download, Loader2, ChevronDown, Filter, RefreshCw, X , BarChart3, ChartNoAxesCombined, ArrowRight} from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
@@ -483,10 +483,10 @@ const [activeGscSubTab, setActiveGscSubTab] = useState<'whole-analytics' | 'blog
 </div>
 
       {/* Table */}
-      <div className="bg-white rounded-3xl border border-gray-200 overflow-hidden shadow-sm">
+      <div className="bg-white rounded-sm border border-gray-200 overflow-hidden shadow-sm">
         {/* Table Header */}
-        <div className="border-b border-gray-200 bg-gray-50/50">
-          <div className="grid grid-cols-6 gap-4 px-6 py-3 text-xs font-medium text-gray-600 uppercase tracking-wider">
+        <div className="border-b border-gray-200 bg-[#E9EAEB]">
+          <div className="grid grid-cols-6 gap-4 px-6 py-4 text-xs font-medium text-gray-600 uppercase tracking-wider">
             <div 
               className="flex items-center space-x-2 cursor-pointer hover:text-gray-900 transition-colors"
               onClick={() => handleSort('page')}
@@ -531,7 +531,7 @@ const [activeGscSubTab, setActiveGscSubTab] = useState<'whole-analytics' | 'blog
           {currentPages.map((page, index) => (
             <div
               key={index}
-              className="grid grid-cols-6 gap-4 px-6 py-3.5 hover:bg-gray-50/50 transition-all duration-200 border-b border-gray-50 last:border-b-0"
+              className="grid grid-cols-6 gap-4 px-6 py-4 hover:bg-gray-50/50 transition-all duration-200 border-b border-gray-50 last:border-b-0"
             >
               <div className="flex items-center">
                 <Tooltip>
@@ -592,23 +592,23 @@ const [activeGscSubTab, setActiveGscSubTab] = useState<'whole-analytics' | 'blog
                 </span>
               </div>
               <div className="flex items-center justify-center">
-                <button
-                  onClick={() => onPageSelect(page.page)}
-                  disabled={isQueriesLoading && loadingPageUrl === page.page}
-                  className="h-8 px-4 border border-gray-200 text-gray-700 rounded-full hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed text-xs font-light tracking-tight transition-all duration-200 inline-flex items-center gap-1.5"
-                >
-                  {isQueriesLoading && loadingPageUrl === page.page ? (
-                    <>
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      Loading...
-                    </>
-                  ) : (
-                    <>
-                      View Queries
-                      <ChevronRight className="h-3.5 w-3.5" />
-                    </>
-                  )}
-                </button>
+               <button
+  onClick={() => onPageSelect(page.page)}
+  disabled={isQueriesLoading && loadingPageUrl === page.page}
+  className="text-blue-500 underline hover:text-blue-800 disabled:opacity-50 disabled:cursor-not-allowed text-xs font-medium inline-flex items-center gap-1 transition-colors duration-200"
+>
+  {isQueriesLoading && loadingPageUrl === page.page ? (
+    <>
+      <Loader2 className="h-3.5 w-3.5 animate-spin text-blue-600" />
+      Loading...
+    </>
+  ) : (
+    <>
+      View Queries
+      <ArrowRight className="h-3.5 w-3.5 text-blue-500" />
+    </>
+  )}
+</button>
               </div>
             </div>
           ))}
