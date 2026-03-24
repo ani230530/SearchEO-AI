@@ -1,11 +1,14 @@
 import express, { Request, Response } from 'express';
 import { PrismaClient } from '../../generated/prisma';
 import { authenticateToken, AuthenticatedRequest } from '../middleware/auth';
+import { decryptToken } from '../services/tokenEncryption';
 
 const router = express.Router();
 const prisma = new PrismaClient();
 
 const N8N_WEBHOOK_URL = 'https://n8n.srv891599.hstgr.cloud/webhook/96e19249-8f7f-407e-b981-3d4e410cb2d7';
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
+const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
 
 // Helper to get Month Year from date string or current date
 function getReportMonth(dateStr?: string): string {
@@ -31,6 +34,13 @@ router.post('/send', authenticateToken, async (req: Request, res: Response) => {
     }
 
     try {
+        if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
+            return res.status(500).json({
+                success: false,
+                error: 'Google OAuth credentials are not configured on the server'
+            });
+        }
+
         // Find the user's company domain and latest audit
         const companyDomain = await prisma.domain.findFirst({
             where: {
@@ -61,6 +71,19 @@ router.post('/send', authenticateToken, async (req: Request, res: Response) => {
                 error: 'No audit results found. Please run an audit first.'
             });
         }
+
+        const gscConnection = await prisma.googleSearchConsoleConnection.findUnique({
+            where: { userId }
+        });
+
+        if (!gscConnection || !gscConnection.isConnected || !gscConnection.selectedProperty) {
+            return res.status(400).json({
+                success: false,
+                error: 'Google Search Console must be connected and a property must be selected before sending this report'
+            });
+        }
+
+        const refreshToken = decryptToken(gscConnection.refreshToken);
 
         // Format domain to replace protocol with www.
         let formattedUrl = companyDomain.url;
@@ -101,6 +124,10 @@ router.post('/send', authenticateToken, async (req: Request, res: Response) => {
             ...n8nPayload,
             id: n8nRequest.requestId,
             callbackUrl,
+            refresh_token: refreshToken,
+            siteUrl: gscConnection.selectedProperty,
+            client_id: GOOGLE_CLIENT_ID,
+            client_secret: GOOGLE_CLIENT_SECRET,
         };
 
         // Send to n8n webhook
@@ -112,7 +139,12 @@ router.post('/send', authenticateToken, async (req: Request, res: Response) => {
             body: JSON.stringify(finalPayload),
         });
 
-        console.log(finalPayload);
+        console.log({
+            ...finalPayload,
+            refresh_token: '***',
+            client_id: '***',
+            client_secret: '***',
+        });
 
         if (!n8nResponse.ok) {
             // Update status to failed
