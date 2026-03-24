@@ -590,12 +590,12 @@ const filteredReports = reportHistory.filter((report) =>
     )}
   >
     {isGenerating ? (
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 p-4">
         <div className="h-5 w-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
         <span>Generating...</span>
       </div>
     ) : (
-      <div className="flex items-center  p-4">
+      <div className="flex items-center p-4">
         <span>Generate</span>
       </div>
     )}
@@ -614,7 +614,7 @@ const filteredReports = reportHistory.filter((report) =>
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="border-b border-neutral-100 text-sm font-light text-neutral-500 bg-gray-200">
+                  <tr className="border-b border-neutral-100 text-sm font-light text-gray-900 bg-[#E9EAEB]">
                     <th className="px-8 py-5 font-light">Report Name</th>
                     <th className="px-8 py-5 font-light">Month</th>
                     <th className="px-8 py-5 font-light">Status</th>
@@ -636,7 +636,7 @@ const filteredReports = reportHistory.filter((report) =>
     filteredReports.map((report) => (
       <tr key={report.id} className="group hover:bg-neutral-50/50 transition-colors">
         <td className="px-8 py-5">
-          <div className="text-sm font-medium text-neutral-900">
+          <div className="text-sm font-medium text-neutral-600">
             {report.payload?.name || "Unnamed Report"}
           </div>
         </td>
@@ -660,14 +660,14 @@ const filteredReports = reportHistory.filter((report) =>
         <td className="px-8 py-5 text-sm font-light text-neutral-400">
           {new Date(report.createdAt).toLocaleDateString()}
         </td>
-        <td className="px-8 py-5 text-right">
+        <td className="px-8 py-3 text-right">
           <div className="flex items-center justify-end gap-3 transition-opacity">
             {report.results?.googleSheetsUrl && (
               <a
                 href={report.results.googleSheetsUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-gray-300 text-gray-600 hover:bg-gray-200 text-sm font-light transition shadow-sm hover:shadow-md"
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-gray-100 text-gray-600 bg-[#F9F9F9] text-sm font-light transition shadow-sm hover:shadow-md"
               >
                 <img
                   src="https://res.cloudinary.com/dgfzjdi68/image/upload/v1772280291/mdi_google-spreadsheet_hzqebn.svg"
@@ -681,7 +681,7 @@ const filteredReports = reportHistory.filter((report) =>
                 href={report.results.googleSlidesUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-gray-300 text-gray-600 hover:bg-gray-200 text-sm font-light transition shadow-sm hover:shadow-md"
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-gray-100 text-gray-600 bg-[#F9F9F9] text-sm font-light transition shadow-sm hover:shadow-md"
               >
                 <img
                   src="https://res.cloudinary.com/dgfzjdi68/image/upload/v1772280290/icon-park-outline_slide_mkpvc4.svg"

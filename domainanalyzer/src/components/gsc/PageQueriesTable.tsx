@@ -513,76 +513,6 @@ const PageQueriesTable = ({
 
       {renderDateRangeInfo()}
 
-      {/* Trends Chart */}
-      {showTrends && (
-        <div className="space-y-4 mb-8">
-          {/* Chart */}
-          {isLoadingTrends ? (
-            <div className="bg-white rounded-xl border border-gray-200 p-16 flex items-center justify-center">
-              <div className="text-center space-y-3">
-                <Loader2 className="h-8 w-8 animate-spin mx-auto text-gray-400" />
-                <p className="text-sm font-light text-gray-600">Loading trends data...</p>
-              </div>
-            </div>
-          ) : !trendsData ? (
-            <div className="bg-white rounded-2xl border border-gray-200 p-16 flex items-center justify-center">
-              <div className="text-center space-y-3">
-                <TrendingUp className="h-8 w-8 mx-auto text-gray-400" />
-                <p className="text-sm font-light text-gray-600">No trends data available</p>
-              </div>
-            </div>
-          ) : (() => {
-            // Convert trendsData to chart format
-            const chartDataMap = new Map<string, TrendDataPoint>();
-            
-            // Get selected queries (default to top 5 by clicks if none selected)
-            const queriesToShow = selectedQueries.length > 0 
-              ? selectedQueries 
-              : data.slice(0, 5).map((q) => q.query);
-
-            queriesToShow.forEach((query) => {
-              const queryData = trendsData[query];
-              if (queryData) {
-                Object.entries(queryData).forEach(([date, metrics]) => {
-                  const existing = chartDataMap.get(date);
-                  if (existing) {
-                    existing.clicks = (existing.clicks || 0) + metrics.clicks;
-                    existing.impressions = (existing.impressions || 0) + metrics.impressions;
-                    existing.ctr = existing.clicks && existing.impressions 
-                      ? existing.clicks / existing.impressions 
-                      : 0;
-                    existing.position = existing.position 
-                      ? (existing.position + metrics.position) / 2 
-                      : metrics.position;
-                  } else {
-                    chartDataMap.set(date, {
-                      date,
-                      clicks: metrics.clicks,
-                      impressions: metrics.impressions,
-                      ctr: metrics.ctr,
-                      position: metrics.position,
-                    });
-                  }
-                });
-              }
-            });
-
-            const chartData = Array.from(chartDataMap.values()).sort((a, b) => 
-              a.date.localeCompare(b.date)
-            );
-
-            if (chartData.length === 0) {
-              return (
-                <div className="bg-white rounded-2xl border border-gray-200 p-12 flex items-center justify-center">
-                  <p className="text-sm text-gray-600 font-medium">No trends data available</p>
-                </div>
-              );
-            }
-
-            
-          })()}
-        </div>
-      )}
       {/* Blog URL */}
       <a
     href={pageUrl}
@@ -594,44 +524,44 @@ const PageQueriesTable = ({
     <span className="text-gray-700 font-medium">Blog: </span>
     {pageUrl}
   </a>
-<div className="flex flex-col lg:flex-row gap-6">
-  <div className="flex-[1] min-w-[300px]">
+<div className="flex flex-col lg:flex-row gap-2">
+   <div className="flex-1 min-w-0">
      
       {/* Table */}
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         {/* Table Header */}
-        <div className="border-b border-gray-200 bg-gray-50/50">
-          <div className="grid grid-cols-5 gap-4 px-6 py-3 text-xs font-medium text-gray-600 uppercase tracking-wider">
+        <div className="border-b border-gray-200 bg-[#E9EAEB]">
+          <div className="grid grid-cols-5 gap-4 px-6 py-3 text-xs font-medium text-gray-900 uppercase tracking-wider">
             <div 
-              className="flex items-center space-x-2 cursor-pointer hover:text-gray-900 transition-colors"
+              className="flex items-center space-x-2 cursor-pointer hover:text-gray-600 transition-colors"
               onClick={() => handleSort('query')}
             >
               <span>Search Query</span>
               {getSortIcon('query')}
             </div>
             <div 
-              className="flex items-center space-x-2 cursor-pointer hover:text-gray-900 transition-colors justify-center"
+              className="flex items-center space-x-2 cursor-pointer hover:text-gray-600 transition-colors justify-center"
               onClick={() => handleSort('clicks')}
             >
               <span>Clicks</span>
               {getSortIcon('clicks')}
             </div>
             <div 
-              className="flex items-center space-x-2 cursor-pointer hover:text-gray-900 transition-colors justify-center"
+              className="flex items-center space-x-2 cursor-pointer hover:text-gray-600 transition-colors justify-center"
               onClick={() => handleSort('impressions')}
             >
               <span>Impressions</span>
               {getSortIcon('impressions')}
             </div>
             <div 
-              className="flex items-center space-x-2 cursor-pointer hover:text-gray-900 transition-colors justify-center"
+              className="flex items-center space-x-2 cursor-pointer hover:text-gray-600 transition-colors justify-center"
               onClick={() => handleSort('position')}
             >
               <span>Avg Position</span>
               {getSortIcon('position')}
             </div>
             <div 
-              className="flex items-center space-x-2 cursor-pointer hover:text-gray-900 transition-colors justify-center"
+              className="flex items-center space-x-2 cursor-pointer hover:text-gray-600 transition-colors justify-center"
               onClick={() => handleSort('ctr')}
             >
               <span>CTR</span>
@@ -770,11 +700,82 @@ const PageQueriesTable = ({
         )}
       </div>
       </div>
+      
+      {/* Trends Chart */}
+      {showTrends && (
+        <div className="space-y-4 mb-8">
+          {/* Chart */}
+          {isLoadingTrends ? (
+            <div className="bg-white rounded-md border border-gray-200 p-16 flex items-center justify-center">
+              <div className="text-center space-y-3">
+                <Loader2 className="h-8 w-8 animate-spin mx-auto text-gray-400" />
+                <p className="text-sm font-light text-gray-600">Loading trends data...</p>
+              </div>
+            </div>
+          ) : !trendsData ? (
+            <div className="bg-white rounded-xl border border-gray-200 p-16 flex items-center justify-center">
+              <div className="text-center space-y-3">
+                <TrendingUp className="h-8 w-8 mx-auto text-gray-400" />
+                <p className="text-sm font-light text-gray-600">No trends data available</p>
+              </div>
+            </div>
+          ) : (() => {
+            // Convert trendsData to chart format
+            const chartDataMap = new Map<string, TrendDataPoint>();
+            
+            // Get selected queries (default to top 5 by clicks if none selected)
+            const queriesToShow = selectedQueries.length > 0 
+              ? selectedQueries 
+              : data.slice(0, 5).map((q) => q.query);
+
+            queriesToShow.forEach((query) => {
+              const queryData = trendsData[query];
+              if (queryData) {
+                Object.entries(queryData).forEach(([date, metrics]) => {
+                  const existing = chartDataMap.get(date);
+                  if (existing) {
+                    existing.clicks = (existing.clicks || 0) + metrics.clicks;
+                    existing.impressions = (existing.impressions || 0) + metrics.impressions;
+                    existing.ctr = existing.clicks && existing.impressions 
+                      ? existing.clicks / existing.impressions 
+                      : 0;
+                    existing.position = existing.position 
+                      ? (existing.position + metrics.position) / 2 
+                      : metrics.position;
+                  } else {
+                    chartDataMap.set(date, {
+                      date,
+                      clicks: metrics.clicks,
+                      impressions: metrics.impressions,
+                      ctr: metrics.ctr,
+                      position: metrics.position,
+                    });
+                  }
+                });
+              }
+            });
+
+            const chartData = Array.from(chartDataMap.values()).sort((a, b) => 
+              a.date.localeCompare(b.date)
+            );
+
+            if (chartData.length === 0) {
+              return (
+                <div className="bg-white rounded-2xl border border-gray-200 p-12 flex items-center justify-center">
+                  <p className="text-sm text-gray-600 font-medium">No trends data available</p>
+                </div>
+              );
+            }
+
+            
+          })()}
+        </div>
+      )}
 {/* Right column for the chart */}
-<div className="flex-1 min-w-[300px] h-full">
+ <div className="flex-1 min-w-0">
   {showTrends && trendsData ? (
-   <div className="w-full h-[600px] overflow-x-auto">
-  <div className="min-w-[600px] h-full">
+   <div className="w-full h-[600px]">
+  <div className="w-full h-full">
     <TrendsChart
   data={Object.entries(trendsData)
     .filter(([query]) => selectedQueries.length === 0 || selectedQueries.includes(query))
