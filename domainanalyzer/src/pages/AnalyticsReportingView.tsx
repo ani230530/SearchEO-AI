@@ -500,7 +500,7 @@ const filteredReports = reportHistory.filter((report) =>
                   <div className="space-y-2">
                     <h4 className="text-xl font-light text-neutral-900">Analytics Connection Required</h4>
                     <p className="text-sm text-neutral-500 font-light max-w-xs mx-auto leading-relaxed">
-                      Please go to the <strong>Integration</strong> tab and add your Google Analytics Property ID to enable report generation.
+                      Please go to the <strong>Integration</strong> tab, connect Google Search Console and Google Analytics access, then add your Google Analytics Property ID to enable report generation.
                     </p>
                   </div>
                 </div>

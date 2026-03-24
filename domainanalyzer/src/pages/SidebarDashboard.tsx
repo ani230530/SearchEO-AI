@@ -1426,7 +1426,7 @@ useEffect(() => {
       console.error('Error fetching GSC properties:', error);
       toast({
         title: "Error",
-        description: "Failed to fetch Search Console properties",
+        description: "Failed to fetch Google Search Console properties",
         variant: "destructive"
       });
     } finally {
@@ -1483,7 +1483,7 @@ useEffect(() => {
       if (success === 'true') {
       toast({
           title: "Connected Successfully",
-          description: "Google Search Console has been connected",
+          description: "Google Search Console and Google Analytics access have been connected",
         });
         const newUrl = new URL(window.location.href);
         newUrl.searchParams.delete('success');
@@ -1530,7 +1530,7 @@ useEffect(() => {
       console.error("Error connecting GSC:", error);
       toast({
         title: "Connection Failed",
-        description: "Failed to initiate Google Search Console connection",
+        description: "Failed to initiate Google Search Console and Google Analytics connection",
         variant: "destructive",
       });
     }
@@ -1560,7 +1560,7 @@ useEffect(() => {
         setGscSelectedProperty(property);
         toast({
           title: "Property Selected",
-          description: "Search Console property has been selected",
+          description: "Google Search Console property has been selected",
         });
       }
     } catch (error) {
@@ -1600,14 +1600,14 @@ useEffect(() => {
         setGscLastSynced(null);
         toast({
           title: "Disconnected",
-          description: "Google Search Console has been disconnected",
+          description: "Google Search Console and Google Analytics access have been disconnected",
         });
       }
     } catch (error) {
       console.error("Error disconnecting GSC:", error);
       toast({
         title: "Error",
-        description: "Failed to disconnect Google Search Console",
+        description: "Failed to disconnect Google Search Console and Google Analytics access",
         variant: "destructive"
       });
     }
@@ -4503,8 +4503,8 @@ const allSections = [...leftSections, ...rightSections];
                             </div>
                             <p className="text-sm font-light text-gray-500">
                               Search Console data will be available for this
-                              property. You can fetch analytics data using the
-                              API.
+                              property, and the same Google connection now
+                              includes Analytics read access for reporting.
                             </p>
                           </div>
                         )}
@@ -4518,7 +4518,7 @@ const allSections = [...leftSections, ...rightSections];
                               </div>
                               <div className="space-y-1">
                                 <div className="flex items-center gap-3">
-                                  <h3 className="text-2xl font-light text-black tracking-tight">Google Analytics 4</h3>
+                                  <h3 className="text-2xl font-light text-black tracking-tight">Google Search Console + Google Analytics</h3>
                                   {googleAnalyticsId && (
                                     <div className="flex items-center gap-1.5 bg-green-50 text-green-700 px-3 py-1 rounded-full text-[10px] font-medium border border-green-100 uppercase tracking-wider">
                                       <CheckCircle className="h-3 w-3" />
@@ -4526,7 +4526,7 @@ const allSections = [...leftSections, ...rightSections];
                                     </div>
                                   )}
                                 </div>
-                                <p className="text-sm text-neutral-400 font-light max-w-xs">Link your Property ID for automated reporting and advanced audit insights.</p>
+                                <p className="text-sm text-neutral-400 font-light max-w-xs">Connect Google once for Search Console access, then save your GA4 Property ID for automated reporting.</p>
                               </div>
                             </div>
 
@@ -4559,7 +4559,7 @@ const allSections = [...leftSections, ...rightSections];
                                     if (res.ok) {
                                       toast({
                                         title: "Connection Successful",
-                                        description: "Your Google Analytics Property ID has been securely linked.",
+                                        description: "Your Google Analytics Property ID has been saved for the connected Google account.",
                                       });
                                     } else {
                                       throw new Error("Failed to update");
