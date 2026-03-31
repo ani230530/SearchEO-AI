@@ -134,6 +134,15 @@ const slugifyText = (value: string): string =>
     .replace(/\s+/g, '-')
     .replace(/-+/g, '-');
 
+const isValidHttpUrl = (value: string): boolean => {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'http:' || url.protocol === 'https:';
+  } catch {
+    return false;
+  }
+};
+
 const createDraftSnapshot = (
   content: GeneratedArticleContent | null,
   htmlContent?: string
@@ -219,6 +228,9 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
   const [editedHtmlContent, setEditedHtmlContent] = useState('');
   const [newImageUrl, setNewImageUrl] = useState('');
   const [newImageAlt, setNewImageAlt] = useState('');
+  const [featuredImageInput, setFeaturedImageInput] = useState('');
+  const [featuredImageEditNote, setFeaturedImageEditNote] = useState('');
+  const [featuredImageEditing, setFeaturedImageEditing] = useState(false);
   const [showAddImageModal, setShowAddImageModal] = useState(false);
   const [originalHtmlContent, setOriginalHtmlContent] = useState('');
   const quillRef = useRef<ReactQuill>(null);
@@ -514,6 +526,10 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
     () => publishImages.find((image) => image.src === selectedImage) ?? null,
     [publishImages, selectedImage]
   );
+
+  useEffect(() => {
+    setFeaturedImageInput(publishResult?.featuredImageUrl ?? '');
+  }, [publishResult?.featuredImageUrl]);
 
   const filteredPublishKeywords = useMemo(() => {
     if (!publishKeywordQuery) {
@@ -924,6 +940,138 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
     });
   }, []);
 
+  const applyFeaturedImageState = useCallback((url: string | null, enabled: boolean) => {
+    const normalizedUrl = url?.trim() ? url.trim() : null;
+    setFeaturedImageInput(normalizedUrl ?? '');
+    setPublishResult((prev) =>
+      prev
+        ? {
+            ...prev,
+            featuredImageEnabled: enabled,
+            featuredImageUrl: normalizedUrl,
+          }
+        : prev
+    );
+  }, []);
+
+  const handleApplyFeaturedImageUrl = useCallback(() => {
+    if (!publishResult) return;
+
+    const trimmedUrl = featuredImageInput.trim();
+    if (!trimmedUrl) {
+      toast({
+        title: 'Thumbnail URL Required',
+        description: 'Paste an image URL to update the featured image.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (!isValidHttpUrl(trimmedUrl)) {
+      toast({
+        title: 'Invalid URL',
+        description: 'Use a full http or https image URL.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    applyFeaturedImageState(trimmedUrl, true);
+    toast({
+      title: 'Thumbnail Updated',
+      description: 'Save draft or publish to persist the featured image change.',
+    });
+  }, [applyFeaturedImageState, featuredImageInput, publishResult, toast]);
+
+  const handleUseInlineImageAsFeatured = useCallback(
+    (imageSrc: string) => {
+      if (!publishResult) return;
+
+      applyFeaturedImageState(imageSrc, true);
+      toast({
+        title: 'Thumbnail Selected',
+        description: 'The inline image is now set as the featured thumbnail.',
+      });
+    },
+    [applyFeaturedImageState, publishResult, toast]
+  );
+
+  const handleEnableAutoFeaturedImage = useCallback(() => {
+    if (!publishResult) return;
+
+    applyFeaturedImageState(null, true);
+    setFeaturedImageEditNote('');
+    toast({
+      title: 'Automatic Thumbnail Enabled',
+      description: 'WordPress publishing will use an automatic featured image again.',
+    });
+  }, [applyFeaturedImageState, publishResult, toast]);
+
+  const handleDisableFeaturedImage = useCallback(() => {
+    if (!publishResult) return;
+
+    applyFeaturedImageState(null, false);
+    setFeaturedImageEditNote('');
+    toast({
+      title: 'Thumbnail Disabled',
+      description: 'The post will publish without a featured image.',
+    });
+  }, [applyFeaturedImageState, publishResult, toast]);
+
+  const handleFeaturedImageEdit = useCallback(async () => {
+    if (!publishResult || !publishResult.featuredImageUrl || !featuredImageEditNote.trim()) {
+      toast({
+        title: 'Thumbnail Note Required',
+        description: 'Add a note describing how the thumbnail should change.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setFeaturedImageEditing(true);
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/publish/edit-image`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('authToken')}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          title: publishResult.title,
+          metaDescription: publishResult.metaDescription,
+          image: publishResult.featuredImageUrl,
+          userNote: featuredImageEditNote,
+        }),
+      });
+
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || 'Failed to edit thumbnail');
+      }
+
+      const updatedImage = extractEditedImage(data.result);
+      if (!updatedImage) {
+        throw new Error('Automation service did not return an updated thumbnail');
+      }
+
+      applyFeaturedImageState(updatedImage, true);
+      setFeaturedImageEditNote('');
+      toast({
+        title: 'Thumbnail Regenerated',
+        description: 'Review the new featured image, then save draft or publish.',
+      });
+    } catch (error) {
+      console.error('Error editing featured image:', error);
+      toast({
+        title: 'Thumbnail Edit Failed',
+        description: error instanceof Error ? error.message : 'Unable to update the thumbnail',
+        variant: 'destructive',
+      });
+    } finally {
+      setFeaturedImageEditing(false);
+    }
+  }, [applyFeaturedImageState, extractEditedImage, featuredImageEditNote, publishResult, toast]);
+
   const renderMetadataEditor = () => {
     if (!publishResult || !isEditMode) return null;
 
@@ -975,6 +1123,149 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
             className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-900 outline-none transition focus:border-gray-900"
           />
         </div>
+      </div>
+    );
+  };
+
+  const renderFeaturedImageEditor = () => {
+    if (!publishResult || !isEditMode) return null;
+
+    const featuredImageUrl = publishResult.featuredImageUrl ?? '';
+    const hasCustomThumbnail = Boolean(featuredImageUrl);
+    const quickPickImages = publishImages.filter((image) => image.src !== featuredImageUrl).slice(0, 4);
+
+    return (
+      <div className="rounded-2xl border border-gray-200 bg-white p-4 space-y-4">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-xs text-gray-500 mb-1">Featured image</p>
+            <p className="text-sm font-medium text-gray-900">Thumbnail for WordPress and previews</p>
+          </div>
+          <span
+            className={`inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] ${
+              publishResult.featuredImageEnabled
+                ? hasCustomThumbnail
+                  ? 'bg-emerald-100 text-emerald-700'
+                  : 'bg-amber-100 text-amber-700'
+                : 'bg-gray-100 text-gray-500'
+            }`}
+          >
+            {publishResult.featuredImageEnabled
+              ? hasCustomThumbnail
+                ? 'Custom'
+                : 'Auto'
+              : 'Off'}
+          </span>
+        </div>
+
+        <div className="overflow-hidden rounded-2xl border border-gray-200 bg-gray-50">
+          {hasCustomThumbnail ? (
+            <img
+              src={featuredImageUrl}
+              alt="Featured thumbnail preview"
+              className="h-40 w-full object-cover"
+            />
+          ) : (
+            <div className="flex h-40 flex-col items-center justify-center gap-2 px-4 text-center text-sm text-gray-500">
+              <ImageIcon className="h-8 w-8 text-gray-400" />
+              <p>
+                {publishResult.featuredImageEnabled
+                  ? 'No custom thumbnail set. The publish flow will generate one automatically.'
+                  : 'Featured image is currently disabled.'}
+              </p>
+            </div>
+          )}
+        </div>
+
+        <div className="space-y-2">
+          <label className="text-xs font-medium uppercase tracking-[0.2em] text-gray-500">
+            Thumbnail URL
+          </label>
+          <input
+            type="url"
+            value={featuredImageInput}
+            onChange={(event) => setFeaturedImageInput(event.target.value)}
+            placeholder="https://example.com/featured-image.jpg"
+            className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-900 outline-none transition focus:border-gray-900"
+          />
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+            <button
+              type="button"
+              onClick={handleApplyFeaturedImageUrl}
+              className="rounded-full bg-gray-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-gray-800"
+            >
+              Apply URL
+            </button>
+            <button
+              type="button"
+              onClick={handleEnableAutoFeaturedImage}
+              className="rounded-full border border-gray-200 px-4 py-2.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+            >
+              Auto-generate
+            </button>
+            <button
+              type="button"
+              onClick={handleDisableFeaturedImage}
+              className="rounded-full border border-gray-200 px-4 py-2.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+            >
+              Disable
+            </button>
+          </div>
+        </div>
+
+        {quickPickImages.length > 0 && (
+          <div className="space-y-2">
+            <p className="text-xs font-medium uppercase tracking-[0.2em] text-gray-500">
+              Use inline image
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              {quickPickImages.map((image) => (
+                <button
+                  key={`featured-image-pick-${image.src}`}
+                  type="button"
+                  onClick={() => handleUseInlineImageAsFeatured(image.src)}
+                  className="overflow-hidden rounded-2xl border border-gray-200 bg-gray-50 text-left transition hover:border-gray-300 hover:bg-gray-100"
+                >
+                  <img src={image.src} alt={image.alt} className="h-20 w-full object-cover" />
+                  <div className="px-3 py-2">
+                    <p className="truncate text-xs font-medium text-gray-700">{image.alt}</p>
+                    <p className="mt-1 text-[11px] text-gray-500">Use as thumbnail</p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {hasCustomThumbnail && (
+          <div className="space-y-2">
+            <label className="text-xs font-medium uppercase tracking-[0.2em] text-gray-500">
+              Regenerate thumbnail
+            </label>
+            <textarea
+              value={featuredImageEditNote}
+              onChange={(event) => setFeaturedImageEditNote(event.target.value)}
+              placeholder="Describe the new look, style, framing, or mood for the thumbnail..."
+              rows={3}
+              className="w-full resize-none rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-900 outline-none transition focus:border-gray-900"
+            />
+            <button
+              type="button"
+              onClick={handleFeaturedImageEdit}
+              disabled={!featuredImageEditNote.trim() || featuredImageEditing}
+              className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-gray-200 px-4 py-2.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {featuredImageEditing ? (
+                <>
+                  <ButtonSpinner />
+                  Regenerating
+                </>
+              ) : (
+                'Regenerate thumbnail'
+              )}
+            </button>
+          </div>
+        )}
       </div>
     );
   };
@@ -1152,7 +1443,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
     } finally {
       setSaving(false);
     }
-  }, [toast, fetchPublishHistory, currentDraftId, publishForm, publishResult, currentHtmlContent, initialDraft]);
+  }, [toast, fetchPublishHistory, currentDraftId, publishForm, publishResult, currentHtmlContent, initialDraft, pageId]);
 
   // Keep publishResult in sync with updated long-tail selections (for preview only)
   // User must click Save to persist to DB
@@ -2722,6 +3013,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
                       </div>
 
                       {renderMetadataEditor()}
+                      {renderFeaturedImageEditor()}
                       
                       <div className="rounded-2xl border border-gray-200 bg-white p-4">
                         <p className="text-xs text-gray-500 mb-2">Secondary Keywords</p>
@@ -3339,6 +3631,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
                         </div>
 
                         {renderMetadataEditor()}
+                        {renderFeaturedImageEditor()}
                         
                         <div className="rounded-2xl border border-gray-200 bg-white p-4">
                           <p className="text-xs text-gray-500 mb-2">Secondary Keywords</p>
