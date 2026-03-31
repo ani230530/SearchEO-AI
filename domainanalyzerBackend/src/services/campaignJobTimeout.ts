@@ -56,12 +56,21 @@ export async function checkCampaignJobTimeouts() {
 
                 // Also update the draft log if it exists
                 if (page.draftId) {
+                    const existingDraft = await prisma.wordpressPublishLog.findUnique({
+                        where: { id: page.draftId },
+                        select: { response: true }
+                    });
+                    const currentResponse = ((existingDraft?.response as Record<string, unknown> | null) || {}) as Record<string, unknown>;
+
                     await prisma.wordpressPublishLog.update({
                         where: { id: page.draftId },
                         data: {
                             status: 'draft', // Reset to draft/failed
                             response: {
-                                error: 'Timeout: Generation stuck for > 15 minutes'
+                                ...currentResponse,
+                                error: 'Timeout: Generation stuck for > 15 minutes',
+                                status: 'failed',
+                                failedAt: new Date().toISOString()
                             }
                         }
                     }).catch(e => console.error(`Failed to update draft ${page.draftId} timeout`, e));

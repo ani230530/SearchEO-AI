@@ -232,11 +232,18 @@ async function handlePublishFailure(job: Job, error: any, meta: any) {
 
     // Update DB to draft (failed state)
     try {
+        const existingDraft = await prisma.wordpressPublishLog.findUnique({
+            where: { id: draftId },
+            select: { response: true }
+        });
+        const currentResponse = ((existingDraft?.response as Record<string, unknown> | null) || {}) as Record<string, unknown>;
+
         await prisma.wordpressPublishLog.update({
             where: { id: draftId },
             data: {
                 status: 'failed',
                 response: {
+                    ...currentResponse,
                     error: error.message || 'Publish job failed',
                     status: 'failed',
                     failedAt: new Date().toISOString()
@@ -310,11 +317,22 @@ async function handleCampaignGenerationFailure(job: Job, error: any, meta: any) 
 
                 // Update draft if exists
                 if (page.draftId) {
+                    const existingDraft = await prisma.wordpressPublishLog.findUnique({
+                        where: { id: page.draftId },
+                        select: { response: true }
+                    });
+                    const currentResponse = ((existingDraft?.response as Record<string, unknown> | null) || {}) as Record<string, unknown>;
+
                     await prisma.wordpressPublishLog.update({
                         where: { id: page.draftId },
                         data: {
                             status: 'draft',
-                            response: { error: error.message || 'Generation queue job failed' }
+                            response: {
+                                ...currentResponse,
+                                error: error.message || 'Generation queue job failed',
+                                status: 'failed',
+                                failedAt: new Date().toISOString()
+                            }
                         }
                     }).catch(e => console.error(`Failed to update draft ${page.draftId} failure`, e));
                 }

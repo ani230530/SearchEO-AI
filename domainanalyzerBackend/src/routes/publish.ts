@@ -1075,11 +1075,13 @@ router.post(
 
     if (error || !finalUrl) {
       // Handle Failure
+      const currentResponse = ((draft.response as Record<string, unknown> | null) || {}) as Record<string, unknown>;
       await prisma.wordpressPublishLog.update({
         where: { id: Number(draftId) },
         data: {
           status: 'failed',
           response: {
+            ...currentResponse,
             error: error || 'Async publish failed (no link returned)',
             status: 'failed',
             failedAt: new Date().toISOString()
