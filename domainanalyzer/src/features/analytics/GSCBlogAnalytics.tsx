@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { 
   BarChart3, 
   TrendingUp, 
@@ -12,11 +13,20 @@ import {
   Loader2,
   XCircle
 } from 'lucide-react';
+import PageQueriesTable from '@/components/gsc/PageQueriesTable';
 import D3LineChart from '@/components/charts/D3LineChart';
 import D3BarChart from '@/components/charts/D3BarChart';
 import D3GaugeChart from '@/components/charts/D3GaugeChart';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+
+const getAuthHeaders = () => {
+  const token = localStorage.getItem('authToken');
+  return {
+    Authorization: `Bearer ${token}`,
+    'Content-Type': 'application/json',
+  };
+};
 
 interface BlogPerformance {
   id: number;
@@ -122,6 +132,58 @@ const GSCBlogAnalytics: React.FC = () => {
     setSelectedBlog(blog);
   };
 
+  const { data: queriesData, isLoading: isLoadingQueries } = useQuery({
+    queryKey: ['gsc-blog-queries', selectedBlog?.url, dateRange],
+    queryFn: async () => {
+      if (!selectedBlog?.url) return null;
+      const encodedPageUrl = encodeURIComponent(selectedBlog.url);
+      const response = await fetch(`${API_BASE_URL}/api/gsc/pages/${encodedPageUrl}/queries?days=${dateRange}`, {
+        headers: getAuthHeaders(),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to fetch page queries');
+      }
+      return data;
+    },
+    enabled: Boolean(selectedBlog?.url),
+    staleTime: 60 * 60 * 1000,
+  });
+
+  const { data: trendsData, isLoading: isLoadingTrends } = useQuery({
+    queryKey: ['gsc-blog-queries-trends', selectedBlog?.url, dateRange],
+    queryFn: async () => {
+      if (!selectedBlog?.url) return null;
+      const encodedPageUrl = encodeURIComponent(selectedBlog.url);
+      const response = await fetch(`${API_BASE_URL}/api/gsc/pages/${encodedPageUrl}/queries?days=${dateRange}&includeDateBreakdown=true`, {
+        headers: getAuthHeaders(),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to fetch trends data');
+      }
+      return data;
+    },
+    enabled: Boolean(selectedBlog?.url),
+    staleTime: 60 * 60 * 1000,
+  });
+
+  if (selectedBlog) {
+    return (
+      <PageQueriesTable
+        data={queriesData?.queries || []}
+        pageUrl={selectedBlog.url}
+        dateRange={queriesData?.dateRange || null}
+        isLoading={isLoadingQueries}
+        onBack={() => setSelectedBlog(null)}
+        showTrends
+        onShowTrendsChange={() => {}}
+        trendsData={trendsData?.dateBreakdown}
+        isLoadingTrends={isLoadingTrends}
+      />
+    );
+  }
+
   // Render loading state
   if (loading) {
     return (
@@ -135,7 +197,7 @@ const GSCBlogAnalytics: React.FC = () => {
   // Render domain mismatch or not connected states
   if (domainMatch && !domainMatch.match) {
     return (
-      <div className="rounded-2xl border border-gray-100 bg-white p-8">
+      <div className="rounded-[28px] border border-gray-200 bg-white p-8 shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
         <div className="flex items-start gap-4">
           {domainMatch.reason === 'wordpress_not_connected' ? (
             <>
@@ -149,7 +211,7 @@ const GSCBlogAnalytics: React.FC = () => {
                 </p>
                 <a 
                   href="/newdashboard?tab=publish" 
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+                  className="inline-flex items-center gap-2 rounded-full bg-black px-4 py-2 text-sm font-medium text-white hover:bg-black/90 transition-colors"
                 >
                   Connect WordPress <ExternalLink className="w-4 h-4" />
                 </a>
@@ -170,7 +232,7 @@ const GSCBlogAnalytics: React.FC = () => {
                 </p>
                 <a 
                   href="/newdashboard?tab=analytics&subtab=integration" 
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+                  className="inline-flex items-center gap-2 rounded-full bg-black px-4 py-2 text-sm font-medium text-white hover:bg-black/90 transition-colors"
                 >
                   Connect GSC <ExternalLink className="w-4 h-4" />
                 </a>
@@ -208,13 +270,13 @@ const GSCBlogAnalytics: React.FC = () => {
   // Render error state
   if (error) {
     return (
-      <div className="rounded-2xl border border-red-100 bg-red-50 p-8 text-center">
+      <div className="rounded-[28px] border border-red-100 bg-white p-8 text-center shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
         <AlertCircle className="w-10 h-10 text-red-500 mx-auto mb-4" />
         <h3 className="text-lg font-semibold text-red-800 mb-2">Error Loading Analytics</h3>
         <p className="text-red-600 mb-4">{error}</p>
         <button 
           onClick={handleRefresh}
-          className="inline-flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+          className="inline-flex items-center gap-2 rounded-full bg-black px-4 py-2 text-sm font-medium text-white hover:bg-black/90 transition-colors"
         >
           <RefreshCw className="w-4 h-4" /> Try Again
         </button>
@@ -225,20 +287,20 @@ const GSCBlogAnalytics: React.FC = () => {
   // No data state
   if (!aggregateData || aggregateData.totalBlogsAnalyzed === 0) {
     return (
-      <div className="rounded-2xl border border-gray-100 bg-white p-8">
+      <div className="rounded-[28px] border border-gray-200 bg-white p-8 shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
         <div className="text-center py-8">
           <BarChart3 className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">No Published Blogs Found</h3>
+          <h3 className="text-xl font-medium tracking-tight text-gray-900 mb-2">No Published Blogs Found</h3>
           <p className="text-gray-600 mb-4">
             Publish your first blog to start tracking its performance in Google Search Console.
           </p>
-          <div className="flex items-center justify-center gap-2 text-sm text-green-600 mb-4">
+          <div className="mb-4 inline-flex items-center justify-center gap-2 rounded-full border border-gray-200 bg-gray-50 px-3 py-1.5 text-sm text-gray-600">
             <CheckCircle2 className="w-4 h-4" />
             <span>Domains matched: {domainMatch?.wordpressDomain}</span>
           </div>
           <a 
             href="/newdashboard?tab=publish" 
-            className="inline-flex items-center gap-2 px-4 py-2 bg-black text-white rounded-lg hover:bg-gray-700 transition-colors"
+            className="inline-flex items-center gap-2 rounded-full bg-black px-4 py-2 text-sm font-medium text-white hover:bg-black/90 transition-colors"
           >
             Publish Your First Blog <ExternalLink className="w-4 h-4" />
           </a>
@@ -269,7 +331,7 @@ const GSCBlogAnalytics: React.FC = () => {
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-light text-gray-900">Published Blog Analytics</h2>
+          <h2 className="text-2xl font-light tracking-tight text-gray-900">Published Blog Analytics</h2>
           <div className="flex items-center gap-2 mt-1">
             <CheckCircle2 className="w-4 h-4 text-green-500" />
             <span className="text-sm text-gray-600">
@@ -281,7 +343,7 @@ const GSCBlogAnalytics: React.FC = () => {
           <select
             value={dateRange}
             onChange={(e) => setDateRange(Number(e.target.value))}
-            className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+            className="rounded-2xl border border-gray-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-black/5"
           >
             <option value={7}>Last 7 days</option>
             <option value={28}>Last 28 days</option>
@@ -289,7 +351,7 @@ const GSCBlogAnalytics: React.FC = () => {
           </select>
           <button
             onClick={handleRefresh}
-            className="p-2 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+            className="rounded-2xl border border-gray-200 p-2 hover:bg-gray-50 transition-colors"
           >
             <RefreshCw className="w-4 h-4 text-gray-600" />
           </button>
@@ -298,10 +360,10 @@ const GSCBlogAnalytics: React.FC = () => {
 
       {/* Overview Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="rounded-xl border border-gray-100 bg-white p-5">
+        <div className="rounded-[24px] border border-gray-200 bg-white p-5 shadow-[0_8px_24px_rgba(15,23,42,0.03)]">
           <div className="flex items-center gap-3 mb-3">
-            <div className="p-2 rounded-lg bg-purple-100">
-              <MousePointer className="w-5 h-5 text-purple-600" />
+            <div className="p-2 rounded-2xl bg-gray-100">
+              <MousePointer className="w-5 h-5 text-gray-700" />
             </div>
             <span className="text-sm text-gray-600">Total Clicks</span>
           </div>
@@ -310,9 +372,9 @@ const GSCBlogAnalytics: React.FC = () => {
           </p>
         </div>
 
-        <div className="rounded-xl border border-gray-100 bg-white p-5">
+        <div className="rounded-[24px] border border-gray-200 bg-white p-5 shadow-[0_8px_24px_rgba(15,23,42,0.03)]">
           <div className="flex items-center gap-3 mb-3">
-            <div className="p-2 rounded-lg bg-blue-100">
+            <div className="p-2 rounded-2xl bg-blue-50">
               <Eye className="w-5 h-5 text-blue-600" />
             </div>
             <span className="text-sm text-gray-600">Impressions</span>
@@ -322,9 +384,9 @@ const GSCBlogAnalytics: React.FC = () => {
           </p>
         </div>
 
-        <div className="rounded-xl border border-gray-100 bg-white p-5">
+        <div className="rounded-[24px] border border-gray-200 bg-white p-5 shadow-[0_8px_24px_rgba(15,23,42,0.03)]">
           <div className="flex items-center gap-3 mb-3">
-            <div className="p-2 rounded-lg bg-green-100">
+            <div className="p-2 rounded-2xl bg-green-50">
               <TrendingUp className="w-5 h-5 text-green-600" />
             </div>
             <span className="text-sm text-gray-600">Avg CTR</span>
@@ -334,9 +396,9 @@ const GSCBlogAnalytics: React.FC = () => {
           </p>
         </div>
 
-        <div className="rounded-xl border border-gray-100 bg-white p-5">
+        <div className="rounded-[24px] border border-gray-200 bg-white p-5 shadow-[0_8px_24px_rgba(15,23,42,0.03)]">
           <div className="flex items-center gap-3 mb-3">
-            <div className="p-2 rounded-lg bg-amber-100">
+            <div className="p-2 rounded-2xl bg-amber-50">
               <Target className="w-5 h-5 text-amber-600" />
             </div>
             <span className="text-sm text-gray-600">Avg Position</span>
@@ -348,47 +410,98 @@ const GSCBlogAnalytics: React.FC = () => {
       </div>
 
       {/* Charts Row */}
-  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-  
-  {/* Line Chart */}
-  <div className="w-full">
-    <div className="rounded-xl border border-gray-100 bg-white p-6 w-full">
-      <h3 className="text-lg font-medium text-gray-900 mb-4 text-center">
-        Performance Trend
-      </h3>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Line Chart - Performance Over Time */}
+        <div className="min-h-[380px] rounded-[24px] border border-gray-200 bg-white p-6 shadow-[0_8px_24px_rgba(15,23,42,0.03)]">
+          <h3 className="text-lg font-medium text-gray-900 mb-4">Performance Trend</h3>
+          <div className="overflow-x-auto">
+            <D3LineChart
+              data={clicksData}
+              secondaryData={impressionsData}
+              width={500}
+              height={280}
+              primaryColor="#111111"
+              secondaryColor="#3b82f6"
+              primaryLabel="Clicks"
+              secondaryLabel="Impressions"
+            />
+          </div>
+        </div>
 
-      {/* IMPORTANT: give height */}
-      <div className="w-full h-[280px]">
-        <D3LineChart
-          data={clicksData}
-          secondaryData={impressionsData}
-          primaryColor="#8b5cf6"
-          secondaryColor="#3b82f6"
-          primaryLabel="Clicks"
-          secondaryLabel="Impressions"
-        />
+        {/* Bar Chart - Top Blogs */}
+        <div className="min-h-[380px] rounded-[24px] border border-gray-200 bg-white p-6 shadow-[0_8px_24px_rgba(15,23,42,0.03)]">
+          <h3 className="text-lg font-medium text-gray-900 mb-4">Top Performing Blogs</h3>
+          <div className="overflow-x-auto">
+            <D3BarChart
+              data={blogBarData}
+              width={500}
+              height={280}
+              horizontal
+              gradientColors={['#111111', '#4b5563']}
+              onBarClick={(item) => {
+                const blog = aggregateData.blogs.find(b => b.id === item.id);
+                if (blog) handleBlogClick(blog);
+              }}
+            />
+          </div>
+        </div>
       </div>
     </div>
   </div>
 
-  {/* Bar Chart */}
-  <div className="w-full">
-    <div className="rounded-xl border border-gray-100 bg-white p-6 w-full">
-      <h3 className="text-lg font-medium text-gray-900 mb-4 text-center">
-        Top Performing Blogs
-      </h3>
+      {/* Gauges Row */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="rounded-[24px] border border-gray-200 bg-white p-6 shadow-[0_8px_24px_rgba(15,23,42,0.03)]">
+          <div className="mb-4 flex items-center gap-3">
+            <div className="rounded-2xl bg-gray-100 p-2">
+              <MousePointer className="h-5 w-5 text-gray-700" />
+            </div>
+            <div>
+              <h3 className="text-lg font-medium text-gray-900">Click-Through Rate</h3>
+              <p className="text-sm text-gray-500">How often published pages earn clicks from search impressions.</p>
+            </div>
+          </div>
+          <div className="flex w-full justify-center">
+            <D3GaugeChart
+              value={aggregateData.avgCTR * 100}
+              maxValue={10}
+              label="CTR Performance"
+              unit="%"
+              size={190}
+              colorRanges={[
+                { min: 0, max: 1, color: '#fee2e2' },
+                { min: 1, max: 3, color: '#fef3c7' },
+                { min: 3, max: 10, color: '#d1fae5' }
+              ]}
+            />
+          </div>
+        </div>
 
-      {/* IMPORTANT: give height */}
-      <div className="w-full h-[280px]">
-        <D3BarChart
-          data={blogBarData}
-          horizontal
-          gradientColors={['#8b5cf6', '#c084fc']}
-          onBarClick={(item) => {
-            const blog = aggregateData.blogs.find(b => b.id === item.id);
-            if (blog) handleBlogClick(blog);
-          }}
-        />
+        <div className="rounded-[24px] border border-gray-200 bg-white p-6 shadow-[0_8px_24px_rgba(15,23,42,0.03)]">
+          <div className="mb-4 flex items-center gap-3">
+            <div className="rounded-2xl bg-amber-50 p-2">
+              <Target className="h-5 w-5 text-amber-600" />
+            </div>
+            <div>
+              <h3 className="text-lg font-medium text-gray-900">Average Position</h3>
+              <p className="text-sm text-gray-500">Lower positions mean your published pages rank closer to the top.</p>
+            </div>
+          </div>
+          <div className="flex w-full justify-center">
+            <D3GaugeChart
+              value={Math.min(aggregateData.avgPosition, 100)}
+              maxValue={100}
+              label="Lower is Better"
+              unit=""
+              size={190}
+              colorRanges={[
+                { min: 0, max: 10, color: '#d1fae5' },
+                { min: 10, max: 30, color: '#fef3c7' },
+                { min: 30, max: 100, color: '#fee2e2' }
+              ]}
+            />
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -463,7 +576,7 @@ const GSCBlogAnalytics: React.FC = () => {
 </div>
 
       {/* Blog Details Table */}
-      <div className="rounded-xl border border-gray-100 bg-white p-6">
+      <div className="rounded-[24px] border border-gray-200 bg-white p-6 shadow-[0_8px_24px_rgba(15,23,42,0.03)]">
         <h3 className="text-lg font-medium text-gray-900 mb-4">All Published Blogs</h3>
         <div className="overflow-x-auto">
           <table className="min-w-full text-sm">
@@ -475,14 +588,14 @@ const GSCBlogAnalytics: React.FC = () => {
                 <th className="py-3 pr-4 text-right">Impressions</th>
                 <th className="py-3 pr-4 text-right">CTR</th>
                 <th className="py-3 text-right">Position</th>
+                <th className="py-3 pl-4 text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
               {aggregateData.blogs.map((blog) => (
                 <tr 
                   key={blog.id} 
-                  className="border-b border-gray-50 hover:bg-gray-50/50 cursor-pointer transition-colors"
-                  onClick={() => handleBlogClick(blog)}
+                  className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors"
                 >
                   <td className="py-3 pr-4">
                     <div className="max-w-[200px] truncate font-medium text-gray-900" title={blog.title}>
@@ -493,7 +606,7 @@ const GSCBlogAnalytics: React.FC = () => {
                     </div>
                   </td>
                   <td className="py-3 pr-4 text-gray-600">{blog.primaryKeyword || '—'}</td>
-                  <td className="py-3 pr-4 text-right font-medium text-purple-600">
+                  <td className="py-3 pr-4 text-right font-medium text-gray-900">
                     {blog.clicks.toLocaleString()}
                   </td>
                   <td className="py-3 pr-4 text-right text-gray-600">
@@ -511,70 +624,20 @@ const GSCBlogAnalytics: React.FC = () => {
                       {blog.position.toFixed(1)}
                     </span>
                   </td>
+                  <td className="py-3 pl-4 text-right">
+                    <button
+                      onClick={() => handleBlogClick(blog)}
+                      className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50"
+                    >
+                      View Queries
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       </div>
-
-      {/* Selected Blog Detail Modal */}
-      {selectedBlog && (
-        <div 
-          className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
-          onClick={() => setSelectedBlog(null)}
-        >
-          <div 
-            className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">{selectedBlog.title}</h3>
-            <div className="space-y-3 mb-4">
-              <p className="text-sm text-gray-500 break-all">{selectedBlog.url}</p>
-              {selectedBlog.primaryKeyword && (
-                <p className="text-sm">
-                  <span className="text-gray-500">Target Keyword:</span>{' '}
-                  <span className="font-medium">{selectedBlog.primaryKeyword}</span>
-                </p>
-              )}
-            </div>
-            <div className="grid grid-cols-2 gap-4 mb-6">
-              <div className="text-center p-4 bg-purple-50 rounded-xl">
-                <p className="text-2xl font-bold text-purple-600">{selectedBlog.clicks}</p>
-                <p className="text-sm text-gray-600">Clicks</p>
-              </div>
-              <div className="text-center p-4 bg-blue-50 rounded-xl">
-                <p className="text-2xl font-bold text-blue-600">{selectedBlog.impressions}</p>
-                <p className="text-sm text-gray-600">Impressions</p>
-              </div>
-              <div className="text-center p-4 bg-green-50 rounded-xl">
-                <p className="text-2xl font-bold text-green-600">{(selectedBlog.ctr * 100).toFixed(2)}%</p>
-                <p className="text-sm text-gray-600">CTR</p>
-              </div>
-              <div className="text-center p-4 bg-amber-50 rounded-xl">
-                <p className="text-2xl font-bold text-amber-600">{selectedBlog.position.toFixed(1)}</p>
-                <p className="text-sm text-gray-600">Avg Position</p>
-              </div>
-            </div>
-            <div className="flex gap-3">
-              <a
-                href={selectedBlog.url}
-                target="_blank"
-                rel="noreferrer"
-                className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
-              >
-                View Live <ExternalLink className="w-4 h-4" />
-              </a>
-              <button
-                onClick={() => setSelectedBlog(null)}
-                className="px-4 py-2 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

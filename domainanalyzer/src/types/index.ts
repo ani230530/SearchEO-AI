@@ -48,6 +48,7 @@ export interface CampaignStructure {
 
 export type GenerationPageStatus = {
     jobId: string;
+    topicId?: number | null;
     pageId: number;
     pageType: 'pillar' | 'subpage';
     status: 'pending' | 'generating' | 'completed' | 'failed' | 'published';
@@ -58,6 +59,7 @@ export type GenerationPageStatus = {
     updatedAt?: string;
     error?: string | null;
     wordpressUrl?: string | null;
+    phase?: string | null;
 };
 
 export type DraftPreview = {
@@ -65,8 +67,14 @@ export type DraftPreview = {
     title?: string;
     metaDescription?: string;
     slug?: string;
-    featuredImage?: string;
+    featuredImageEnabled: boolean;
+    featuredImageUrl?: string | null;
     primaryKeyword?: string;
+    longtailKeywords?: string;
+    status?: string;
+    wordpressUrl?: string | null;
+    error?: string | null;
+    updatedAt?: string;
 };
 
 export type DraftStatusRecord = {
@@ -81,6 +89,19 @@ export type DraftStatusRecord = {
     updatedAt?: string;
     error?: string | null;
     wordpressUrl?: string | null;
+};
+
+export type GenerationStreamingEvent = {
+    jobId: string;
+    topicId?: number | null;
+    pageId?: number | null;
+    pageType?: 'pillar' | 'subpage' | null;
+    status?: 'pending' | 'generating' | 'completed' | 'failed' | 'published';
+    phase?: string | null;
+    progress?: number | null;
+    message: string;
+    sequence?: number | null;
+    timestamp: string;
 };
 
 export interface KeywordTableItem {

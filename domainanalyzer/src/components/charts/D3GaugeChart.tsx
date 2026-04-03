@@ -35,10 +35,10 @@ const D3GaugeChart: React.FC<D3GaugeChartProps> = ({
 
     const svg = d3.select(svgRef.current)
       .attr('width', size)
-      .attr('height', size * 0.65);
+      .attr('height', size * 0.82);
 
     const g = svg.append('g')
-      .attr('transform', `translate(${size / 2}, ${size * 0.55})`);
+      .attr('transform', `translate(${size / 2}, ${size * 0.54})`);
 
     const radius = size * 0.4;
     const thickness = radius * 0.25;
@@ -119,8 +119,8 @@ const D3GaugeChart: React.FC<D3GaugeChartProps> = ({
 
     // Animate needle rotation
     if (animate) {
-      const startRotation = (startAngle * 180) / Math.PI + 90;
-      const endRotation = (valueAngle * 180) / Math.PI + 90;
+      const startRotation = (startAngle * 180) / Math.PI;
+      const endRotation = (valueAngle * 180) / Math.PI;
 
       needleGroup
         .attr('transform', `rotate(${startRotation})`)
@@ -129,7 +129,7 @@ const D3GaugeChart: React.FC<D3GaugeChartProps> = ({
         .ease(d3.easeQuadOut)
         .attr('transform', `rotate(${endRotation})`);
     } else {
-      const rotation = (valueAngle * 180) / Math.PI + 90;
+      const rotation = (valueAngle * 180) / Math.PI;
       needleGroup.attr('transform', `rotate(${rotation})`);
     }
 
@@ -162,33 +162,33 @@ if (showValue) {
     if (label) {
       g.append('text')
         .attr('text-anchor', 'middle')
-        .attr('dy', radius * 0.35)
+        .attr('dy', radius * 0.82)
         .text(label)
-        .style('font-size', `${size * 0.06}px`)
+        .style('font-size', `${size * 0.044}px`)
         .attr('fill', '#6b7280');
     }
 
     // Add min/max labels
     g.append('text')
       .attr('x', -radius * 0.85)
-      .attr('y', radius * 0.1)
+      .attr('y', radius * 0.18)
       .attr('text-anchor', 'middle')
       .text('0')
-      .style('font-size', `${size * 0.05}px`)
+      .style('font-size', `${size * 0.036}px`)
       .attr('fill', '#9ca3af');
 
     g.append('text')
       .attr('x', radius * 0.85)
-      .attr('y', radius * 0.1)
+      .attr('y', radius * 0.18)
       .attr('text-anchor', 'middle')
       .text(maxValue.toString())
-      .style('font-size', `${size * 0.05}px`)
+      .style('font-size', `${size * 0.036}px`)
       .attr('fill', '#9ca3af');
 
   }, [value, maxValue, label, unit, size, colorRanges, animate]);
 
   return (
-    <svg ref={svgRef} className="overflow-visible" />
+    <svg ref={svgRef} className="mx-auto block overflow-visible" />
   );
 };
 

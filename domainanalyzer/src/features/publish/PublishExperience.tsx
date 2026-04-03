@@ -36,7 +36,6 @@ import {
 } from '@/types/publish';
 import type { Instance } from 'tippy.js';
 import parse from 'html-react-parser';
-import { usePublishStatus } from '@/hooks/usePublishStatus';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3002';
 
@@ -61,6 +60,13 @@ interface PublishExperienceProps {
   setDraftToPageMap?: React.Dispatch<React.SetStateAction<Map<number, number>>>;
   draftStatuses?: Map<number, { isPublished: boolean; isFailed?: boolean; publishedUrl?: string; draftId?: number; error?: string }>;
   setDraftStatuses?: React.Dispatch<React.SetStateAction<Map<number, { isPublished: boolean; isFailed?: boolean; publishedUrl?: string; draftId?: number; error?: string }>>>;
+  sharedPublishStatuses?: Map<number, {
+    status: 'generating' | 'published' | 'failed';
+    publishedUrl?: string;
+    wordpressPostId?: number | null;
+    error?: string;
+    updatedAt?: string;
+  }>;
 }
 
 interface PublishFormState {
@@ -70,7 +76,18 @@ interface PublishFormState {
   brandDescription: string;
   images: number;
   wordCount: number;
-  featuredImage: boolean;
+  featuredImageEnabled: boolean;
+}
+
+interface DraftSnapshot {
+  htmlContent: string;
+  title: string;
+  metaDescription: string;
+  slug: string;
+  longtailKeywords: string;
+  featuredImageEnabled: boolean;
+  featuredImageUrl: string;
+  primaryKeyword: string;
 }
 
 const summarizeDomainContext = (input: string, maxLines = 6, maxChars = 800) => {
@@ -109,6 +126,37 @@ const calculateWordCount = (html: string): number => {
   }
 };
 
+const slugifyText = (value: string): string =>
+  value
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9\s-]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-');
+
+const isValidHttpUrl = (value: string): boolean => {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'http:' || url.protocol === 'https:';
+  } catch {
+    return false;
+  }
+};
+
+const createDraftSnapshot = (
+  content: GeneratedArticleContent | null,
+  htmlContent?: string
+): DraftSnapshot => ({
+  htmlContent: htmlContent ?? content?.htmlContent ?? '',
+  title: content?.title ?? '',
+  metaDescription: content?.metaDescription ?? '',
+  slug: content?.slug ?? '',
+  longtailKeywords: content?.longtailKeywords ?? '',
+  featuredImageEnabled: Boolean(content?.featuredImageEnabled),
+  featuredImageUrl: content?.featuredImageUrl ?? '',
+  primaryKeyword: content?.primaryKeyword ?? '',
+});
+
 const PublishExperience: React.FC<PublishExperienceProps> = ({
   companyDomain,
   domainContext,
@@ -128,6 +176,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
   setDraftToPageMap,
   draftStatuses,
   setDraftStatuses,
+  sharedPublishStatuses,
 }) => {
   const { toast } = useToast();
   const [publishForm, setPublishForm] = useState<PublishFormState>({
@@ -137,7 +186,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
     brandDescription: '',
     images: 2,
     wordCount: 800,
-    featuredImage: true,
+    featuredImageEnabled: true,
   });
   const [publishLoading, setPublishLoading] = useState(false);
   const [publishResult, setPublishResult] = useState<GeneratedArticleContent | null>(null);
@@ -148,10 +197,12 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
   const totalDrawerSteps = 4;
   // savingDraft removed - using 'saving' state instead
   const [currentDraftId, setCurrentDraftId] = useState<number | null>(initialDraftId || null);
+  const [currentDraftStatus, setCurrentDraftStatus] = useState<string | null>(null);
   const [selectedText, setSelectedText] = useState('');
   const [textEditNote, setTextEditNote] = useState('');
   const [textEditing, setTextEditing] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string>('');
+  const [selectedImageAlt, setSelectedImageAlt] = useState('');
   const [imageEditNote, setImageEditNote] = useState('');
   const [imageEditing, setImageEditing] = useState(false);
   const [selectedRange, setSelectedRange] = useState<Range | null>(null);
@@ -177,6 +228,9 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
   const [editedHtmlContent, setEditedHtmlContent] = useState('');
   const [newImageUrl, setNewImageUrl] = useState('');
   const [newImageAlt, setNewImageAlt] = useState('');
+  const [featuredImageInput, setFeaturedImageInput] = useState('');
+  const [featuredImageEditNote, setFeaturedImageEditNote] = useState('');
+  const [featuredImageEditing, setFeaturedImageEditing] = useState(false);
   const [showAddImageModal, setShowAddImageModal] = useState(false);
   const [originalHtmlContent, setOriginalHtmlContent] = useState('');
   const quillRef = useRef<ReactQuill>(null);
@@ -185,8 +239,11 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
   const [isDirty, setIsDirty] = useState(false);
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
   const [saving, setSaving] = useState(false);
+  const [originalDraftSnapshot, setOriginalDraftSnapshot] = useState<DraftSnapshot>(() =>
+    createDraftSnapshot(initialDraft ?? null, initialDraft?.htmlContent ?? '')
+  );
 
-   const fetchPublishHistory = useCallback(async () => {
+  const fetchPublishHistory = useCallback(async () => {
     try {
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/publish/history`, {
         headers: {
@@ -206,50 +263,150 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
     }
   }, []);
 
-  // Listen for real-time publish updates
-  usePublishStatus({
-    onUpdate: (data) => {
-      console.log('[Publish:SSE] Received update:', data);
-      
-      // Refresh history to show updated status for everyone
+  const applyTerminalPublishState = useCallback((params: {
+    status: 'published' | 'failed';
+    draftId?: number | null;
+    publishedUrl?: string | null;
+    wordpressPostId?: number | null;
+    error?: string | null;
+    notify?: boolean;
+  }) => {
+    const { status, draftId, publishedUrl, wordpressPostId, error, notify = false } = params;
+
+    setPublishLoading(false);
+
+    if (status === 'published') {
+      setPublishError('');
+      setCurrentDraftStatus('published');
+      if (publishedUrl || wordpressPostId !== undefined) {
+        setPublishResult((prev) =>
+          prev
+            ? {
+                ...prev,
+                wordpressUrl: publishedUrl || prev.wordpressUrl,
+                wordpressPostId:
+                  wordpressPostId !== undefined ? wordpressPostId : prev.wordpressPostId,
+              }
+            : null
+        );
+      }
+      if (pageId && setPublishingPageIds) {
+        setPublishingPageIds((prev) => {
+          const updated = new Set(prev);
+          updated.delete(pageId);
+          return updated;
+        });
+      }
+      if (pageId && setDraftStatuses) {
+        setDraftStatuses((prev) => {
+          const updated = new Map(prev);
+          const existing = updated.get(pageId);
+          updated.set(pageId, {
+            ...(existing || {}),
+            isPublished: true,
+            isFailed: false,
+            publishedUrl: publishedUrl || undefined,
+            draftId: draftId || existing?.draftId,
+            error: undefined,
+          });
+          return updated;
+        });
+      }
+      if (draftId && setDraftToPageMap) {
+        setDraftToPageMap((prev) => {
+          const updated = new Map(prev);
+          updated.delete(Number(draftId));
+          return updated;
+        });
+      }
+      onRefreshWordpressIntegration();
       if (!initialDraft) {
         fetchPublishHistory();
       }
-
-      // If this update is for the currently viewed draft, update the UI
-      // Use double equals or cast to match number vs string if needed, though they should be numbers
-      if (currentDraftId && Number(data.draftId) === Number(currentDraftId)) {
-        console.log('[Publish:SSE] Matching draft update found, status:', data.status);
-        
-        // ALWAYS clear loading state on a terminal update
-        if (data.status === 'published' || data.status === 'failed') {
-          setPublishLoading(false);
-        }
-
-        if (data.status === 'published' && data.publishedUrl) {
-          setPublishResult((prev) => prev ? {
-            ...prev,
-            wordpressUrl: data.publishedUrl,
-          } : null);
-          
-          toast({
-            title: 'Published Successfully',
-            description: `Your content is live! View it here: ${data.publishedUrl}`,
-          });
-
-          // Also refresh integration stats
-          onRefreshWordpressIntegration();
-        } else if (data.status === 'failed') {
-          setPublishError(data.error || 'Publish failed');
-          toast({
-            title: 'Publish Failed',
-            description: data.error || 'An error occurred while publishing',
-            variant: 'destructive',
-          });
-        }
+      if (notify && publishedUrl) {
+        toast({
+          title: 'Published Successfully',
+          description: `Your content is live! View it here: ${publishedUrl}`,
+        });
       }
+      return;
     }
-  });
+
+    setCurrentDraftStatus('failed');
+    setPublishError(error || 'Publish failed');
+    if (pageId && setPublishingPageIds) {
+      setPublishingPageIds((prev) => {
+        const updated = new Set(prev);
+        updated.delete(pageId);
+        return updated;
+      });
+    }
+    if (pageId && setDraftStatuses) {
+      setDraftStatuses((prev) => {
+        const updated = new Map(prev);
+        const existing = updated.get(pageId);
+        updated.set(pageId, {
+          ...(existing || {}),
+          isPublished: false,
+          isFailed: true,
+          publishedUrl: undefined,
+          draftId: draftId || existing?.draftId,
+          error: error || existing?.error,
+        });
+        return updated;
+      });
+    }
+    if (draftId && setDraftToPageMap) {
+      setDraftToPageMap((prev) => {
+        const updated = new Map(prev);
+        updated.delete(Number(draftId));
+        return updated;
+      });
+    }
+    if (!initialDraft) {
+      fetchPublishHistory();
+    }
+    if (notify) {
+      toast({
+        title: 'Publish Failed',
+        description: error || 'The publish job failed.',
+        variant: 'destructive',
+      });
+    }
+  }, [
+    fetchPublishHistory,
+    initialDraft,
+    onRefreshWordpressIntegration,
+    pageId,
+    setDraftStatuses,
+    setDraftToPageMap,
+    setPublishingPageIds,
+    toast,
+  ]);
+
+  useEffect(() => {
+    if (!currentDraftId || !sharedPublishStatuses) return;
+    const update = sharedPublishStatuses.get(Number(currentDraftId));
+    if (!update) return;
+
+    if (update.status === 'published') {
+      applyTerminalPublishState({
+        status: 'published',
+        draftId: currentDraftId,
+        publishedUrl: update.publishedUrl,
+        wordpressPostId: update.wordpressPostId,
+      });
+      return;
+    }
+
+    if (update.status === 'failed') {
+      applyTerminalPublishState({
+        status: 'failed',
+        draftId: currentDraftId,
+        error: update.error,
+      });
+    }
+  }, [applyTerminalPublishState, currentDraftId, sharedPublishStatuses]);
 
   // Polling fallback to ensure we don't get stuck in loading state if SSE fails
   useEffect(() => {
@@ -257,13 +414,13 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
 
     const pollInterval = setInterval(async () => {
       try {
-        // Try campaign endpoint first, then publish endpoint
-        let response = await fetch(`${API_BASE_URL}/api/campaigns/drafts/${currentDraftId}`, {
+        // Prefer publish endpoint (status-capable), then fallback to campaign endpoint
+        let response = await fetch(`${API_BASE_URL}/api/publish/drafts/${currentDraftId}`, {
           headers: { Authorization: `Bearer ${localStorage.getItem('authToken')}` },
         });
 
         if (!response.ok) {
-           response = await fetch(`${API_BASE_URL}/api/publish/drafts/${currentDraftId}`, {
+           response = await fetch(`${API_BASE_URL}/api/campaigns/drafts/${currentDraftId}`, {
              headers: { Authorization: `Bearer ${localStorage.getItem('authToken')}` },
            });
         }
@@ -275,24 +432,19 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
              
              // If terminal state reached, update UI
              if (status === 'published') {
-                setPublishLoading(false);
-                if (data.draft.wordpressUrl) {
-                    setPublishResult((prev) => prev ? { ...prev, wordpressUrl: data.draft.wordpressUrl } : null);
-                    toast({
-                        title: 'Published Successfully',
-                        description: `Your content is live! View it here: ${data.draft.wordpressUrl}`,
-                    });
-                    onRefreshWordpressIntegration();
-                    fetchPublishHistory();
-                }
-             } else if (status === 'failed') {
-                setPublishLoading(false);
-                toast({
-                    title: 'Publish Failed',
-                    description: 'The publish job failed (detected via polling).',
-                    variant: 'destructive',
+                applyTerminalPublishState({
+                  status: 'published',
+                  draftId: currentDraftId,
+                  publishedUrl: data.draft.wordpressUrl,
+                  notify: true,
                 });
-                fetchPublishHistory();
+             } else if (status === 'failed') {
+                applyTerminalPublishState({
+                  status: 'failed',
+                  draftId: currentDraftId,
+                  error: data.draft.error || 'The publish job failed.',
+                  notify: true,
+                });
              }
           }
         }
@@ -302,7 +454,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
     }, 15000); // 15 seconds
 
     return () => clearInterval(pollInterval);
-  }, [publishLoading, currentDraftId, toast, onRefreshWordpressIntegration, fetchPublishHistory]);
+  }, [applyTerminalPublishState, publishLoading, currentDraftId]);
 
   const showPreviewStage = publishStage === 'preview';
 
@@ -323,11 +475,18 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
   }, [currentHtmlContent]);
 
   const hasUnsavedChanges = useMemo(() => {
-    // Check if current content differs from what was last saved (originalHtmlContent)
     if (!publishResult) return false;
-    const currentContent = currentHtmlContent;
-    return currentContent !== originalHtmlContent;
-  }, [currentHtmlContent, originalHtmlContent, publishResult]);
+    return (
+      currentHtmlContent !== originalDraftSnapshot.htmlContent ||
+      (publishResult.title ?? '') !== originalDraftSnapshot.title ||
+      (publishResult.metaDescription ?? '') !== originalDraftSnapshot.metaDescription ||
+      (publishResult.slug ?? '') !== originalDraftSnapshot.slug ||
+      (publishResult.longtailKeywords ?? '') !== originalDraftSnapshot.longtailKeywords ||
+      Boolean(publishResult.featuredImageEnabled) !== originalDraftSnapshot.featuredImageEnabled ||
+      (publishResult.featuredImageUrl ?? '') !== originalDraftSnapshot.featuredImageUrl ||
+      (publishResult.primaryKeyword ?? '') !== originalDraftSnapshot.primaryKeyword
+    );
+  }, [currentHtmlContent, originalDraftSnapshot, publishResult]);
   
   // Sync dirty state
   useEffect(() => {
@@ -362,6 +521,15 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
       return [];
     }
   }, [currentHtmlContent]);
+
+  const selectedImageDetails = useMemo(
+    () => publishImages.find((image) => image.src === selectedImage) ?? null,
+    [publishImages, selectedImage]
+  );
+
+  useEffect(() => {
+    setFeaturedImageInput(publishResult?.featuredImageUrl ?? '');
+  }, [publishResult?.featuredImageUrl]);
 
   const filteredPublishKeywords = useMemo(() => {
     if (!publishKeywordQuery) {
@@ -465,7 +633,9 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
       const draftContent: GeneratedArticleContent = {
         primaryKeyword: draft.primaryKeyword || '',
         htmlContent: draft.htmlContent || '',
-        featuredImage: draft.featuredImage,
+        featuredImageEnabled: Boolean(draft.featuredImageEnabled),
+        featuredImageUrl: draft.featuredImageUrl || null,
+        wordpressPostId: draft.wordpressPostId ?? null,
         title: draft.title,
         metaDescription: draft.metaDescription,
         slug: draft.slug,
@@ -477,7 +647,9 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
       setPublishResult(draftContent);
       setEditedHtmlContent(draftContent.htmlContent || '');
       setOriginalHtmlContent(draftContent.htmlContent || ''); // This is what we'll compare against for dirty state
+      setOriginalDraftSnapshot(createDraftSnapshot(draftContent, draftContent.htmlContent || ''));
       setCurrentDraftId(draftId);
+      setCurrentDraftStatus(draft.status || 'draft');
       setPublishStage('preview');
       setIsEditMode(false);
       setIsDirty(false);
@@ -488,6 +660,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
         ...prev,
         primaryKeyword: draftContent.primaryKeyword || prev.primaryKeyword,
         longtailKeywords: draftContent.longtailKeywords || prev.longtailKeywords,
+        featuredImageEnabled: draftContent.featuredImageEnabled,
       }));
       setSelectedLongtailKeywords(
         (draftContent.longtailKeywords || '')
@@ -538,6 +711,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
         ...prev,
         primaryKeyword: initialDraft.primaryKeyword || prev.primaryKeyword,
         longtailKeywords: initialDraft.longtailKeywords || prev.longtailKeywords,
+        featuredImageEnabled: initialDraft.featuredImageEnabled,
       }));
       setSelectedLongtailKeywords(
         (initialDraft.longtailKeywords || '')
@@ -548,6 +722,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
       const initialHtml = initialDraft.htmlContent || '';
       setEditedHtmlContent(initialHtml);
       setOriginalHtmlContent(initialHtml);
+      setOriginalDraftSnapshot(createDraftSnapshot(initialDraft, initialHtml));
       setIsEditMode(false);
       setIsDirty(false);
       // Clear edit UI state
@@ -751,6 +926,434 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
     setPublishStage('compose');
   }, []);
 
+  const updatePublishMetadata = useCallback(
+    (field: 'title' | 'metaDescription' | 'slug', value: string) => {
+      setPublishResult((prev) => (prev ? { ...prev, [field]: value } : prev));
+    },
+    []
+  );
+
+  const syncSlugFromTitle = useCallback(() => {
+    setPublishResult((prev) => {
+      if (!prev) return prev;
+      return { ...prev, slug: slugifyText(prev.title || prev.primaryKeyword || '') };
+    });
+  }, []);
+
+  const applyFeaturedImageState = useCallback((url: string | null, enabled: boolean) => {
+    const normalizedUrl = url?.trim() ? url.trim() : null;
+    setFeaturedImageInput(normalizedUrl ?? '');
+    setPublishResult((prev) =>
+      prev
+        ? {
+            ...prev,
+            featuredImageEnabled: enabled,
+            featuredImageUrl: normalizedUrl,
+          }
+        : prev
+    );
+  }, []);
+
+  const handleApplyFeaturedImageUrl = useCallback(() => {
+    if (!publishResult) return;
+
+    const trimmedUrl = featuredImageInput.trim();
+    if (!trimmedUrl) {
+      toast({
+        title: 'Thumbnail URL Required',
+        description: 'Paste an image URL to update the featured image.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (!isValidHttpUrl(trimmedUrl)) {
+      toast({
+        title: 'Invalid URL',
+        description: 'Use a full http or https image URL.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    applyFeaturedImageState(trimmedUrl, true);
+    toast({
+      title: 'Thumbnail Updated',
+      description: 'Save draft or publish to persist the featured image change.',
+    });
+  }, [applyFeaturedImageState, featuredImageInput, publishResult, toast]);
+
+  const handleUseInlineImageAsFeatured = useCallback(
+    (imageSrc: string) => {
+      if (!publishResult) return;
+
+      applyFeaturedImageState(imageSrc, true);
+      toast({
+        title: 'Thumbnail Selected',
+        description: 'The inline image is now set as the featured thumbnail.',
+      });
+    },
+    [applyFeaturedImageState, publishResult, toast]
+  );
+
+  const handleEnableAutoFeaturedImage = useCallback(() => {
+    if (!publishResult) return;
+
+    applyFeaturedImageState(null, true);
+    setFeaturedImageEditNote('');
+    toast({
+      title: 'Automatic Thumbnail Enabled',
+      description: 'WordPress publishing will use an automatic featured image again.',
+    });
+  }, [applyFeaturedImageState, publishResult, toast]);
+
+  const handleDisableFeaturedImage = useCallback(() => {
+    if (!publishResult) return;
+
+    applyFeaturedImageState(null, false);
+    setFeaturedImageEditNote('');
+    toast({
+      title: 'Thumbnail Disabled',
+      description: 'The post will publish without a featured image.',
+    });
+  }, [applyFeaturedImageState, publishResult, toast]);
+
+  const handleFeaturedImageEdit = useCallback(async () => {
+    if (!publishResult || !publishResult.featuredImageUrl || !featuredImageEditNote.trim()) {
+      toast({
+        title: 'Thumbnail Note Required',
+        description: 'Add a note describing how the thumbnail should change.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setFeaturedImageEditing(true);
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/publish/edit-image`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('authToken')}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          title: publishResult.title,
+          metaDescription: publishResult.metaDescription,
+          image: publishResult.featuredImageUrl,
+          userNote: featuredImageEditNote,
+        }),
+      });
+
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || 'Failed to edit thumbnail');
+      }
+
+      const updatedImage = extractEditedImage(data.result);
+      if (!updatedImage) {
+        throw new Error('Automation service did not return an updated thumbnail');
+      }
+
+      applyFeaturedImageState(updatedImage, true);
+      setFeaturedImageEditNote('');
+      toast({
+        title: 'Thumbnail Regenerated',
+        description: 'Review the new featured image, then save draft or publish.',
+      });
+    } catch (error) {
+      console.error('Error editing featured image:', error);
+      toast({
+        title: 'Thumbnail Edit Failed',
+        description: error instanceof Error ? error.message : 'Unable to update the thumbnail',
+        variant: 'destructive',
+      });
+    } finally {
+      setFeaturedImageEditing(false);
+    }
+  }, [applyFeaturedImageState, extractEditedImage, featuredImageEditNote, publishResult, toast]);
+
+  const renderMetadataEditor = () => {
+    if (!publishResult || !isEditMode) return null;
+
+    return (
+      <div className="rounded-2xl border border-gray-200 bg-white p-4 space-y-4">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-xs text-gray-500 mb-1">Draft metadata</p>
+            <p className="text-sm font-medium text-gray-900">Title, description, and slug</p>
+          </div>
+          <button
+            type="button"
+            onClick={syncSlugFromTitle}
+            className="rounded-full border border-gray-200 px-3 py-1 text-[11px] font-medium text-gray-600 hover:bg-gray-50"
+          >
+            Use title for slug
+          </button>
+        </div>
+
+        <div className="space-y-2">
+          <label className="text-xs font-medium uppercase tracking-[0.2em] text-gray-500">Title</label>
+          <input
+            type="text"
+            value={publishResult.title ?? ''}
+            onChange={(event) => updatePublishMetadata('title', event.target.value)}
+            placeholder="Draft title"
+            className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-900 outline-none transition focus:border-gray-900"
+          />
+        </div>
+
+        <div className="space-y-2">
+          <label className="text-xs font-medium uppercase tracking-[0.2em] text-gray-500">Meta Description</label>
+          <textarea
+            value={publishResult.metaDescription ?? ''}
+            onChange={(event) => updatePublishMetadata('metaDescription', event.target.value)}
+            placeholder="Search snippet description"
+            rows={3}
+            className="w-full resize-none rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-900 outline-none transition focus:border-gray-900"
+          />
+        </div>
+
+        <div className="space-y-2">
+          <label className="text-xs font-medium uppercase tracking-[0.2em] text-gray-500">Slug</label>
+          <input
+            type="text"
+            value={publishResult.slug ?? ''}
+            onChange={(event) => updatePublishMetadata('slug', slugifyText(event.target.value))}
+            placeholder="url-slug"
+            className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-900 outline-none transition focus:border-gray-900"
+          />
+        </div>
+      </div>
+    );
+  };
+
+  const renderFeaturedImageEditor = () => {
+    if (!publishResult || !isEditMode) return null;
+
+    const featuredImageUrl = publishResult.featuredImageUrl ?? '';
+    const hasCustomThumbnail = Boolean(featuredImageUrl);
+    const quickPickImages = publishImages.filter((image) => image.src !== featuredImageUrl).slice(0, 4);
+
+    return (
+      <div className="rounded-2xl border border-gray-200 bg-white p-4 space-y-4">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-xs text-gray-500 mb-1">Featured image</p>
+            <p className="text-sm font-medium text-gray-900">Thumbnail for WordPress and previews</p>
+          </div>
+          <span
+            className={`inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] ${
+              publishResult.featuredImageEnabled
+                ? hasCustomThumbnail
+                  ? 'bg-emerald-100 text-emerald-700'
+                  : 'bg-amber-100 text-amber-700'
+                : 'bg-gray-100 text-gray-500'
+            }`}
+          >
+            {publishResult.featuredImageEnabled
+              ? hasCustomThumbnail
+                ? 'Custom'
+                : 'Auto'
+              : 'Off'}
+          </span>
+        </div>
+
+        <div className="overflow-hidden rounded-2xl border border-gray-200 bg-gray-50">
+          {hasCustomThumbnail ? (
+            <img
+              src={featuredImageUrl}
+              alt="Featured thumbnail preview"
+              className="h-40 w-full object-cover"
+            />
+          ) : (
+            <div className="flex h-40 flex-col items-center justify-center gap-2 px-4 text-center text-sm text-gray-500">
+              <ImageIcon className="h-8 w-8 text-gray-400" />
+              <p>
+                {publishResult.featuredImageEnabled
+                  ? 'No custom thumbnail set. The publish flow will generate one automatically.'
+                  : 'Featured image is currently disabled.'}
+              </p>
+            </div>
+          )}
+        </div>
+
+        <div className="space-y-2">
+          <label className="text-xs font-medium uppercase tracking-[0.2em] text-gray-500">
+            Thumbnail URL
+          </label>
+          <input
+            type="url"
+            value={featuredImageInput}
+            onChange={(event) => setFeaturedImageInput(event.target.value)}
+            placeholder="https://example.com/featured-image.jpg"
+            className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-900 outline-none transition focus:border-gray-900"
+          />
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+            <button
+              type="button"
+              onClick={handleApplyFeaturedImageUrl}
+              className="rounded-full bg-gray-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-gray-800"
+            >
+              Apply URL
+            </button>
+            <button
+              type="button"
+              onClick={handleEnableAutoFeaturedImage}
+              className="rounded-full border border-gray-200 px-4 py-2.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+            >
+              Auto-generate
+            </button>
+            <button
+              type="button"
+              onClick={handleDisableFeaturedImage}
+              className="rounded-full border border-gray-200 px-4 py-2.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+            >
+              Disable
+            </button>
+          </div>
+        </div>
+
+        {quickPickImages.length > 0 && (
+          <div className="space-y-2">
+            <p className="text-xs font-medium uppercase tracking-[0.2em] text-gray-500">
+              Use inline image
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              {quickPickImages.map((image) => (
+                <button
+                  key={`featured-image-pick-${image.src}`}
+                  type="button"
+                  onClick={() => handleUseInlineImageAsFeatured(image.src)}
+                  className="overflow-hidden rounded-2xl border border-gray-200 bg-gray-50 text-left transition hover:border-gray-300 hover:bg-gray-100"
+                >
+                  <img src={image.src} alt={image.alt} className="h-20 w-full object-cover" />
+                  <div className="px-3 py-2">
+                    <p className="truncate text-xs font-medium text-gray-700">{image.alt}</p>
+                    <p className="mt-1 text-[11px] text-gray-500">Use as thumbnail</p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {hasCustomThumbnail && (
+          <div className="space-y-2">
+            <label className="text-xs font-medium uppercase tracking-[0.2em] text-gray-500">
+              Regenerate thumbnail
+            </label>
+            <textarea
+              value={featuredImageEditNote}
+              onChange={(event) => setFeaturedImageEditNote(event.target.value)}
+              placeholder="Describe the new look, style, framing, or mood for the thumbnail..."
+              rows={3}
+              className="w-full resize-none rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-900 outline-none transition focus:border-gray-900"
+            />
+            <button
+              type="button"
+              onClick={handleFeaturedImageEdit}
+              disabled={!featuredImageEditNote.trim() || featuredImageEditing}
+              className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-gray-200 px-4 py-2.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {featuredImageEditing ? (
+                <>
+                  <ButtonSpinner />
+                  Regenerating
+                </>
+              ) : (
+                'Regenerate thumbnail'
+              )}
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const savePublishedEdits = useCallback(async () => {
+    if (!publishResult) {
+      toast({
+        title: 'Nothing to Save',
+        description: 'No content to update',
+        variant: 'destructive',
+      });
+      return false;
+    }
+
+    if (!currentDraftId) {
+      toast({
+        title: 'Missing Draft',
+        description: 'Published edit requires a draft ID.',
+        variant: 'destructive',
+      });
+      return false;
+    }
+
+    setSaving(true);
+    try {
+      const latestHtml = currentHtmlContent;
+      const response = await fetch(`${API_BASE_URL}/api/publish/published-edit`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('authToken')}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          draftId: currentDraftId,
+          pageId,
+          primaryKeyword: publishResult.primaryKeyword || publishForm.primaryKeyword,
+          htmlContent: latestHtml,
+          featuredImageEnabled: publishResult.featuredImageEnabled,
+          featuredImageUrl: publishResult.featuredImageUrl,
+          title: publishResult.title,
+          metaDescription: publishResult.metaDescription,
+          slug: publishResult.slug,
+          longtailKeywords: publishResult.longtailKeywords ?? publishForm.longtailKeywords,
+          wordpressUrl: publishResult.wordpressUrl,
+        }),
+      });
+
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || 'Failed to update published blog');
+      }
+
+      const savedResult = {
+        ...publishResult,
+        htmlContent: latestHtml,
+        wordpressUrl: data.wordpressUrl || publishResult.wordpressUrl,
+      };
+
+      setOriginalHtmlContent(latestHtml);
+      setOriginalDraftSnapshot(createDraftSnapshot(savedResult, latestHtml));
+      setIsDirty(false);
+      setLastSavedAt(new Date());
+      setPublishResult(savedResult);
+      setCurrentDraftStatus('published');
+
+      if (!initialDraft) {
+        fetchPublishHistory();
+      }
+
+      toast({
+        title: 'Published Blog Updated',
+        description: 'Changes were sent to WordPress automation.',
+      });
+
+      return true;
+    } catch (error) {
+      console.error('Error updating published blog:', error);
+      toast({
+        title: 'Update Failed',
+        description: error instanceof Error ? error.message : 'Failed to update published blog',
+        variant: 'destructive',
+      });
+      return false;
+    } finally {
+      setSaving(false);
+    }
+  }, [toast, publishResult, currentDraftId, currentHtmlContent, pageId, publishForm.primaryKeyword, publishForm.longtailKeywords, initialDraft, fetchPublishHistory]);
+
   // SIMPLE SAVE FUNCTION - Only called by Save button
   const saveDraftToDatabase = useCallback(async (silent = false) => {
     if (!publishResult) {
@@ -779,7 +1382,8 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
           draftId: currentDraftId || undefined, // Updates existing draft if we have ID
           primaryKeyword: publishResult.primaryKeyword || publishForm.primaryKeyword,
           htmlContent: latestHtml, // The actual content to save
-          featuredImage: publishResult.featuredImage,
+          featuredImageEnabled: publishResult.featuredImageEnabled,
+          featuredImageUrl: publishResult.featuredImageUrl,
           title: publishResult.title,
           metaDescription: publishResult.metaDescription,
           slug: publishResult.slug,
@@ -798,16 +1402,19 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
         setCurrentDraftId(data.draftId);
       }
       
+      const savedResult = {
+        ...publishResult,
+        htmlContent: latestHtml,
+      };
+
       // SIMPLE: After saving, update state to reflect what was saved
       setOriginalHtmlContent(latestHtml); // This is what we compare against for dirty state
+      setOriginalDraftSnapshot(createDraftSnapshot(savedResult, latestHtml));
       setIsDirty(false);
       setLastSavedAt(new Date());
       
       // Update publishResult with saved HTML (for metadata consistency)
-      setPublishResult({
-        ...publishResult,
-        htmlContent: latestHtml,
-      });
+      setPublishResult(savedResult);
       // editedHtmlContent already has latestHtml, so preview stays correct
       
       if (!silent) {
@@ -836,7 +1443,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
     } finally {
       setSaving(false);
     }
-  }, [toast, fetchPublishHistory, currentDraftId, publishForm, publishResult, currentHtmlContent, initialDraft]);
+  }, [toast, fetchPublishHistory, currentDraftId, publishForm, publishResult, currentHtmlContent, initialDraft, pageId]);
 
   // Keep publishResult in sync with updated long-tail selections (for preview only)
   // User must click Save to persist to DB
@@ -852,8 +1459,13 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
 
   // SIMPLE: Save button handler
   const handleSaveDraft = useCallback(async () => {
+    if (currentDraftStatus === 'published') {
+      await savePublishedEdits();
+      return;
+    }
+
     await saveDraftToDatabase(false);
-  }, [saveDraftToDatabase]);
+  }, [currentDraftStatus, savePublishedEdits, saveDraftToDatabase]);
 
   const handleResumeDraft = useCallback(
     (entry: PublishHistoryEntry) => {
@@ -879,10 +1491,16 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
           (payload.primaryKeyword as string) ??
           (entry.primaryKeyword ?? publishForm.primaryKeyword),
         htmlContent,
-        featuredImage:
+        featuredImageEnabled:
+          Boolean(payload.featuredImageEnabled ?? payload['Featured Image Enabled']) ||
+          Boolean(payload.featuredImageUrl ?? payload.featuredImage ?? payload['Featured Image']) ||
+          publishResult?.featuredImageEnabled ||
+          false,
+        featuredImageUrl:
+          (payload.featuredImageUrl as string) ??
           (payload.featuredImage as string) ??
           (payload['Featured Image'] as string | undefined) ??
-          publishResult?.featuredImage,
+          publishResult?.featuredImageUrl,
         title:
           (payload.title as string) ??
           (payload['Title'] as string | undefined) ??
@@ -892,6 +1510,12 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
           (payload.metaDescription as string) ??
           (payload['Meta Description'] as string | undefined) ??
           publishResult?.metaDescription,
+        wordpressPostId:
+          typeof payload.wordpressPostId === 'number'
+            ? payload.wordpressPostId
+            : typeof payload.id === 'number'
+            ? payload.id
+            : entry.wordpressPostId ?? publishResult?.wordpressPostId ?? null,
         slug: (payload.slug as string) ?? (entry.slug ?? publishResult?.slug),
         wordpressUrl:
           (payload.wordpressUrl as string) ?? entry.wordpressUrl ?? publishResult?.wordpressUrl,
@@ -910,13 +1534,16 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
       // Initialize all state from the draft
       setPublishResult(nextResult);
       setCurrentDraftId(entry.id);
+      setCurrentDraftStatus(entry.status ?? 'draft');
       const initialHtml = nextResult.htmlContent || '';
       setEditedHtmlContent(initialHtml);
       setOriginalHtmlContent(initialHtml);
+      setOriginalDraftSnapshot(createDraftSnapshot(nextResult, initialHtml));
       setPublishForm((prev) => ({
         ...prev,
         primaryKeyword: nextResult.primaryKeyword || prev.primaryKeyword,
         longtailKeywords: payloadLongtail || prev.longtailKeywords,
+        featuredImageEnabled: nextResult.featuredImageEnabled,
       }));
       setSelectedLongtailKeywords(normalizedLongtail);
       setPublishStage('preview');
@@ -999,7 +1626,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
       brandDescription: publishForm.brandDescription,
       images: publishForm.images,
       wordCount: publishForm.wordCount,
-      featuredImage: publishForm.featuredImage,
+      featuredImageEnabled: publishForm.featuredImageEnabled,
     };
 
     try {
@@ -1020,7 +1647,8 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
       const normalized: GeneratedArticleContent = {
         primaryKeyword: data.content?.primaryKeyword || publishForm.primaryKeyword,
         htmlContent: data.content?.htmlContent || '',
-        featuredImage: data.content?.featuredImage,
+        featuredImageEnabled: Boolean(data.content?.featuredImageEnabled),
+        featuredImageUrl: data.content?.featuredImageUrl || null,
         title: data.content?.title,
         metaDescription: data.content?.metaDescription,
         slug: data.content?.slug,
@@ -1037,6 +1665,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
       const initialHtml = normalized.htmlContent || '';
       setEditedHtmlContent(initialHtml);
       setOriginalHtmlContent(initialHtml);
+      setOriginalDraftSnapshot(createDraftSnapshot(normalized, initialHtml));
       setPublishStage('preview');
       setIsEditMode(false);
       setIsDirty(false);
@@ -1062,7 +1691,8 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
               title: normalized.title,
               metaDescription: normalized.metaDescription,
               slug: normalized.slug,
-              featuredImage: normalized.featuredImage,
+              featuredImageEnabled: normalized.featuredImageEnabled,
+              featuredImageUrl: normalized.featuredImageUrl,
               longtailKeywords: normalized.longtailKeywords,
               wordpressUrl: normalized.wordpressUrl,
             }),
@@ -1374,7 +2004,8 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
           pageId, // Pass pageId context for campaign synchronization
           primaryKeyword: publishResult.primaryKeyword || publishForm.primaryKeyword,
           htmlContent: latestHtmlContent, // This is now synced with DB
-          featuredImage: publishResult.featuredImage,
+          featuredImageEnabled: publishResult.featuredImageEnabled,
+          featuredImageUrl: publishResult.featuredImageUrl,
           title: publishResult.title,
           metaDescription: publishResult.metaDescription,
           slug: publishResult.slug,
@@ -1397,10 +2028,12 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
       // Handle Immediate Success
       if (data.status === 'published' && data.publishedUrl) {
         const publishedUrl = data.publishedUrl;
+        setCurrentDraftStatus('published');
         
         setPublishResult((prev) => prev ? {
           ...prev,
           wordpressUrl: publishedUrl,
+          wordpressPostId: typeof data.wordpressPostId === 'number' ? data.wordpressPostId : prev.wordpressPostId,
         } : null);
         
         toast({
@@ -1416,6 +2049,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
                 ...entry,
                 status: 'published',
                 wordpressUrl: publishedUrl,
+                wordpressPostId: typeof data.wordpressPostId === 'number' ? data.wordpressPostId : entry.wordpressPostId,
                 updatedAt: new Date().toISOString()
               };
             }
@@ -1431,6 +2065,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
       // Handle Queued/Generating Status
       else if (data.status === 'generating') {
         console.log('[Publish:Debug] Job queued, setting currentDraftId:', data.draftId);
+        setCurrentDraftStatus('generating');
         if (data.draftId) {
           setCurrentDraftId(data.draftId);
         }
@@ -1508,13 +2143,16 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
   const handleImageSelect = useCallback(
     (imageSrc: string) => {
       setSelectedImage(imageSrc);
+      setSelectedImageAlt(
+        publishImages.find((image) => image.src === imageSrc)?.alt || ''
+      );
       setImageEditNote((prev) => (selectedImage === imageSrc ? prev : ''));
       imageTooltipInstanceRef.current?.show();
       setTimeout(() => {
         imageEditTextareaRef.current?.focus();
       }, 100);
     },
-    [selectedImage]
+    [publishImages, selectedImage]
   );
 
   const handleResetDraft = useCallback(() => {
@@ -1522,6 +2160,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
     setCurrentDraftId(null);
     setSelectedText('');
     setSelectedImage('');
+    setSelectedImageAlt('');
     setTextEditNote('');
     setImageEditNote('');
     setPublishStage('compose');
@@ -1533,6 +2172,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
       tooltipAnchorRef.current.style.display = 'none';
     }
     setSelectedRange(null);
+    setOriginalDraftSnapshot(createDraftSnapshot(null, ''));
   }, []);
 
   const handleToggleEditMode = useCallback(() => {
@@ -1581,6 +2221,46 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
         description: 'The image has been removed. Click Save to persist changes.',
     });
   }, [publishResult, isEditMode, currentHtmlContent, handleHtmlEditorChange, toast]);
+
+  const updateImageAltText = useCallback(() => {
+    if (!publishResult || !selectedImage) return;
+
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(currentHtmlContent, 'text/html');
+    const image = Array.from(doc.querySelectorAll('img')).find(
+      (item) => item.getAttribute('src') === selectedImage
+    );
+
+    if (!image) {
+      toast({
+        title: 'Image Not Found',
+        description: 'The selected image could not be updated.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    image.setAttribute('alt', selectedImageAlt.trim());
+    const updatedHtml = doc.body.innerHTML;
+
+    setEditedHtmlContent(updatedHtml);
+    if (isEditMode) {
+      handleHtmlEditorChange(updatedHtml);
+    }
+
+    toast({
+      title: 'Alt Text Updated',
+      description: 'Image alt text was updated. Save to persist changes.',
+    });
+  }, [
+    currentHtmlContent,
+    handleHtmlEditorChange,
+    isEditMode,
+    publishResult,
+    selectedImage,
+    selectedImageAlt,
+    toast,
+  ]);
 
   const handleAddImage = useCallback(() => {
     if (!newImageUrl.trim()) {
@@ -1634,6 +2314,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
   const closeImageTooltip = useCallback(() => {
     imageTooltipInstanceRef.current?.hide();
     setSelectedImage('');
+    setSelectedImageAlt('');
     setImageEditNote('');
   }, []);
 
@@ -1887,15 +2568,15 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
                     </p>
                     <button
                       onClick={() =>
-                        setPublishForm((prev) => ({ ...prev, featuredImage: !prev.featuredImage }))
+                        setPublishForm((prev) => ({ ...prev, featuredImageEnabled: !prev.featuredImageEnabled }))
                       }
                       className={`w-full px-4 py-3 rounded-[30px] border text-sm font-medium transition-all ${
-                        publishForm.featuredImage
+                        publishForm.featuredImageEnabled
                           ? 'bg-black text-white border-black shadow-lg'
                           : 'border-gray-200 text-gray-700 hover:bg-gray-100'
                       }`}
                     >
-                      {publishForm.featuredImage 
+                      {publishForm.featuredImageEnabled 
   ? 'Skip banner imagery' 
   : 'Use banner imagery'}
                     </button>
@@ -2277,13 +2958,25 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
                   >
                     {publishLoading ? 'Generating…' : publishResult ? 'Regenerate' : 'Generate'}
                   </button>
-                  <button
-                    onClick={handlePublishToWordpress}
-                    disabled={publishLoading || !publishResult}
-                    className="px-6 py-2.5 rounded-full bg-black text-white text-sm font-medium shadow-lg hover:bg-black/90 disabled:opacity-60 transition-colors"
-                  >
-                    {publishLoading ? 'Working…' : (publishResult?.wordpressUrl?.startsWith('http') ? 'Re-publish to WordPress' : 'Publish to WordPress')}
-                  </button>
+                  {currentDraftStatus === 'published' && publishResult?.wordpressUrl ? (
+                    <a
+                      href={publishResult.wordpressUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-6 py-2.5 rounded-full bg-black text-white text-sm font-medium shadow-lg hover:bg-black/90 transition-colors inline-flex items-center gap-2"
+                    >
+                      <Eye className="h-4 w-4" />
+                      Live URL
+                    </a>
+                  ) : (
+                    <button
+                      onClick={handlePublishToWordpress}
+                      disabled={publishLoading || !publishResult}
+                      className="px-6 py-2.5 rounded-full bg-black text-white text-sm font-medium shadow-lg hover:bg-black/90 disabled:opacity-60 transition-colors"
+                    >
+                      {publishLoading ? 'Working…' : 'Publish to WordPress'}
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -2318,6 +3011,9 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
                           {publishResult.primaryKeyword || publishForm.primaryKeyword || 'Not set'}
                         </p>
                       </div>
+
+                      {renderMetadataEditor()}
+                      {renderFeaturedImageEditor()}
                       
                       <div className="rounded-2xl border border-gray-200 bg-white p-4">
                         <p className="text-xs text-gray-500 mb-2">Secondary Keywords</p>
@@ -2685,6 +3381,25 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
                               <img src={selectedImage} alt="Selected for editing" className="w-full h-24 object-cover" />
                               <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
                             </div>
+                            <div className="space-y-2">
+                              <label className="text-xs uppercase tracking-[0.2em] text-gray-500 font-medium">
+                                Alt text
+                              </label>
+                              <input
+                                type="text"
+                                value={selectedImageAlt}
+                                onChange={(e) => setSelectedImageAlt(e.target.value)}
+                                placeholder="Describe this image"
+                                className="w-full px-3 py-2.5 text-sm rounded-2xl border border-gray-200/80 bg-white focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent transition-all"
+                              />
+                              <button
+                                onClick={updateImageAltText}
+                                disabled={!selectedImage || selectedImageAlt === (selectedImageDetails?.alt || '')}
+                                className="w-full px-4 py-2.5 rounded-full border border-gray-200 bg-white text-sm font-semibold hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                              >
+                                Save Alt Text
+                              </button>
+                            </div>
                             <textarea
                               ref={imageEditTextareaRef}
                               value={imageEditNote}
@@ -2845,7 +3560,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
                       {publishLoading ? 'Generating…' : publishResult ? 'Regenerate' : 'Generate'}
                     </button>
                     
-                    {publishResult?.wordpressUrl ? (
+                    {currentDraftStatus === 'published' && publishResult?.wordpressUrl ? (
                       <div className="flex items-center gap-3">
                         <div className="flex items-center gap-1.5 px-3 py-1.5 bg-green-50 text-green-700 rounded-full border border-green-200 shadow-sm animate-in fade-in slide-in-from-right-4 duration-500">
                           <CheckCircle className="h-4 w-4" />
@@ -2858,16 +3573,8 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
                           className="px-6 py-2.5 rounded-full bg-black text-white text-sm font-medium shadow-lg hover:bg-gray-800 transition-all flex items-center gap-2"
                         >
                           <Eye className="h-4 w-4" />
-                          View Live Article
+                          Live URL
                         </a>
-                        <button
-                          onClick={handlePublishToWordpress}
-                          disabled={publishLoading}
-                          className="p-2.5 rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors"
-                          title="Republish to WordPress"
-                        >
-                          <RotateCcw className={`h-4 w-4 ${publishLoading ? 'animate-spin' : ''}`} />
-                        </button>
                       </div>
                     ) : (
                       <button
@@ -2922,6 +3629,9 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
                             {publishResult.primaryKeyword || publishForm.primaryKeyword || 'Not set'}
                           </p>
                         </div>
+
+                        {renderMetadataEditor()}
+                        {renderFeaturedImageEditor()}
                         
                         <div className="rounded-2xl border border-gray-200 bg-white p-4">
                           <p className="text-xs text-gray-500 mb-2">Secondary Keywords</p>
@@ -3289,6 +3999,25 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
                               <img src={selectedImage} alt="Selected for editing" className="w-full h-24 object-cover" />
                               <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
                             </div>
+                            <div className="space-y-2">
+                              <label className="text-xs uppercase tracking-[0.2em] text-gray-500 font-medium">
+                                Alt text
+                              </label>
+                              <input
+                                type="text"
+                                value={selectedImageAlt}
+                                onChange={(e) => setSelectedImageAlt(e.target.value)}
+                                placeholder="Describe this image"
+                                className="w-full px-3 py-2.5 text-sm rounded-2xl border border-gray-200/80 bg-white focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent transition-all"
+                              />
+                              <button
+                                onClick={updateImageAltText}
+                                disabled={!selectedImage || selectedImageAlt === (selectedImageDetails?.alt || '')}
+                                className="w-full px-4 py-2.5 rounded-full border border-gray-200 bg-white text-sm font-semibold hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                              >
+                                Save Alt Text
+                              </button>
+                            </div>
                             <textarea
                               ref={imageEditTextareaRef}
                               value={imageEditNote}
@@ -3639,5 +4368,3 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
 };
 
 export default PublishExperience;
-
-

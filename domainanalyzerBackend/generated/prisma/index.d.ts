@@ -30301,12 +30301,14 @@ export namespace Prisma {
   export type WordpressPublishLogAvgAggregateOutputType = {
     id: number | null
     userId: number | null
+    generationPageId: number | null
     integrationId: number | null
   }
 
   export type WordpressPublishLogSumAggregateOutputType = {
     id: number | null
     userId: number | null
+    generationPageId: number | null
     integrationId: number | null
   }
 
@@ -30315,6 +30317,9 @@ export namespace Prisma {
     userId: number | null
     wordpressUrl: string | null
     primaryKeyword: string | null
+    normalizedPrimaryKeyword: string | null
+    generationJobId: string | null
+    generationPageId: number | null
     title: string | null
     slug: string | null
     status: string | null
@@ -30328,6 +30333,9 @@ export namespace Prisma {
     userId: number | null
     wordpressUrl: string | null
     primaryKeyword: string | null
+    normalizedPrimaryKeyword: string | null
+    generationJobId: string | null
+    generationPageId: number | null
     title: string | null
     slug: string | null
     status: string | null
@@ -30341,6 +30349,9 @@ export namespace Prisma {
     userId: number
     wordpressUrl: number
     primaryKeyword: number
+    normalizedPrimaryKeyword: number
+    generationJobId: number
+    generationPageId: number
     title: number
     slug: number
     status: number
@@ -30355,12 +30366,14 @@ export namespace Prisma {
   export type WordpressPublishLogAvgAggregateInputType = {
     id?: true
     userId?: true
+    generationPageId?: true
     integrationId?: true
   }
 
   export type WordpressPublishLogSumAggregateInputType = {
     id?: true
     userId?: true
+    generationPageId?: true
     integrationId?: true
   }
 
@@ -30369,6 +30382,9 @@ export namespace Prisma {
     userId?: true
     wordpressUrl?: true
     primaryKeyword?: true
+    normalizedPrimaryKeyword?: true
+    generationJobId?: true
+    generationPageId?: true
     title?: true
     slug?: true
     status?: true
@@ -30382,6 +30398,9 @@ export namespace Prisma {
     userId?: true
     wordpressUrl?: true
     primaryKeyword?: true
+    normalizedPrimaryKeyword?: true
+    generationJobId?: true
+    generationPageId?: true
     title?: true
     slug?: true
     status?: true
@@ -30395,6 +30414,9 @@ export namespace Prisma {
     userId?: true
     wordpressUrl?: true
     primaryKeyword?: true
+    normalizedPrimaryKeyword?: true
+    generationJobId?: true
+    generationPageId?: true
     title?: true
     slug?: true
     status?: true
@@ -30496,6 +30518,9 @@ export namespace Prisma {
     userId: number
     wordpressUrl: string
     primaryKeyword: string | null
+    normalizedPrimaryKeyword: string | null
+    generationJobId: string | null
+    generationPageId: number | null
     title: string | null
     slug: string | null
     status: string | null
@@ -30529,6 +30554,9 @@ export namespace Prisma {
     userId?: boolean
     wordpressUrl?: boolean
     primaryKeyword?: boolean
+    normalizedPrimaryKeyword?: boolean
+    generationJobId?: boolean
+    generationPageId?: boolean
     title?: boolean
     slug?: boolean
     status?: boolean
@@ -30547,6 +30575,9 @@ export namespace Prisma {
     userId?: boolean
     wordpressUrl?: boolean
     primaryKeyword?: boolean
+    normalizedPrimaryKeyword?: boolean
+    generationJobId?: boolean
+    generationPageId?: boolean
     title?: boolean
     slug?: boolean
     status?: boolean
@@ -30564,6 +30595,9 @@ export namespace Prisma {
     userId?: boolean
     wordpressUrl?: boolean
     primaryKeyword?: boolean
+    normalizedPrimaryKeyword?: boolean
+    generationJobId?: boolean
+    generationPageId?: boolean
     title?: boolean
     slug?: boolean
     status?: boolean
@@ -30573,7 +30607,7 @@ export namespace Prisma {
     integrationId?: boolean
   }
 
-  export type WordpressPublishLogOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "userId" | "wordpressUrl" | "primaryKeyword" | "title" | "slug" | "status" | "response" | "createdAt" | "updatedAt" | "integrationId", ExtArgs["result"]["wordpressPublishLog"]>
+  export type WordpressPublishLogOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "userId" | "wordpressUrl" | "primaryKeyword" | "normalizedPrimaryKeyword" | "generationJobId" | "generationPageId" | "title" | "slug" | "status" | "response" | "createdAt" | "updatedAt" | "integrationId", ExtArgs["result"]["wordpressPublishLog"]>
   export type WordpressPublishLogInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     user?: boolean | UserDefaultArgs<ExtArgs>
     integration?: boolean | WordpressPublishLog$integrationArgs<ExtArgs>
@@ -30597,6 +30631,9 @@ export namespace Prisma {
       userId: number
       wordpressUrl: string
       primaryKeyword: string | null
+      normalizedPrimaryKeyword: string | null
+      generationJobId: string | null
+      generationPageId: number | null
       title: string | null
       slug: string | null
       status: string | null
@@ -31004,6 +31041,9 @@ export namespace Prisma {
     readonly userId: FieldRef<"WordpressPublishLog", 'Int'>
     readonly wordpressUrl: FieldRef<"WordpressPublishLog", 'String'>
     readonly primaryKeyword: FieldRef<"WordpressPublishLog", 'String'>
+    readonly normalizedPrimaryKeyword: FieldRef<"WordpressPublishLog", 'String'>
+    readonly generationJobId: FieldRef<"WordpressPublishLog", 'String'>
+    readonly generationPageId: FieldRef<"WordpressPublishLog", 'Int'>
     readonly title: FieldRef<"WordpressPublishLog", 'String'>
     readonly slug: FieldRef<"WordpressPublishLog", 'String'>
     readonly status: FieldRef<"WordpressPublishLog", 'String'>
@@ -49547,6 +49587,9 @@ export namespace Prisma {
     userId: 'userId',
     wordpressUrl: 'wordpressUrl',
     primaryKeyword: 'primaryKeyword',
+    normalizedPrimaryKeyword: 'normalizedPrimaryKeyword',
+    generationJobId: 'generationJobId',
+    generationPageId: 'generationPageId',
     title: 'title',
     slug: 'slug',
     status: 'status',
@@ -51994,6 +52037,9 @@ export namespace Prisma {
     userId?: IntFilter<"WordpressPublishLog"> | number
     wordpressUrl?: StringFilter<"WordpressPublishLog"> | string
     primaryKeyword?: StringNullableFilter<"WordpressPublishLog"> | string | null
+    normalizedPrimaryKeyword?: StringNullableFilter<"WordpressPublishLog"> | string | null
+    generationJobId?: StringNullableFilter<"WordpressPublishLog"> | string | null
+    generationPageId?: IntNullableFilter<"WordpressPublishLog"> | number | null
     title?: StringNullableFilter<"WordpressPublishLog"> | string | null
     slug?: StringNullableFilter<"WordpressPublishLog"> | string | null
     status?: StringNullableFilter<"WordpressPublishLog"> | string | null
@@ -52011,6 +52057,9 @@ export namespace Prisma {
     userId?: SortOrder
     wordpressUrl?: SortOrder
     primaryKeyword?: SortOrderInput | SortOrder
+    normalizedPrimaryKeyword?: SortOrderInput | SortOrder
+    generationJobId?: SortOrderInput | SortOrder
+    generationPageId?: SortOrderInput | SortOrder
     title?: SortOrderInput | SortOrder
     slug?: SortOrderInput | SortOrder
     status?: SortOrderInput | SortOrder
@@ -52031,6 +52080,9 @@ export namespace Prisma {
     userId?: IntFilter<"WordpressPublishLog"> | number
     wordpressUrl?: StringFilter<"WordpressPublishLog"> | string
     primaryKeyword?: StringNullableFilter<"WordpressPublishLog"> | string | null
+    normalizedPrimaryKeyword?: StringNullableFilter<"WordpressPublishLog"> | string | null
+    generationJobId?: StringNullableFilter<"WordpressPublishLog"> | string | null
+    generationPageId?: IntNullableFilter<"WordpressPublishLog"> | number | null
     title?: StringNullableFilter<"WordpressPublishLog"> | string | null
     slug?: StringNullableFilter<"WordpressPublishLog"> | string | null
     status?: StringNullableFilter<"WordpressPublishLog"> | string | null
@@ -52048,6 +52100,9 @@ export namespace Prisma {
     userId?: SortOrder
     wordpressUrl?: SortOrder
     primaryKeyword?: SortOrderInput | SortOrder
+    normalizedPrimaryKeyword?: SortOrderInput | SortOrder
+    generationJobId?: SortOrderInput | SortOrder
+    generationPageId?: SortOrderInput | SortOrder
     title?: SortOrderInput | SortOrder
     slug?: SortOrderInput | SortOrder
     status?: SortOrderInput | SortOrder
@@ -52070,6 +52125,9 @@ export namespace Prisma {
     userId?: IntWithAggregatesFilter<"WordpressPublishLog"> | number
     wordpressUrl?: StringWithAggregatesFilter<"WordpressPublishLog"> | string
     primaryKeyword?: StringNullableWithAggregatesFilter<"WordpressPublishLog"> | string | null
+    normalizedPrimaryKeyword?: StringNullableWithAggregatesFilter<"WordpressPublishLog"> | string | null
+    generationJobId?: StringNullableWithAggregatesFilter<"WordpressPublishLog"> | string | null
+    generationPageId?: IntNullableWithAggregatesFilter<"WordpressPublishLog"> | number | null
     title?: StringNullableWithAggregatesFilter<"WordpressPublishLog"> | string | null
     slug?: StringNullableWithAggregatesFilter<"WordpressPublishLog"> | string | null
     status?: StringNullableWithAggregatesFilter<"WordpressPublishLog"> | string | null
@@ -55631,6 +55689,9 @@ export namespace Prisma {
   export type WordpressPublishLogCreateInput = {
     wordpressUrl: string
     primaryKeyword?: string | null
+    normalizedPrimaryKeyword?: string | null
+    generationJobId?: string | null
+    generationPageId?: number | null
     title?: string | null
     slug?: string | null
     status?: string | null
@@ -55647,6 +55708,9 @@ export namespace Prisma {
     userId: number
     wordpressUrl: string
     primaryKeyword?: string | null
+    normalizedPrimaryKeyword?: string | null
+    generationJobId?: string | null
+    generationPageId?: number | null
     title?: string | null
     slug?: string | null
     status?: string | null
@@ -55660,6 +55724,9 @@ export namespace Prisma {
   export type WordpressPublishLogUpdateInput = {
     wordpressUrl?: StringFieldUpdateOperationsInput | string
     primaryKeyword?: NullableStringFieldUpdateOperationsInput | string | null
+    normalizedPrimaryKeyword?: NullableStringFieldUpdateOperationsInput | string | null
+    generationJobId?: NullableStringFieldUpdateOperationsInput | string | null
+    generationPageId?: NullableIntFieldUpdateOperationsInput | number | null
     title?: NullableStringFieldUpdateOperationsInput | string | null
     slug?: NullableStringFieldUpdateOperationsInput | string | null
     status?: NullableStringFieldUpdateOperationsInput | string | null
@@ -55676,6 +55743,9 @@ export namespace Prisma {
     userId?: IntFieldUpdateOperationsInput | number
     wordpressUrl?: StringFieldUpdateOperationsInput | string
     primaryKeyword?: NullableStringFieldUpdateOperationsInput | string | null
+    normalizedPrimaryKeyword?: NullableStringFieldUpdateOperationsInput | string | null
+    generationJobId?: NullableStringFieldUpdateOperationsInput | string | null
+    generationPageId?: NullableIntFieldUpdateOperationsInput | number | null
     title?: NullableStringFieldUpdateOperationsInput | string | null
     slug?: NullableStringFieldUpdateOperationsInput | string | null
     status?: NullableStringFieldUpdateOperationsInput | string | null
@@ -55691,6 +55761,9 @@ export namespace Prisma {
     userId: number
     wordpressUrl: string
     primaryKeyword?: string | null
+    normalizedPrimaryKeyword?: string | null
+    generationJobId?: string | null
+    generationPageId?: number | null
     title?: string | null
     slug?: string | null
     status?: string | null
@@ -55703,6 +55776,9 @@ export namespace Prisma {
   export type WordpressPublishLogUpdateManyMutationInput = {
     wordpressUrl?: StringFieldUpdateOperationsInput | string
     primaryKeyword?: NullableStringFieldUpdateOperationsInput | string | null
+    normalizedPrimaryKeyword?: NullableStringFieldUpdateOperationsInput | string | null
+    generationJobId?: NullableStringFieldUpdateOperationsInput | string | null
+    generationPageId?: NullableIntFieldUpdateOperationsInput | number | null
     title?: NullableStringFieldUpdateOperationsInput | string | null
     slug?: NullableStringFieldUpdateOperationsInput | string | null
     status?: NullableStringFieldUpdateOperationsInput | string | null
@@ -55716,6 +55792,9 @@ export namespace Prisma {
     userId?: IntFieldUpdateOperationsInput | number
     wordpressUrl?: StringFieldUpdateOperationsInput | string
     primaryKeyword?: NullableStringFieldUpdateOperationsInput | string | null
+    normalizedPrimaryKeyword?: NullableStringFieldUpdateOperationsInput | string | null
+    generationJobId?: NullableStringFieldUpdateOperationsInput | string | null
+    generationPageId?: NullableIntFieldUpdateOperationsInput | number | null
     title?: NullableStringFieldUpdateOperationsInput | string | null
     slug?: NullableStringFieldUpdateOperationsInput | string | null
     status?: NullableStringFieldUpdateOperationsInput | string | null
@@ -59002,6 +59081,9 @@ export namespace Prisma {
     userId?: SortOrder
     wordpressUrl?: SortOrder
     primaryKeyword?: SortOrder
+    normalizedPrimaryKeyword?: SortOrder
+    generationJobId?: SortOrder
+    generationPageId?: SortOrder
     title?: SortOrder
     slug?: SortOrder
     status?: SortOrder
@@ -59014,6 +59096,7 @@ export namespace Prisma {
   export type WordpressPublishLogAvgOrderByAggregateInput = {
     id?: SortOrder
     userId?: SortOrder
+    generationPageId?: SortOrder
     integrationId?: SortOrder
   }
 
@@ -59022,6 +59105,9 @@ export namespace Prisma {
     userId?: SortOrder
     wordpressUrl?: SortOrder
     primaryKeyword?: SortOrder
+    normalizedPrimaryKeyword?: SortOrder
+    generationJobId?: SortOrder
+    generationPageId?: SortOrder
     title?: SortOrder
     slug?: SortOrder
     status?: SortOrder
@@ -59035,6 +59121,9 @@ export namespace Prisma {
     userId?: SortOrder
     wordpressUrl?: SortOrder
     primaryKeyword?: SortOrder
+    normalizedPrimaryKeyword?: SortOrder
+    generationJobId?: SortOrder
+    generationPageId?: SortOrder
     title?: SortOrder
     slug?: SortOrder
     status?: SortOrder
@@ -59046,6 +59135,7 @@ export namespace Prisma {
   export type WordpressPublishLogSumOrderByAggregateInput = {
     id?: SortOrder
     userId?: SortOrder
+    generationPageId?: SortOrder
     integrationId?: SortOrder
   }
 
@@ -63293,6 +63383,9 @@ export namespace Prisma {
   export type WordpressPublishLogCreateWithoutUserInput = {
     wordpressUrl: string
     primaryKeyword?: string | null
+    normalizedPrimaryKeyword?: string | null
+    generationJobId?: string | null
+    generationPageId?: number | null
     title?: string | null
     slug?: string | null
     status?: string | null
@@ -63307,6 +63400,9 @@ export namespace Prisma {
     id?: number
     wordpressUrl: string
     primaryKeyword?: string | null
+    normalizedPrimaryKeyword?: string | null
+    generationJobId?: string | null
+    generationPageId?: number | null
     title?: string | null
     slug?: string | null
     status?: string | null
@@ -63487,6 +63583,9 @@ export namespace Prisma {
     userId?: IntFilter<"WordpressPublishLog"> | number
     wordpressUrl?: StringFilter<"WordpressPublishLog"> | string
     primaryKeyword?: StringNullableFilter<"WordpressPublishLog"> | string | null
+    normalizedPrimaryKeyword?: StringNullableFilter<"WordpressPublishLog"> | string | null
+    generationJobId?: StringNullableFilter<"WordpressPublishLog"> | string | null
+    generationPageId?: IntNullableFilter<"WordpressPublishLog"> | number | null
     title?: StringNullableFilter<"WordpressPublishLog"> | string | null
     slug?: StringNullableFilter<"WordpressPublishLog"> | string | null
     status?: StringNullableFilter<"WordpressPublishLog"> | string | null
@@ -68963,6 +69062,9 @@ export namespace Prisma {
   export type WordpressPublishLogCreateWithoutIntegrationInput = {
     wordpressUrl: string
     primaryKeyword?: string | null
+    normalizedPrimaryKeyword?: string | null
+    generationJobId?: string | null
+    generationPageId?: number | null
     title?: string | null
     slug?: string | null
     status?: string | null
@@ -68978,6 +69080,9 @@ export namespace Prisma {
     userId: number
     wordpressUrl: string
     primaryKeyword?: string | null
+    normalizedPrimaryKeyword?: string | null
+    generationJobId?: string | null
+    generationPageId?: number | null
     title?: string | null
     slug?: string | null
     status?: string | null
@@ -71994,6 +72099,9 @@ export namespace Prisma {
   export type WordpressPublishLogCreateWithoutCampaignPagesInput = {
     wordpressUrl: string
     primaryKeyword?: string | null
+    normalizedPrimaryKeyword?: string | null
+    generationJobId?: string | null
+    generationPageId?: number | null
     title?: string | null
     slug?: string | null
     status?: string | null
@@ -72009,6 +72117,9 @@ export namespace Prisma {
     userId: number
     wordpressUrl: string
     primaryKeyword?: string | null
+    normalizedPrimaryKeyword?: string | null
+    generationJobId?: string | null
+    generationPageId?: number | null
     title?: string | null
     slug?: string | null
     status?: string | null
@@ -72093,6 +72204,9 @@ export namespace Prisma {
   export type WordpressPublishLogUpdateWithoutCampaignPagesInput = {
     wordpressUrl?: StringFieldUpdateOperationsInput | string
     primaryKeyword?: NullableStringFieldUpdateOperationsInput | string | null
+    normalizedPrimaryKeyword?: NullableStringFieldUpdateOperationsInput | string | null
+    generationJobId?: NullableStringFieldUpdateOperationsInput | string | null
+    generationPageId?: NullableIntFieldUpdateOperationsInput | number | null
     title?: NullableStringFieldUpdateOperationsInput | string | null
     slug?: NullableStringFieldUpdateOperationsInput | string | null
     status?: NullableStringFieldUpdateOperationsInput | string | null
@@ -72108,6 +72222,9 @@ export namespace Prisma {
     userId?: IntFieldUpdateOperationsInput | number
     wordpressUrl?: StringFieldUpdateOperationsInput | string
     primaryKeyword?: NullableStringFieldUpdateOperationsInput | string | null
+    normalizedPrimaryKeyword?: NullableStringFieldUpdateOperationsInput | string | null
+    generationJobId?: NullableStringFieldUpdateOperationsInput | string | null
+    generationPageId?: NullableIntFieldUpdateOperationsInput | number | null
     title?: NullableStringFieldUpdateOperationsInput | string | null
     slug?: NullableStringFieldUpdateOperationsInput | string | null
     status?: NullableStringFieldUpdateOperationsInput | string | null
@@ -72601,6 +72718,9 @@ export namespace Prisma {
     id?: number
     wordpressUrl: string
     primaryKeyword?: string | null
+    normalizedPrimaryKeyword?: string | null
+    generationJobId?: string | null
+    generationPageId?: number | null
     title?: string | null
     slug?: string | null
     status?: string | null
@@ -72720,6 +72840,9 @@ export namespace Prisma {
   export type WordpressPublishLogUpdateWithoutUserInput = {
     wordpressUrl?: StringFieldUpdateOperationsInput | string
     primaryKeyword?: NullableStringFieldUpdateOperationsInput | string | null
+    normalizedPrimaryKeyword?: NullableStringFieldUpdateOperationsInput | string | null
+    generationJobId?: NullableStringFieldUpdateOperationsInput | string | null
+    generationPageId?: NullableIntFieldUpdateOperationsInput | number | null
     title?: NullableStringFieldUpdateOperationsInput | string | null
     slug?: NullableStringFieldUpdateOperationsInput | string | null
     status?: NullableStringFieldUpdateOperationsInput | string | null
@@ -72734,6 +72857,9 @@ export namespace Prisma {
     id?: IntFieldUpdateOperationsInput | number
     wordpressUrl?: StringFieldUpdateOperationsInput | string
     primaryKeyword?: NullableStringFieldUpdateOperationsInput | string | null
+    normalizedPrimaryKeyword?: NullableStringFieldUpdateOperationsInput | string | null
+    generationJobId?: NullableStringFieldUpdateOperationsInput | string | null
+    generationPageId?: NullableIntFieldUpdateOperationsInput | number | null
     title?: NullableStringFieldUpdateOperationsInput | string | null
     slug?: NullableStringFieldUpdateOperationsInput | string | null
     status?: NullableStringFieldUpdateOperationsInput | string | null
@@ -72748,6 +72874,9 @@ export namespace Prisma {
     id?: IntFieldUpdateOperationsInput | number
     wordpressUrl?: StringFieldUpdateOperationsInput | string
     primaryKeyword?: NullableStringFieldUpdateOperationsInput | string | null
+    normalizedPrimaryKeyword?: NullableStringFieldUpdateOperationsInput | string | null
+    generationJobId?: NullableStringFieldUpdateOperationsInput | string | null
+    generationPageId?: NullableIntFieldUpdateOperationsInput | number | null
     title?: NullableStringFieldUpdateOperationsInput | string | null
     slug?: NullableStringFieldUpdateOperationsInput | string | null
     status?: NullableStringFieldUpdateOperationsInput | string | null
@@ -74279,6 +74408,9 @@ export namespace Prisma {
     userId: number
     wordpressUrl: string
     primaryKeyword?: string | null
+    normalizedPrimaryKeyword?: string | null
+    generationJobId?: string | null
+    generationPageId?: number | null
     title?: string | null
     slug?: string | null
     status?: string | null
@@ -74290,6 +74422,9 @@ export namespace Prisma {
   export type WordpressPublishLogUpdateWithoutIntegrationInput = {
     wordpressUrl?: StringFieldUpdateOperationsInput | string
     primaryKeyword?: NullableStringFieldUpdateOperationsInput | string | null
+    normalizedPrimaryKeyword?: NullableStringFieldUpdateOperationsInput | string | null
+    generationJobId?: NullableStringFieldUpdateOperationsInput | string | null
+    generationPageId?: NullableIntFieldUpdateOperationsInput | number | null
     title?: NullableStringFieldUpdateOperationsInput | string | null
     slug?: NullableStringFieldUpdateOperationsInput | string | null
     status?: NullableStringFieldUpdateOperationsInput | string | null
@@ -74305,6 +74440,9 @@ export namespace Prisma {
     userId?: IntFieldUpdateOperationsInput | number
     wordpressUrl?: StringFieldUpdateOperationsInput | string
     primaryKeyword?: NullableStringFieldUpdateOperationsInput | string | null
+    normalizedPrimaryKeyword?: NullableStringFieldUpdateOperationsInput | string | null
+    generationJobId?: NullableStringFieldUpdateOperationsInput | string | null
+    generationPageId?: NullableIntFieldUpdateOperationsInput | number | null
     title?: NullableStringFieldUpdateOperationsInput | string | null
     slug?: NullableStringFieldUpdateOperationsInput | string | null
     status?: NullableStringFieldUpdateOperationsInput | string | null
@@ -74319,6 +74457,9 @@ export namespace Prisma {
     userId?: IntFieldUpdateOperationsInput | number
     wordpressUrl?: StringFieldUpdateOperationsInput | string
     primaryKeyword?: NullableStringFieldUpdateOperationsInput | string | null
+    normalizedPrimaryKeyword?: NullableStringFieldUpdateOperationsInput | string | null
+    generationJobId?: NullableStringFieldUpdateOperationsInput | string | null
+    generationPageId?: NullableIntFieldUpdateOperationsInput | number | null
     title?: NullableStringFieldUpdateOperationsInput | string | null
     slug?: NullableStringFieldUpdateOperationsInput | string | null
     status?: NullableStringFieldUpdateOperationsInput | string | null

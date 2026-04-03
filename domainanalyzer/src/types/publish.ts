@@ -8,7 +8,9 @@ export interface WordpressIntegration {
 export interface GeneratedArticleContent {
   primaryKeyword: string;
   htmlContent: string;
-  featuredImage?: string;
+  featuredImageEnabled: boolean;
+  featuredImageUrl?: string | null;
+  wordpressPostId?: number | null;
   title?: string;
   metaDescription?: string;
   slug?: string;
@@ -19,6 +21,7 @@ export interface GeneratedArticleContent {
 export interface PublishHistoryEntry {
   id: number;
   wordpressUrl: string;
+  wordpressPostId?: number | null;
   primaryKeyword?: string | null;
   title?: string | null;
   slug?: string | null;
@@ -26,5 +29,3 @@ export interface PublishHistoryEntry {
   createdAt: string;
   response?: Record<string, unknown> | null;
 }
-
-

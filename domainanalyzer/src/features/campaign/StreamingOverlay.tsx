@@ -1,54 +1,51 @@
 import React, { useEffect, useState } from 'react';
 import { Loader2 } from 'lucide-react';
+import { GenerationStreamingEvent } from '@/types';
 
 interface StreamingOverlayProps {
   isVisible: boolean;
-  messages: Array<{ message: string; timestamp: string }>;
-  jobId?: string;
+  events: GenerationStreamingEvent[];
 }
 
 export const StreamingOverlay: React.FC<StreamingOverlayProps> = ({
   isVisible,
-  messages,
-  jobId
+  events,
 }) => {
   const [activeMessage, setActiveMessage] = useState<string>('Initializing...');
 
-  // Auto-scroll messages or show latest
   useEffect(() => {
-    if (messages.length > 0) {
-      setActiveMessage(messages[messages.length - 1].message);
+    if (events.length > 0) {
+      setActiveMessage(events[events.length - 1].message);
+    } else if (isVisible) {
+      setActiveMessage('Preparing your content generation...');
     }
-  }, [messages]);
+  }, [events, isVisible]);
+
+  const pageCount = new Set(events.map((event) => event.pageId).filter((pageId) => typeof pageId === 'number')).size;
 
   if (!isVisible) return null;
 
   return (
-    <div className="absolute inset-0 z-50 bg-white/90 backdrop-blur-sm flex flex-col items-center justify-center p-8 transition-all duration-500">
-      <div className="max-w-md w-full text-center space-y-6">
-        <div className="relative mx-auto w-16 h-16">
-            <div className="absolute inset-0 border-4 border-gray-100 rounded-full"></div>
-            <div className="absolute inset-0 border-4 border-black border-t-transparent rounded-full animate-spin"></div>
-            <div className="absolute inset-0 flex items-center justify-center">
-                <Loader2 className="h-6 w-6 text-gray-400 animate-pulse" />
-            </div>
-        </div>
-        
-        <div className="space-y-2">
-            <h3 className="text-xl font-light tracking-tight text-gray-900">
-                Generating Content
-            </h3>
-            <p className="text-sm text-gray-500 font-light">
-                {jobId ? `Job ID: ${jobId}` : 'Preparing your campaign...'}
-            </p>
-        </div>
+    <div className="pointer-events-none absolute right-4 top-4 z-30 w-full max-w-[260px]">
+      <div className="ml-auto rounded-[18px] border border-gray-200 bg-white/92 px-3 py-2.5 shadow-[0_8px_24px_rgba(15,23,42,0.05)] backdrop-blur-md transition-all duration-500 animate-in slide-in-from-top-3 fade-in">
+        <div className="flex items-start gap-3">
+          <div className="relative mt-0.5 flex h-7 w-7 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-700">
+            <Loader2 className="h-3 w-3 animate-spin" />
+          </div>
 
-        <div className="h-12 overflow-hidden relative">
-            <div className="animate-in slide-in-from-bottom-4 fade-in duration-300 absolute inset-0 flex items-center justify-center">
-                <p className="text-sm font-medium text-black bg-gray-50 px-4 py-2 rounded-full border border-gray-100 shadow-sm">
-                    {activeMessage}
-                </p>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-[10px] uppercase tracking-[0.14em] text-gray-400">Generating</p>
+                <h3 className="mt-0.5 text-[12px] font-medium text-gray-900">Pages are updating</h3>
+              </div>
+              <span className="rounded-full border border-gray-200 bg-white px-2 py-0.5 text-[10px] font-medium text-gray-500">
+                {pageCount || 0} page{pageCount === 1 ? '' : 's'}
+              </span>
             </div>
+
+            <p className="mt-1.5 text-[12px] leading-5 text-gray-500">{activeMessage}</p>
+          </div>
         </div>
       </div>
     </div>

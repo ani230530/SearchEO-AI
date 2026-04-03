@@ -1,4 +1,5 @@
 import IORedis from 'ioredis';
+import type { CanonicalStreamingEvent } from './contentFlowService';
 
 // Reuse the Redis connection from existing infrastructure if possible, or create new
 const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
@@ -13,6 +14,8 @@ export interface StreamingMessage {
     timestamp: string;
 }
 
+export interface StreamingEvent extends CanonicalStreamingEvent {}
+
 /**
  * Saves a streaming progress message for a specific job.
  */
@@ -22,6 +25,12 @@ export const saveStreamingMessage = async (jobId: string, message: string, times
 
     await redis.rpush(key, JSON.stringify(messageObj));
     await redis.expire(key, MESSAGE_TTL_SECONDS); // Refresh TTL on every new message
+};
+
+export const saveStreamingEvent = async (jobId: string, event: StreamingEvent) => {
+    const key = `streaming:${jobId}:messages`;
+    await redis.rpush(key, JSON.stringify(event));
+    await redis.expire(key, MESSAGE_TTL_SECONDS);
 };
 
 /**
@@ -36,6 +45,42 @@ export const getStreamingMessages = async (jobId: string): Promise<StreamingMess
             return JSON.parse(raw) as StreamingMessage;
         } catch (e) {
             return { message: raw, timestamp: new Date().toISOString() }; // Fallback
+        }
+    });
+};
+
+export const getStreamingEvents = async (jobId: string): Promise<StreamingEvent[]> => {
+    const key = `streaming:${jobId}:messages`;
+    const rawMessages = await redis.lrange(key, 0, -1);
+
+    return rawMessages.map((raw) => {
+        try {
+            const parsed = JSON.parse(raw) as Partial<StreamingEvent>;
+            return {
+                jobId,
+                topicId: parsed.topicId ?? null,
+                pageId: parsed.pageId ?? null,
+                pageType: parsed.pageType ?? null,
+                status: parsed.status ?? 'generating',
+                phase: parsed.phase ?? null,
+                progress: parsed.progress ?? null,
+                message: parsed.message || '',
+                sequence: parsed.sequence ?? null,
+                timestamp: parsed.timestamp || new Date().toISOString(),
+            };
+        } catch (e) {
+            return {
+                jobId,
+                topicId: null,
+                pageId: null,
+                pageType: null,
+                status: 'generating',
+                phase: null,
+                progress: null,
+                message: raw,
+                sequence: null,
+                timestamp: new Date().toISOString(),
+            };
         }
     });
 };

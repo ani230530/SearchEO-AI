@@ -62,7 +62,7 @@ import { useToast } from '@/hooks/use-toast';
 import { ButtonSpinner } from '@/components/ui/button-spinner';
 import { CampaignTopicSidebar } from '@/features/campaign/CampaignTopicSidebar';
 import { CampaignTopicDetail } from '@/features/campaign/CampaignTopicDetail';
-import { Topic, CampaignStructure, GenerationPageStatus, DraftStatusRecord, KeywordTableItem, DraftPreview, Keyword } from '@/types';
+import { Topic, CampaignStructure, GenerationPageStatus, DraftStatusRecord, KeywordTableItem, DraftPreview, Keyword, GenerationStreamingEvent } from '@/types';
 import CampaignGraph from '@/components/CampaignGraph';
 import { AuditBarChart, AuditGaugeChart, AuditRadarChart, AuditScoreDistribution, OverallScoreGauge } from '@/components/audit/AuditCharts';
 import { WordpressIntegration } from '@/types/publish';
@@ -80,7 +80,6 @@ import Profile from './Profile';
 import {AnimatePresence, motion} from 'framer-motion'
 import GSCAnalyticsView from '@/components/gsc/GSCAnalyticsView';
 import GSCBlogAnalytics from '@/features/analytics/GSCBlogAnalytics';
-import { usePublishStatus } from '@/hooks/usePublishStatus';
 import {
   Sheet,
   SheetContent,
@@ -297,11 +296,19 @@ const sseRef = useRef<EventSource | null>(null);
   const [draftToPageMap, setDraftToPageMap] = useState<Map<number, number>>(new Map());
   // Track draft statuses (published/local drafts/failed)
   const [draftStatuses, setDraftStatuses] = useState<Map<number, { isPublished: boolean; isFailed?: boolean; publishedUrl?: string; draftId?: number; error?: string }>>(new Map());
+  const [sharedPublishStatuses, setSharedPublishStatuses] = useState<Map<number, {
+    status: 'generating' | 'published' | 'failed';
+    publishedUrl?: string;
+    wordpressPostId?: number | null;
+    error?: string;
+    updatedAt?: string;
+  }>>(new Map());
   // Track generation job statuses
   const [generationJobs, setGenerationJobs] = useState<Map<number, GenerationPageStatus>>(new Map());
   // Lifted context from CampaignStructureView
   const [campaignPageIdContext, setCampaignPageIdContext] = useState<number | null>(null);
   const [currentGenerationTopicId, setCurrentGenerationTopicId] = useState<number | null>(null);
+  const notifiedReadyPageIdsRef = useRef<Set<number>>(new Set());
 const [improvedContent, setImprovedContent] = useState("");
   const [gscEmail, setGscEmail] = useState<string>("");
   const [gscSelectedProperty, setGscSelectedProperty] = useState<string>("");
@@ -417,6 +424,23 @@ const [selectedTopicId, setSelectedTopicId] = useState<number | null>(null);
 const [campaignStructure, setCampaignStructure] = useState<CampaignStructure>({
   topics: []
 });
+
+  const getCampaignPageDisplayName = useCallback((pageId?: number, fallback?: string | null) => {
+    if (!pageId) return fallback || 'Your draft';
+
+    for (const topic of campaignStructure.topics) {
+      if (topic.pillarPage?.id === pageId) {
+        return topic.pillarPage.title || fallback || 'Your draft';
+      }
+      const subPage = topic.subPages.find((page) => page.id === pageId);
+      if (subPage) {
+        return subPage.title || fallback || 'Your draft';
+      }
+    }
+
+    return fallback || 'Your draft';
+  }, [campaignStructure.topics]);
+
 // For inline editing of campaigns
 const [showEditModal, setShowEditModal] = useState(false);
 const [editingCampaignId, setEditingCampaignId] = useState<number | null>(null);
@@ -437,134 +461,146 @@ const [editDescription, setEditDescription] = useState('');
     }
   }, [sidebarOpen]);
 
-  // Listen for real-time publish updates via SSE
-  usePublishStatus({
-    onUpdate: (data) => {
-      console.log('[Dashboard:SSE] Received update:', data);
-      
-      const incomingDraftId = data.draftId ? Number(data.draftId) : null;
-      const incomingPageId = data.pageId ? Number(data.pageId) : null;
-      
-      let targetPageId: number | null = incomingPageId;
-      
-      if (!targetPageId && incomingDraftId) {
-        // Fallback: look in local mapping
-        for (const [dId, pId] of draftToPageMap.entries()) {
-          if (Number(dId) === incomingDraftId) {
-            targetPageId = Number(pId);
-            break;
-          }
+  const handlePublishUpdate = useCallback((data: {
+    draftId?: number;
+    pageId?: number;
+    status: 'published' | 'failed' | 'generating';
+    publishedUrl?: string;
+    wordpressPostId?: number | null;
+    error?: string;
+  }) => {
+    console.log('[Dashboard:SSE] Received update:', data);
+
+    const incomingDraftId = data.draftId ? Number(data.draftId) : null;
+    const incomingPageId = data.pageId ? Number(data.pageId) : null;
+
+    if (incomingDraftId) {
+      setSharedPublishStatuses((prev) => {
+        const updated = new Map(prev);
+        updated.set(incomingDraftId, {
+          status: data.status,
+          publishedUrl: data.publishedUrl,
+          wordpressPostId: data.wordpressPostId,
+          error: data.error,
+          updatedAt: new Date().toISOString()
+        });
+        return updated;
+      });
+    }
+
+    let targetPageId: number | null = incomingPageId;
+
+    if (!targetPageId && incomingDraftId) {
+      for (const [dId, pId] of draftToPageMapRef.current.entries()) {
+        if (Number(dId) === incomingDraftId) {
+          targetPageId = Number(pId);
+          break;
         }
       }
-      
-      console.log('[Dashboard:SSE] Match attempt:', { incomingDraftId, incomingPageId, resolvedPageId: targetPageId });
+    }
 
-      // Terminal states: Clear loading and mapping
-      if (data.status === 'published' || data.status === 'failed') {
-        if (targetPageId) {
-          console.log('[Dashboard:SSE] Clearing loading state for page:', targetPageId);
-          setPublishingPageIds(prev => {
-            const next = new Set(prev);
-            for (const val of Array.from(next)) {
-              if (Number(val) === Number(targetPageId)) {
-                next.delete(val);
-              }
-            }
-            return next;
-          });
-        }
-        
-        if (incomingDraftId) {
-          setDraftToPageMap(prev => {
-            const next = new Map(prev);
-            for (const [dId] of next.entries()) {
-              if (Number(dId) === incomingDraftId) {
-                next.delete(dId);
-              }
-            }
-            return next;
-          });
-        }
+    if (data.status === 'published' || data.status === 'failed') {
+      if (targetPageId) {
+        setPublishingPageIds(prev => {
+          const next = new Set(prev);
+          next.delete(targetPageId!);
+          return next;
+        });
       }
 
-      // Handle specific statuses
-      if (data.status === 'published' && data.publishedUrl && targetPageId) {
-        // Update generationJobs
-        setGenerationJobs(prev => {
-          const updated = new Map(prev);
-          const existing = updated.get(targetPageId!);
-          if (existing) {
-            updated.set(targetPageId!, {
-              ...existing,
-              wordpressUrl: data.publishedUrl || null,
-            });
-          }
-          return updated;
-        });
-
-        // Update draftStatuses
-        setDraftStatuses(prev => {
-          const updated = new Map(prev);
-          const existing = updated.get(targetPageId!);
-          if (existing) {
-            updated.set(targetPageId!, {
-              ...existing,
-              isPublished: true,
-              publishedUrl: data.publishedUrl,
-              draftId: incomingDraftId || undefined
-            });
-          } else {
-            // Add new entry even if it wasn't there before
-            updated.set(targetPageId!, {
-              isPublished: true,
-              publishedUrl: data.publishedUrl,
-              draftId: incomingDraftId || undefined
-            });
-          }
-          return updated;
-        });
-
-        toast({
-          title: 'Published Successfully',
-          description: `Your content is live! View it at: ${data.publishedUrl}`,
-        });
-      } else if (data.status === 'failed') {
-        // Update draftStatuses for failure
-        setDraftStatuses(prev => {
-          const updated = new Map(prev);
-          if (targetPageId && updated.has(targetPageId)) {
-            const existing = updated.get(targetPageId)!;
-            updated.set(targetPageId, {
-              ...existing,
-              isFailed: true,
-              isPublished: false,
-              error: data.error,
-              draftId: incomingDraftId || existing.draftId
-            });
-          } else if (incomingDraftId) {
-            for (const [pid, status] of updated.entries()) {
-              if (Number(status.draftId) === incomingDraftId) {
-                updated.set(pid, {
-                  ...status,
-                  isFailed: true,
-                  isPublished: false,
-                  error: data.error,
-                });
-                break;
-              }
-            }
-          }
-          return updated;
-        });
-
-        toast({
-          title: 'Publish Failed',
-          description: data.error || 'An error occurred while publishing to WordPress',
-          variant: 'destructive',
+      if (incomingDraftId) {
+        setDraftToPageMap(prev => {
+          const next = new Map(prev);
+          next.delete(incomingDraftId);
+          return next;
         });
       }
     }
-  });
+
+    if (data.status === 'published' && data.publishedUrl && targetPageId) {
+      setGenerationJobs(prev => {
+        const updated = new Map(prev);
+        const existing = updated.get(targetPageId!);
+        if (existing) {
+          updated.set(targetPageId!, {
+            ...existing,
+            wordpressUrl: data.publishedUrl || null,
+            status: 'published',
+          });
+        }
+        return updated;
+      });
+
+      setDraftStatuses(prev => {
+        const updated = new Map(prev);
+        const existing = updated.get(targetPageId!);
+        updated.set(targetPageId!, {
+          ...(existing || {}),
+          isPublished: true,
+          publishedUrl: data.publishedUrl,
+          draftId: incomingDraftId || existing?.draftId
+        });
+        return updated;
+      });
+
+      toast({
+        title: 'Published Successfully',
+        description: `Your content is live! View it at: ${data.publishedUrl}`,
+      });
+      return;
+    }
+
+    if (data.status === 'failed') {
+      setDraftStatuses(prev => {
+        const updated = new Map(prev);
+        if (targetPageId && updated.has(targetPageId)) {
+          const existing = updated.get(targetPageId)!;
+          updated.set(targetPageId, {
+            ...existing,
+            isFailed: true,
+            isPublished: false,
+            publishedUrl: undefined,
+            error: data.error,
+            draftId: incomingDraftId || existing.draftId
+          });
+        } else if (incomingDraftId) {
+          for (const [pid, status] of updated.entries()) {
+            if (Number(status.draftId) === incomingDraftId) {
+              updated.set(pid, {
+                ...status,
+                isFailed: true,
+                isPublished: false,
+                publishedUrl: undefined,
+                error: data.error,
+              });
+              break;
+            }
+          }
+        }
+        return updated;
+      });
+
+      if (targetPageId) {
+        setGenerationJobs(prev => {
+          const updated = new Map(prev);
+          const existing = updated.get(targetPageId);
+          if (existing) {
+            updated.set(targetPageId, {
+              ...existing,
+              wordpressUrl: null,
+            });
+          }
+          return updated;
+        });
+      }
+
+      toast({
+        title: 'Publish Failed',
+        description: data.error || 'An error occurred while publishing to WordPress',
+        variant: 'destructive',
+      });
+    }
+  }, [draftToPageMap, toast]);
 
   const tabs: Tab[] = [
     { id: 'ai-checker', label: 'AI Checker', icon: <Sparkles className="h-5 w-5" /> },
@@ -1409,7 +1445,7 @@ useEffect(() => {
       console.error('Error fetching GSC properties:', error);
       toast({
         title: "Error",
-        description: "Failed to fetch Search Console properties",
+        description: "Failed to fetch Google Search Console properties",
         variant: "destructive"
       });
     } finally {
@@ -1466,7 +1502,7 @@ useEffect(() => {
       if (success === 'true') {
       toast({
           title: "Connected Successfully",
-          description: "Google Search Console has been connected",
+          description: "Google Search Console and Google Analytics access have been connected",
         });
         const newUrl = new URL(window.location.href);
         newUrl.searchParams.delete('success');
@@ -1513,7 +1549,7 @@ useEffect(() => {
       console.error("Error connecting GSC:", error);
       toast({
         title: "Connection Failed",
-        description: "Failed to initiate Google Search Console connection",
+        description: "Failed to initiate Google Search Console and Google Analytics connection",
         variant: "destructive",
       });
     }
@@ -1543,7 +1579,7 @@ useEffect(() => {
         setGscSelectedProperty(property);
         toast({
           title: "Property Selected",
-          description: "Search Console property has been selected",
+          description: "Google Search Console property has been selected",
         });
       }
     } catch (error) {
@@ -1583,14 +1619,14 @@ useEffect(() => {
         setGscLastSynced(null);
         toast({
           title: "Disconnected",
-          description: "Google Search Console has been disconnected",
+          description: "Google Search Console and Google Analytics access have been disconnected",
         });
       }
     } catch (error) {
       console.error("Error disconnecting GSC:", error);
       toast({
         title: "Error",
-        description: "Failed to disconnect Google Search Console",
+        description: "Failed to disconnect Google Search Console and Google Analytics access",
         variant: "destructive"
       });
     }
@@ -2832,7 +2868,7 @@ useEffect(() => {
                     }`}
                   >
                     <Table className="h-4 w-4" />
-                    <span>Inventory</span>
+                    <span>Table</span>
                   </button>
                </div>
 
@@ -4505,8 +4541,8 @@ const allSections = [...leftSections, ...rightSections];
                             </div>
                             <p className="text-sm font-light text-gray-500">
                               Search Console data will be available for this
-                              property. You can fetch analytics data using the
-                              API.
+                              property, and the same Google connection now
+                              includes Analytics read access for reporting.
                             </p>
                           </div>
                         )}
@@ -4520,7 +4556,7 @@ const allSections = [...leftSections, ...rightSections];
 </div>
                               <div className="space-y-1">
                                 <div className="flex items-center gap-3">
-                                  <h3 className="text-2xl font-light text-black tracking-tight">Google Analytics 4</h3>
+                                  <h3 className="text-2xl font-light text-black tracking-tight">Google Search Console + Google Analytics</h3>
                                   {googleAnalyticsId && (
                                     <div className="flex items-center gap-1.5 bg-green-50 text-green-700 px-3 py-1 rounded-full text-[10px] font-medium border border-green-100 uppercase tracking-wider">
                                       <CheckCircle className="h-3 w-3" />
@@ -4528,7 +4564,7 @@ const allSections = [...leftSections, ...rightSections];
                                     </div>
                                   )}
                                 </div>
-                                <p className="text-sm text-neutral-400 font-light max-w-xs">Link your Property ID for automated reporting and advanced audit insights.</p>
+                                <p className="text-sm text-neutral-400 font-light max-w-xs">Connect Google once for Search Console access, then save your GA4 Property ID for automated reporting.</p>
                               </div>
                             </div>
 
@@ -4562,7 +4598,7 @@ const allSections = [...leftSections, ...rightSections];
                                     if (res.ok) {
                                       toast({
                                         title: "Connection Successful",
-                                        description: "Your Google Analytics Property ID has been securely linked.",
+                                        description: "Your Google Analytics Property ID has been saved for the connected Google account.",
                                       });
                                     } else {
                                       throw new Error("Failed to update");
@@ -4940,6 +4976,9 @@ const allSections = [...leftSections, ...rightSections];
                       setDraftToPageMap={setDraftToPageMap}
                       draftStatuses={draftStatuses}
                       setDraftStatuses={setDraftStatuses}
+                      sharedPublishStatuses={sharedPublishStatuses}
+                      onPublishUpdate={handlePublishUpdate}
+                      getCampaignPageDisplayName={getCampaignPageDisplayName}
                       generationJobs={generationJobs}
                       setGenerationJobs={setGenerationJobs}
                       campaignPageIdContext={campaignPageIdContext}
@@ -5336,8 +5375,8 @@ const allSections = [...leftSections, ...rightSections];
                 ) : (
                   <div className="max-w-6xl mx-auto px-4 sm:px-6 py-12 sm:py-16">
                    <PublishExperience
-                   companyDomain={companyDomain}
-                   domainContext={domainContext}
+                     companyDomain={companyDomain}
+                     domainContext={domainContext}
                    keywordsTableData={keywordsTableData}
                    hasWordpressIntegration={hasWordpressIntegration}
                    wpIntegration={wpIntegration}
@@ -5350,11 +5389,12 @@ const allSections = [...leftSections, ...rightSections];
                    // Pass shared sync states
                    publishingPageIds={publishingPageIds}
                    setPublishingPageIds={setPublishingPageIds}
-                   draftToPageMap={draftToPageMap}
-                   setDraftToPageMap={setDraftToPageMap}
-                   draftStatuses={draftStatuses}
-                   setDraftStatuses={setDraftStatuses}
-                 />
+                     draftToPageMap={draftToPageMap}
+                     setDraftToPageMap={setDraftToPageMap}
+                     draftStatuses={draftStatuses}
+                     setDraftStatuses={setDraftStatuses}
+                     sharedPublishStatuses={sharedPublishStatuses}
+                   />
                                     </div>
             )
           ) : activeTab === 'audit' ? (
@@ -5933,6 +5973,22 @@ interface CampaignStructureViewProps {
   setDraftToPageMap: React.Dispatch<React.SetStateAction<Map<number, number>>>;
   draftStatuses: Map<number, { isPublished: boolean; isFailed?: boolean; publishedUrl?: string; draftId?: number; error?: string }>;
   setDraftStatuses: React.Dispatch<React.SetStateAction<Map<number, { isPublished: boolean; isFailed?: boolean; publishedUrl?: string; draftId?: number; error?: string }>>>;
+  sharedPublishStatuses: Map<number, {
+    status: 'generating' | 'published' | 'failed';
+    publishedUrl?: string;
+    wordpressPostId?: number | null;
+    error?: string;
+    updatedAt?: string;
+  }>;
+  onPublishUpdate: (data: {
+    draftId?: number;
+    pageId?: number;
+    status: 'published' | 'failed' | 'generating';
+    publishedUrl?: string;
+    wordpressPostId?: number | null;
+    error?: string;
+  }) => void;
+  getCampaignPageDisplayName: (pageId?: number, fallback?: string | null) => string;
   generationJobs: Map<number, GenerationPageStatus>;
   setGenerationJobs: React.Dispatch<React.SetStateAction<Map<number, GenerationPageStatus>>>;
   campaignPageIdContext: number | null;
@@ -5960,6 +6016,9 @@ function CampaignStructureView({
   setDraftToPageMap,
   draftStatuses,
   setDraftStatuses,
+  sharedPublishStatuses,
+  onPublishUpdate,
+  getCampaignPageDisplayName,
   generationJobs,
   setGenerationJobs,
   campaignPageIdContext,
@@ -6036,7 +6095,7 @@ function CampaignStructureView({
   const [generationConfig, setGenerationConfig] = useState({
     wordCount: 800,
     images: 0,
-    featuredImage: false,
+    featuredImageEnabled: true,
     brandName: '',
     brandDescription: ''
   });
@@ -6174,10 +6233,7 @@ function CampaignStructureView({
   // States now lifted to parent props: publishingPageIds, draftToPageMap, draftStatuses, generationJobs
   
   // Streaming progress state
-  const [streamingMessages, setStreamingMessages] = useState<Map<string, Array<{
-    message: string;
-    timestamp: string;
-  }>>>(new Map());
+  const [streamingMessages, setStreamingMessages] = useState<Map<string, GenerationStreamingEvent[]>>(new Map());
   const [jobIdToTopicId, setJobIdToTopicId] = useState<Map<string, number>>(new Map());
   
   // Active generation tracking - track last streaming timestamp per jobId
@@ -6191,6 +6247,12 @@ function CampaignStructureView({
     status: 'pending' | 'generating' | 'completed' | 'failed';
     pages: Array<{ pageId: number; status: string; progress: number }>;
   }>>(new Map());
+  const generationJobsRef = useRef(generationJobs);
+  const jobIdToTopicIdRef = useRef(jobIdToTopicId);
+  const draftToPageMapRef = useRef(draftToPageMap);
+  const campaignEventSourceRef = useRef<EventSource | null>(null);
+  const campaignReconnectTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const campaignReconnectAttemptRef = useRef(0);
   
   // Helper to check if generation is active (streaming received within last 10 minutes)
   const isGenerationActive = useCallback((jobId: string): boolean => {
@@ -6213,6 +6275,140 @@ function CampaignStructureView({
     window.location.href = "/auth";
   }, []);
 
+  useEffect(() => {
+    generationJobsRef.current = generationJobs;
+  }, [generationJobs]);
+
+  useEffect(() => {
+    jobIdToTopicIdRef.current = jobIdToTopicId;
+  }, [jobIdToTopicId]);
+
+  useEffect(() => {
+    draftToPageMapRef.current = draftToPageMap;
+  }, [draftToPageMap]);
+
+  const resolveTopicIdForJobId = useCallback((jobId: string): number | null => {
+    const mappedTopicId = jobIdToTopicIdRef.current.get(jobId);
+    if (typeof mappedTopicId === 'number') return mappedTopicId;
+    return null;
+  }, []);
+
+  const reconcileTopicDraftStatus = useCallback(async (topicId: number) => {
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/campaigns/topics/${topicId}/drafts-status`,
+        { headers: getAuthHeaders() }
+      );
+
+      if (response.status === 401 || response.status === 403) {
+        handleUnauthorized();
+        return;
+      }
+
+      if (!response.ok) return;
+      const data = await response.json();
+      if (!data.success || !Array.isArray(data.pages)) return;
+
+      const topicPages = data.pages as DraftStatusRecord[];
+      if (!topicPages.length) return;
+      const terminalPageIds = new Set<number>();
+      const terminalDraftIds = new Set<number>();
+
+      topicPages.forEach((p) => {
+        if (p.status === 'published' || p.status === 'failed') {
+          terminalPageIds.add(p.pageId);
+          if (p.draftId) {
+            terminalDraftIds.add(p.draftId);
+          }
+        }
+      });
+
+      setGenerationJobs(prev => {
+        const updated = new Map(prev);
+        topicPages.forEach((p) => {
+          const existing = updated.get(p.pageId);
+          let finalStatus = (p.status || existing?.status || 'pending') as GenerationPageStatus['status'];
+          if (p.hasHtml && finalStatus !== 'published') {
+            finalStatus = 'completed';
+          }
+          updated.set(p.pageId, {
+            jobId: p.jobId || existing?.jobId || '',
+            topicId,
+            pageId: p.pageId,
+            pageType: p.pageType === 'subpage' ? 'subpage' : 'pillar',
+            status: finalStatus,
+            draftId: p.draftId ?? existing?.draftId,
+            progress: typeof p.progress === 'number' ? p.progress : p.hasHtml ? 100 : existing?.progress ?? 0,
+            primaryKeyword: p.primaryKeyword ?? existing?.primaryKeyword,
+            hasHtml: p.hasHtml ?? existing?.hasHtml,
+            updatedAt: p.updatedAt || existing?.updatedAt || new Date().toISOString(),
+            error: p.error ?? existing?.error ?? null,
+            wordpressUrl: p.wordpressUrl ?? existing?.wordpressUrl ?? null,
+          });
+        });
+        return updated;
+      });
+
+        setDraftStatuses(prev => {
+          const updated = new Map(prev);
+          topicPages.forEach((p) => {
+            const existing = updated.get(p.pageId);
+            if (p.draftId) {
+            const isPublished = p.status === 'published';
+            updated.set(p.pageId, {
+              isPublished,
+              isFailed: p.status === 'failed',
+              publishedUrl: isPublished ? p.wordpressUrl || undefined : undefined,
+              draftId: p.draftId,
+              error: p.error || existing?.error
+            });
+            return;
+          }
+          if (p.status === 'failed' && existing) {
+            updated.set(p.pageId, {
+              ...existing,
+              isPublished: false,
+              isFailed: true,
+              error: p.error || existing.error
+            });
+          }
+        });
+        return updated;
+      });
+
+      if (terminalPageIds.size > 0) {
+        setPublishingPageIds((prev) => {
+          const updated = new Set(prev);
+          terminalPageIds.forEach((pageId) => updated.delete(pageId));
+          return updated;
+        });
+      }
+
+      if (terminalDraftIds.size > 0) {
+        setDraftToPageMap((prev) => {
+          const updated = new Map(prev);
+          terminalDraftIds.forEach((draftId) => updated.delete(draftId));
+          return updated;
+        });
+      }
+
+      if (data.job?.jobId && Array.isArray(data.events)) {
+        setJobIdToTopicId(prev => {
+          const updated = new Map(prev);
+          updated.set(data.job.jobId, topicId);
+          return updated;
+        });
+        setStreamingMessages(prev => {
+          const updated = new Map(prev);
+          updated.set(data.job.jobId, data.events);
+          return updated;
+        });
+      }
+    } catch (err) {
+      console.error('Failed to reconcile topic drafts-status', { topicId, err });
+    }
+  }, [getAuthHeaders, handleUnauthorized, setDraftStatuses, setGenerationJobs, setDraftToPageMap, setPublishingPageIds]);
+
   // Hydrate active jobs on mount
   const fetchActiveJobs = useCallback(async () => {
     try {
@@ -6229,56 +6425,68 @@ function CampaignStructureView({
       
       const data = await response.json();
       if (data.success && data.jobs) {
+        const activeJobIds = new Set<string>(data.jobs.map((job: any) => String(job.jobId)));
+        const staleJobIds = new Set<string>();
+        generationJobsRef.current.forEach((job) => {
+          if (!job.jobId) return;
+          if ((job.status === 'generating' || job.status === 'pending') && !activeJobIds.has(job.jobId)) {
+            staleJobIds.add(job.jobId);
+          }
+        });
+
         // Update generationJobs
         setGenerationJobs(prev => {
-             const updated = new Map(prev);
-             // First mark all existing generating jobs as potentially stale/checked by backend
-             // If a job is NOT in the backend active list, it might have finished or failed silently
-             // But we don't want to remove it aggressively unless we know for sure.
-             // For now, we just update/upsert what the backend tells us.
-             
-             data.jobs.forEach((job: any) => {
-                 job.pages.forEach((p: any) => {
-                     updated.set(p.pageId, {
-                        jobId: job.jobId,
-                        pageId: p.pageId,
-                        pageType: p.pageType,
-                        status: p.status,
-                        draftId: p.draftId, // draftId from DB response
-                        progress: p.progress || 0,
-                        primaryKeyword: p.primaryKeyword,
-                        hasHtml: false, // We'll rely on draft status mostly
-                        updatedAt: new Date().toISOString(),
-                        error: null
-                     });
-                 });
-             });
-             return updated;
+          const updated = new Map(prev);
+
+          data.jobs.forEach((job: any) => {
+            job.pages.forEach((p: any) => {
+              updated.set(p.pageId, {
+                jobId: job.jobId,
+                topicId: job.topicId,
+                pageId: p.pageId,
+                pageType: p.pageType,
+                status: p.status,
+                draftId: p.draftId,
+                progress: p.progress || 0,
+                primaryKeyword: p.primaryKeyword,
+                hasHtml: false,
+                updatedAt: new Date().toISOString(),
+                error: null
+              });
+            });
+          });
+          return updated;
         });
         
         // Update streaming messages
         setStreamingMessages(prev => {
-            const updated = new Map(prev);
-            data.jobs.forEach((job: any) => {
-                if (job.messages && job.messages.length > 0) {
-                    updated.set(job.jobId, job.messages);
-                }
-            });
-            return updated;
+          const updated = new Map(prev);
+          for (const key of Array.from(updated.keys())) {
+            if (!activeJobIds.has(key)) updated.delete(key);
+          }
+          data.jobs.forEach((job: any) => {
+            if (job.events && job.events.length > 0) {
+              updated.set(job.jobId, job.events);
+            }
+          });
+          return updated;
         });
         
         // Update jobId mapping
         setJobIdToTopicId(prev => {
-           const updated = new Map(prev);
-           data.jobs.forEach((job: any) => {
-               updated.set(job.jobId, job.topicId);
-           });
-           return updated;
+          const updated = new Map(prev);
+          data.jobs.forEach((job: any) => {
+            updated.set(job.jobId, job.topicId);
+          });
+          return updated;
         });
 
         // Sync backend job status for consistency
         setBackendJobStatus(prev => {
           const updated = new Map(prev);
+          for (const key of Array.from(updated.keys())) {
+            if (!activeJobIds.has(key)) updated.delete(key);
+          }
           data.jobs.forEach((job: any) => {
             updated.set(job.jobId, {
               status: job.status,
@@ -6287,150 +6495,300 @@ function CampaignStructureView({
           });
           return updated;
         });
+
+        setLastStreamingTimestamp(prev => {
+          const updated = new Map(prev);
+          for (const key of Array.from(updated.keys())) {
+            if (!activeJobIds.has(key)) updated.delete(key);
+          }
+          return updated;
+        });
+
+        if (staleJobIds.size > 0) {
+          const topicIds = new Set<number>();
+          staleJobIds.forEach((jobId) => {
+            const topicId = resolveTopicIdForJobId(jobId);
+            if (typeof topicId === 'number') {
+              topicIds.add(topicId);
+            }
+          });
+          if (topicIds.size > 0) {
+            await Promise.all(Array.from(topicIds).map((topicId) => reconcileTopicDraftStatus(topicId)));
+          }
+        }
       }
     } catch (err) {
       console.error("Failed to hydrate active jobs", err);
     }
-  }, [CAMPAIGN_API_BASE, getAuthHeaders, handleUnauthorized]);
+  }, [CAMPAIGN_API_BASE, getAuthHeaders, handleUnauthorized, reconcileTopicDraftStatus, resolveTopicIdForJobId]);
 
   React.useEffect(() => {
     fetchActiveJobs();
   }, [fetchActiveJobs]);
 
-  // Helper function to extract topicId from jobId pattern
-  const extractTopicIdFromJobId = useCallback((jobId: string): number | null => {
-    // JobId format: job_{topicId}_{timestamp}
-    const match = jobId.match(/^job_(\d+)_/);
-    return match ? parseInt(match[1], 10) : null;
-  }, []);
-
   // Handle streaming progress updates
-  const handleStreamingUpdate = useCallback((jobId: string | undefined, message: string | undefined, timestamp: string | undefined) => {
-    if (!jobId || !message) return;
-    
-    const topicId = extractTopicIdFromJobId(jobId);
-    if (!topicId) return;
-    
-    // Store jobId -> topicId mapping
-    setJobIdToTopicId(prev => {
-      const updated = new Map(prev);
-      updated.set(jobId, topicId);
-      return updated;
-    });
-    
+  const handleStreamingUpdate = useCallback((event: GenerationStreamingEvent) => {
+    if (!event.jobId || !event.message) return;
+
+    if (typeof event.topicId === 'number') {
+      setJobIdToTopicId(prev => {
+        const updated = new Map(prev);
+        updated.set(event.jobId, event.topicId!);
+        return updated;
+      });
+    }
+
     // Update last streaming timestamp (marks generation as active)
     const now = Date.now();
     setLastStreamingTimestamp(prev => {
       const updated = new Map(prev);
-      updated.set(jobId, now);
+      updated.set(event.jobId, now);
       return updated;
     });
-    
-    // Add message to streaming messages
+
     setStreamingMessages(prev => {
       const updated = new Map(prev);
-      const messages = updated.get(jobId) || [];
-      const newMessages = [
-        ...messages,
-        { message, timestamp: timestamp || new Date().toISOString() }
-      ];
-      // Keep last 10 messages per job
-      updated.set(jobId, newMessages.slice(-10));
+      const messages = updated.get(event.jobId) || [];
+      updated.set(event.jobId, [...messages, event].slice(-100));
       return updated;
     });
-  }, [extractTopicIdFromJobId]);
 
-  // Subscribe to server-sent events for generation status (replaces polling)
+    if (typeof event.pageId === 'number') {
+      setGenerationJobs((prev) => {
+        const updated = new Map(prev);
+        const existing = updated.get(event.pageId!);
+        updated.set(event.pageId!, {
+          jobId: event.jobId,
+          topicId: event.topicId ?? existing?.topicId ?? null,
+          pageId: event.pageId!,
+          pageType: event.pageType === 'subpage' ? 'subpage' : 'pillar',
+          status: (event.status || existing?.status || 'generating') as GenerationPageStatus['status'],
+          draftId: existing?.draftId,
+          progress: typeof event.progress === 'number' ? event.progress : existing?.progress,
+          primaryKeyword: existing?.primaryKeyword,
+          hasHtml: existing?.hasHtml,
+          updatedAt: event.timestamp,
+          error: event.status === 'failed' ? event.message : existing?.error ?? null,
+          wordpressUrl: existing?.wordpressUrl || null,
+          phase: event.phase ?? existing?.phase ?? null,
+        });
+        return updated;
+      });
+    }
+  }, []);
+
+  // Subscribe to one SSE stream for campaign + publish state.
   useEffect(() => {
     const token = localStorage.getItem('authToken');
     if (!token) return;
 
-    const eventSource = new EventSource(
-      `${API_BASE_URL}/api/campaigns/events?token=${encodeURIComponent(token)}`
-    );
+    let isUnmounted = false;
 
-    eventSource.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data) as {
-          type?: string;
-          jobId?: string;
-          message?: string;
-          timestamp?: string;
-          pages?: Partial<GenerationPageStatus & { pageType: string; hasHtml?: boolean; error?: string | null }>[];
-          error?: string;
-        };
-        
-        // Handle streaming progress updates
-        if (data.type === 'streaming') {
-          handleStreamingUpdate(data.jobId, data.message, data.timestamp);
-          return;
-        }
-
-        // Handle n8n critical errors
-        if (data.type === 'n8n_error') {
-          console.error('Received n8n error:', data);
-          toast({
-            title: 'Generation Failed',
-            description: data.error || 'An external error occurred during processing',
-            variant: 'destructive',
-          });
-          // We don't return here, allowing the 'drafts' update (if triggered) to also process
-        }
-        
-        // Handle draft updates
-        if (data.type === 'drafts' && data.pages) {
-          setGenerationJobs((prev) => {
-            const updated = new Map(prev);
-            data.pages!.forEach((p) => {
-              const pageId = p.pageId;
-              if (!pageId) return;
-              const existing = updated.get(pageId);
-              const jobId = data.jobId || existing?.jobId || '';
-              
-              // Clear streaming messages and timestamps when generation completes
-              if (p.status === 'completed' && jobId) {
-                setStreamingMessages(prevMsgs => {
-                  const updatedMsgs = new Map(prevMsgs);
-                  updatedMsgs.delete(jobId);
-                  return updatedMsgs;
-                });
-                setLastStreamingTimestamp(prev => {
-                  const updated = new Map(prev);
-                  updated.delete(jobId);
-                  return updated;
-                });
-              }
-              
-              updated.set(pageId, {
-                jobId,
-                pageId,
-                pageType: p.pageType === 'subpage' ? 'subpage' : 'pillar',
-                status: (p.status || existing?.status || 'generating') as GenerationPageStatus['status'],
-                draftId: p.draftId ?? existing?.draftId,
-                progress: typeof p.progress === 'number' ? p.progress : p.hasHtml ? 100 : existing?.progress,
-                primaryKeyword: p.primaryKeyword ?? existing?.primaryKeyword,
-                hasHtml: p.hasHtml ?? existing?.hasHtml,
-                updatedAt: new Date().toISOString(),
-                error: p.error ?? existing?.error ?? null,
-              });
-            });
-            return updated;
-          });
-        }
-      } catch (err) {
-        console.error('Failed to parse SSE payload', err);
+    const connect = () => {
+      if (isUnmounted) return;
+      if (campaignEventSourceRef.current) {
+        campaignEventSourceRef.current.close();
       }
+
+      const eventSource = new EventSource(`${API_BASE_URL}/api/sse?token=${encodeURIComponent(token)}`);
+      campaignEventSourceRef.current = eventSource;
+
+      eventSource.onopen = () => {
+        campaignReconnectAttemptRef.current = 0;
+      };
+
+      eventSource.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data) as {
+            type?: string;
+            jobId?: string;
+            topicId?: number;
+            pageId?: number;
+            pageType?: 'pillar' | 'subpage';
+            status?: 'pending' | 'generating' | 'completed' | 'failed' | 'published';
+            phase?: string;
+            progress?: number;
+            message?: string;
+            timestamp?: string;
+            sequence?: number;
+            draftId?: number;
+            publishedUrl?: string;
+            wordpressPostId?: number | null;
+            pages?: Partial<GenerationPageStatus & { pageType: string; hasHtml?: boolean; error?: string | null }>[];
+            error?: string;
+          };
+
+          if (data.type === 'publish_update' && data.status) {
+            onPublishUpdate({
+              draftId: data.draftId,
+              pageId: data.pageId,
+              status: data.status === 'published' || data.status === 'failed' ? data.status : 'generating',
+              publishedUrl: data.publishedUrl,
+              wordpressPostId: data.wordpressPostId,
+              error: data.error,
+            });
+            return;
+          }
+
+          if (data.type === 'generation_update' && data.jobId) {
+            setBackendJobStatus((prev) => {
+              const updated = new Map(prev);
+              updated.set(data.jobId!, {
+                status: data.status === 'failed' ? 'failed' : 'generating',
+                pages: [],
+              });
+              return updated;
+            });
+
+            if (data.status === 'failed') {
+              setGenerationJobs((prev) => {
+                const updated = new Map(prev);
+                updated.forEach((job, pageId) => {
+                  if (job.jobId === data.jobId && (job.status === 'pending' || job.status === 'generating')) {
+                    updated.set(pageId, {
+                      ...job,
+                      status: 'failed',
+                      error: data.error || 'Generation failed before n8n returned content.',
+                      updatedAt: data.timestamp || new Date().toISOString(),
+                    });
+                  }
+                });
+                return updated;
+              });
+
+              toast({
+                title: 'Generation Failed',
+                description: data.error || 'The generation request was rejected.',
+                variant: 'destructive',
+              });
+            }
+            return;
+          }
+          
+          // Handle streaming progress updates
+          if (data.type === 'streaming') {
+            handleStreamingUpdate({
+              jobId: data.jobId || '',
+              topicId: data.topicId,
+              pageId: data.pageId,
+              pageType: data.pageType,
+              status: data.status,
+              phase: data.phase,
+              progress: data.progress,
+              message: data.message || '',
+              sequence: data.sequence,
+              timestamp: data.timestamp || new Date().toISOString(),
+            });
+            return;
+          }
+
+          // Handle n8n critical errors
+          if (data.type === 'n8n_error') {
+            console.error('Received n8n error:', data);
+            toast({
+              title: 'Generation Failed',
+              description: data.error || 'An external error occurred during processing',
+              variant: 'destructive',
+            });
+            // We don't return here, allowing the 'drafts' update (if triggered) to also process
+          }
+          
+          // Handle draft updates
+          if (data.type === 'drafts' && data.pages) {
+            setGenerationJobs((prev) => {
+              const updated = new Map(prev);
+              data.pages!.forEach((p) => {
+                const pageId = p.pageId;
+                if (!pageId) return;
+                const existing = updated.get(pageId);
+                const jobId = data.jobId || existing?.jobId || '';
+                
+                // Clear streaming messages and timestamps when generation completes
+                if (p.status === 'completed' && jobId) {
+                  setStreamingMessages(prevMsgs => {
+                    const updatedMsgs = new Map(prevMsgs);
+                    updatedMsgs.delete(jobId);
+                    return updatedMsgs;
+                  });
+                  setLastStreamingTimestamp(prev => {
+                    const updated = new Map(prev);
+                    updated.delete(jobId);
+                    return updated;
+                  });
+                }
+                
+                updated.set(pageId, {
+                  jobId,
+                  topicId: data.topicId ?? existing?.topicId ?? null,
+                  pageId,
+                  pageType: p.pageType === 'subpage' ? 'subpage' : 'pillar',
+                  status: (p.status || existing?.status || 'generating') as GenerationPageStatus['status'],
+                  draftId: p.draftId ?? existing?.draftId,
+                  progress: typeof p.progress === 'number' ? p.progress : p.hasHtml ? 100 : existing?.progress,
+                  primaryKeyword: p.primaryKeyword ?? existing?.primaryKeyword,
+                  hasHtml: p.hasHtml ?? existing?.hasHtml,
+                  updatedAt: new Date().toISOString(),
+                  error: p.error ?? existing?.error ?? null,
+                  wordpressUrl: existing?.wordpressUrl ?? null,
+                  phase: existing?.phase ?? null,
+                });
+
+                const justCompleted =
+                  p.status === 'completed' &&
+                  existing?.status !== 'completed' &&
+                  existing?.status !== 'published' &&
+                  !notifiedReadyPageIdsRef.current.has(pageId);
+
+                if (justCompleted) {
+                  notifiedReadyPageIdsRef.current.add(pageId);
+                  const pageName = getCampaignPageDisplayName(pageId, p.primaryKeyword ?? existing?.primaryKeyword ?? null);
+                  toast({
+                    title: 'Draft ready',
+                    description: `${pageName} is ready for review.`,
+                  });
+                }
+              });
+              return updated;
+            });
+          }
+        } catch (err) {
+          console.error('Failed to parse SSE payload', err);
+        }
+      };
+
+      eventSource.onerror = (err) => {
+        console.error('SSE connection error', err);
+        eventSource.close();
+        if (campaignEventSourceRef.current === eventSource) {
+          campaignEventSourceRef.current = null;
+        }
+        if (isUnmounted) return;
+        const attempt = campaignReconnectAttemptRef.current + 1;
+        campaignReconnectAttemptRef.current = attempt;
+        const delayMs = Math.min(30000, 1000 * Math.pow(2, Math.min(attempt, 5)));
+        if (campaignReconnectTimerRef.current) {
+          clearTimeout(campaignReconnectTimerRef.current);
+        }
+        campaignReconnectTimerRef.current = setTimeout(() => {
+          connect();
+        }, delayMs);
+      };
     };
 
-    eventSource.onerror = (err) => {
-      console.error('SSE connection error', err);
-      eventSource.close();
-    };
+    connect();
 
     return () => {
-      eventSource.close();
+      isUnmounted = true;
+      if (campaignReconnectTimerRef.current) {
+        clearTimeout(campaignReconnectTimerRef.current);
+        campaignReconnectTimerRef.current = null;
+      }
+      if (campaignEventSourceRef.current) {
+        campaignEventSourceRef.current.close();
+        campaignEventSourceRef.current = null;
+      }
     };
-  }, [handleStreamingUpdate]);
+  }, [onPublishUpdate, handleStreamingUpdate, toast, getCampaignPageDisplayName]);
 
   // Periodic polling for active generation jobs using the bulk endpoint
   // This serves as a fallback if SSE events are missed or not supported
@@ -6459,7 +6817,13 @@ function CampaignStructureView({
     const rehydrate = async () => {
       if (!campaignStructure.topics || campaignStructure.topics.length === 0) return;
       const newMap = new Map<number, GenerationPageStatus>();
-      const newDraftStatuses = new Map<number, { isPublished: boolean; publishedUrl?: string; draftId?: number }>();
+      const newDraftStatuses = new Map<number, {
+        isPublished: boolean;
+        isFailed?: boolean;
+        publishedUrl?: string;
+        draftId?: number;
+        error?: string;
+      }>();
 
       for (const topic of campaignStructure.topics) {
         try {
@@ -6487,9 +6851,11 @@ function CampaignStructureView({
             // Populate draftStatuses map if we have a draftId
             if (p.draftId) {
                 newDraftStatuses.set(p.pageId, {
-                    isPublished: p.status === 'published' || (p.wordpressUrl && p.wordpressUrl.startsWith('http')),
-                    publishedUrl: p.wordpressUrl || undefined,
-                    draftId: p.draftId
+                    isPublished: p.status === 'published',
+                    isFailed: p.status === 'failed',
+                    publishedUrl: p.status === 'published' ? p.wordpressUrl || undefined : undefined,
+                    draftId: p.draftId,
+                    error: p.error || undefined
                 });
             }
 
@@ -6544,6 +6910,7 @@ function CampaignStructureView({
             
             newMap.set(p.pageId, {
               jobId: p.jobId || '',
+              topicId: topic.id,
               pageId: p.pageId,
               pageType: p.pageType === 'subpage' ? 'subpage' : 'pillar',
               status: finalStatus,
@@ -6556,6 +6923,18 @@ function CampaignStructureView({
               wordpressUrl: p.wordpressUrl || null,
             });
           });
+          if (data.job?.jobId && Array.isArray(data.events)) {
+            setJobIdToTopicId((prev) => {
+              const updated = new Map(prev);
+              updated.set(data.job.jobId, topic.id);
+              return updated;
+            });
+            setStreamingMessages((prev) => {
+              const updated = new Map(prev);
+              updated.set(data.job.jobId, data.events);
+              return updated;
+            });
+          }
         } catch (err) {
           console.error('Failed to rehydrate drafts-status', err);
         }
@@ -6936,11 +7315,10 @@ function CampaignStructureView({
         if (backendStatus?.status === 'generating' || backendStatus?.status === 'pending') {
           return true;
         }
-        return true; // Fallback: if in generationJobs map and no HTML, assume generating
+        return false;
       }
       
-      // If no jobId but in map and no HTML, assume initial generating state
-      return true; 
+      return false;
     });
   }, [generationJobs, backendJobStatus, generateTopicLoading, isGenerationActive]);
 
@@ -6979,6 +7357,170 @@ function CampaignStructureView({
       }
     }
   };
+
+  // Poll publish status as fallback when SSE terminal event is missed
+  useEffect(() => {
+    if (publishingPageIds.size === 0) return;
+
+    let cancelled = false;
+
+    const pollPublishStatuses = async () => {
+      const mappings = Array.from(draftToPageMap.entries());
+      const publishingTopicIds = new Set<number>();
+      publishingPageIds.forEach((pageId) => {
+        const topicId = generationJobs.get(pageId)?.topicId
+          || campaignStructure.topics.find((topic) =>
+            topic.pillarPage?.id === pageId || topic.subPages?.some((page) => page.id === pageId)
+          )?.id;
+        if (typeof topicId === 'number') {
+          publishingTopicIds.add(topicId);
+        }
+      });
+
+      type TerminalPublishStatus = {
+        draftId: number;
+        pageId: number;
+        status: 'published' | 'failed';
+        wordpressUrl?: string | null;
+        error?: string | null;
+      };
+
+      try {
+        if (mappings.length > 0) {
+          const results = await Promise.all(
+            mappings.map(async ([draftId, pageId]): Promise<TerminalPublishStatus | null> => {
+              const draftHeaders = getAuthHeaders();
+              let response = await fetch(`${API_BASE_URL}/api/publish/drafts/${draftId}`, {
+                headers: draftHeaders,
+              });
+
+              if (response.status === 401 || response.status === 403) {
+                handleUnauthorized();
+                return null;
+              }
+
+              if (!response.ok) {
+                response = await fetch(`${API_BASE_URL}/api/campaigns/drafts/${draftId}`, {
+                  headers: draftHeaders,
+                });
+                if (response.status === 401 || response.status === 403) {
+                  handleUnauthorized();
+                  return null;
+                }
+              }
+
+              if (!response.ok) return null;
+
+              const data = await response.json();
+              if (!data.success || !data.draft) return null;
+
+              const status = String(data.draft.status || '').toLowerCase();
+              if (status !== 'published' && status !== 'failed') return null;
+
+              return {
+                draftId,
+                pageId,
+                status,
+                wordpressUrl: data.draft.wordpressUrl ?? null,
+                error: data.draft.error ?? null
+              };
+            })
+          );
+
+          if (cancelled) return;
+
+          const terminalResults = results.filter(Boolean) as TerminalPublishStatus[];
+          if (terminalResults.length > 0) {
+            const terminalDraftIds = new Set<number>(terminalResults.map((r) => r.draftId));
+            const terminalPageIds = new Set<number>(terminalResults.map((r) => r.pageId));
+
+            setPublishingPageIds(prev => {
+              const updated = new Set(prev);
+              terminalPageIds.forEach((pageId) => updated.delete(pageId));
+              return updated;
+            });
+
+            setDraftToPageMap(prev => {
+              const updated = new Map(prev);
+              terminalDraftIds.forEach((draftId) => updated.delete(draftId));
+              return updated;
+            });
+
+            setSharedPublishStatuses(prev => {
+              const updated = new Map(prev);
+              terminalResults.forEach((result) => {
+                updated.set(result.draftId, {
+                  status: result.status,
+                  publishedUrl: result.wordpressUrl || undefined,
+                  error: result.error || undefined,
+                  updatedAt: new Date().toISOString()
+                });
+              });
+              return updated;
+            });
+
+            setDraftStatuses(prev => {
+              const updated = new Map(prev);
+              terminalResults.forEach((result) => {
+                const existing = updated.get(result.pageId);
+                if (result.status === 'published') {
+                  updated.set(result.pageId, {
+                    isPublished: true,
+                    isFailed: false,
+                    publishedUrl: result.wordpressUrl || undefined,
+                    draftId: result.draftId,
+                    error: undefined
+                  });
+                  return;
+                }
+                updated.set(result.pageId, {
+                  isPublished: false,
+                  isFailed: true,
+                  publishedUrl: undefined,
+                  draftId: result.draftId,
+                  error: result.error || existing?.error
+                });
+              });
+              return updated;
+            });
+
+            setGenerationJobs(prev => {
+              const updated = new Map(prev);
+              terminalResults.forEach((result) => {
+                const existing = updated.get(result.pageId);
+                if (!existing) return;
+                updated.set(result.pageId, {
+                  ...existing,
+                  status: result.status,
+                  wordpressUrl: result.status === 'published'
+                    ? (result.wordpressUrl || existing.wordpressUrl || null)
+                    : null,
+                  error: result.status === 'failed'
+                    ? (result.error || existing.error || null)
+                    : null
+                });
+              });
+              return updated;
+            });
+          }
+        }
+
+        if (publishingTopicIds.size > 0) {
+          await Promise.all(Array.from(publishingTopicIds).map((topicId) => reconcileTopicDraftStatus(topicId)));
+        }
+      } catch (err) {
+        console.error('Publish polling fallback failed', err);
+      }
+    };
+
+    pollPublishStatuses();
+    const interval = setInterval(pollPublishStatuses, 15000);
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [campaignStructure.topics, draftToPageMap, generationJobs, getAuthHeaders, handleUnauthorized, publishingPageIds, reconcileTopicDraftStatus, setDraftStatuses, setGenerationJobs, setDraftToPageMap, setPublishingPageIds]);
 
   const publishDraft = async (draftId?: number, pageId?: number) => {
     if (!draftId) return;
@@ -7037,7 +7579,8 @@ function CampaignStructureView({
           pageId: pageId, // Pass pageId context for campaign synchronization
           primaryKeyword: draft.primaryKeyword,
           htmlContent: draft.htmlContent,
-          featuredImage: draft.featuredImage,
+          featuredImageEnabled: draft.featuredImageEnabled,
+          featuredImageUrl: draft.featuredImageUrl,
           title: draft.title,
           metaDescription: draft.metaDescription,
           slug: draft.slug,
@@ -7051,8 +7594,9 @@ function CampaignStructureView({
 
       // Job queued successfully - store mapping for SSE handler
       // The actual publishedUrl will come via SSE when n8n responds
-      if (publishData.draftId && pageId) {
-        setDraftToPageMap(prev => new Map(prev).set(publishData.draftId, pageId));
+      const mappedDraftId = publishData.draftId || draftId;
+      if (mappedDraftId && pageId) {
+        setDraftToPageMap(prev => new Map(prev).set(Number(mappedDraftId), pageId));
       }
 
       // Show "Publishing..." toast - success toast will come from SSE handler
@@ -7089,6 +7633,11 @@ function CampaignStructureView({
   const renderStatusPill = (pageId?: number) => {
     if (!pageId) return null;
     const job = generationJobs.get(pageId);
+    const draftStatus = draftStatuses.get(pageId);
+    const resolvedPublishedUrl =
+      draftStatus?.publishedUrl ||
+      (job?.status === 'published' ? job.wordpressUrl || undefined : undefined);
+    const resolvedDraftId = draftStatus?.draftId || job?.draftId;
 
     // Check if currently publishing (waiting for SSE confirmation)
     if (publishingPageIds.has(pageId)) {
@@ -7117,14 +7666,12 @@ function CampaignStructureView({
       );
     }
 
-    const draftStatus = draftStatuses.get(pageId);
-    
     // 3. Published State
-    if (draftStatus?.isPublished) {
+    if ((draftStatus?.isPublished || job?.status === 'published') && resolvedPublishedUrl) {
          return (
             <div className="flex items-center gap-1.5">
                <button 
-                 onClick={() => viewDraft(draftStatus.draftId!, pageId)}
+                 onClick={() => viewDraft(resolvedDraftId!, pageId)}
                  className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors"
                >
                   <Pencil className="h-3 w-3" />
@@ -7134,7 +7681,7 @@ function CampaignStructureView({
                  Published
                </span>
                <a 
-                 href={draftStatus.publishedUrl} 
+                 href={resolvedPublishedUrl} 
                  target="_blank" 
                  rel="noopener noreferrer"
                  className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors"
@@ -7219,7 +7766,7 @@ function CampaignStructureView({
     setGenerationConfig({
       wordCount: 800,
       images: 0,
-      featuredImage: false,
+      featuredImageEnabled: true,
       brandName: derivedBrandName || 'Brand',
       brandDescription: derivedBrandDescription || '',
     });
@@ -7273,29 +7820,34 @@ function CampaignStructureView({
       const pillarKeywords = getKeywordSelections(pillar.keywords);
 
       const payload = {
-        user_id: 'user', // backend uses authenticated user
-        campaign_name: campaign.title,
-        pillar_page: {
-          primary_keyword: pillarKeywords.primary || pillar.title,
-          longtail_keywords: pillarKeywords.longtail,
-          options: {
-            image: generationConfig.images,
-            word_count: generationConfig.wordCount,
-            featured_image: generationConfig.featuredImage ? 'yes' : 'no',
+        campaign_id: campaign.id,
+        topic_id: topic.id,
+        pages: [
+          {
+            page_id: pillar.id,
+            page_type: 'pillar',
+            primary_keyword: pillarKeywords.primary || pillar.title,
+            longtail_keywords: pillarKeywords.longtail,
+            options: {
+              image_count: generationConfig.images,
+              word_count: generationConfig.wordCount,
+              featured_image: generationConfig.featuredImageEnabled ? 'yes' : 'no',
+            },
           },
-        },
-        sub_pillar_pages: topic.subPages.map((sp) => {
+          ...topic.subPages.map((sp) => {
           const subPageKeywords = getKeywordSelections(sp.keywords);
           return {
+            page_id: sp.id,
+            page_type: 'subpage',
             primary_keyword: subPageKeywords.primary || sp.title,
             longtail_keywords: subPageKeywords.longtail,
             options: {
-              image: generationConfig.images,
+              image_count: generationConfig.images,
               word_count: generationConfig.wordCount,
-              featured_image: generationConfig.featuredImage ? 'yes' : 'no',
+              featured_image: generationConfig.featuredImageEnabled ? 'yes' : 'no',
             },
           };
-        }),
+        })],
         brand: {
           brand_name: generationConfig.brandName,
           brand_description: generationConfig.brandDescription,
@@ -7338,6 +7890,7 @@ function CampaignStructureView({
         pages.forEach((p) => {
           updated.set(p.pageId, {
             jobId,
+            topicId: topic.id,
             pageId: p.pageId,
             pageType: p.pageType === 'subpage' ? 'subpage' : 'pillar',
             status: 'generating',
@@ -7354,7 +7907,7 @@ function CampaignStructureView({
 
       toast({
         title: 'Generation started',
-        description: `Job ${jobId} is generating ${pages.length} page(s).`,
+        description: `Generating ${pages.length} page(s).`,
       });
     } catch (error) {
       toast({
@@ -7545,6 +8098,21 @@ function CampaignStructureView({
     }
   };
 
+  const handleUpdateTopicTitle = async (topicId: number, title: string) => {
+    try {
+      await mutateStructure(
+        `${CAMPAIGN_API_BASE}/topics/${topicId}`,
+        {
+          method: 'PUT',
+          body: JSON.stringify({ title }),
+        },
+        { successMessage: 'Topic title updated' }
+      );
+    } catch {
+      // handled upstream
+    }
+  };
+
   const handleUpdatePillar = async (topicId: number, updates: { title?: string; referenceUrl?: string }) => {
     try {
       await mutateStructure(
@@ -7719,40 +8287,42 @@ function CampaignStructureView({
     <>
     <div className="flex h-[calc(100vh-4rem)] w-full bg-white overflow-hidden">
       {/* 2. Secondary Sidebar: Topic List */}
-      <div 
-        className={`w-[280px] border-r border-[#0000001a] flex-shrink-0 transition-all duration-300 ${viewMode === 'graph' ? 'w-0 opacity-0 overflow-hidden border-none' : ''}`}
-        style={{
-          background: 'rgba(255, 255, 255, 0.72)',
-          backdropFilter: 'saturate(180%) blur(20px)',
-          WebkitBackdropFilter: 'saturate(180%) blur(20px)',
-        }}
-      >
-        <div className="h-full flex flex-col">
-          {/* Header */}
-          <div className="h-16 flex items-center px-5 border-b border-[#0000001a] flex-shrink-0 z-10">
-             <button
-                onClick={onBack}
-                className="mr-3 p-1.5 hover:bg-gray-100 rounded-full text-gray-400 hover:text-gray-600 transition-colors"
-             >
-               <ArrowLeft className="h-4 w-4" />
-             </button>
-             <h1 className="font-medium text-gray-900 truncate text-sm" title={campaign.title}>
-               {campaign.title}
-             </h1>
-          </div>
+      {viewMode === 'split' && (
+        <div 
+          className="w-[280px] border-r border-[#0000001a] flex-shrink-0"
+          style={{
+            background: 'rgba(255, 255, 255, 0.72)',
+            backdropFilter: 'saturate(180%) blur(20px)',
+            WebkitBackdropFilter: 'saturate(180%) blur(20px)',
+          }}
+        >
+          <div className="h-full flex flex-col">
+            {/* Header */}
+            <div className="h-16 flex items-center px-5 border-b border-[#0000001a] flex-shrink-0 z-10">
+               <button
+                  onClick={onBack}
+                  className="mr-3 p-1.5 hover:bg-gray-100 rounded-full text-gray-400 hover:text-gray-600 transition-colors"
+               >
+                 <ArrowLeft className="h-4 w-4" />
+               </button>
+               <h1 className="font-medium text-gray-900 truncate text-sm" title={campaign.title}>
+                 {campaign.title}
+               </h1>
+            </div>
 
-          <CampaignTopicSidebar
-            topics={campaignStructure.topics}
-            selectedTopicId={selectedTopicId}
-            onSelectTopic={setSelectedTopicId}
-            onAddTopic={(isAi) => isAi ? handleAddTopic(true) : handleAddTopic(false)}
-            onDeleteTopic={handleDeleteTopic}
-            aiLoading={aiLoading}
-            syncing={syncing}
-            isTopicGenerating={isTopicGenerating}
-          />
+            <CampaignTopicSidebar
+              topics={campaignStructure.topics}
+              selectedTopicId={selectedTopicId}
+              onSelectTopic={setSelectedTopicId}
+              onAddTopic={(isAi) => isAi ? handleAddTopic(true) : handleAddTopic(false)}
+              onDeleteTopic={handleDeleteTopic}
+              aiLoading={aiLoading}
+              syncing={syncing}
+              isTopicGenerating={isTopicGenerating}
+            />
+          </div>
         </div>
-      </div>
+      )}
 
       {/* 3. Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0 bg-gray-50/50 relative">
@@ -7767,7 +8337,7 @@ function CampaignStructureView({
                    <CampaignTopicDetail
                      topic={selectedTopic}
                      isGenerating={isTopicGenerating(selectedTopic)}
-                     streamingMessages={
+                     streamingEvents={
                        (jobIdToTopicId.size > 0 
                          ? Array.from(jobIdToTopicId.entries()).find(([_, tid]) => tid === selectedTopicId)?.[0] 
                          : undefined) 
@@ -7779,14 +8349,15 @@ function CampaignStructureView({
                      }
                      generationJobs={generationJobs}
                      onGenerateTopic={handleGenerateTopic}
+                     onUpdateTopicTitle={handleUpdateTopicTitle}
                      onReferenceUrlChange={(tid, url) => {
                         const t = campaignStructure.topics.find(t => t.id === tid);
                         if(t) handleUpdatePillar(t.pillarPage!.id, { referenceUrl: url });
                      }}
                       onDeletePillar={handleDeletePillarPage}
-                      onCreatePillar={handleCreatePillarPage}
+                      onCreatePillar={(tid) => handleAddPillarPage(tid, false)}
                       onGenerateAiPillar={triggerAiPillar}
-                      onAddSubPage={(tid) => { setTargetTopicId(tid); setShowAddSubPageModal(true); }}
+                      onAddSubPage={(tid) => handleAddSubPage(tid, false)}
                       onGenerateAiSubPage={triggerAiSubPage}
                       onDeleteSubPage={handleDeleteSubPage}
                       onUpdatePageTitle={handleUpdatePageTitle}
@@ -7813,6 +8384,8 @@ function CampaignStructureView({
                 <CampaignGraph
                   campaignStructure={campaignStructure}
                   selectedTopics={selectedTopics}
+                  generationJobs={generationJobs}
+                  draftStatuses={draftStatuses}
                 />
                </div>
             </div>
@@ -7829,14 +8402,21 @@ function CampaignStructureView({
                   }}
                   renderStatusPill={renderStatusPill}
                   generationJobs={generationJobs}
+                  draftStatuses={draftStatuses}
                   onGenerateTopic={handleGenerateTopic}
                   onUpdatePageTitle={handleUpdatePageTitle}
                   onDeleteSubPage={handleDeleteSubPage}
                   onDeletePillarPage={handleDeletePillarPage}
+                  onDeleteTopic={handleDeleteTopic}
+                  onCreatePillar={(tid) => handleAddPillarPage(tid, false)}
+                  onGenerateAiPillar={triggerAiPillar}
+                  onAddSubPage={(tid) => handleAddSubPage(tid, false)}
+                  onGenerateAiSubPage={triggerAiSubPage}
                   onAddKeyword={handleAddKeyword}
                   onDeleteKeyword={handleDeleteKeyword}
                   onSelectPrimaryKeyword={handleSelectPrimaryKeyword}
                   onSelectLongtailKeyword={handleSelectLongtailKeyword}
+                  onDeselectKeyword={handleDeselectKeyword}
                   aiLoading={aiLoading}
                 />
 
@@ -7844,8 +8424,42 @@ function CampaignStructureView({
             </div>
 
 
-        </div>
       </div>
+      </div>
+{showAddPillarModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md border border-gray-100">
+            <h2 className="text-xl font-light text-gray-900 mb-6">Create Pillar Page</h2>
+            <input
+              type="text"
+              placeholder="Pillar Page Title"
+              className="w-full p-4 border border-gray-200 rounded-xl mb-6 text-sm focus:ring-2 focus:ring-black/5 focus:border-black outline-none transition-all"
+              value={newPillarTitle}
+              onChange={(e) => setNewPillarTitle(e.target.value)}
+              autoFocus
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleSubmitPillarPage();
+                if (e.key === 'Escape') setShowAddPillarModal(false);
+              }}
+            />
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setShowAddPillarModal(false)}
+                className="px-6 py-2.5 rounded-full text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSubmitPillarPage}
+                disabled={!newPillarTitle.trim()}
+                className="px-6 py-2.5 bg-black text-white rounded-full hover:bg-black/90 disabled:opacity-50 disabled:cursor-not-allowed transition-all text-sm font-medium shadow-lg shadow-black/10"
+              >
+                Create Pillar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 {showAddSubPageModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
           <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md border border-gray-100">
@@ -7948,8 +8562,8 @@ function CampaignStructureView({
                     <p className="text-xs text-gray-500">Generate a high-quality hero image</p>
                   </div>
                   <Switch
-                    checked={generationConfig.featuredImage}
-                    onCheckedChange={(checked) => setGenerationConfig(prev => ({ ...prev, featuredImage: checked }))}
+                    checked={generationConfig.featuredImageEnabled}
+                    onCheckedChange={(checked) => setGenerationConfig(prev => ({ ...prev, featuredImageEnabled: checked }))}
                   />
                 </div>
 
@@ -8418,8 +9032,8 @@ function CampaignStructureView({
                     <p className="text-xs text-gray-500">Generate a high-quality hero banner</p>
                   </div>
                   <Switch
-                    checked={generationConfig.featuredImage}
-                    onCheckedChange={(checked) => setGenerationConfig(prev => ({ ...prev, featuredImage: checked }))}
+                    checked={generationConfig.featuredImageEnabled}
+                    onCheckedChange={(checked) => setGenerationConfig(prev => ({ ...prev, featuredImageEnabled: checked }))}
                   />
                 </div>
                 <div className="flex justify-end gap-3">
@@ -8543,6 +9157,7 @@ function CampaignStructureView({
               initialDraftId={previewPageId}
               pageId={campaignPageIdContext || undefined}
               disablePreviewOverlay={true}
+              sharedPublishStatuses={sharedPublishStatuses}
             />
           </div>
         </div>

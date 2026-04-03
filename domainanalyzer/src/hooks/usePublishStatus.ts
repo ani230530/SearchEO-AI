@@ -5,6 +5,7 @@ interface PublishUpdateData {
     pageId?: number;
     status: 'published' | 'draft' | 'failed';
     publishedUrl?: string;
+    wordpressPostId?: number | null;
     error?: string;
 }
 
@@ -17,6 +18,7 @@ interface SSEEvent {
     pageId?: number;
     status?: string;
     publishedUrl?: string;
+    wordpressPostId?: number | null;
     error?: string;
 }
 
@@ -73,6 +75,7 @@ export function usePublishStatus({ onUpdate, onError }: UsePublishStatusOptions)
                             pageId: data.pageId,
                             status: data.status,
                             publishedUrl: data.publishedUrl,
+                            wordpressPostId: data.wordpressPostId,
                             error: data.error
                         };
                         onUpdateRef.current(updateData);

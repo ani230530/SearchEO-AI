@@ -53,6 +53,31 @@ const worker = new Worker(
 
             console.log('[Queue] Payload:', JSON.stringify(maskSecrets(payload), null, 2));
 
+            if (job.name === JOB_TYPES.CAMPAIGN_GENERATION) {
+                try {
+                    const kickoffResponse = await axios.post(url, payload, {
+                        headers,
+                        timeout: Math.min(timeout || 30000, 30000),
+                    });
+
+                    console.log(`[Queue] Campaign kickoff ${job.id} accepted. Status: ${kickoffResponse.status}`);
+                    return {
+                        accepted: true,
+                        status: kickoffResponse.status,
+                    };
+                } catch (error: any) {
+                    const isTimeout = axios.isAxiosError(error) && (error.code === 'ECONNABORTED' || error.message?.includes('timeout'));
+                    if (isTimeout) {
+                        console.warn(`[Queue] Campaign kickoff ${job.id} timed out waiting for HTTP response; keeping job active because completion is callback-driven.`);
+                        return {
+                            accepted: true,
+                            status: 'timeout_waiting_for_ack',
+                        };
+                    }
+                    throw error;
+                }
+            }
+
             // Perform the actual n8n call
             const response = await axios.post(url, payload, {
                 headers,
@@ -104,12 +129,26 @@ async function handlePublishCompletion(job: Job, responseData: any, meta: any) {
         if (typeof val === 'string' && val.trim()) return val.trim();
         return undefined;
     };
+    const getNumberValue = (val: any): number | undefined => {
+        if (typeof val === 'number' && Number.isFinite(val)) return Math.trunc(val);
+        if (typeof val === 'string' && val.trim()) {
+            const parsed = Number(val.trim());
+            if (!Number.isNaN(parsed)) return Math.trunc(parsed);
+        }
+        return undefined;
+    };
 
     const publishedUrl =
         getStringValue(entry?.Link) ??
         getStringValue(entry?.link) ??
         getStringValue(entry?.['wordpress url']) ??
         getStringValue(entry?.wordpressUrl) ??
+        undefined;
+    const wordpressPostId =
+        getNumberValue(entry?.id) ??
+        getNumberValue(entry?.postId) ??
+        getNumberValue(entry?.wordpressPostId) ??
+        getNumberValue(entry?.['WordPress Post ID']) ??
         undefined;
 
     // Get base site URL to compare
@@ -151,6 +190,9 @@ async function handlePublishCompletion(job: Job, responseData: any, meta: any) {
         // Ensure we don't lose the content if n8n doesn't return it
         htmlContent: currentResponse.htmlContent || entry.htmlContent,
         title: currentResponse.title || entry.title,
+        featuredImageEnabled: currentResponse.featuredImageEnabled ?? false,
+        featuredImageUrl: currentResponse.featuredImageUrl || currentResponse.featuredImage || null,
+        wordpressPostId: wordpressPostId ?? currentResponse.wordpressPostId ?? currentResponse.id ?? null,
         status: finalStatus
     };
 
@@ -159,6 +201,7 @@ async function handlePublishCompletion(job: Job, responseData: any, meta: any) {
             where: { id: draftId },
             data: {
                 wordpressUrl: finalUrl,
+                wordpressPostId: wordpressPostId ?? null,
                 status: finalStatus,
                 response: mergedResponse,
                 slug: entry?.slug ?? slug,
@@ -177,7 +220,8 @@ async function handlePublishCompletion(job: Job, responseData: any, meta: any) {
         draftId,
         pageId: meta.pageId, // Include pageId for global sync
         status: finalStatus,
-        publishedUrl: finalUrl
+        publishedUrl: finalUrl,
+        wordpressPostId: wordpressPostId ?? null,
     });
 }
 
@@ -188,11 +232,22 @@ async function handlePublishFailure(job: Job, error: any, meta: any) {
 
     // Update DB to draft (failed state)
     try {
+        const existingDraft = await prisma.wordpressPublishLog.findUnique({
+            where: { id: draftId },
+            select: { response: true }
+        });
+        const currentResponse = ((existingDraft?.response as Record<string, unknown> | null) || {}) as Record<string, unknown>;
+
         await prisma.wordpressPublishLog.update({
             where: { id: draftId },
             data: {
                 status: 'failed',
-                response: { error: error.message || 'Publish job failed' }
+                response: {
+                    ...currentResponse,
+                    error: error.message || 'Publish job failed',
+                    status: 'failed',
+                    failedAt: new Date().toISOString()
+                }
             }
         });
     } catch (dbError) {
@@ -262,11 +317,22 @@ async function handleCampaignGenerationFailure(job: Job, error: any, meta: any) 
 
                 // Update draft if exists
                 if (page.draftId) {
+                    const existingDraft = await prisma.wordpressPublishLog.findUnique({
+                        where: { id: page.draftId },
+                        select: { response: true }
+                    });
+                    const currentResponse = ((existingDraft?.response as Record<string, unknown> | null) || {}) as Record<string, unknown>;
+
                     await prisma.wordpressPublishLog.update({
                         where: { id: page.draftId },
                         data: {
                             status: 'draft',
-                            response: { error: error.message || 'Generation queue job failed' }
+                            response: {
+                                ...currentResponse,
+                                error: error.message || 'Generation queue job failed',
+                                status: 'failed',
+                                failedAt: new Date().toISOString()
+                            }
                         }
                     }).catch(e => console.error(`Failed to update draft ${page.draftId} failure`, e));
                 }

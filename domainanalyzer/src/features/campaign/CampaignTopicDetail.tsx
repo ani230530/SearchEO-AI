@@ -1,17 +1,16 @@
 import React from 'react';
-import { Topic, GenerationPageStatus } from '../../types';
-import { Target, FileText, Sparkles, Plus, Trash2, Search, Zap, Pencil, Check, X } from 'lucide-react';
+import { Topic, GenerationPageStatus, GenerationStreamingEvent } from '../../types';
+import { Target, FileText, Sparkles, Plus, Trash2, Search, Zap, Pencil, Check, X, AlertCircle, CheckCircle2, LoaderCircle } from 'lucide-react';
 import { ButtonSpinner } from '@/components/ui/button-spinner';
-import { StreamingOverlay } from './StreamingOverlay';
 import { useState } from 'react';
 
 interface CampaignTopicDetailProps {
   topic: Topic;
   isGenerating: boolean;
-  streamingMessages: Array<{ message: string; timestamp: string }>;
-  jobId?: string;
+  streamingEvents: GenerationStreamingEvent[];
   generationJobs: Map<number, GenerationPageStatus>;
   onGenerateTopic: (topic: Topic) => void;
+  onUpdateTopicTitle: (topicId: number, title: string) => void;
   onReferenceUrlChange: (topicId: number, url: string) => void;
   onDeletePillar: (topicId: number) => void;
   onDeleteSubPage: (subPageId: number) => void;
@@ -32,10 +31,10 @@ interface CampaignTopicDetailProps {
 export const CampaignTopicDetail: React.FC<CampaignTopicDetailProps> = ({
   topic,
   isGenerating,
-  streamingMessages,
-  jobId,
+  streamingEvents,
   generationJobs,
   onGenerateTopic,
+  onUpdateTopicTitle,
   onReferenceUrlChange,
   onDeletePillar,
   onDeleteSubPage,
@@ -54,6 +53,193 @@ export const CampaignTopicDetail: React.FC<CampaignTopicDetailProps> = ({
 }) => {
   const [editingPageId, setEditingPageId] = useState<number | null>(null);
   const [editingTitle, setEditingTitle] = useState("");
+  const [isEditingTopicTitle, setIsEditingTopicTitle] = useState(false);
+  const [editingTopicTitle, setEditingTopicTitle] = useState("");
+  const [now, setNow] = useState(() => Date.now());
+
+  React.useEffect(() => {
+    if (!isGenerating) return;
+
+    const intervalId = window.setInterval(() => {
+      setNow(Date.now());
+    }, 60000);
+
+    return () => window.clearInterval(intervalId);
+  }, [isGenerating]);
+
+  const getPageTone = (status: string) => {
+    if (status === 'failed') {
+      return {
+        shell: 'border-gray-200 bg-white',
+        badge: 'bg-white text-gray-700 border border-gray-200',
+        progress: 'bg-gray-700',
+        icon: <AlertCircle className="h-3.5 w-3.5 text-gray-500" />,
+      };
+    }
+    if (status === 'completed' || status === 'published') {
+      return {
+        shell: 'border-gray-200 bg-white',
+        badge: 'bg-white text-gray-700 border border-gray-200',
+        progress: 'bg-gray-900',
+        icon: <CheckCircle2 className="h-3.5 w-3.5 text-gray-700" />,
+      };
+    }
+    return {
+      shell: 'border-gray-200 bg-white',
+      badge: 'bg-white text-gray-700 border border-gray-200',
+      progress: 'bg-black',
+      icon: <LoaderCircle className="h-3.5 w-3.5 text-gray-700 animate-spin" />,
+    };
+  };
+
+  const getPageStatusLabel = (status: string) => {
+    if (status === 'completed') return 'Draft Ready';
+    if (status === 'published') return 'Published';
+    if (status === 'failed') return 'Failed';
+    if (status === 'pending') return 'Queued';
+    return 'Generating';
+  };
+
+  const pageProgressCards = React.useMemo(() => {
+    const pages = [
+      ...(topic.pillarPage ? [{ id: topic.pillarPage.id, title: topic.pillarPage.title, pageType: 'pillar' as const }] : []),
+      ...(topic.subPages || []).map((page) => ({ id: page.id, title: page.title, pageType: 'subpage' as const })),
+    ];
+
+    return pages
+      .map((page) => {
+        const pageEvents = streamingEvents.filter((event) => event.pageId === page.id);
+        const latestEvent = pageEvents[pageEvents.length - 1];
+        const pageJob = generationJobs.get(page.id);
+        if (!latestEvent && !pageJob) {
+          return null;
+        }
+
+        return {
+          ...page,
+          status: latestEvent?.status || pageJob?.status || 'pending',
+          phase: latestEvent?.phase || pageJob?.phase || null,
+          progress: typeof latestEvent?.progress === 'number' ? latestEvent.progress : pageJob?.progress || 0,
+          message:
+            latestEvent?.message ||
+            pageJob?.error ||
+            (pageJob?.status === 'failed'
+              ? 'Generation stopped before content was returned.'
+              : pageJob?.status === 'completed'
+              ? 'Draft ready for review.'
+              : pageJob?.status === 'generating'
+              ? 'Preparing your content generation...'
+              : 'Queued for generation.'),
+          updatedAt: latestEvent?.timestamp || pageJob?.updatedAt || null,
+          draftId: pageJob?.draftId,
+          wordpressUrl: pageJob?.wordpressUrl || null,
+        };
+      })
+      .filter(Boolean) as Array<{
+        id: number;
+        title: string;
+        pageType: 'pillar' | 'subpage';
+        status: string;
+        phase: string | null;
+        progress: number;
+        message: string;
+        updatedAt: string | null;
+        draftId?: number;
+        wordpressUrl?: string | null;
+      }>;
+  }, [generationJobs, streamingEvents, topic.pillarPage, topic.subPages]);
+
+  const pageProgressById = React.useMemo(
+    () => new Map(pageProgressCards.map((card) => [card.id, card])),
+    [pageProgressCards]
+  );
+
+  const renderInlineProgressPanel = (pageId: number) => {
+    const card = pageProgressById.get(pageId);
+    if (!card) return null;
+
+    const tone = getPageTone(card.status);
+    const lastUpdatedAt = card.updatedAt ? new Date(card.updatedAt).getTime() : null;
+    const isDelayed = card.status === 'generating' && lastUpdatedAt !== null && now - lastUpdatedAt >= 7 * 60 * 1000;
+    const showProgressBar = card.status === 'generating' || card.status === 'pending';
+    const normalizedProgress =
+      card.status === 'failed'
+        ? Math.max(card.progress || 0, 10)
+        : Math.max(card.progress || 0, card.status === 'completed' || card.status === 'published' ? 100 : 6);
+    const visibleMessage = isDelayed
+      ? 'Still working. Updates are taking longer than usual.'
+      : card.message;
+
+    return (
+      <div className={`mt-4 rounded-[16px] border px-3 py-2.5 shadow-[0_4px_14px_rgba(15,23,42,0.03)] transition-all duration-300 ${tone.shell}`}>
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              {tone.icon}
+              <p className="text-[10px] uppercase tracking-[0.14em] text-gray-400">Progress</p>
+              <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${tone.badge}`}>
+                {getPageStatusLabel(card.status)}
+              </span>
+              {isDelayed && (
+                <span className="rounded-full border border-gray-200 bg-white px-2 py-0.5 text-[10px] font-medium text-gray-500">
+                  Delayed
+                </span>
+              )}
+              {card.phase && (
+                <span className="rounded-full border border-gray-200 bg-white px-2 py-0.5 text-[10px] font-medium text-gray-500">
+                  {card.phase}
+                </span>
+              )}
+            </div>
+          </div>
+          <span className="rounded-full border border-gray-200 bg-white px-2 py-0.5 text-[10px] font-medium text-gray-500">
+            {Math.min(100, normalizedProgress)}%
+          </span>
+        </div>
+
+        {showProgressBar && (
+          <div className="mt-2.5 h-1 overflow-hidden rounded-full bg-gray-200">
+            <div
+              className={`h-full rounded-full transition-all duration-500 ease-out ${tone.progress} ${card.status === 'generating' ? 'animate-pulse' : ''}`}
+              style={{ width: `${Math.min(100, normalizedProgress)}%` }}
+            />
+          </div>
+        )}
+
+        <div className="mt-2.5 flex items-start gap-2">
+          <div className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-gray-300" />
+          <p className="min-w-0 text-[12px] leading-5 text-gray-500">{visibleMessage}</p>
+        </div>
+
+        <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2 text-[10px] text-gray-400">
+          <span>
+            {card.updatedAt
+              ? `Updated ${new Date(card.updatedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`
+              : card.status === 'generating'
+              ? 'Waiting for the first progress update'
+              : 'No update yet'}
+          </span>
+          <div className="flex items-center gap-2">
+            {card.draftId && (
+              <span className="rounded-full border border-gray-200 bg-white px-2 py-0.5 text-[10px] font-medium text-gray-500">
+                Draft #{card.draftId}
+              </span>
+            )}
+            {card.wordpressUrl && (
+              <a
+                href={card.wordpressUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="rounded-full border border-gray-200 bg-white px-2 py-0.5 text-[10px] font-medium text-gray-600 transition-colors hover:bg-gray-50"
+              >
+                Live page
+              </a>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   const startEditing = (pageId: number, currentTitle: string) => {
     setEditingPageId(pageId);
@@ -63,6 +249,26 @@ export const CampaignTopicDetail: React.FC<CampaignTopicDetailProps> = ({
   const cancelEditing = () => {
     setEditingPageId(null);
     setEditingTitle("");
+  };
+
+  const startEditingTopicTitle = () => {
+    setEditingTopicTitle(topic.title);
+    setIsEditingTopicTitle(true);
+  };
+
+  const cancelTopicTitleEditing = () => {
+    setIsEditingTopicTitle(false);
+    setEditingTopicTitle(topic.title);
+  };
+
+  const handleSaveTopicTitle = () => {
+    const nextTitle = editingTopicTitle.trim();
+    if (!nextTitle || nextTitle === topic.title) {
+      cancelTopicTitleEditing();
+      return;
+    }
+    onUpdateTopicTitle(topic.id, nextTitle);
+    setIsEditingTopicTitle(false);
   };
 
   const handleSaveTitle = (pageId: number) => {
@@ -197,15 +403,52 @@ const renderKeywords = (
 
   return (
     <div className="relative h-full flex flex-col min-w-0">
-      <StreamingOverlay isVisible={isGenerating} messages={streamingMessages} jobId={jobId} />
-
       {/* Modern Header */}
       <div className="flex items-center justify-between mb-8 pb-6 border-b border-gray-100">
         <div>
           <div className="flex items-center gap-2 mb-2">
              <span className="px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 text-[10px] font-bold uppercase tracking-wider">Topic Cluster</span>
           </div>
-          <h2 className="text-3xl font-light text-[#1d1d1f] tracking-tight leading-tight">{topic.title}</h2>
+          {isEditingTopicTitle ? (
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                value={editingTopicTitle}
+                onChange={(e) => setEditingTopicTitle(e.target.value)}
+                className="min-w-[320px] max-w-3xl bg-white border border-gray-200 rounded-xl px-4 py-2 text-3xl font-light text-[#1d1d1f] tracking-tight leading-tight focus:outline-none focus:ring-2 focus:ring-black/5"
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleSaveTopicTitle();
+                  if (e.key === 'Escape') cancelTopicTitleEditing();
+                }}
+              />
+              <button
+                onClick={handleSaveTopicTitle}
+                className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-full transition-all"
+                aria-label="Save topic title"
+              >
+                <Check className="h-4 w-4" />
+              </button>
+              <button
+                onClick={cancelTopicTitleEditing}
+                className="p-2 text-gray-400 hover:bg-gray-100 rounded-full transition-all"
+                aria-label="Cancel topic title edit"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          ) : (
+            <div className="group/topic-title flex items-center gap-2">
+              <h2 className="text-3xl font-light text-[#1d1d1f] tracking-tight leading-tight">{topic.title}</h2>
+              <button
+                onClick={startEditingTopicTitle}
+                className="opacity-0 group-hover/topic-title:opacity-100 p-1.5 text-gray-400 hover:text-black transition-all"
+                aria-label="Edit topic cluster title"
+              >
+                <Pencil className="h-4 w-4" />
+              </button>
+            </div>
+          )}
           <p className="text-sm text-gray-400 mt-1 font-light tracking-wide">{topic.subPages?.length || 0} sub-pages configured</p>
         </div>
         <button
@@ -279,17 +522,6 @@ const renderKeywords = (
                     )}
                     <div className="flex items-center gap-2">
                          {renderStatusPill(topic.pillarPage.id)}
-                         {topic.pillarPage.publishStatus === 'published' && topic.pillarPage.liveUrl && (
-                            <a 
-                                href={topic.pillarPage.liveUrl} 
-                                target="_blank" 
-                                rel="noopener noreferrer"
-                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-100 hover:bg-emerald-100 transition-colors"
-                            >
-                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                                Live
-                            </a>
-                         )}
                     </div>
                     {/* <input
                       type="url"
@@ -309,6 +541,7 @@ const renderKeywords = (
                  </button>
                </div>
                
+               {renderInlineProgressPanel(topic.pillarPage.id)}
                {renderKeywords(topic.pillarPage.keywords || [], 'pillar', topic.pillarPage.id)}
             </div>
           </section>
@@ -324,20 +557,24 @@ const renderKeywords = (
                   This topic doesn't have a pillar page. You need one to structure your content cluster.
                 </p>
               </div>
-              <div className="flex flex-col sm:flex-row gap-3 w-full max-w-sm mx-auto">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-xl mx-auto auto-rows-fr">
                 <button
                   onClick={() => onCreatePillar(topic.id)}
-                  className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2 bg-white border border-gray-300 shadow-sm rounded-full text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                  className="min-h-[132px] inline-flex flex-col items-center justify-center gap-3 px-4 py-4 bg-white border border-gray-300 shadow-sm rounded-[24px] text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
                 >
-                  <Plus className="h-4 w-4" />
+                  <span className="flex h-10 w-10 items-center justify-center rounded-full border border-gray-200 bg-gray-50">
+                    <Plus className="h-4 w-4" />
+                  </span>
                   Manual Create
                 </button>
                 <button
                   onClick={() => onGenerateAiPillar(topic.id)}
                   disabled={aiLoading === `pillar-${topic.id}`}
-                  className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2 bg-black text-white shadow-sm rounded-full text-sm font-medium hover:bg-gray-800 transition-all disabled:opacity-50"
+                  className="min-h-[132px] inline-flex flex-col items-center justify-center gap-3 px-4 py-4 bg-black text-white shadow-sm rounded-[24px] text-sm font-medium hover:bg-gray-800 transition-all disabled:opacity-50"
                 >
-                  {aiLoading === `pillar-${topic.id}` ? <ButtonSpinner /> : <Sparkles className="h-4 w-4" />}
+                  <span className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10">
+                    {aiLoading === `pillar-${topic.id}` ? <ButtonSpinner /> : <Sparkles className="h-4 w-4" />}
+                  </span>
                   Generate with AI
                 </button>
               </div>
@@ -397,17 +634,6 @@ const renderKeywords = (
                           )}
                           <div className="flex items-center gap-2 mt-2">
                              {renderStatusPill(subPage.id)}
-                             {subPage.publishStatus === 'published' && subPage.liveUrl && (
-                                <a 
-                                    href={subPage.liveUrl} 
-                                    target="_blank" 
-                                    rel="noopener noreferrer"
-                                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-100 hover:bg-emerald-100 transition-colors"
-                                >
-                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                                    Live
-                                </a>
-                             )}
                           </div>
                         </div>
                         <button 
@@ -417,6 +643,7 @@ const renderKeywords = (
                             <Trash2 className="h-3.5 w-3.5" />
                         </button>
                     </div>
+                    {renderInlineProgressPanel(subPage.id)}
                     {renderKeywords(subPage.keywords || [], 'subpage', subPage.id)}
                 </div>
             ))}
@@ -425,12 +652,12 @@ const renderKeywords = (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <button
                  onClick={() => onAddSubPage(topic.id)}
-                 className="group flex flex-col items-center justify-center p-4 rounded-xl border border-dashed border-gray-200 hover:border-gray-300 hover:bg-gray-50/50 transition-all min-h-[140px]"
+                 className="group inline-flex min-h-[112px] items-center justify-center gap-3 rounded-[20px] border border-dashed border-gray-200 px-5 py-4 transition-all hover:border-gray-300 hover:bg-gray-50/50"
               >
-                 <div className="h-8 w-8 rounded-full bg-gray-50 group-hover:bg-white border border-gray-100 flex items-center justify-center mb-2 transition-colors shadow-sm">
+                 <div className="flex h-9 w-9 items-center justify-center rounded-full border border-gray-100 bg-gray-50 transition-colors shadow-sm group-hover:bg-white">
                    <Plus className="h-4 w-4 text-gray-400 group-hover:text-black transition-colors" />
                  </div>
-                 <span className="text-xs font-semibold text-gray-500 group-hover:text-gray-900 transition-colors">Add Manually</span>
+                 <span className="text-sm font-medium text-gray-600 transition-colors group-hover:text-gray-900">Add Manually</span>
               </button>
 
               <button
@@ -439,12 +666,12 @@ const renderKeywords = (
                    onGenerateAiSubPage(topic.id);
                  }}
                  disabled={aiLoading === `subpage-${topic.id}`}
-                 className="group flex flex-col items-center justify-center p-4 rounded-xl border border-gray-200 bg-black hover:bg-black/90 transition-all disabled:opacity-50 min-h-[140px]"
+                 className="group inline-flex min-h-[112px] items-center justify-center gap-3 rounded-[20px] border border-gray-200 bg-black px-5 py-4 transition-all hover:bg-black/90 disabled:opacity-50"
               >
-                 <div className="h-8 w-8 rounded-full bg-white/10 group-hover:bg-white/20 flex items-center justify-center mb-2 transition-colors shadow-sm">
+                 <div className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 transition-colors shadow-sm group-hover:bg-white/20">
                    {aiLoading === `subpage-${topic.id}` ? <ButtonSpinner /> : <Sparkles className="h-4 w-4 text-white" />}
                  </div>
-                 <span className="text-xs font-semibold text-white transition-colors">Generate with AI</span>
+                 <span className="text-sm font-medium text-white transition-colors">Generate with AI</span>
               </button>
             </div>
           </div>
