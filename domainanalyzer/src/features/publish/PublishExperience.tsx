@@ -3148,7 +3148,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
                               border: none;
                             }
                             .ql-container {
-                              font-family: inherit;
+                              font-family: SF Pro Display;
                               font-size: 16px;
                               min-height: calc(100vh - 450px);
                               height: auto;
@@ -3766,7 +3766,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
                               border: none;
                             }
                             .ql-container {
-                              font-family: inherit;
+                              font-family: SF Pro Display;
                               font-size: 16px;
                               min-height: calc(100vh - 450px);
                               height: auto;

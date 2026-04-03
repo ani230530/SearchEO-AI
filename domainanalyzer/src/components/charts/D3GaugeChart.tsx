@@ -9,6 +9,7 @@ interface D3GaugeChartProps {
   size?: number;
   colorRanges?: { min: number; max: number; color: string }[];
   animate?: boolean;
+  showValue?: boolean;
 }
 
 const D3GaugeChart: React.FC<D3GaugeChartProps> = ({
@@ -22,7 +23,8 @@ const D3GaugeChart: React.FC<D3GaugeChartProps> = ({
     { min: 33, max: 66, color: '#f59e0b' },   // Yellow
     { min: 66, max: 100, color: '#22c55e' }   // Green
   ],
-  animate = true
+  animate = true,
+  showValue = true
 }) => {
   const svgRef = useRef<SVGSVGElement>(null);
 
@@ -132,27 +134,29 @@ const D3GaugeChart: React.FC<D3GaugeChartProps> = ({
     }
 
     // Add value text in center
-    const valueText = g.append('text')
-      .attr('text-anchor', 'middle')
-      .attr('dy', radius * 0.48)
-      .style('font-size', `${size * 0.082}px`)
-      .style('font-weight', 'bold')
-      .attr('fill', '#1f2937');
+if (showValue) {
+  const valueText = g.append('text')
+    .attr('text-anchor', 'middle')
+    .attr('dy', radius * 0.15)
+    .style('font-size', `${size * 0.12}px`)
+    .style('font-weight', 'bold')
+    .attr('fill', '#1f2937');
 
-    if (animate) {
-      valueText
-        .text('0')
-        .transition()
-        .duration(1000)
-        .tween('text', function() {
-          const interpolate = d3.interpolateNumber(0, value);
-          return function(t) {
-            this.textContent = interpolate(t).toFixed(1);
-          };
-        });
-    } else {
-      valueText.text(value.toFixed(1));
-    }
+  if (animate) {
+    valueText
+      .text('0' + unit)
+      .transition()
+      .duration(1000)
+      .tween('text', function () {
+        const interpolate = d3.interpolateNumber(0, value);
+        return function (t) {
+          this.textContent = interpolate(t).toFixed(1) + unit;
+        };
+      });
+  } else {
+    valueText.text(value.toFixed(1) + unit);
+  }
+}
 
     // Add label
     if (label) {
