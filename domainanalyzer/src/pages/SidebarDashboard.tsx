@@ -2980,7 +2980,7 @@ useEffect(() => {
     {/* Visit Site with icon */}
     <button
   onClick={() => window.open(companyDomain.startsWith("http") ? companyDomain : `https://${companyDomain}`, "_blank")}
-  className="inline-flex items-center gap-1 px-4 py-2 text-sm font-medium text-[#4E76C7]  rounded-lg hover:underline transition"
+  className="inline-flex items-center gap-1 px-2  py-2 text-sm font-medium text-[#4E76C7]  rounded-lg hover:underline transition"
 >
   {/* Icon */}
   <img
@@ -2994,29 +2994,45 @@ useEffect(() => {
 </button>
 
     {/* Analytics */}
-    <button className="inline-flex items-center gap-1 px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-100 transition">
+    <button
+            onClick={() => {
+              setActiveTab("analytics");
+              setActiveCompanySubTab("company-info");
+              }}
+            className="inline-flex items-center gap-1 px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-100 transition"
+          >
       <img
-    src="https://res.cloudinary.com/dgfzjdi68/image/upload/v1775205399/gridicons_external_y0240k.png"
+    src="https://res.cloudinary.com/dgfzjdi68/image/upload/v1775224313/uil_chart-growth_v4botd.png"
     alt="Visit Site"
     className="w-4 h-4"
   />
-      Analytics
-    </button>
+              Analytics
+              </button>
 
     {/* Select Duration */}
-    <button className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-100 transition">
+    <button className="inline-flex items-center gap-1 px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-100 transition">
+      <img
+    src="https://res.cloudinary.com/dgfzjdi68/image/upload/v1775224439/calendar_jb8btr.png"
+    alt="Visit Site"
+    className="w-4 h-4"
+  />
       Select Duration
     </button>
 
     {/* Sort */}
-    <button className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-100 transition">
+    <button className="inline-flex items-center gap-1 px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-100 transition">
+      <img
+    src="https://res.cloudinary.com/dgfzjdi68/image/upload/v1775224313/uil_chart-growth_v4botd.png"
+    alt="Visit Site"
+    className="w-4 h-4"
+  />
       Sort
     </button>
   </div>
 </div>
 
     {/* ===================== KPI GRID ===================== */}
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
       {/* Opportunities Card */}
 <div className="rounded-xl bg-white border border-gray-100 p-6 transition">
