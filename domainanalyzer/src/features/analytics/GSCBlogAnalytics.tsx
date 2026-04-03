@@ -126,7 +126,7 @@ const GSCBlogAnalytics: React.FC = () => {
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center py-20">
-        <Loader2 className="w-10 h-10 animate-spin text-purple-600 mb-4" />
+        <Loader2 className="w-10 h-10 animate-spin text-gray-600 mb-4" />
         <p className="text-gray-600">Loading analytics...</p>
       </div>
     );
@@ -238,7 +238,7 @@ const GSCBlogAnalytics: React.FC = () => {
           </div>
           <a 
             href="/newdashboard?tab=publish" 
-            className="inline-flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-black text-white rounded-lg hover:bg-gray-700 transition-colors"
           >
             Publish Your First Blog <ExternalLink className="w-4 h-4" />
           </a>
@@ -348,81 +348,119 @@ const GSCBlogAnalytics: React.FC = () => {
       </div>
 
       {/* Charts Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Line Chart - Performance Over Time */}
-        <div className="rounded-xl border border-gray-100 bg-white p-6">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">Performance Trend</h3>
-          <div className="overflow-x-auto">
-            <D3LineChart
-              data={clicksData}
-              secondaryData={impressionsData}
-              width={500}
-              height={280}
-              primaryColor="#8b5cf6"
-              secondaryColor="#3b82f6"
-              primaryLabel="Clicks"
-              secondaryLabel="Impressions"
-            />
-          </div>
-        </div>
+  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+  
+  {/* Line Chart */}
+  <div className="w-full">
+    <div className="rounded-xl border border-gray-100 bg-white p-6 w-full">
+      <h3 className="text-lg font-medium text-gray-900 mb-4 text-center">
+        Performance Trend
+      </h3>
 
-        {/* Bar Chart - Top Blogs */}
-        <div className="rounded-xl border border-gray-100 bg-white p-6">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">Top Performing Blogs</h3>
-          <div className="overflow-x-auto">
-            <D3BarChart
-              data={blogBarData}
-              width={500}
-              height={280}
-              horizontal
-              gradientColors={['#8b5cf6', '#c084fc']}
-              onBarClick={(item) => {
-                const blog = aggregateData.blogs.find(b => b.id === item.id);
-                if (blog) handleBlogClick(blog);
-              }}
-            />
-          </div>
-        </div>
+      {/* IMPORTANT: give height */}
+      <div className="w-full h-[280px]">
+        <D3LineChart
+          data={clicksData}
+          secondaryData={impressionsData}
+          primaryColor="#8b5cf6"
+          secondaryColor="#3b82f6"
+          primaryLabel="Clicks"
+          secondaryLabel="Impressions"
+        />
       </div>
+    </div>
+  </div>
+
+  {/* Bar Chart */}
+  <div className="w-full">
+    <div className="rounded-xl border border-gray-100 bg-white p-6 w-full">
+      <h3 className="text-lg font-medium text-gray-900 mb-4 text-center">
+        Top Performing Blogs
+      </h3>
+
+      {/* IMPORTANT: give height */}
+      <div className="w-full h-[280px]">
+        <D3BarChart
+          data={blogBarData}
+          horizontal
+          gradientColors={['#8b5cf6', '#c084fc']}
+          onBarClick={(item) => {
+            const blog = aggregateData.blogs.find(b => b.id === item.id);
+            if (blog) handleBlogClick(blog);
+          }}
+        />
+      </div>
+    </div>
+  </div>
+
+</div>
 
       {/* Gauges Row */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="rounded-xl border border-gray-100 bg-white p-6">
-          <h3 className="text-lg font-medium text-gray-900 mb-4 text-center">Click-Through Rate</h3>
-          <div className="flex justify-center">
-            <D3GaugeChart
-              value={aggregateData.avgCTR * 100}
-              maxValue={10}
-              label="CTR Performance"
-              unit="%"
-              size={220}
-              colorRanges={[
-                { min: 0, max: 1, color: '#ef4444' },
-                { min: 1, max: 3, color: '#f59e0b' },
-                { min: 3, max: 10, color: '#22c55e' }
-              ]}
-            />
-          </div>
-        </div>
+     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+  
+  {/* CTR Card */}
+  <div className="rounded-xl border border-gray-100 bg-white p-6 shadow-sm flex flex-col items-center">
+    <h3 className="text-lg font-medium text-gray-900 text-center">
+      Click-Through Rate
+    </h3>
 
-        <div className="rounded-xl border border-gray-100 bg-white p-6">
-          <h3 className="text-lg font-medium text-gray-900 mb-4 text-center">Average Position</h3>
-          <div className="flex justify-center">
-            <D3GaugeChart
-              value={Math.min(aggregateData.avgPosition, 100)}
-              maxValue={100}
-              label="Lower is Better"
-              unit=""
-              size={220}
-              colorRanges={[
-                { min: 0, max: 10, color: '#22c55e' },
-                { min: 10, max: 30, color: '#f59e0b' },
-                { min: 30, max: 100, color: '#ef4444' }
-              ]}
-            />
-          </div>
-        </div>
-      </div>
+    <div className="mt-2 flex justify-center">
+      <D3GaugeChart
+        value={aggregateData.avgCTR * 100}
+        maxValue={10}
+        showValue={false}
+        label=""
+        unit="%"
+        size={220}
+        colorRanges={[
+          { min: 0, max: 1, color: '#ef4444' },
+          { min: 1, max: 3, color: '#f59e0b' },
+          { min: 3, max: 10, color: '#22c55e' }
+        ]}
+      />
+    </div>
+
+    <p className="mt-4 text-2xl font-semibold text-gray-900">
+      {(aggregateData.avgCTR * 100).toFixed(2)}%
+    </p>
+
+    <p className="text-sm text-gray-500 text-center">
+      Higher is better
+    </p>
+  </div>
+
+  {/* Position Card */}
+  <div className="rounded-xl border border-gray-100 bg-white p-6 shadow-sm flex flex-col items-center">
+    <h3 className="text-lg font-medium text-gray-900 text-center">
+      Average Position
+    </h3>
+
+    <div className="mt-2 flex justify-center">
+      <D3GaugeChart
+        value={Math.min(aggregateData.avgPosition, 100)}
+        maxValue={100}
+        showValue={false}
+        label=""
+        unit=""
+        size={220}
+        colorRanges={[
+          { min: 0, max: 10, color: '#22c55e' },
+          { min: 10, max: 30, color: '#f59e0b' },
+          { min: 30, max: 100, color: '#ef4444' }
+        ]}
+      />
+    </div>
+
+    <p className="mt-4 text-2xl font-semibold text-gray-900">
+      {aggregateData.avgPosition.toFixed(1)}
+    </p>
+
+    <p className="text-sm text-gray-500 text-center">
+      Lower is better
+    </p>
+  </div>
+
+</div>
 
       {/* Blog Details Table */}
       <div className="rounded-xl border border-gray-100 bg-white p-6">

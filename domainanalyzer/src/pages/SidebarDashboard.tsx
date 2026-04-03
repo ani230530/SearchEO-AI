@@ -7,6 +7,7 @@ import {
   Plus,
   Trash2,
   Edit,
+  Ellipsis,
   AlertCircle,
   CheckCircle,
   Loader2,
@@ -24,6 +25,8 @@ import {
   ClipboardList,
   FileChartColumnIncreasing,
   Settings,
+  Star,
+  SquarePen,
   User,
   Search,
   Grid3X3,
@@ -33,6 +36,7 @@ import {
   Check,
   FileText,
   X,
+  ListCheck,
   LogOut,
   ChevronUp,
   ArrowUpDown,
@@ -51,6 +55,7 @@ import {
 import { CampaignTableView } from '@/features/campaign/CampaignTableView';
 
 import { cn } from '@/lib/utils';
+import { formatDistanceToNow } from "date-fns";
 import { maskDomainId } from '@/lib/domainUtils';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -89,12 +94,13 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import TrendsChart, { TrendDataPoint } from "@/components/gsc/TrendsChart";
+import IntegrationsDashboard from './IntegrationsDashboard';
 
 
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3002";
 
-type TabId = 'overview' | 'analytics' | 'campaign' | 'publish' | 'settings' | 'profile' | 'ai-checker' | 'gsc-analytics' | 'audit' | 'analytics-report';
+type TabId = 'overview' | 'analytics' | 'projects' | 'publish' | 'settings' | 'profile' | 'ai-checker' | 'gsc-analytics' | 'audit' | 'analytics-report';
 type CompanySubTabId = 'company-info' | 'integration';
 type GscSubTabId = 'whole-analytics' | 'blog-performance';
 
@@ -316,6 +322,7 @@ const [improvedContent, setImprovedContent] = useState("");
   const [campaignsLoading, setCampaignsLoading] = useState(false);
   const [campaignTabDataLoading, setCampaignTabDataLoading] = useState(false);
   const [showCreateCampaign, setShowCreateCampaign] = useState(false);
+  const [campaignLayout, setCampaignLayout] = useState<'grid' | 'list'>('grid');
   const [newCampaignTitle, setNewCampaignTitle] = useState("");
   const [newCampaignDescription, setNewCampaignDescription] = useState("");
   const [expandedCampaignId, setExpandedCampaignId] = useState<number | null>(
@@ -324,7 +331,19 @@ const [improvedContent, setImprovedContent] = useState("");
   const [selectedCampaignId, setSelectedCampaignId] = useState<number | null>(
     null
   );
-
+  const [section, setSection] = useState<"all" | "favourites">("all");
+  const [activeSection, setActiveSection] = useState<'all' | 'favourites' | 'published'>('all');
+  const [openSortMenu, setOpenSortMenu] = useState(false);
+const [sortBy, setSortBy] = useState<"date" | "name">("date");
+  const [favouriteIds, setFavouriteIds] = useState<Set<number>>(new Set());
+const [openMenuId, setOpenMenuId] = useState<number | null>(null);
+const toggleFavourite = (id: number) => {
+  setFavouriteIds(prev => {
+    const newSet = new Set(prev);
+    newSet.has(id) ? newSet.delete(id) : newSet.add(id);
+    return newSet;
+  });
+};
   // PUBLISH PAGE STATES
 const [primaryKeyword, setPrimaryKeyword] = useState("");
 const [longtailKeywords, setLongtailKeywords] = useState("");
@@ -551,7 +570,7 @@ const [editDescription, setEditDescription] = useState('');
     { id: 'ai-checker', label: 'AI Checker', icon: <Sparkles className="h-5 w-5" /> },
     { id: 'overview', label: 'Overview', icon: <LayoutDashboard className="h-5 w-5" /> },
     { id: 'analytics', label: 'Company', icon: <Building className="h-5 w-5" /> } ,
-    { id: 'campaign', label: 'Campaign', icon: <Megaphone className="h-5 w-5" /> },
+    { id: 'projects', label: 'All Projects', icon: <Megaphone className="h-5 w-5" /> },
     { id: 'publish', label: 'Publish', icon: <Send className="h-5 w-5" /> },
     { id: 'gsc-analytics', label: 'GSC Analytics', icon: <BarChart3 className="h-5 w-5" /> },
     { id: 'audit', label: 'Audit', icon: <ClipboardList className="h-5 w-5" /> },
@@ -880,7 +899,7 @@ useEffect(() => {
 
     if (tabParam === 'ai-checker') {
       navigate('/ai-checker');
-    } else if (tabParam && ['overview', 'analytics', 'campaign', 'publish', 'settings', 'profile', 'gsc-analytics'].includes(tabParam)) {
+    } else if (tabParam && ['overview', 'analytics', 'projects', 'publish', 'settings', 'profile', 'gsc-analytics'].includes(tabParam)) {
       setActiveTab(tabParam as TabId);
     }
 
@@ -976,7 +995,7 @@ useEffect(() => {
 
   // Fetch all campaign tab data in parallel when campaign tab is active
   const fetchCampaignTabData = useCallback(async () => {
-    if (activeTab !== 'campaign') return;
+    if (activeTab !== 'projects') return;
     
     setCampaignTabDataLoading(true);
     try {
@@ -1034,7 +1053,7 @@ useEffect(() => {
   }, [activeTab]);
 
   useEffect(() => {
-    if (activeTab === 'campaign') {
+    if (activeTab === 'projects') {
       fetchCampaignTabData();
     }
   }, [activeTab, fetchCampaignTabData]);
@@ -1724,7 +1743,7 @@ useEffect(() => {
       fetchWordpressIntegration();
     
     // Also refresh campaign tab data if we're on campaign tab and WordPress integration might have changed
-    if (activeTab === 'campaign' && activeCompanySubTab === 'integration') {
+    if (activeTab === 'projects' && activeCompanySubTab === 'integration') {
       fetchCampaignTabData();
     }
   }, [activeTab, activeCompanySubTab, fetchGscStatus, fetchWordpressIntegration, fetchCampaignTabData]);
@@ -1767,7 +1786,7 @@ useEffect(() => {
   }, [toast]);
 
   useEffect(() => {
-    if (activeTab === 'campaign' || activeTab === 'overview') {
+    if (activeTab === 'projects' || activeTab === 'overview') {
       // Fetch campaigns for both the Campaign tab and the Overview
       // so Overview can show recent campaigns/quick access.
       fetchCampaigns();
@@ -1820,11 +1839,11 @@ useEffect(() => {
         fetchCampaigns();
       }
     } catch (error) {
-      console.error("Error creating campaign:", error);
+      console.error("Error creating project:", error);
       toast({
         title: "Error",
         description:
-          error instanceof Error ? error.message : "Failed to create campaign",
+          error instanceof Error ? error.message : "Failed to create project",
         variant: "destructive",
       });
     }
@@ -1834,7 +1853,7 @@ useEffect(() => {
   if (!editTitle.trim()) {
     toast({
       title: "Title Required",
-      description: "Please enter a campaign title",
+      description: "Please enter a Project title",
       variant: "destructive",
     });
     return;
@@ -1860,15 +1879,15 @@ useEffect(() => {
 
     if (!response.ok) {
       const errorData = await response.json();
-      throw new Error(errorData.error || "Failed to update campaign");
+      throw new Error(errorData.error || "Failed to update project");
     }
 
     const data = await response.json();
 
     if (data.success) {
       toast({
-        title: "Campaign Updated",
-        description: "Your campaign has been updated successfully",
+        title: "Project Updated",
+        description: "Your project has been updated successfully",
       });
       setEditingCampaignId(null);
       setEditTitle("");
@@ -1876,13 +1895,13 @@ useEffect(() => {
       fetchCampaigns();
     }
   } catch (error) {
-    console.error("Error updating campaign:", error);
+    console.error("Error updating project:", error);
     toast({
       title: "Error",
       description:
         error instanceof Error
           ? error.message
-          : "Failed to update campaign",
+          : "Failed to update project",
       variant: "destructive",
     });
   }
@@ -1903,15 +1922,15 @@ useEffect(() => {
       );
 
       if (!response.ok) {
-        throw new Error("Failed to delete campaign");
+        throw new Error("Failed to delete project");
       }
 
       const data = await response.json();
 
       if (data.success) {
         toast({
-          title: "Campaign Deleted",
-          description: "Campaign has been deleted successfully",
+          title: "Project Deleted",
+          description: "Project has been deleted successfully",
         });
         fetchCampaigns();
         if (expandedCampaignId === campaignId) {
@@ -1919,10 +1938,10 @@ useEffect(() => {
         }
       }
     } catch (error) {
-      console.error("Error deleting campaign:", error);
+      console.error("Error deleting project:", error);
       toast({
         title: "Error",
-        description: "Failed to delete campaign",
+        description: "Failed to delete project",
         variant: "destructive",
       });
     }
@@ -2780,7 +2799,7 @@ useEffect(() => {
             </div>
 
             
-            {activeTab === 'campaign' && selectedCampaignId && (
+            {activeTab === 'projects' && selectedCampaignId && (
                 <div className="flex items-center gap-2 bg-gray-100/80 p-1 rounded-lg border border-gray-200/50 mr-4">
                   <button
                     onClick={() => setCampaignViewMode('split')}
@@ -2839,52 +2858,36 @@ useEffect(() => {
         </header>
 
         {/* Content Body */}
-        <div className={activeTab === 'campaign' && selectedCampaignId ? "flex-1 min-h-[calc(100vh-80px)] bg-white" : "content-body"}>
+        <div className={activeTab === 'projects' && selectedCampaignId ? "flex-1 min-h-[calc(100vh-80px)] bg-white" : "content-body"}>
           {activeTab === "overview" ? (
-           <div className="max-w-7xl mx-auto px-4 sm:px-6 py-10 space-y-12">
+           <div className="min-w-7xl mx-auto px-4 sm:px-6 py-4 space-y-12">
 
     {/* ===================== HERO ===================== */}
-    <div className="relative overflow-hidden rounded-3xl border border-gray-100 bg-gradient-to-br from-white via-slate-50 to-white hover:shadow-lg">
+    <div className="relative overflow-hidden rounded-xl border border-gray-200 bg-gradient-to-br from-white via-slate-50 to-white">
       {/* soft glow */}
-      <div className="absolute -top-24 -left-24 w-96 h-96 bg-white rounded-full blur-3xl opacity-60" />
-
-      <div className="relative p-8 sm:p-10 flex flex-col lg:flex-row gap-10 justify-between">
-        {/* Left */}
-        <div className="max-w-xl">
-          <h1 className="text-4xl sm:text-5xl font-light text-gray-900 leading-tight">
-            Overview
-          </h1>
-          <p className="mt-3 text-base text-gray-600">
-            A real-time snapshot of your domain’s SEO health, performance,
-            and growth potential.
+      <div className="absolute -top-24 -left-24 w-96 h-96 rounded-full blur-3xl" />
+<p className="pl-4 pt-4 text-base text-[#717680]">
+            Free website audit
           </p>
-
-          <div className="mt-6 flex flex-wrap items-center gap-3">
-            <button
-              onClick={() => handleRunAudit(companyDomain)}
-              disabled={!companyDomain || auditLoading}
-              className="inline-flex items-center gap-2 px-6 py-3 bg-black text-white rounded-full text-sm font-medium hover:bg-gray-600  disabled:opacity-60 transition"
-            >
-              {auditLoading ? "Running audit…" : "Run Audit"}
-            </button>
-
-            <button
-              onClick={() => {
-                setActiveTab("analytics");
-                setActiveCompanySubTab("company-info");
-              }}
-              className="px-5 py-3 rounded-full border text-gray-700 border-gray-200 bg-white text-sm hover:bg-gray-100 hover:text-gray-700 hover:shadow-lg transition"
-            >
-              Analytics
-            </button>
-          </div>
+      <div className="relative p-4 sm:p-4 gap-10 justify-between">
+        {/* Left */}
+        <div className="min-w-4xl">
+          <h1 className="text-3xl sm:text-2xl font-bold text-gray-900 leading-tight">
+            Analyze Your Site’s SEO, Performance, and Visibility in Seconds
+          </h1>
+          <p className="pt-4 text-base text-[#717680]">
+            Get a clear view of how your website is performing across key metrics. Identify technical issues, uncover optimization opportunities, and understand what’s holding your rankings back. We’ll scan your site and deliver actionable insights to improve search visibility, speed, and overall performance.
+          </p>
         </div>
 
         {/* Right */}
           <div className="hidden lg:block w-px h-54 bg-gray-200" />
-<div className="flex flex-col items-center gap-6">
+          
+<div className=" items-start gap-6">
+ <div className="mt-6 flex flex-wrap items-center gap-3">
+  {/* Company Info Box */}
   {companyDomain && (
-    <div className="inline-flex items-center gap-3 bg-blue-50 border border-blue-200 text-blue-700 px-5 py-3 rounded-2xl shadow-sm">
+    <div className="flex items-center gap-3 border border-gray-200 text-blue-700 px-5 py-3 rounded-xl flex-1 min-w-[300px]">
       <img
         src={`https://img.logo.dev/${normalizedDomain}?token=pk_DTdFFG1JT9WOCjATvZEzIA&size=128`}
         alt="Company logo"
@@ -2898,7 +2901,7 @@ useEffect(() => {
           href={companyDomain.startsWith("http") ? companyDomain : `https://${companyDomain}`}
           target="_blank"
           rel="noopener noreferrer"
-          className="text-blue-600 hover:underline text-lg"
+          className="text-blue-600 hover:underline"
         >
           {companyDomain.replace(/^https?:\/\//, "").replace(/^www\./, "")}
         </a>
@@ -2906,46 +2909,81 @@ useEffect(() => {
     </div>
   )}
 
-  {/* Info blocks*/}
-  <div className="flex flex-col-2 items-center gap-20">
-    <div>
-      <div className="text-xs text-gray-500">Last scanned</div>
-      {auditData?.updatedAt ? (
-        <>
-          <div className="font-medium text-gray-900">
-            {new Date(auditData.updatedAt).toLocaleDateString("en-GB", {
-              day: "numeric",
-              month: "short",
-              year: "numeric",
-            })}
-          </div>
-          <div className="text-xs text-gray-900">
-            {new Date(auditData.updatedAt).toLocaleTimeString("en-US", {
-              hour: "2-digit",
-              minute: "2-digit",
-            })}
-          </div>
-        </>
-      ) : (
-        <div className="font-medium text-gray-900">Never</div>
-      )}
-    </div>
+  {/* Run Audit Button */}
+  <button
+  onClick={() => handleRunAudit(companyDomain)}
+  disabled={auditLoading || !companyDomain}
+  className={cn(
+    "inline-flex items-center justify-center gap-2 px-6 py-3 text-white rounded-md text-sm font-medium hover:opacity-90 disabled:opacity-60 transition min-h-[52px] min-w-[180px]",
+    auditLoading && "cursor-not-allowed"
+  )}
+  style={{
+    background: "linear-gradient(90deg, #2D4059 0%, #4E76C7 100%)",
+  }}
+>
+  <img
+    src="https://res.cloudinary.com/dgfzjdi68/image/upload/v1775200251/file-check-02_zg8eno.png"
+    alt="Check icon"
+    className="w-5 h-5"
+  />
 
-    <div>
-      <div className="text-xs text-gray-500">Keywords tracked</div>
-      <div className="font-medium text-gray-900">{keywordsTableData.length}</div>
-    </div>
-  </div>
+  {auditLoading ? "Running audit…" : "Run Audit"}
+</button>
 </div>
-
+</div>
       </div>
     </div>
+    <div className="w-full flex items-center justify-between px-4">
+  {/* Left title */}
+  <div className="text-xl font-bold text-gray-900">
+    Overview
+  </div>
+
+  {/* Right buttons */}
+  <div className="flex items-center gap-3">
+    {/* Visit Site with icon */}
+    <button
+  onClick={() => window.open(companyDomain.startsWith("http") ? companyDomain : `https://${companyDomain}`, "_blank")}
+  className="inline-flex items-center gap-1 px-4 py-2 text-sm font-medium text-[#4E76C7]  rounded-lg hover:underline transition"
+>
+  {/* Icon */}
+  <img
+    src="https://res.cloudinary.com/dgfzjdi68/image/upload/v1775205399/gridicons_external_y0240k.png"
+    alt="Visit Site"
+    className="w-4 h-4"
+  />
+
+  {/* Button text */}
+  <span className="font-medium">Visit Site</span>
+</button>
+
+    {/* Analytics */}
+    <button className="inline-flex items-center gap-1 px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-100 transition">
+      <img
+    src="https://res.cloudinary.com/dgfzjdi68/image/upload/v1775205399/gridicons_external_y0240k.png"
+    alt="Visit Site"
+    className="w-4 h-4"
+  />
+      Analytics
+    </button>
+
+    {/* Select Duration */}
+    <button className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-100 transition">
+      Select Duration
+    </button>
+
+    {/* Sort */}
+    <button className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-100 transition">
+      Sort
+    </button>
+  </div>
+</div>
 
     {/* ===================== KPI GRID ===================== */}
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
 
       {/* Opportunities Card */}
-<div className="rounded-3xl bg-white border border-gray-100 p-6 hover:shadow-lg transition">
+<div className="rounded-xl bg-white border border-gray-100 p-6 transition">
   <div className="flex items-center justify-between mb-4">
     <h3 className="text-[28px] font-medium text-gray-900">
       Top Opportunities
@@ -3054,7 +3092,7 @@ useEffect(() => {
 </div>
 )}
       {/* Audit Summary */}
-   <div className="lg:col-span-1 rounded-3xl bg-white border border-gray-100 p-6 shadow-sm hover:shadow-lg transition-shadow duration-300">
+   <div className="lg:col-span-1 rounded-xl bg-white border border-gray-100 p-6 shadow-sm  transition-shadow duration-300">
   {/* Header */}
   <div className="flex items-center justify-between mb-4">
     <div>
@@ -3158,7 +3196,7 @@ useEffect(() => {
 
     {/* ===================== SNAPSHOT ===================== */}
   <div className="grid grid-cols-1 lg:grid-cols-1 gap-6">
-  <div className="rounded-3xl bg-white border border-gray-100 p-6 hover:shadow-lg transition">
+  <div className="rounded-3xl bg-white border border-gray-100 p-6  transition">
     <div className="mb-6">
       <h3 className="text-[28px] font-medium text-gray-900">Snapshot</h3>
       <p className="text-xs text-gray-400 mt-1">
@@ -3209,7 +3247,7 @@ useEffect(() => {
     </div>
   </div>
   {/* <div className="grid grid-cols-1 lg:grid-cols-1 gap-6">
- <div className="px-4 py-6 grid-cols-1 lg:grid-cols-1 rounded-3xl bg-white border border-gray-100 p-6 hover:shadow-lg transition space-y-2">
+ <div className="px-4 py-6 grid-cols-1 lg:grid-cols-1 rounded-3xl bg-white border border-gray-100 p-6  transition space-y-2">
       <h3 className='py-2'>Suggested Next Actions</h3>
                            <div className="flex justify-between items-center px-4 py-3 rounded-xl bg-gray-50/50 border border-gray-200 hover:bg-gray-50 transition-all" style={{ borderWidth: '0.5px' }}>
                                   <span className="font-light text-gray-900 flex items-center gap-1" style={{ letterSpacing: '0.011em' }}> Publish 1 ready article</span>
@@ -3226,7 +3264,7 @@ useEffect(() => {
   </div>
 </div> */}
   </div>
- <div className="px-4 py-6 grid-cols-1 lg:grid-cols-1 rounded-3xl bg-white border border-gray-100 p-6 hover:shadow-lg transition">
+ <div className="px-4 py-6 grid-cols-1 lg:grid-cols-1 rounded-3xl bg-white border border-gray-100 p-6  transition">
    <GSCAnalyticsView/>
   </div>
   </div>
@@ -3234,7 +3272,7 @@ useEffect(() => {
             companyDomainLoading ? (
               <CompanyInfoSkeleton />
             ) : showResults ? (
-              <div className="min-w-6xl mx-auto px-4 sm:px-6 py-12 sm:py-16">
+              <div className="min-w-6xl mx-auto px-4 sm:px-6 py-4 sm:py-6">
                 {/* Company Domain Heading */}
                 {/* <div className="text-center mb-12 flex flex-col items-center gap-4">
                 
@@ -3252,52 +3290,52 @@ useEffect(() => {
   "Business Model Analysis": <img
     src="https://res.cloudinary.com/dgfzjdi68/image/upload/v1772020198/Group_1_vvjxuz.svg"
     alt="Target Audience Profiling"
-    width={20}
-    height={20}
+    width={50}
+    height={50}
   />,
   "Target Audience Profiling": (
   <img
     src="https://res.cloudinary.com/dgfzjdi68/image/upload/v1772020378/Group_2_t45oi4.svg"
     alt="Target Audience Profiling"
-    width={20}
-    height={20}
+    width={50}
+    height={50}
   />
 ),
   "Value Proposition & Positioning": <img
     src="https://res.cloudinary.com/dgfzjdi68/image/upload/v1772020608/streamline-plump_target-3_zf59wp.svg"
     alt="Target Audience Profiling"
-    width={25}
-    height={25}
+    width={50}
+    height={50}
   />,
   "SEO & Content Strategy Insights": <img
     src="https://res.cloudinary.com/dgfzjdi68/image/upload/v1772020608/hugeicons_seo_itfmdp.svg"
     alt="Target Audience Profiling"
-    width={25}
-    height={25}
+    width={50}
+    height={50}
   />,
   "Competitive Intelligence": <img
     src="https://res.cloudinary.com/dgfzjdi68/image/upload/v1772020606/Group_ho0bh5.svg"
     alt="Target Audience Profiling"
-    width={20}
-    height={20}
+    width={50}
+    height={50}
   />,
   "Market Dynamics": <img
     src="https://res.cloudinary.com/dgfzjdi68/image/upload/v1772020608/market-analysis_svgrepo.com_wjuzuv.svg"
     alt="Target Audience Profiling"
-    width={20}
-    height={20}
+    width={50}
+    height={50}
   />,
   "Location-Based SEO Analysis": <img
     src="https://res.cloudinary.com/dgfzjdi68/image/upload/v1772020608/location-med-2_svgrepo.com_y5xuuh.svg"
     alt="Target Audience Profiling"
-    width={25}
-    height={25}
+    width={50}
+    height={50}
   />,
   "SEO Opportunity Analysis": <img
     src="https://res.cloudinary.com/dgfzjdi68/image/upload/v1772020609/seo_svgrepo.com_wwqcub.svg"
     alt="Target Audience Profiling"
-    width={20}
-    height={20}
+    width={50}
+    height={50}
   />,
 };
                           const normalize = (s: string) =>
@@ -3335,13 +3373,13 @@ const rightSections = sections.slice(4, 8);
 const allSections = [...leftSections, ...rightSections];
                        if (sections.some((s) => s.content.length > 0)) {
   return (
-    <div className="p-4 sm:p-6 bg-white rounded-3xl border border-gray-100 hover:shadow-lg overflow-hidden backdrop-blur-sm">
+    <div className="p-4 sm:p-6 bg-white rounded-3xl border border-gray-100  overflow-hidden backdrop-blur-sm">
       {/* Master Panel */}
       <div>
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-6 border-gray-600/50">
           <div>
-            <h1 className="text-2xl font-light tracking-tight text-gray-900">
+            <h1 className="text-3xl font-light tracking-tight text-gray-900">
               Domain Info
             </h1>
             <p className="text-sm text-gray-500 mt-1">
@@ -3391,7 +3429,7 @@ const allSections = [...leftSections, ...rightSections];
     return (
       <div
         key={idx}
-        className={`rounded-3xl border overflow-hidden ${
+        className={`rounded-3xl border overflow-hidden pb-6${
           isOpen ? " bg-blue-50" : " bg-white"
         }`}
         style={{
@@ -3434,7 +3472,7 @@ const allSections = [...leftSections, ...rightSections];
     return (
       <div
         key={realIdx}
-        className={`rounded-3xl border overflow-hidden ${
+        className={`rounded-3xl border overflow-hidden pb-6${
           isOpen ? " bg-blue-50" : " bg-white"
         }`}
         style={{
@@ -3504,7 +3542,7 @@ const allSections = [...leftSections, ...rightSections];
                     {/* Keywords - Table with Filters and Add Custom Keyword */}
                     {keywordsTableData.length > 0 && (
                       <div className="mt-16">
-                        <div className="bg-white rounded-3xl border border-gray-100 hover:shadow-lg overflow-hidden backdrop-blur-sm">
+                        <div className="bg-white rounded-3xl border border-gray-100  overflow-hidden backdrop-blur-sm">
                           <div className="p-4 sm:p-6 border-b border-gray-100 bg-gradient-to-b from-gray-50/50 to-white">
                             <div className="flex items-center justify-between mb-4">
                               <h2 className="text-2xl font-light text-gray-900 tracking-tight">
@@ -4359,8 +4397,8 @@ const allSections = [...leftSections, ...rightSections];
                         </button>
                       </div>
                     ) : (
-                      <div className="space-y-6">
-                        <div className="bg-white rounded-3xl p-8 border border-gray-100 hover:shadow-lg">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="bg-white rounded-3xl p-8 border border-gray-100 ">
                           <div className="flex items-center justify-between mb-6">
                             <div className="flex items-center gap-3">
                               <div className="w-12 h-12 rounded-xl bg-green-50 flex items-center justify-center">
@@ -4445,7 +4483,7 @@ const allSections = [...leftSections, ...rightSections];
                             )}
                           </div>
                         ) : (
-                          <div className="bg-white rounded-3xl p-8 border border-gray-100 hover:shadow-lg">
+                          <div className="bg-white rounded-3xl p-8 border border-gray-100 ">
                             <div className="flex items-center justify-between mb-6">
                               <div>
                                 <h3 className="text-xl font-light text-black tracking-tight mb-1">
@@ -4474,12 +4512,12 @@ const allSections = [...leftSections, ...rightSections];
                         )}
 
                         {/* Google Analytics Section */}
-                        <div className="bg-white rounded-[32px] p-10 border border-gray-100 hover:shadow-xl transition-all duration-300">
+                        <div className="bg-white rounded-3xl p-8 border border-gray-100 ">
                           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-8">
-                            <div className="flex items-center gap-6">
-                              <div className="w-16 h-16 rounded-3xl bg-neutral-900 flex items-center justify-center shadow-xl shadow-neutral-200">
-                                <BarChart3 className="h-8 w-8 text-white" />
-                              </div>
+                            <div className="flex items-start gap-4">
+                              <div className="w-14 h-14 rounded-xl bg-neutral-900 flex items-center justify-center shadow-lg">
+  <BarChart3 className="h-6 w-6 text-white" />
+</div>
                               <div className="space-y-1">
                                 <div className="flex items-center gap-3">
                                   <h3 className="text-2xl font-light text-black tracking-tight">Google Analytics 4</h3>
@@ -4494,19 +4532,20 @@ const allSections = [...leftSections, ...rightSections];
                               </div>
                             </div>
 
-                            <div className="flex flex-col sm:flex-row items-center gap-4 w-full lg:w-auto">
-                              <div className="relative flex-1 lg:w-80 w-full group">
-                                <div className="absolute left-6 top-1/2 -translate-y-1/2 text-neutral-400 group-focus-within:text-black transition">
-                                  <Database className="h-4 w-4" />
-                                </div>
-                                <input
-                                  type="text"
-                                  value={googleAnalyticsId}
-                                  onChange={(e) => setGoogleAnalyticsId(e.target.value)}
-                                  placeholder="GA4 Property ID (e.g. 123456789)"
-                                  className="w-full h-14 pl-14 pr-6 text-sm rounded-full border border-neutral-100 bg-neutral-50 focus:bg-white focus:border-black/10 focus:ring-4 focus:ring-black/5 outline-none transition-all placeholder:text-neutral-300 font-light"
-                                />
-                              </div>
+                            <div className='grid grid-rows-2 '>
+                              <div className="relative flex-1 group pb-2">
+  <div className="absolute left-6 top-1/2 -translate-y-1/2 text-neutral-400 group-focus-within:text-black transition">
+    <Database className="h-4 w-4" />
+  </div>
+
+  <input
+    type="text"
+    value={googleAnalyticsId}
+    onChange={(e) => setGoogleAnalyticsId(e.target.value)}
+    placeholder="GA4 Property ID (e.g. 123456789)"
+    className="w-full h-14 pl-14 text-sm rounded-full border border-neutral-100 bg-neutral-50 focus:bg-white focus:border-black/10 focus:ring-4 focus:ring-black/5 outline-none transition-all placeholder:text-neutral-300 font-light"
+  />
+</div>
                               <button
                                 onClick={async () => {
                                   if (!createdDomainId) return;
@@ -4556,10 +4595,7 @@ const allSections = [...leftSections, ...rightSections];
                             </div>
                           </div>
                         </div>
-                      </div>
-                    )}
-
-                    <div className="bg-white rounded-3xl p-8 border border-gray-100 hover:shadow-lg">
+                         <div className="bg-white rounded-3xl p-8 border border-gray-100 ">
                       <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
                         <div>
                           <h3 className="text-2xl font-light text-black tracking-tight">
@@ -4649,7 +4685,7 @@ const allSections = [...leftSections, ...rightSections];
                               <button
                                 onClick={handleDisconnectWordpress}
                                 disabled={wpIntegrationDeleting}
-                                className="px-6 py-3 rounded-full border text-gray-700 border-gray-200 bg-white text-sm hover:bg-gray-100 hover:text-gray-700 hover:shadow-lg transition"
+                                className="px-6 py-3 rounded-full border text-gray-700 border-gray-200 bg-white text-sm hover:bg-gray-100 hover:text-gray-700  transition"
                               >
                                 {wpIntegrationDeleting ? 'Removing…' : 'Disconnect'}
                               </button>
@@ -4658,6 +4694,8 @@ const allSections = [...leftSections, ...rightSections];
                         </div>
                       )}
                     </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -4851,7 +4889,7 @@ const allSections = [...leftSections, ...rightSections];
                 </div>
               </div>
             )
-          ) : activeTab === "campaign" ? (
+          ) : activeTab === "projects" ? (
             // Campaign Tab Logic - moved logic inside to handle full width for structure view
             (() => {
               if (selectedCampaignId) {
@@ -4888,7 +4926,7 @@ const allSections = [...leftSections, ...rightSections];
                       onConfigureWordpress={handleConfigureWordpress}
                       onRefreshWordpressIntegration={async () => {
                         await fetchWordpressIntegration();
-                        if (activeTab === 'campaign') {
+                        if (activeTab === 'projects') {
                           await fetchCampaignTabData();
                         }
                       }}
@@ -4925,9 +4963,9 @@ const allSections = [...leftSections, ...rightSections];
     />
 
     {/* Modal */}
-    <div className="relative w-full max-w-xl mx-4 bg-white rounded-3xl p-8 border border-gray-100 shadow-xl">
+    <div className="relative w-full max-w-xl mx-4 bg-white rounded-xl p-8 border border-gray-100 shadow-xl">
       <h3 className="text-xl font-light text-black tracking-tight mb-6">
-        Create New Campaign
+        Create New Project
       </h3>
 
       <form onSubmit={handleCreateCampaign} className="space-y-6">
@@ -4939,22 +4977,9 @@ const allSections = [...leftSections, ...rightSections];
             type="text"
             value={newCampaignTitle}
             onChange={(e) => setNewCampaignTitle(e.target.value)}
-            placeholder="Enter campaign title"
+            placeholder="Enter project title"
             className="w-full px-4 py-3 rounded-2xl border border-gray-200 bg-gray-50 focus:ring-2 focus:ring-black focus:outline-none"
             required
-          />
-        </div>
-
-        <div>
-          <label className="block text-base font-light text-black mb-2">
-            Description
-          </label>
-          <textarea
-            value={newCampaignDescription}
-            onChange={(e) => setNewCampaignDescription(e.target.value)}
-            rows={4}
-            placeholder="Enter campaign description (optional)"
-            className="w-full px-4 py-3 rounded-2xl border border-gray-200 bg-gray-50 focus:ring-2 focus:ring-black focus:outline-none resize-none"
           />
         </div>
 
@@ -4966,16 +4991,19 @@ const allSections = [...leftSections, ...rightSections];
               setNewCampaignTitle("");
               setNewCampaignDescription("");
             }}
-            className="px-6 py-3 rounded-full border border-gray-200 text-gray-700 hover:bg-gray-100"
+            className="px-6 py-3 rounded-md border border-gray-200 text-gray-700 hover:bg-gray-100"
           >
             Cancel
           </button>
 
           <button
             type="submit"
-            className="px-6 py-3 bg-black text-white rounded-full hover:bg-gray-600"
+            className="px-6 py-3 bg-black text-white rounded-md hover:opacity-90"
+            style={{
+    background: "linear-gradient(90deg, #2D4059 0%, #4E76C7 100%)",
+  }}
           >
-            Create Campaign
+            Create Project
           </button>
         </div>
       </form>
@@ -4983,29 +5011,101 @@ const allSections = [...leftSections, ...rightSections];
   </div>
 )}
 
-              <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
+              <div className="min-w-8xl px-1 sm:px-1 py-2 sm:py-">
+  {/* Header */}
+                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
 
-                <div className='p-4 mb-6 sm:p-6 bg-white rounded-3xl border border-gray-100 hover:shadow-lg overflow-hidden backdrop-blur-sm'>
-                  {/* Header */}
-                  <div className="flex items-center justify-between mb-8">
-                    <div>
-                      <h1 className="text-3xl font-thin text-black tracking-tight mb-2">
-                        Campaigns
-                      </h1>
-                      <p className="text-base font-light text-gray-600">
-                        Manage your marketing campaigns
-                      </p>
-                    </div>
-                    <button
-                      onClick={() => setShowCreateCampaign(!showCreateCampaign)}
-                      className="inline-flex items-center gap-2 px-6 py-3 bg-black text-white rounded-full text-sm font-medium hover:bg-gray-600  disabled:opacity-60 transition"
-                    >
-                      <Plus className="h-4 w-4" />
-                      {showCreateCampaign ? "Cancel" : "New Campaign"}
-                    </button>
-                  </div>
-                </div>
+ {/* New Campaign */}
+    <button
+      onClick={() => setShowCreateCampaign(!showCreateCampaign)}
+      className="inline-flex border border-gray-700 items-center gap-2 px-5 py-2.5 bg-white text-black rounded-md text-md font-medium hover:bg-gray-200 transition"
+    >
+      <Plus className="h-4 w-4" />
+      {showCreateCampaign ? "Cancel" : "Create New"}
+    </button>
 
+{/* Actions */}
+<div className="flex items-center gap-1">
+
+  {/* Layout Toggle */}
+  <button
+    onClick={() =>
+      setCampaignLayout(campaignLayout === "grid" ? "list" : "grid")
+    }
+    className="flex items-center gap-1 px-3 py-2 rounded-md hover:bg-gray-200 transition"
+  >
+    {campaignLayout === "grid" ? (
+      <>
+        <List className="h-4 w-5" />
+        <span className="text-sm font-medium text-gray-700">List</span>
+      </>
+    ) : (
+      <>
+        <Grid3X3 className="h-4 w-5" />
+        <span className="text-sm font-medium text-gray-700">Grid</span>
+      </>
+    )}
+  </button>
+
+  {/* Sort Button */}
+ <div className="relative">
+  <button
+    onClick={() => setOpenSortMenu(!openSortMenu)}
+    className="flex items-center gap-1 px-3 py-2 rounded-md hover:bg-gray-200 transition"
+  >
+    <ArrowUpDown className="h-5 w-5" />
+    <span className="text-sm font-medium text-gray-700">Sort</span>
+  </button>
+
+  {openSortMenu && (
+    <div className="absolute right-0 mt-2 w-32 bg-white border border-gray-200 rounded-md shadow-lg z-10">
+      <button
+        className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-100 ${
+          sortBy === "date" ? "font-semibold" : ""
+        }`}
+        onClick={() => {
+          setSortBy("date");
+          setOpenSortMenu(false);
+        }}
+      >
+        Date
+      </button>
+
+      <button
+        className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-100 ${
+          sortBy === "name" ? "font-semibold" : ""
+        }`}
+        onClick={() => {
+          setSortBy("name");
+          setOpenSortMenu(false);
+        }}
+      >
+        Name
+      </button>
+    </div>
+  )}
+</div>
+
+</div>
+</div>
+
+
+                <div className='p-4 mb-6 sm:p-6 bg-white rounded-xl border border-gray-100  overflow-hidden backdrop-blur-sm'>
+         <div className="flex gap-6 border-b border-gray-200 mb-6">
+  {['all', 'favourites'].map((section) => (
+    <button
+      key={section}
+      onClick={() => setActiveSection(section as 'all' | 'favourites' )}
+      className={`relative pb-2 text-sm font-medium transition-colors ${
+        activeSection === section
+          ? 'text-black after:absolute after:-bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-black'
+          : 'text-gray-500 hover:text-black'
+      }`}
+    >
+      {section === 'all' ? 'All' : section === 'favourites' ? 'Favourites' : 'Published'}
+    </button>
+  ))}
+</div>
               {/* Campaigns List */}
               {(() => {
                 if (campaignsLoading || campaignTabDataLoading) {
@@ -5013,7 +5113,7 @@ const allSections = [...leftSections, ...rightSections];
                     <div className="text-center py-12">
                       <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
                       <p className="text-sm font-light text-gray-600 mt-4">
-                        {campaignsLoading ? 'Loading campaigns...' : 'Loading campaign data...'}
+                        {campaignsLoading ? 'Loading projects...' : 'Loading project data...'}
                       </p>
                     </div>
                   );
@@ -5028,91 +5128,146 @@ const allSections = [...leftSections, ...rightSections];
                         <Megaphone className="h-8 w-8 text-gray-400" />
                       </div>
                       <h3 className="text-xl font-light text-black tracking-tight mb-3">
-                        No Campaigns Yet
+                        No Projects Yet
                       </h3>
                       <p className="text-base font-light text-gray-600 mb-6">
-                        Create your first campaign to get started
+                        Create your first project to get started
                       </p>
                       <button
                         onClick={() => setShowCreateCampaign(true)}
                         className="px-6 py-3 bg-black text-white rounded-full hover:bg-black/90 focus:outline-none focus:ring-4 focus:ring-black/10 transition-all shadow text-base font-medium flex items-center gap-2 mx-auto"
                       >
                         <Plus className="h-5 w-5" />
-                        Create Campaign
+                        Create Project
                       </button>
                     </div>
                   );
                 }
 
                return (
-<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-6">
-  {campaigns.map((campaign) => {
+<div
+  className={
+    campaignLayout === "grid"
+      ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"
+      : "flex flex-col gap-4"
+  }
+>
+  {[...campaigns]
+  
+ .filter(campaign => {
+  switch (activeSection) {
+    case "favourites":
+      return favouriteIds.has(campaign.id);
+
+    case "all":
+    default:
+      return true;
+  }
+})
+  .sort((a, b) => {
+    if (sortBy === "date") {
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    } else {
+      return a.title.localeCompare(b.title);
+    }
+  })
+  .map((campaign) => {
     const isEditing = editingCampaignId === campaign.id;
+    const isFavourite = favouriteIds.has(campaign.id);
+    
 
     return (
       <div
-        key={campaign.id}
-        className="bg-white rounded-3xl border border-gray-100 hover:shadow-lg shadow-sm mt-6 p-6 flex flex-col min-h-[180px]"
-      >
-          <div className="flex flex-col flex-1">
-            {/* Top row: Title & View */}
-            <div className="flex justify-between items-start mb-2">
-              <h3 className="text-lg font-light text-black tracking-tight truncate">
-                {campaign.title}
-              </h3>
-              <button
-  onClick={() => setSelectedCampaignId(campaign.id)}
-  className="group text-sm font-medium text-black transition-transform duration-200 ease-in-out flex items-center gap-1 hover:scale-105"
+  key={campaign.id}
+  className={`
+    bg-white rounded-md border border-gray-100  shadow-sm p-4 flex flex-col justify-between
+    ${campaignLayout === "grid" ? "min-h-[200px]" : "min-h-[100px]"}
+  `}
 >
-  View
-  <span className="relative flex items-center w-4 h-4">
-    <ChevronRight
-      className="absolute inset-0 w-4 h-4 transition-all duration-200 ease-in-out group-hover:opacity-0 group-hover:translate-x-1"
-    />
-    <ArrowRight
-      className="absolute inset-0 w-4 h-4 opacity-0 transition-all duration-200 ease-in-out group-hover:opacity-100 group-hover:translate-x-0"
-    />
-  </span>
-</button>
-            </div>
-
-            {/* Description */}
-            {campaign.description ? (
-              <p className="text-sm font-light text-gray-600 line-clamp-3 mb-4">
-                {campaign.description}
-              </p>
-            ) : (
-              <p className="text-sm font-light text-gray-400 italic mb-4">
-                No description provided
-              </p>
-            )}
+        
+        {/* Active Badge */}
+      
+        <div className="flex justify-between items-center">
+          <div className="w-fit inline-flex items-center text-xs font-medium bg-blue-50 border border-blue-400 text-blue-700 px-2 rounded-full mb-2">
+            Active
           </div>
-            {/* Bottom actions: Edit & Delete */}
-            <div className="flex justify-end gap-2">
-              <button
-  onClick={() => {
-    setEditingCampaignId(campaign.id);
-    setEditTitle(campaign.title);
-    setEditDescription(campaign.description || '');
-    setShowEditModal(true); 
-  }}
-  className="text-gray-400 hover:text-blue-600 flex items-center gap-1"
->
-  <Edit className="h-5 w-5" />
-</button>
+          {/* Actions: Star + 3-dots */}
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <button
+              onClick={() => toggleFavourite(campaign.id)}
+              className="rounded-lg transition p-2"
+            >
+              <Star
+                className="h-5 w-5"
+                fill={isFavourite ? "#f77373" : "none"}
+                stroke={isFavourite ? "rgb(199, 29, 7)" : "#000000"}
+              />
+            </button>
 
+            {/* 3-dots menu */}
+            <div className="relative">
               <button
-  onClick={() =>
-    confirmDelete("Campaign", () => 
-      handleDeleteCampaign(campaign.id)
-    )
-  }
-  className="text-gray-400 hover:text-red-600 flex items-center gap-1" 
->
-  <Trash2 className="h-5 w-5" />
-</button>
+                onClick={() =>
+                  setOpenMenuId(openMenuId === campaign.id ? null : campaign.id)
+                }
+                className="p-2 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition"
+              >
+                <Ellipsis className="h-5 w-5 text-black" />
+              </button>
 
+              {openMenuId === campaign.id && (
+                <div className="absolute right-0 mt-2 w-32 bg-white border border-gray-200 rounded-md shadow-lg z-10">
+                  <button
+                    className="w-full flex items-center gap-2 px-4 py-2 text-sm text-gray-600 hover:bg-gray-100"
+                    onClick={() => {
+                      setEditingCampaignId(campaign.id);
+                      setEditTitle(campaign.title);
+                      setEditDescription(campaign.description || "");
+                      setShowEditModal(true);
+                      setOpenMenuId(null);
+                    }}
+                  >
+                    <SquarePen className="h-3.5 w-3.5" />
+                    Edit
+                  </button>
+
+                  <button
+                    className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-gray-100"
+                    onClick={() => {
+                      confirmDelete("Project", () => handleDeleteCampaign(campaign.id));
+                      setOpenMenuId(null);
+                    }}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    Delete
+                  </button>
+                </div>
+              )}
             </div>
+          </div>
+        </div>
+        
+
+        {/* Top row: Title + Actions */}
+          <div
+            onClick={() => setSelectedCampaignId(campaign.id)}
+            className="cursor-pointer flex-1 overflow-hidden mr-4 pt-2"
+            title={campaign.title}
+          >
+            <h3 className="text-lg font-medium text-black tracking-tight truncate">
+              {campaign.title}
+            </h3>
+          </div>
+
+
+        {/* Bottom row: Created time */}
+        {campaign.createdAt && (
+          <div className="flex justify-end mt-4">
+            <p className="text-sm text-gray-500">
+              {formatDistanceToNow(new Date(campaign.createdAt), { addSuffix: true })}
+            </p>
+          </div>
+        )}
       </div>
     );
   })}
@@ -5125,7 +5280,7 @@ const allSections = [...leftSections, ...rightSections];
   <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50">
     <div className="bg-white rounded-3xl p-8 w-full max-w-md shadow-lg">
       <h3 className="text-xl font-light text-black tracking-tight mb-6">
-        Edit Campaign
+        Edit Project
       </h3>
       <form
         onSubmit={async (e) => {
@@ -5146,28 +5301,16 @@ const allSections = [...leftSections, ...rightSections];
             type="text"
             value={editTitle}
             onChange={(e) => setEditTitle(e.target.value)}
-            placeholder="Enter campaign title"
+            placeholder="Enter project title"
             className="w-full px-4 py-3 text-base font-light rounded-2xl border border-gray-200 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-black"
             required
-          />
-        </div>
-        <div>
-          <label className="block text-base font-light text-black mb-2">
-            Description
-          </label>
-          <textarea
-            value={editDescription}
-            onChange={(e) => setEditDescription(e.target.value)}
-            placeholder="Enter campaign description (optional)"
-            rows={4}
-            className="w-full px-4 py-3 text-base font-light rounded-2xl border border-gray-200 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-black resize-none"
           />
         </div>
         <div className="flex items-center justify-end gap-4">
           <button
             type="button"
             onClick={() => setShowEditModal(false)}
-            className="px-6 py-3 rounded-full border text-gray-700 border-gray-200 bg-white text-sm hover:bg-gray-100 hover:text-gray-700 hover:shadow-lg transition"
+            className="px-6 py-3 rounded-full border text-gray-700 border-gray-200 bg-white text-sm hover:bg-gray-100 hover:text-gray-700  transition"
           >
             Cancel
           </button>
@@ -5182,6 +5325,7 @@ const allSections = [...leftSections, ...rightSections];
     </div>
   </div>
 )}
+            </div>
             </div>
             );
             })()
@@ -5604,7 +5748,7 @@ const allSections = [...leftSections, ...rightSections];
             </div>
           ) : activeTab === 'settings' ? (
             <div className="max-w-6xl mx-auto px-4 sm:px-6 py-12 sm:py-16">
-              <div className="bg-white rounded-3xl p-12 border border-gray-200 hover:shadow-lg text-center">
+              <div className="bg-white rounded-3xl p-12 border border-gray-200  text-center">
                 <h2 className="text-2xl font-light text-black tracking-tight mb-3">
                   Domain Settings
                 </h2>
@@ -8281,7 +8425,7 @@ function CampaignStructureView({
                 <div className="flex justify-end gap-3">
                   <button 
                     onClick={() => setGenerationStep(1)}
-                    className="inline-flex items-center gap-2 px-6 py-3 bg-white text-gray-700 border border-gray-200 rounded-full text-sm hover:bg-gray-100 hover:text-gray-700 hover:shadow-lg transition"
+                    className="inline-flex items-center gap-2 px-6 py-3 bg-white text-gray-700 border border-gray-200 rounded-full text-sm hover:bg-gray-100 hover:text-gray-700  transition"
                   >
                     Back
                   </button>
@@ -8330,7 +8474,7 @@ function CampaignStructureView({
                 <div className="flex justify-end gap-3">
                   <button 
                     onClick={() => setGenerationStep(2)}
-                    className="inline-flex items-center gap-2 px-6 py-3 bg-white text-gray-700 border border-gray-200 rounded-full text-sm hover:bg-gray-100 hover:text-gray-700 hover:shadow-lg transition"
+                    className="inline-flex items-center gap-2 px-6 py-3 bg-white text-gray-700 border border-gray-200 rounded-full text-sm hover:bg-gray-100 hover:text-gray-700  transition"
                   >
                     Back
                   </button>
