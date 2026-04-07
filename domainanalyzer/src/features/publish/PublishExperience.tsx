@@ -11,6 +11,7 @@ import {
   Plus,
   Save ,
   X,
+  ImagePlus,
   ArrowUpDown,
   RotateCcw,
   Edit,
@@ -28,7 +29,7 @@ import PublishHistoryTable from './PublishHistoryTable';
 import Tippy from '@tippyjs/react';
 import 'tippy.js/dist/tippy.css';
 import 'tippy.js/themes/light.css';
-import { KeywordTableItem } from '@/types';
+import { KeywordTableItem, DraftPreview } from '@/types';
 import {
   WordpressIntegration,
   GeneratedArticleContent,
@@ -40,20 +41,19 @@ import parse from 'html-react-parser';
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3002';
 
 interface PublishExperienceProps {
-  companyDomain: string;
-  domainContext: string;
-  keywordsTableData: KeywordTableItem[];
-  hasWordpressIntegration: boolean;
-  wpIntegration: WordpressIntegration | null;
-  onConfigureWordpress: () => void;
-  onRefreshWordpressIntegration: () => void;
-  isActive: boolean;
+  companyDomain?: string;
+  domainContext?: string;
+  keywordsTableData?: KeywordTableItem[];
+  hasWordpressIntegration?: boolean;
+  wpIntegration?: WordpressIntegration | null;
+  onConfigureWordpress?: () => void;
+  onRefreshWordpressIntegration?: () => void;
+  isActive?: boolean;
   initialDraft?: GeneratedArticleContent | null;
   initialDraftId?: number | null;
-  pageId?: number; // Context: CampaignPage ID to link the draft to
-  disablePreviewOverlay?: boolean; // When true, don't render the preview overlay wrapper (for embedded use)
-  
-  // Shared sync states from parent
+  pageId?: number;
+  disablePreviewOverlay?: boolean;
+  onBack?: () => void;
   publishingPageIds?: Set<number>;
   setPublishingPageIds?: React.Dispatch<React.SetStateAction<Set<number>>>;
   draftToPageMap?: Map<number, number>;
@@ -169,6 +169,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
   initialDraft,
   initialDraftId,
   pageId,
+  onBack,
   disablePreviewOverlay = false,
   publishingPageIds,
   setPublishingPageIds,
@@ -234,7 +235,9 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
   const [showAddImageModal, setShowAddImageModal] = useState(false);
   const [originalHtmlContent, setOriginalHtmlContent] = useState('');
   const quillRef = useRef<ReactQuill>(null);
-  
+   const [previewPageId, setPreviewPageId] = useState<number | null>(null);
+    const [previewDraft, setPreviewDraft] = useState<DraftPreview | null>(null);
+    
   // Track if content has unsaved changes (dirty state)
   const [isDirty, setIsDirty] = useState(false);
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
@@ -2838,7 +2841,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
               </section>
             )}
 
-            <div className="flex items-center justify-between pt-4 border-t border-gray-200">
+            {/* <div className="flex items-center justify-between pt-4 border-t border-gray-200">
               <button
                 onClick={handleDrawerBack}
                 disabled={drawerStep === 1}
@@ -2867,7 +2870,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
                   </button>
                 )}
               </div>
-            </div>
+            </div> */}
           </div>
         </SheetContent>
       </Sheet>
@@ -2887,11 +2890,19 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
           // Parent overlay already provides fixed inset-0, so we just fill it
           <div className="absolute inset-0 overflow-y-auto bg-white">
           <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-xl border-b border-gray-100 shadow-sm">
-            <div className="max-w-7xl mx-auto px-6 py-4">
+            <div className="min-w-7xl mx-2 px-6 py-4">
               <div className="flex items-center justify-between gap-4">
                 <div className="flex items-center gap-3 min-w-0">
                     {/* No back button in embedded mode - parent overlay handles closing */}
                   <div className="flex-1 min-w-0">
+                    {onBack && (
+  <button
+    onClick={onBack}
+    className="flex items-center gap-2 py-2 text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all  group"
+  >
+    <ChevronLeft className="h-4 w-4 text-gray-400 group-hover:text-gray-900 transition-colors" />
+  </button>
+)}
                     <div className="flex items-center gap-2 mb-1">
                       <p className="text-xs uppercase tracking-[0.3em] text-gray-500">
                         {isEditMode ? 'Edit Mode' : 'Draft Preview'}
@@ -2919,24 +2930,26 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
                 </div>
                 <div className="flex flex-wrap items-center gap-3 justify-end flex-shrink-0">
                   {publishResult && (
-                    <button
-                      onClick={handleToggleEditMode}
-                      className={`px-5 py-2.5 rounded-full border text-sm font-medium transition-colors ${
-                        isEditMode
-                          ? 'border-gray-900 bg-gray-900 text-white hover:bg-gray-800'
-                          : 'border-gray-200 bg-white text-gray-900 hover:bg-gray-50'
-                      }`}
-                    >
-                      <span className="flex items-center gap-2">
-                        {isEditMode ? <Eye className="h-4 w-4" /> : <Edit className="h-4 w-4" />}
-                        {isEditMode ? 'Preview' : 'Edit Mode'}
-                      </span>
-                    </button>
+                   <button
+  onClick={handleToggleEditMode}
+  title={isEditMode ? "Switch to Preview" : "Switch to Edit"}
+  className={`px-5 py-2.5 rounded-md border text-sm font-medium transition-colors ${
+    isEditMode
+      ? 'border-gray-900 bg-gray-900 text-white hover:bg-gray-800'
+      : 'border-gray-200 bg-white text-gray-900 hover:bg-gray-50'
+  }`}
+>
+  <span className="flex items-center gap-2">
+    {isEditMode ? <Eye className="h-4 w-4" /> : <Edit className="h-4 w-4" />}
+  </span>
+</button>
                   )}
                   <button
                     onClick={handleSaveDraft}
+                    
+  title={"Save Draft" + (hasUnsavedChanges ? " • Unsaved changes" : "")}
                     disabled={saving || !publishResult || !hasUnsavedChanges}
-                    className={`px-5 py-2.5 rounded-full border text-sm font-medium transition-colors ${
+                    className={`px-5 py-2.5 rounded-md border text-sm font-medium transition-colors ${
                       hasUnsavedChanges 
                         ? 'border-orange-300 text-orange-50 text-orange-700 hover:bg-orange-100' 
                         : 'border-gray-200 bg-white text-gray-900 hover:bg-gray-50'
@@ -2945,38 +2958,37 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
                     <Save className='h-5 w-5' />
                     {/* {saving ? 'Saving…' : hasUnsavedChanges ? 'Save Draft • Unsaved' : 'Save Draft'} */}
                   </button>
-                  <button
+                  {/* <button
                     onClick={handleResetDraft}
-                    className="px-4 py-2 rounded-full text-sm font-medium text-gray-500 hover:text-gray-900 transition-colors"
+                    title='Reset'
+                    className="px-4 py-2.5 rounded-md border border-gray-200 bg-white text-sm font-medium text-gray-900 hover:bg-gray-50 disabled:opacity-60 transition-colors"
                   >
-                   <RotateCcw className='h-5 w-5'/>
-                  </button>
+                   Reset
+                  </button> */}
                   <button
                     onClick={handleGenerateContent}
+                    title='Regenerate'
                     disabled={publishLoading}
-                    className="px-5 py-2.5 rounded-full border border-gray-200 bg-white text-sm font-medium text-gray-900 hover:bg-gray-50 disabled:opacity-60 transition-colors"
-                  >
-                    {publishLoading ? 'Generating…' : publishResult ? 'Regenerate' : 'Generate'}
+                    className="flex items-center gap-2 px-4 py-2.5 rounded-md border border-gray-200 bg-white text-sm font-medium text-gray-900 hover:bg-gray-50 disabled:opacity-60 transition-colors"
+                  ><RotateCcw className='h-4 w-4'/>
                   </button>
-                  {currentDraftStatus === 'published' && publishResult?.wordpressUrl ? (
-                    <a
-                      href={publishResult.wordpressUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="px-6 py-2.5 rounded-full bg-black text-white text-sm font-medium shadow-lg hover:bg-black/90 transition-colors inline-flex items-center gap-2"
-                    >
-                      <Eye className="h-4 w-4" />
-                      Live URL
-                    </a>
-                  ) : (
-                    <button
-                      onClick={handlePublishToWordpress}
-                      disabled={publishLoading || !publishResult}
-                      className="px-6 py-2.5 rounded-full bg-black text-white text-sm font-medium shadow-lg hover:bg-black/90 disabled:opacity-60 transition-colors"
-                    >
-                      {publishLoading ? 'Working…' : 'Publish to WordPress'}
-                    </button>
-                  )}
+                  <button
+                    // onClick={handleGenerateContent} 
+                    title='Add Image'
+                    disabled={publishLoading}
+                    className="flex items-center gap-2 px-4 py-2 rounded-md border border-[#2D4059] bg-white text-sm font-medium text-[#2D4059] hover:bg-gray-100 disabled:opacity-60 transition-colors"
+                  ><ImagePlus />Add Image
+                  </button>
+                  <button
+  onClick={handlePublishToWordpress}
+  disabled={publishLoading || !publishResult}
+  className="px-4 py-2.5 rounded-md bg-[#2D4059] text-white text-sm font-medium shadow-lg hover:bg-[#2D4059]/90 disabled:opacity-60 transition-colors flex items-center gap-2"
+>
+  <Send className="h-4 w-4" />
+  {publishLoading
+    ? 'Working…'
+    : (publishResult?.wordpressUrl?.startsWith('http') ? 'Re-publish' : 'Publish')}
+</button>
                 </div>
               </div>
             </div>
@@ -2984,7 +2996,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
 
           <div className="flex overflow-hidden" style={{ height: 'calc(100vh - 80px)' }}>
             {/* Left Sidebar - Article Stats */}
-            {publishResult && (
+            {/* {publishResult && (
               <div className="w-80 border-r border-gray-200 bg-gray-50/50 overflow-y-auto">
                 <div className="p-6 space-y-6">
                   <div>
@@ -3033,10 +3045,10 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
                         )}
                       </div>
                     </div>
-                  </div>
+                  </div> */}
 
                   {/* Image Management Panel - Below Article Stats */}
-                  {isEditMode && (
+                  {/* {isEditMode && (
                     <div>
                       <h4 className="text-xs uppercase tracking-[0.3em] text-gray-500 mb-3">Image Management</h4>
                       <div className="rounded-2xl border border-gray-200 bg-white overflow-hidden flex flex-col max-h-[calc(100vh-400px)]">
@@ -3091,11 +3103,11 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
                   )}
                 </div>
               </div>
-            )}
+            )} */}
             
             {/* Main Content Area */}
             <div className="flex-1 overflow-y-auto">
-              <div className="max-w-4xl mx-auto px-6 py-8">
+              <div className="max-w-8xl mx-auto px-6 py-8">
               {publishLoading && !publishResult ? (
                 <div className="space-y-8">
                   {/* Hero section skeleton */}
@@ -3471,9 +3483,9 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
           // Render with full-screen overlay wrapper (for standalone use in publish tab)
           // Only render if active (to prevent showing when viewing from campaign)
           isActive ? (
-            <div className="fixed inset-0 z-0 bg-white ">
-            <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-xl border-b border-gray-100 shadow-sm">
-              <div className="max-w-7xl mx-auto px-6 py-4">
+            <div className="fixed inset-0 z-50 bg-white">
+            <div className="sticky top-0 z-0 bg-white/95 backdrop-blur-xl border-b border-gray-100 shadow-sm">
+              <div className="min-w-7xl mx-auto px-6 py-4">
                 <div className="flex items-center justify-between gap-4">
                   <div className="flex items-center gap-3 min-w-0">
                     <button
@@ -3545,13 +3557,13 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
                       <Save className='h-5 w-5'/>
                       {/* {saving ? 'Saving…' : hasUnsavedChanges ? 'Save Draft • Unsaved' : 'Save Draft'} */}
                     </button>
-                    <button
+                    {/* <button
                     title='Reset'
                       onClick={handleResetDraft}
                       className="px-1 py-2 rounded-full text-sm font-medium text-gray-500 hover:text-gray-900 transition-colors"
                     >
                      <RotateCcw className='h-5 w-5'/>
-                    </button>
+                    </button> */}
                     <button
                       onClick={handleGenerateContent}
                       disabled={publishLoading}
@@ -3602,7 +3614,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
 
             <div className="h-[calc(100vh-80px)] flex overflow-hidden">
               {/* Left Sidebar - Article Stats */}
-              {publishResult && (
+              {/* {publishResult && (
                 <div className="w-80 border-r border-gray-200 bg-gray-50/50 overflow-y-auto">
                   <div className="p-6 space-y-6">
                     <div>
@@ -3651,10 +3663,10 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
                           )}
                         </div>
                       </div>
-                    </div>
+                    </div> */}
 
                     {/* Image Management Panel - Below Article Stats */}
-                  {isEditMode && (
+                  {/* {isEditMode && (
                     <div>
                       <h4 className="text-xs uppercase tracking-[0.3em] text-gray-500 mb-3">Image Management</h4>
                       <div className="rounded-2xl border border-gray-200 bg-white overflow-hidden flex flex-col max-h-[calc(100vh-400px)]">
@@ -3709,11 +3721,11 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
                   )}
                 </div>
               </div>
-            )}
+            )} */}
               
               {/* Main Content Area */}
               <div className="flex-1 overflow-y-auto">
-                <div className="max-w-4xl mx-auto px-6 py-8">
+                <div className="max-w-7xl mx-auto px-6 py-8">
                 {publishLoading && !publishResult ? (
                   <div className="space-y-8">
                     {/* Hero section skeleton */}

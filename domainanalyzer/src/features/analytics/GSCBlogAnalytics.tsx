@@ -446,8 +446,6 @@ const GSCBlogAnalytics: React.FC = () => {
           </div>
         </div>
       </div>
-    </div>
-  </div>
 
       {/* Gauges Row */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -503,77 +501,6 @@ const GSCBlogAnalytics: React.FC = () => {
           </div>
         </div>
       </div>
-    </div>
-  </div>
-
-</div>
-
-      {/* Gauges Row */}
-     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-  
-  {/* CTR Card */}
-  <div className="rounded-xl border border-gray-100 bg-white p-6 shadow-sm flex flex-col items-center">
-    <h3 className="text-lg font-medium text-gray-900 text-center">
-      Click-Through Rate
-    </h3>
-
-    <div className="mt-2 flex justify-center">
-      <D3GaugeChart
-        value={aggregateData.avgCTR * 100}
-        maxValue={10}
-        showValue={false}
-        label=""
-        unit="%"
-        size={220}
-        colorRanges={[
-          { min: 0, max: 1, color: '#ef4444' },
-          { min: 1, max: 3, color: '#f59e0b' },
-          { min: 3, max: 10, color: '#22c55e' }
-        ]}
-      />
-    </div>
-
-    <p className="mt-4 text-2xl font-semibold text-gray-900">
-      {(aggregateData.avgCTR * 100).toFixed(2)}%
-    </p>
-
-    <p className="text-sm text-gray-500 text-center">
-      Higher is better
-    </p>
-  </div>
-
-  {/* Position Card */}
-  <div className="rounded-xl border border-gray-100 bg-white p-6 shadow-sm flex flex-col items-center">
-    <h3 className="text-lg font-medium text-gray-900 text-center">
-      Average Position
-    </h3>
-
-    <div className="mt-2 flex justify-center">
-      <D3GaugeChart
-        value={Math.min(aggregateData.avgPosition, 100)}
-        maxValue={100}
-        showValue={false}
-        label=""
-        unit=""
-        size={220}
-        colorRanges={[
-          { min: 0, max: 10, color: '#22c55e' },
-          { min: 10, max: 30, color: '#f59e0b' },
-          { min: 30, max: 100, color: '#ef4444' }
-        ]}
-      />
-    </div>
-
-    <p className="mt-4 text-2xl font-semibold text-gray-900">
-      {aggregateData.avgPosition.toFixed(1)}
-    </p>
-
-    <p className="text-sm text-gray-500 text-center">
-      Lower is better
-    </p>
-  </div>
-
-</div>
 
       {/* Blog Details Table */}
       <div className="rounded-[24px] border border-gray-200 bg-white p-6 shadow-[0_8px_24px_rgba(15,23,42,0.03)]">

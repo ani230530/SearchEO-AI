@@ -2680,7 +2680,7 @@ useEffect(() => {
             >
               Dashboard
             </h1>
-            <button
+            {/* <button
               onClick={() => setSidebarOpen((prev) => !prev)}
               aria-label={sidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
               style={{
@@ -2707,7 +2707,7 @@ useEffect(() => {
               ) : (
                 <Menu className="h-5 w-5 text-gray-600" />
               )}
-            </button>
+            </button> */}
           </div>
         </div>
 
@@ -9137,7 +9137,7 @@ function CampaignStructureView({
           style={{ left: sidebarOpen ? '280px' : '96px' }}
         >
           {/* Header with prominent back button */}
-          <div className="sticky top-0 z-[70] flex items-center gap-4 px-6 py-4 border-b border-gray-200 bg-white/80 backdrop-blur-md shadow-sm supports-[backdrop-filter]:bg-white/60">
+          {/* <div className="sticky top-0 z-[70] flex items-center gap-4 px-6 py-4 border-b border-gray-200 bg-white/80 backdrop-blur-md shadow-sm supports-[backdrop-filter]:bg-white/60">
             <button
               onClick={() => { setPreviewPageId(null); setPreviewDraft(null); }}
               className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all shadow-sm group"
@@ -9157,7 +9157,7 @@ function CampaignStructureView({
             >
               <X className="h-5 w-5" />
             </button>
-          </div>
+          </div> */}
           
           {/* Content */}
           <div className="relative flex-1 overflow-hidden bg-gray-50">
