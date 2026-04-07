@@ -9174,6 +9174,10 @@ function CampaignStructureView({
               pageId={campaignPageIdContext || undefined}
               disablePreviewOverlay={true}
               sharedPublishStatuses={sharedPublishStatuses}
+              onBack={() => {
+    setPreviewPageId(null);
+    setPreviewDraft(null);
+  }}
             />
           </div>
         </div>

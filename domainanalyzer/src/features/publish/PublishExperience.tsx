@@ -2895,18 +2895,20 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
                 <div className="flex items-center gap-3 min-w-0">
                     {/* No back button in embedded mode - parent overlay handles closing */}
                   <div className="flex-1 min-w-0">
-                    {onBack && (
-  <button
-    onClick={onBack}
-    className="flex items-center gap-2 py-2 text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all  group"
-  >
-    <ChevronLeft className="h-4 w-4 text-gray-400 group-hover:text-gray-900 transition-colors" />
-  </button>
-)}
                     <div className="flex items-center gap-2 mb-1">
-                      <p className="text-xs uppercase tracking-[0.3em] text-gray-500">
-                        {isEditMode ? 'Edit Mode' : 'Draft Preview'}
-                      </p>
+  {onBack && (
+    <button
+      onClick={onBack}
+      className="flex items-center gap-2 py-1  text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all group"
+    >
+      <ChevronLeft className="h-4 w-4 text-gray-400 group-hover:text-gray-900 transition-colors" />
+    </button>
+  )}
+  <p className="text-xs uppercase tracking-[0.3em] text-gray-500">
+    {isEditMode ? 'Edit Mode' : 'Draft Preview'}
+  </p>
+</div>
+                    <div className="flex items-center gap-2 mb-1">
                       {publishLoading && !publishResult && (
                         <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-blue-50 border border-blue-200 text-[10px] font-medium text-blue-700 uppercase tracking-[0.2em]">
                           <svg className="h-3 w-3 animate-spin" fill="none" viewBox="0 0 24 24">
@@ -2976,8 +2978,8 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
                     // onClick={handleGenerateContent} 
                     title='Add Image'
                     disabled={publishLoading}
-                    className="flex items-center gap-2 px-4 py-2 rounded-md border border-[#2D4059] bg-white text-sm font-medium text-[#2D4059] hover:bg-gray-100 disabled:opacity-60 transition-colors"
-                  ><ImagePlus />Add Image
+                    className="flex items-center gap-2 px-4 py-2.5 rounded-md border border-[#2D4059] bg-white text-sm font-medium text-[#2D4059] hover:bg-gray-100 disabled:opacity-60 transition-colors"
+                  ><ImagePlus className='h-4 w-4'/>Add Image
                   </button>
                   <button
   onClick={handlePublishToWordpress}
