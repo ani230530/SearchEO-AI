@@ -292,8 +292,20 @@ async function analyzeResponseWithAI(response: string, targetDomain: string): Pr
 // Enhanced query function that better mimics ChatGPT web browsing
 async function queryWithGpt4o(phrase: string, modelType: 'GPT-4o' | 'GPT-4o Pro' | 'GPT-4o Advanced' = 'GPT-4o', domain?: string, location?: string): Promise<{ response: string, cost: number, sources?: string[], enhancedData?: any }> {
   try {
+    const hasLocation = Boolean(location?.trim());
+    const locationGuidance = hasLocation ? `
+
+Location context:
+- The user is in or targeting: ${location!.trim()}
+- For ambiguous queries, assume the user wants an answer relevant to this location.
+- For local-intent requests such as businesses, services, pricing, regulations, events, availability, time, or "near me" style queries, prioritize this location in the answer.
+- If the query is clearly global, conceptual, or not location-sensitive, answer normally without forcing the location.
+- When location affects the answer, mention location-specific details naturally and put the local answer first.` : '';
+
     // Enhanced prompt that encourages web-search-like behavior
     const enhancedPrompt = `${phrase}
+
+${locationGuidance}
 
 Please provide a comprehensive response that includes:
 1. Current, up-to-date information
@@ -413,7 +425,7 @@ Format your response with clear structure using markdown headings and bullet poi
         model: 'gpt-4o',
         messages: [
           { role: 'system', content: CHATGPT_SYSTEM_PROMPT },
-          { role: 'user', content: phrase }
+          { role: 'user', content: enhancedPrompt }
         ],
         max_tokens: 2000,
         temperature: 0.1,
@@ -430,7 +442,7 @@ Format your response with clear structure using markdown headings and bullet poi
       sources = Array.from(new Set(found)).slice(0, 8);
       
       // Cost calculation for fallback
-      const inputTokens = Math.ceil((phrase.length + CHATGPT_SYSTEM_PROMPT.length) / 4);
+      const inputTokens = Math.ceil((enhancedPrompt.length + CHATGPT_SYSTEM_PROMPT.length) / 4);
       const outputTokens = Math.ceil(responseText.length / 4);
       const cost = (inputTokens * 0.000005 + outputTokens * 0.000015);
       
@@ -641,7 +653,7 @@ async function scoreResponseWithAI(phrase: string, response: string, model: stri
 export const aiQueryService = {
   query: async (phrase: string, model: 'GPT-4o' | 'Claude 3' | 'Gemini 1.5', domain?: string, location?: string): Promise<{ response: string, cost: number, sources?: string[], enhancedData?: any }> => {
     console.log(`AI Query Service: Processing query with GPT-4o`);
-    return await queryWithGpt4o(phrase, 'GPT-4o');
+    return await queryWithGpt4o(phrase, 'GPT-4o', domain, location);
   },
   
   scoreResponse: async (phrase: string, response: string, model: string, domain?: string, location?: string): Promise<{ 
