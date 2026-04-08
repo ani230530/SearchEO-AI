@@ -2680,7 +2680,7 @@ useEffect(() => {
             >
               Dashboard
             </h1>
-            <button
+            {/* <button
               onClick={() => setSidebarOpen((prev) => !prev)}
               aria-label={sidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
               style={{
@@ -2707,7 +2707,7 @@ useEffect(() => {
               ) : (
                 <Menu className="h-5 w-5 text-gray-600" />
               )}
-            </button>
+            </button> */}
           </div>
         </div>
 
@@ -2980,7 +2980,7 @@ useEffect(() => {
     {/* Visit Site with icon */}
     <button
   onClick={() => window.open(companyDomain.startsWith("http") ? companyDomain : `https://${companyDomain}`, "_blank")}
-  className="inline-flex items-center gap-1 px-4 py-2 text-sm font-medium text-[#4E76C7]  rounded-lg hover:underline transition"
+  className="inline-flex items-center gap-1 px-2  py-2 text-sm font-medium text-[#4E76C7]  rounded-lg hover:underline transition"
 >
   {/* Icon */}
   <img
@@ -2994,29 +2994,45 @@ useEffect(() => {
 </button>
 
     {/* Analytics */}
-    <button className="inline-flex items-center gap-1 px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-100 transition">
+    <button
+            onClick={() => {
+              setActiveTab("analytics");
+              setActiveCompanySubTab("company-info");
+              }}
+            className="inline-flex items-center gap-1 px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-100 transition"
+          >
       <img
-    src="https://res.cloudinary.com/dgfzjdi68/image/upload/v1775205399/gridicons_external_y0240k.png"
+    src="https://res.cloudinary.com/dgfzjdi68/image/upload/v1775224313/uil_chart-growth_v4botd.png"
     alt="Visit Site"
     className="w-4 h-4"
   />
-      Analytics
-    </button>
+              Analytics
+              </button>
 
     {/* Select Duration */}
-    <button className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-100 transition">
+    <button className="inline-flex items-center gap-1 px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-100 transition">
+      <img
+    src="https://res.cloudinary.com/dgfzjdi68/image/upload/v1775224439/calendar_jb8btr.png"
+    alt="Visit Site"
+    className="w-4 h-4"
+  />
       Select Duration
     </button>
 
     {/* Sort */}
-    <button className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-100 transition">
+    <button className="inline-flex items-center gap-1 px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-100 transition">
+      <img
+    src="https://res.cloudinary.com/dgfzjdi68/image/upload/v1775224313/uil_chart-growth_v4botd.png"
+    alt="Visit Site"
+    className="w-4 h-4"
+  />
       Sort
     </button>
   </div>
 </div>
 
     {/* ===================== KPI GRID ===================== */}
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
       {/* Opportunities Card */}
 <div className="rounded-xl bg-white border border-gray-100 p-6 transition">
@@ -9121,7 +9137,7 @@ function CampaignStructureView({
           style={{ left: sidebarOpen ? '280px' : '96px' }}
         >
           {/* Header with prominent back button */}
-          <div className="sticky top-0 z-[70] flex items-center gap-4 px-6 py-4 border-b border-gray-200 bg-white/80 backdrop-blur-md shadow-sm supports-[backdrop-filter]:bg-white/60">
+          {/* <div className="sticky top-0 z-[70] flex items-center gap-4 px-6 py-4 border-b border-gray-200 bg-white/80 backdrop-blur-md shadow-sm supports-[backdrop-filter]:bg-white/60">
             <button
               onClick={() => { setPreviewPageId(null); setPreviewDraft(null); }}
               className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all shadow-sm group"
@@ -9141,7 +9157,7 @@ function CampaignStructureView({
             >
               <X className="h-5 w-5" />
             </button>
-          </div>
+          </div> */}
           
           {/* Content */}
           <div className="relative flex-1 overflow-hidden bg-gray-50">
@@ -9158,6 +9174,10 @@ function CampaignStructureView({
               pageId={campaignPageIdContext || undefined}
               disablePreviewOverlay={true}
               sharedPublishStatuses={sharedPublishStatuses}
+              onBack={() => {
+    setPreviewPageId(null);
+    setPreviewDraft(null);
+  }}
             />
           </div>
         </div>
