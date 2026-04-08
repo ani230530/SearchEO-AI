@@ -72,14 +72,11 @@ import { AuditPDF } from '@/components/audit/AuditPDF';
 import PublishExperience from '@/features/publish/PublishExperience';
 import { CompanyInfoSkeleton } from '@/components/dashboard/CompanyInfoSkeleton';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@radix-ui/react-accordion';
-import AnalyticsReportingView from './AnalyticsReportingView';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { AlertDialogHeader } from '@/components/ui/alert-dialog';
-import Profile from './Profile';
 import {AnimatePresence, motion} from 'framer-motion'
 import GSCAnalyticsView from '@/components/gsc/GSCAnalyticsView';
-import GSCBlogAnalytics from '@/features/analytics/GSCBlogAnalytics';
 import {
   Sheet,
   SheetContent,
@@ -94,32 +91,45 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import TrendsChart, { TrendDataPoint } from "@/components/gsc/TrendsChart";
 import IntegrationsDashboard from './IntegrationsDashboard';
+import { DashboardContentRouter } from "@/features/sidebar-dashboard/components/DashboardContentRouter";
+import { DashboardHeader } from "@/features/sidebar-dashboard/components/DashboardHeader";
+import { DashboardSidebar } from "@/features/sidebar-dashboard/components/DashboardSidebar";
+import { IntegrationSkeleton } from "@/features/sidebar-dashboard/components/IntegrationSkeleton";
+import {
+  CATEGORY_DESCRIPTIONS,
+  DASHBOARD_TABS,
+  METRIC_DESCRIPTIONS,
+} from "@/features/sidebar-dashboard/constants";
+import type {
+  CompanySubTabId,
+  DashboardCampaignViewMode,
+  DashboardContentRouterProps,
+  DashboardSidebarTab,
+  DomainCheckResult,
+  GscSubTabId,
+  TabId,
+} from "@/features/sidebar-dashboard/types";
+import {
+  buildKeywordTableData,
+  buildPageNumbers,
+  extractOrgName,
+  filterKeywordTableData,
+  getCompetitionBadgeClassName,
+  getStoredActiveTab,
+  normalizeDomain,
+  normalizeTerm,
+  paginateItems,
+  parseDashboardSearchState,
+  sortKeywordTableData,
+  summarizeDomainContext,
+} from "@/features/sidebar-dashboard/utils";
 
 
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3002";
 
-type TabId = 'overview' | 'analytics' | 'projects' | 'publish' | 'settings' | 'profile' | 'ai-checker' | 'gsc-analytics' | 'audit' | 'analytics-report';
-type CompanySubTabId = 'company-info' | 'integration';
-type GscSubTabId = 'whole-analytics' | 'blog-performance';
 
-interface Tab {
-  id: TabId;
-  label: string;
-  icon: React.ReactNode;
-}
-
-interface DomainCheckResult {
-  exists: boolean;
-  domainId?: number;
-  url?: string;
-  hasCurrentAnalysis?: boolean;
-  lastAnalyzed?: string;
-}
-
-// Types moved to @/types
-
-const summarizeDomainContext = (input: string, maxLines = 6, maxChars = 800) => {
+const legacySummarizeDomainContext = (input: string, maxLines = 6, maxChars = 800) => {
   if (!input) return '';
   const normalized = input.replace(/\r\n/g, '\n');
   const lines = normalized
@@ -135,52 +145,10 @@ const summarizeDomainContext = (input: string, maxLines = 6, maxChars = 800) => 
 
 
 
-const IntegrationSkeleton = () => (
-  <div className="max-w-4xl mx-auto space-y-6 animate-pulse">
-    <div className="bg-white rounded-3xl p-8 border border-gray-100 shadow-sm">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 bg-gray-200 rounded-xl" />
-          <div className="space-y-2">
-            <div className="h-5 w-32 bg-gray-200 rounded-full" />
-            <div className="h-4 w-48 bg-gray-100 rounded-full" />
-          </div>
-        </div>
-        <div className="h-4 w-20 bg-gray-100 rounded-full" />
-      </div>
-      <div className="h-4 w-40 bg-gray-100 rounded-full mt-6" />
-    </div>
-    <div className="bg-white rounded-3xl p-8 border border-gray-100 shadow-sm">
-      <div className="h-5 w-36 bg-gray-200 rounded-full mb-4" />
-      <div className="space-y-3">
-        {Array.from({ length: 3 }).map((_, idx) => (
-          <div key={idx} className="p-4 rounded-2xl border border-gray-100">
-            <div className="flex items-center justify-between">
-              <div className="space-y-2">
-                <div className="h-4 w-48 bg-gray-200 rounded-full" />
-                <div className="h-3 w-32 bg-gray-100 rounded-full" />
-              </div>
-              
-              <div className="w-8 h-8 bg-gray-100 rounded-full" />
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  </div>
-);
-
-const tooltipInfo = {
-  Performance: "Measures how fast your domain loads and responds.",
-  SEO: "Shows how well your domain is optimized for search engines.",
-  Accessibility: "Indicates how usable the site is for all users, including disabilities.",
-  "Best Practices": "Checks if your site follows recommended web development standards.",
-};
-
 const SidebarDashboard = () => {
-const [activeTab, setActiveTab] = useState<TabId>(() => {
-  return (localStorage.getItem("activeTab") as TabId) || "overview";
-});
+const [activeTab, setActiveTab] = useState<TabId>(() =>
+  getStoredActiveTab(localStorage.getItem("activeTab"))
+);
 useEffect(() => {
   if (activeTab) {
     localStorage.setItem("activeTab", activeTab);
@@ -418,7 +386,7 @@ const toggleSection = (idx: number) => {
   const { toast } = useToast();
   const isSidebarExpanded = sidebarOpen || isSidebarHovered;
 // Campaign States
-  const [campaignViewMode, setCampaignViewMode] = useState<'split' | 'graph' | 'table'>('split');
+  const [campaignViewMode, setCampaignViewMode] = useState<DashboardCampaignViewMode>('split');
 
 const [selectedTopicId, setSelectedTopicId] = useState<number | null>(null);
 const [campaignStructure, setCampaignStructure] = useState<CampaignStructure>({
@@ -602,18 +570,10 @@ const [editDescription, setEditDescription] = useState('');
     }
   }, [draftToPageMap, toast]);
 
-  const tabs: Tab[] = [
-    { id: 'ai-checker', label: 'AI Checker', icon: <Sparkles className="h-5 w-5" /> },
-    { id: 'overview', label: 'Overview', icon: <LayoutDashboard className="h-5 w-5" /> },
-    { id: 'analytics', label: 'Company', icon: <Building className="h-5 w-5" /> } ,
-    { id: 'projects', label: 'All Projects', icon: <Megaphone className="h-5 w-5" /> },
-    { id: 'publish', label: 'Publish', icon: <Send className="h-5 w-5" /> },
-    { id: 'gsc-analytics', label: 'GSC Analytics', icon: <BarChart3 className="h-5 w-5" /> },
-    { id: 'audit', label: 'Audit', icon: <ClipboardList className="h-5 w-5" /> },
-    { id: 'analytics-report', label: 'Analytics Report', icon: <FileChartColumnIncreasing className="h-5 w-5" /> },
-    { id: 'settings', label: 'Settings', icon: <Settings className="h-5 w-5" /> },
-    { id: 'profile', label: 'Profile', icon: <User className="h-5 w-5" /> },
-  ];
+  const tabs: DashboardSidebarTab[] = DASHBOARD_TABS.map((tab) => ({
+    ...tab,
+    icon: <tab.icon className="h-5 w-5" />,
+  }));
 
   const validateDomain = (value: string) => {
     const domainRegex =
@@ -669,10 +629,7 @@ const handleAnalyze = async () => {
 };
 
 
-const normalizedDomain = companyDomain
-  .replace(/^https?:\/\//, "")
-  .replace(/^www\./, "")
-  .split("/")[0];
+const normalizedDomain = normalizeDomain(companyDomain);
 
 
 // Fetch existing audit for company domain
@@ -785,21 +742,6 @@ const InfoTooltip = ({ text }: { text: string }) => (
     </span>
   </span>
 );
-
-const categoryDescriptions: Record<string, string> = {
-  Performance: "Overall speed and responsiveness of the page.",
-  SEO: "How well the page is optimized for search engines.",
-  Accessibility: "How usable the page is for users with disabilities.",
-  "Best Practices": "Adherence to modern web development best practices.",
-};
-
-const metricDescriptions: Record<string, string> = {
-  fcp: "Time until the first visible content appears on the page.",
-  lcp: "Time it takes for the largest visible element to fully render.",
-  cls: "Measures visual stability by tracking unexpected layout shifts.",
-  tbt: "Total time the page is blocked from responding to user input.",
-  speedIndex: "How quickly content is visually displayed during load.",
-};
 
 // Handle Send to N8n
 const handleSendToN8n = async () => {
@@ -929,18 +871,16 @@ useEffect(() => {
 
   // Handle URL query parameters for tab navigation (e.g., from OAuth callback)
   useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const tabParam = urlParams.get("tab");
-    const subtabParam = urlParams.get("subtab");
+    const searchState = parseDashboardSearchState(window.location.search);
 
-    if (tabParam === 'ai-checker') {
+    if (searchState.redirectToAiChecker) {
       navigate('/ai-checker');
-    } else if (tabParam && ['overview', 'analytics', 'projects', 'publish', 'settings', 'profile', 'gsc-analytics'].includes(tabParam)) {
-      setActiveTab(tabParam as TabId);
+    } else if (searchState.activeTab) {
+      setActiveTab(searchState.activeTab);
     }
 
-    if (subtabParam && ["company-info", "integration"].includes(subtabParam)) {
-      setActiveCompanySubTab(subtabParam as CompanySubTabId);
+    if (searchState.activeCompanySubTab) {
+      setActiveCompanySubTab(searchState.activeCompanySubTab);
     }
   }, [navigate]);
 
@@ -1183,30 +1123,11 @@ useEffect(() => {
         .filter(Boolean);
       const customSet = new Set([...lsCustom, ...lsAdvanced]);
 
-      const tableKeywords: KeywordTableItem[] = keywords.map((kw) => ({
-        id: kw.id.toString(),
-        keyword: kw.term,
-        intent: kw.intent || determineIntent(kw.term),
-        volume: kw.volume,
-        kd: kw.difficulty === "High" ? 75 : kw.difficulty === "Low" ? 25 : 50,
-        competition:
-          kw.difficulty === "High"
-            ? "High"
-            : kw.difficulty === "Low"
-            ? "Low"
-            : "Medium",
-        cpc: kw.cpc || 0,
-        organic: Math.floor(kw.volume * 0.1),
-        paid: Math.floor(kw.volume * 0.05),
-        trend: "Stable",
-        position: 0,
-        url: `https://${companyDomain}/${kw.term
-          .toLowerCase()
-          .replace(/\s+/g, "-")}`,
-        updated: new Date().toISOString().split("T")[0],
-        selected: false,
-        isCustom: customSet.has(kw.term.toLowerCase()),
-      }));
+      const tableKeywords = buildKeywordTableData(
+        keywords,
+        companyDomain,
+        Array.from(customSet)
+      );
 
       setKeywordsTableData(tableKeywords);
     } else {
@@ -1217,55 +1138,25 @@ useEffect(() => {
   }, [keywords, createdDomainId, companyDomain]);
 
   // Filter and sort keywords
-  const filteredKeywords = React.useMemo(() => {
-    return keywordsTableData.filter((keyword) => {
-      const matchesSearch = keyword.keyword
-        .toLowerCase()
-        .includes(searchTerm.toLowerCase());
-      const matchesCompetition =
-        !filters.competition || keyword.competition === filters.competition;
-      const matchesIntent =
-        !filters.intent || keyword.intent === filters.intent;
-      return matchesSearch && matchesCompetition && matchesIntent;
-    });
-  }, [keywordsTableData, searchTerm, filters.competition, filters.intent]);
+  const filteredKeywords = React.useMemo(
+    () =>
+      filterSidebarKeywordTableData(keywordsTableData, searchTerm, {
+        competition: filters.competition,
+        intent: filters.intent,
+      }),
+    [keywordsTableData, searchTerm, filters.competition, filters.intent]
+  );
 
-  const sortedKeywords = React.useMemo(() => {
-    const sortableKeywords = [...filteredKeywords];
-    if (sortConfig !== null) {
-      sortableKeywords.sort((a, b) => {
-        const aValue = a[sortConfig.key];
-        const bValue = b[sortConfig.key];
-
-        if (typeof aValue === "number" && typeof bValue === "number") {
-          return sortConfig.direction === "asc"
-            ? aValue - bValue
-            : bValue - aValue;
-        }
-
-        const aStr = String(aValue).toLowerCase();
-        const bStr = String(bValue).toLowerCase();
-
-        if (aStr < bStr) {
-          return sortConfig.direction === "asc" ? -1 : 1;
-        }
-        if (aStr > bStr) {
-          return sortConfig.direction === "asc" ? 1 : -1;
-        }
-        return 0;
-      });
-    }
-    return sortableKeywords;
-  }, [filteredKeywords, sortConfig]);
+  const sortedKeywords = React.useMemo(
+    () => sortSidebarKeywordTableData(filteredKeywords, sortConfig),
+    [filteredKeywords, sortConfig]
+  );
 
   // Pagination
-  const totalPages = Math.max(
-    1,
-    Math.ceil(sortedKeywords.length / itemsPerPage)
+  const { totalPages, currentItems: currentKeywords } = React.useMemo(
+    () => paginateSidebarItems(sortedKeywords, currentPage, itemsPerPage),
+    [sortedKeywords, currentPage, itemsPerPage]
   );
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
-  const currentKeywords = sortedKeywords.slice(startIndex, endIndex);
 
   // Reset to first page when keywords change
   useEffect(() => {
@@ -1326,51 +1217,22 @@ useEffect(() => {
 
   const handlePageChange = useCallback(
     (page: number) => {
-      const totalPagesCalc = Math.max(
-        1,
-        Math.ceil(sortedKeywords.length / itemsPerPage)
-      );
+      const totalPagesCalc = paginateSidebarItems(
+        sortedKeywords,
+        currentPage,
+        itemsPerPage
+      ).totalPages;
       if (page >= 1 && page <= totalPagesCalc) {
         setCurrentPage(page);
       }
     },
-    [sortedKeywords.length, itemsPerPage]
+    [sortedKeywords, currentPage, itemsPerPage]
   );
 
-  const getPageNumbers = useCallback(() => {
-    const pages = [];
-    const maxVisiblePages = 5;
-
-    if (totalPages <= maxVisiblePages) {
-      for (let i = 1; i <= totalPages; i++) {
-        pages.push(i);
-      }
-    } else {
-      if (currentPage <= 3) {
-        for (let i = 1; i <= 4; i++) {
-          pages.push(i);
-        }
-        pages.push("...");
-        pages.push(totalPages);
-      } else if (currentPage >= totalPages - 2) {
-        pages.push(1);
-        pages.push("...");
-        for (let i = totalPages - 3; i <= totalPages; i++) {
-          pages.push(i);
-        }
-      } else {
-        pages.push(1);
-        pages.push("...");
-        for (let i = currentPage - 1; i <= currentPage + 1; i++) {
-          pages.push(i);
-        }
-        pages.push("...");
-        pages.push(totalPages);
-      }
-    }
-
-    return pages;
-  }, [totalPages, currentPage]);
+  const getPageNumbers = useCallback(
+    () => buildPageNumbers(totalPages, currentPage),
+    [totalPages, currentPage]
+  );
 
   // Domain context helpers
   const trimmedDomainContext = React.useMemo(
@@ -2372,6 +2234,102 @@ useEffect(() => {
     }
   };
 
+  const handleConfirmUpdateCompanyDomain = async () => {
+    if (updateLoading) {
+      return;
+    }
+
+    setUpdateLoading(true);
+
+    try {
+      const resp = await fetch(`${API_BASE_URL}/api/user/company-domain`, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("authToken")}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (resp.ok) {
+        const data = await resp.json();
+        const id = data?.domain?.id;
+
+        if (id) {
+          await fetch(`${API_BASE_URL}/api/domain/${id}`, {
+            method: "DELETE",
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem("authToken")}`,
+              "Content-Type": "application/json",
+            },
+          });
+        }
+      }
+    } catch (_) {
+      // ignore
+    } finally {
+      setUpdateLoading(false);
+      setConfirmUpdateOpen(false);
+    }
+
+    setActiveTab("analytics");
+    setActiveCompanySubTab("company-info");
+    setShowResults(false);
+    setCompanyDomain("");
+    setDomainError("");
+    setDomainContext("");
+    setKeywords([]);
+    setKeywordsTableData([]);
+    setCreatedDomainId(null);
+    setLoadingSteps([
+      {
+        name: "Domain Validation",
+        status: "pending",
+        progress: 0,
+      },
+      {
+        name: "SSL Certificate Check",
+        status: "pending",
+        progress: 0,
+      },
+      {
+        name: "Server Response Analysis",
+        status: "pending",
+        progress: 0,
+      },
+      {
+        name: "Domain Extraction & Keyword Generation",
+        status: "pending",
+        progress: 0,
+      },
+    ]);
+  };
+
+  const lowRiskContentRouterProps: Omit<DashboardContentRouterProps, "activeTab"> = {
+    analyticsContent: null,
+    auditContent: null,
+    overviewContent: null,
+    projectsContent: null,
+    publishContent: null,
+    tabs,
+    analyticsReport: {
+      domainContext,
+      googleAnalyticsId,
+    },
+    gscAnalytics: {
+      activeGscSubTab,
+    },
+    settings: {
+      confirmUpdateOpen,
+      updateLoading,
+      onCloseConfirm: () => {
+        if (!updateLoading) {
+          setConfirmUpdateOpen(false);
+        }
+      },
+      onConfirmUpdate: handleConfirmUpdateCompanyDomain,
+      onOpenConfirm: () => setConfirmUpdateOpen(true),
+    },
+  };
+
   return (
     <div
       className="min-h-screen overflow-x-hidden"
@@ -2653,245 +2611,41 @@ useEffect(() => {
       `}</style>
 
       {/* Sidebar */}
-      <aside
-        className={`sidebar ${isSidebarExpanded ? "open" : "closed"}`}
-        onMouseEnter={() => {
-          if (!sidebarOpen) {
-            setIsSidebarHovered(true);
+      <DashboardSidebar
+        activeCompanySubTab={activeCompanySubTab}
+        activeTab={activeTab}
+        isSidebarExpanded={isSidebarExpanded}
+        onHoverChange={setIsSidebarHovered}
+        onLogout={logout}
+        onSelectCompanySubTab={setActiveCompanySubTab}
+        onSelectTab={(tabId) => {
+          if (tabId === "ai-checker") {
+            navigate("/ai-checker");
+            return;
+          }
+          setActiveTab(tabId);
+          if (tabId === "analytics" && !showResults) {
+            setActiveCompanySubTab("company-info");
           }
         }}
-        onMouseLeave={() => {
-          if (!sidebarOpen) {
-            setIsSidebarHovered(false);
-          }
-        }}
-      >
-        <div className="sidebar-header">
-          <div className="flex items-center justify-between mb-4">
-            <h1
-              className="sidebar-title"
-              style={{
-                fontSize: "24px",
-                fontWeight: "400",
-                letterSpacing: "-0.022em",
-                color: "#1d1d1f",
-                marginTop: "20px",
-              }}
-            >
-              Dashboard
-            </h1>
-            {/* <button
-              onClick={() => setSidebarOpen((prev) => !prev)}
-              aria-label={sidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
-              style={{
-                background: "transparent",
-                border: "none",
-                padding: "4px",
-                borderRadius: "6px",
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                marginTop: "20px",
-                justifyContent: "center",
-                transition: "background 0.2s ease",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = "rgba(0, 0, 0, 0.05)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = "transparent";
-              }}
-            >
-              {sidebarOpen ? (
-                <ChevronLeft className="h-5 w-5 text-gray-600" />
-              ) : (
-                <Menu className="h-5 w-5 text-gray-600" />
-              )}
-            </button> */}
-          </div>
-        </div>
-
-        <div className="sidebar-content">
-          <nav className="space-y-2">
-            {tabs.map((tab) => (
-              <div key={tab.id}>
-                <button
-                  className={`sidebar-tab ${
-                    activeTab === tab.id ? "active" : ""
-                  } ${tab.id === "ai-checker" ? "ai-checker-tab" : ""}`}
-                  onClick={() => {
-                    if (tab.id === "ai-checker") {
-                      navigate("/ai-checker");
-                      return;
-                    }
-                    setActiveTab(tab.id);
-                    if (tab.id === "analytics" && !showResults) {
-                      setActiveCompanySubTab("company-info");
-                    }
-                  }}
-                >
-                  <span className="sidebar-tab-icon">{tab.icon}</span>
-                  <span className="sidebar-tab-label">{tab.label}</span>
-                  {tab.id === "analytics" && (
-  <ChevronDown
-    className={`h-4 w-4 ml-auto sidebar-tab-chevron transition-transform ${
-      activeTab === "analytics" && showResults ? "rotate-180" : ""
-    }`}
-  />
-)}
-
-                </button>
-                {/* Show sub-tabs when Company is active and results are shown */}
-                {tab.id === "analytics" &&
-                  activeTab === "analytics" &&
-                  showResults && (
-                    
-                    <div className="ml-8 mt-1 space-y-1 sidebar-subtabs">
-                      
-                      <button
-                        onClick={() => setActiveCompanySubTab("company-info")}
-                        className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-light transition-all duration-200 ${
-                          activeCompanySubTab === "company-info"
-                            ? "bg-blue-50 text-blue-700"
-                            : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
-                        }`}
-                      >
-                        <FileText className="h-4 w-4" />
-                        <span>Domain Info</span>
-                        {activeCompanySubTab === "company-info" }
-                      </button>
-                      <button
-                        onClick={() => setActiveCompanySubTab("integration")}
-                        className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-light transition-all duration-200 ${
-                          activeCompanySubTab === "integration" 
-                            ? "bg-blue-50 text-blue-700"
-                            : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
-                        }`}
-                      >
-                        <Plug className="h-4 w-4" />
-                        <span>Integration</span>
-                        {activeCompanySubTab === "integration" }
-                      </button>
-                    </div>
-                  )}
-              </div>
-            ))}
-          </nav>
-
-          <div
-            style={{
-              marginTop: "32px",
-              paddingTop: "32px",
-              borderTop: "0.5px solid rgba(0, 0, 0, 0.1)",
-            }}
-          >
-            <button
-              onClick={logout}
-              className="sidebar-tab"
-              style={{ color: "#FF3B30" }}
-            >
-              <LogOut
-                className="h-5 w-5 sidebar-tab-icon"
-                style={{ color: "#FF3B30" }}
-              />
-              <span className="sidebar-tab-label sidebar-logout-label">
-                Logout
-              </span>
-            </button>
-          </div>
-        </div>
-      </aside>
+        showResults={showResults}
+        sidebarOpen={sidebarOpen}
+        tabs={tabs}
+      />
 
       {/* Main Content */}
       <main
         className={`main-content ${!isSidebarExpanded ? "sidebar-closed" : ""}`}
       >
         {/* Content Header */}
-        <header className="content-header">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              {/* <button
-                className="desktop-sidebar-toggle"
-                onClick={() => setSidebarOpen((prev) => !prev)}
-                aria-label={sidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
-              >
-                {sidebarOpen ? (
-                  <ChevronLeft className="h-4 w-4 text-gray-700" />
-                ) : (
-                  <Menu className="h-4 w-4 text-gray-700" />
-                )}
-              </button> */}
-              <h2
-                style={{
-                  fontSize: "28px",
-                  fontWeight: "400",
-                  letterSpacing: "-0.022em",
-                  color: "#1d1d1f",
-                  margin: "0",
-                }}
-              >
-                {tabs.find((t) => t.id === activeTab)?.label || "Dashboard"}
-              </h2>
-            </div>
-
-            
-            {activeTab === 'projects' && selectedCampaignId && (
-                <div className="flex items-center gap-2 bg-gray-100/80 p-1 rounded-lg border border-gray-200/50 mr-4">
-                  <button
-                    onClick={() => setCampaignViewMode('split')}
-                    className={`p-1.5 rounded-md transition-all flex items-center gap-2 text-xs font-medium ${
-                      campaignViewMode === 'split' 
-                        ? 'bg-white text-black shadow-sm' 
-                        : 'text-gray-500 hover:text-gray-700'
-                    }`}
-                  >
-                    <List className="h-4 w-4" />
-                    <span>Topics</span>
-                  </button>
-                  <button
-                    onClick={() => setCampaignViewMode('graph')}
-                    className={`p-1.5 rounded-md transition-all flex items-center gap-2 text-xs font-medium ${
-                      campaignViewMode === 'graph' 
-                        ? 'bg-white text-black shadow-sm' 
-                        : 'text-gray-500 hover:text-gray-700'
-                    }`}
-                  >
-                    <Network className="h-4 w-4" />
-                    <span>Map</span>
-                  </button>
-                  <button
-                    onClick={() => setCampaignViewMode('table')}
-                    className={`p-1.5 rounded-md transition-all flex items-center gap-2 text-xs font-medium ${
-                      campaignViewMode === 'table' 
-                        ? 'bg-white text-black shadow-sm' 
-                        : 'text-gray-500 hover:text-gray-700'
-                    }`}
-                  >
-                    <Table className="h-4 w-4" />
-                    <span>Table</span>
-                  </button>
-               </div>
-
-            )}
-
-            {user && (
-              <div className="flex items-center gap-3">
-                <div
-                  style={{
-                    background: "rgba(0, 122, 255, 0.1)",
-                    color: "#007AFF",
-                    padding: "6px 12px",
-                    borderRadius: "12px",
-                    fontSize: "14px",
-                    fontWeight: "500",
-                  }}
-                >
-                  {user.email}
-                </div>
-              </div>
-            )}
-          </div>
-        </header>
+        <DashboardHeader
+          activeTab={activeTab}
+          campaignViewMode={campaignViewMode}
+          selectedCampaignId={selectedCampaignId}
+          tabs={tabs}
+          userEmail={user?.email}
+          onCampaignViewModeChange={setCampaignViewMode}
+        />
 
         {/* Content Body */}
         <div className={activeTab === 'projects' && selectedCampaignId ? "flex-1 min-h-[calc(100vh-80px)] bg-white" : "content-body"}>
@@ -5664,9 +5418,9 @@ const allSections = [...leftSections, ...rightSections];
   </div>
 
   {/* Description on the right, vertically centered */}
-  {categoryDescriptions[label] && (
+  {CATEGORY_DESCRIPTIONS[label] && (
     <div className="flex-1 text-sm text-gray-500 flex items-center">
-      {categoryDescriptions[label]}
+      {CATEGORY_DESCRIPTIONS[label]}
     </div>
   )}
 </div>
@@ -5766,7 +5520,7 @@ const allSections = [...leftSections, ...rightSections];
             <span className="font-light text-gray-900 flex items-center gap-1" style={{ letterSpacing: '0.011em' }}>
               {key.toUpperCase()}
               <span className="text-gray-500">({fullForms[key] || key})</span>
-              {metricDescriptions[key] && <InfoTooltip text={metricDescriptions[key]} />}
+              {METRIC_DESCRIPTIONS[key] && <InfoTooltip text={METRIC_DESCRIPTIONS[key]} />}
             </span>
             <span className="font-mono text-sm font-light text-gray-700 bg-white px-3 py-1 rounded-lg border border-gray-200" style={{ borderWidth: '0.5px' }}>
               {String(value)}
@@ -5783,150 +5537,30 @@ const allSections = [...leftSections, ...rightSections];
               </div>
             </div>
           ) : activeTab === 'analytics-report' ? (
-            <AnalyticsReportingView 
-              initialGaId={googleAnalyticsId}
-              initialOrgName={extractOrgName(domainContext)}
+            <DashboardContentRouter
+              activeTab={activeTab}
+              {...lowRiskContentRouterProps}
             />
           ): activeTab === 'gsc-analytics' ? (
-            <div className="min-w-8xl mx-auto px-4 sm:px-6 py-8">
-            
-
-              {/* GSC Sub-tab Content */}
-              {activeGscSubTab === 'whole-analytics' ? (
-                <GSCAnalyticsView />
-              ) : (
-                <GSCBlogAnalytics />
-              )}
-            </div>
+            <DashboardContentRouter
+              activeTab={activeTab}
+              {...lowRiskContentRouterProps}
+            />
           ) : activeTab === 'profile' ? (
-            <div className="max-w-8xl mx-auto px-4 sm:px-6 py-12 sm:py-16 space-y-12">
-              <Profile />
-            </div>
+            <DashboardContentRouter
+              activeTab={activeTab}
+              {...lowRiskContentRouterProps}
+            />
           ) : activeTab === 'settings' ? (
-            <div className="max-w-6xl mx-auto px-4 sm:px-6 py-12 sm:py-16">
-              <div className="bg-white rounded-3xl p-12 border border-gray-200  text-center">
-                <h2 className="text-2xl font-light text-black tracking-tight mb-3">
-                  Domain Settings
-                </h2>
-                <p className="text-base font-light text-gray-600 mb-8">
-                  Update your company domain
-                </p>
-                <div className="flex items-center justify-center gap-4">
-                  <button
-                    onClick={() => setConfirmUpdateOpen(true)}
-                    className="px-6 py-3 bg-gray-100 text-gray-900 rounded-full hover:bg-gray-200 transition-all duration-200 text-base font-light"
-                  >
-                    Update Company Domain
-                  </button>
-                </div>
-                {confirmUpdateOpen && (
-                  <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50">
-                    <div className="bg-white p-6 rounded-xl shadow-xl w-[90%] max-w-sm">
-                      <h2 className="text-lg font-medium text-gray-800">Remove Company Domain?</h2>
-                      <p className="text-sm text-gray-500 mt-2">
-                        This will remove your current company domain and take you to re-enter a new one.
-                      </p>
-                      <div className="flex justify-end gap-3 mt-6">
-                        <button
-                          onClick={() => { if (!updateLoading) setConfirmUpdateOpen(false); }}
-                          disabled={updateLoading}
-                          className="px-4 py-2 rounded-lg text-sm bg-gray-100 hover:bg-gray-200 disabled:opacity-60 disabled:cursor-not-allowed"
-                        >
-                          Cancel
-                        </button>
-                        <button
-                          onClick={async () => {
-                            if (updateLoading) return;
-                            setUpdateLoading(true);
-                            try {
-                              const resp = await fetch(`${import.meta.env.VITE_API_URL}/api/user/company-domain`, {
-                                headers: {
-                                  Authorization: `Bearer ${localStorage.getItem("authToken")}`,
-                                  "Content-Type": "application/json",
-                                },
-                              });
-                              if (resp.ok) {
-                                const data = await resp.json();
-                                const id = data?.domain?.id;
-                                if (id) {
-                                  await fetch(`${import.meta.env.VITE_API_URL}/api/domain/${id}`, {
-                                    method: "DELETE",
-                                    headers: {
-                                      Authorization: `Bearer ${localStorage.getItem("authToken")}`,
-                                      "Content-Type": "application/json",
-                                    },
-                                  });
-                                }
-                              }
-                            } catch (_) {
-                              // ignore
-                            } finally {
-                              setUpdateLoading(false);
-                              setConfirmUpdateOpen(false);
-                            }
-                            setActiveTab('analytics');
-                            setActiveCompanySubTab('company-info');
-                            setShowResults(false);
-                            setCompanyDomain("");
-                            setDomainError("");
-                            setDomainContext("");
-                            setKeywords([]);
-                            setKeywordsTableData([]);
-                            setCreatedDomainId(null);
-                            setLoadingSteps([
-                              {
-                                name: "Domain Validation",
-                                status: "pending",
-                                progress: 0,
-                              },
-                              {
-                                name: "SSL Certificate Check",
-                                status: "pending",
-                                progress: 0,
-                              },
-                              {
-                                name: "Server Response Analysis",
-                                status: "pending",
-                                progress: 0,
-                              },
-                              {
-                                name: "Domain Extraction & Keyword Generation",
-                                status: "pending",
-                                progress: 0,
-                              },
-                            ]);
-                          }}
-                          className="px-4 py-2 rounded-lg text-sm bg-black text-white hover:bg-black/90 disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2"
-                        >
-                          {updateLoading ? <ButtonSpinner /> : null}
-                          {updateLoading ? 'Updating…' : 'Confirm'}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
+            <DashboardContentRouter
+              activeTab={activeTab}
+              {...lowRiskContentRouterProps}
+            />
           ) : (
-            <div style={{
-              background: 'rgba(255, 255, 255, 0.8)',
-              backdropFilter: 'saturate(180%) blur(20px)',
-              WebkitBackdropFilter: 'saturate(180%) blur(20px)',
-              border: '0.5px solid rgba(0, 0, 0, 0.1)',
-              borderRadius: '16px',
-              padding: '48px',
-              textAlign: 'center'
-            }}>
-              <p style={{ 
-                fontSize: '17px',
-                fontWeight: '300',
-                letterSpacing: '0.011em',
-                color: '#86868b',
-                margin: '0'
-              }}>
-                Content for {tabs.find(t => t.id === activeTab)?.label || 'Dashboard'} will appear here
-              </p>
-            </div>
+            <DashboardContentRouter
+              activeTab={activeTab}
+              {...lowRiskContentRouterProps}
+            />
           )}
         {showDeleteModal && (
           <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50">
@@ -6116,40 +5750,25 @@ function CampaignStructureView({
     brandDescription: ''
   });
   
-  const drawerFilteredKeywords = React.useMemo(() => {
-    return keywordsTableData.filter((keyword) => {
-      const matchesSearch = keyword.keyword.toLowerCase().includes(drawerSearchTerm.toLowerCase());
-      const matchesCompetition = !drawerCompetition || keyword.competition === drawerCompetition;
-      const matchesIntent = !drawerIntent || keyword.intent === drawerIntent;
-      return matchesSearch && matchesCompetition && matchesIntent;
-    });
-  }, [keywordsTableData, drawerSearchTerm, drawerCompetition, drawerIntent]);
-  const drawerSortedKeywords = React.useMemo(() => {
-    const sortableKeywords = [...drawerFilteredKeywords];
-    if (drawerSortConfig !== null) {
-      sortableKeywords.sort((a, b) => {
-        const aValue = a[drawerSortConfig.key];
-        const bValue = b[drawerSortConfig.key];
-        if (typeof aValue === "number" && typeof bValue === "number") {
-          return drawerSortConfig.direction === "asc" ? aValue - bValue : bValue - aValue;
-        }
-        const aStr = String(aValue).toLowerCase();
-        const bStr = String(bValue).toLowerCase();
-        if (aStr < bStr) {
-          return drawerSortConfig.direction === "asc" ? -1 : 1;
-        }
-        if (aStr > bStr) {
-          return drawerSortConfig.direction === "asc" ? 1 : -1;
-        }
-        return 0;
-      });
-    }
-    return sortableKeywords;
-  }, [drawerFilteredKeywords, drawerSortConfig]);
-  const drawerTotalPages = Math.max(1, Math.ceil(drawerSortedKeywords.length / drawerItemsPerPage));
-  const drawerStartIndex = (drawerCurrentPage - 1) * drawerItemsPerPage;
-  const drawerEndIndex = drawerStartIndex + drawerItemsPerPage;
-  const drawerCurrentKeywords = drawerSortedKeywords.slice(drawerStartIndex, drawerEndIndex);
+  const drawerFilteredKeywords = React.useMemo(
+    () =>
+      filterSidebarKeywordTableData(keywordsTableData, drawerSearchTerm, {
+        competition: drawerCompetition,
+        intent: drawerIntent,
+      }),
+    [keywordsTableData, drawerSearchTerm, drawerCompetition, drawerIntent]
+  );
+  const drawerSortedKeywords = React.useMemo(
+    () => sortSidebarKeywordTableData(drawerFilteredKeywords, drawerSortConfig),
+    [drawerFilteredKeywords, drawerSortConfig]
+  );
+  const {
+    totalPages: drawerTotalPages,
+    currentItems: drawerCurrentKeywords,
+  } = React.useMemo(
+    () => paginateSidebarItems(drawerSortedKeywords, drawerCurrentPage, drawerItemsPerPage),
+    [drawerSortedKeywords, drawerCurrentPage, drawerItemsPerPage]
+  );
   const drawerHandleSort = useCallback((key: keyof KeywordTableItem) => {
     let direction: "asc" | "desc" = "asc";
     if (drawerSortConfig && drawerSortConfig.key === key && drawerSortConfig.direction === "asc") {
@@ -6168,56 +5787,23 @@ function CampaignStructureView({
     );
   }, [drawerSortConfig]);
   const drawerHandlePageChange = useCallback((page: number) => {
-    const totalPagesCalc = Math.max(1, Math.ceil(drawerSortedKeywords.length / drawerItemsPerPage));
+    const totalPagesCalc = paginateSidebarItems(
+      drawerSortedKeywords,
+      drawerCurrentPage,
+      drawerItemsPerPage
+    ).totalPages;
     if (page >= 1 && page <= totalPagesCalc) {
       setDrawerCurrentPage(page);
     }
-  }, [drawerSortedKeywords.length, drawerItemsPerPage]);
-  const drawerGetPageNumbers = useCallback(() => {
-    const pages: Array<number | string> = [];
-    const maxVisiblePages = 5;
-    if (drawerTotalPages <= maxVisiblePages) {
-      for (let i = 1; i <= drawerTotalPages; i++) {
-        pages.push(i);
-      }
-    } else {
-      if (drawerCurrentPage <= 3) {
-        for (let i = 1; i <= 4; i++) {
-          pages.push(i);
-        }
-        pages.push("...");
-        pages.push(drawerTotalPages);
-      } else if (drawerCurrentPage >= drawerTotalPages - 2) {
-        pages.push(1);
-        pages.push("...");
-        for (let i = drawerTotalPages - 3; i <= drawerTotalPages; i++) {
-          pages.push(i);
-        }
-      } else {
-        pages.push(1);
-        pages.push("...");
-        for (let i = drawerCurrentPage - 1; i <= drawerCurrentPage + 1; i++) {
-          pages.push(i);
-        }
-        pages.push("...");
-        pages.push(drawerTotalPages);
-      }
-    }
-    return pages;
-  }, [drawerTotalPages, drawerCurrentPage]);
-  const drawerCompetitionBadge = useCallback((competition: string) => {
-    const baseClasses = "px-2.5 py-1 rounded-full text-xs font-semibold";
-    switch (competition) {
-      case "High":
-        return `${baseClasses} bg-red-100 text-red-800`;
-      case "Medium":
-        return `${baseClasses} bg-yellow-100 text-yellow-800`;
-      case "Low":
-        return `${baseClasses} bg-green-100 text-green-800`;
-      default:
-        return `${baseClasses} bg-gray-100 text-gray-800`;
-    }
-  }, []);
+  }, [drawerSortedKeywords, drawerCurrentPage, drawerItemsPerPage]);
+  const drawerGetPageNumbers = useCallback(
+    () => buildPageNumbers(drawerTotalPages, drawerCurrentPage),
+    [drawerTotalPages, drawerCurrentPage]
+  );
+  const drawerCompetitionBadge = useCallback(
+    (competition: string) => getCompetitionBadgeClassName(competition),
+    []
+  );
 
   const [targetTopicId, setTargetTopicId] = useState<number | null>(null);
   const { toast } = useToast();
@@ -6228,7 +5814,7 @@ function CampaignStructureView({
   // Auto-fill brand fields using company domain/context (mirrors publish tab)
   const derivedBrandName = React.useMemo(() => {
     if (companyDomain) {
-      return companyDomain.replace(/^https?:\/\//i, '').replace(/^www\./i, '').split('/')[0];
+      return normalizeDomain(companyDomain);
     }
     return '';
   }, [companyDomain]);
