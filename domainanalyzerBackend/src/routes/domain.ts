@@ -485,6 +485,7 @@ router.get('/:id', authenticateToken, asyncHandler(async (req: Request, res: Res
       ...domain,
       crawlResults: normalizedCrawlResults,
       contextJson: parseContextJson(domain.contextJson),
+      summaryContext: parseContextJson(domain.contextJson)?.summaryContext || null,
       currentStep: syncedStep,
     });
 

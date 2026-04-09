@@ -1,5 +1,5 @@
 import OpenAI from 'openai';
-import type { CrawlPolicy, CrawlQualitySummary, DomainContextClaim, DomainContextJson, PageSnapshot } from './domainContextTypes';
+import type { CrawlPolicy, CrawlQualitySummary, DomainContextClaim, DomainContextJson, DomainContextEntity, PageSnapshot } from './domainContextTypes';
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 if (!OPENAI_API_KEY) {
@@ -12,17 +12,78 @@ function trimText(text: string, maxLength: number): string {
   return text.length <= maxLength ? text : `${text.slice(0, maxLength)}...`;
 }
 
-function sanitizeEvidencePages(pages: string[], fallbackPages: string[]): string[] {
+function sanitizeEvidencePages(pages: string[] | undefined, fallbackPages: string[]): string[] {
   const sanitized = Array.from(new Set((pages || []).filter(Boolean)));
   return sanitized.length > 0 ? sanitized : fallbackPages.slice(0, 2);
 }
 
 function buildClaim(text: string, evidencePages: string[], confidence: number): DomainContextClaim {
   return {
-    text: text || 'Signal not confidently identified.',
+    text: text || 'Not clearly established from website evidence.',
     evidencePages,
     confidence: Math.max(0, Math.min(1, confidence)),
   };
+}
+
+function buildCompactSummary(contextJson: DomainContextJson): string {
+  return [
+    `Company Summary: ${contextJson.companySummary.text}`,
+    `Evidence: ${contextJson.companySummary.evidencePages.join(', ')}`,
+    '',
+    `Offerings: ${contextJson.offerings.map((item) => item.text).join('; ') || 'Not clearly established from website evidence.'}`,
+    `Audience: ${contextJson.audience.map((item) => item.text).join('; ') || 'Not clearly established from website evidence.'}`,
+    `Geo Scope: ${contextJson.geoScope.text}`,
+    `Brand Entities: ${contextJson.brandEntities.map((entity) => entity.name).join(', ') || 'None identified.'}`,
+    `Missing Signals: ${contextJson.missingSignals.join(', ') || 'None'}`,
+    `Overall Confidence: ${Math.round(contextJson.overallConfidence * 100)}%`,
+  ].join('\n').trim();
+}
+
+function buildRichAnalysis(contextJson: DomainContextJson): string {
+  return [
+    '### Comprehensive Domain Analysis',
+    '',
+    '#### 1. BUSINESS MODEL ANALYSIS',
+    '',
+    contextJson.businessModelAnalysis,
+    '',
+    '#### 2. TARGET AUDIENCE PROFILING',
+    '',
+    contextJson.targetAudienceProfiling,
+    '',
+    '#### 3. VALUE PROPOSITION & POSITIONING',
+    '',
+    contextJson.valuePropositionAndPositioning,
+    '',
+    '#### 4. SEO & CONTENT STRATEGY INSIGHTS',
+    '',
+    contextJson.seoAndContentStrategyInsights,
+    '',
+    '#### 5. COMPETITIVE INTELLIGENCE',
+    '',
+    contextJson.competitiveIntelligence,
+    '',
+    '#### 6. MARKET DYNAMICS',
+    '',
+    contextJson.marketDynamics,
+    '',
+    '#### 7. LOCATION-BASED SEO ANALYSIS',
+    '',
+    contextJson.locationBasedSeoAnalysis,
+    '',
+    '#### 8. SEO OPPORTUNITY ANALYSIS',
+    '',
+    contextJson.seoOpportunityAnalysis,
+  ].join('\n').trim();
+}
+
+function extractJsonObject(content: string): string | null {
+  const match = content.match(/\{[\s\S]*\}/);
+  return match ? match[0] : null;
+}
+
+function buildFallbackAnalysisSection(label: string): string {
+  return `- ${label}: Not clearly established from website evidence.`;
 }
 
 function buildFallbackContext(params: {
@@ -39,52 +100,103 @@ function buildFallbackContext(params: {
       page.schemaCoverage > 0 ? 'Contains structured data' : 'Contains extractable main content',
     ],
   }));
-  const primaryPages = evidencePages.map((page) => page.url);
+  const fallbackPages = evidencePages.map((page) => page.url);
   const homepage = pages[0];
-  const summary = homepage?.metaDescription || homepage?.title || `Public website for ${domain}`;
+  const companySummary = buildClaim(
+    homepage?.metaDescription || homepage?.title || `Public website for ${domain}`,
+    fallbackPages.slice(0, 2),
+    0.5
+  );
   const offerings = pages
     .filter((page) => /services|solutions|products|pricing/i.test(page.url) || /service|solution|product/i.test(page.mainText))
     .slice(0, 3)
-    .map((page) => buildClaim(page.title || 'Website offering', [page.url], 0.55));
+    .map((page) => buildClaim(page.title || 'Website offering', [page.url], 0.5));
+  const audience = [buildClaim('Audience is not clearly established from website evidence.', fallbackPages.slice(0, 2), 0.25)];
+  const geoScope = buildClaim(location || 'Geographic scope is not clearly established from website evidence.', fallbackPages.slice(0, 2), location ? 0.5 : 0.25);
+  const brandEntities: DomainContextEntity[] = pages
+    .slice(0, 3)
+    .filter((page) => !!page.title)
+    .map((page) => ({
+      name: page.title,
+      type: 'page_title',
+      evidencePages: [page.url],
+    }));
 
-  return {
-    companySummary: buildClaim(summary, primaryPages.slice(0, 2), 0.55),
-    offerings: offerings.length > 0 ? offerings : [buildClaim('Offerings need manual review from evidence pages.', primaryPages.slice(0, 2), 0.35)],
-    audience: [buildClaim('Audience requires manual confirmation from website messaging.', primaryPages.slice(0, 2), 0.3)],
-    geoScope: buildClaim(location || 'No explicit geographic scope detected.', primaryPages.slice(0, 2), location ? 0.5 : 0.25),
-    brandEntities: pages
-      .slice(0, 3)
-      .filter((page) => !!page.title)
-      .map((page) => ({
-        name: page.title,
-        type: 'page_title',
-        evidencePages: [page.url],
-      })),
+  const contextJson: DomainContextJson = {
+    companySummary,
+    offerings: offerings.length > 0 ? offerings : [buildClaim('Offerings are not clearly established from website evidence.', fallbackPages.slice(0, 2), 0.3)],
+    audience,
+    geoScope,
+    brandEntities,
+    businessModelAnalysis: [
+      buildFallbackAnalysisSection('Core Business'),
+      buildFallbackAnalysisSection('Industry Classification'),
+      buildFallbackAnalysisSection('Company Profile'),
+      buildFallbackAnalysisSection('Geographic Scope'),
+    ].join('\n'),
+    targetAudienceProfiling: [
+      buildFallbackAnalysisSection('Primary Audience'),
+      buildFallbackAnalysisSection('Secondary Audiences'),
+      buildFallbackAnalysisSection('Customer Journey'),
+      buildFallbackAnalysisSection('Pain Points'),
+      buildFallbackAnalysisSection('Decision Factors'),
+    ].join('\n'),
+    valuePropositionAndPositioning: [
+      buildFallbackAnalysisSection('Unique Selling Propositions'),
+      buildFallbackAnalysisSection('Brand Positioning'),
+      buildFallbackAnalysisSection('Key Benefits'),
+      buildFallbackAnalysisSection('Solution Categories'),
+      buildFallbackAnalysisSection('Market Positioning'),
+    ].join('\n'),
+    seoAndContentStrategyInsights: [
+      buildFallbackAnalysisSection('Primary Keywords'),
+      buildFallbackAnalysisSection('Content Themes'),
+      buildFallbackAnalysisSection('Expertise Areas'),
+      buildFallbackAnalysisSection('Authority Building'),
+      buildFallbackAnalysisSection('Content Gaps'),
+    ].join('\n'),
+    competitiveIntelligence: [
+      buildFallbackAnalysisSection('Direct Competitors'),
+      buildFallbackAnalysisSection('Indirect Competitors'),
+      buildFallbackAnalysisSection('Market Leaders'),
+      buildFallbackAnalysisSection('Competitive Advantages'),
+      buildFallbackAnalysisSection('Vulnerability Areas'),
+    ].join('\n'),
+    marketDynamics: [
+      buildFallbackAnalysisSection('Market Size'),
+      buildFallbackAnalysisSection('Industry Trends'),
+      buildFallbackAnalysisSection('Seasonal Patterns'),
+      buildFallbackAnalysisSection('Geographic Considerations'),
+    ].join('\n'),
+    locationBasedSeoAnalysis: [
+      buildFallbackAnalysisSection('Local Market Opportunities'),
+      buildFallbackAnalysisSection('Cultural Considerations'),
+      buildFallbackAnalysisSection('Location-Specific Keywords'),
+      buildFallbackAnalysisSection('Local Search Behavior'),
+      buildFallbackAnalysisSection('Competitive Landscape'),
+      buildFallbackAnalysisSection('Local SEO Strategy'),
+    ].join('\n'),
+    seoOpportunityAnalysis: [
+      buildFallbackAnalysisSection('Keyword Opportunities'),
+      buildFallbackAnalysisSection('Content Opportunities'),
+      buildFallbackAnalysisSection('Competitive Gaps'),
+      buildFallbackAnalysisSection('Long-tail Opportunities'),
+      buildFallbackAnalysisSection('Local SEO'),
+    ].join('\n'),
+    richAnalysis: '',
+    summaryContext: '',
     evidencePages,
     missingSignals: ['Structured synthesis fallback used'],
-    overallConfidence: 0.4,
+    overallConfidence: 0.35,
   };
+
+  contextJson.summaryContext = buildCompactSummary(contextJson);
+  contextJson.richAnalysis = buildRichAnalysis(contextJson);
+  return contextJson;
 }
 
-function buildLegacyContext(contextJson: DomainContextJson): string {
-  const sections = [
-    `Company Summary: ${contextJson.companySummary.text}`,
-    `Evidence: ${contextJson.companySummary.evidencePages.join(', ')}`,
-    '',
-    `Offerings: ${contextJson.offerings.map((item) => item.text).join('; ') || 'Not confidently identified.'}`,
-    `Audience: ${contextJson.audience.map((item) => item.text).join('; ') || 'Not confidently identified.'}`,
-    `Geo Scope: ${contextJson.geoScope.text}`,
-    `Brand Entities: ${contextJson.brandEntities.map((entity) => entity.name).join(', ') || 'None identified.'}`,
-    `Missing Signals: ${contextJson.missingSignals.join(', ') || 'None'}`,
-    `Overall Confidence: ${Math.round(contextJson.overallConfidence * 100)}%`,
-  ];
-
-  return sections.join('\n').trim();
-}
-
-function extractJsonObject(content: string): string | null {
-  const match = content.match(/\{[\s\S]*\}/);
-  return match ? match[0] : null;
+function normalizeString(value: unknown, fallback: string): string {
+  return typeof value === 'string' && value.trim() ? value.trim() : fallback;
 }
 
 export async function synthesizeDomainContext(params: {
@@ -93,7 +205,7 @@ export async function synthesizeDomainContext(params: {
   pages: PageSnapshot[];
   policy: CrawlPolicy;
   quality: CrawlQualitySummary;
-}): Promise<{ contextJson: DomainContextJson; contextText: string; tokenUsage: number }> {
+}): Promise<{ contextJson: DomainContextJson; contextText: string; summaryContext: string; tokenUsage: number }> {
   const { domain, location, pages, policy, quality } = params;
   const curatedPages = [...pages]
     .sort((a, b) => b.contentScore - a.contentScore)
@@ -105,24 +217,31 @@ export async function synthesizeDomainContext(params: {
       headings: page.headings.slice(0, 4),
       schemaCoverage: page.schemaCoverage,
       contentScore: page.contentScore,
-      mainText: trimText(page.mainText, 1800),
+      mainText: trimText(page.mainText, 2200),
     }));
 
   try {
     const response = await openai.chat.completions.create({
       model: 'gpt-4o',
       temperature: 0.2,
-      max_tokens: 2200,
+      max_tokens: 2800,
       messages: [
         {
           role: 'system',
-          content: 'You are an expert at extracting company context from website evidence. Return only JSON. Never invent unsupported facts. Every claim must cite source page URLs from the provided evidence.',
+          content: [
+            'You are an expert business intelligence analyst and SEO strategist.',
+            'Use only website evidence provided.',
+            'Return only JSON.',
+            'Do not invent unsupported facts.',
+            'If evidence is weak, explicitly say "not clearly established from website evidence".',
+            'Each structured claim must cite evidence page URLs from the provided pages.',
+          ].join(' '),
         },
         {
           role: 'user',
           content: JSON.stringify(
             {
-              task: 'Synthesize domain context from evidence pages.',
+              task: 'Produce structured domain context plus a rich 8-section business analysis grounded in page evidence.',
               domain,
               location: location || null,
               crawlPolicy: {
@@ -138,6 +257,14 @@ export async function synthesizeDomainContext(params: {
                 audience: [{ text: 'string', evidencePages: ['url'], confidence: 0.0 }],
                 geoScope: { text: 'string', evidencePages: ['url'], confidence: 0.0 },
                 brandEntities: [{ name: 'string', type: 'string', evidencePages: ['url'] }],
+                businessModelAnalysis: 'markdown string with bullets',
+                targetAudienceProfiling: 'markdown string with bullets',
+                valuePropositionAndPositioning: 'markdown string with bullets',
+                seoAndContentStrategyInsights: 'markdown string with bullets',
+                competitiveIntelligence: 'markdown string with bullets',
+                marketDynamics: 'markdown string with bullets',
+                locationBasedSeoAnalysis: 'markdown string with bullets',
+                seoOpportunityAnalysis: 'markdown string with bullets',
                 evidencePages: [{ url: 'string', title: 'string', reasons: ['string'] }],
                 missingSignals: ['string'],
                 overallConfidence: 0.0,
@@ -159,28 +286,39 @@ export async function synthesizeDomainContext(params: {
 
     const parsed = JSON.parse(jsonPayload) as Partial<DomainContextJson>;
     const fallbackPages = curatedPages.map((page) => page.url);
+
     const contextJson: DomainContextJson = {
       companySummary: buildClaim(
-        parsed.companySummary?.text || 'Company summary was not confidently identified.',
-        sanitizeEvidencePages(parsed.companySummary?.evidencePages || [], fallbackPages),
+        parsed.companySummary?.text || 'Company summary is not clearly established from website evidence.',
+        sanitizeEvidencePages(parsed.companySummary?.evidencePages, fallbackPages),
         parsed.companySummary?.confidence ?? 0.4
       ),
       offerings: (parsed.offerings || []).map((item) =>
-        buildClaim(item.text, sanitizeEvidencePages(item.evidencePages || [], fallbackPages), item.confidence ?? 0.4)
+        buildClaim(item.text, sanitizeEvidencePages(item.evidencePages, fallbackPages), item.confidence ?? 0.4)
       ),
       audience: (parsed.audience || []).map((item) =>
-        buildClaim(item.text, sanitizeEvidencePages(item.evidencePages || [], fallbackPages), item.confidence ?? 0.4)
+        buildClaim(item.text, sanitizeEvidencePages(item.evidencePages, fallbackPages), item.confidence ?? 0.4)
       ),
       geoScope: buildClaim(
-        parsed.geoScope?.text || (location ? `Likely serving ${location}` : 'Geographic scope not explicit.'),
-        sanitizeEvidencePages(parsed.geoScope?.evidencePages || [], fallbackPages),
+        parsed.geoScope?.text || (location ? `Likely serving ${location}` : 'Geographic scope is not clearly established from website evidence.'),
+        sanitizeEvidencePages(parsed.geoScope?.evidencePages, fallbackPages),
         parsed.geoScope?.confidence ?? 0.4
       ),
       brandEntities: (parsed.brandEntities || []).map((entity) => ({
         name: entity.name,
         type: entity.type,
-        evidencePages: sanitizeEvidencePages(entity.evidencePages || [], fallbackPages),
+        evidencePages: sanitizeEvidencePages(entity.evidencePages, fallbackPages),
       })),
+      businessModelAnalysis: normalizeString(parsed.businessModelAnalysis, buildFallbackAnalysisSection('Business Model Analysis')),
+      targetAudienceProfiling: normalizeString(parsed.targetAudienceProfiling, buildFallbackAnalysisSection('Target Audience Profiling')),
+      valuePropositionAndPositioning: normalizeString(parsed.valuePropositionAndPositioning, buildFallbackAnalysisSection('Value Proposition & Positioning')),
+      seoAndContentStrategyInsights: normalizeString(parsed.seoAndContentStrategyInsights, buildFallbackAnalysisSection('SEO & Content Strategy Insights')),
+      competitiveIntelligence: normalizeString(parsed.competitiveIntelligence, buildFallbackAnalysisSection('Competitive Intelligence')),
+      marketDynamics: normalizeString(parsed.marketDynamics, buildFallbackAnalysisSection('Market Dynamics')),
+      locationBasedSeoAnalysis: normalizeString(parsed.locationBasedSeoAnalysis, buildFallbackAnalysisSection('Location-Based SEO Analysis')),
+      seoOpportunityAnalysis: normalizeString(parsed.seoOpportunityAnalysis, buildFallbackAnalysisSection('SEO Opportunity Analysis')),
+      richAnalysis: '',
+      summaryContext: '',
       evidencePages:
         parsed.evidencePages?.map((page) => ({
           url: page.url,
@@ -191,16 +329,21 @@ export async function synthesizeDomainContext(params: {
       overallConfidence: Math.max(0, Math.min(1, parsed.overallConfidence ?? 0.5)),
     };
 
+    contextJson.summaryContext = buildCompactSummary(contextJson);
+    contextJson.richAnalysis = buildRichAnalysis(contextJson);
+
     return {
       contextJson,
-      contextText: buildLegacyContext(contextJson),
+      contextText: contextJson.richAnalysis,
+      summaryContext: contextJson.summaryContext,
       tokenUsage: response.usage?.total_tokens || 0,
     };
   } catch (error) {
     const fallback = buildFallbackContext({ pages: curatedPages.length > 0 ? pages : [], domain, location });
     return {
       contextJson: fallback,
-      contextText: buildLegacyContext(fallback),
+      contextText: fallback.richAnalysis,
+      summaryContext: fallback.summaryContext,
       tokenUsage: 0,
     };
   }

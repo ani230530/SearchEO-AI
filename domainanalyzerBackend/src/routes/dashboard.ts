@@ -772,6 +772,7 @@ router.get('/:domainId', authenticateToken, asyncHandler(async (req: Authenticat
         url: domain.url,
         context: domain.context,
         contextJson: parseContextJson(domain.contextJson),
+        summaryContext: parseContextJson(domain.contextJson)?.summaryContext || null,
         lastAnalyzed: domain.dashboardAnalyses?.length ? domain.dashboardAnalyses[domain.dashboardAnalyses.length - 1].updatedAt || domain.dashboardAnalyses[domain.dashboardAnalyses.length - 1].createdAt : domain.updatedAt,
         industry: 'Technology', // Default industry since it's not in the schema
         description: domain.context || '',

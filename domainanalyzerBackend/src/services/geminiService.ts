@@ -22,6 +22,7 @@ export interface ExtractionResult {
   extractedContext: string;
   tokenUsage?: number;
   contextJson?: DomainContextJson;
+  summaryContext?: string;
   pages?: PageSnapshot[];
   crawlPolicy?: CrawlPolicy;
   quality?: CrawlQualitySummary;
@@ -594,6 +595,7 @@ export async function crawlAndExtractWithGpt4o(
       extractedContext: synthesis.contextText,
       tokenUsage: synthesis.tokenUsage,
       contextJson: synthesis.contextJson,
+      summaryContext: synthesis.summaryContext,
       pages,
       crawlPolicy: policy,
       quality,

@@ -91,6 +91,16 @@ export interface DomainContextJson {
   audience: DomainContextClaim[];
   geoScope: DomainContextClaim;
   brandEntities: DomainContextEntity[];
+  businessModelAnalysis: string;
+  targetAudienceProfiling: string;
+  valuePropositionAndPositioning: string;
+  seoAndContentStrategyInsights: string;
+  competitiveIntelligence: string;
+  marketDynamics: string;
+  locationBasedSeoAnalysis: string;
+  seoOpportunityAnalysis: string;
+  richAnalysis: string;
+  summaryContext: string;
   evidencePages: Array<{
     url: string;
     title: string;
