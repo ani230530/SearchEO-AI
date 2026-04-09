@@ -2890,6 +2890,8 @@ useEffect(() => {
               handleSubmit={handleSubmit}
               domainError={domainError}
               isSubmitting={isSubmitting}
+              loadingSteps={loadingSteps}
+              currentTaskIndex={currentTaskIndex}
               handleDomainChange={handleDomainChange}
             />
           ) : activeTab === "projects" ? (

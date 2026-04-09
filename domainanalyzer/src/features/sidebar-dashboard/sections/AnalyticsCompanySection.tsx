@@ -45,6 +45,12 @@ type WpFormState = {
   password: string;
 };
 
+type LoadingStep = {
+  name: string;
+  status: 'pending' | 'running' | 'completed' | 'failed';
+  progress: number;
+};
+
 export interface AnalyticsCompanySectionProps {
   companyDomainLoading: boolean;
   isLoading: boolean;
@@ -110,6 +116,8 @@ export interface AnalyticsCompanySectionProps {
   handleSubmit: (e: FormEvent) => void | Promise<void>;
   domainError: string;
   isSubmitting: boolean;
+  loadingSteps: LoadingStep[];
+  currentTaskIndex: number;
   handleDomainChange: (value: string) => void;
 }
 
@@ -178,6 +186,8 @@ export function AnalyticsCompanySection({
   handleSubmit,
   domainError,
   isSubmitting,
+  loadingSteps,
+  currentTaskIndex,
   handleDomainChange,
 }: AnalyticsCompanySectionProps) {
   const startIndex = (currentPage - 1) * itemsPerPage;
