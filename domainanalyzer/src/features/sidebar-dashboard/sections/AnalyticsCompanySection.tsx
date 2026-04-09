@@ -72,6 +72,9 @@ export interface AnalyticsCompanySectionProps {
   itemsPerPage: number;
   setItemsPerPage: Dispatch<SetStateAction<number>>;
   setCurrentPage: Dispatch<SetStateAction<number>>;
+  showCountByCompetition: Record<string, number>;
+  setShowCountByCompetition: Dispatch<SetStateAction<Record<string, number>>>;
+  sortedKeywords: KeywordTableItem[];
   currentKeywords: KeywordTableItem[];
   currentPage: number;
   totalPages: number;
@@ -137,6 +140,9 @@ export function AnalyticsCompanySection({
   itemsPerPage,
   setItemsPerPage,
   setCurrentPage,
+  showCountByCompetition,
+  setShowCountByCompetition,
+  sortedKeywords,
   currentKeywords,
   currentPage,
   totalPages,
@@ -174,6 +180,9 @@ export function AnalyticsCompanySection({
   isSubmitting,
   handleDomainChange,
 }: AnalyticsCompanySectionProps) {
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + currentKeywords.length;
+
   return (
             <CompanySection
               companyDomainLoading={companyDomainLoading}
