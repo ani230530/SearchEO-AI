@@ -9,6 +9,7 @@ import {
   normalizePublishGenerateResponse,
   serializeDraftContent,
 } from '../services/contentFlowService';
+import { parseSiteUrlInput } from '../utils/domainValidation';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -154,7 +155,15 @@ router.post(
       });
     }
 
-    const sanitizedUrl = siteUrl.trim();
+    const parsedSiteUrl = parseSiteUrlInput(siteUrl);
+    if (!parsedSiteUrl) {
+      return res.status(400).json({
+        success: false,
+        error: 'Please enter a valid WordPress site URL (e.g., https://example.org)',
+      });
+    }
+
+    const sanitizedUrl = parsedSiteUrl.normalizedSiteUrl;
     const sanitizedUsername = username.trim();
 
     const existingIntegration = await prisma.wordpressIntegration.findUnique({

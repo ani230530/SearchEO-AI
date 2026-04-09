@@ -5,6 +5,7 @@ import https from 'https';
 import http from 'http';
 import { URL } from 'url';
 import OpenAI from 'openai';
+import { getDomainLookupCandidates, parseDomainInput } from '../utils/domainValidation';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -35,21 +36,18 @@ router.post('/validate-domain', authenticateToken, asyncHandler(async (req: Requ
       });
     }
 
-    let normalizedDomain = domain.trim();
-    if (!normalizedDomain.startsWith('http://') && !normalizedDomain.startsWith('https://')) {
-      normalizedDomain = `https://${normalizedDomain}`;
-    }
-
-    const domainRegex = /^(?:https?:\/\/)?(?:www\.)?([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}$/;
-    if (!domainRegex.test(normalizedDomain.replace(/^https?:\/\//, ''))) {
+    const parsedDomain = parseDomainInput(domain);
+    if (!parsedDomain) {
       return res.json({
         success: false,
-        error: 'Invalid domain format',
+        error: 'Please enter a valid domain or URL (e.g., example.org or brand.co.uk)',
         step: 'Domain Validation',
         status: 'failed',
         progress: 100
       });
     }
+
+    const normalizedDomain = parsedDomain.normalizedUrl;
 
     const isAccessible = await checkDomainAccessibility(normalizedDomain);
     
@@ -65,11 +63,7 @@ router.post('/validate-domain', authenticateToken, asyncHandler(async (req: Requ
 
     const existingDomain = await prisma.domain.findFirst({
       where: {
-        OR: [
-          { url: normalizedDomain },
-          { url: normalizedDomain.replace('https://', 'http://') },
-          { url: normalizedDomain.replace(/^https?:\/\//, '') }
-        ],
+        OR: getDomainLookupCandidates(parsedDomain).map((candidate) => ({ url: candidate })),
         userId: authReq.user.userId
       }
     });
@@ -155,10 +149,17 @@ router.post('/check-ssl', authenticateToken, asyncHandler(async (req: Request, r
       });
     }
 
-    let normalizedDomain = domain.trim();
-    if (!normalizedDomain.startsWith('http://') && !normalizedDomain.startsWith('https://')) {
-      normalizedDomain = `https://${normalizedDomain}`;
+    const parsedDomain = parseDomainInput(domain);
+    if (!parsedDomain) {
+      return res.status(400).json({
+        success: false,
+        error: 'Please enter a valid domain or URL (e.g., example.org or brand.co.uk)',
+        step: 'SSL Certificate Check',
+        status: 'failed'
+      });
     }
+
+    const normalizedDomain = parsedDomain.normalizedUrl;
 
     const hasSSL = await checkSSL(normalizedDomain);
 
@@ -197,10 +198,17 @@ router.post('/analyze-server', authenticateToken, asyncHandler(async (req: Reque
       });
     }
 
-    let normalizedDomain = domain.trim();
-    if (!normalizedDomain.startsWith('http://') && !normalizedDomain.startsWith('https://')) {
-      normalizedDomain = `https://${normalizedDomain}`;
+    const parsedDomain = parseDomainInput(domain);
+    if (!parsedDomain) {
+      return res.status(400).json({
+        success: false,
+        error: 'Please enter a valid domain or URL (e.g., example.org or brand.co.uk)',
+        step: 'Server Response Analysis',
+        status: 'failed'
+      });
     }
+
+    const normalizedDomain = parsedDomain.normalizedUrl;
 
     const serverInfo = await analyzeServerResponse(normalizedDomain);
 
@@ -240,10 +248,17 @@ router.post('/configure-geo', authenticateToken, asyncHandler(async (req: Reques
       });
     }
 
-    let normalizedDomain = domain.trim();
-    if (!normalizedDomain.startsWith('http://') && !normalizedDomain.startsWith('https://')) {
-      normalizedDomain = `https://${normalizedDomain}`;
+    const parsedDomain = parseDomainInput(domain);
+    if (!parsedDomain) {
+      return res.status(400).json({
+        success: false,
+        error: 'Please enter a valid domain or URL (e.g., example.org or brand.co.uk)',
+        step: 'Geo-location Configuration',
+        status: 'failed'
+      });
     }
+
+    const normalizedDomain = parsedDomain.normalizedUrl;
 
     // Generate AI analysis of domain-location interrelation
     const locationContext = await generateLocationDomainContext(normalizedDomain, location);

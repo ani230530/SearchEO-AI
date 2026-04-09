@@ -1,32 +1,33 @@
 import { AnalyticsReportSection } from "@/features/sidebar-dashboard/sections/AnalyticsReportSection";
+import { AuditSection } from "@/features/sidebar-dashboard/sections/AuditSection";
+import { CompanySection } from "@/features/sidebar-dashboard/sections/CompanySection";
 import { GscAnalyticsSection } from "@/features/sidebar-dashboard/sections/GscAnalyticsSection";
 import { ProfileSection } from "@/features/sidebar-dashboard/sections/ProfileSection";
+import { PublishSection } from "@/features/sidebar-dashboard/sections/PublishSection";
+import { OverviewSection } from "@/features/sidebar-dashboard/sections/OverviewSection";
 import { SettingsSection } from "@/features/sidebar-dashboard/sections/SettingsSection";
 import type { DashboardContentRouterProps } from "@/features/sidebar-dashboard/types";
 
 export function DashboardContentRouter({
   activeTab,
-  analyticsContent,
-  auditContent,
-  overviewContent,
-  projectsContent,
-  publishContent,
   tabs,
+  audit,
+  company,
   analyticsReport,
   gscAnalytics,
+  overview,
+  publish,
   settings,
 }: DashboardContentRouterProps) {
   switch (activeTab) {
     case "overview":
-      return <>{overviewContent}</>;
+      return <OverviewSection {...overview} />;
     case "analytics":
-      return <>{analyticsContent}</>;
-    case "projects":
-      return <>{projectsContent}</>;
+      return <CompanySection {...company} />;
     case "publish":
-      return <>{publishContent}</>;
+      return <PublishSection {...publish} />;
     case "audit":
-      return <>{auditContent}</>;
+      return <AuditSection {...audit} />;
     case "analytics-report":
       return <AnalyticsReportSection {...analyticsReport} />;
     case "gsc-analytics":

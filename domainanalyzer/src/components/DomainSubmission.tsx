@@ -11,6 +11,8 @@ import Select from 'react-select';
 import countryList from 'react-select-country-list';
 import { City, Country, State } from 'country-state-city';
 import type { CSSObjectWithLabel } from 'react-select';
+import type { ParsedDomainInput } from '@/lib/domainValidation';
+import { validateDomainInput } from '@/lib/domainValidation';
 
 interface DomainSubmissionProps {
   domain: string;
@@ -156,26 +158,25 @@ const DomainSubmission: React.FC<DomainSubmissionProps> = ({
     return () => clearInterval(interval);
   }, [loadingSteps]);
 
-  const validateDomain = (value: string) => {
-    const domainRegex = /^(?:https?:\/\/)?(?:www\.)?([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}$/;
-    if (!value) {
-      setDomainError('Domain is required');
-      return false;
-    }
-    if (!domainRegex.test(value)) {
-      setDomainError('Please enter a valid domain (e.g., example.com)');
-      return false;
-    }
-    setDomainError('');
-    return true;
+  const validateDomain = (value: string): ParsedDomainInput | null => {
+    const result = validateDomainInput(value);
+    setDomainError(result.error);
+    return result.parsed;
   };
 
   const handleDomainChange = (value: string) => {
     setDomain(value);
-    if (value) validateDomain(value);
+    if (value) {
+      validateDomain(value);
+      return;
+    }
+
+    setDomainError('');
   };
 
-  const checkDomain = async (): Promise<DomainCheckResult | null> => {
+  const checkDomain = async (
+    parsedDomain?: ParsedDomainInput | null
+  ): Promise<DomainCheckResult | null> => {
     if (!domain.trim()) {
       toast({
         title: "Domain required",
@@ -185,13 +186,14 @@ const DomainSubmission: React.FC<DomainSubmissionProps> = ({
       return null;
     }
 
-    if (!validateDomain(domain.trim())) {
+    const normalizedDomain = parsedDomain || validateDomain(domain.trim());
+    if (!normalizedDomain) {
       return null;
     }
 
     // Don't show loading state for domain check - it should be silent
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/domain/check/${encodeURIComponent(domain.trim())}`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/domain/check/${encodeURIComponent(normalizedDomain.hostname)}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
           'Content-Type': 'application/json',
@@ -214,8 +216,9 @@ const DomainSubmission: React.FC<DomainSubmissionProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!validateDomain(domain) || !selectedCountry) {
+
+    const parsedDomain = validateDomain(domain);
+    if (!parsedDomain || !selectedCountry) {
       toast({
         title: "Required fields missing",
         description: "Please fill in all required fields",
@@ -223,6 +226,9 @@ const DomainSubmission: React.FC<DomainSubmissionProps> = ({
       });
       return;
     }
+
+    const submittedDomain = parsedDomain.normalizedUrl;
+    setDomain(parsedDomain.normalizedHostname);
 
     // Validate advanced filters if shown
     if (showAdvanced) {
@@ -257,7 +263,7 @@ const DomainSubmission: React.FC<DomainSubmissionProps> = ({
 
     // First check if domain exists BEFORE showing any loading
     console.log('Checking domain existence before proceeding...');
-    const domainCheck = await checkDomain();
+    const domainCheck = await checkDomain(parsedDomain);
     if (!domainCheck) {
       setIsSubmitting(false);
       return;
@@ -285,7 +291,7 @@ const DomainSubmission: React.FC<DomainSubmissionProps> = ({
                 },
                 body: JSON.stringify({
                   keyword: keyword,
-                  domain: domain,
+                  domain: submittedDomain,
                   location: location || 'Global',
                   domainId: domainCheck.domainId
                 })
@@ -421,7 +427,7 @@ const DomainSubmission: React.FC<DomainSubmissionProps> = ({
           'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ domain })
+        body: JSON.stringify({ domain: submittedDomain })
       });
       
       const validationResult = await validationResponse.json();
@@ -458,7 +464,7 @@ const DomainSubmission: React.FC<DomainSubmissionProps> = ({
           'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ domain })
+        body: JSON.stringify({ domain: submittedDomain })
       });
       
       const sslResult = await sslResponse.json();
@@ -495,7 +501,7 @@ const DomainSubmission: React.FC<DomainSubmissionProps> = ({
           'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ domain })
+        body: JSON.stringify({ domain: submittedDomain })
       });
       
       const serverResult = await serverResponse.json();
@@ -533,7 +539,7 @@ const DomainSubmission: React.FC<DomainSubmissionProps> = ({
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ 
-          domain, 
+          domain: submittedDomain, 
           location, 
           customKeywords, 
           intentPhrases, 
@@ -725,7 +731,7 @@ const DomainSubmission: React.FC<DomainSubmissionProps> = ({
                 type="text"
                 value={domain}
                 onChange={(e) => handleDomainChange(e.target.value)}
-                placeholder="example.com"
+                placeholder="example.org or brand.co.uk"
                 className={`w-full px-4 py-3 text-base font-light rounded-2xl border ${domainError ? 'border-red-300' : 'border-gray-200'} bg-gray-50 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all`}
                 required
               />

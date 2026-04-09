@@ -1,5 +1,7 @@
-import type { ReactNode } from "react";
+import type { Dispatch, ReactNode, RefObject, SetStateAction } from "react";
 import type { LucideIcon } from "lucide-react";
+import type { KeywordTableItem } from "@/types";
+import type { WordpressIntegration } from "@/types/publish";
 
 export type TabId =
   | "overview"
@@ -59,8 +61,71 @@ export interface AnalyticsReportSectionProps {
   googleAnalyticsId: string;
 }
 
+export interface OverviewSectionProps {
+  auditComplete: boolean;
+  auditLoading: boolean;
+  auditResult: any;
+  campaignsCount: number;
+  companyDomain: string;
+  hasWordpressIntegration: boolean;
+  keywordsTableData: KeywordTableItem[];
+  normalizedDomain: string;
+  onAuditModalOpenChange: (open: boolean) => void;
+  onOpenAnalytics: () => void;
+  onOpenAuditDetails: () => void;
+  onRunAudit: () => void;
+  onViewReport: () => void;
+  onVisitSite: () => void;
+  overallScore: number;
+  showAuditModal: boolean;
+}
+
+export interface CompanySectionProps {
+  companyDomainLoading: boolean;
+  isLoading: boolean;
+  loadingContent: ReactNode;
+  resultsContent: ReactNode;
+  setupContent: ReactNode;
+  showResults: boolean;
+}
+
 export interface GscAnalyticsSectionProps {
   activeGscSubTab: GscSubTabId;
+}
+
+export interface PublishSectionProps {
+  companyDomain: string;
+  companyDomainLoading: boolean;
+  domainContext: string;
+  draftStatuses: Map<number, any>;
+  draftToPageMap: Map<number, number>;
+  hasWordpressIntegration: boolean;
+  isActive: boolean;
+  keywordsTableData: KeywordTableItem[];
+  pageId?: number;
+  publishingPageIds: Set<number>;
+  setDraftStatuses: Dispatch<SetStateAction<Map<number, any>>>;
+  setDraftToPageMap: Dispatch<SetStateAction<Map<number, number>>>;
+  setPublishingPageIds: Dispatch<SetStateAction<Set<number>>>;
+  sharedPublishStatuses: Map<number, any>;
+  wpIntegration: WordpressIntegration | null;
+  onConfigureWordpress: () => void;
+  onRefreshWordpressIntegration: () => Promise<void>;
+}
+
+export interface AuditSectionProps {
+  activeChartTab: "overview" | "comparison" | "distribution";
+  auditLoading: boolean;
+  auditResult: any;
+  companyDomain: string;
+  n8nResults: { sheetsUrl?: string; slidesUrl?: string } | null;
+  n8nStatus: "processing" | "completed" | "failed" | null;
+  overallScore: number;
+  resultsRef: RefObject<HTMLDivElement | null>;
+  selectedMetric?: string;
+  onActiveChartTabChange: (tab: "overview" | "comparison" | "distribution") => void;
+  onRunAudit: () => void;
+  onSelectedMetricChange: (metric: string) => void;
 }
 
 export interface SettingsSectionProps {
@@ -73,13 +138,12 @@ export interface SettingsSectionProps {
 
 export interface DashboardContentRouterProps {
   activeTab: TabId;
-  analyticsContent: ReactNode;
-  auditContent: ReactNode;
-  overviewContent: ReactNode;
-  projectsContent: ReactNode;
-  publishContent: ReactNode;
   tabs: DashboardSidebarTab[];
+  audit: AuditSectionProps;
+  company: CompanySectionProps;
   analyticsReport: AnalyticsReportSectionProps;
   gscAnalytics: GscAnalyticsSectionProps;
+  overview: OverviewSectionProps;
+  publish: PublishSectionProps;
   settings: SettingsSectionProps;
 }

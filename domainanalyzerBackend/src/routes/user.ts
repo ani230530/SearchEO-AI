@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { PrismaClient } from '../../generated/prisma';
 import { authenticateToken, AuthenticatedRequest } from '../middleware/auth';
 import { crawlAndExtractWithGpt4o, generateKeywordsForDomain } from '../services/geminiService';
+import { getDomainLookupCandidates, parseDomainInput } from '../utils/domainValidation';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -76,13 +77,16 @@ router.post('/company-domain', authenticateToken, asyncHandler(async (req: Reque
   }
 
   try {
-    // Normalize URL
-    let normalizedUrl = url.trim().toLowerCase();
-    if (!normalizedUrl.startsWith('http://') && !normalizedUrl.startsWith('https://')) {
-      normalizedUrl = `https://${normalizedUrl}`;
+    const parsedDomain = parseDomainInput(url);
+    if (!parsedDomain) {
+      return res.status(400).json({
+        error: 'Please enter a valid domain or URL (e.g., example.org or brand.co.uk)',
+      });
     }
-    // Remove trailing slash
-    normalizedUrl = normalizedUrl.replace(/\/$/, '');
+
+    const normalizedUrl = parsedDomain.normalizedUrl;
+    const lookupCandidates = getDomainLookupCandidates(parsedDomain);
+    const lookupConditions = lookupCandidates.map((candidate) => ({ url: candidate }));
 
     // Check if user already has a company domain
     const existingCompanyDomain = await prisma.domain.findFirst({
@@ -96,7 +100,7 @@ router.post('/company-domain', authenticateToken, asyncHandler(async (req: Reque
     const existingDomain = await prisma.domain.findFirst({
       where: {
         userId: userId,
-        url: normalizedUrl
+        OR: lookupConditions
       }
     });
 
@@ -104,26 +108,35 @@ router.post('/company-domain', authenticateToken, asyncHandler(async (req: Reque
 
     if (existingCompanyDomain) {
       // If user already has a company domain, update it
-      if (existingCompanyDomain.url === normalizedUrl) {
-        // Same URL, just return existing
-        domainId = existingCompanyDomain.id;
+      if (lookupCandidates.includes(existingCompanyDomain.url)) {
+        const updatedCompanyDomain = await prisma.domain.update({
+          where: { id: existingCompanyDomain.id },
+          data: {
+            url: normalizedUrl,
+            location: location || existingCompanyDomain.location || 'Global',
+            isCompanyDomain: true,
+          }
+        });
+        domainId = updatedCompanyDomain.id;
       } else {
         // Different URL - update the existing company domain
         // First, unset isCompanyDomain on old domain if URL is different
-        if (existingCompanyDomain.url !== normalizedUrl) {
-          await prisma.domain.update({
-            where: { id: existingCompanyDomain.id },
-            data: { isCompanyDomain: false }
-          });
-        }
+        await prisma.domain.update({
+          where: { id: existingCompanyDomain.id },
+          data: { isCompanyDomain: false }
+        });
 
         // If the new URL exists as a regular domain, update it to be company domain
         if (existingDomain) {
-          await prisma.domain.update({
+          const updatedExistingDomain = await prisma.domain.update({
             where: { id: existingDomain.id },
-            data: { isCompanyDomain: true, location: location || 'Global' }
+            data: {
+              url: normalizedUrl,
+              isCompanyDomain: true,
+              location: location || existingDomain.location || 'Global'
+            }
           });
-          domainId = existingDomain.id;
+          domainId = updatedExistingDomain.id;
         } else {
           // Create new company domain
           const newDomain = await prisma.domain.create({
@@ -140,12 +153,15 @@ router.post('/company-domain', authenticateToken, asyncHandler(async (req: Reque
     } else {
       // No existing company domain
       if (existingDomain) {
-        // Update existing domain to be company domain
-        await prisma.domain.update({
+        const updatedExistingDomain = await prisma.domain.update({
           where: { id: existingDomain.id },
-          data: { isCompanyDomain: true, location: location || 'Global' }
+          data: {
+            url: normalizedUrl,
+            isCompanyDomain: true,
+            location: location || existingDomain.location || 'Global'
+          }
         });
-        domainId = existingDomain.id;
+        domainId = updatedExistingDomain.id;
       } else {
         // Create new company domain
         const newDomain = await prisma.domain.create({
