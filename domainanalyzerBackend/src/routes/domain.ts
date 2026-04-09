@@ -3,6 +3,7 @@ import { PrismaClient } from '../../generated/prisma';
 import { crawlAndExtractWithGpt4o, ProgressCallback, generateKeywordsForDomain } from '../services/geminiService';
 import { generateSeedKeywords } from '../services/googleAdsService';
 import { authenticateToken, AuthenticatedRequest } from '../middleware/auth';
+import { parseContextJson, parseCrawlPolicy, parseCrawlQuality, parsePageSnapshots, parseStringArray } from '../services/crawlResultUtils';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -318,13 +319,17 @@ router.post('/', authenticateToken, asyncHandler(async (req: Request, res: Respo
     // Save crawl result
     sendEvent({ type: 'progress', phase: 'domain_extraction', step: 'Saving domain extraction results...', progress: 95 });
 
-    const crawlResult = await prisma.crawlResult.create({
+      const crawlResult = await prisma.crawlResult.create({
       data: {
         domainId: domain.id,
         pagesScanned: extraction.pagesScanned,
         analyzedUrls: JSON.stringify(extraction.analyzedUrls),
         extractedContext: extraction.extractedContext,
         tokenUsage: extraction.tokenUsage || 0,
+        pageSnapshots: extraction.pages as any,
+        crawlPolicy: extraction.crawlPolicy as any,
+        quality: extraction.quality as any,
+        contextJson: extraction.contextJson as any,
       },
     });
 
@@ -336,7 +341,10 @@ router.post('/', authenticateToken, asyncHandler(async (req: Request, res: Respo
     // Update domain context
     await prisma.domain.update({
       where: { id: domain.id },
-      data: { context: extraction.extractedContext },
+      data: {
+        context: extraction.extractedContext,
+        contextJson: extraction.contextJson as any,
+      },
     });
 
     // PHASE 2: Enhanced AI Keyword Generation
@@ -463,9 +471,20 @@ router.get('/:id', authenticateToken, asyncHandler(async (req: Request, res: Res
 
     const syncedStep = await syncDomainCurrentStep(domain.id);
 
+    const normalizedCrawlResults = domain.crawlResults.map((crawlResult) => ({
+      ...crawlResult,
+      analyzedUrls: parseStringArray(crawlResult.analyzedUrls),
+      pageSnapshots: parsePageSnapshots(crawlResult.pageSnapshots),
+      crawlPolicy: parseCrawlPolicy(crawlResult.crawlPolicy),
+      quality: parseCrawlQuality(crawlResult.quality),
+      contextJson: parseContextJson(crawlResult.contextJson),
+    }));
+
     res.json({
       success: true,
       ...domain,
+      crawlResults: normalizedCrawlResults,
+      contextJson: parseContextJson(domain.contextJson),
       currentStep: syncedStep,
     });
 

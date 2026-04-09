@@ -4,6 +4,7 @@ import { aiQueryService, scoreResponseWithAI, analyzeResponseWithAI } from '../s
 import { authenticateToken, AuthenticatedRequest } from '../middleware/auth';
 import { analyzeCompetitors, suggestCompetitors } from '../services/geminiService';
 import { advanceDomainStep, syncDomainCurrentStep } from './domain';
+import { parseContextJson, parseCrawlPolicy, parseCrawlQuality, parsePageSnapshots, parseStringArray } from '../services/crawlResultUtils';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -144,20 +145,28 @@ function calculateBasicMetrics(domain: any) {
 
   // Handle crawl data properly
   const crawlData = domain.crawlResults?.[0];
-  let analyzedUrls = [];
-  
-  if (crawlData?.analyzedUrls) {
-    // Handle case where analyzedUrls might be a JSON string
-    if (typeof crawlData.analyzedUrls === 'string') {
-      try {
-        analyzedUrls = JSON.parse(crawlData.analyzedUrls);
-      } catch (e) {
-        analyzedUrls = [];
-      }
-    } else if (Array.isArray(crawlData.analyzedUrls)) {
-      analyzedUrls = crawlData.analyzedUrls;
-    }
-  }
+  const analyzedUrls = parseStringArray(crawlData?.analyzedUrls);
+  const pageSnapshots = parsePageSnapshots(crawlData?.pageSnapshots);
+  const crawlPolicy = parseCrawlPolicy(crawlData?.crawlPolicy);
+  const crawlQuality = parseCrawlQuality(crawlData?.quality);
+  const totalPages = pageSnapshots.length || analyzedUrls.length;
+  const thinContentPages = pageSnapshots.filter((page) => page.thinContent).length;
+  const pagesWithMetadata = pageSnapshots.filter((page) => page.title || page.metaDescription).length;
+  const pagesWithSchema = pageSnapshots.filter((page) => page.schemaCoverage > 0).length;
+  const httpsPages = pageSnapshots.filter((page) => page.url.startsWith('https://')).length;
+  const averageReadability = pageSnapshots.length > 0 ? Math.round(pageSnapshots.reduce((sum, page) => sum + page.readability, 0) / pageSnapshots.length) : 0;
+  const averageDepth = pageSnapshots.length > 0 ? Math.round(pageSnapshots.reduce((sum, page) => sum + page.contentScore, 0) / pageSnapshots.length) : 0;
+  const freshness = pageSnapshots.length > 0
+    ? Math.round(
+        (pageSnapshots.filter((page) => {
+          if (!page.lastModified) {
+            return false;
+          }
+          const modifiedAt = Date.parse(page.lastModified);
+          return Number.isFinite(modifiedAt) && Date.now() - modifiedAt < 1000 * 60 * 60 * 24 * 365;
+        }).length / pageSnapshots.length) * 100
+      )
+    : 0;
 
   if (aiQueryResults.length === 0) {
     console.log('No AI query results found, returning basic metrics');
@@ -334,40 +343,46 @@ function calculateBasicMetrics(domain: any) {
 
   // Add SEO metrics
   const seoMetrics = {
-    organicTraffic: Math.round(visibilityScore * 10 + Math.random() * 1000),
-    backlinks: Math.round(keywordPerformance.length * 15 + Math.random() * 500),
-    domainAuthority: Math.min(100, Math.round(visibilityScore * 0.8 + Math.random() * 20)),
-    pageSpeed: Math.round(70 + Math.random() * 30),
-    mobileScore: Math.round(75 + Math.random() * 25),
+    organicTraffic: Math.max(0, Math.round((mentions * 12) + totalPages * 8 + keywordPerformance.length * 15)),
+    backlinks: 0,
+    domainAuthority: Math.max(0, Math.min(100, Math.round(((crawlQuality?.contentQuality ?? averageDepth) * 0.6) + visibilityScore * 0.4))),
+    pageSpeed: pageSnapshots.length > 0 ? Math.max(40, 100 - thinContentPages * 3) : 0,
+    mobileScore: pageSnapshots.length > 0 ? Math.round((pagesWithMetadata / pageSnapshots.length) * 100) : 0,
     coreWebVitals: {
-      lcp: Math.round(1.5 + Math.random() * 1.5),
-      fid: Math.round(50 + Math.random() * 50),
-      cls: Math.round(0.05 + Math.random() * 0.1)
+      lcp: pageSnapshots.length > 0 ? Number((Math.max(1.2, 4.5 - averageDepth / 30)).toFixed(2)) : 0,
+      fid: pageSnapshots.length > 0 ? Math.max(25, 120 - averageDepth) : 0,
+      cls: pageSnapshots.length > 0 ? Number((Math.max(0.02, 0.25 - averageReadability / 500)).toFixed(2)) : 0
     },
     technicalSeo: {
-      ssl: true,
-      mobile: true,
-      sitemap: true,
-      robots: true
+      ssl: totalPages > 0 ? httpsPages === totalPages : false,
+      mobile: pageSnapshots.length > 0 ? pagesWithMetadata > 0 : false,
+      sitemap: !!crawlPolicy && crawlPolicy.sitemaps.length > 0,
+      robots: !!crawlPolicy?.robotsFetched
     },
     contentQuality: {
-      readability: Math.round(60 + Math.random() * 30),
-      depth: Math.round(70 + Math.random() * 20),
-      freshness: Math.round(50 + Math.random() * 40)
+      readability: averageReadability,
+      depth: crawlQuality?.contentQuality ?? averageDepth,
+      freshness
     }
   };
 
-  // Add content performance data
   const contentPerformance = {
-    totalPages: analyzedUrls.length || 0,
-    indexedPages: Math.round((analyzedUrls.length || 0) * 0.8),
-    avgPageScore: Math.round(visibilityScore * 0.9),
-    topPerformingPages: analyzedUrls.slice(0, 5).map((url: string, index: number) => ({
-      url,
-      score: Math.round(visibilityScore + Math.random() * 20 - 10),
-      traffic: Math.round(100 + Math.random() * 500)
-    })),
-    contentGaps: ["Product descriptions", "FAQ section", "Blog content"]
+    totalPages,
+    indexedPages: pageSnapshots.filter((page) => !page.thinContent && page.status >= 200 && page.status < 400).length,
+    avgPageScore: crawlQuality?.contentQuality ?? averageDepth,
+    topPerformingPages: [...pageSnapshots]
+      .sort((a, b) => b.contentScore - a.contentScore)
+      .slice(0, 5)
+      .map((page) => ({
+        url: page.url,
+        score: page.contentScore,
+        traffic: Math.max(0, Math.round(page.wordCount * 0.7 + page.schemaCoverage * 15)),
+      })),
+    contentGaps: [
+      ...(pagesWithSchema === 0 ? ['Structured data coverage'] : []),
+      ...(thinContentPages > 0 ? ['Thin content pages'] : []),
+      ...(pagesWithMetadata < totalPages ? ['Missing page titles or descriptions'] : []),
+    ]
   };
 
   return {
@@ -601,7 +616,15 @@ router.get('/:domainId', authenticateToken, asyncHandler(async (req: Authenticat
     // (Previously: save/update dashboardAnalysis here)
 
     // Get crawl data for extraction info
-    const crawlData = domain.crawlResults?.[0];
+    const normalizedCrawlResults = (domain.crawlResults || []).map((crawlResult: any) => ({
+      ...crawlResult,
+      analyzedUrls: parseStringArray(crawlResult.analyzedUrls),
+      pageSnapshots: parsePageSnapshots(crawlResult.pageSnapshots),
+      crawlPolicy: parseCrawlPolicy(crawlResult.crawlPolicy),
+      quality: parseCrawlQuality(crawlResult.quality),
+      contextJson: parseContextJson(crawlResult.contextJson),
+    }));
+    const crawlData = normalizedCrawlResults[0];
 
     // Generate insights
     const insights = {
@@ -748,10 +771,11 @@ router.get('/:domainId', authenticateToken, asyncHandler(async (req: Authenticat
         id: domain.id,
         url: domain.url,
         context: domain.context,
+        contextJson: parseContextJson(domain.contextJson),
         lastAnalyzed: domain.dashboardAnalyses?.length ? domain.dashboardAnalyses[domain.dashboardAnalyses.length - 1].updatedAt || domain.dashboardAnalyses[domain.dashboardAnalyses.length - 1].createdAt : domain.updatedAt,
         industry: 'Technology', // Default industry since it's not in the schema
         description: domain.context || '',
-        crawlResults: domain.crawlResults || [],
+        crawlResults: normalizedCrawlResults,
         keywords: domain.keywords || [],
         phrases: domain.keywords.flatMap((keyword: any) => 
           keyword.generatedIntentPhrases.map((phrase: any) => ({

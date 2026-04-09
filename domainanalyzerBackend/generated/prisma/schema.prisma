@@ -31,6 +31,7 @@ model Domain {
   id                          Int                          @id @default(autoincrement())
   url                         String
   context                     String?
+  contextJson                 Json?
   createdAt                   DateTime                     @default(now())
   updatedAt                   DateTime                     @updatedAt
   userId                      Int?
@@ -82,6 +83,10 @@ model CrawlResult {
   tokenUsage       Int?
   domainId         Int?
   analyzedUrls     String
+  pageSnapshots    Json?
+  crawlPolicy      Json?
+  quality          Json?
+  contextJson      Json?
   domain           Domain?  @relation(fields: [domainId], references: [id])
 }
 
@@ -420,6 +425,7 @@ model WordpressPublishLog {
   id                       Int                   @id @default(autoincrement())
   userId                   Int
   wordpressUrl             String
+  wordpressPostId          Int?
   primaryKeyword           String?
   normalizedPrimaryKeyword String?
   generationJobId          String?

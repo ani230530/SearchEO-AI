@@ -2,6 +2,13 @@ import axios from 'axios';
 import * as cheerio from 'cheerio';
 import OpenAI from 'openai';
 import { PrismaClient } from '../../generated/prisma';
+import { collectSitemapUrls, fetchCrawlPolicy, isUrlAllowed } from './crawlPolicyService';
+import { parsePageSnapshots } from './crawlResultUtils';
+import { synthesizeDomainContext } from './domainSynthesisService';
+import type { CrawlPolicy, CrawlQualitySummary, DomainContextJson, PageSnapshot } from './domainContextTypes';
+import { extractPageSnapshot } from './pageExtractionService';
+import { fetchPageWithFallback } from './pageFetchService';
+import { buildInitialUrlCandidates, expandCandidatesFromPage } from './urlDiscoveryService';
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 if (!OPENAI_API_KEY) throw new Error('OPENAI_API_KEY not set in environment variables');
@@ -14,6 +21,10 @@ export interface ExtractionResult {
   analyzedUrls: string[];
   extractedContext: string;
   tokenUsage?: number;
+  contextJson?: DomainContextJson;
+  pages?: PageSnapshot[];
+  crawlPolicy?: CrawlPolicy;
+  quality?: CrawlQualitySummary;
   metadata?: {
     domainsAnalyzed: number;
     contentQuality: number;
@@ -33,6 +44,34 @@ export interface CrawlProgress {
 }
 
 export type ProgressCallback = (progress: CrawlProgress) => void;
+
+function buildQualitySummary(params: {
+  pages: PageSnapshot[];
+  policy: CrawlPolicy;
+  blockedUrls: string[];
+  cacheHits: number;
+  browserFallbacks: number;
+}): CrawlQualitySummary {
+  const { pages, policy, blockedUrls, cacheHits, browserFallbacks } = params;
+  const totalPages = Math.max(pages.length, 1);
+  const pagesWithMetadata = pages.filter((page) => page.title || page.metaDescription).length;
+  const canonicalCoverage = pages.filter((page) => !!page.canonicalUrl).length;
+
+  return {
+    contentQuality: Math.round(
+      pages.reduce((sum, page) => sum + page.contentScore, 0) / totalPages
+    ),
+    crawlEfficiency: Math.round((pages.length / Math.max(policy.maxPages, 1)) * 100),
+    thinContentRate: Math.round((pages.filter((page) => page.thinContent).length / totalPages) * 100),
+    schemaCoverage: Math.round((pages.reduce((sum, page) => sum + page.schemaCoverage, 0) / totalPages) * 100) / 100,
+    browserFallbackRate: Math.round((browserFallbacks / totalPages) * 100),
+    cacheHitRate: Math.round((cacheHits / totalPages) * 100),
+    reusedPages: cacheHits,
+    canonicalCoverage: Math.round((canonicalCoverage / totalPages) * 100),
+    pagesWithMetadata: Math.round((pagesWithMetadata / totalPages) * 100),
+    blockedUrls,
+  };
+}
 
 async function delay(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -375,160 +414,200 @@ export async function crawlAndExtractWithGpt4o(
   try {
     const domainList = Array.isArray(domains) ? domains : [domains];
     const primaryDomain = domainList[0];
-    
     const {
-      maxPages = 20,
-      maxTokens = 150000, // Leave room for response
-      contentQualityThreshold = 100, // Min chars for quality content
-      parallelDomains = true
+      maxPages = 12,
     } = options || {};
 
     onProgress?.({
-      phase: 'ai_processing',
-      step: 'Initializing intelligent crawling strategy...',
+      phase: 'discovery',
+      step: 'Loading crawl policy, robots, and sitemap hints...',
       progress: 10,
       stats: { pagesScanned: 0, analyzedUrls: [] }
     });
 
-    // Batch fetch domain contexts
-    const domainRecords = await prisma.domain.findMany({
-      where: { 
-        OR: domainList.map(domain => ({ url: { contains: domain } }))
+    const policy = await fetchCrawlPolicy(primaryDomain, { maxPages });
+    const sitemapUrls = await collectSitemapUrls(policy);
+
+    const latestDomain = await prisma.domain.findFirst({
+      where: { url: { contains: primaryDomain } },
+      include: {
+        crawlResults: {
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+        },
       },
-      select: { url: true, locationContext: true }
     });
 
-    const domainContextMap = new Map(
-      domainRecords.map(record => [record.url, record.locationContext])
-    );
+    const previousSnapshots = parsePageSnapshots(latestDomain?.crawlResults?.[0]?.pageSnapshots);
+    const previousSnapshotMap = new Map(previousSnapshots.map((page) => [page.url, page]));
 
     onProgress?.({
-      phase: 'ai_processing',
-      step: 'Executing parallel domain analysis...',
-      progress: 30,
+      phase: 'discovery',
+      step: 'Seeding crawl queue from priority URLs, homepage, and sitemap URLs...',
+      progress: 20,
       stats: { pagesScanned: 0, analyzedUrls: [] }
     });
 
-    // Parallel or sequential crawling based on options
-    let allCrawlResults: Array<{contentBlocks: string[], urls: string[]}>;
-    
-    if (parallelDomains && domainList.length > 1) {
-      // Parallel crawling for multiple domains
-      const crawlPromises = domainList.map(domain => 
-        crawlWebsiteWithProgress(
-          domain, 
-          Math.ceil(maxPages / domainList.length), // Distribute pages across domains
-          undefined, // Don't pass progress to avoid conflicts
-          customPaths, 
-          priorityUrls
-        )
-      );
-      allCrawlResults = await Promise.all(crawlPromises);
-    } else {
-      // Sequential crawling
-      allCrawlResults = [];
-      for (const domain of domainList) {
-        const result = await crawlWebsiteWithProgress(
-          domain, 
-          maxPages, 
-          onProgress, 
-          customPaths, 
-          priorityUrls
-        );
-        allCrawlResults.push(result);
+    const queue = buildInitialUrlCandidates({
+      policy,
+      sitemapUrls,
+      priorityUrls: priorityUrls || [],
+      customPaths: customPaths || [],
+    });
+    const knownUrls = new Set(queue.map((candidate) => candidate.url));
+    const visitedUrls = new Set<string>();
+    const pages: PageSnapshot[] = [];
+    const blockedUrls: string[] = [];
+    let cacheHits = 0;
+    let browserFallbacks = 0;
+
+    while (queue.length > 0 && pages.length < policy.maxPages) {
+      const candidate = queue.shift();
+      if (!candidate) {
+        break;
       }
+
+      if (visitedUrls.has(candidate.url)) {
+        continue;
+      }
+
+      if (!isUrlAllowed(policy, candidate.url)) {
+        blockedUrls.push(candidate.url);
+        visitedUrls.add(candidate.url);
+        continue;
+      }
+
+      onProgress?.({
+        phase: 'content',
+        step: `Fetching ${pages.length + 1}/${policy.maxPages} candidate pages...`,
+        progress: Math.min(75, 25 + pages.length * (45 / Math.max(policy.maxPages, 1))),
+        stats: {
+          pagesScanned: pages.length,
+          analyzedUrls: pages.map((page) => page.url),
+        },
+      });
+
+      const previousSnapshot = previousSnapshotMap.get(candidate.url);
+      const fetchResult = await fetchPageWithFallback({
+        candidate,
+        policy,
+        previousSnapshot,
+      });
+
+      let pageSnapshot: PageSnapshot | null = null;
+
+      if (fetchResult.notModified && fetchResult.cachedSnapshot) {
+        cacheHits += 1;
+        pageSnapshot = {
+          ...fetchResult.cachedSnapshot,
+          fetchedAt: new Date().toISOString(),
+          fetchMode: 'cached',
+          discoveredVia: candidate.discoveredVia,
+          sourceUrl: candidate.sourceUrl ?? fetchResult.cachedSnapshot.sourceUrl ?? null,
+          notModified: true,
+        };
+      } else if (fetchResult.html) {
+        pageSnapshot = extractPageSnapshot({
+          html: fetchResult.html,
+          requestedUrl: fetchResult.requestedUrl,
+          finalUrl: fetchResult.url,
+          status: fetchResult.status,
+          fetchMode: fetchResult.fetchMode,
+          discoveredVia: candidate.discoveredVia,
+          sourceUrl: candidate.sourceUrl,
+          headers: fetchResult.headers,
+          policy,
+        });
+        if (fetchResult.fetchMode === 'browser') {
+          browserFallbacks += 1;
+        }
+      }
+
+      visitedUrls.add(candidate.url);
+
+      if (!pageSnapshot) {
+        continue;
+      }
+
+      pages.push(pageSnapshot);
+      visitedUrls.add(pageSnapshot.url);
+      knownUrls.add(pageSnapshot.url);
+      if (pageSnapshot.canonicalUrl) {
+        knownUrls.add(pageSnapshot.canonicalUrl);
+      }
+
+      const discoveredCandidates = expandCandidatesFromPage({
+        page: pageSnapshot,
+        policy,
+        knownUrls,
+      });
+
+      for (const nextCandidate of discoveredCandidates) {
+        if (knownUrls.has(nextCandidate.url) || visitedUrls.has(nextCandidate.url)) {
+          continue;
+        }
+        knownUrls.add(nextCandidate.url);
+        queue.push(nextCandidate);
+      }
+      queue.sort((a, b) => b.priority - a.priority);
     }
 
-    // Aggregate results with smart prioritization
-    const { prioritizedContent, analyzedUrls, totalPages } = 
-      prioritizeAndFilterContent(allCrawlResults, {
-        maxPages,
-        maxTokens,
-        contentQualityThreshold,
-        priorityUrls: priorityUrls || []
-      });
+    const quality = buildQualitySummary({
+      pages,
+      policy,
+      blockedUrls,
+      cacheHits,
+      browserFallbacks,
+    });
 
     onProgress?.({
       phase: 'ai_processing',
-      step: 'Generating comprehensive business intelligence...',
-      progress: 70,
-      stats: { pagesScanned: totalPages, analyzedUrls }
+      step: 'Synthesizing structured domain context from page evidence...',
+      progress: 85,
+      stats: {
+        pagesScanned: pages.length,
+        analyzedUrls: pages.map((page) => page.url),
+      },
     });
 
-    // Build enhanced context
-    const locationDomainContext = buildLocationContext(domainContextMap, domainList);
-    const enhancedPrompt = buildAnalysisPrompt({
-      primaryDomain,
+    const synthesis = await synthesizeDomainContext({
+      domain: primaryDomain,
       location,
-      contentBlocks: prioritizedContent,
-      locationDomainContext,
-      totalPages,
-      analyzedUrls
+      pages,
+      policy,
+      quality,
     });
-
-    // Validate token count before API call
-    let promptToUse = enhancedPrompt;
-    const estimatedTokens = estimateTokenCount(enhancedPrompt);
-    if (estimatedTokens > maxTokens) {
-      console.warn(`Prompt too long (${estimatedTokens} tokens), truncating content`);
-      const truncatedContent = truncateToTokenLimit(prioritizedContent, Math.floor(maxTokens * 0.7));
-      promptToUse = buildAnalysisPrompt({
-        primaryDomain,
-        location,
-        contentBlocks: truncatedContent,
-        locationDomainContext,
-        totalPages,
-        analyzedUrls
-      });
-    }
-
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o',
-      messages: [
-        { 
-          role: 'system', 
-          content: 'You are an expert business analyst specializing in brand context extraction for SEO and marketing purposes. Provide specific, actionable insights based on actual website content.' 
-        },
-        { role: 'user', content: promptToUse }
-      ],
-      max_tokens: 2500, // Increased for comprehensive analysis
-      temperature: 0.2 // Lower for more consistent results
-    });
-
-    const totalTokens = completion.usage?.total_tokens || 0;
-    const extractedContext = completion.choices[0].message?.content || 'No context extracted';
 
     onProgress?.({
       phase: 'validation',
-      step: 'Finalizing analysis and quality validation...',
+      step: 'Finalizing structured context and compatibility output...',
       progress: 95,
-      stats: { pagesScanned: totalPages, analyzedUrls }
+      stats: {
+        pagesScanned: pages.length,
+        analyzedUrls: pages.map((page) => page.url),
+      },
     });
 
-    // Enhanced result with metadata
-    const finalResult: ExtractionResult = {
-      pagesScanned: totalPages,
-      analyzedUrls: analyzedUrls,
-      extractedContext: extractedContext,
-      tokenUsage: totalTokens,
+    return {
+      pagesScanned: pages.length,
+      analyzedUrls: pages.map((page) => page.url),
+      extractedContext: synthesis.contextText,
+      tokenUsage: synthesis.tokenUsage,
+      contextJson: synthesis.contextJson,
+      pages,
+      crawlPolicy: policy,
+      quality,
       metadata: {
         domainsAnalyzed: domainList.length,
-        contentQuality: calculateContentQualityScore(prioritizedContent),
-        crawlEfficiency: totalPages > 0 ? (prioritizedContent.length / totalPages) : 0,
-        locationContext: !!location
-      }
+        contentQuality: quality.contentQuality,
+        crawlEfficiency: quality.crawlEfficiency / 100,
+        locationContext: !!location,
+      },
     };
-
-    return finalResult;
 
   } catch (error) {
     console.error('Enhanced crawling error:', error);
-    
-    // Enhanced error handling with recovery strategies
     if (error instanceof Error) {
-      if (error.message.includes('token')) {
-        throw new Error(`Token limit exceeded. Try reducing content scope or increasing maxTokens option.`);
-      }
       if (error.message.includes('rate limit')) {
         throw new Error(`API rate limit reached. Please wait before retrying.`);
       }

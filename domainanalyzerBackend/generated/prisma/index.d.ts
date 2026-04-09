@@ -6156,6 +6156,7 @@ export namespace Prisma {
     id: number
     url: number
     context: number
+    contextJson: number
     createdAt: number
     updatedAt: number
     userId: number
@@ -6224,6 +6225,7 @@ export namespace Prisma {
     id?: true
     url?: true
     context?: true
+    contextJson?: true
     createdAt?: true
     updatedAt?: true
     userId?: true
@@ -6329,6 +6331,7 @@ export namespace Prisma {
     id: number
     url: string
     context: string | null
+    contextJson: JsonValue | null
     createdAt: Date
     updatedAt: Date
     userId: number | null
@@ -6366,6 +6369,7 @@ export namespace Prisma {
     id?: boolean
     url?: boolean
     context?: boolean
+    contextJson?: boolean
     createdAt?: boolean
     updatedAt?: boolean
     userId?: boolean
@@ -6410,6 +6414,7 @@ export namespace Prisma {
     id?: boolean
     url?: boolean
     context?: boolean
+    contextJson?: boolean
     createdAt?: boolean
     updatedAt?: boolean
     userId?: boolean
@@ -6430,6 +6435,7 @@ export namespace Prisma {
     id?: boolean
     url?: boolean
     context?: boolean
+    contextJson?: boolean
     createdAt?: boolean
     updatedAt?: boolean
     userId?: boolean
@@ -6444,7 +6450,7 @@ export namespace Prisma {
     googleAnalyticsId?: boolean
   }
 
-  export type DomainOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "url" | "context" | "createdAt" | "updatedAt" | "userId" | "location" | "chatModel" | "customKeywords" | "intentPhrases" | "runAllModels" | "locationContext" | "currentStep" | "isCompanyDomain" | "googleAnalyticsId", ExtArgs["result"]["domain"]>
+  export type DomainOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "url" | "context" | "contextJson" | "createdAt" | "updatedAt" | "userId" | "location" | "chatModel" | "customKeywords" | "intentPhrases" | "runAllModels" | "locationContext" | "currentStep" | "isCompanyDomain" | "googleAnalyticsId", ExtArgs["result"]["domain"]>
   export type DomainInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     analysisPhases?: boolean | Domain$analysisPhasesArgs<ExtArgs>
     analysisReports?: boolean | Domain$analysisReportsArgs<ExtArgs>
@@ -6510,6 +6516,7 @@ export namespace Prisma {
       id: number
       url: string
       context: string | null
+      contextJson: Prisma.JsonValue | null
       createdAt: Date
       updatedAt: Date
       userId: number | null
@@ -6943,6 +6950,7 @@ export namespace Prisma {
     readonly id: FieldRef<"Domain", 'Int'>
     readonly url: FieldRef<"Domain", 'String'>
     readonly context: FieldRef<"Domain", 'String'>
+    readonly contextJson: FieldRef<"Domain", 'Json'>
     readonly createdAt: FieldRef<"Domain", 'DateTime'>
     readonly updatedAt: FieldRef<"Domain", 'DateTime'>
     readonly userId: FieldRef<"Domain", 'Int'>
@@ -7980,6 +7988,10 @@ export namespace Prisma {
     tokenUsage: number
     domainId: number
     analyzedUrls: number
+    pageSnapshots: number
+    crawlPolicy: number
+    quality: number
+    contextJson: number
     _all: number
   }
 
@@ -8026,6 +8038,10 @@ export namespace Prisma {
     tokenUsage?: true
     domainId?: true
     analyzedUrls?: true
+    pageSnapshots?: true
+    crawlPolicy?: true
+    quality?: true
+    contextJson?: true
     _all?: true
   }
 
@@ -8123,6 +8139,10 @@ export namespace Prisma {
     tokenUsage: number | null
     domainId: number | null
     analyzedUrls: string
+    pageSnapshots: JsonValue | null
+    crawlPolicy: JsonValue | null
+    quality: JsonValue | null
+    contextJson: JsonValue | null
     _count: CrawlResultCountAggregateOutputType | null
     _avg: CrawlResultAvgAggregateOutputType | null
     _sum: CrawlResultSumAggregateOutputType | null
@@ -8152,6 +8172,10 @@ export namespace Prisma {
     tokenUsage?: boolean
     domainId?: boolean
     analyzedUrls?: boolean
+    pageSnapshots?: boolean
+    crawlPolicy?: boolean
+    quality?: boolean
+    contextJson?: boolean
     domain?: boolean | CrawlResult$domainArgs<ExtArgs>
   }, ExtArgs["result"]["crawlResult"]>
 
@@ -8163,6 +8187,10 @@ export namespace Prisma {
     tokenUsage?: boolean
     domainId?: boolean
     analyzedUrls?: boolean
+    pageSnapshots?: boolean
+    crawlPolicy?: boolean
+    quality?: boolean
+    contextJson?: boolean
     domain?: boolean | CrawlResult$domainArgs<ExtArgs>
   }, ExtArgs["result"]["crawlResult"]>
 
@@ -8175,9 +8203,13 @@ export namespace Prisma {
     tokenUsage?: boolean
     domainId?: boolean
     analyzedUrls?: boolean
+    pageSnapshots?: boolean
+    crawlPolicy?: boolean
+    quality?: boolean
+    contextJson?: boolean
   }
 
-  export type CrawlResultOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "pagesScanned" | "extractedContext" | "createdAt" | "tokenUsage" | "domainId" | "analyzedUrls", ExtArgs["result"]["crawlResult"]>
+  export type CrawlResultOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "pagesScanned" | "extractedContext" | "createdAt" | "tokenUsage" | "domainId" | "analyzedUrls" | "pageSnapshots" | "crawlPolicy" | "quality" | "contextJson", ExtArgs["result"]["crawlResult"]>
   export type CrawlResultInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     domain?: boolean | CrawlResult$domainArgs<ExtArgs>
   }
@@ -8198,6 +8230,10 @@ export namespace Prisma {
       tokenUsage: number | null
       domainId: number | null
       analyzedUrls: string
+      pageSnapshots: Prisma.JsonValue | null
+      crawlPolicy: Prisma.JsonValue | null
+      quality: Prisma.JsonValue | null
+      contextJson: Prisma.JsonValue | null
     }, ExtArgs["result"]["crawlResult"]>
     composites: {}
   }
@@ -8599,6 +8635,10 @@ export namespace Prisma {
     readonly tokenUsage: FieldRef<"CrawlResult", 'Int'>
     readonly domainId: FieldRef<"CrawlResult", 'Int'>
     readonly analyzedUrls: FieldRef<"CrawlResult", 'String'>
+    readonly pageSnapshots: FieldRef<"CrawlResult", 'Json'>
+    readonly crawlPolicy: FieldRef<"CrawlResult", 'Json'>
+    readonly quality: FieldRef<"CrawlResult", 'Json'>
+    readonly contextJson: FieldRef<"CrawlResult", 'Json'>
   }
     
 
@@ -30301,6 +30341,7 @@ export namespace Prisma {
   export type WordpressPublishLogAvgAggregateOutputType = {
     id: number | null
     userId: number | null
+    wordpressPostId: number | null
     generationPageId: number | null
     integrationId: number | null
   }
@@ -30308,6 +30349,7 @@ export namespace Prisma {
   export type WordpressPublishLogSumAggregateOutputType = {
     id: number | null
     userId: number | null
+    wordpressPostId: number | null
     generationPageId: number | null
     integrationId: number | null
   }
@@ -30316,6 +30358,7 @@ export namespace Prisma {
     id: number | null
     userId: number | null
     wordpressUrl: string | null
+    wordpressPostId: number | null
     primaryKeyword: string | null
     normalizedPrimaryKeyword: string | null
     generationJobId: string | null
@@ -30332,6 +30375,7 @@ export namespace Prisma {
     id: number | null
     userId: number | null
     wordpressUrl: string | null
+    wordpressPostId: number | null
     primaryKeyword: string | null
     normalizedPrimaryKeyword: string | null
     generationJobId: string | null
@@ -30348,6 +30392,7 @@ export namespace Prisma {
     id: number
     userId: number
     wordpressUrl: number
+    wordpressPostId: number
     primaryKeyword: number
     normalizedPrimaryKeyword: number
     generationJobId: number
@@ -30366,6 +30411,7 @@ export namespace Prisma {
   export type WordpressPublishLogAvgAggregateInputType = {
     id?: true
     userId?: true
+    wordpressPostId?: true
     generationPageId?: true
     integrationId?: true
   }
@@ -30373,6 +30419,7 @@ export namespace Prisma {
   export type WordpressPublishLogSumAggregateInputType = {
     id?: true
     userId?: true
+    wordpressPostId?: true
     generationPageId?: true
     integrationId?: true
   }
@@ -30381,6 +30428,7 @@ export namespace Prisma {
     id?: true
     userId?: true
     wordpressUrl?: true
+    wordpressPostId?: true
     primaryKeyword?: true
     normalizedPrimaryKeyword?: true
     generationJobId?: true
@@ -30397,6 +30445,7 @@ export namespace Prisma {
     id?: true
     userId?: true
     wordpressUrl?: true
+    wordpressPostId?: true
     primaryKeyword?: true
     normalizedPrimaryKeyword?: true
     generationJobId?: true
@@ -30413,6 +30462,7 @@ export namespace Prisma {
     id?: true
     userId?: true
     wordpressUrl?: true
+    wordpressPostId?: true
     primaryKeyword?: true
     normalizedPrimaryKeyword?: true
     generationJobId?: true
@@ -30517,6 +30567,7 @@ export namespace Prisma {
     id: number
     userId: number
     wordpressUrl: string
+    wordpressPostId: number | null
     primaryKeyword: string | null
     normalizedPrimaryKeyword: string | null
     generationJobId: string | null
@@ -30553,6 +30604,7 @@ export namespace Prisma {
     id?: boolean
     userId?: boolean
     wordpressUrl?: boolean
+    wordpressPostId?: boolean
     primaryKeyword?: boolean
     normalizedPrimaryKeyword?: boolean
     generationJobId?: boolean
@@ -30574,6 +30626,7 @@ export namespace Prisma {
     id?: boolean
     userId?: boolean
     wordpressUrl?: boolean
+    wordpressPostId?: boolean
     primaryKeyword?: boolean
     normalizedPrimaryKeyword?: boolean
     generationJobId?: boolean
@@ -30594,6 +30647,7 @@ export namespace Prisma {
     id?: boolean
     userId?: boolean
     wordpressUrl?: boolean
+    wordpressPostId?: boolean
     primaryKeyword?: boolean
     normalizedPrimaryKeyword?: boolean
     generationJobId?: boolean
@@ -30607,7 +30661,7 @@ export namespace Prisma {
     integrationId?: boolean
   }
 
-  export type WordpressPublishLogOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "userId" | "wordpressUrl" | "primaryKeyword" | "normalizedPrimaryKeyword" | "generationJobId" | "generationPageId" | "title" | "slug" | "status" | "response" | "createdAt" | "updatedAt" | "integrationId", ExtArgs["result"]["wordpressPublishLog"]>
+  export type WordpressPublishLogOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "userId" | "wordpressUrl" | "wordpressPostId" | "primaryKeyword" | "normalizedPrimaryKeyword" | "generationJobId" | "generationPageId" | "title" | "slug" | "status" | "response" | "createdAt" | "updatedAt" | "integrationId", ExtArgs["result"]["wordpressPublishLog"]>
   export type WordpressPublishLogInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     user?: boolean | UserDefaultArgs<ExtArgs>
     integration?: boolean | WordpressPublishLog$integrationArgs<ExtArgs>
@@ -30630,6 +30684,7 @@ export namespace Prisma {
       id: number
       userId: number
       wordpressUrl: string
+      wordpressPostId: number | null
       primaryKeyword: string | null
       normalizedPrimaryKeyword: string | null
       generationJobId: string | null
@@ -31040,6 +31095,7 @@ export namespace Prisma {
     readonly id: FieldRef<"WordpressPublishLog", 'Int'>
     readonly userId: FieldRef<"WordpressPublishLog", 'Int'>
     readonly wordpressUrl: FieldRef<"WordpressPublishLog", 'String'>
+    readonly wordpressPostId: FieldRef<"WordpressPublishLog", 'Int'>
     readonly primaryKeyword: FieldRef<"WordpressPublishLog", 'String'>
     readonly normalizedPrimaryKeyword: FieldRef<"WordpressPublishLog", 'String'>
     readonly generationJobId: FieldRef<"WordpressPublishLog", 'String'>
@@ -49233,6 +49289,7 @@ export namespace Prisma {
     id: 'id',
     url: 'url',
     context: 'context',
+    contextJson: 'contextJson',
     createdAt: 'createdAt',
     updatedAt: 'updatedAt',
     userId: 'userId',
@@ -49257,7 +49314,11 @@ export namespace Prisma {
     createdAt: 'createdAt',
     tokenUsage: 'tokenUsage',
     domainId: 'domainId',
-    analyzedUrls: 'analyzedUrls'
+    analyzedUrls: 'analyzedUrls',
+    pageSnapshots: 'pageSnapshots',
+    crawlPolicy: 'crawlPolicy',
+    quality: 'quality',
+    contextJson: 'contextJson'
   };
 
   export type CrawlResultScalarFieldEnum = (typeof CrawlResultScalarFieldEnum)[keyof typeof CrawlResultScalarFieldEnum]
@@ -49586,6 +49647,7 @@ export namespace Prisma {
     id: 'id',
     userId: 'userId',
     wordpressUrl: 'wordpressUrl',
+    wordpressPostId: 'wordpressPostId',
     primaryKeyword: 'primaryKeyword',
     normalizedPrimaryKeyword: 'normalizedPrimaryKeyword',
     generationJobId: 'generationJobId',
@@ -49959,6 +50021,13 @@ export namespace Prisma {
 
 
   /**
+   * Reference to a field of type 'Json'
+   */
+  export type JsonFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Json'>
+    
+
+
+  /**
    * Reference to a field of type 'Float'
    */
   export type FloatFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Float'>
@@ -49969,13 +50038,6 @@ export namespace Prisma {
    * Reference to a field of type 'Float[]'
    */
   export type ListFloatFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Float[]'>
-    
-
-
-  /**
-   * Reference to a field of type 'Json'
-   */
-  export type JsonFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Json'>
     
 
 
@@ -50116,6 +50178,7 @@ export namespace Prisma {
     id?: IntFilter<"Domain"> | number
     url?: StringFilter<"Domain"> | string
     context?: StringNullableFilter<"Domain"> | string | null
+    contextJson?: JsonNullableFilter<"Domain">
     createdAt?: DateTimeFilter<"Domain"> | Date | string
     updatedAt?: DateTimeFilter<"Domain"> | Date | string
     userId?: IntNullableFilter<"Domain"> | number | null
@@ -50159,6 +50222,7 @@ export namespace Prisma {
     id?: SortOrder
     url?: SortOrder
     context?: SortOrderInput | SortOrder
+    contextJson?: SortOrderInput | SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     userId?: SortOrderInput | SortOrder
@@ -50206,6 +50270,7 @@ export namespace Prisma {
     NOT?: DomainWhereInput | DomainWhereInput[]
     url?: StringFilter<"Domain"> | string
     context?: StringNullableFilter<"Domain"> | string | null
+    contextJson?: JsonNullableFilter<"Domain">
     createdAt?: DateTimeFilter<"Domain"> | Date | string
     updatedAt?: DateTimeFilter<"Domain"> | Date | string
     userId?: IntNullableFilter<"Domain"> | number | null
@@ -50249,6 +50314,7 @@ export namespace Prisma {
     id?: SortOrder
     url?: SortOrder
     context?: SortOrderInput | SortOrder
+    contextJson?: SortOrderInput | SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     userId?: SortOrderInput | SortOrder
@@ -50275,6 +50341,7 @@ export namespace Prisma {
     id?: IntWithAggregatesFilter<"Domain"> | number
     url?: StringWithAggregatesFilter<"Domain"> | string
     context?: StringNullableWithAggregatesFilter<"Domain"> | string | null
+    contextJson?: JsonNullableWithAggregatesFilter<"Domain">
     createdAt?: DateTimeWithAggregatesFilter<"Domain"> | Date | string
     updatedAt?: DateTimeWithAggregatesFilter<"Domain"> | Date | string
     userId?: IntNullableWithAggregatesFilter<"Domain"> | number | null
@@ -50300,6 +50367,10 @@ export namespace Prisma {
     tokenUsage?: IntNullableFilter<"CrawlResult"> | number | null
     domainId?: IntNullableFilter<"CrawlResult"> | number | null
     analyzedUrls?: StringFilter<"CrawlResult"> | string
+    pageSnapshots?: JsonNullableFilter<"CrawlResult">
+    crawlPolicy?: JsonNullableFilter<"CrawlResult">
+    quality?: JsonNullableFilter<"CrawlResult">
+    contextJson?: JsonNullableFilter<"CrawlResult">
     domain?: XOR<DomainNullableRelationFilter, DomainWhereInput> | null
   }
 
@@ -50311,6 +50382,10 @@ export namespace Prisma {
     tokenUsage?: SortOrderInput | SortOrder
     domainId?: SortOrderInput | SortOrder
     analyzedUrls?: SortOrder
+    pageSnapshots?: SortOrderInput | SortOrder
+    crawlPolicy?: SortOrderInput | SortOrder
+    quality?: SortOrderInput | SortOrder
+    contextJson?: SortOrderInput | SortOrder
     domain?: DomainOrderByWithRelationInput
   }
 
@@ -50325,6 +50400,10 @@ export namespace Prisma {
     tokenUsage?: IntNullableFilter<"CrawlResult"> | number | null
     domainId?: IntNullableFilter<"CrawlResult"> | number | null
     analyzedUrls?: StringFilter<"CrawlResult"> | string
+    pageSnapshots?: JsonNullableFilter<"CrawlResult">
+    crawlPolicy?: JsonNullableFilter<"CrawlResult">
+    quality?: JsonNullableFilter<"CrawlResult">
+    contextJson?: JsonNullableFilter<"CrawlResult">
     domain?: XOR<DomainNullableRelationFilter, DomainWhereInput> | null
   }, "id">
 
@@ -50336,6 +50415,10 @@ export namespace Prisma {
     tokenUsage?: SortOrderInput | SortOrder
     domainId?: SortOrderInput | SortOrder
     analyzedUrls?: SortOrder
+    pageSnapshots?: SortOrderInput | SortOrder
+    crawlPolicy?: SortOrderInput | SortOrder
+    quality?: SortOrderInput | SortOrder
+    contextJson?: SortOrderInput | SortOrder
     _count?: CrawlResultCountOrderByAggregateInput
     _avg?: CrawlResultAvgOrderByAggregateInput
     _max?: CrawlResultMaxOrderByAggregateInput
@@ -50354,6 +50437,10 @@ export namespace Prisma {
     tokenUsage?: IntNullableWithAggregatesFilter<"CrawlResult"> | number | null
     domainId?: IntNullableWithAggregatesFilter<"CrawlResult"> | number | null
     analyzedUrls?: StringWithAggregatesFilter<"CrawlResult"> | string
+    pageSnapshots?: JsonNullableWithAggregatesFilter<"CrawlResult">
+    crawlPolicy?: JsonNullableWithAggregatesFilter<"CrawlResult">
+    quality?: JsonNullableWithAggregatesFilter<"CrawlResult">
+    contextJson?: JsonNullableWithAggregatesFilter<"CrawlResult">
   }
 
   export type KeywordWhereInput = {
@@ -52036,6 +52123,7 @@ export namespace Prisma {
     id?: IntFilter<"WordpressPublishLog"> | number
     userId?: IntFilter<"WordpressPublishLog"> | number
     wordpressUrl?: StringFilter<"WordpressPublishLog"> | string
+    wordpressPostId?: IntNullableFilter<"WordpressPublishLog"> | number | null
     primaryKeyword?: StringNullableFilter<"WordpressPublishLog"> | string | null
     normalizedPrimaryKeyword?: StringNullableFilter<"WordpressPublishLog"> | string | null
     generationJobId?: StringNullableFilter<"WordpressPublishLog"> | string | null
@@ -52056,6 +52144,7 @@ export namespace Prisma {
     id?: SortOrder
     userId?: SortOrder
     wordpressUrl?: SortOrder
+    wordpressPostId?: SortOrderInput | SortOrder
     primaryKeyword?: SortOrderInput | SortOrder
     normalizedPrimaryKeyword?: SortOrderInput | SortOrder
     generationJobId?: SortOrderInput | SortOrder
@@ -52079,6 +52168,7 @@ export namespace Prisma {
     NOT?: WordpressPublishLogWhereInput | WordpressPublishLogWhereInput[]
     userId?: IntFilter<"WordpressPublishLog"> | number
     wordpressUrl?: StringFilter<"WordpressPublishLog"> | string
+    wordpressPostId?: IntNullableFilter<"WordpressPublishLog"> | number | null
     primaryKeyword?: StringNullableFilter<"WordpressPublishLog"> | string | null
     normalizedPrimaryKeyword?: StringNullableFilter<"WordpressPublishLog"> | string | null
     generationJobId?: StringNullableFilter<"WordpressPublishLog"> | string | null
@@ -52099,6 +52189,7 @@ export namespace Prisma {
     id?: SortOrder
     userId?: SortOrder
     wordpressUrl?: SortOrder
+    wordpressPostId?: SortOrderInput | SortOrder
     primaryKeyword?: SortOrderInput | SortOrder
     normalizedPrimaryKeyword?: SortOrderInput | SortOrder
     generationJobId?: SortOrderInput | SortOrder
@@ -52124,6 +52215,7 @@ export namespace Prisma {
     id?: IntWithAggregatesFilter<"WordpressPublishLog"> | number
     userId?: IntWithAggregatesFilter<"WordpressPublishLog"> | number
     wordpressUrl?: StringWithAggregatesFilter<"WordpressPublishLog"> | string
+    wordpressPostId?: IntNullableWithAggregatesFilter<"WordpressPublishLog"> | number | null
     primaryKeyword?: StringNullableWithAggregatesFilter<"WordpressPublishLog"> | string | null
     normalizedPrimaryKeyword?: StringNullableWithAggregatesFilter<"WordpressPublishLog"> | string | null
     generationJobId?: StringNullableWithAggregatesFilter<"WordpressPublishLog"> | string | null
@@ -53609,6 +53701,7 @@ export namespace Prisma {
   export type DomainCreateInput = {
     url: string
     context?: string | null
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: Date | string
     updatedAt?: Date | string
     location?: string | null
@@ -53651,6 +53744,7 @@ export namespace Prisma {
     id?: number
     url: string
     context?: string | null
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: Date | string
     updatedAt?: Date | string
     userId?: number | null
@@ -53692,6 +53786,7 @@ export namespace Prisma {
   export type DomainUpdateInput = {
     url?: StringFieldUpdateOperationsInput | string
     context?: NullableStringFieldUpdateOperationsInput | string | null
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     location?: NullableStringFieldUpdateOperationsInput | string | null
@@ -53734,6 +53829,7 @@ export namespace Prisma {
     id?: IntFieldUpdateOperationsInput | number
     url?: StringFieldUpdateOperationsInput | string
     context?: NullableStringFieldUpdateOperationsInput | string | null
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     userId?: NullableIntFieldUpdateOperationsInput | number | null
@@ -53776,6 +53872,7 @@ export namespace Prisma {
     id?: number
     url: string
     context?: string | null
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: Date | string
     updatedAt?: Date | string
     userId?: number | null
@@ -53793,6 +53890,7 @@ export namespace Prisma {
   export type DomainUpdateManyMutationInput = {
     url?: StringFieldUpdateOperationsInput | string
     context?: NullableStringFieldUpdateOperationsInput | string | null
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     location?: NullableStringFieldUpdateOperationsInput | string | null
@@ -53810,6 +53908,7 @@ export namespace Prisma {
     id?: IntFieldUpdateOperationsInput | number
     url?: StringFieldUpdateOperationsInput | string
     context?: NullableStringFieldUpdateOperationsInput | string | null
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     userId?: NullableIntFieldUpdateOperationsInput | number | null
@@ -53830,6 +53929,10 @@ export namespace Prisma {
     createdAt?: Date | string
     tokenUsage?: number | null
     analyzedUrls: string
+    pageSnapshots?: NullableJsonNullValueInput | InputJsonValue
+    crawlPolicy?: NullableJsonNullValueInput | InputJsonValue
+    quality?: NullableJsonNullValueInput | InputJsonValue
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     domain?: DomainCreateNestedOneWithoutCrawlResultsInput
   }
 
@@ -53841,6 +53944,10 @@ export namespace Prisma {
     tokenUsage?: number | null
     domainId?: number | null
     analyzedUrls: string
+    pageSnapshots?: NullableJsonNullValueInput | InputJsonValue
+    crawlPolicy?: NullableJsonNullValueInput | InputJsonValue
+    quality?: NullableJsonNullValueInput | InputJsonValue
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
   }
 
   export type CrawlResultUpdateInput = {
@@ -53849,6 +53956,10 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     tokenUsage?: NullableIntFieldUpdateOperationsInput | number | null
     analyzedUrls?: StringFieldUpdateOperationsInput | string
+    pageSnapshots?: NullableJsonNullValueInput | InputJsonValue
+    crawlPolicy?: NullableJsonNullValueInput | InputJsonValue
+    quality?: NullableJsonNullValueInput | InputJsonValue
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     domain?: DomainUpdateOneWithoutCrawlResultsNestedInput
   }
 
@@ -53860,6 +53971,10 @@ export namespace Prisma {
     tokenUsage?: NullableIntFieldUpdateOperationsInput | number | null
     domainId?: NullableIntFieldUpdateOperationsInput | number | null
     analyzedUrls?: StringFieldUpdateOperationsInput | string
+    pageSnapshots?: NullableJsonNullValueInput | InputJsonValue
+    crawlPolicy?: NullableJsonNullValueInput | InputJsonValue
+    quality?: NullableJsonNullValueInput | InputJsonValue
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
   }
 
   export type CrawlResultCreateManyInput = {
@@ -53870,6 +53985,10 @@ export namespace Prisma {
     tokenUsage?: number | null
     domainId?: number | null
     analyzedUrls: string
+    pageSnapshots?: NullableJsonNullValueInput | InputJsonValue
+    crawlPolicy?: NullableJsonNullValueInput | InputJsonValue
+    quality?: NullableJsonNullValueInput | InputJsonValue
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
   }
 
   export type CrawlResultUpdateManyMutationInput = {
@@ -53878,6 +53997,10 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     tokenUsage?: NullableIntFieldUpdateOperationsInput | number | null
     analyzedUrls?: StringFieldUpdateOperationsInput | string
+    pageSnapshots?: NullableJsonNullValueInput | InputJsonValue
+    crawlPolicy?: NullableJsonNullValueInput | InputJsonValue
+    quality?: NullableJsonNullValueInput | InputJsonValue
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
   }
 
   export type CrawlResultUncheckedUpdateManyInput = {
@@ -53888,6 +54011,10 @@ export namespace Prisma {
     tokenUsage?: NullableIntFieldUpdateOperationsInput | number | null
     domainId?: NullableIntFieldUpdateOperationsInput | number | null
     analyzedUrls?: StringFieldUpdateOperationsInput | string
+    pageSnapshots?: NullableJsonNullValueInput | InputJsonValue
+    crawlPolicy?: NullableJsonNullValueInput | InputJsonValue
+    quality?: NullableJsonNullValueInput | InputJsonValue
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
   }
 
   export type KeywordCreateInput = {
@@ -55688,6 +55815,7 @@ export namespace Prisma {
 
   export type WordpressPublishLogCreateInput = {
     wordpressUrl: string
+    wordpressPostId?: number | null
     primaryKeyword?: string | null
     normalizedPrimaryKeyword?: string | null
     generationJobId?: string | null
@@ -55707,6 +55835,7 @@ export namespace Prisma {
     id?: number
     userId: number
     wordpressUrl: string
+    wordpressPostId?: number | null
     primaryKeyword?: string | null
     normalizedPrimaryKeyword?: string | null
     generationJobId?: string | null
@@ -55723,6 +55852,7 @@ export namespace Prisma {
 
   export type WordpressPublishLogUpdateInput = {
     wordpressUrl?: StringFieldUpdateOperationsInput | string
+    wordpressPostId?: NullableIntFieldUpdateOperationsInput | number | null
     primaryKeyword?: NullableStringFieldUpdateOperationsInput | string | null
     normalizedPrimaryKeyword?: NullableStringFieldUpdateOperationsInput | string | null
     generationJobId?: NullableStringFieldUpdateOperationsInput | string | null
@@ -55742,6 +55872,7 @@ export namespace Prisma {
     id?: IntFieldUpdateOperationsInput | number
     userId?: IntFieldUpdateOperationsInput | number
     wordpressUrl?: StringFieldUpdateOperationsInput | string
+    wordpressPostId?: NullableIntFieldUpdateOperationsInput | number | null
     primaryKeyword?: NullableStringFieldUpdateOperationsInput | string | null
     normalizedPrimaryKeyword?: NullableStringFieldUpdateOperationsInput | string | null
     generationJobId?: NullableStringFieldUpdateOperationsInput | string | null
@@ -55760,6 +55891,7 @@ export namespace Prisma {
     id?: number
     userId: number
     wordpressUrl: string
+    wordpressPostId?: number | null
     primaryKeyword?: string | null
     normalizedPrimaryKeyword?: string | null
     generationJobId?: string | null
@@ -55775,6 +55907,7 @@ export namespace Prisma {
 
   export type WordpressPublishLogUpdateManyMutationInput = {
     wordpressUrl?: StringFieldUpdateOperationsInput | string
+    wordpressPostId?: NullableIntFieldUpdateOperationsInput | number | null
     primaryKeyword?: NullableStringFieldUpdateOperationsInput | string | null
     normalizedPrimaryKeyword?: NullableStringFieldUpdateOperationsInput | string | null
     generationJobId?: NullableStringFieldUpdateOperationsInput | string | null
@@ -55791,6 +55924,7 @@ export namespace Prisma {
     id?: IntFieldUpdateOperationsInput | number
     userId?: IntFieldUpdateOperationsInput | number
     wordpressUrl?: StringFieldUpdateOperationsInput | string
+    wordpressPostId?: NullableIntFieldUpdateOperationsInput | number | null
     primaryKeyword?: NullableStringFieldUpdateOperationsInput | string | null
     normalizedPrimaryKeyword?: NullableStringFieldUpdateOperationsInput | string | null
     generationJobId?: NullableStringFieldUpdateOperationsInput | string | null
@@ -57460,6 +57594,28 @@ export namespace Prisma {
     _min?: NestedDateTimeFilter<$PrismaModel>
     _max?: NestedDateTimeFilter<$PrismaModel>
   }
+  export type JsonNullableFilter<$PrismaModel = never> =
+    | PatchUndefined<
+        Either<Required<JsonNullableFilterBase<$PrismaModel>>, Exclude<keyof Required<JsonNullableFilterBase<$PrismaModel>>, 'path'>>,
+        Required<JsonNullableFilterBase<$PrismaModel>>
+      >
+    | OptionalFlat<Omit<Required<JsonNullableFilterBase<$PrismaModel>>, 'path'>>
+
+  export type JsonNullableFilterBase<$PrismaModel = never> = {
+    equals?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
+    path?: string[]
+    string_contains?: string | StringFieldRefInput<$PrismaModel>
+    string_starts_with?: string | StringFieldRefInput<$PrismaModel>
+    string_ends_with?: string | StringFieldRefInput<$PrismaModel>
+    array_contains?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
+    array_starts_with?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
+    array_ends_with?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
+    lt?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    lte?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    gt?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    gte?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    not?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
+  }
 
   export type IntNullableFilter<$PrismaModel = never> = {
     equals?: number | IntFieldRefInput<$PrismaModel> | null
@@ -57726,6 +57882,7 @@ export namespace Prisma {
     id?: SortOrder
     url?: SortOrder
     context?: SortOrder
+    contextJson?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     userId?: SortOrder
@@ -57787,6 +57944,31 @@ export namespace Prisma {
     userId?: SortOrder
     currentStep?: SortOrder
   }
+  export type JsonNullableWithAggregatesFilter<$PrismaModel = never> =
+    | PatchUndefined<
+        Either<Required<JsonNullableWithAggregatesFilterBase<$PrismaModel>>, Exclude<keyof Required<JsonNullableWithAggregatesFilterBase<$PrismaModel>>, 'path'>>,
+        Required<JsonNullableWithAggregatesFilterBase<$PrismaModel>>
+      >
+    | OptionalFlat<Omit<Required<JsonNullableWithAggregatesFilterBase<$PrismaModel>>, 'path'>>
+
+  export type JsonNullableWithAggregatesFilterBase<$PrismaModel = never> = {
+    equals?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
+    path?: string[]
+    string_contains?: string | StringFieldRefInput<$PrismaModel>
+    string_starts_with?: string | StringFieldRefInput<$PrismaModel>
+    string_ends_with?: string | StringFieldRefInput<$PrismaModel>
+    array_contains?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
+    array_starts_with?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
+    array_ends_with?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
+    lt?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    lte?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    gt?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    gte?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    not?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
+    _count?: NestedIntNullableFilter<$PrismaModel>
+    _min?: NestedJsonNullableFilter<$PrismaModel>
+    _max?: NestedJsonNullableFilter<$PrismaModel>
+  }
 
   export type IntNullableWithAggregatesFilter<$PrismaModel = never> = {
     equals?: number | IntFieldRefInput<$PrismaModel> | null
@@ -57817,6 +57999,10 @@ export namespace Prisma {
     tokenUsage?: SortOrder
     domainId?: SortOrder
     analyzedUrls?: SortOrder
+    pageSnapshots?: SortOrder
+    crawlPolicy?: SortOrder
+    quality?: SortOrder
+    contextJson?: SortOrder
   }
 
   export type CrawlResultAvgOrderByAggregateInput = {
@@ -57950,28 +58136,6 @@ export namespace Prisma {
     _min?: NestedFloatFilter<$PrismaModel>
     _max?: NestedFloatFilter<$PrismaModel>
   }
-  export type JsonNullableFilter<$PrismaModel = never> =
-    | PatchUndefined<
-        Either<Required<JsonNullableFilterBase<$PrismaModel>>, Exclude<keyof Required<JsonNullableFilterBase<$PrismaModel>>, 'path'>>,
-        Required<JsonNullableFilterBase<$PrismaModel>>
-      >
-    | OptionalFlat<Omit<Required<JsonNullableFilterBase<$PrismaModel>>, 'path'>>
-
-  export type JsonNullableFilterBase<$PrismaModel = never> = {
-    equals?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
-    path?: string[]
-    string_contains?: string | StringFieldRefInput<$PrismaModel>
-    string_starts_with?: string | StringFieldRefInput<$PrismaModel>
-    string_ends_with?: string | StringFieldRefInput<$PrismaModel>
-    array_contains?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
-    array_starts_with?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
-    array_ends_with?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
-    lt?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
-    lte?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
-    gt?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
-    gte?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
-    not?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
-  }
 
   export type KeywordRelationFilter = {
     is?: KeywordWhereInput
@@ -58050,31 +58214,6 @@ export namespace Prisma {
     keywordId?: SortOrder
     relevanceScore?: SortOrder
     confidence?: SortOrder
-  }
-  export type JsonNullableWithAggregatesFilter<$PrismaModel = never> =
-    | PatchUndefined<
-        Either<Required<JsonNullableWithAggregatesFilterBase<$PrismaModel>>, Exclude<keyof Required<JsonNullableWithAggregatesFilterBase<$PrismaModel>>, 'path'>>,
-        Required<JsonNullableWithAggregatesFilterBase<$PrismaModel>>
-      >
-    | OptionalFlat<Omit<Required<JsonNullableWithAggregatesFilterBase<$PrismaModel>>, 'path'>>
-
-  export type JsonNullableWithAggregatesFilterBase<$PrismaModel = never> = {
-    equals?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
-    path?: string[]
-    string_contains?: string | StringFieldRefInput<$PrismaModel>
-    string_starts_with?: string | StringFieldRefInput<$PrismaModel>
-    string_ends_with?: string | StringFieldRefInput<$PrismaModel>
-    array_contains?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
-    array_starts_with?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
-    array_ends_with?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
-    lt?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
-    lte?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
-    gt?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
-    gte?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
-    not?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
-    _count?: NestedIntNullableFilter<$PrismaModel>
-    _min?: NestedJsonNullableFilter<$PrismaModel>
-    _max?: NestedJsonNullableFilter<$PrismaModel>
   }
 
   export type FloatNullableFilter<$PrismaModel = never> = {
@@ -59080,6 +59219,7 @@ export namespace Prisma {
     id?: SortOrder
     userId?: SortOrder
     wordpressUrl?: SortOrder
+    wordpressPostId?: SortOrder
     primaryKeyword?: SortOrder
     normalizedPrimaryKeyword?: SortOrder
     generationJobId?: SortOrder
@@ -59096,6 +59236,7 @@ export namespace Prisma {
   export type WordpressPublishLogAvgOrderByAggregateInput = {
     id?: SortOrder
     userId?: SortOrder
+    wordpressPostId?: SortOrder
     generationPageId?: SortOrder
     integrationId?: SortOrder
   }
@@ -59104,6 +59245,7 @@ export namespace Prisma {
     id?: SortOrder
     userId?: SortOrder
     wordpressUrl?: SortOrder
+    wordpressPostId?: SortOrder
     primaryKeyword?: SortOrder
     normalizedPrimaryKeyword?: SortOrder
     generationJobId?: SortOrder
@@ -59120,6 +59262,7 @@ export namespace Prisma {
     id?: SortOrder
     userId?: SortOrder
     wordpressUrl?: SortOrder
+    wordpressPostId?: SortOrder
     primaryKeyword?: SortOrder
     normalizedPrimaryKeyword?: SortOrder
     generationJobId?: SortOrder
@@ -59135,6 +59278,7 @@ export namespace Prisma {
   export type WordpressPublishLogSumOrderByAggregateInput = {
     id?: SortOrder
     userId?: SortOrder
+    wordpressPostId?: SortOrder
     generationPageId?: SortOrder
     integrationId?: SortOrder
   }
@@ -63093,6 +63237,28 @@ export namespace Prisma {
     _min?: NestedDateTimeFilter<$PrismaModel>
     _max?: NestedDateTimeFilter<$PrismaModel>
   }
+  export type NestedJsonNullableFilter<$PrismaModel = never> =
+    | PatchUndefined<
+        Either<Required<NestedJsonNullableFilterBase<$PrismaModel>>, Exclude<keyof Required<NestedJsonNullableFilterBase<$PrismaModel>>, 'path'>>,
+        Required<NestedJsonNullableFilterBase<$PrismaModel>>
+      >
+    | OptionalFlat<Omit<Required<NestedJsonNullableFilterBase<$PrismaModel>>, 'path'>>
+
+  export type NestedJsonNullableFilterBase<$PrismaModel = never> = {
+    equals?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
+    path?: string[]
+    string_contains?: string | StringFieldRefInput<$PrismaModel>
+    string_starts_with?: string | StringFieldRefInput<$PrismaModel>
+    string_ends_with?: string | StringFieldRefInput<$PrismaModel>
+    array_contains?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
+    array_starts_with?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
+    array_ends_with?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
+    lt?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    lte?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    gt?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    gte?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    not?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
+  }
 
   export type NestedIntNullableWithAggregatesFilter<$PrismaModel = never> = {
     equals?: number | IntFieldRefInput<$PrismaModel> | null
@@ -63135,28 +63301,6 @@ export namespace Prisma {
     _sum?: NestedFloatFilter<$PrismaModel>
     _min?: NestedFloatFilter<$PrismaModel>
     _max?: NestedFloatFilter<$PrismaModel>
-  }
-  export type NestedJsonNullableFilter<$PrismaModel = never> =
-    | PatchUndefined<
-        Either<Required<NestedJsonNullableFilterBase<$PrismaModel>>, Exclude<keyof Required<NestedJsonNullableFilterBase<$PrismaModel>>, 'path'>>,
-        Required<NestedJsonNullableFilterBase<$PrismaModel>>
-      >
-    | OptionalFlat<Omit<Required<NestedJsonNullableFilterBase<$PrismaModel>>, 'path'>>
-
-  export type NestedJsonNullableFilterBase<$PrismaModel = never> = {
-    equals?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
-    path?: string[]
-    string_contains?: string | StringFieldRefInput<$PrismaModel>
-    string_starts_with?: string | StringFieldRefInput<$PrismaModel>
-    string_ends_with?: string | StringFieldRefInput<$PrismaModel>
-    array_contains?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
-    array_starts_with?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
-    array_ends_with?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
-    lt?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
-    lte?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
-    gt?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
-    gte?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
-    not?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
   }
 
   export type NestedFloatNullableWithAggregatesFilter<$PrismaModel = never> = {
@@ -63234,6 +63378,7 @@ export namespace Prisma {
   export type DomainCreateWithoutUserInput = {
     url: string
     context?: string | null
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: Date | string
     updatedAt?: Date | string
     location?: string | null
@@ -63275,6 +63420,7 @@ export namespace Prisma {
     id?: number
     url: string
     context?: string | null
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: Date | string
     updatedAt?: Date | string
     location?: string | null
@@ -63382,6 +63528,7 @@ export namespace Prisma {
 
   export type WordpressPublishLogCreateWithoutUserInput = {
     wordpressUrl: string
+    wordpressPostId?: number | null
     primaryKeyword?: string | null
     normalizedPrimaryKeyword?: string | null
     generationJobId?: string | null
@@ -63399,6 +63546,7 @@ export namespace Prisma {
   export type WordpressPublishLogUncheckedCreateWithoutUserInput = {
     id?: number
     wordpressUrl: string
+    wordpressPostId?: number | null
     primaryKeyword?: string | null
     normalizedPrimaryKeyword?: string | null
     generationJobId?: string | null
@@ -63475,6 +63623,7 @@ export namespace Prisma {
     id?: IntFilter<"Domain"> | number
     url?: StringFilter<"Domain"> | string
     context?: StringNullableFilter<"Domain"> | string | null
+    contextJson?: JsonNullableFilter<"Domain">
     createdAt?: DateTimeFilter<"Domain"> | Date | string
     updatedAt?: DateTimeFilter<"Domain"> | Date | string
     userId?: IntNullableFilter<"Domain"> | number | null
@@ -63582,6 +63731,7 @@ export namespace Prisma {
     id?: IntFilter<"WordpressPublishLog"> | number
     userId?: IntFilter<"WordpressPublishLog"> | number
     wordpressUrl?: StringFilter<"WordpressPublishLog"> | string
+    wordpressPostId?: IntNullableFilter<"WordpressPublishLog"> | number | null
     primaryKeyword?: StringNullableFilter<"WordpressPublishLog"> | string | null
     normalizedPrimaryKeyword?: StringNullableFilter<"WordpressPublishLog"> | string | null
     generationJobId?: StringNullableFilter<"WordpressPublishLog"> | string | null
@@ -63822,6 +63972,10 @@ export namespace Prisma {
     createdAt?: Date | string
     tokenUsage?: number | null
     analyzedUrls: string
+    pageSnapshots?: NullableJsonNullValueInput | InputJsonValue
+    crawlPolicy?: NullableJsonNullValueInput | InputJsonValue
+    quality?: NullableJsonNullValueInput | InputJsonValue
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
   }
 
   export type CrawlResultUncheckedCreateWithoutDomainInput = {
@@ -63831,6 +63985,10 @@ export namespace Prisma {
     createdAt?: Date | string
     tokenUsage?: number | null
     analyzedUrls: string
+    pageSnapshots?: NullableJsonNullValueInput | InputJsonValue
+    crawlPolicy?: NullableJsonNullValueInput | InputJsonValue
+    quality?: NullableJsonNullValueInput | InputJsonValue
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
   }
 
   export type CrawlResultCreateOrConnectWithoutDomainInput = {
@@ -64676,6 +64834,10 @@ export namespace Prisma {
     tokenUsage?: IntNullableFilter<"CrawlResult"> | number | null
     domainId?: IntNullableFilter<"CrawlResult"> | number | null
     analyzedUrls?: StringFilter<"CrawlResult"> | string
+    pageSnapshots?: JsonNullableFilter<"CrawlResult">
+    crawlPolicy?: JsonNullableFilter<"CrawlResult">
+    quality?: JsonNullableFilter<"CrawlResult">
+    contextJson?: JsonNullableFilter<"CrawlResult">
   }
 
   export type DashboardAnalysisUpsertWithWhereUniqueWithoutDomainInput = {
@@ -65268,6 +65430,7 @@ export namespace Prisma {
   export type DomainCreateWithoutCrawlResultsInput = {
     url: string
     context?: string | null
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: Date | string
     updatedAt?: Date | string
     location?: string | null
@@ -65309,6 +65472,7 @@ export namespace Prisma {
     id?: number
     url: string
     context?: string | null
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: Date | string
     updatedAt?: Date | string
     userId?: number | null
@@ -65365,6 +65529,7 @@ export namespace Prisma {
   export type DomainUpdateWithoutCrawlResultsInput = {
     url?: StringFieldUpdateOperationsInput | string
     context?: NullableStringFieldUpdateOperationsInput | string | null
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     location?: NullableStringFieldUpdateOperationsInput | string | null
@@ -65406,6 +65571,7 @@ export namespace Prisma {
     id?: IntFieldUpdateOperationsInput | number
     url?: StringFieldUpdateOperationsInput | string
     context?: NullableStringFieldUpdateOperationsInput | string | null
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     userId?: NullableIntFieldUpdateOperationsInput | number | null
@@ -65580,6 +65746,7 @@ export namespace Prisma {
   export type DomainCreateWithoutKeywordsInput = {
     url: string
     context?: string | null
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: Date | string
     updatedAt?: Date | string
     location?: string | null
@@ -65621,6 +65788,7 @@ export namespace Prisma {
     id?: number
     url: string
     context?: string | null
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: Date | string
     updatedAt?: Date | string
     userId?: number | null
@@ -65838,6 +66006,7 @@ export namespace Prisma {
   export type DomainUpdateWithoutKeywordsInput = {
     url?: StringFieldUpdateOperationsInput | string
     context?: NullableStringFieldUpdateOperationsInput | string | null
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     location?: NullableStringFieldUpdateOperationsInput | string | null
@@ -65879,6 +66048,7 @@ export namespace Prisma {
     id?: IntFieldUpdateOperationsInput | number
     url?: StringFieldUpdateOperationsInput | string
     context?: NullableStringFieldUpdateOperationsInput | string | null
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     userId?: NullableIntFieldUpdateOperationsInput | number | null
@@ -66268,6 +66438,7 @@ export namespace Prisma {
   export type DomainCreateWithoutAnalysisReportsInput = {
     url: string
     context?: string | null
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: Date | string
     updatedAt?: Date | string
     location?: string | null
@@ -66309,6 +66480,7 @@ export namespace Prisma {
     id?: number
     url: string
     context?: string | null
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: Date | string
     updatedAt?: Date | string
     userId?: number | null
@@ -66365,6 +66537,7 @@ export namespace Prisma {
   export type DomainUpdateWithoutAnalysisReportsInput = {
     url?: StringFieldUpdateOperationsInput | string
     context?: NullableStringFieldUpdateOperationsInput | string | null
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     location?: NullableStringFieldUpdateOperationsInput | string | null
@@ -66406,6 +66579,7 @@ export namespace Prisma {
     id?: IntFieldUpdateOperationsInput | number
     url?: StringFieldUpdateOperationsInput | string
     context?: NullableStringFieldUpdateOperationsInput | string | null
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     userId?: NullableIntFieldUpdateOperationsInput | number | null
@@ -66446,6 +66620,7 @@ export namespace Prisma {
   export type DomainCreateWithoutModelPerformancesInput = {
     url: string
     context?: string | null
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: Date | string
     updatedAt?: Date | string
     location?: string | null
@@ -66487,6 +66662,7 @@ export namespace Prisma {
     id?: number
     url: string
     context?: string | null
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: Date | string
     updatedAt?: Date | string
     userId?: number | null
@@ -66543,6 +66719,7 @@ export namespace Prisma {
   export type DomainUpdateWithoutModelPerformancesInput = {
     url?: StringFieldUpdateOperationsInput | string
     context?: NullableStringFieldUpdateOperationsInput | string | null
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     location?: NullableStringFieldUpdateOperationsInput | string | null
@@ -66584,6 +66761,7 @@ export namespace Prisma {
     id?: IntFieldUpdateOperationsInput | number
     url?: StringFieldUpdateOperationsInput | string
     context?: NullableStringFieldUpdateOperationsInput | string | null
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     userId?: NullableIntFieldUpdateOperationsInput | number | null
@@ -66624,6 +66802,7 @@ export namespace Prisma {
   export type DomainCreateWithoutCompetitorTrackingsInput = {
     url: string
     context?: string | null
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: Date | string
     updatedAt?: Date | string
     location?: string | null
@@ -66665,6 +66844,7 @@ export namespace Prisma {
     id?: number
     url: string
     context?: string | null
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: Date | string
     updatedAt?: Date | string
     userId?: number | null
@@ -66721,6 +66901,7 @@ export namespace Prisma {
   export type DomainUpdateWithoutCompetitorTrackingsInput = {
     url?: StringFieldUpdateOperationsInput | string
     context?: NullableStringFieldUpdateOperationsInput | string | null
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     location?: NullableStringFieldUpdateOperationsInput | string | null
@@ -66762,6 +66943,7 @@ export namespace Prisma {
     id?: IntFieldUpdateOperationsInput | number
     url?: StringFieldUpdateOperationsInput | string
     context?: NullableStringFieldUpdateOperationsInput | string | null
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     userId?: NullableIntFieldUpdateOperationsInput | number | null
@@ -66802,6 +66984,7 @@ export namespace Prisma {
   export type DomainCreateWithoutPerformanceInsightsInput = {
     url: string
     context?: string | null
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: Date | string
     updatedAt?: Date | string
     location?: string | null
@@ -66843,6 +67026,7 @@ export namespace Prisma {
     id?: number
     url: string
     context?: string | null
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: Date | string
     updatedAt?: Date | string
     userId?: number | null
@@ -66899,6 +67083,7 @@ export namespace Prisma {
   export type DomainUpdateWithoutPerformanceInsightsInput = {
     url?: StringFieldUpdateOperationsInput | string
     context?: NullableStringFieldUpdateOperationsInput | string | null
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     location?: NullableStringFieldUpdateOperationsInput | string | null
@@ -66940,6 +67125,7 @@ export namespace Prisma {
     id?: IntFieldUpdateOperationsInput | number
     url?: StringFieldUpdateOperationsInput | string
     context?: NullableStringFieldUpdateOperationsInput | string | null
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     userId?: NullableIntFieldUpdateOperationsInput | number | null
@@ -66980,6 +67166,7 @@ export namespace Prisma {
   export type DomainCreateWithoutDashboardAnalysesInput = {
     url: string
     context?: string | null
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: Date | string
     updatedAt?: Date | string
     location?: string | null
@@ -67021,6 +67208,7 @@ export namespace Prisma {
     id?: number
     url: string
     context?: string | null
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: Date | string
     updatedAt?: Date | string
     userId?: number | null
@@ -67077,6 +67265,7 @@ export namespace Prisma {
   export type DomainUpdateWithoutDashboardAnalysesInput = {
     url?: StringFieldUpdateOperationsInput | string
     context?: NullableStringFieldUpdateOperationsInput | string | null
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     location?: NullableStringFieldUpdateOperationsInput | string | null
@@ -67118,6 +67307,7 @@ export namespace Prisma {
     id?: IntFieldUpdateOperationsInput | number
     url?: StringFieldUpdateOperationsInput | string
     context?: NullableStringFieldUpdateOperationsInput | string | null
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     userId?: NullableIntFieldUpdateOperationsInput | number | null
@@ -67158,6 +67348,7 @@ export namespace Prisma {
   export type DomainCreateWithoutCompetitorAnalysesInput = {
     url: string
     context?: string | null
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: Date | string
     updatedAt?: Date | string
     location?: string | null
@@ -67199,6 +67390,7 @@ export namespace Prisma {
     id?: number
     url: string
     context?: string | null
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: Date | string
     updatedAt?: Date | string
     userId?: number | null
@@ -67255,6 +67447,7 @@ export namespace Prisma {
   export type DomainUpdateWithoutCompetitorAnalysesInput = {
     url?: StringFieldUpdateOperationsInput | string
     context?: NullableStringFieldUpdateOperationsInput | string | null
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     location?: NullableStringFieldUpdateOperationsInput | string | null
@@ -67296,6 +67489,7 @@ export namespace Prisma {
     id?: IntFieldUpdateOperationsInput | number
     url?: StringFieldUpdateOperationsInput | string
     context?: NullableStringFieldUpdateOperationsInput | string | null
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     userId?: NullableIntFieldUpdateOperationsInput | number | null
@@ -67336,6 +67530,7 @@ export namespace Prisma {
   export type DomainCreateWithoutSuggestedCompetitorsInput = {
     url: string
     context?: string | null
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: Date | string
     updatedAt?: Date | string
     location?: string | null
@@ -67377,6 +67572,7 @@ export namespace Prisma {
     id?: number
     url: string
     context?: string | null
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: Date | string
     updatedAt?: Date | string
     userId?: number | null
@@ -67433,6 +67629,7 @@ export namespace Prisma {
   export type DomainUpdateWithoutSuggestedCompetitorsInput = {
     url?: StringFieldUpdateOperationsInput | string
     context?: NullableStringFieldUpdateOperationsInput | string | null
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     location?: NullableStringFieldUpdateOperationsInput | string | null
@@ -67474,6 +67671,7 @@ export namespace Prisma {
     id?: IntFieldUpdateOperationsInput | number
     url?: StringFieldUpdateOperationsInput | string
     context?: NullableStringFieldUpdateOperationsInput | string | null
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     userId?: NullableIntFieldUpdateOperationsInput | number | null
@@ -67514,6 +67712,7 @@ export namespace Prisma {
   export type DomainCreateWithoutAnalysisPhasesInput = {
     url: string
     context?: string | null
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: Date | string
     updatedAt?: Date | string
     location?: string | null
@@ -67555,6 +67754,7 @@ export namespace Prisma {
     id?: number
     url: string
     context?: string | null
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: Date | string
     updatedAt?: Date | string
     userId?: number | null
@@ -67611,6 +67811,7 @@ export namespace Prisma {
   export type DomainUpdateWithoutAnalysisPhasesInput = {
     url?: StringFieldUpdateOperationsInput | string
     context?: NullableStringFieldUpdateOperationsInput | string | null
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     location?: NullableStringFieldUpdateOperationsInput | string | null
@@ -67652,6 +67853,7 @@ export namespace Prisma {
     id?: IntFieldUpdateOperationsInput | number
     url?: StringFieldUpdateOperationsInput | string
     context?: NullableStringFieldUpdateOperationsInput | string | null
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     userId?: NullableIntFieldUpdateOperationsInput | number | null
@@ -67692,6 +67894,7 @@ export namespace Prisma {
   export type DomainCreateWithoutSemanticAnalysesInput = {
     url: string
     context?: string | null
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: Date | string
     updatedAt?: Date | string
     location?: string | null
@@ -67733,6 +67936,7 @@ export namespace Prisma {
     id?: number
     url: string
     context?: string | null
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: Date | string
     updatedAt?: Date | string
     userId?: number | null
@@ -67789,6 +67993,7 @@ export namespace Prisma {
   export type DomainUpdateWithoutSemanticAnalysesInput = {
     url?: StringFieldUpdateOperationsInput | string
     context?: NullableStringFieldUpdateOperationsInput | string | null
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     location?: NullableStringFieldUpdateOperationsInput | string | null
@@ -67830,6 +68035,7 @@ export namespace Prisma {
     id?: IntFieldUpdateOperationsInput | number
     url?: StringFieldUpdateOperationsInput | string
     context?: NullableStringFieldUpdateOperationsInput | string | null
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     userId?: NullableIntFieldUpdateOperationsInput | number | null
@@ -67870,6 +68076,7 @@ export namespace Prisma {
   export type DomainCreateWithoutKeywordAnalysesInput = {
     url: string
     context?: string | null
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: Date | string
     updatedAt?: Date | string
     location?: string | null
@@ -67911,6 +68118,7 @@ export namespace Prisma {
     id?: number
     url: string
     context?: string | null
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: Date | string
     updatedAt?: Date | string
     userId?: number | null
@@ -67967,6 +68175,7 @@ export namespace Prisma {
   export type DomainUpdateWithoutKeywordAnalysesInput = {
     url?: StringFieldUpdateOperationsInput | string
     context?: NullableStringFieldUpdateOperationsInput | string | null
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     location?: NullableStringFieldUpdateOperationsInput | string | null
@@ -68008,6 +68217,7 @@ export namespace Prisma {
     id?: IntFieldUpdateOperationsInput | number
     url?: StringFieldUpdateOperationsInput | string
     context?: NullableStringFieldUpdateOperationsInput | string | null
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     userId?: NullableIntFieldUpdateOperationsInput | number | null
@@ -68048,6 +68258,7 @@ export namespace Prisma {
   export type DomainCreateWithoutSearchVolumeClassificationsInput = {
     url: string
     context?: string | null
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: Date | string
     updatedAt?: Date | string
     location?: string | null
@@ -68089,6 +68300,7 @@ export namespace Prisma {
     id?: number
     url: string
     context?: string | null
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: Date | string
     updatedAt?: Date | string
     userId?: number | null
@@ -68145,6 +68357,7 @@ export namespace Prisma {
   export type DomainUpdateWithoutSearchVolumeClassificationsInput = {
     url?: StringFieldUpdateOperationsInput | string
     context?: NullableStringFieldUpdateOperationsInput | string | null
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     location?: NullableStringFieldUpdateOperationsInput | string | null
@@ -68186,6 +68399,7 @@ export namespace Prisma {
     id?: IntFieldUpdateOperationsInput | number
     url?: StringFieldUpdateOperationsInput | string
     context?: NullableStringFieldUpdateOperationsInput | string | null
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     userId?: NullableIntFieldUpdateOperationsInput | number | null
@@ -68226,6 +68440,7 @@ export namespace Prisma {
   export type DomainCreateWithoutIntentClassificationsInput = {
     url: string
     context?: string | null
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: Date | string
     updatedAt?: Date | string
     location?: string | null
@@ -68267,6 +68482,7 @@ export namespace Prisma {
     id?: number
     url: string
     context?: string | null
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: Date | string
     updatedAt?: Date | string
     userId?: number | null
@@ -68323,6 +68539,7 @@ export namespace Prisma {
   export type DomainUpdateWithoutIntentClassificationsInput = {
     url?: StringFieldUpdateOperationsInput | string
     context?: NullableStringFieldUpdateOperationsInput | string | null
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     location?: NullableStringFieldUpdateOperationsInput | string | null
@@ -68364,6 +68581,7 @@ export namespace Prisma {
     id?: IntFieldUpdateOperationsInput | number
     url?: StringFieldUpdateOperationsInput | string
     context?: NullableStringFieldUpdateOperationsInput | string | null
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     userId?: NullableIntFieldUpdateOperationsInput | number | null
@@ -68404,6 +68622,7 @@ export namespace Prisma {
   export type DomainCreateWithoutCommunityInsightsInput = {
     url: string
     context?: string | null
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: Date | string
     updatedAt?: Date | string
     location?: string | null
@@ -68445,6 +68664,7 @@ export namespace Prisma {
     id?: number
     url: string
     context?: string | null
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: Date | string
     updatedAt?: Date | string
     userId?: number | null
@@ -68545,6 +68765,7 @@ export namespace Prisma {
   export type DomainUpdateWithoutCommunityInsightsInput = {
     url?: StringFieldUpdateOperationsInput | string
     context?: NullableStringFieldUpdateOperationsInput | string | null
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     location?: NullableStringFieldUpdateOperationsInput | string | null
@@ -68586,6 +68807,7 @@ export namespace Prisma {
     id?: IntFieldUpdateOperationsInput | number
     url?: StringFieldUpdateOperationsInput | string
     context?: NullableStringFieldUpdateOperationsInput | string | null
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     userId?: NullableIntFieldUpdateOperationsInput | number | null
@@ -68676,6 +68898,7 @@ export namespace Prisma {
   export type DomainCreateWithoutSearchPatternsInput = {
     url: string
     context?: string | null
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: Date | string
     updatedAt?: Date | string
     location?: string | null
@@ -68717,6 +68940,7 @@ export namespace Prisma {
     id?: number
     url: string
     context?: string | null
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: Date | string
     updatedAt?: Date | string
     userId?: number | null
@@ -68817,6 +69041,7 @@ export namespace Prisma {
   export type DomainUpdateWithoutSearchPatternsInput = {
     url?: StringFieldUpdateOperationsInput | string
     context?: NullableStringFieldUpdateOperationsInput | string | null
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     location?: NullableStringFieldUpdateOperationsInput | string | null
@@ -68858,6 +69083,7 @@ export namespace Prisma {
     id?: IntFieldUpdateOperationsInput | number
     url?: StringFieldUpdateOperationsInput | string
     context?: NullableStringFieldUpdateOperationsInput | string | null
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     userId?: NullableIntFieldUpdateOperationsInput | number | null
@@ -69061,6 +69287,7 @@ export namespace Prisma {
 
   export type WordpressPublishLogCreateWithoutIntegrationInput = {
     wordpressUrl: string
+    wordpressPostId?: number | null
     primaryKeyword?: string | null
     normalizedPrimaryKeyword?: string | null
     generationJobId?: string | null
@@ -69079,6 +69306,7 @@ export namespace Prisma {
     id?: number
     userId: number
     wordpressUrl: string
+    wordpressPostId?: number | null
     primaryKeyword?: string | null
     normalizedPrimaryKeyword?: string | null
     generationJobId?: string | null
@@ -69749,6 +69977,7 @@ export namespace Prisma {
   export type DomainCreateWithoutIntentPhraseGenerationsInput = {
     url: string
     context?: string | null
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: Date | string
     updatedAt?: Date | string
     location?: string | null
@@ -69790,6 +70019,7 @@ export namespace Prisma {
     id?: number
     url: string
     context?: string | null
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: Date | string
     updatedAt?: Date | string
     userId?: number | null
@@ -69846,6 +70076,7 @@ export namespace Prisma {
   export type DomainUpdateWithoutIntentPhraseGenerationsInput = {
     url?: StringFieldUpdateOperationsInput | string
     context?: NullableStringFieldUpdateOperationsInput | string | null
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     location?: NullableStringFieldUpdateOperationsInput | string | null
@@ -69887,6 +70118,7 @@ export namespace Prisma {
     id?: IntFieldUpdateOperationsInput | number
     url?: StringFieldUpdateOperationsInput | string
     context?: NullableStringFieldUpdateOperationsInput | string | null
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     userId?: NullableIntFieldUpdateOperationsInput | number | null
@@ -69927,6 +70159,7 @@ export namespace Prisma {
   export type DomainCreateWithoutCommunityMiningResultsInput = {
     url: string
     context?: string | null
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: Date | string
     updatedAt?: Date | string
     location?: string | null
@@ -69968,6 +70201,7 @@ export namespace Prisma {
     id?: number
     url: string
     context?: string | null
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: Date | string
     updatedAt?: Date | string
     userId?: number | null
@@ -70068,6 +70302,7 @@ export namespace Prisma {
   export type DomainUpdateWithoutCommunityMiningResultsInput = {
     url?: StringFieldUpdateOperationsInput | string
     context?: NullableStringFieldUpdateOperationsInput | string | null
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     location?: NullableStringFieldUpdateOperationsInput | string | null
@@ -70109,6 +70344,7 @@ export namespace Prisma {
     id?: IntFieldUpdateOperationsInput | number
     url?: StringFieldUpdateOperationsInput | string
     context?: NullableStringFieldUpdateOperationsInput | string | null
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     userId?: NullableIntFieldUpdateOperationsInput | number | null
@@ -70199,6 +70435,7 @@ export namespace Prisma {
   export type DomainCreateWithoutSearchPatternResultsInput = {
     url: string
     context?: string | null
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: Date | string
     updatedAt?: Date | string
     location?: string | null
@@ -70240,6 +70477,7 @@ export namespace Prisma {
     id?: number
     url: string
     context?: string | null
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: Date | string
     updatedAt?: Date | string
     userId?: number | null
@@ -70340,6 +70578,7 @@ export namespace Prisma {
   export type DomainUpdateWithoutSearchPatternResultsInput = {
     url?: StringFieldUpdateOperationsInput | string
     context?: NullableStringFieldUpdateOperationsInput | string | null
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     location?: NullableStringFieldUpdateOperationsInput | string | null
@@ -70381,6 +70620,7 @@ export namespace Prisma {
     id?: IntFieldUpdateOperationsInput | number
     url?: StringFieldUpdateOperationsInput | string
     context?: NullableStringFieldUpdateOperationsInput | string | null
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     userId?: NullableIntFieldUpdateOperationsInput | number | null
@@ -70471,6 +70711,7 @@ export namespace Prisma {
   export type DomainCreateWithoutIntentClassificationResultsInput = {
     url: string
     context?: string | null
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: Date | string
     updatedAt?: Date | string
     location?: string | null
@@ -70512,6 +70753,7 @@ export namespace Prisma {
     id?: number
     url: string
     context?: string | null
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: Date | string
     updatedAt?: Date | string
     userId?: number | null
@@ -70612,6 +70854,7 @@ export namespace Prisma {
   export type DomainUpdateWithoutIntentClassificationResultsInput = {
     url?: StringFieldUpdateOperationsInput | string
     context?: NullableStringFieldUpdateOperationsInput | string | null
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     location?: NullableStringFieldUpdateOperationsInput | string | null
@@ -70653,6 +70896,7 @@ export namespace Prisma {
     id?: IntFieldUpdateOperationsInput | number
     url?: StringFieldUpdateOperationsInput | string
     context?: NullableStringFieldUpdateOperationsInput | string | null
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     userId?: NullableIntFieldUpdateOperationsInput | number | null
@@ -70826,6 +71070,7 @@ export namespace Prisma {
   export type DomainCreateWithoutGeneratedIntentPhrasesInput = {
     url: string
     context?: string | null
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: Date | string
     updatedAt?: Date | string
     location?: string | null
@@ -70867,6 +71112,7 @@ export namespace Prisma {
     id?: number
     url: string
     context?: string | null
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: Date | string
     updatedAt?: Date | string
     userId?: number | null
@@ -71053,6 +71299,7 @@ export namespace Prisma {
   export type DomainUpdateWithoutGeneratedIntentPhrasesInput = {
     url?: StringFieldUpdateOperationsInput | string
     context?: NullableStringFieldUpdateOperationsInput | string | null
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     location?: NullableStringFieldUpdateOperationsInput | string | null
@@ -71094,6 +71341,7 @@ export namespace Prisma {
     id?: IntFieldUpdateOperationsInput | number
     url?: StringFieldUpdateOperationsInput | string
     context?: NullableStringFieldUpdateOperationsInput | string | null
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     userId?: NullableIntFieldUpdateOperationsInput | number | null
@@ -71200,6 +71448,7 @@ export namespace Prisma {
   export type DomainCreateWithoutRelevanceScoreResultsInput = {
     url: string
     context?: string | null
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: Date | string
     updatedAt?: Date | string
     location?: string | null
@@ -71241,6 +71490,7 @@ export namespace Prisma {
     id?: number
     url: string
     context?: string | null
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: Date | string
     updatedAt?: Date | string
     userId?: number | null
@@ -71339,6 +71589,7 @@ export namespace Prisma {
   export type DomainUpdateWithoutRelevanceScoreResultsInput = {
     url?: StringFieldUpdateOperationsInput | string
     context?: NullableStringFieldUpdateOperationsInput | string | null
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     location?: NullableStringFieldUpdateOperationsInput | string | null
@@ -71380,6 +71631,7 @@ export namespace Prisma {
     id?: IntFieldUpdateOperationsInput | number
     url?: StringFieldUpdateOperationsInput | string
     context?: NullableStringFieldUpdateOperationsInput | string | null
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     userId?: NullableIntFieldUpdateOperationsInput | number | null
@@ -71554,6 +71806,7 @@ export namespace Prisma {
   export type DomainCreateWithoutCampaignsInput = {
     url: string
     context?: string | null
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: Date | string
     updatedAt?: Date | string
     location?: string | null
@@ -71595,6 +71848,7 @@ export namespace Prisma {
     id?: number
     url: string
     context?: string | null
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: Date | string
     updatedAt?: Date | string
     userId?: number | null
@@ -71690,6 +71944,7 @@ export namespace Prisma {
   export type DomainUpdateWithoutCampaignsInput = {
     url?: StringFieldUpdateOperationsInput | string
     context?: NullableStringFieldUpdateOperationsInput | string | null
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     location?: NullableStringFieldUpdateOperationsInput | string | null
@@ -71731,6 +71986,7 @@ export namespace Prisma {
     id?: IntFieldUpdateOperationsInput | number
     url?: StringFieldUpdateOperationsInput | string
     context?: NullableStringFieldUpdateOperationsInput | string | null
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     userId?: NullableIntFieldUpdateOperationsInput | number | null
@@ -72098,6 +72354,7 @@ export namespace Prisma {
 
   export type WordpressPublishLogCreateWithoutCampaignPagesInput = {
     wordpressUrl: string
+    wordpressPostId?: number | null
     primaryKeyword?: string | null
     normalizedPrimaryKeyword?: string | null
     generationJobId?: string | null
@@ -72116,6 +72373,7 @@ export namespace Prisma {
     id?: number
     userId: number
     wordpressUrl: string
+    wordpressPostId?: number | null
     primaryKeyword?: string | null
     normalizedPrimaryKeyword?: string | null
     generationJobId?: string | null
@@ -72203,6 +72461,7 @@ export namespace Prisma {
 
   export type WordpressPublishLogUpdateWithoutCampaignPagesInput = {
     wordpressUrl?: StringFieldUpdateOperationsInput | string
+    wordpressPostId?: NullableIntFieldUpdateOperationsInput | number | null
     primaryKeyword?: NullableStringFieldUpdateOperationsInput | string | null
     normalizedPrimaryKeyword?: NullableStringFieldUpdateOperationsInput | string | null
     generationJobId?: NullableStringFieldUpdateOperationsInput | string | null
@@ -72221,6 +72480,7 @@ export namespace Prisma {
     id?: IntFieldUpdateOperationsInput | number
     userId?: IntFieldUpdateOperationsInput | number
     wordpressUrl?: StringFieldUpdateOperationsInput | string
+    wordpressPostId?: NullableIntFieldUpdateOperationsInput | number | null
     primaryKeyword?: NullableStringFieldUpdateOperationsInput | string | null
     normalizedPrimaryKeyword?: NullableStringFieldUpdateOperationsInput | string | null
     generationJobId?: NullableStringFieldUpdateOperationsInput | string | null
@@ -72393,6 +72653,7 @@ export namespace Prisma {
   export type DomainCreateWithoutAuditResultsInput = {
     url: string
     context?: string | null
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: Date | string
     updatedAt?: Date | string
     location?: string | null
@@ -72434,6 +72695,7 @@ export namespace Prisma {
     id?: number
     url: string
     context?: string | null
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: Date | string
     updatedAt?: Date | string
     userId?: number | null
@@ -72519,6 +72781,7 @@ export namespace Prisma {
   export type DomainUpdateWithoutAuditResultsInput = {
     url?: StringFieldUpdateOperationsInput | string
     context?: NullableStringFieldUpdateOperationsInput | string | null
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     location?: NullableStringFieldUpdateOperationsInput | string | null
@@ -72560,6 +72823,7 @@ export namespace Prisma {
     id?: IntFieldUpdateOperationsInput | number
     url?: StringFieldUpdateOperationsInput | string
     context?: NullableStringFieldUpdateOperationsInput | string | null
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     userId?: NullableIntFieldUpdateOperationsInput | number | null
@@ -72701,6 +72965,7 @@ export namespace Prisma {
     id?: number
     url: string
     context?: string | null
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: Date | string
     updatedAt?: Date | string
     location?: string | null
@@ -72717,6 +72982,7 @@ export namespace Prisma {
   export type WordpressPublishLogCreateManyUserInput = {
     id?: number
     wordpressUrl: string
+    wordpressPostId?: number | null
     primaryKeyword?: string | null
     normalizedPrimaryKeyword?: string | null
     generationJobId?: string | null
@@ -72742,6 +73008,7 @@ export namespace Prisma {
   export type DomainUpdateWithoutUserInput = {
     url?: StringFieldUpdateOperationsInput | string
     context?: NullableStringFieldUpdateOperationsInput | string | null
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     location?: NullableStringFieldUpdateOperationsInput | string | null
@@ -72783,6 +73050,7 @@ export namespace Prisma {
     id?: IntFieldUpdateOperationsInput | number
     url?: StringFieldUpdateOperationsInput | string
     context?: NullableStringFieldUpdateOperationsInput | string | null
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     location?: NullableStringFieldUpdateOperationsInput | string | null
@@ -72824,6 +73092,7 @@ export namespace Prisma {
     id?: IntFieldUpdateOperationsInput | number
     url?: StringFieldUpdateOperationsInput | string
     context?: NullableStringFieldUpdateOperationsInput | string | null
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     location?: NullableStringFieldUpdateOperationsInput | string | null
@@ -72839,6 +73108,7 @@ export namespace Prisma {
 
   export type WordpressPublishLogUpdateWithoutUserInput = {
     wordpressUrl?: StringFieldUpdateOperationsInput | string
+    wordpressPostId?: NullableIntFieldUpdateOperationsInput | number | null
     primaryKeyword?: NullableStringFieldUpdateOperationsInput | string | null
     normalizedPrimaryKeyword?: NullableStringFieldUpdateOperationsInput | string | null
     generationJobId?: NullableStringFieldUpdateOperationsInput | string | null
@@ -72856,6 +73126,7 @@ export namespace Prisma {
   export type WordpressPublishLogUncheckedUpdateWithoutUserInput = {
     id?: IntFieldUpdateOperationsInput | number
     wordpressUrl?: StringFieldUpdateOperationsInput | string
+    wordpressPostId?: NullableIntFieldUpdateOperationsInput | number | null
     primaryKeyword?: NullableStringFieldUpdateOperationsInput | string | null
     normalizedPrimaryKeyword?: NullableStringFieldUpdateOperationsInput | string | null
     generationJobId?: NullableStringFieldUpdateOperationsInput | string | null
@@ -72873,6 +73144,7 @@ export namespace Prisma {
   export type WordpressPublishLogUncheckedUpdateManyWithoutUserInput = {
     id?: IntFieldUpdateOperationsInput | number
     wordpressUrl?: StringFieldUpdateOperationsInput | string
+    wordpressPostId?: NullableIntFieldUpdateOperationsInput | number | null
     primaryKeyword?: NullableStringFieldUpdateOperationsInput | string | null
     normalizedPrimaryKeyword?: NullableStringFieldUpdateOperationsInput | string | null
     generationJobId?: NullableStringFieldUpdateOperationsInput | string | null
@@ -72990,6 +73262,10 @@ export namespace Prisma {
     createdAt?: Date | string
     tokenUsage?: number | null
     analyzedUrls: string
+    pageSnapshots?: NullableJsonNullValueInput | InputJsonValue
+    crawlPolicy?: NullableJsonNullValueInput | InputJsonValue
+    quality?: NullableJsonNullValueInput | InputJsonValue
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
   }
 
   export type DashboardAnalysisCreateManyDomainInput = {
@@ -73400,6 +73676,10 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     tokenUsage?: NullableIntFieldUpdateOperationsInput | number | null
     analyzedUrls?: StringFieldUpdateOperationsInput | string
+    pageSnapshots?: NullableJsonNullValueInput | InputJsonValue
+    crawlPolicy?: NullableJsonNullValueInput | InputJsonValue
+    quality?: NullableJsonNullValueInput | InputJsonValue
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
   }
 
   export type CrawlResultUncheckedUpdateWithoutDomainInput = {
@@ -73409,6 +73689,10 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     tokenUsage?: NullableIntFieldUpdateOperationsInput | number | null
     analyzedUrls?: StringFieldUpdateOperationsInput | string
+    pageSnapshots?: NullableJsonNullValueInput | InputJsonValue
+    crawlPolicy?: NullableJsonNullValueInput | InputJsonValue
+    quality?: NullableJsonNullValueInput | InputJsonValue
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
   }
 
   export type CrawlResultUncheckedUpdateManyWithoutDomainInput = {
@@ -73418,6 +73702,10 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     tokenUsage?: NullableIntFieldUpdateOperationsInput | number | null
     analyzedUrls?: StringFieldUpdateOperationsInput | string
+    pageSnapshots?: NullableJsonNullValueInput | InputJsonValue
+    crawlPolicy?: NullableJsonNullValueInput | InputJsonValue
+    quality?: NullableJsonNullValueInput | InputJsonValue
+    contextJson?: NullableJsonNullValueInput | InputJsonValue
   }
 
   export type DashboardAnalysisUpdateWithoutDomainInput = {
@@ -74407,6 +74695,7 @@ export namespace Prisma {
     id?: number
     userId: number
     wordpressUrl: string
+    wordpressPostId?: number | null
     primaryKeyword?: string | null
     normalizedPrimaryKeyword?: string | null
     generationJobId?: string | null
@@ -74421,6 +74710,7 @@ export namespace Prisma {
 
   export type WordpressPublishLogUpdateWithoutIntegrationInput = {
     wordpressUrl?: StringFieldUpdateOperationsInput | string
+    wordpressPostId?: NullableIntFieldUpdateOperationsInput | number | null
     primaryKeyword?: NullableStringFieldUpdateOperationsInput | string | null
     normalizedPrimaryKeyword?: NullableStringFieldUpdateOperationsInput | string | null
     generationJobId?: NullableStringFieldUpdateOperationsInput | string | null
@@ -74439,6 +74729,7 @@ export namespace Prisma {
     id?: IntFieldUpdateOperationsInput | number
     userId?: IntFieldUpdateOperationsInput | number
     wordpressUrl?: StringFieldUpdateOperationsInput | string
+    wordpressPostId?: NullableIntFieldUpdateOperationsInput | number | null
     primaryKeyword?: NullableStringFieldUpdateOperationsInput | string | null
     normalizedPrimaryKeyword?: NullableStringFieldUpdateOperationsInput | string | null
     generationJobId?: NullableStringFieldUpdateOperationsInput | string | null
@@ -74456,6 +74747,7 @@ export namespace Prisma {
     id?: IntFieldUpdateOperationsInput | number
     userId?: IntFieldUpdateOperationsInput | number
     wordpressUrl?: StringFieldUpdateOperationsInput | string
+    wordpressPostId?: NullableIntFieldUpdateOperationsInput | number | null
     primaryKeyword?: NullableStringFieldUpdateOperationsInput | string | null
     normalizedPrimaryKeyword?: NullableStringFieldUpdateOperationsInput | string | null
     generationJobId?: NullableStringFieldUpdateOperationsInput | string | null

@@ -138,6 +138,7 @@ exports.Prisma.DomainScalarFieldEnum = {
   id: 'id',
   url: 'url',
   context: 'context',
+  contextJson: 'contextJson',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt',
   userId: 'userId',
@@ -159,7 +160,11 @@ exports.Prisma.CrawlResultScalarFieldEnum = {
   createdAt: 'createdAt',
   tokenUsage: 'tokenUsage',
   domainId: 'domainId',
-  analyzedUrls: 'analyzedUrls'
+  analyzedUrls: 'analyzedUrls',
+  pageSnapshots: 'pageSnapshots',
+  crawlPolicy: 'crawlPolicy',
+  quality: 'quality',
+  contextJson: 'contextJson'
 };
 
 exports.Prisma.KeywordScalarFieldEnum = {
@@ -428,6 +433,7 @@ exports.Prisma.WordpressPublishLogScalarFieldEnum = {
   id: 'id',
   userId: 'userId',
   wordpressUrl: 'wordpressUrl',
+  wordpressPostId: 'wordpressPostId',
   primaryKeyword: 'primaryKeyword',
   normalizedPrimaryKeyword: 'normalizedPrimaryKeyword',
   generationJobId: 'generationJobId',
