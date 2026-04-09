@@ -8,6 +8,7 @@ import {
   Database,
   Globe,
   Grid3X3,
+  List,
   Loader2,
   Plug,
   Plus,
