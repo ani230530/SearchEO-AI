@@ -12,6 +12,7 @@ interface PageFetchResult {
   headers: Record<string, string | undefined>;
   notModified?: boolean;
   cachedSnapshot?: PageSnapshot;
+  error?: string;
 }
 
 function parseRetryAfter(value?: string): number | null {
@@ -74,6 +75,23 @@ async function fetchWithBrowser(url: string, timeoutMs: number): Promise<{ html:
   }
 }
 
+function buildCachedFallback(candidate: UrlCandidate, previousSnapshot: PageSnapshot, reason: string): PageFetchResult {
+  return {
+    url: previousSnapshot.url,
+    requestedUrl: candidate.url,
+    status: 304,
+    html: null,
+    fetchMode: 'cached',
+    headers: {
+      etag: previousSnapshot.etag ?? undefined,
+      'last-modified': previousSnapshot.lastModified ?? undefined,
+    },
+    notModified: true,
+    cachedSnapshot: previousSnapshot,
+    error: reason,
+  };
+}
+
 export async function fetchPageWithFallback(params: {
   candidate: UrlCandidate;
   policy: CrawlPolicy;
@@ -94,13 +112,62 @@ export async function fetchPageWithFallback(params: {
 
   let attempt = 0;
   while (attempt <= policy.rateLimits.retryBackoffMs.length) {
-    const response = await axios.get<string>(candidate.url, {
-      timeout: policy.timeouts.responseMs,
-      responseType: 'text',
-      validateStatus: () => true,
-      headers,
-      maxRedirects: 5,
-    });
+    let response;
+    try {
+      response = await axios.get<string>(candidate.url, {
+        timeout: policy.timeouts.responseMs,
+        responseType: 'text',
+        validateStatus: () => true,
+        headers,
+        maxRedirects: 5,
+      });
+    } catch (error) {
+      const axiosError = axios.isAxiosError(error) ? error : null;
+      const isTimeout = axiosError?.code === 'ECONNABORTED' || String(axiosError?.message || '').toLowerCase().includes('timeout');
+      const responseHeaders: Record<string, string | undefined> = {};
+
+      if (isTimeout) {
+        try {
+          const browserResult = await fetchWithBrowser(candidate.url, policy.timeouts.browserMs);
+          return {
+            url: browserResult.finalUrl,
+            requestedUrl: candidate.url,
+            status: 200,
+            html: browserResult.html,
+            fetchMode: 'browser',
+            headers: responseHeaders,
+          };
+        } catch (browserError) {
+          if (previousSnapshot) {
+            return buildCachedFallback(candidate, previousSnapshot, 'HTTP timeout; reused cached snapshot');
+          }
+
+          return {
+            url: candidate.url,
+            requestedUrl: candidate.url,
+            status: 408,
+            html: null,
+            fetchMode: 'http',
+            headers: responseHeaders,
+            error: browserError instanceof Error ? browserError.message : 'Timed out fetching page',
+          };
+        }
+      }
+
+      if (previousSnapshot) {
+        return buildCachedFallback(candidate, previousSnapshot, 'Network error; reused cached snapshot');
+      }
+
+      return {
+        url: candidate.url,
+        requestedUrl: candidate.url,
+        status: 599,
+        html: null,
+        fetchMode: 'http',
+        headers: responseHeaders,
+        error: axiosError?.message || 'Failed to fetch page',
+      };
+    }
 
     if (response.status === 304 && previousSnapshot) {
       return {
@@ -147,9 +214,9 @@ export async function fetchPageWithFallback(params: {
     let fetchMode: PageFetchMode = 'http';
     let finalUrl = responseUrl;
 
-    if (looksLikeAppShell(html) || !hasMeaningfulMainContent(html)) {
-      try {
-        const browserResult = await fetchWithBrowser(responseUrl, policy.timeouts.browserMs);
+      if (looksLikeAppShell(html) || !hasMeaningfulMainContent(html)) {
+        try {
+          const browserResult = await fetchWithBrowser(responseUrl, policy.timeouts.browserMs);
         html = browserResult.html;
         finalUrl = browserResult.finalUrl;
         fetchMode = 'browser';
@@ -175,5 +242,6 @@ export async function fetchPageWithFallback(params: {
     html: null,
     fetchMode: 'http',
     headers: {},
+    error: 'Host throttled after retries',
   };
 }
