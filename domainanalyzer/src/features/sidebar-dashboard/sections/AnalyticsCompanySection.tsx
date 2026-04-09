@@ -21,6 +21,7 @@ import { cn } from '@/lib/utils';
 import { IntegrationSkeleton } from '@/features/sidebar-dashboard/components/IntegrationSkeleton';
 import { CompanySection } from '@/features/sidebar-dashboard/sections/CompanySection';
 import type { CompanySubTabId } from '@/features/sidebar-dashboard/types';
+import { getCompetitionBadgeClassName } from '@/features/sidebar-dashboard/utils';
 import type { KeywordTableItem } from '@/types';
 import type { WordpressIntegration } from '@/types/publish';
 
@@ -763,7 +764,7 @@ const allSections = [...leftSections, ...rightSections];
                                       {/* Competition Column */}
                                       <div className="col-span-1 flex items-center justify-center">
                                         <span
-                                          className={getCompetitionBadge(
+                                          className={getCompetitionBadgeClassName(
                                             keyword.competition
                                           )}
                                         >
