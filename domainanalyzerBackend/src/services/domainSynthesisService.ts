@@ -83,7 +83,7 @@ function extractJsonObject(content: string): string | null {
 }
 
 function buildFallbackAnalysisSection(label: string): string {
-  return `- ${label}: Not clearly established from website evidence.`;
+  return `- **${label}**: Not clearly established from website evidence.`;
 }
 
 function buildFallbackContext(params: {
@@ -235,6 +235,7 @@ export async function synthesizeDomainContext(params: {
             'Do not invent unsupported facts.',
             'If evidence is weak, explicitly say "not clearly established from website evidence".',
             'Each structured claim must cite evidence page URLs from the provided pages.',
+            'For the narrative section fields, use markdown bullet lists with exact bold labels matching the requested field names.',
           ].join(' '),
         },
         {
@@ -257,18 +258,71 @@ export async function synthesizeDomainContext(params: {
                 audience: [{ text: 'string', evidencePages: ['url'], confidence: 0.0 }],
                 geoScope: { text: 'string', evidencePages: ['url'], confidence: 0.0 },
                 brandEntities: [{ name: 'string', type: 'string', evidencePages: ['url'] }],
-                businessModelAnalysis: 'markdown string with bullets',
-                targetAudienceProfiling: 'markdown string with bullets',
-                valuePropositionAndPositioning: 'markdown string with bullets',
-                seoAndContentStrategyInsights: 'markdown string with bullets',
-                competitiveIntelligence: 'markdown string with bullets',
-                marketDynamics: 'markdown string with bullets',
-                locationBasedSeoAnalysis: 'markdown string with bullets',
-                seoOpportunityAnalysis: 'markdown string with bullets',
+                businessModelAnalysis: [
+                  '- **Core Business**: ...',
+                  '- **Industry Classification**: ...',
+                  '- **Company Profile**: ...',
+                  '- **Geographic Scope**: ...',
+                ].join('\\n'),
+                targetAudienceProfiling: [
+                  '- **Primary Audience**: ...',
+                  '- **Secondary Audiences**: ...',
+                  '- **Customer Journey**: ...',
+                  '- **Pain Points**: ...',
+                  '- **Decision Factors**: ...',
+                ].join('\\n'),
+                valuePropositionAndPositioning: [
+                  '- **Unique Selling Propositions**: ...',
+                  '- **Brand Positioning**: ...',
+                  '- **Key Benefits**: ...',
+                  '- **Solution Categories**: ...',
+                  '- **Market Positioning**: ...',
+                ].join('\\n'),
+                seoAndContentStrategyInsights: [
+                  '- **Primary Keywords**: ...',
+                  '- **Content Themes**: ...',
+                  '- **Expertise Areas**: ...',
+                  '- **Authority Building**: ...',
+                  '- **Content Gaps**: ...',
+                ].join('\\n'),
+                competitiveIntelligence: [
+                  '- **Direct Competitors**: ...',
+                  '- **Indirect Competitors**: ...',
+                  '- **Market Leaders**: ...',
+                  '- **Competitive Advantages**: ...',
+                  '- **Vulnerability Areas**: ...',
+                ].join('\\n'),
+                marketDynamics: [
+                  '- **Market Size**: ...',
+                  '- **Industry Trends**: ...',
+                  '- **Seasonal Patterns**: ...',
+                  '- **Geographic Considerations**: ...',
+                ].join('\\n'),
+                locationBasedSeoAnalysis: [
+                  '- **Local Market Opportunities**: ...',
+                  '- **Cultural Considerations**: ...',
+                  '- **Location-Specific Keywords**: ...',
+                  '- **Local Search Behavior**: ...',
+                  '- **Competitive Landscape**: ...',
+                  '- **Local SEO Strategy**: ...',
+                ].join('\\n'),
+                seoOpportunityAnalysis: [
+                  '- **Keyword Opportunities**: ...',
+                  '- **Content Opportunities**: ...',
+                  '- **Competitive Gaps**: ...',
+                  '- **Long-tail Opportunities**: ...',
+                  '- **Local SEO**: ...',
+                ].join('\\n'),
                 evidencePages: [{ url: 'string', title: 'string', reasons: ['string'] }],
                 missingSignals: ['string'],
                 overallConfidence: 0.0,
               },
+              formattingRequirements: [
+                'Use the exact field labels shown in the schema examples.',
+                'Each section must be a markdown bullet list.',
+                'Each bullet must start with "- **Label**: "',
+                'Be detailed like the previous long-form output, but keep every claim conservative and evidence-based.',
+              ],
             },
             null,
             2
