@@ -20,7 +20,7 @@ import { OverallScoreGauge } from "@/components/audit/AuditCharts";
 import { AuditPDF } from "@/components/audit/AuditPDF";
 import { cn } from "@/lib/utils";
 import D3LineChart from "@/components/charts/D3LineChart";
-import type { OverviewSectionProps } from "@/features/sidebar-dashboard/types";
+import type { GscSubTabId, OverviewSectionProps } from "@/features/sidebar-dashboard/types";
 import { getStoredActiveTab } from "@/features/sidebar-dashboard/utils";
 import { TabId, CompanySubTabId } from "@/features/sidebar-dashboard/types";
 import TrendsChart from "@/components/gsc/TrendsChart";
@@ -382,7 +382,7 @@ useEffect(() => {
   <div className="grid grid-cols-4 gap-4">
   {[
     ["Ranking Keywords", keywordsTableData.length, "https://res.cloudinary.com/dgfzjdi68/image/upload/v1775648922/Frame_1321316715_sku1sv.png"],
-    ["Campaigns", campaignsCount, "https://res.cloudinary.com/dgfzjdi68/image/upload/v1775648922/Frame_1321316715_sku1sv.png"],
+    ["Projects", campaignsCount, "https://res.cloudinary.com/dgfzjdi68/image/upload/v1775648922/Frame_1321316715_sku1sv.png"],
     ["WordPress", hasWordpressIntegration ? "Connected" : "Not connected", "https://res.cloudinary.com/dgfzjdi68/image/upload/v1775648922/Frame_1321316715_sku1sv.png"],
     ["Integrations", hasWordpressIntegration ? "WordPress" : "—", "https://res.cloudinary.com/dgfzjdi68/image/upload/v1775648922/Frame_1321316715_sku1sv.png"],
   ].map(([label, value, img]) => {
@@ -515,10 +515,7 @@ useEffect(() => {
             </div>
         
             <button
-          onClick={() => {
-            setActiveTab("audit");
-            setTimeout(() => setShowAuditModal(true), 120);
-          }}
+          onClick={onOpenAuditDetails}
           className="group text-sm font-medium text-black  transition-colors duration-200 flex items-center gap-1 hover:underline"
         >
           View Details
@@ -662,10 +659,7 @@ useEffect(() => {
             </h3>
             <div
           className="group text-sm font-medium text-black  transition-colors duration-200 flex items-center gap-1 hover:underline"
-          onClick={() => {
-            setActiveTab('analytics');
-            setActiveCompanySubTab('company-info');
-          }}
+          onClick={onOpenAnalytics}
         >
           View Details
           <span className="relative flex items-center w-4 h-4">
@@ -696,10 +690,10 @@ useEffect(() => {
                   </div>
         
                   {/* Volume badge */}
-                  <div className="px-3 py-2 rounded-2xl bg-green-50 flex items-center justify-center min-w-[50px]">
-                    <span className="text-sm font-medium text-green-700">
+                  <div className="px-3 py-2 rounded-3xl bg-green-50 flex items-center justify-center min-w-[50px]">
+                    <span className="text-xs font-medium text-green-700">
                       {item?.volume
-                        ? item.volume >= 1000
+                        ? item.volume >= 10002
                           ? `${(item.volume / 1000).toFixed(1)}K`
                           : item.volume.toLocaleString()
                         : "-"}
@@ -717,7 +711,7 @@ useEffect(() => {
         {gscConnected ? 'Top 5 queries performance trends' : 'Connect GSC to view analytics'}
       </p>
     </div>
-    <button
+    {/* <button
       onClick={onOpenAnalytics}
       className="group text-sm font-medium text-black transition-colors duration-200 flex items-center gap-1 hover:underline"
     >
@@ -726,7 +720,7 @@ useEffect(() => {
         <ChevronRight className="absolute inset-0 w-4 h-4 transition-all duration-200 ease-in-out group-hover:opacity-0 group-hover:translate-x-1" />
         <ArrowRight className="absolute inset-0 w-4 h-4 opacity-0 transition-all duration-200 ease-in-out group-hover:opacity-100 group-hover:translate-x-0" />
       </span>
-    </button>
+    </button> */}
   </div>
 
   <div className="w-full h-[400px]">
