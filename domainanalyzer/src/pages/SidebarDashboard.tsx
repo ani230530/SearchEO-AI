@@ -2579,28 +2579,28 @@ useEffect(() => {
         }
 
         .sidebar-tab.active {
-          background: rgba(0, 122, 255, 0.1);
-          color: #007AFF;
+          background: #2D4059;
+          color: #ffffff;
         }
 
         .sidebar-tab.active .sidebar-tab-icon {
-          color: #007AFF;
+          color: #ffffff;
         }
 
         .sidebar-tab.ai-checker-tab {
           margin-top: 12px;
-          background: linear-gradient(120deg, rgba(255, 182, 193, 0.25), rgba(173, 216, 230, 0.25));
+          background: rgba(255, 255, 255, 0.6);
           border: 1px solid rgba(255, 255, 255, 0.6);
-          color: #b83280;
+          color: #052d7c;
           box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.4);
         }
 
         .sidebar-tab.ai-checker-tab .sidebar-tab-icon {
-          color: #b83280;
+          color: #052d7c;
         }
 
         .sidebar-tab.ai-checker-tab:hover {
-          background: linear-gradient(120deg, rgba(255, 182, 193, 0.4), rgba(173, 216, 230, 0.4));
+          background: rgba(0, 0, 0, 0.05);
         }
 
         .ai-checker-badge {
@@ -2667,7 +2667,7 @@ useEffect(() => {
 
         .content-body {
           padding: 24px;
-          background: #f5f5f7;
+          background: rgba(255, 255, 255, 0.6);
           min-height: calc(100vh - 80px);
         }
 

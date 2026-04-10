@@ -164,7 +164,7 @@ const D3LineChart: React.FC<D3LineChartProps> = ({
         .datum(secondaryData)
         .attr('fill', 'none')
         .attr('stroke', secondaryColor)
-        .attr('stroke-width', 2)
+        .attr('stroke-width', 1.5)
         .attr('d', line);
 
       if (animate) {
@@ -173,7 +173,7 @@ const D3LineChart: React.FC<D3LineChartProps> = ({
           .attr('stroke-dasharray', `${totalLength} ${totalLength}`)
           .attr('stroke-dashoffset', totalLength)
           .transition()
-          .duration(1500)
+          .duration(1000)
           .ease(d3.easeQuadOut)
           .attr('stroke-dashoffset', 0);
       }
@@ -192,7 +192,7 @@ const D3LineChart: React.FC<D3LineChartProps> = ({
       .datum(data)
       .attr('fill', 'none')
       .attr('stroke', primaryColor)
-      .attr('stroke-width', 2.5)
+      .attr('stroke-width', 1.5)
       .attr('d', line);
 
     if (animate) {
@@ -201,7 +201,7 @@ const D3LineChart: React.FC<D3LineChartProps> = ({
         .attr('stroke-dasharray', `${totalLength} ${totalLength}`)
         .attr('stroke-dashoffset', totalLength)
         .transition()
-        .duration(1500)
+        .duration(1000)
         .ease(d3.easeQuadOut)
         .attr('stroke-dashoffset', 0);
     }
@@ -214,13 +214,13 @@ const D3LineChart: React.FC<D3LineChartProps> = ({
       .attr('class', 'dot-primary')
       .attr('cx', d => xScale(parseDate(d.date)!))
       .attr('cy', d => yScale(d.value))
-      .attr('r', 4)
+      .attr('r', 3)
       .attr('fill', primaryColor)
       .attr('stroke', 'white')
       .attr('stroke-width', 2)
       .style('opacity', 0)
       .transition()
-      .delay(animate ? 1500 : 0)
+      .delay(animate ? 1000 : 0)
       .duration(300)
       .style('opacity', 1);
 
@@ -231,7 +231,7 @@ const D3LineChart: React.FC<D3LineChartProps> = ({
     legend.append('circle')
       .attr('cx', 0)
       .attr('cy', 0)
-      .attr('r', 5)
+      .attr('r', 3)
       .attr('fill', primaryColor);
 
     legend.append('text')
@@ -245,7 +245,7 @@ const D3LineChart: React.FC<D3LineChartProps> = ({
       legend.append('circle')
         .attr('cx', 100)
         .attr('cy', 0)
-        .attr('r', 5)
+        .attr('r', 3)
         .attr('fill', secondaryColor);
 
       legend.append('text')

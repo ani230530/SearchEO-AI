@@ -36,7 +36,7 @@ interface TrendsChartProps {
 
 const TrendsChart = ({
   data,
-  selectedMetrics = ["clicks", "impressions"],
+  selectedMetrics = ["clicks", "impressions", "ctr", "position"],
   chartType = "line",
   height = 300,
 }: TrendsChartProps) => {
@@ -175,7 +175,7 @@ const [selectedMetricsState, setSelectedMetricsState] = useState<("clicks" | "im
   const ChartComponent = chartType === "area" ? AreaChart : LineChart;
 
   return (
-    <div className="w-full bg-white rounded-2xl border border-gray-200 p-4 h-full pt-16 relative">
+    <div className="w-full bg-white rounded-2xl  p-4 h-full pt-16 relative">
       
   {/* Metrics Selection – top-right overlay */}
   <div className="absolute top-4 right-4  rounded-xl  p-3 shadow-sm z-10">
