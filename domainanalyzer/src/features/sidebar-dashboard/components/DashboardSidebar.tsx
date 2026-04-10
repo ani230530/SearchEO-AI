@@ -57,7 +57,7 @@ export function DashboardSidebar({
               marginTop: "20px",
             }}
           >
-            Dashboard
+            SEO Tool
           </h1>
         </div>
       </div>
