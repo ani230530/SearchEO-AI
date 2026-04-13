@@ -1,8 +1,9 @@
-import { List, Network, Table } from "lucide-react";
+import { List, Network, Table, User } from "lucide-react";
 
 import type {
   DashboardCampaignViewMode,
   DashboardHeaderProps,
+  TabId,
 } from "@/features/sidebar-dashboard/types";
 
 const VIEW_MODE_OPTIONS: Array<{
@@ -22,6 +23,7 @@ export function DashboardHeader({
   tabs,
   userEmail,
   onCampaignViewModeChange,
+  onTabChange,
 }: DashboardHeaderProps) {
   const activeLabel = tabs.find((tab) => tab.id === activeTab)?.label || "Dashboard";
 
@@ -60,9 +62,15 @@ export function DashboardHeader({
             ))}
           </div>
         )}
-
         {userEmail && (
           <div className="flex items-center gap-3">
+            <button
+              onClick={() => onTabChange?.("profile")}
+              className="cursor-pointer hover:opacity-70 transition-opacity"
+              title="Go to Profile"
+            >
+              <User className="h-5 w-5 text-gray-400" />
+            </button>
             <div
               style={{
                 background: "rgba(0, 122, 255, 0.1)",

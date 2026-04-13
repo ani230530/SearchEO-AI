@@ -1,4 +1,4 @@
-import { ChevronDown, FileText, LogOut, Plug } from "lucide-react";
+import { ChevronDown, FileText, Info, Link, LogOut, Plug } from "lucide-react";
 
 import type {
   CompanySubTabId,
@@ -95,7 +95,7 @@ export function DashboardSidebar({
                           : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
                       }`}
                     >
-                      <FileText className="h-4 w-4" />
+                      <Info className="h-4 w-4" />
                       <span>Domain Info</span>
                     </button>
                     <button
@@ -106,7 +106,7 @@ export function DashboardSidebar({
                           : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
                       }`}
                     >
-                      <Plug className="h-4 w-4" />
+                      <Link className="h-4 w-4" />
                       <span>Integration</span>
                     </button>
                   </div>

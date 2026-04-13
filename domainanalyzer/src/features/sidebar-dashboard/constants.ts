@@ -1,8 +1,11 @@
 import {
   BarChart3,
   Building,
+  ChartColumnBig,
+  ChartPie,
   ClipboardList,
   FileChartColumnIncreasing,
+  Globe,
   LayoutDashboard,
   Megaphone,
   Send,
@@ -16,16 +19,16 @@ import type { DashboardTabConfig, TabId } from "@/features/sidebar-dashboard/typ
 export const DASHBOARD_DEFAULT_TAB: TabId = "overview";
 
 export const DASHBOARD_TABS: DashboardTabConfig[] = [
-  { id: "ai-checker", label: "AI Checker", icon: Sparkles },
-  { id: "overview", label: "Overview", icon: LayoutDashboard },
+  { id: "ai-checker", label: "AI Visibility", icon: Sparkles },
+  { id: "overview", label: "Dashboard", icon: LayoutDashboard },
   { id: "analytics", label: "Company", icon: Building },
-  { id: "projects", label: "All Projects", icon: Megaphone },
-  { id: "publish", label: "Publish", icon: Send },
-  { id: "gsc-analytics", label: "GSC Analytics", icon: BarChart3 },
-  { id: "audit", label: "Audit", icon: ClipboardList },
-  { id: "analytics-report", label: "Analytics Report", icon: FileChartColumnIncreasing },
+  { id: "projects", label: "All Projects", icon: Send },
+  { id: "publish", label: "Publish", icon: Megaphone },
+  { id: "gsc-analytics", label: "GSC Analytics", icon: ChartPie },
+  { id: "audit", label: "Website Audit", icon: Globe },
+  { id: "analytics-report", label: "Performance Reports", icon: ChartColumnBig },
   { id: "settings", label: "Settings", icon: Settings },
-  { id: "profile", label: "Profile", icon: User },
+  
 ];
 
 export const TOOLTIP_INFO = {
