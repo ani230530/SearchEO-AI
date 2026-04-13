@@ -53,7 +53,6 @@ import { WordpressIntegration } from '@/types/publish';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@radix-ui/react-accordion';
 import {AnimatePresence, motion} from 'framer-motion'
 import TrendsChart, { TrendDataPoint } from "@/components/gsc/TrendsChart";
-import IntegrationsDashboard from './IntegrationsDashboard';
 import { DashboardContentRouter } from "@/features/sidebar-dashboard/components/DashboardContentRouter";
 import { DashboardHeader } from "@/features/sidebar-dashboard/components/DashboardHeader";
 import { DashboardSidebar } from "@/features/sidebar-dashboard/components/DashboardSidebar";
@@ -2820,6 +2819,7 @@ useEffect(() => {
           tabs={tabs}
           userEmail={user?.email}
           onCampaignViewModeChange={setCampaignViewMode}
+          onTabChange={setActiveTab}
         />
 
         {/* Content Body */}

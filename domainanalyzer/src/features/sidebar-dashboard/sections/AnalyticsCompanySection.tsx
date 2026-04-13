@@ -1097,7 +1097,7 @@ const allSections = [...leftSections, ...rightSections];
 
                 {/* Integration Tab Content */}
                 {activeCompanySubTab === 'integration' && (
-                  <div className="max-w-6xl mx-auto space-y-6">
+                  <div className="min-w-6xl mx-auto space-y-6">
                     {gscStatusLoading ? (
                       <IntegrationSkeleton />
                     ) : !gscConnected ? (
@@ -1143,6 +1143,19 @@ const allSections = [...leftSections, ...rightSections];
                               Disconnect
                             </button>
                           </div>
+                          <p className="text-sm font-light text-gray-500">
+                             To upload it directly to your website, please connect your Google search console account. Once connected, we’ll be able to analyse your content with the correct formatting, and SEO settings. You remain in full control of what goes live.
+                            </p>
+                          <div className="relative w-full aspect-video rounded-2xl overflow-hidden border border-gray-100 mb-4">
+    <iframe
+      className="w-full h-full"
+      src="https://www.youtube.com/embed/JnX6_YAflt8?si=EvfXp_9hEyyCSI0m"
+      title="Google Search Console Tutorial"
+      frameBorder="0"
+      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+      allowFullScreen
+    ></iframe>
+  </div>
                           {gscLastSynced && (
                             <p className="text-xs font-light text-gray-500 ">
                               Last synced:{" "}
@@ -1231,6 +1244,16 @@ const allSections = [...leftSections, ...rightSections];
                               property, and the same Google connection now
                               includes Analytics read access for reporting.
                             </p>
+                              <div className="relative w-full aspect-video rounded-2xl overflow-hidden border border-gray-100 mb-4">
+    <iframe
+      className="w-full h-full"
+      src="https://www.youtube.com/embed/JnX6_YAflt8?si=EvfXp_9hEyyCSI0m"
+      title="Google Search Console Tutorial"
+      frameBorder="0"
+      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+      allowFullScreen
+    ></iframe>
+  </div>
                           </div>
                         )}
 
@@ -1246,48 +1269,74 @@ const allSections = [...leftSections, ...rightSections];
                                   <h3 className="text-2xl font-light text-black tracking-tight">Google Search Console + Google Analytics</h3>
                                   {googleAnalyticsId && (
                                     <div className="flex items-center gap-1.5 bg-green-50 text-green-700 px-3 py-1 rounded-full text-[10px] font-medium border border-green-100 uppercase tracking-wider">
-                                      <CheckCircle className="h-3 w-3" />
+                                      {/* <CheckCircle className="h-3 w-3" /> */}
                                       Connected
                                     </div>
                                   )}
                                 </div>
                                 <p className="text-sm text-neutral-400 font-light max-w-xs">Connect Google once for Search Console access, then save your GA4 Property ID for automated reporting.</p>
+                            
+                                <div className="relative w-full aspect-video rounded-2xl overflow-hidden border border-gray-100 mb-4">
+    <iframe
+      className="w-full h-full"
+      src="https://www.youtube.com/embed/pJxNPfwQfHs?si=DmLV-gdgqw9TJUdZ"
+      title="Google Search Console Tutorial"
+      frameBorder="0"
+      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+      allowFullScreen
+    ></iframe>
+  </div>
+  
                               </div>
                             </div>
 
-                            <div className='grid grid-rows-2 '>
-                              <div className="relative flex-1 group pb-2">
-  <div className="absolute left-6 top-1/2 -translate-y-1/2 text-neutral-400 group-focus-within:text-black transition">
-    <Database className="h-4 w-4" />
+                          </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-3 mt-4 items-center">
+  
+  {/* Input */}
+  <div className="relative group">
+    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-400 group-focus-within:text-black transition">
+      <Database className="h-4 w-4" />
+    </div>
+
+    <input
+      type="text"
+      value={googleAnalyticsId}
+      onChange={(e) => setGoogleAnalyticsId(e.target.value)}
+      placeholder="GA4 Property ID (e.g. 123456789)"
+      className="w-full h-12 pl-11 pr-4 text-sm rounded-md border border-neutral-200 bg-neutral-50 focus:bg-white focus:border-black/20 focus:ring-4 focus:ring-black/5 outline-none transition-all placeholder:text-neutral-400 font-light"
+    />
   </div>
 
-  <input
-    type="text"
-    value={googleAnalyticsId}
-    onChange={(e) => setGoogleAnalyticsId(e.target.value)}
-    placeholder="GA4 Property ID (e.g. 123456789)"
-    className="w-full h-14 pl-14 text-sm rounded-full border border-neutral-100 bg-neutral-50 focus:bg-white focus:border-black/10 focus:ring-4 focus:ring-black/5 outline-none transition-all placeholder:text-neutral-300 font-light"
-  />
+  {/* Button */}
+  <button
+    onClick={handleSaveGoogleAnalyticsId}
+    disabled={gaSaving || !googleAnalyticsId}
+    className={cn(
+      "inline-flex items-center gap-2 px-6 py-3 text-white rounded-md text-sm font-medium hover:opacity-90 disabled:opacity-60 transition",
+      googleAnalyticsId && !gaSaving
+        ? "text-white shadow-md hover:shadow-lg active:scale-95"
+        : "bg-neutral-100 text-neutral-400 cursor-not-allowed"
+    )}
+    style={
+      googleAnalyticsId && !gaSaving
+        ? {
+            background:
+              "linear-gradient(90deg, #2D4059 0%, #4E76C7 100%)",
+          }
+        : {}
+    }
+  >
+    {gaSaving ? (
+      <>
+        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+        Syncing
+      </>
+    ) : (
+      "Update Analytics ID"
+    )}
+  </button>
 </div>
-                              <button
-                                onClick={handleSaveGoogleAnalyticsId}
-                                disabled={gaSaving || !googleAnalyticsId}
-                                className={cn(
-                                  "h-14 px-10 rounded-full text-sm font-medium transition-all shadow-xl",
-                                  googleAnalyticsId && !gaSaving
-                                    ? "bg-black text-white hover:bg-neutral-800 hover:-translate-y-0.5 active:scale-95 shadow-black/10"
-                                    : "bg-neutral-100 text-neutral-400 cursor-not-allowed shadow-none"
-                                )}
-                              >
-                                {gaSaving ? (
-                                  <div className="flex items-center gap-2 justify-center">
-                                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                    <span>Syncing</span>
-                                  </div>
-                                ) : "Update Connection"}
-                              </button>
-                            </div>
-                          </div>
                         </div>
                          <div className="bg-white rounded-3xl p-8 border border-gray-100 ">
                       <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
@@ -1300,7 +1349,7 @@ const allSections = [...leftSections, ...rightSections];
                           </p>
                         </div>
                         <div
-                          className={`px-4 py-1.5 rounded-full text-xs font-semibold ${
+                          className={`flex items-center gap-1.5 bg-green-50 text-green-700 px-3 py-1 rounded-full text-[10px] font-medium border border-green-100 uppercase tracking-wider ${
                             hasWordpressIntegration ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
                           }`}
                         >
@@ -1371,7 +1420,10 @@ const allSections = [...leftSections, ...rightSections];
                             <button
                               onClick={handleSaveWordpressIntegration}
                               disabled={wpIntegrationSaving}
-                              className="inline-flex items-center gap-2 px-6 py-3 bg-black text-white rounded-full text-sm font-medium hover:bg-gray-600  disabled:opacity-60 transition"
+                              className="inline-flex items-center gap-2 px-6 py-3 text-white rounded-md text-sm font-medium hover:opacity-90 disabled:opacity-60 transition"
+                            style={{
+                  background: "linear-gradient(90deg, #2D4059 0%, #4E76C7 100%)",
+                }}
                             >
                               {wpIntegrationSaving ? 'Savingâ€¦' : hasWordpressIntegration ? 'Update Connection' : 'Save Connection'}
                             </button>
@@ -1379,7 +1431,7 @@ const allSections = [...leftSections, ...rightSections];
                               <button
                                 onClick={handleDisconnectWordpress}
                                 disabled={wpIntegrationDeleting}
-                                className="px-6 py-3 rounded-full border text-gray-700 border-gray-200 bg-white text-sm hover:bg-gray-100 hover:text-gray-700  transition"
+                                className="px-6 py-3 rounded-md border text-gray-700 border-gray-200 bg-white text-sm hover:bg-gray-100 hover:text-gray-700  transition"
                               >
                                 {wpIntegrationDeleting ? 'Removingâ€¦' : 'Disconnect'}
                               </button>

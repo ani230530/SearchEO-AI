@@ -262,7 +262,7 @@ useEffect(() => {
         </div>
       </div>
     ) : (
-    <div className="min-w-7xl mx-auto px-4 sm:px-6 py-4 space-y-12">
+    <div className="min-w-7xl mx-auto px-4 sm:px-6 py-4 space-y-6">
       <div className="relative overflow-hidden rounded-xl border border-gray-200 ">
         <div className="absolute -top-24 -left-24 w-96 h-96 rounded-full blur-3xl" />
         <p className="pl-4 pt-4 text-base text-[#717680]">Free website audit</p>
@@ -364,15 +364,6 @@ useEffect(() => {
               className="w-4 h-4"
             />
             Select Duration
-          </button>
-
-          <button className="inline-flex items-center gap-1 px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-100 transition">
-            <img
-              src="https://res.cloudinary.com/dgfzjdi68/image/upload/v1775224313/uil_chart-growth_v4botd.png"
-              alt="Sort"
-              className="w-4 h-4"
-            />
-            Sort
           </button>
         </div>
       </div>
@@ -589,64 +580,63 @@ useEffect(() => {
         )}
         </div>
         {/* Performance over Time - Blog Analytics */}
-{blogAggregateData && blogAggregateData.dateBreakdown.length > 0 && (
-  <div className="lg:col-span-1 rounded-xl bg-white border border-gray-200 p-6 shadow-sm transition-shadow duration-300">
-    <div className="flex items-center justify-between mb-4">
-      <div>
-        <h3 className="text-3xl font-medium text-gray-900"> Performance</h3>
-        <p className="text-xs text-gray-400">
-          Tracking {blogAggregateData.totalBlogsAnalyzed} published blogs
-        </p>
-      </div>
-      
-      {/* <button
-        onClick={() => {
-          setActiveTab('analytics');
-          // You might want to add a way to switch to the blog performance tab
-        }}
-        className="group text-sm font-medium text-black transition-colors duration-200 flex items-center gap-1 hover:underline"
-      >
-        View Details
-        <span className="relative flex items-center w-4 h-4">
-          <ChevronRight className="absolute inset-0 w-4 h-4 transition-all duration-200 ease-in-out group-hover:opacity-0 group-hover:translate-x-1" />
-          <ArrowRight className="absolute inset-0 w-4 h-4 opacity-0 transition-all duration-200 ease-in-out group-hover:opacity-100 group-hover:translate-x-0" />
-        </span>
-      </button> */}
-    </div>
-
-    <D3LineChart
-      data={blogClicksData}
-      secondaryData={blogImpressionsData}
-      width={650}
-      height={180}
-      primaryColor="#111111"
-      secondaryColor="#3b82f6"
-      primaryLabel="Clicks"
-      secondaryLabel="Impressions"
-    />
-
-    {/* Mini stats below the chart */}
-    <div className="mt-4 pt-4 border-t border-gray-100 grid grid-cols-3 gap-4">
-      <div>
-        <p className="text-xs text-gray-500">Total Clicks</p>
-        <p className="text-lg font-semibold text-gray-900">
-          {blogAggregateData.totalClicks.toLocaleString()}
-        </p>
-      </div>
-      <div>
-        <p className="text-xs text-gray-500">Avg CTR</p>
-        <p className="text-lg font-semibold text-gray-900">
-          {(blogAggregateData.avgCTR * 100).toFixed(2)}%
-        </p>
-      </div>
-      <div>
-        <p className="text-xs text-gray-500">Avg Position</p>
-        <p className="text-lg font-semibold text-gray-900">
-          {blogAggregateData.avgPosition.toFixed(1)}
-        </p>
+{isLoadingBlogData ? (
+  <div className="lg:col-span-1 rounded-xl bg-white border border-gray-200 p-6 shadow-sm">
+    <div className="space-y-4">
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center space-y-3">
+          <Loader2 className="h-10 w-10 animate-spin mx-auto text-gray-400" />
+          <p className="text-sm text-gray-500">Loading performance data...</p>
+        </div>
       </div>
     </div>
   </div>
+) : (
+  blogAggregateData && blogAggregateData.dateBreakdown.length > 0 && (
+    <div className="lg:col-span-1 rounded-xl bg-white border border-gray-200 p-6 shadow-sm transition-shadow duration-300">
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h3 className="text-3xl font-medium text-gray-900"> Performance</h3>
+          <p className="text-xs text-gray-400">
+            Tracking {blogAggregateData.totalBlogsAnalyzed} published blogs
+          </p>
+        </div>
+      </div>
+
+      <D3LineChart
+        data={blogClicksData}
+        secondaryData={blogImpressionsData}
+        width={650}
+        height={180}
+        primaryColor="#111111"
+        secondaryColor="#3b82f6"
+        primaryLabel="Clicks"
+        secondaryLabel="Impressions"
+      />
+
+      {/* Mini stats below the chart */}
+      <div className="mt-4 pt-4 border-t border-gray-100 grid grid-cols-3 gap-4">
+        <div>
+          <p className="text-xs text-gray-500">Total Clicks</p>
+          <p className="text-lg font-semibold text-gray-900">
+            {blogAggregateData.totalClicks.toLocaleString()}
+          </p>
+        </div>
+        <div>
+          <p className="text-xs text-gray-500">Avg CTR</p>
+          <p className="text-lg font-semibold text-gray-900">
+            {(blogAggregateData.avgCTR * 100).toFixed(2)}%
+          </p>
+        </div>
+        <div>
+          <p className="text-xs text-gray-500">Avg Position</p>
+          <p className="text-lg font-semibold text-gray-900">
+            {blogAggregateData.avgPosition.toFixed(1)}
+          </p>
+        </div>
+      </div>
+    </div>
+  )
 )}
 </div>
 

@@ -488,41 +488,41 @@ const [activeGscSubTab, setActiveGscSubTab] = useState<'whole-analytics' | 'blog
         <div className="border-b border-gray-200 bg-[#E9EAEB]">
           <div className="grid grid-cols-6 gap-4 px-6 py-4 text-xs font-medium text-gray-600 uppercase tracking-wider">
             <div 
-              className="flex items-center space-x-2 cursor-pointer hover:text-gray-900 transition-colors"
+              className="flex items-center space-x-2 cursor-pointer font-semibold hover:text-gray-900 transition-colors"
               onClick={() => handleSort('page')}
             >
               <span>Page URL</span>
               {getSortIcon('page')}
             </div>
             <div 
-              className="flex items-center space-x-2 cursor-pointer hover:text-gray-900 transition-colors justify-center"
+              className="flex items-center space-x-2 cursor-pointer font-semibold hover:text-gray-900 transition-colors justify-center"
               onClick={() => handleSort('clicks')}
             >
               <span>Clicks</span>
               {getSortIcon('clicks')}
             </div>
             <div 
-              className="flex items-center space-x-2 cursor-pointer hover:text-gray-900 transition-colors justify-center"
+              className="flex items-center space-x-2 cursor-pointer hover:text-gray-900 font-semibold transition-colors justify-center"
               onClick={() => handleSort('impressions')}
             >
               <span>Impressions</span>
               {getSortIcon('impressions')}
             </div>
             <div 
-              className="flex items-center space-x-2 cursor-pointer hover:text-gray-900 transition-colors justify-center"
+              className="flex items-center space-x-2 cursor-pointer hover:text-gray-900 font-semibold transition-colors justify-center"
               onClick={() => handleSort('position')}
             >
               <span>Avg Position</span>
               {getSortIcon('position')}
             </div>
             <div 
-              className="flex items-center space-x-2 cursor-pointer hover:text-gray-900 transition-colors justify-center"
+              className="flex items-center space-x-2 cursor-pointer hover:text-gray-900 font-semibold transition-colors justify-center"
               onClick={() => handleSort('ctr')}
             >
               <span>CTR</span>
               {getSortIcon('ctr')}
             </div>
-            <div className="text-center">Actions</div>
+            <div className="text-center font-semibold">Actions</div>
           </div>
         </div>
         
@@ -543,8 +543,8 @@ const [activeGscSubTab, setActiveGscSubTab] = useState<'whole-analytics' | 'blog
                       className="font-light text-gray-900 text-sm hover:text-blue-600 hover:underline truncate max-w-md inline-flex items-center gap-1.5 tracking-tight"
                       onClick={(e) => e.stopPropagation()}
                     >
-                      <span className="truncate">{page.page}</span>
                       <ExternalLink className="h-3.5 w-3.5 flex-shrink-0 text-gray-400" />
+                      <span className="truncate">{page.page}</span>
                     </a>
                   </TooltipTrigger>
                   <TooltipContent 
