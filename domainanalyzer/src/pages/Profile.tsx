@@ -98,7 +98,7 @@ const Profile: React.FC = () => {
   };
 
   return (
-    <div className="relative min-h-screen w-full">
+    <div className="relative w-full">
       {/* Background Layer */}
       <div className="fixed inset-0 pointer-events-none">
         <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-gray-100 rounded-full blur-3xl opacity-20" />
@@ -106,12 +106,12 @@ const Profile: React.FC = () => {
       </div>
 
       {/* Content Layer */}
-      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 py-2 sm:py-2">
+      <div className="relative z-10 min-w-7xl mx-auto px-4 sm:px-6 py-2 sm:py-2">
         {/* Hero Section */}
         
 
         {/* Profile and Security Cards */}
-        <div className="space-y-16">
+        <div className="space-y-6">
           {/* Profile Information Card */}
           <div
             className="bg-white/70 backdrop-blur-md rounded-2xl border border-gray-200 p-8 hover:shadow-lg"

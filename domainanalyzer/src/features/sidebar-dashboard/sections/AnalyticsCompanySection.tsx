@@ -1,4 +1,5 @@
 ﻿import React, { type Dispatch, type FormEvent, type ReactNode, type SetStateAction } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   BarChart3,
   CheckCircle,
@@ -190,6 +191,7 @@ export function AnalyticsCompanySection({
   currentTaskIndex,
   handleDomainChange,
 }: AnalyticsCompanySectionProps) {
+  const navigate = useNavigate();
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + currentKeywords.length;
 
@@ -1128,7 +1130,7 @@ const allSections = [...leftSections, ...rightSections];
                               Disconnect
                             </button>
                           </div>
-                          <p className="text-sm font-light text-gray-500">
+                          <p className="text-sm text-neutral-400 font-light max-w-xl mb-2">
                              To upload it directly to your website, please connect your Google search console account. Once connected, we’ll be able to analyse your content with the correct formatting, and SEO settings. You remain in full control of what goes live.
                             </p>
                           <div className="relative w-full aspect-video rounded-2xl overflow-hidden border border-gray-100 mb-4">
@@ -1207,9 +1209,12 @@ const allSections = [...leftSections, ...rightSections];
                           <div className="bg-white rounded-3xl p-8 border border-gray-100 ">
                             <div className="flex items-center justify-between mb-6">
                               <div>
+                              <div className="flex items-center gap-3">
+                                <img src="/public/gsc-icon.png" alt="" srcset="" />
                                 <h3 className="text-xl font-light text-black tracking-tight mb-1">
                                   Selected Property
                                 </h3>
+                                </div>
                                 <p className="text-sm font-light text-gray-600">
                                   {gscSelectedProperty}
                                 </p>
@@ -1224,7 +1229,7 @@ const allSections = [...leftSections, ...rightSections];
                                 Change
                               </button>
                             </div>
-                            <p className="text-sm font-light text-gray-500">
+                            <p className="text-sm text-neutral-400 font-light max-w-xl mb-2">
                               Search Console data will be available for this
                               property, and the same Google connection now
                               includes Analytics read access for reporting.
@@ -1244,92 +1249,90 @@ const allSections = [...leftSections, ...rightSections];
 
                         {/* Google Analytics Section */}
                         <div className="bg-white rounded-3xl p-8 border border-gray-100 ">
-                          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-8">
-                            <div className="flex items-start gap-4">
-                              <div className="w-14 h-14 rounded-xl bg-neutral-900 flex items-center justify-center shadow-lg">
-  <BarChart3 className="h-6 w-6 text-white" />
-</div>
-                              <div className="space-y-1">
-                                <div className="flex items-center gap-3">
-                                  <h3 className="text-2xl font-light text-black tracking-tight">Google Search Console + Google Analytics</h3>
-                                  {googleAnalyticsId && (
-                                    <div className="flex items-center gap-1.5 bg-green-50 text-green-700 px-3 py-1 rounded-full text-[10px] font-medium border border-green-100 uppercase tracking-wider">
-                                      {/* <CheckCircle className="h-3 w-3" /> */}
-                                      Connected
-                                    </div>
-                                  )}
-                                </div>
-                                <p className="text-sm text-neutral-400 font-light max-w-xs">Connect Google once for Search Console access, then save your GA4 Property ID for automated reporting.</p>
-                            
-                                <div className="relative w-full aspect-video rounded-2xl overflow-hidden border border-gray-100 mb-4">
+
+  {/* Header */}
+  <div>
+    <div className="flex items-center justify-between">
+      <div className="flex items-center gap-3">
+      <img src="icons8-google-analytics-24.png" alt="" srcset="" />
+      <h3 className="text-2xl font-light text-black tracking-tight">
+        Google Analytics
+      </h3>
+      </div>
+      {googleAnalyticsId && (
+        <div className="flex items-center gap-1.5 bg-green-50 text-green-700 px-3 py-1 rounded-full text-[10px] font-medium border border-green-100 uppercase tracking-wider">
+          Connected
+        </div>
+      )}
+    </div>
+
+    <p className="text-sm text-neutral-400 font-light max-w-xl mb-2">
+      Connect Google for Search Console, then add your GA4 ID for reporting.
+    </p>
+  </div>
+
+  {/* ✅ Bigger Video */}
+  <div className="w-full aspect-video rounded-2xl overflow-hidden border border-gray-100">
     <iframe
       className="w-full h-full"
-      src="https://www.youtube.com/embed/pJxNPfwQfHs?si=DmLV-gdgqw9TJUdZ"
+      src="https://www.youtube.com/embed/pJxNPfwQfHs"
       title="Google Search Console Tutorial"
       frameBorder="0"
       allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
       allowFullScreen
     ></iframe>
   </div>
-  
-                              </div>
-                            </div>
 
-                          </div>
-                          <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-3 mt-4 items-center">
-  
-  {/* Input */}
-  <div className="relative group">
-    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-400 group-focus-within:text-black transition">
-      <Database className="h-4 w-4" />
+  {/* ✅ Input + Button Row */}
+  <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center py-3">
+
+    {/* Input */}
+    <div className="relative flex-1 group">
+      <div className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-400 group-focus-within:text-black transition">
+        <Database className="h-4 w-4" />
+      </div>
+
+      <input
+        type="text"
+        value={googleAnalyticsId}
+        onChange={(e) => setGoogleAnalyticsId(e.target.value)}
+        placeholder="GA4 Property ID (e.g. 123456789)"
+        className="w-full h-12 pl-11 pr-4 text-sm rounded-md border border-neutral-200 bg-neutral-50 focus:bg-white focus:border-black/20 focus:ring-4 focus:ring-black/5 outline-none transition-all placeholder:text-neutral-400 font-light"
+      />
     </div>
 
-    <input
-      type="text"
-      value={googleAnalyticsId}
-      onChange={(e) => setGoogleAnalyticsId(e.target.value)}
-      placeholder="GA4 Property ID (e.g. 123456789)"
-      className="w-full h-12 pl-11 pr-4 text-sm rounded-md border border-neutral-200 bg-neutral-50 focus:bg-white focus:border-black/20 focus:ring-4 focus:ring-black/5 outline-none transition-all placeholder:text-neutral-400 font-light"
-    />
-  </div>
+    {/* Button */}
+    <button
+      onClick={handleSaveGoogleAnalyticsId}
+      disabled={gaSaving || !googleAnalyticsId}
+      className={cn(
+        "h-12 px-6 whitespace-nowrap inline-flex items-center justify-center gap-2 rounded-md bg-[#2D4059] text-md font-medium transition",
+        googleAnalyticsId && !gaSaving
+          ? "text-white shadow-md hover:shadow-lg active:scale-95"
+          : "bg-neutral-100 text-neutral-400 cursor-not-allowed"
+      )}
+    >
+      {gaSaving ? (
+        <>
+          <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+          Syncing
+        </>
+      ) : (
+        "Update Analytics ID"
+      )}
+    </button>
 
-  {/* Button */}
-  <button
-    onClick={handleSaveGoogleAnalyticsId}
-    disabled={gaSaving || !googleAnalyticsId}
-    className={cn(
-      "inline-flex items-center gap-2 px-6 py-3 text-white rounded-md text-sm font-medium hover:opacity-90 disabled:opacity-60 transition",
-      googleAnalyticsId && !gaSaving
-        ? "text-white shadow-md hover:shadow-lg active:scale-95"
-        : "bg-neutral-100 text-neutral-400 cursor-not-allowed"
-    )}
-    style={
-      googleAnalyticsId && !gaSaving
-        ? {
-            background:
-              "linear-gradient(90deg, #2D4059 0%, #4E76C7 100%)",
-          }
-        : {}
-    }
-  >
-    {gaSaving ? (
-      <>
-        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-        Syncing
-      </>
-    ) : (
-      "Update Analytics ID"
-    )}
-  </button>
+  </div>
 </div>
-                        </div>
                          <div className="bg-white rounded-3xl p-8 border border-gray-100 ">
-                      <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+                      <div className="flex flex-wrap items-center justify-between gap-4 ">
                         <div>
+                          <div className="flex items-center gap-3">
+                          <img src="/public/skill-icons_wordpress.png" alt="" srcset="" />
                           <h3 className="text-2xl font-light text-black tracking-tight">
                             WordPress Publishing
-                          </h3>
-                          <p className="text-sm font-light text-gray-600">
+                          </h3></div>
+                          <p className="text-sm text-neutral-400 font-light max-w-xl mb-2">
                             Securely store credentials to auto-publish generated content
                           </p>
                         </div>
@@ -1349,80 +1352,27 @@ const allSections = [...leftSections, ...rightSections];
                           <div className="h-4 bg-gray-100 rounded w-1/2"></div>
                         </div>
                       ) : (
-                        <div className="space-y-5">
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">WordPress URL</label>
-                            <input
-                              type="text"
-                              value={wpForm.siteUrl}
-                              onChange={(e) => setWpForm((prev) => ({ ...prev, siteUrl: e.target.value }))}
-                              placeholder="https://example.org"
-                              className="w-full px-4 py-3 text-sm rounded-2xl border border-gray-200 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-900"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Username or Email</label>
-                            <input
-                              type="text"
-                              value={wpForm.username}
-                              onChange={(e) => setWpForm((prev) => ({ ...prev, username: e.target.value }))}
-                              placeholder="admin"
-                              className="w-full px-4 py-3 text-sm rounded-2xl border border-gray-200 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-900"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Application Password</label>
-                            <input
-                              type="password"
-                              value={wpForm.password}
-                              onChange={(e) => setWpForm((prev) => ({ ...prev, password: e.target.value }))}
-                              placeholder={hasWordpressIntegration ? 'Enter new password to update (optional)' : 'â€¢â€¢â€¢â€¢â€¢â€¢â€¢'}
-                              className="w-full px-4 py-3 text-sm rounded-2xl border border-gray-200 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-900"
-                            />
-                            <div className="mt-2 space-y-1.5 text-xs text-gray-500">
-                              <p className="">
-                                Use a <span className="font-medium text-gray-700">WordPress Application Password</span>, not your normal login password.
-                              </p>
-                              <ul className="list-disc list-inside space-y-0.5">
-                                <li>
-                                  In your WordPress admin go to{' '}
-                                  <span className="font-medium text-gray-700">Users â†’ Profile â†’ Application Passwords</span>.
-                                </li>
-                                <li>Generate a new application password and copy it once.</li>
-                                <li>Paste that value here to allow secure REST API publishing.</li>
-                              </ul>
-                              <p className="">
-                                We encrypt this token before storing it. Leave blank to keep the existing one.
-                              </p>
-                            </div>
-                          </div>
-                          {wpIntegration?.lastPublishedAt && (
-                            <p className="text-xs text-gray-500">
-                              Last published {new Date(wpIntegration.lastPublishedAt).toLocaleString()}
-                            </p>
-                          )}
-                          <div className="flex flex-wrap gap-3 pt-2">
-                            <button
-                              onClick={handleSaveWordpressIntegration}
-                              disabled={wpIntegrationSaving}
-                              className="inline-flex items-center gap-2 px-6 py-3 text-white rounded-md text-sm font-medium hover:opacity-90 disabled:opacity-60 transition"
-                            style={{
-                  background: "linear-gradient(90deg, #2D4059 0%, #4E76C7 100%)",
-                }}
-                            >
-                              {wpIntegrationSaving ? 'Savingâ€¦' : hasWordpressIntegration ? 'Update Connection' : 'Save Connection'}
-                            </button>
-                            {hasWordpressIntegration && (
-                              <button
-                                onClick={handleDisconnectWordpress}
-                                disabled={wpIntegrationDeleting}
-                                className="px-6 py-3 rounded-md border text-gray-700 border-gray-200 bg-white text-sm hover:bg-gray-100 hover:text-gray-700  transition"
-                              >
-                                {wpIntegrationDeleting ? 'Removingâ€¦' : 'Disconnect'}
-                              </button>
-                            )}
-                          </div>
-                        </div>
+                        
+  <div>
+                           <div className="relative w-full aspect-video rounded-2xl overflow-hidden border border-gray-100 mb-4">
+    <iframe
+      className="w-full h-full"
+      src="https://www.youtube.com/embed/pJxNPfwQfHs?si=DmLV-gdgqw9TJUdZ"
+      title="Google Search Console Tutorial"
+      frameBorder="0"
+      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+      allowFullScreen
+    ></iframe>
+  </div>
+  <button
+    onClick={() => navigate('/wordpress-connection')}
+    className={cn(
+      "h-12 px-6 whitespace-nowrap inline-flex items-center justify-center gap-2 rounded-md bg-[#2D4059] text-md font-medium transition text-white shadow-md hover:shadow-lg active:scale-95",
+      
+    )}
+  >Wordpress
+  </button>
+  </div>
                       )}
                     </div>
                       </div>
@@ -1630,3 +1580,4 @@ const allSections = [...leftSections, ...rightSections];
             />
   );
 }
+
