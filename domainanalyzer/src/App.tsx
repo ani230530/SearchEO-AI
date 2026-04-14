@@ -13,6 +13,7 @@ import NotFound from "./pages/NotFound";
 import Profile from "./pages/Profile";
 import LandingPage from "./pages/LandingPage";
 import SidebarDashboard from "./pages/SidebarDashboard";
+import WordPressConnection from "./pages/WordPressConnection";
 
 const queryClient = new QueryClient();
 
@@ -57,6 +58,11 @@ const App = () => (
             <Route path="/newdashboard" element={
               <ProtectedRoute>
                 <SidebarDashboard />
+              </ProtectedRoute>
+            } />
+            <Route path="/wordpress-connection" element={
+              <ProtectedRoute>
+                <WordPressConnection />
               </ProtectedRoute>
             } />
             
