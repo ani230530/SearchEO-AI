@@ -8,6 +8,7 @@ import {
   ChevronRight,
   Database,
   Globe,
+  ArrowRight,
   Grid3X3,
   List,
   Loader2,
@@ -1131,7 +1132,7 @@ const allSections = [...leftSections, ...rightSections];
                             </button>
                           </div>
                           <p className="text-sm text-neutral-400 font-light max-w-xl mb-2">
-                             To upload it directly to your website, please connect your Google search console account. Once connected, we’ll be able to analyse your content with the correct formatting, and SEO settings. You remain in full control of what goes live.
+                             Connect Google Search Console to analyze your content and SEO automatically.
                             </p>
                           <div className="relative w-full aspect-video rounded-2xl overflow-hidden border border-gray-100 mb-4">
     <iframe
@@ -1320,6 +1321,7 @@ const allSections = [...leftSections, ...rightSections];
       ) : (
         "Update Analytics ID"
       )}
+      <ArrowRight />
     </button>
 
   </div>
@@ -1371,6 +1373,7 @@ const allSections = [...leftSections, ...rightSections];
       
     )}
   >Wordpress
+  <ArrowRight />
   </button>
   </div>
                       )}
