@@ -1687,8 +1687,8 @@ router.post('/batch-analyze', authenticateToken, asyncHandler(async (req: Authen
   }
 }));
 
-// GET /api/ai-queries/debug/:domainId - Debug endpoint (no auth) to test database
-router.get('/debug/:domainId', asyncHandler(async (req: Request, res: Response) => {
+// GET /api/ai-queries/debug/:domainId - Debug endpoint to test database
+router.get('/debug/:domainId', authenticateToken, asyncHandler(async (req: Request, res: Response) => {
   try {
     const { domainId } = req.params;
     
@@ -2300,7 +2300,7 @@ router.get('/stats/:domainId', authenticateToken, asyncHandler(async (req: Authe
 }));
 
 // Existing SSE entrypoint remains unchanged except where stats are streamed
-router.post('/:domainId', async (req, res) => {
+router.post('/:domainId', authenticateToken, async (req, res) => {
     const domainId = Number(req.params.domainId);
     if (!domainId) {
         res.status(400).json({ error: 'Invalid domainId' });
@@ -2410,7 +2410,7 @@ router.post('/:domainId', async (req, res) => {
         // Determine batch size based on total queries - optimized for realistic processing
         const batchSize = totalQueries > 100 ? 4 : totalQueries > 50 ? 6 : totalQueries > 20 ? 8 : 10;
         
-        res.write(`event: progress\ndata: ${JSON.stringify({ message: `Initializing AI analysis engine - Processing ${totalQueries} queries across ${AI_MODELS.length} AI models for domain visibility analysis...` })}\n\n`);
+        res.write(`event: progress\ndata: ${JSON.stringify({ message: `Initializing AI analysis engine - Processing ${totalQueries} queries across ${AI_MODELS.length} AI models for domain visibility analysis...`, totalExpected: totalQueries })}\n\n`);
 
         // Process queries in optimized batches with domain context
         await processQueryBatch(allQueries, batchSize, res, allResults, completedQueries, totalQueries, domain, context, location);

@@ -377,6 +377,71 @@ export default function Step4Report({ domainId, onBack, onComplete }: Step4Props
         };
       });
 
+      // Extract unique keywords from results
+      const keywordMap = new Map<string, { count: number; avgPresence: number }>();
+      for (const r of results) {
+        const kw = r.keyword || 'unknown';
+        const existing = keywordMap.get(kw) || { count: 0, avgPresence: 0 };
+        existing.count++;
+        existing.avgPresence += Number(r.scores.presence) || 0;
+        keywordMap.set(kw, existing);
+      }
+      const selectedKeywords = Array.from(keywordMap.entries()).map(([keyword, data], idx) => ({
+        id: idx + 1,
+        keyword,
+        volume: 0,
+        difficulty: data.avgPresence / data.count > 0.5 ? 'Low' : 'Medium',
+        cpc: 0,
+        isSelected: true,
+      }));
+
+      // Generate recommendations based on actual scores
+      const recommendations: Array<{ priority: string; type: string; description: string; impact: string }> = [];
+      const presenceRate = Math.round((safeAvgPresence || 0) * 100);
+      const overallPct = Math.round((safeAvgOverall || 0) * 20);
+
+      if (presenceRate < 30) {
+        recommendations.push({
+          priority: 'High',
+          type: 'AI Visibility',
+          description: `Your domain appears in only ${presenceRate}% of AI responses. Focus on creating authoritative, structured content that AI models can easily reference.`,
+          impact: 'Could increase AI visibility by 40-60%'
+        });
+      }
+      if (safeAvgSentiment < 3) {
+        recommendations.push({
+          priority: 'High',
+          type: 'Brand Sentiment',
+          description: 'AI models are not consistently portraying your brand positively. Ensure public reviews, case studies, and documentation reflect well on your offering.',
+          impact: 'Improved sentiment leads to higher recommendation rates'
+        });
+      }
+      if (finalTopCompetitors.length > 0) {
+        const topComp = finalTopCompetitors[0];
+        recommendations.push({
+          priority: 'Medium',
+          type: 'Competitive Positioning',
+          description: `${topComp.domain || topComp.name} appears frequently in AI responses. Analyze their content strategy and create comparison content highlighting your advantages.`,
+          impact: 'Differentiation can capture competitive mention share'
+        });
+      }
+      if (overallPct < 60) {
+        recommendations.push({
+          priority: 'Medium',
+          type: 'Content Optimization',
+          description: 'Create FAQ-style and how-to content that directly answers the types of prompts AI models receive. Structure content with clear headings and concise answers.',
+          impact: 'Structured content improves AI citation rates by 30-50%'
+        });
+      }
+      if (recommendations.length === 0) {
+        recommendations.push({
+          priority: 'Low',
+          type: 'Maintenance',
+          description: 'Your AI visibility is strong. Continue publishing fresh, authoritative content and monitor competitor movements.',
+          impact: 'Sustained visibility in AI-powered search'
+        });
+      }
+
       const reportDataComputed: ReportDataType = {
         domain: {
           id: domainId,
@@ -384,7 +449,7 @@ export default function Step4Report({ domainId, onBack, onComplete }: Step4Props
           context: 'AI analysis completed successfully with comprehensive insights',
           location: domainContext
         },
-        selectedKeywords: [],
+        selectedKeywords,
         intentPhrases: results.map(r => ({
           id: r.phrase,
           phrase: r.phrase,
@@ -402,7 +467,7 @@ export default function Step4Report({ domainId, onBack, onComplete }: Step4Props
           onPageOptimization: { weight: 10, score: Math.round((safeAvgSentiment || 0) * 20) },
           competitorGaps: { weight: 5, score: Math.round((safeAvgOverall || 0) * 20) }
         },
-        recommendations: [],
+        recommendations,
         analysis: {
           semanticAnalysis: {},
           keywordAnalysis: {},

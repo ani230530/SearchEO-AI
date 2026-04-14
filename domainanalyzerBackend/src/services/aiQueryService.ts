@@ -201,6 +201,14 @@ function extractDomainPattern(domain: string): string {
   return domain.toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/$/, '');
 }
 
+// Common words that are also brand names — require word-boundary matching
+const GENERIC_BRAND_NAMES = new Set([
+  'tools', 'data', 'app', 'web', 'cloud', 'code', 'hub', 'lab', 'labs',
+  'bit', 'box', 'go', 'one', 'pro', 'get', 'try', 'use', 'dev', 'api',
+  'base', 'flow', 'link', 'page', 'site', 'team', 'work', 'plan', 'mail',
+  'chat', 'shop', 'help', 'docs', 'test', 'read', 'note', 'open', 'fast',
+]);
+
 function findFirstMentionPosition(text: string, domain: string): number {
   const pattern = extractDomainPattern(domain);
   const brandName = pattern.split('.')[0];
@@ -210,7 +218,14 @@ function findFirstMentionPosition(text: string, domain: string): number {
   const urlIndex = lowerText.indexOf(pattern);
   if (urlIndex >= 0) return urlIndex;
 
-  // Check for brand name
+  // For short or generic brand names, require word boundary match to avoid false positives
+  if (brandName.length <= 4 || GENERIC_BRAND_NAMES.has(brandName)) {
+    const regex = new RegExp(`\\b${brandName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
+    const match = regex.exec(lowerText);
+    return match ? match.index : -1;
+  }
+
+  // For longer, unique brand names, simple indexOf is fine
   const brandIndex = lowerText.indexOf(brandName);
   if (brandIndex >= 0) return brandIndex;
 
@@ -228,8 +243,8 @@ function extractAllBrandsFromText(text: string, citations: Citation[]): string[]
     } catch { /* skip invalid URLs */ }
   }
 
-  // From text – look for domain-like patterns
-  const domainRegex = /\b([a-z0-9-]+\.(?:com|io|org|net|co|ai|dev|app|tech|tools|cloud))\b/gi;
+  // From text – look for domain-like patterns (expanded TLDs)
+  const domainRegex = /\b([a-z0-9-]+\.(?:com|io|org|net|co|ai|dev|app|tech|tools|cloud|uk|de|fr|in|jp|es|it|nl|br|au|ca|ru|me|info|biz|xyz|so|sh|gg|to|fm|ly|cc|agency|software|solutions|digital|online|store|site|page))\b/gi;
   let match;
   while ((match = domainRegex.exec(text)) !== null) {
     brands.add(match[1].toLowerCase());
@@ -241,18 +256,28 @@ function extractAllBrandsFromText(text: string, citations: Citation[]): string[]
 function classifySentiment(contexts: string[]): 'positive' | 'neutral' | 'negative' {
   if (contexts.length === 0) return 'neutral';
 
-  const positiveWords = ['best', 'top', 'recommend', 'excellent', 'great', 'leading', 'popular', 'powerful', 'favorite', 'outstanding', 'preferred', 'trusted', 'reliable', 'innovative'];
-  const negativeWords = ['worst', 'avoid', 'poor', 'bad', 'expensive', 'slow', 'outdated', 'unreliable', 'limited', 'disappointing', 'lacks', 'difficult'];
+  const positiveWords = ['best', 'top', 'recommend', 'excellent', 'great', 'leading', 'popular', 'powerful', 'favorite', 'outstanding', 'preferred', 'trusted', 'reliable', 'innovative', 'robust', 'seamless', 'efficient', 'intuitive', 'versatile', 'comprehensive'];
+  const negativeWords = ['worst', 'avoid', 'poor', 'bad', 'expensive', 'slow', 'outdated', 'unreliable', 'limited', 'disappointing', 'lacks', 'difficult', 'clunky', 'buggy', 'overpriced', 'confusing', 'frustrating', 'mediocre', 'weak'];
+  const negationWords = ['not', "n't", 'no', 'never', 'neither', 'hardly', 'barely', 'without'];
 
   let positiveCount = 0;
   let negativeCount = 0;
   const allText = contexts.join(' ').toLowerCase();
+  const words = allText.split(/\s+/);
 
-  for (const word of positiveWords) {
-    if (allText.includes(word)) positiveCount++;
-  }
-  for (const word of negativeWords) {
-    if (allText.includes(word)) negativeCount++;
+  for (let i = 0; i < words.length; i++) {
+    const word = words[i].replace(/[^a-z']/g, '');
+    const isNegated = (i > 0 && negationWords.some(n => words[i - 1].includes(n))) ||
+                      (i > 1 && negationWords.some(n => words[i - 2].includes(n)));
+
+    if (positiveWords.includes(word)) {
+      if (isNegated) negativeCount++;
+      else positiveCount++;
+    }
+    if (negativeWords.includes(word)) {
+      if (isNegated) positiveCount++;
+      else negativeCount++;
+    }
   }
 
   if (positiveCount > negativeCount + 1) return 'positive';
@@ -267,13 +292,23 @@ function extractMentionContexts(text: string, domain: string): string[] {
   const contexts: string[] = [];
 
   // Find all mentions and extract surrounding sentences
+  const sentenceBoundary = /[.!?;]/;
   const searchTerms = [pattern, brandName];
   for (const term of searchTerms) {
+    // Skip generic brand names for context extraction too
+    if (term === brandName && (brandName.length <= 3 || GENERIC_BRAND_NAMES.has(brandName))) {
+      const regex = new RegExp(`\\b${brandName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
+      if (!regex.test(text)) continue;
+    }
     let idx = lowerText.indexOf(term);
     while (idx >= 0) {
-      const start = Math.max(0, text.lastIndexOf('.', idx) + 1);
-      const end = Math.min(text.length, text.indexOf('.', idx + term.length));
-      const sentence = text.substring(start, end > idx ? end : idx + 200).trim();
+      // Search backward for sentence start
+      let start = idx;
+      while (start > 0 && !sentenceBoundary.test(text[start - 1])) start--;
+      // Search forward for sentence end
+      let end = idx + term.length;
+      while (end < text.length && !sentenceBoundary.test(text[end])) end++;
+      const sentence = text.substring(start, Math.min(end + 1, text.length)).trim();
       if (sentence) contexts.push(sentence);
       idx = lowerText.indexOf(term, idx + term.length);
     }
@@ -375,20 +410,23 @@ function scoreResponseDeterministic(
     bp.brand.includes(domainPattern.split('.')[0]) || domainPattern.includes(bp.brand.split('.')[0])
   ) + 1 || 0;
 
-  // 4. MENTIONS COUNT
-  let mentions = 0;
+  // 4. MENTIONS COUNT — deduplicate overlapping domain/brand matches by tracking positions
+  const mentionPositions = new Set<number>();
   let idx = lowerText.indexOf(domainPattern);
   while (idx >= 0) {
-    mentions++;
+    mentionPositions.add(idx);
     idx = lowerText.indexOf(domainPattern, idx + domainPattern.length);
   }
-  idx = lowerText.indexOf(brandName);
-  while (idx >= 0) {
-    mentions++;
-    idx = lowerText.indexOf(brandName, idx + brandName.length);
+  // Only count brand name hits that don't overlap with domain pattern hits
+  if (brandName.length > 3 && !GENERIC_BRAND_NAMES.has(brandName)) {
+    idx = lowerText.indexOf(brandName);
+    while (idx >= 0) {
+      const overlaps = [...mentionPositions].some(p => Math.abs(p - idx) < domainPattern.length);
+      if (!overlaps) mentionPositions.add(idx);
+      idx = lowerText.indexOf(brandName, idx + brandName.length);
+    }
   }
-  // Deduplicate overlapping brand/domain mentions roughly
-  mentions = Math.max(1, Math.ceil(mentions / 2));
+  const mentions = mentionPositions.size;
 
   // 5. CITATION STRENGTH
   const domainCitations = llmResponse.citations.filter(c => {
@@ -408,8 +446,8 @@ function scoreResponseDeterministic(
   // 7. HIGHLIGHT CONTEXT
   let highlightContext = '';
   if (firstMentionPos >= 0) {
-    const start = Math.max(0, firstMentionPos - 80);
-    const end = Math.min(llmResponse.text.length, firstMentionPos + 200);
+    const start = Math.max(0, firstMentionPos - 120);
+    const end = Math.min(llmResponse.text.length, firstMentionPos + 300);
     highlightContext = llmResponse.text.substring(start, end).trim();
   }
 
@@ -518,7 +556,7 @@ async function analyzeResponseWithAI(response: string, targetDomain: string): Pr
        - Detect whether TARGET DOMAIN or Brand Name or Sub Brand Name is present.
        - Determine the first occurrence RANK based on textual order (Rank 1 = first mention in the text; Rank 2 = second, etc.). If absent, rank must be 0.
        - Provide detectionMethod as one of: "url" | "brand" | "text". Priority if multiple match types exist for the same occurrence: url > brand > text.
-       - Provide highlightContext: a short exact substring (≤ 280 chars) from the RESPONSE where the target or competitor is clearly mentioned.
+       - Provide highlightContext: a short exact substring (≤ 420 chars) from the RESPONSE where the target or competitor is clearly mentioned.
        - Count mentions for TARGET DOMAIN (exact and normalized forms) as an integer.
        - Extract COMPETITORS (brands/domains) with their first position, sentiment, and mentionType.
 

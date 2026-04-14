@@ -578,8 +578,15 @@ const AIQueryResults: React.FC<AIQueryResultsProps> = ({
             if (!isDuplicate) {
               resultsRef.current.push(data);
               setRawResults(prev => [...prev, data]);
-              // Progress: best-effort since we only process missing
-              setProgress(prev => Math.min(100, prev + 2));
+              // Calculate real progress from totalExpected, fallback to +2% increment
+              setTotalExpected(prev => {
+                if (prev > 0) {
+                  setProgress(Math.min(95, Math.round((resultsRef.current.length / prev) * 100)));
+                } else {
+                  setProgress(p => Math.min(95, p + 2));
+                }
+                return prev;
+              });
               setModelStatus(prev => ({ ...prev, [data.model]: 'Querying...' }));
             }
           } else if (ev.event === 'stats') {
@@ -595,6 +602,9 @@ const AIQueryResults: React.FC<AIQueryResultsProps> = ({
           } else if (ev.event === 'progress') {
             const data = JSON.parse(ev.data);
             setCurrentPhrase(data.message);
+            if (data.totalExpected && data.totalExpected > 0) {
+              setTotalExpected(data.totalExpected);
+            }
           } else if (ev.event === 'error') {
             clearTimeout(overallTimeout);
             try {
@@ -609,11 +619,16 @@ const AIQueryResults: React.FC<AIQueryResultsProps> = ({
         },
         onerror(err) {
           clearTimeout(connectionTimeout);
-          clearTimeout(overallTimeout);
           console.error('EventSource error:', err);
-          setError('Connection error. Please check your internet connection and try again.');
-          setIsAnalyzing(false);
-          ctrl.abort();
+          // Allow @microsoft/fetch-event-source built-in retry (up to 3 reconnection attempts)
+          // Only abort permanently if we've had no results at all (likely auth/server error)
+          if (resultsRef.current.length === 0) {
+            clearTimeout(overallTimeout);
+            setError('Connection error. Please check your internet connection and try again.');
+            setIsAnalyzing(false);
+            ctrl.abort();
+          }
+          // Otherwise, the library will auto-retry and we keep the existing results
         }
       });
 
@@ -958,16 +973,40 @@ const AIQueryResults: React.FC<AIQueryResultsProps> = ({
           </div>
 
           {/* Progress Bar */}
-          {rawResults.length > 0 && totalExpected > 0 && (
+          {rawResults.length > 0 && (
             <div className="w-full max-w-md mx-auto mb-8">
               <div className="h-1 bg-gray-200 rounded-full overflow-hidden">
-                <div 
+                <div
                   className="bg-blue-500 h-1 rounded-full transition-all duration-500"
-                  style={{ width: `${Math.min(100, (rawResults.length / totalExpected) * 100)}%` }}
+                  style={{ width: totalExpected > 0 ? `${Math.min(100, (rawResults.length / totalExpected) * 100)}%` : `${Math.min(95, progress)}%` }}
                 />
               </div>
               <div className="text-sm text-gray-600 mt-3 font-medium">
-                {rawResults.length} / {totalExpected} queries processed
+                {rawResults.length}{totalExpected > 0 ? ` / ${totalExpected}` : ''} queries processed
+              </div>
+            </div>
+          )}
+
+          {/* Incremental Results Preview */}
+          {rawResults.length > 0 && (
+            <div className="w-full max-w-md mx-auto mb-8">
+              <div className="text-xs text-gray-500 mb-2 font-medium uppercase tracking-wide">Latest Results</div>
+              <div className="space-y-2 max-h-40 overflow-y-auto">
+                {rawResults.slice(-5).reverse().map((r, idx) => {
+                  const presence = Math.round(Number(r.scores.presence) * 100);
+                  return (
+                    <div key={idx} className="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2 text-sm">
+                      <div className="truncate flex-1 mr-2">
+                        <span className="text-gray-700 font-medium">{r.model}</span>
+                        <span className="text-gray-400 mx-1">·</span>
+                        <span className="text-gray-500 truncate">{r.phrase.slice(0, 40)}{r.phrase.length > 40 ? '...' : ''}</span>
+                      </div>
+                      <span className={`font-semibold ${presence > 0 ? 'text-green-600' : 'text-gray-400'}`}>
+                        {presence > 0 ? `${presence}%` : 'Not found'}
+                      </span>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}

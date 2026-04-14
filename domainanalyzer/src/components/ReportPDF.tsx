@@ -981,7 +981,7 @@ export default function ReportPDF({ reportData }: ReportPDFProps) {
             <View style={{ borderWidth: 1, borderTopWidth: 0, borderColor: '#F1F5F9' }}>
               {(reportData.llmResults || []).slice(0, 8).map((r, idx) => {
                 const bg = idx % 2 === 1 ? '#F8FAFC' : '#FFFFFF';
-                const confidencePct = Math.min(Math.max(Math.round((r.avgConfidence || 0) * 100), 0), 100);
+                const confidencePct = Math.min(Math.max(Math.round(r.avgConfidence || 0), 0), 100);
                 const status = confidencePct >= 80 ? { label: 'Excellent', bg: '#DBEAFE', color: '#1D4ED8' } : confidencePct >= 60 ? { label: 'Good', bg: '#FEF3C7', color: '#B45309' } : { label: 'Needs attention', bg: '#FEE2E2', color: '#B91C1C' };
                 return (
                   <View key={`${r.model}-${idx}`} style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', backgroundColor: bg, paddingVertical: 8 }} wrap={false}>
@@ -1280,16 +1280,16 @@ export default function ReportPDF({ reportData }: ReportPDFProps) {
             </View>
             {reportData.llmResults.map((r, idx) => {
               const getConfidenceBadge = (confidence: number) => {
-                if (confidence >= 0.8) return styles.statusGood;
-                if (confidence >= 0.6) return styles.statusMedium;
+                if (confidence >= 80) return styles.statusGood;
+                if (confidence >= 60) return styles.statusMedium;
                 return styles.statusHigh;
               };
-              
+
               return (
                 <View key={idx} style={idx % 2 === 0 ? styles.tableRow : styles.tableRowAlt} wrap={false}>
                   <Text style={styles.tableCell}>{r.model}</Text>
                   <Text style={[styles.tableCell, getConfidenceBadge(r.avgConfidence)]}>
-                    {Math.min(Math.max(Math.round(r.avgConfidence * 100), 0), 100)}%
+                    {Math.min(Math.max(Math.round(r.avgConfidence), 0), 100)}%
                   </Text>
                   <Text style={styles.tableCell}>{r.responses}</Text>
                   <Text style={[styles.tableCell, { fontSize: 9, color: '#718096' }]}>{r.topSource}</Text>
@@ -1414,7 +1414,37 @@ export default function ReportPDF({ reportData }: ReportPDFProps) {
             );
           })}
         </View>
+
+        {/* Citations Section */}
+        {(() => {
+          const allCitations = (reportData.aiResults || [])
+            .flatMap(r => (r.citations || []).map(c => ({ ...c, model: r.model, phrase: r.phrase })))
+            .filter(c => c.url);
+          const uniqueCitations = Array.from(
+            new Map(allCitations.map(c => [c.url, c])).values()
+          ).slice(0, 20);
+          if (uniqueCitations.length === 0) return null;
+          return (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Citations & Sources</Text>
+              <Text style={{ fontSize: 10, color: '#64748B', marginBottom: 8 }}>
+                Sources referenced by AI models during analysis ({uniqueCitations.length} unique citations)
+              </Text>
+              {uniqueCitations.map((c, idx) => (
+                <View key={idx} style={{ marginBottom: 6, paddingBottom: 6, borderBottomWidth: idx < uniqueCitations.length - 1 ? 1 : 0, borderBottomColor: '#F1F5F9' }} wrap={false}>
+                  <Text style={{ fontSize: 10, fontWeight: 'bold', color: '#1E293B' }}>{c.title || 'Untitled Source'}</Text>
+                  <Text style={{ fontSize: 8, color: '#3B82F6', marginTop: 2 }}>{c.url}</Text>
+                  {c.citedText && (
+                    <Text style={{ fontSize: 8, color: '#64748B', marginTop: 2, fontStyle: 'italic' }}>
+                      "{c.citedText.slice(0, 150)}{c.citedText.length > 150 ? '...' : ''}"
+                    </Text>
+                  )}
+                </View>
+              ))}
+            </View>
+          );
+        })()}
       </Page>
     </Document>
   );
-} 
+}
