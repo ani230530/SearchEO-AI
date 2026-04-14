@@ -608,6 +608,44 @@ model RelevanceScoreResult {
   @@index([phraseId])
 }
 
+model NichePromptPattern {
+  id             Int      @id @default(autoincrement())
+  niche          String // e.g. "project management", "CRM", "email marketing"
+  template       String // e.g. "I need a {category} that {capability} for {constraint}"
+  retrievalFrame String // category_formation | attribute_recall | procedural | evaluation | provider_comparison | trust | roi
+  buyerStage     String // awareness | consideration | decision
+  source         String? // e.g. "reddit_r/smallbusiness", "quora", "autocomplete"
+  realExample    String? // verbatim Reddit/Quora post title
+  variables      Json? // {category: {type, examples}, constraint: {type, examples}}
+  humannessScore Float    @default(0) // 0-1 based on pronoun usage, constraint count, word count
+  usageCount     Int      @default(0) // times used across domains
+  mentionRate    Float? // avg % of times this pattern triggers brand mentions
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([niche])
+  @@index([retrievalFrame])
+  @@index([niche, retrievalFrame])
+}
+
+model RedditPattern {
+  id               Int      @id @default(autoincrement())
+  subreddit        String // e.g. "r/smallbusiness"
+  postTitle        String // original post title
+  postUrl          String?
+  postScore        Int      @default(0)
+  commentCount     Int      @default(0)
+  patternType      String // recommendation | comparison | troubleshooting | discovery | complaint
+  extractedPattern String? // structural pattern extracted from the post
+  niche            String // linked niche category
+  keywords         Json? // extracted keywords from the post
+  createdAt        DateTime @default(now())
+
+  @@index([niche])
+  @@index([subreddit])
+  @@index([patternType])
+}
+
 model GoogleSearchConsoleConnection {
   id     Int  @id @default(autoincrement())
   userId Int  @unique

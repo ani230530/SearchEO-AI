@@ -1,22 +1,25 @@
 import OpenAI from 'openai';
 import { PrismaClient } from '../../generated/prisma';
+import { redditMiningService } from './redditMiningService';
+import { nichePatternService } from './nichePatternService';
+import { humanPromptGenerator } from './humanPromptGenerator';
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const SERP_API_KEY = process.env.SERP_API_KEY;
 if (!OPENAI_API_KEY) throw new Error('OPENAI_API_KEY not set in environment variables');
-if (!SERP_API_KEY) throw new Error('SERP_API_KEY not set in environment variables');
 
 const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
 const prisma = new PrismaClient();
 
-// SERP API helper functions
+// ── SERP API (legacy, kept for Quora mining fallback) ────────────────────────
+// Reddit mining now uses PullPush API via redditMiningService.ts
+
 const searchSerpApi = async (query: string, engine: 'reddit' | 'quora') => {
+  if (!SERP_API_KEY) return null;
   const baseUrl = 'https://serpapi.com/search';
-  
-  // Use Google search with site restriction for Reddit and Quora
   const siteRestriction = engine === 'reddit' ? 'site:reddit.com' : 'site:quora.com';
   const searchQuery = `${query} ${siteRestriction}`;
-  
+
   const params = new URLSearchParams({
     api_key: SERP_API_KEY,
     engine: 'google',
@@ -28,53 +31,25 @@ const searchSerpApi = async (query: string, engine: 'reddit' | 'quora') => {
 
   try {
     const response = await fetch(`${baseUrl}?${params}`);
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`SERP API error ${response.status}:`, errorText);
-      throw new Error(`SERP API error: ${response.status} - ${errorText}`);
-    }
+    if (!response.ok) return null;
     return await response.json();
-  } catch (error) {
-    console.error(`SERP API search error for ${engine}:`, error);
+  } catch {
     return null;
   }
 };
 
-const extractRedditData = (serpData: any) => {
-  if (!serpData || !serpData.organic_results) return [];
-  
-  return serpData.organic_results
-    .filter((result: any) => result.link && result.link.includes('reddit.com'))
-    .map((result: any) => ({
-      title: result.title || '',
-      content: result.snippet || '',
-      subreddit: extractSubredditFromUrl(result.link) || '',
-      url: result.link || '',
-      score: 0, // Not available in Google results
-      comments: 0, // Not available in Google results
-      author: '', // Not available in Google results
-      created: '' // Not available in Google results
-    }));
-};
-
 const extractQuoraData = (serpData: any) => {
   if (!serpData || !serpData.organic_results) return [];
-  
   return serpData.organic_results
     .filter((result: any) => result.link && result.link.includes('quora.com'))
     .map((result: any) => ({
       title: result.title || '',
       content: result.snippet || '',
       url: result.link || '',
-      author: '', // Not available in Google results
-      answers: 0, // Not available in Google results
-      views: 0 // Not available in Google results
+      author: '',
+      answers: 0,
+      views: 0
     }));
-};
-
-const extractSubredditFromUrl = (url: string): string => {
-  const match = url.match(/reddit\.com\/r\/([^\/]+)/);
-  return match ? match[1] : '';
 };
 
 export interface IntentPhraseProgress {
@@ -461,10 +436,10 @@ Provide a comprehensive analysis that will be used to inform community research,
       phase: 'community_mining',
       step: 'Community Data Mining',
       progress: 0,
-      message: 'Extracting real insights from Reddit and Quora using SERP API'
+      message: 'Mining real Reddit data via PullPush API + extracting prompt patterns'
     });
 
-    // 1. GET SEMANTIC ANALYSIS CONTEXT FIRST
+    // 1. GET SEMANTIC ANALYSIS CONTEXT
     const semanticAnalysis = await prisma.semanticAnalysis.findFirst({
       where: { domainId: this.domainId },
       orderBy: { createdAt: 'desc' }
@@ -475,104 +450,145 @@ Provide a comprehensive analysis that will be used to inform community research,
     }
 
     const semanticContext = JSON.parse(semanticAnalysis.contentSummary);
-    const targetSubreddits = semanticContext.communityContext?.subreddits || [];
+    const targetSubreddits = (semanticContext.communityContext?.subreddits || [])
+      .map((s: any) => (typeof s === 'string' ? s : s.name || '').replace(/^r\//, ''))
+      .filter(Boolean);
     const targetQuoraSpaces = semanticContext.communityContext?.quoraSpaces || [];
-    const expectedFAQs = semanticContext.faqs || {};
+
+    // Determine niche from themes
+    const niche = semanticContext.themes?.industryFocus
+      || semanticContext.themes?.primary?.[0]?.theme
+      || this.keywords[0]?.term
+      || 'general';
 
     this.onProgress({
       phase: 'community_mining',
       step: 'Community Data Mining',
       progress: 10,
-      message: `Targeting ${targetSubreddits.length} subreddits and ${targetQuoraSpaces.length} Quora spaces based on semantic analysis`
+      message: `Mining ${targetSubreddits.length} subreddits via PullPush API for niche: "${niche}"`
     });
 
-    for (let i = 0; i < this.keywords.length; i++) {
-      const keyword = this.keywords[i];
-      const progress = 10 + Math.round((i / this.keywords.length) * 80);
+    // 2. CHECK IF WE ALREADY HAVE PATTERNS FOR THIS NICHE
+    const hasPatterns = await nichePatternService.hasPatterns(niche, 10);
 
+    if (!hasPatterns) {
+      // 3a. MINE REDDIT VIA PULLPUSH (real data, real scores)
+      try {
+        const keywordTerms = this.keywords.map(k => k.term).slice(0, 5);
+        const subredditsToMine = targetSubreddits.length > 0
+          ? targetSubreddits.slice(0, 5)
+          : ['technology', 'smallbusiness', 'SaaS', 'startups'];
+
+        this.onProgress({
+          phase: 'community_mining',
+          step: 'Community Data Mining',
+          progress: 25,
+          message: `Mining Reddit posts from r/${subredditsToMine.join(', r/')}...`
+        });
+
+        const miningResult = await redditMiningService.mineNiche({
+          niche,
+          subreddits: subredditsToMine,
+          keywords: keywordTerms,
+        });
+
+        this.onProgress({
+          phase: 'community_mining',
+          step: 'Community Data Mining',
+          progress: 50,
+          message: `Found ${miningResult.postsFound} Reddit posts. Extracting prompt patterns...`
+        });
+
+        // 3b. EXTRACT PATTERNS FROM MINED REDDIT POSTS
+        const redditPatterns = await prisma.redditPattern.findMany({
+          where: { niche: { equals: niche, mode: 'insensitive' } },
+          orderBy: { postScore: 'desc' },
+          take: 50,
+        });
+
+        if (redditPatterns.length > 0) {
+          const patterns = await nichePatternService.extractPatternsFromReddit({
+            niche,
+            redditPosts: redditPatterns.map(p => ({
+              title: p.postTitle,
+              subreddit: p.subreddit,
+              score: p.postScore,
+              url: p.postUrl || undefined,
+            })),
+          });
+
+          const stored = await nichePatternService.storePatterns(niche, patterns);
+          console.log(`[CommunityMining] Stored ${stored} prompt patterns for niche "${niche}"`);
+        }
+      } catch (err) {
+        console.warn('[CommunityMining] PullPush mining failed, will use LLM fallback:', err);
+      }
+
+      // 3c. IF STILL NO PATTERNS, GENERATE FALLBACK VIA LLM
+      const patternCount = await prisma.nichePromptPattern.count({
+        where: { niche: { equals: niche, mode: 'insensitive' } },
+      });
+
+      if (patternCount < 10) {
+        this.onProgress({
+          phase: 'community_mining',
+          step: 'Community Data Mining',
+          progress: 65,
+          message: 'Generating fallback prompt patterns via LLM...'
+        });
+
+        const fallbackPatterns = await nichePatternService.generateFallbackPatterns(
+          niche,
+          this.domain.context || ''
+        );
+        await nichePatternService.storePatterns(niche, fallbackPatterns);
+      }
+    } else {
       this.onProgress({
         phase: 'community_mining',
         step: 'Community Data Mining',
-        progress,
-        message: `Mining community data for "${keyword.term}" from identified communities (${i + 1}/${this.keywords.length})`
+        progress: 50,
+        message: `Reusing ${await prisma.nichePromptPattern.count({ where: { niche: { equals: niche, mode: 'insensitive' } } })} existing patterns for niche "${niche}"`
       });
+    }
 
+    // 4. SAVE COMMUNITY MINING RESULTS PER KEYWORD (for DB compatibility)
+    for (const keyword of this.keywords) {
       try {
-        // 2. GENERATE TARGETED SEARCH QUERIES BASED ON SEMANTIC CONTEXT
-        const searchQueries = this.generateContextualSearchQueries(keyword.term, semanticContext);
-        
-        // 3. MINE REDDIT DATA FROM SPECIFIC SUBREDDITS
-        let redditData = null;
-        try {
-          redditData = await this.mineRedditFromTargetCommunities(
-            keyword.term, 
-            searchQueries.reddit,
-            targetSubreddits,
-            semanticContext
-          );
-          await this.saveCommunityMiningResult(keyword.id, 'reddit', redditData);
-        } catch (redditError) {
-          console.error(`Reddit mining failed for ${keyword.term}:`, redditError);
-          // Create fallback data
-          redditData = {
-            platform: 'reddit',
-            insights: [],
-            sentiment: 'neutral',
-            frequency: 0,
-            subredditAnalysis: [],
-            extractedFAQs: []
-          };
-          await this.saveCommunityMiningResult(keyword.id, 'reddit', redditData);
-        }
-        
-        // 4. MINE QUORA DATA FROM SPECIFIC SPACES
-        let quoraData = null;
-        try {
-          quoraData = await this.mineQuoraFromTargetSpaces(
-            keyword.term, 
-            searchQueries.quora,
-            targetQuoraSpaces,
-            semanticContext
-          );
-          await this.saveCommunityMiningResult(keyword.id, 'quora', quoraData);
-        } catch (quoraError) {
-          console.error(`Quora mining failed for ${keyword.term}:`, quoraError);
-          // Create fallback data
-          quoraData = {
-            platform: 'quora',
-            insights: [],
-            sentiment: 'neutral',
-            frequency: 0,
-            topicAnalysis: [],
-            extractedFAQs: []
-          };
-          await this.saveCommunityMiningResult(keyword.id, 'quora', quoraData);
-        }
-
-        await this.delay(1000); // Rate limiting for SERP API
-      } catch (error) {
-        console.error(`Error mining community data for keyword ${keyword.term}:`, error);
-        // Create fallback data for both platforms
-        const redditFallback = {
+        await this.saveCommunityMiningResult(keyword.id, 'reddit', {
           platform: 'reddit',
           insights: [],
           sentiment: 'neutral',
           frequency: 0,
-          subredditAnalysis: [],
-          extractedFAQs: []
-        };
-        const quoraFallback = {
-          platform: 'quora',
-          insights: [],
-          sentiment: 'neutral',
-          frequency: 0,
-          topicAnalysis: [],
-          extractedFAQs: []
-        };
-        await this.saveCommunityMiningResult(keyword.id, 'reddit', redditFallback);
-        await this.saveCommunityMiningResult(keyword.id, 'quora', quoraFallback);
+        });
+      } catch { /* ignore duplicates */ }
+    }
+
+    // 5. QUORA MINING (keep SERP API for Quora if available)
+    if (SERP_API_KEY && targetQuoraSpaces.length > 0) {
+      this.onProgress({
+        phase: 'community_mining',
+        step: 'Community Data Mining',
+        progress: 80,
+        message: 'Mining Quora discussions...'
+      });
+
+      for (const keyword of this.keywords.slice(0, 3)) {
+        try {
+          const quoraData = await this.mineQuoraFromTargetSpaces(
+            keyword.term,
+            [`${keyword.term} recommendation`, `${keyword.term} best tool`, `how to ${keyword.term}`],
+            targetQuoraSpaces,
+            semanticContext
+          );
+          await this.saveCommunityMiningResult(keyword.id, 'quora', quoraData);
+          await this.delay(1000);
+        } catch { /* ignore */ }
       }
     }
+
+    // Store niche info for use in phrase generation
+    (this as any)._niche = niche;
 
     this.onProgress({
       phase: 'community_mining',
@@ -637,7 +653,13 @@ Provide a comprehensive analysis that will be used to inform community research,
           : `${query} site:reddit.com`;
           
         const serpData = await searchSerpApi(subredditQuery, 'reddit');
-        const redditResults = extractRedditData(serpData);
+        const redditResults = (serpData?.organic_results || [])
+          .filter((r: any) => r.link?.includes('reddit.com'))
+          .map((r: any) => ({
+            title: r.title || '', content: r.snippet || '',
+            subreddit: (r.link?.match(/reddit\.com\/r\/([^/]+)/) || [])[1] || '',
+            url: r.link || '', score: 0, comments: 0,
+          }));
         
         // Filter for target subreddits
         const filteredResults = redditResults.filter((result: any) => 
@@ -990,9 +1012,9 @@ Provide a comprehensive analysis that will be used to inform community research,
   private async phraseGeneration(): Promise<GeneratedPhraseData[]> {
     this.onProgress({
       phase: 'phrase_generation',
-      step: 'Creating optimized intent phrases',
+      step: 'Generating human-like AI test prompts',
       progress: 0,
-      message: 'Generating optimized search phrases'
+      message: 'Generating human-like prompts using pattern library + retrieval frames + fan-out'
     });
 
     const allPhrases: GeneratedPhraseData[] = [];
@@ -1004,84 +1026,100 @@ Provide a comprehensive analysis that will be used to inform community research,
     });
 
     const semanticContext = semanticAnalysis ? JSON.parse(semanticAnalysis.contentSummary) : {};
+    const niche = (this as any)._niche
+      || semanticContext.themes?.industryFocus
+      || this.keywords[0]?.term
+      || 'general';
 
-    for (let i = 0; i < this.keywords.length; i++) {
-      const keyword = this.keywords[i];
-      const progress = Math.round(((i + 1) / this.keywords.length) * 100);
+    this.onProgress({
+      phase: 'phrase_generation',
+      step: 'Phrase Generation',
+      progress: 10,
+      message: `Generating prompts for ${this.keywords.length} keywords using niche patterns + LLM...`
+    });
 
-      this.onProgress({
-        phase: 'phrase_generation',
-        step: 'Phrase Generation',
-        progress,
-        message: `Generating phrases for "${keyword.term}" (${i + 1}/${this.keywords.length})`
-      });
+    // Use the new humanPromptGenerator for all keywords at once
+    const generatedPrompts = await humanPromptGenerator.generateForDomain({
+      keywords: this.keywords.map(k => ({ id: k.id, term: k.term })),
+      domainUrl: this.domain.url || '',
+      domainContext: this.domain.context || '',
+      niche,
+      semanticContext,
+      onPrompt: async (prompt) => {
+        // Save each prompt to DB as it's generated
+        try {
+          const keyword = this.keywords.find(k => k.id === prompt.keywordId);
+          const savedPhrase = await prisma.generatedIntentPhrase.create({
+            data: {
+              phrase: prompt.phrase,
+              keywordId: prompt.keywordId,
+              domainId: this.domainId,
+              relevanceScore: prompt.relevanceScore,
+              sources: prompt.sources,
+              trend: prompt.trend,
+              intent: prompt.intent,
+              communityInsights: { retrievalFrame: prompt.retrievalFrame, buyerStage: prompt.buyerStage },
+              searchPatterns: { humannessScore: prompt.humannessScore },
+              isSelected: false
+            }
+          });
 
-      try {
-        const phrases = await this.generatePhrasesForKeyword(keyword, semanticContext);
-        allPhrases.push(...phrases);
-        
-        // Send each phrase as it's generated and save to database
-        for (const phrase of phrases) {
-          try {
-            // Save phrase to database immediately
-            const savedPhrase = await prisma.generatedIntentPhrase.create({
-              data: {
-                phrase: phrase.phrase,
-                keywordId: keyword.id,
-                domainId: this.domainId,
-                relevanceScore: phrase.relevanceScore,
-                sources: phrase.sources,
-                trend: phrase.trend,
-                intent: phrase.intent,
-                communityInsights: phrase.communityInsights,
-                searchPatterns: phrase.searchPatterns,
-                isSelected: false
-              }
+          if (this.onPhraseGenerated) {
+            this.onPhraseGenerated({
+              id: savedPhrase.id.toString(),
+              phrase: prompt.phrase,
+              relevanceScore: prompt.relevanceScore,
+              sources: prompt.sources,
+              trend: prompt.trend,
+              editable: true,
+              selected: false,
+              parentKeyword: keyword?.term || '',
+              keywordId: prompt.keywordId
             });
-
-            if (this.onPhraseGenerated) {
-              this.onPhraseGenerated({
-                id: savedPhrase.id.toString(),
-                phrase: phrase.phrase,
-                relevanceScore: phrase.relevanceScore,
-                sources: phrase.sources,
-                trend: phrase.trend,
-                editable: true,
-                selected: false,
-                parentKeyword: keyword.term,
-                keywordId: keyword.id
-              });
-            }
-          } catch (error) {
-            console.error('Error saving phrase to database:', error);
-            // Fallback to temporary ID if database save fails
-            if (this.onPhraseGenerated) {
-              this.onPhraseGenerated({
-                id: `temp-${Date.now()}-${Math.random()}`,
-                phrase: phrase.phrase,
-                relevanceScore: phrase.relevanceScore,
-                sources: phrase.sources,
-                trend: phrase.trend,
-                editable: true,
-                selected: false,
-                parentKeyword: keyword.term,
-                keywordId: keyword.id
-              });
-            }
+          }
+        } catch (error) {
+          console.error('Error saving phrase to database:', error);
+          if (this.onPhraseGenerated) {
+            const keyword = this.keywords.find(k => k.id === prompt.keywordId);
+            this.onPhraseGenerated({
+              id: `temp-${Date.now()}-${Math.random()}`,
+              phrase: prompt.phrase,
+              relevanceScore: prompt.relevanceScore,
+              sources: prompt.sources,
+              trend: prompt.trend,
+              editable: true,
+              selected: false,
+              parentKeyword: keyword?.term || '',
+              keywordId: prompt.keywordId
+            });
           }
         }
-        
-        await this.delay(600);
-      } catch (error) {
-        console.error(`Error generating phrases for keyword ${keyword.term}:`, error);
-      }
+      },
+    });
+
+    // Convert to GeneratedPhraseData format
+    for (const prompt of generatedPrompts) {
+      allPhrases.push({
+        phrase: prompt.phrase,
+        relevanceScore: prompt.relevanceScore,
+        sources: prompt.sources,
+        trend: prompt.trend,
+        intent: prompt.intent,
+        communityInsights: { retrievalFrame: prompt.retrievalFrame, buyerStage: prompt.buyerStage },
+        searchPatterns: { humannessScore: prompt.humannessScore },
+        keywordId: prompt.keywordId,
+      });
     }
+
+    // Report coverage
+    const coverage = humanPromptGenerator.checkCoverage(generatedPrompts);
+    console.log(`[PhraseGen] Generated ${allPhrases.length} prompts. Frames covered: ${coverage.covered.join(', ')}. Missing: ${coverage.missing.join(', ') || 'none'}`);
 
     this.onProgress({
       phase: 'phrase_generation',
       step: 'Phrase Generation',
       progress: 100,
-      message: 'Phrase generation completed'
+      message: `Generated ${allPhrases.length} human-like prompts across ${coverage.covered.length}/7 retrieval frames`
     });
 
     return allPhrases;

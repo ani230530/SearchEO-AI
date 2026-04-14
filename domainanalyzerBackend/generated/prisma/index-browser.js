@@ -562,6 +562,36 @@ exports.Prisma.RelevanceScoreResultScalarFieldEnum = {
   createdAt: 'createdAt'
 };
 
+exports.Prisma.NichePromptPatternScalarFieldEnum = {
+  id: 'id',
+  niche: 'niche',
+  template: 'template',
+  retrievalFrame: 'retrievalFrame',
+  buyerStage: 'buyerStage',
+  source: 'source',
+  realExample: 'realExample',
+  variables: 'variables',
+  humannessScore: 'humannessScore',
+  usageCount: 'usageCount',
+  mentionRate: 'mentionRate',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
+exports.Prisma.RedditPatternScalarFieldEnum = {
+  id: 'id',
+  subreddit: 'subreddit',
+  postTitle: 'postTitle',
+  postUrl: 'postUrl',
+  postScore: 'postScore',
+  commentCount: 'commentCount',
+  patternType: 'patternType',
+  extractedPattern: 'extractedPattern',
+  niche: 'niche',
+  keywords: 'keywords',
+  createdAt: 'createdAt'
+};
+
 exports.Prisma.GoogleSearchConsoleConnectionScalarFieldEnum = {
   id: 'id',
   userId: 'userId',
@@ -728,6 +758,8 @@ exports.Prisma.ModelName = {
   IntentClassificationResult: 'IntentClassificationResult',
   GeneratedIntentPhrase: 'GeneratedIntentPhrase',
   RelevanceScoreResult: 'RelevanceScoreResult',
+  NichePromptPattern: 'NichePromptPattern',
+  RedditPattern: 'RedditPattern',
   GoogleSearchConsoleConnection: 'GoogleSearchConsoleConnection',
   Campaign: 'Campaign',
   CampaignTopic: 'CampaignTopic',

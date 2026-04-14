@@ -174,6 +174,16 @@ export type GeneratedIntentPhrase = $Result.DefaultSelection<Prisma.$GeneratedIn
  */
 export type RelevanceScoreResult = $Result.DefaultSelection<Prisma.$RelevanceScoreResultPayload>
 /**
+ * Model NichePromptPattern
+ * 
+ */
+export type NichePromptPattern = $Result.DefaultSelection<Prisma.$NichePromptPatternPayload>
+/**
+ * Model RedditPattern
+ * 
+ */
+export type RedditPattern = $Result.DefaultSelection<Prisma.$RedditPatternPayload>
+/**
  * Model GoogleSearchConsoleConnection
  * 
  */
@@ -682,6 +692,26 @@ export class PrismaClient<
     * ```
     */
   get relevanceScoreResult(): Prisma.RelevanceScoreResultDelegate<ExtArgs, ClientOptions>;
+
+  /**
+   * `prisma.nichePromptPattern`: Exposes CRUD operations for the **NichePromptPattern** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more NichePromptPatterns
+    * const nichePromptPatterns = await prisma.nichePromptPattern.findMany()
+    * ```
+    */
+  get nichePromptPattern(): Prisma.NichePromptPatternDelegate<ExtArgs, ClientOptions>;
+
+  /**
+   * `prisma.redditPattern`: Exposes CRUD operations for the **RedditPattern** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more RedditPatterns
+    * const redditPatterns = await prisma.redditPattern.findMany()
+    * ```
+    */
+  get redditPattern(): Prisma.RedditPatternDelegate<ExtArgs, ClientOptions>;
 
   /**
    * `prisma.googleSearchConsoleConnection`: Exposes CRUD operations for the **GoogleSearchConsoleConnection** model.
@@ -1224,6 +1254,8 @@ export namespace Prisma {
     IntentClassificationResult: 'IntentClassificationResult',
     GeneratedIntentPhrase: 'GeneratedIntentPhrase',
     RelevanceScoreResult: 'RelevanceScoreResult',
+    NichePromptPattern: 'NichePromptPattern',
+    RedditPattern: 'RedditPattern',
     GoogleSearchConsoleConnection: 'GoogleSearchConsoleConnection',
     Campaign: 'Campaign',
     CampaignTopic: 'CampaignTopic',
@@ -1249,7 +1281,7 @@ export namespace Prisma {
       omit: GlobalOmitOptions
     }
     meta: {
-      modelProps: "user" | "domain" | "crawlResult" | "keyword" | "phrase" | "aIQueryResult" | "analysisReport" | "modelPerformance" | "competitorTracking" | "performanceInsight" | "dashboardAnalysis" | "competitorAnalysis" | "suggestedCompetitor" | "analysisPhase" | "semanticAnalysis" | "keywordAnalysis" | "searchVolumeClassification" | "intentClassification" | "communityInsight" | "searchPattern" | "phraseIntentClassification" | "wordpressIntegration" | "wordpressPublishLog" | "generationJob" | "generationJobPage" | "phraseScore" | "intentPhraseGeneration" | "communityMiningResult" | "searchPatternResult" | "intentClassificationResult" | "generatedIntentPhrase" | "relevanceScoreResult" | "googleSearchConsoleConnection" | "campaign" | "campaignTopic" | "campaignPage" | "campaignKeyword" | "auditResult" | "n8nRequest"
+      modelProps: "user" | "domain" | "crawlResult" | "keyword" | "phrase" | "aIQueryResult" | "analysisReport" | "modelPerformance" | "competitorTracking" | "performanceInsight" | "dashboardAnalysis" | "competitorAnalysis" | "suggestedCompetitor" | "analysisPhase" | "semanticAnalysis" | "keywordAnalysis" | "searchVolumeClassification" | "intentClassification" | "communityInsight" | "searchPattern" | "phraseIntentClassification" | "wordpressIntegration" | "wordpressPublishLog" | "generationJob" | "generationJobPage" | "phraseScore" | "intentPhraseGeneration" | "communityMiningResult" | "searchPatternResult" | "intentClassificationResult" | "generatedIntentPhrase" | "relevanceScoreResult" | "nichePromptPattern" | "redditPattern" | "googleSearchConsoleConnection" | "campaign" | "campaignTopic" | "campaignPage" | "campaignKeyword" | "auditResult" | "n8nRequest"
       txIsolationLevel: Prisma.TransactionIsolationLevel
     }
     model: {
@@ -3493,6 +3525,146 @@ export namespace Prisma {
           }
         }
       }
+      NichePromptPattern: {
+        payload: Prisma.$NichePromptPatternPayload<ExtArgs>
+        fields: Prisma.NichePromptPatternFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.NichePromptPatternFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$NichePromptPatternPayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.NichePromptPatternFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$NichePromptPatternPayload>
+          }
+          findFirst: {
+            args: Prisma.NichePromptPatternFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$NichePromptPatternPayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.NichePromptPatternFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$NichePromptPatternPayload>
+          }
+          findMany: {
+            args: Prisma.NichePromptPatternFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$NichePromptPatternPayload>[]
+          }
+          create: {
+            args: Prisma.NichePromptPatternCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$NichePromptPatternPayload>
+          }
+          createMany: {
+            args: Prisma.NichePromptPatternCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.NichePromptPatternCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$NichePromptPatternPayload>[]
+          }
+          delete: {
+            args: Prisma.NichePromptPatternDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$NichePromptPatternPayload>
+          }
+          update: {
+            args: Prisma.NichePromptPatternUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$NichePromptPatternPayload>
+          }
+          deleteMany: {
+            args: Prisma.NichePromptPatternDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.NichePromptPatternUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          upsert: {
+            args: Prisma.NichePromptPatternUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$NichePromptPatternPayload>
+          }
+          aggregate: {
+            args: Prisma.NichePromptPatternAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateNichePromptPattern>
+          }
+          groupBy: {
+            args: Prisma.NichePromptPatternGroupByArgs<ExtArgs>
+            result: $Utils.Optional<NichePromptPatternGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.NichePromptPatternCountArgs<ExtArgs>
+            result: $Utils.Optional<NichePromptPatternCountAggregateOutputType> | number
+          }
+        }
+      }
+      RedditPattern: {
+        payload: Prisma.$RedditPatternPayload<ExtArgs>
+        fields: Prisma.RedditPatternFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.RedditPatternFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$RedditPatternPayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.RedditPatternFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$RedditPatternPayload>
+          }
+          findFirst: {
+            args: Prisma.RedditPatternFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$RedditPatternPayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.RedditPatternFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$RedditPatternPayload>
+          }
+          findMany: {
+            args: Prisma.RedditPatternFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$RedditPatternPayload>[]
+          }
+          create: {
+            args: Prisma.RedditPatternCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$RedditPatternPayload>
+          }
+          createMany: {
+            args: Prisma.RedditPatternCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.RedditPatternCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$RedditPatternPayload>[]
+          }
+          delete: {
+            args: Prisma.RedditPatternDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$RedditPatternPayload>
+          }
+          update: {
+            args: Prisma.RedditPatternUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$RedditPatternPayload>
+          }
+          deleteMany: {
+            args: Prisma.RedditPatternDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.RedditPatternUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          upsert: {
+            args: Prisma.RedditPatternUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$RedditPatternPayload>
+          }
+          aggregate: {
+            args: Prisma.RedditPatternAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateRedditPattern>
+          }
+          groupBy: {
+            args: Prisma.RedditPatternGroupByArgs<ExtArgs>
+            result: $Utils.Optional<RedditPatternGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.RedditPatternCountArgs<ExtArgs>
+            result: $Utils.Optional<RedditPatternCountAggregateOutputType> | number
+          }
+        }
+      }
       GoogleSearchConsoleConnection: {
         payload: Prisma.$GoogleSearchConsoleConnectionPayload<ExtArgs>
         fields: Prisma.GoogleSearchConsoleConnectionFieldRefs
@@ -4099,6 +4271,8 @@ export namespace Prisma {
     intentClassificationResult?: IntentClassificationResultOmit
     generatedIntentPhrase?: GeneratedIntentPhraseOmit
     relevanceScoreResult?: RelevanceScoreResultOmit
+    nichePromptPattern?: NichePromptPatternOmit
+    redditPattern?: RedditPatternOmit
     googleSearchConsoleConnection?: GoogleSearchConsoleConnectionOmit
     campaign?: CampaignOmit
     campaignTopic?: CampaignTopicOmit
@@ -41451,6 +41625,2102 @@ export namespace Prisma {
 
 
   /**
+   * Model NichePromptPattern
+   */
+
+  export type AggregateNichePromptPattern = {
+    _count: NichePromptPatternCountAggregateOutputType | null
+    _avg: NichePromptPatternAvgAggregateOutputType | null
+    _sum: NichePromptPatternSumAggregateOutputType | null
+    _min: NichePromptPatternMinAggregateOutputType | null
+    _max: NichePromptPatternMaxAggregateOutputType | null
+  }
+
+  export type NichePromptPatternAvgAggregateOutputType = {
+    id: number | null
+    humannessScore: number | null
+    usageCount: number | null
+    mentionRate: number | null
+  }
+
+  export type NichePromptPatternSumAggregateOutputType = {
+    id: number | null
+    humannessScore: number | null
+    usageCount: number | null
+    mentionRate: number | null
+  }
+
+  export type NichePromptPatternMinAggregateOutputType = {
+    id: number | null
+    niche: string | null
+    template: string | null
+    retrievalFrame: string | null
+    buyerStage: string | null
+    source: string | null
+    realExample: string | null
+    humannessScore: number | null
+    usageCount: number | null
+    mentionRate: number | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type NichePromptPatternMaxAggregateOutputType = {
+    id: number | null
+    niche: string | null
+    template: string | null
+    retrievalFrame: string | null
+    buyerStage: string | null
+    source: string | null
+    realExample: string | null
+    humannessScore: number | null
+    usageCount: number | null
+    mentionRate: number | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type NichePromptPatternCountAggregateOutputType = {
+    id: number
+    niche: number
+    template: number
+    retrievalFrame: number
+    buyerStage: number
+    source: number
+    realExample: number
+    variables: number
+    humannessScore: number
+    usageCount: number
+    mentionRate: number
+    createdAt: number
+    updatedAt: number
+    _all: number
+  }
+
+
+  export type NichePromptPatternAvgAggregateInputType = {
+    id?: true
+    humannessScore?: true
+    usageCount?: true
+    mentionRate?: true
+  }
+
+  export type NichePromptPatternSumAggregateInputType = {
+    id?: true
+    humannessScore?: true
+    usageCount?: true
+    mentionRate?: true
+  }
+
+  export type NichePromptPatternMinAggregateInputType = {
+    id?: true
+    niche?: true
+    template?: true
+    retrievalFrame?: true
+    buyerStage?: true
+    source?: true
+    realExample?: true
+    humannessScore?: true
+    usageCount?: true
+    mentionRate?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type NichePromptPatternMaxAggregateInputType = {
+    id?: true
+    niche?: true
+    template?: true
+    retrievalFrame?: true
+    buyerStage?: true
+    source?: true
+    realExample?: true
+    humannessScore?: true
+    usageCount?: true
+    mentionRate?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type NichePromptPatternCountAggregateInputType = {
+    id?: true
+    niche?: true
+    template?: true
+    retrievalFrame?: true
+    buyerStage?: true
+    source?: true
+    realExample?: true
+    variables?: true
+    humannessScore?: true
+    usageCount?: true
+    mentionRate?: true
+    createdAt?: true
+    updatedAt?: true
+    _all?: true
+  }
+
+  export type NichePromptPatternAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which NichePromptPattern to aggregate.
+     */
+    where?: NichePromptPatternWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of NichePromptPatterns to fetch.
+     */
+    orderBy?: NichePromptPatternOrderByWithRelationInput | NichePromptPatternOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: NichePromptPatternWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` NichePromptPatterns from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` NichePromptPatterns.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned NichePromptPatterns
+    **/
+    _count?: true | NichePromptPatternCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to average
+    **/
+    _avg?: NichePromptPatternAvgAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to sum
+    **/
+    _sum?: NichePromptPatternSumAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: NichePromptPatternMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: NichePromptPatternMaxAggregateInputType
+  }
+
+  export type GetNichePromptPatternAggregateType<T extends NichePromptPatternAggregateArgs> = {
+        [P in keyof T & keyof AggregateNichePromptPattern]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateNichePromptPattern[P]>
+      : GetScalarType<T[P], AggregateNichePromptPattern[P]>
+  }
+
+
+
+
+  export type NichePromptPatternGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: NichePromptPatternWhereInput
+    orderBy?: NichePromptPatternOrderByWithAggregationInput | NichePromptPatternOrderByWithAggregationInput[]
+    by: NichePromptPatternScalarFieldEnum[] | NichePromptPatternScalarFieldEnum
+    having?: NichePromptPatternScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: NichePromptPatternCountAggregateInputType | true
+    _avg?: NichePromptPatternAvgAggregateInputType
+    _sum?: NichePromptPatternSumAggregateInputType
+    _min?: NichePromptPatternMinAggregateInputType
+    _max?: NichePromptPatternMaxAggregateInputType
+  }
+
+  export type NichePromptPatternGroupByOutputType = {
+    id: number
+    niche: string
+    template: string
+    retrievalFrame: string
+    buyerStage: string
+    source: string | null
+    realExample: string | null
+    variables: JsonValue | null
+    humannessScore: number
+    usageCount: number
+    mentionRate: number | null
+    createdAt: Date
+    updatedAt: Date
+    _count: NichePromptPatternCountAggregateOutputType | null
+    _avg: NichePromptPatternAvgAggregateOutputType | null
+    _sum: NichePromptPatternSumAggregateOutputType | null
+    _min: NichePromptPatternMinAggregateOutputType | null
+    _max: NichePromptPatternMaxAggregateOutputType | null
+  }
+
+  type GetNichePromptPatternGroupByPayload<T extends NichePromptPatternGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<NichePromptPatternGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof NichePromptPatternGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], NichePromptPatternGroupByOutputType[P]>
+            : GetScalarType<T[P], NichePromptPatternGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type NichePromptPatternSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    niche?: boolean
+    template?: boolean
+    retrievalFrame?: boolean
+    buyerStage?: boolean
+    source?: boolean
+    realExample?: boolean
+    variables?: boolean
+    humannessScore?: boolean
+    usageCount?: boolean
+    mentionRate?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+  }, ExtArgs["result"]["nichePromptPattern"]>
+
+  export type NichePromptPatternSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    niche?: boolean
+    template?: boolean
+    retrievalFrame?: boolean
+    buyerStage?: boolean
+    source?: boolean
+    realExample?: boolean
+    variables?: boolean
+    humannessScore?: boolean
+    usageCount?: boolean
+    mentionRate?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+  }, ExtArgs["result"]["nichePromptPattern"]>
+
+
+  export type NichePromptPatternSelectScalar = {
+    id?: boolean
+    niche?: boolean
+    template?: boolean
+    retrievalFrame?: boolean
+    buyerStage?: boolean
+    source?: boolean
+    realExample?: boolean
+    variables?: boolean
+    humannessScore?: boolean
+    usageCount?: boolean
+    mentionRate?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+  }
+
+  export type NichePromptPatternOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "niche" | "template" | "retrievalFrame" | "buyerStage" | "source" | "realExample" | "variables" | "humannessScore" | "usageCount" | "mentionRate" | "createdAt" | "updatedAt", ExtArgs["result"]["nichePromptPattern"]>
+
+  export type $NichePromptPatternPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "NichePromptPattern"
+    objects: {}
+    scalars: $Extensions.GetPayloadResult<{
+      id: number
+      niche: string
+      template: string
+      retrievalFrame: string
+      buyerStage: string
+      source: string | null
+      realExample: string | null
+      variables: Prisma.JsonValue | null
+      humannessScore: number
+      usageCount: number
+      mentionRate: number | null
+      createdAt: Date
+      updatedAt: Date
+    }, ExtArgs["result"]["nichePromptPattern"]>
+    composites: {}
+  }
+
+  type NichePromptPatternGetPayload<S extends boolean | null | undefined | NichePromptPatternDefaultArgs> = $Result.GetResult<Prisma.$NichePromptPatternPayload, S>
+
+  type NichePromptPatternCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> =
+    Omit<NichePromptPatternFindManyArgs, 'select' | 'include' | 'distinct' | 'omit'> & {
+      select?: NichePromptPatternCountAggregateInputType | true
+    }
+
+  export interface NichePromptPatternDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['NichePromptPattern'], meta: { name: 'NichePromptPattern' } }
+    /**
+     * Find zero or one NichePromptPattern that matches the filter.
+     * @param {NichePromptPatternFindUniqueArgs} args - Arguments to find a NichePromptPattern
+     * @example
+     * // Get one NichePromptPattern
+     * const nichePromptPattern = await prisma.nichePromptPattern.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends NichePromptPatternFindUniqueArgs>(args: SelectSubset<T, NichePromptPatternFindUniqueArgs<ExtArgs>>): Prisma__NichePromptPatternClient<$Result.GetResult<Prisma.$NichePromptPatternPayload<ExtArgs>, T, "findUnique", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find one NichePromptPattern that matches the filter or throw an error with `error.code='P2025'`
+     * if no matches were found.
+     * @param {NichePromptPatternFindUniqueOrThrowArgs} args - Arguments to find a NichePromptPattern
+     * @example
+     * // Get one NichePromptPattern
+     * const nichePromptPattern = await prisma.nichePromptPattern.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends NichePromptPatternFindUniqueOrThrowArgs>(args: SelectSubset<T, NichePromptPatternFindUniqueOrThrowArgs<ExtArgs>>): Prisma__NichePromptPatternClient<$Result.GetResult<Prisma.$NichePromptPatternPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first NichePromptPattern that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {NichePromptPatternFindFirstArgs} args - Arguments to find a NichePromptPattern
+     * @example
+     * // Get one NichePromptPattern
+     * const nichePromptPattern = await prisma.nichePromptPattern.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends NichePromptPatternFindFirstArgs>(args?: SelectSubset<T, NichePromptPatternFindFirstArgs<ExtArgs>>): Prisma__NichePromptPatternClient<$Result.GetResult<Prisma.$NichePromptPatternPayload<ExtArgs>, T, "findFirst", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first NichePromptPattern that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {NichePromptPatternFindFirstOrThrowArgs} args - Arguments to find a NichePromptPattern
+     * @example
+     * // Get one NichePromptPattern
+     * const nichePromptPattern = await prisma.nichePromptPattern.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends NichePromptPatternFindFirstOrThrowArgs>(args?: SelectSubset<T, NichePromptPatternFindFirstOrThrowArgs<ExtArgs>>): Prisma__NichePromptPatternClient<$Result.GetResult<Prisma.$NichePromptPatternPayload<ExtArgs>, T, "findFirstOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find zero or more NichePromptPatterns that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {NichePromptPatternFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all NichePromptPatterns
+     * const nichePromptPatterns = await prisma.nichePromptPattern.findMany()
+     * 
+     * // Get first 10 NichePromptPatterns
+     * const nichePromptPatterns = await prisma.nichePromptPattern.findMany({ take: 10 })
+     * 
+     * // Only select the `id`
+     * const nichePromptPatternWithIdOnly = await prisma.nichePromptPattern.findMany({ select: { id: true } })
+     * 
+     */
+    findMany<T extends NichePromptPatternFindManyArgs>(args?: SelectSubset<T, NichePromptPatternFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$NichePromptPatternPayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
+
+    /**
+     * Create a NichePromptPattern.
+     * @param {NichePromptPatternCreateArgs} args - Arguments to create a NichePromptPattern.
+     * @example
+     * // Create one NichePromptPattern
+     * const NichePromptPattern = await prisma.nichePromptPattern.create({
+     *   data: {
+     *     // ... data to create a NichePromptPattern
+     *   }
+     * })
+     * 
+     */
+    create<T extends NichePromptPatternCreateArgs>(args: SelectSubset<T, NichePromptPatternCreateArgs<ExtArgs>>): Prisma__NichePromptPatternClient<$Result.GetResult<Prisma.$NichePromptPatternPayload<ExtArgs>, T, "create", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Create many NichePromptPatterns.
+     * @param {NichePromptPatternCreateManyArgs} args - Arguments to create many NichePromptPatterns.
+     * @example
+     * // Create many NichePromptPatterns
+     * const nichePromptPattern = await prisma.nichePromptPattern.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends NichePromptPatternCreateManyArgs>(args?: SelectSubset<T, NichePromptPatternCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many NichePromptPatterns and returns the data saved in the database.
+     * @param {NichePromptPatternCreateManyAndReturnArgs} args - Arguments to create many NichePromptPatterns.
+     * @example
+     * // Create many NichePromptPatterns
+     * const nichePromptPattern = await prisma.nichePromptPattern.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many NichePromptPatterns and only return the `id`
+     * const nichePromptPatternWithIdOnly = await prisma.nichePromptPattern.createManyAndReturn({
+     *   select: { id: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends NichePromptPatternCreateManyAndReturnArgs>(args?: SelectSubset<T, NichePromptPatternCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$NichePromptPatternPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Delete a NichePromptPattern.
+     * @param {NichePromptPatternDeleteArgs} args - Arguments to delete one NichePromptPattern.
+     * @example
+     * // Delete one NichePromptPattern
+     * const NichePromptPattern = await prisma.nichePromptPattern.delete({
+     *   where: {
+     *     // ... filter to delete one NichePromptPattern
+     *   }
+     * })
+     * 
+     */
+    delete<T extends NichePromptPatternDeleteArgs>(args: SelectSubset<T, NichePromptPatternDeleteArgs<ExtArgs>>): Prisma__NichePromptPatternClient<$Result.GetResult<Prisma.$NichePromptPatternPayload<ExtArgs>, T, "delete", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Update one NichePromptPattern.
+     * @param {NichePromptPatternUpdateArgs} args - Arguments to update one NichePromptPattern.
+     * @example
+     * // Update one NichePromptPattern
+     * const nichePromptPattern = await prisma.nichePromptPattern.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends NichePromptPatternUpdateArgs>(args: SelectSubset<T, NichePromptPatternUpdateArgs<ExtArgs>>): Prisma__NichePromptPatternClient<$Result.GetResult<Prisma.$NichePromptPatternPayload<ExtArgs>, T, "update", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Delete zero or more NichePromptPatterns.
+     * @param {NichePromptPatternDeleteManyArgs} args - Arguments to filter NichePromptPatterns to delete.
+     * @example
+     * // Delete a few NichePromptPatterns
+     * const { count } = await prisma.nichePromptPattern.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends NichePromptPatternDeleteManyArgs>(args?: SelectSubset<T, NichePromptPatternDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more NichePromptPatterns.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {NichePromptPatternUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many NichePromptPatterns
+     * const nichePromptPattern = await prisma.nichePromptPattern.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends NichePromptPatternUpdateManyArgs>(args: SelectSubset<T, NichePromptPatternUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create or update one NichePromptPattern.
+     * @param {NichePromptPatternUpsertArgs} args - Arguments to update or create a NichePromptPattern.
+     * @example
+     * // Update or create a NichePromptPattern
+     * const nichePromptPattern = await prisma.nichePromptPattern.upsert({
+     *   create: {
+     *     // ... data to create a NichePromptPattern
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the NichePromptPattern we want to update
+     *   }
+     * })
+     */
+    upsert<T extends NichePromptPatternUpsertArgs>(args: SelectSubset<T, NichePromptPatternUpsertArgs<ExtArgs>>): Prisma__NichePromptPatternClient<$Result.GetResult<Prisma.$NichePromptPatternPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+
+    /**
+     * Count the number of NichePromptPatterns.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {NichePromptPatternCountArgs} args - Arguments to filter NichePromptPatterns to count.
+     * @example
+     * // Count the number of NichePromptPatterns
+     * const count = await prisma.nichePromptPattern.count({
+     *   where: {
+     *     // ... the filter for the NichePromptPatterns we want to count
+     *   }
+     * })
+    **/
+    count<T extends NichePromptPatternCountArgs>(
+      args?: Subset<T, NichePromptPatternCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], NichePromptPatternCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a NichePromptPattern.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {NichePromptPatternAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends NichePromptPatternAggregateArgs>(args: Subset<T, NichePromptPatternAggregateArgs>): Prisma.PrismaPromise<GetNichePromptPatternAggregateType<T>>
+
+    /**
+     * Group by NichePromptPattern.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {NichePromptPatternGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends NichePromptPatternGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: NichePromptPatternGroupByArgs['orderBy'] }
+        : { orderBy?: NichePromptPatternGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, NichePromptPatternGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetNichePromptPatternGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the NichePromptPattern model
+   */
+  readonly fields: NichePromptPatternFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for NichePromptPattern.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__NichePromptPatternClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the NichePromptPattern model
+   */
+  interface NichePromptPatternFieldRefs {
+    readonly id: FieldRef<"NichePromptPattern", 'Int'>
+    readonly niche: FieldRef<"NichePromptPattern", 'String'>
+    readonly template: FieldRef<"NichePromptPattern", 'String'>
+    readonly retrievalFrame: FieldRef<"NichePromptPattern", 'String'>
+    readonly buyerStage: FieldRef<"NichePromptPattern", 'String'>
+    readonly source: FieldRef<"NichePromptPattern", 'String'>
+    readonly realExample: FieldRef<"NichePromptPattern", 'String'>
+    readonly variables: FieldRef<"NichePromptPattern", 'Json'>
+    readonly humannessScore: FieldRef<"NichePromptPattern", 'Float'>
+    readonly usageCount: FieldRef<"NichePromptPattern", 'Int'>
+    readonly mentionRate: FieldRef<"NichePromptPattern", 'Float'>
+    readonly createdAt: FieldRef<"NichePromptPattern", 'DateTime'>
+    readonly updatedAt: FieldRef<"NichePromptPattern", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * NichePromptPattern findUnique
+   */
+  export type NichePromptPatternFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the NichePromptPattern
+     */
+    select?: NichePromptPatternSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the NichePromptPattern
+     */
+    omit?: NichePromptPatternOmit<ExtArgs> | null
+    /**
+     * Filter, which NichePromptPattern to fetch.
+     */
+    where: NichePromptPatternWhereUniqueInput
+  }
+
+  /**
+   * NichePromptPattern findUniqueOrThrow
+   */
+  export type NichePromptPatternFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the NichePromptPattern
+     */
+    select?: NichePromptPatternSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the NichePromptPattern
+     */
+    omit?: NichePromptPatternOmit<ExtArgs> | null
+    /**
+     * Filter, which NichePromptPattern to fetch.
+     */
+    where: NichePromptPatternWhereUniqueInput
+  }
+
+  /**
+   * NichePromptPattern findFirst
+   */
+  export type NichePromptPatternFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the NichePromptPattern
+     */
+    select?: NichePromptPatternSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the NichePromptPattern
+     */
+    omit?: NichePromptPatternOmit<ExtArgs> | null
+    /**
+     * Filter, which NichePromptPattern to fetch.
+     */
+    where?: NichePromptPatternWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of NichePromptPatterns to fetch.
+     */
+    orderBy?: NichePromptPatternOrderByWithRelationInput | NichePromptPatternOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for NichePromptPatterns.
+     */
+    cursor?: NichePromptPatternWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` NichePromptPatterns from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` NichePromptPatterns.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of NichePromptPatterns.
+     */
+    distinct?: NichePromptPatternScalarFieldEnum | NichePromptPatternScalarFieldEnum[]
+  }
+
+  /**
+   * NichePromptPattern findFirstOrThrow
+   */
+  export type NichePromptPatternFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the NichePromptPattern
+     */
+    select?: NichePromptPatternSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the NichePromptPattern
+     */
+    omit?: NichePromptPatternOmit<ExtArgs> | null
+    /**
+     * Filter, which NichePromptPattern to fetch.
+     */
+    where?: NichePromptPatternWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of NichePromptPatterns to fetch.
+     */
+    orderBy?: NichePromptPatternOrderByWithRelationInput | NichePromptPatternOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for NichePromptPatterns.
+     */
+    cursor?: NichePromptPatternWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` NichePromptPatterns from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` NichePromptPatterns.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of NichePromptPatterns.
+     */
+    distinct?: NichePromptPatternScalarFieldEnum | NichePromptPatternScalarFieldEnum[]
+  }
+
+  /**
+   * NichePromptPattern findMany
+   */
+  export type NichePromptPatternFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the NichePromptPattern
+     */
+    select?: NichePromptPatternSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the NichePromptPattern
+     */
+    omit?: NichePromptPatternOmit<ExtArgs> | null
+    /**
+     * Filter, which NichePromptPatterns to fetch.
+     */
+    where?: NichePromptPatternWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of NichePromptPatterns to fetch.
+     */
+    orderBy?: NichePromptPatternOrderByWithRelationInput | NichePromptPatternOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing NichePromptPatterns.
+     */
+    cursor?: NichePromptPatternWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` NichePromptPatterns from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` NichePromptPatterns.
+     */
+    skip?: number
+    distinct?: NichePromptPatternScalarFieldEnum | NichePromptPatternScalarFieldEnum[]
+  }
+
+  /**
+   * NichePromptPattern create
+   */
+  export type NichePromptPatternCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the NichePromptPattern
+     */
+    select?: NichePromptPatternSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the NichePromptPattern
+     */
+    omit?: NichePromptPatternOmit<ExtArgs> | null
+    /**
+     * The data needed to create a NichePromptPattern.
+     */
+    data: XOR<NichePromptPatternCreateInput, NichePromptPatternUncheckedCreateInput>
+  }
+
+  /**
+   * NichePromptPattern createMany
+   */
+  export type NichePromptPatternCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many NichePromptPatterns.
+     */
+    data: NichePromptPatternCreateManyInput | NichePromptPatternCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * NichePromptPattern createManyAndReturn
+   */
+  export type NichePromptPatternCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the NichePromptPattern
+     */
+    select?: NichePromptPatternSelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the NichePromptPattern
+     */
+    omit?: NichePromptPatternOmit<ExtArgs> | null
+    /**
+     * The data used to create many NichePromptPatterns.
+     */
+    data: NichePromptPatternCreateManyInput | NichePromptPatternCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * NichePromptPattern update
+   */
+  export type NichePromptPatternUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the NichePromptPattern
+     */
+    select?: NichePromptPatternSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the NichePromptPattern
+     */
+    omit?: NichePromptPatternOmit<ExtArgs> | null
+    /**
+     * The data needed to update a NichePromptPattern.
+     */
+    data: XOR<NichePromptPatternUpdateInput, NichePromptPatternUncheckedUpdateInput>
+    /**
+     * Choose, which NichePromptPattern to update.
+     */
+    where: NichePromptPatternWhereUniqueInput
+  }
+
+  /**
+   * NichePromptPattern updateMany
+   */
+  export type NichePromptPatternUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update NichePromptPatterns.
+     */
+    data: XOR<NichePromptPatternUpdateManyMutationInput, NichePromptPatternUncheckedUpdateManyInput>
+    /**
+     * Filter which NichePromptPatterns to update
+     */
+    where?: NichePromptPatternWhereInput
+  }
+
+  /**
+   * NichePromptPattern upsert
+   */
+  export type NichePromptPatternUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the NichePromptPattern
+     */
+    select?: NichePromptPatternSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the NichePromptPattern
+     */
+    omit?: NichePromptPatternOmit<ExtArgs> | null
+    /**
+     * The filter to search for the NichePromptPattern to update in case it exists.
+     */
+    where: NichePromptPatternWhereUniqueInput
+    /**
+     * In case the NichePromptPattern found by the `where` argument doesn't exist, create a new NichePromptPattern with this data.
+     */
+    create: XOR<NichePromptPatternCreateInput, NichePromptPatternUncheckedCreateInput>
+    /**
+     * In case the NichePromptPattern was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<NichePromptPatternUpdateInput, NichePromptPatternUncheckedUpdateInput>
+  }
+
+  /**
+   * NichePromptPattern delete
+   */
+  export type NichePromptPatternDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the NichePromptPattern
+     */
+    select?: NichePromptPatternSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the NichePromptPattern
+     */
+    omit?: NichePromptPatternOmit<ExtArgs> | null
+    /**
+     * Filter which NichePromptPattern to delete.
+     */
+    where: NichePromptPatternWhereUniqueInput
+  }
+
+  /**
+   * NichePromptPattern deleteMany
+   */
+  export type NichePromptPatternDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which NichePromptPatterns to delete
+     */
+    where?: NichePromptPatternWhereInput
+  }
+
+  /**
+   * NichePromptPattern without action
+   */
+  export type NichePromptPatternDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the NichePromptPattern
+     */
+    select?: NichePromptPatternSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the NichePromptPattern
+     */
+    omit?: NichePromptPatternOmit<ExtArgs> | null
+  }
+
+
+  /**
+   * Model RedditPattern
+   */
+
+  export type AggregateRedditPattern = {
+    _count: RedditPatternCountAggregateOutputType | null
+    _avg: RedditPatternAvgAggregateOutputType | null
+    _sum: RedditPatternSumAggregateOutputType | null
+    _min: RedditPatternMinAggregateOutputType | null
+    _max: RedditPatternMaxAggregateOutputType | null
+  }
+
+  export type RedditPatternAvgAggregateOutputType = {
+    id: number | null
+    postScore: number | null
+    commentCount: number | null
+  }
+
+  export type RedditPatternSumAggregateOutputType = {
+    id: number | null
+    postScore: number | null
+    commentCount: number | null
+  }
+
+  export type RedditPatternMinAggregateOutputType = {
+    id: number | null
+    subreddit: string | null
+    postTitle: string | null
+    postUrl: string | null
+    postScore: number | null
+    commentCount: number | null
+    patternType: string | null
+    extractedPattern: string | null
+    niche: string | null
+    createdAt: Date | null
+  }
+
+  export type RedditPatternMaxAggregateOutputType = {
+    id: number | null
+    subreddit: string | null
+    postTitle: string | null
+    postUrl: string | null
+    postScore: number | null
+    commentCount: number | null
+    patternType: string | null
+    extractedPattern: string | null
+    niche: string | null
+    createdAt: Date | null
+  }
+
+  export type RedditPatternCountAggregateOutputType = {
+    id: number
+    subreddit: number
+    postTitle: number
+    postUrl: number
+    postScore: number
+    commentCount: number
+    patternType: number
+    extractedPattern: number
+    niche: number
+    keywords: number
+    createdAt: number
+    _all: number
+  }
+
+
+  export type RedditPatternAvgAggregateInputType = {
+    id?: true
+    postScore?: true
+    commentCount?: true
+  }
+
+  export type RedditPatternSumAggregateInputType = {
+    id?: true
+    postScore?: true
+    commentCount?: true
+  }
+
+  export type RedditPatternMinAggregateInputType = {
+    id?: true
+    subreddit?: true
+    postTitle?: true
+    postUrl?: true
+    postScore?: true
+    commentCount?: true
+    patternType?: true
+    extractedPattern?: true
+    niche?: true
+    createdAt?: true
+  }
+
+  export type RedditPatternMaxAggregateInputType = {
+    id?: true
+    subreddit?: true
+    postTitle?: true
+    postUrl?: true
+    postScore?: true
+    commentCount?: true
+    patternType?: true
+    extractedPattern?: true
+    niche?: true
+    createdAt?: true
+  }
+
+  export type RedditPatternCountAggregateInputType = {
+    id?: true
+    subreddit?: true
+    postTitle?: true
+    postUrl?: true
+    postScore?: true
+    commentCount?: true
+    patternType?: true
+    extractedPattern?: true
+    niche?: true
+    keywords?: true
+    createdAt?: true
+    _all?: true
+  }
+
+  export type RedditPatternAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which RedditPattern to aggregate.
+     */
+    where?: RedditPatternWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of RedditPatterns to fetch.
+     */
+    orderBy?: RedditPatternOrderByWithRelationInput | RedditPatternOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: RedditPatternWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` RedditPatterns from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` RedditPatterns.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned RedditPatterns
+    **/
+    _count?: true | RedditPatternCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to average
+    **/
+    _avg?: RedditPatternAvgAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to sum
+    **/
+    _sum?: RedditPatternSumAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: RedditPatternMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: RedditPatternMaxAggregateInputType
+  }
+
+  export type GetRedditPatternAggregateType<T extends RedditPatternAggregateArgs> = {
+        [P in keyof T & keyof AggregateRedditPattern]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateRedditPattern[P]>
+      : GetScalarType<T[P], AggregateRedditPattern[P]>
+  }
+
+
+
+
+  export type RedditPatternGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: RedditPatternWhereInput
+    orderBy?: RedditPatternOrderByWithAggregationInput | RedditPatternOrderByWithAggregationInput[]
+    by: RedditPatternScalarFieldEnum[] | RedditPatternScalarFieldEnum
+    having?: RedditPatternScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: RedditPatternCountAggregateInputType | true
+    _avg?: RedditPatternAvgAggregateInputType
+    _sum?: RedditPatternSumAggregateInputType
+    _min?: RedditPatternMinAggregateInputType
+    _max?: RedditPatternMaxAggregateInputType
+  }
+
+  export type RedditPatternGroupByOutputType = {
+    id: number
+    subreddit: string
+    postTitle: string
+    postUrl: string | null
+    postScore: number
+    commentCount: number
+    patternType: string
+    extractedPattern: string | null
+    niche: string
+    keywords: JsonValue | null
+    createdAt: Date
+    _count: RedditPatternCountAggregateOutputType | null
+    _avg: RedditPatternAvgAggregateOutputType | null
+    _sum: RedditPatternSumAggregateOutputType | null
+    _min: RedditPatternMinAggregateOutputType | null
+    _max: RedditPatternMaxAggregateOutputType | null
+  }
+
+  type GetRedditPatternGroupByPayload<T extends RedditPatternGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<RedditPatternGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof RedditPatternGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], RedditPatternGroupByOutputType[P]>
+            : GetScalarType<T[P], RedditPatternGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type RedditPatternSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    subreddit?: boolean
+    postTitle?: boolean
+    postUrl?: boolean
+    postScore?: boolean
+    commentCount?: boolean
+    patternType?: boolean
+    extractedPattern?: boolean
+    niche?: boolean
+    keywords?: boolean
+    createdAt?: boolean
+  }, ExtArgs["result"]["redditPattern"]>
+
+  export type RedditPatternSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    subreddit?: boolean
+    postTitle?: boolean
+    postUrl?: boolean
+    postScore?: boolean
+    commentCount?: boolean
+    patternType?: boolean
+    extractedPattern?: boolean
+    niche?: boolean
+    keywords?: boolean
+    createdAt?: boolean
+  }, ExtArgs["result"]["redditPattern"]>
+
+
+  export type RedditPatternSelectScalar = {
+    id?: boolean
+    subreddit?: boolean
+    postTitle?: boolean
+    postUrl?: boolean
+    postScore?: boolean
+    commentCount?: boolean
+    patternType?: boolean
+    extractedPattern?: boolean
+    niche?: boolean
+    keywords?: boolean
+    createdAt?: boolean
+  }
+
+  export type RedditPatternOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "subreddit" | "postTitle" | "postUrl" | "postScore" | "commentCount" | "patternType" | "extractedPattern" | "niche" | "keywords" | "createdAt", ExtArgs["result"]["redditPattern"]>
+
+  export type $RedditPatternPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "RedditPattern"
+    objects: {}
+    scalars: $Extensions.GetPayloadResult<{
+      id: number
+      subreddit: string
+      postTitle: string
+      postUrl: string | null
+      postScore: number
+      commentCount: number
+      patternType: string
+      extractedPattern: string | null
+      niche: string
+      keywords: Prisma.JsonValue | null
+      createdAt: Date
+    }, ExtArgs["result"]["redditPattern"]>
+    composites: {}
+  }
+
+  type RedditPatternGetPayload<S extends boolean | null | undefined | RedditPatternDefaultArgs> = $Result.GetResult<Prisma.$RedditPatternPayload, S>
+
+  type RedditPatternCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> =
+    Omit<RedditPatternFindManyArgs, 'select' | 'include' | 'distinct' | 'omit'> & {
+      select?: RedditPatternCountAggregateInputType | true
+    }
+
+  export interface RedditPatternDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['RedditPattern'], meta: { name: 'RedditPattern' } }
+    /**
+     * Find zero or one RedditPattern that matches the filter.
+     * @param {RedditPatternFindUniqueArgs} args - Arguments to find a RedditPattern
+     * @example
+     * // Get one RedditPattern
+     * const redditPattern = await prisma.redditPattern.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends RedditPatternFindUniqueArgs>(args: SelectSubset<T, RedditPatternFindUniqueArgs<ExtArgs>>): Prisma__RedditPatternClient<$Result.GetResult<Prisma.$RedditPatternPayload<ExtArgs>, T, "findUnique", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find one RedditPattern that matches the filter or throw an error with `error.code='P2025'`
+     * if no matches were found.
+     * @param {RedditPatternFindUniqueOrThrowArgs} args - Arguments to find a RedditPattern
+     * @example
+     * // Get one RedditPattern
+     * const redditPattern = await prisma.redditPattern.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends RedditPatternFindUniqueOrThrowArgs>(args: SelectSubset<T, RedditPatternFindUniqueOrThrowArgs<ExtArgs>>): Prisma__RedditPatternClient<$Result.GetResult<Prisma.$RedditPatternPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first RedditPattern that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {RedditPatternFindFirstArgs} args - Arguments to find a RedditPattern
+     * @example
+     * // Get one RedditPattern
+     * const redditPattern = await prisma.redditPattern.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends RedditPatternFindFirstArgs>(args?: SelectSubset<T, RedditPatternFindFirstArgs<ExtArgs>>): Prisma__RedditPatternClient<$Result.GetResult<Prisma.$RedditPatternPayload<ExtArgs>, T, "findFirst", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first RedditPattern that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {RedditPatternFindFirstOrThrowArgs} args - Arguments to find a RedditPattern
+     * @example
+     * // Get one RedditPattern
+     * const redditPattern = await prisma.redditPattern.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends RedditPatternFindFirstOrThrowArgs>(args?: SelectSubset<T, RedditPatternFindFirstOrThrowArgs<ExtArgs>>): Prisma__RedditPatternClient<$Result.GetResult<Prisma.$RedditPatternPayload<ExtArgs>, T, "findFirstOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find zero or more RedditPatterns that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {RedditPatternFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all RedditPatterns
+     * const redditPatterns = await prisma.redditPattern.findMany()
+     * 
+     * // Get first 10 RedditPatterns
+     * const redditPatterns = await prisma.redditPattern.findMany({ take: 10 })
+     * 
+     * // Only select the `id`
+     * const redditPatternWithIdOnly = await prisma.redditPattern.findMany({ select: { id: true } })
+     * 
+     */
+    findMany<T extends RedditPatternFindManyArgs>(args?: SelectSubset<T, RedditPatternFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$RedditPatternPayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
+
+    /**
+     * Create a RedditPattern.
+     * @param {RedditPatternCreateArgs} args - Arguments to create a RedditPattern.
+     * @example
+     * // Create one RedditPattern
+     * const RedditPattern = await prisma.redditPattern.create({
+     *   data: {
+     *     // ... data to create a RedditPattern
+     *   }
+     * })
+     * 
+     */
+    create<T extends RedditPatternCreateArgs>(args: SelectSubset<T, RedditPatternCreateArgs<ExtArgs>>): Prisma__RedditPatternClient<$Result.GetResult<Prisma.$RedditPatternPayload<ExtArgs>, T, "create", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Create many RedditPatterns.
+     * @param {RedditPatternCreateManyArgs} args - Arguments to create many RedditPatterns.
+     * @example
+     * // Create many RedditPatterns
+     * const redditPattern = await prisma.redditPattern.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends RedditPatternCreateManyArgs>(args?: SelectSubset<T, RedditPatternCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many RedditPatterns and returns the data saved in the database.
+     * @param {RedditPatternCreateManyAndReturnArgs} args - Arguments to create many RedditPatterns.
+     * @example
+     * // Create many RedditPatterns
+     * const redditPattern = await prisma.redditPattern.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many RedditPatterns and only return the `id`
+     * const redditPatternWithIdOnly = await prisma.redditPattern.createManyAndReturn({
+     *   select: { id: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends RedditPatternCreateManyAndReturnArgs>(args?: SelectSubset<T, RedditPatternCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$RedditPatternPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Delete a RedditPattern.
+     * @param {RedditPatternDeleteArgs} args - Arguments to delete one RedditPattern.
+     * @example
+     * // Delete one RedditPattern
+     * const RedditPattern = await prisma.redditPattern.delete({
+     *   where: {
+     *     // ... filter to delete one RedditPattern
+     *   }
+     * })
+     * 
+     */
+    delete<T extends RedditPatternDeleteArgs>(args: SelectSubset<T, RedditPatternDeleteArgs<ExtArgs>>): Prisma__RedditPatternClient<$Result.GetResult<Prisma.$RedditPatternPayload<ExtArgs>, T, "delete", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Update one RedditPattern.
+     * @param {RedditPatternUpdateArgs} args - Arguments to update one RedditPattern.
+     * @example
+     * // Update one RedditPattern
+     * const redditPattern = await prisma.redditPattern.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends RedditPatternUpdateArgs>(args: SelectSubset<T, RedditPatternUpdateArgs<ExtArgs>>): Prisma__RedditPatternClient<$Result.GetResult<Prisma.$RedditPatternPayload<ExtArgs>, T, "update", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Delete zero or more RedditPatterns.
+     * @param {RedditPatternDeleteManyArgs} args - Arguments to filter RedditPatterns to delete.
+     * @example
+     * // Delete a few RedditPatterns
+     * const { count } = await prisma.redditPattern.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends RedditPatternDeleteManyArgs>(args?: SelectSubset<T, RedditPatternDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more RedditPatterns.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {RedditPatternUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many RedditPatterns
+     * const redditPattern = await prisma.redditPattern.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends RedditPatternUpdateManyArgs>(args: SelectSubset<T, RedditPatternUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create or update one RedditPattern.
+     * @param {RedditPatternUpsertArgs} args - Arguments to update or create a RedditPattern.
+     * @example
+     * // Update or create a RedditPattern
+     * const redditPattern = await prisma.redditPattern.upsert({
+     *   create: {
+     *     // ... data to create a RedditPattern
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the RedditPattern we want to update
+     *   }
+     * })
+     */
+    upsert<T extends RedditPatternUpsertArgs>(args: SelectSubset<T, RedditPatternUpsertArgs<ExtArgs>>): Prisma__RedditPatternClient<$Result.GetResult<Prisma.$RedditPatternPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+
+    /**
+     * Count the number of RedditPatterns.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {RedditPatternCountArgs} args - Arguments to filter RedditPatterns to count.
+     * @example
+     * // Count the number of RedditPatterns
+     * const count = await prisma.redditPattern.count({
+     *   where: {
+     *     // ... the filter for the RedditPatterns we want to count
+     *   }
+     * })
+    **/
+    count<T extends RedditPatternCountArgs>(
+      args?: Subset<T, RedditPatternCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], RedditPatternCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a RedditPattern.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {RedditPatternAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends RedditPatternAggregateArgs>(args: Subset<T, RedditPatternAggregateArgs>): Prisma.PrismaPromise<GetRedditPatternAggregateType<T>>
+
+    /**
+     * Group by RedditPattern.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {RedditPatternGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends RedditPatternGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: RedditPatternGroupByArgs['orderBy'] }
+        : { orderBy?: RedditPatternGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, RedditPatternGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetRedditPatternGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the RedditPattern model
+   */
+  readonly fields: RedditPatternFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for RedditPattern.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__RedditPatternClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the RedditPattern model
+   */
+  interface RedditPatternFieldRefs {
+    readonly id: FieldRef<"RedditPattern", 'Int'>
+    readonly subreddit: FieldRef<"RedditPattern", 'String'>
+    readonly postTitle: FieldRef<"RedditPattern", 'String'>
+    readonly postUrl: FieldRef<"RedditPattern", 'String'>
+    readonly postScore: FieldRef<"RedditPattern", 'Int'>
+    readonly commentCount: FieldRef<"RedditPattern", 'Int'>
+    readonly patternType: FieldRef<"RedditPattern", 'String'>
+    readonly extractedPattern: FieldRef<"RedditPattern", 'String'>
+    readonly niche: FieldRef<"RedditPattern", 'String'>
+    readonly keywords: FieldRef<"RedditPattern", 'Json'>
+    readonly createdAt: FieldRef<"RedditPattern", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * RedditPattern findUnique
+   */
+  export type RedditPatternFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the RedditPattern
+     */
+    select?: RedditPatternSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the RedditPattern
+     */
+    omit?: RedditPatternOmit<ExtArgs> | null
+    /**
+     * Filter, which RedditPattern to fetch.
+     */
+    where: RedditPatternWhereUniqueInput
+  }
+
+  /**
+   * RedditPattern findUniqueOrThrow
+   */
+  export type RedditPatternFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the RedditPattern
+     */
+    select?: RedditPatternSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the RedditPattern
+     */
+    omit?: RedditPatternOmit<ExtArgs> | null
+    /**
+     * Filter, which RedditPattern to fetch.
+     */
+    where: RedditPatternWhereUniqueInput
+  }
+
+  /**
+   * RedditPattern findFirst
+   */
+  export type RedditPatternFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the RedditPattern
+     */
+    select?: RedditPatternSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the RedditPattern
+     */
+    omit?: RedditPatternOmit<ExtArgs> | null
+    /**
+     * Filter, which RedditPattern to fetch.
+     */
+    where?: RedditPatternWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of RedditPatterns to fetch.
+     */
+    orderBy?: RedditPatternOrderByWithRelationInput | RedditPatternOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for RedditPatterns.
+     */
+    cursor?: RedditPatternWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` RedditPatterns from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` RedditPatterns.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of RedditPatterns.
+     */
+    distinct?: RedditPatternScalarFieldEnum | RedditPatternScalarFieldEnum[]
+  }
+
+  /**
+   * RedditPattern findFirstOrThrow
+   */
+  export type RedditPatternFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the RedditPattern
+     */
+    select?: RedditPatternSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the RedditPattern
+     */
+    omit?: RedditPatternOmit<ExtArgs> | null
+    /**
+     * Filter, which RedditPattern to fetch.
+     */
+    where?: RedditPatternWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of RedditPatterns to fetch.
+     */
+    orderBy?: RedditPatternOrderByWithRelationInput | RedditPatternOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for RedditPatterns.
+     */
+    cursor?: RedditPatternWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` RedditPatterns from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` RedditPatterns.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of RedditPatterns.
+     */
+    distinct?: RedditPatternScalarFieldEnum | RedditPatternScalarFieldEnum[]
+  }
+
+  /**
+   * RedditPattern findMany
+   */
+  export type RedditPatternFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the RedditPattern
+     */
+    select?: RedditPatternSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the RedditPattern
+     */
+    omit?: RedditPatternOmit<ExtArgs> | null
+    /**
+     * Filter, which RedditPatterns to fetch.
+     */
+    where?: RedditPatternWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of RedditPatterns to fetch.
+     */
+    orderBy?: RedditPatternOrderByWithRelationInput | RedditPatternOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing RedditPatterns.
+     */
+    cursor?: RedditPatternWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` RedditPatterns from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` RedditPatterns.
+     */
+    skip?: number
+    distinct?: RedditPatternScalarFieldEnum | RedditPatternScalarFieldEnum[]
+  }
+
+  /**
+   * RedditPattern create
+   */
+  export type RedditPatternCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the RedditPattern
+     */
+    select?: RedditPatternSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the RedditPattern
+     */
+    omit?: RedditPatternOmit<ExtArgs> | null
+    /**
+     * The data needed to create a RedditPattern.
+     */
+    data: XOR<RedditPatternCreateInput, RedditPatternUncheckedCreateInput>
+  }
+
+  /**
+   * RedditPattern createMany
+   */
+  export type RedditPatternCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many RedditPatterns.
+     */
+    data: RedditPatternCreateManyInput | RedditPatternCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * RedditPattern createManyAndReturn
+   */
+  export type RedditPatternCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the RedditPattern
+     */
+    select?: RedditPatternSelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the RedditPattern
+     */
+    omit?: RedditPatternOmit<ExtArgs> | null
+    /**
+     * The data used to create many RedditPatterns.
+     */
+    data: RedditPatternCreateManyInput | RedditPatternCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * RedditPattern update
+   */
+  export type RedditPatternUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the RedditPattern
+     */
+    select?: RedditPatternSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the RedditPattern
+     */
+    omit?: RedditPatternOmit<ExtArgs> | null
+    /**
+     * The data needed to update a RedditPattern.
+     */
+    data: XOR<RedditPatternUpdateInput, RedditPatternUncheckedUpdateInput>
+    /**
+     * Choose, which RedditPattern to update.
+     */
+    where: RedditPatternWhereUniqueInput
+  }
+
+  /**
+   * RedditPattern updateMany
+   */
+  export type RedditPatternUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update RedditPatterns.
+     */
+    data: XOR<RedditPatternUpdateManyMutationInput, RedditPatternUncheckedUpdateManyInput>
+    /**
+     * Filter which RedditPatterns to update
+     */
+    where?: RedditPatternWhereInput
+  }
+
+  /**
+   * RedditPattern upsert
+   */
+  export type RedditPatternUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the RedditPattern
+     */
+    select?: RedditPatternSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the RedditPattern
+     */
+    omit?: RedditPatternOmit<ExtArgs> | null
+    /**
+     * The filter to search for the RedditPattern to update in case it exists.
+     */
+    where: RedditPatternWhereUniqueInput
+    /**
+     * In case the RedditPattern found by the `where` argument doesn't exist, create a new RedditPattern with this data.
+     */
+    create: XOR<RedditPatternCreateInput, RedditPatternUncheckedCreateInput>
+    /**
+     * In case the RedditPattern was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<RedditPatternUpdateInput, RedditPatternUncheckedUpdateInput>
+  }
+
+  /**
+   * RedditPattern delete
+   */
+  export type RedditPatternDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the RedditPattern
+     */
+    select?: RedditPatternSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the RedditPattern
+     */
+    omit?: RedditPatternOmit<ExtArgs> | null
+    /**
+     * Filter which RedditPattern to delete.
+     */
+    where: RedditPatternWhereUniqueInput
+  }
+
+  /**
+   * RedditPattern deleteMany
+   */
+  export type RedditPatternDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which RedditPatterns to delete
+     */
+    where?: RedditPatternWhereInput
+  }
+
+  /**
+   * RedditPattern without action
+   */
+  export type RedditPatternDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the RedditPattern
+     */
+    select?: RedditPatternSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the RedditPattern
+     */
+    omit?: RedditPatternOmit<ExtArgs> | null
+  }
+
+
+  /**
    * Model GoogleSearchConsoleConnection
    */
 
@@ -49838,6 +52108,42 @@ export namespace Prisma {
   export type RelevanceScoreResultScalarFieldEnum = (typeof RelevanceScoreResultScalarFieldEnum)[keyof typeof RelevanceScoreResultScalarFieldEnum]
 
 
+  export const NichePromptPatternScalarFieldEnum: {
+    id: 'id',
+    niche: 'niche',
+    template: 'template',
+    retrievalFrame: 'retrievalFrame',
+    buyerStage: 'buyerStage',
+    source: 'source',
+    realExample: 'realExample',
+    variables: 'variables',
+    humannessScore: 'humannessScore',
+    usageCount: 'usageCount',
+    mentionRate: 'mentionRate',
+    createdAt: 'createdAt',
+    updatedAt: 'updatedAt'
+  };
+
+  export type NichePromptPatternScalarFieldEnum = (typeof NichePromptPatternScalarFieldEnum)[keyof typeof NichePromptPatternScalarFieldEnum]
+
+
+  export const RedditPatternScalarFieldEnum: {
+    id: 'id',
+    subreddit: 'subreddit',
+    postTitle: 'postTitle',
+    postUrl: 'postUrl',
+    postScore: 'postScore',
+    commentCount: 'commentCount',
+    patternType: 'patternType',
+    extractedPattern: 'extractedPattern',
+    niche: 'niche',
+    keywords: 'keywords',
+    createdAt: 'createdAt'
+  };
+
+  export type RedditPatternScalarFieldEnum = (typeof RedditPatternScalarFieldEnum)[keyof typeof RedditPatternScalarFieldEnum]
+
+
   export const GoogleSearchConsoleConnectionScalarFieldEnum: {
     id: 'id',
     userId: 'userId',
@@ -53017,6 +55323,184 @@ export namespace Prisma {
     factors?: JsonNullableWithAggregatesFilter<"RelevanceScoreResult">
     tokenUsage?: IntNullableWithAggregatesFilter<"RelevanceScoreResult"> | number | null
     createdAt?: DateTimeWithAggregatesFilter<"RelevanceScoreResult"> | Date | string
+  }
+
+  export type NichePromptPatternWhereInput = {
+    AND?: NichePromptPatternWhereInput | NichePromptPatternWhereInput[]
+    OR?: NichePromptPatternWhereInput[]
+    NOT?: NichePromptPatternWhereInput | NichePromptPatternWhereInput[]
+    id?: IntFilter<"NichePromptPattern"> | number
+    niche?: StringFilter<"NichePromptPattern"> | string
+    template?: StringFilter<"NichePromptPattern"> | string
+    retrievalFrame?: StringFilter<"NichePromptPattern"> | string
+    buyerStage?: StringFilter<"NichePromptPattern"> | string
+    source?: StringNullableFilter<"NichePromptPattern"> | string | null
+    realExample?: StringNullableFilter<"NichePromptPattern"> | string | null
+    variables?: JsonNullableFilter<"NichePromptPattern">
+    humannessScore?: FloatFilter<"NichePromptPattern"> | number
+    usageCount?: IntFilter<"NichePromptPattern"> | number
+    mentionRate?: FloatNullableFilter<"NichePromptPattern"> | number | null
+    createdAt?: DateTimeFilter<"NichePromptPattern"> | Date | string
+    updatedAt?: DateTimeFilter<"NichePromptPattern"> | Date | string
+  }
+
+  export type NichePromptPatternOrderByWithRelationInput = {
+    id?: SortOrder
+    niche?: SortOrder
+    template?: SortOrder
+    retrievalFrame?: SortOrder
+    buyerStage?: SortOrder
+    source?: SortOrderInput | SortOrder
+    realExample?: SortOrderInput | SortOrder
+    variables?: SortOrderInput | SortOrder
+    humannessScore?: SortOrder
+    usageCount?: SortOrder
+    mentionRate?: SortOrderInput | SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type NichePromptPatternWhereUniqueInput = Prisma.AtLeast<{
+    id?: number
+    AND?: NichePromptPatternWhereInput | NichePromptPatternWhereInput[]
+    OR?: NichePromptPatternWhereInput[]
+    NOT?: NichePromptPatternWhereInput | NichePromptPatternWhereInput[]
+    niche?: StringFilter<"NichePromptPattern"> | string
+    template?: StringFilter<"NichePromptPattern"> | string
+    retrievalFrame?: StringFilter<"NichePromptPattern"> | string
+    buyerStage?: StringFilter<"NichePromptPattern"> | string
+    source?: StringNullableFilter<"NichePromptPattern"> | string | null
+    realExample?: StringNullableFilter<"NichePromptPattern"> | string | null
+    variables?: JsonNullableFilter<"NichePromptPattern">
+    humannessScore?: FloatFilter<"NichePromptPattern"> | number
+    usageCount?: IntFilter<"NichePromptPattern"> | number
+    mentionRate?: FloatNullableFilter<"NichePromptPattern"> | number | null
+    createdAt?: DateTimeFilter<"NichePromptPattern"> | Date | string
+    updatedAt?: DateTimeFilter<"NichePromptPattern"> | Date | string
+  }, "id">
+
+  export type NichePromptPatternOrderByWithAggregationInput = {
+    id?: SortOrder
+    niche?: SortOrder
+    template?: SortOrder
+    retrievalFrame?: SortOrder
+    buyerStage?: SortOrder
+    source?: SortOrderInput | SortOrder
+    realExample?: SortOrderInput | SortOrder
+    variables?: SortOrderInput | SortOrder
+    humannessScore?: SortOrder
+    usageCount?: SortOrder
+    mentionRate?: SortOrderInput | SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    _count?: NichePromptPatternCountOrderByAggregateInput
+    _avg?: NichePromptPatternAvgOrderByAggregateInput
+    _max?: NichePromptPatternMaxOrderByAggregateInput
+    _min?: NichePromptPatternMinOrderByAggregateInput
+    _sum?: NichePromptPatternSumOrderByAggregateInput
+  }
+
+  export type NichePromptPatternScalarWhereWithAggregatesInput = {
+    AND?: NichePromptPatternScalarWhereWithAggregatesInput | NichePromptPatternScalarWhereWithAggregatesInput[]
+    OR?: NichePromptPatternScalarWhereWithAggregatesInput[]
+    NOT?: NichePromptPatternScalarWhereWithAggregatesInput | NichePromptPatternScalarWhereWithAggregatesInput[]
+    id?: IntWithAggregatesFilter<"NichePromptPattern"> | number
+    niche?: StringWithAggregatesFilter<"NichePromptPattern"> | string
+    template?: StringWithAggregatesFilter<"NichePromptPattern"> | string
+    retrievalFrame?: StringWithAggregatesFilter<"NichePromptPattern"> | string
+    buyerStage?: StringWithAggregatesFilter<"NichePromptPattern"> | string
+    source?: StringNullableWithAggregatesFilter<"NichePromptPattern"> | string | null
+    realExample?: StringNullableWithAggregatesFilter<"NichePromptPattern"> | string | null
+    variables?: JsonNullableWithAggregatesFilter<"NichePromptPattern">
+    humannessScore?: FloatWithAggregatesFilter<"NichePromptPattern"> | number
+    usageCount?: IntWithAggregatesFilter<"NichePromptPattern"> | number
+    mentionRate?: FloatNullableWithAggregatesFilter<"NichePromptPattern"> | number | null
+    createdAt?: DateTimeWithAggregatesFilter<"NichePromptPattern"> | Date | string
+    updatedAt?: DateTimeWithAggregatesFilter<"NichePromptPattern"> | Date | string
+  }
+
+  export type RedditPatternWhereInput = {
+    AND?: RedditPatternWhereInput | RedditPatternWhereInput[]
+    OR?: RedditPatternWhereInput[]
+    NOT?: RedditPatternWhereInput | RedditPatternWhereInput[]
+    id?: IntFilter<"RedditPattern"> | number
+    subreddit?: StringFilter<"RedditPattern"> | string
+    postTitle?: StringFilter<"RedditPattern"> | string
+    postUrl?: StringNullableFilter<"RedditPattern"> | string | null
+    postScore?: IntFilter<"RedditPattern"> | number
+    commentCount?: IntFilter<"RedditPattern"> | number
+    patternType?: StringFilter<"RedditPattern"> | string
+    extractedPattern?: StringNullableFilter<"RedditPattern"> | string | null
+    niche?: StringFilter<"RedditPattern"> | string
+    keywords?: JsonNullableFilter<"RedditPattern">
+    createdAt?: DateTimeFilter<"RedditPattern"> | Date | string
+  }
+
+  export type RedditPatternOrderByWithRelationInput = {
+    id?: SortOrder
+    subreddit?: SortOrder
+    postTitle?: SortOrder
+    postUrl?: SortOrderInput | SortOrder
+    postScore?: SortOrder
+    commentCount?: SortOrder
+    patternType?: SortOrder
+    extractedPattern?: SortOrderInput | SortOrder
+    niche?: SortOrder
+    keywords?: SortOrderInput | SortOrder
+    createdAt?: SortOrder
+  }
+
+  export type RedditPatternWhereUniqueInput = Prisma.AtLeast<{
+    id?: number
+    AND?: RedditPatternWhereInput | RedditPatternWhereInput[]
+    OR?: RedditPatternWhereInput[]
+    NOT?: RedditPatternWhereInput | RedditPatternWhereInput[]
+    subreddit?: StringFilter<"RedditPattern"> | string
+    postTitle?: StringFilter<"RedditPattern"> | string
+    postUrl?: StringNullableFilter<"RedditPattern"> | string | null
+    postScore?: IntFilter<"RedditPattern"> | number
+    commentCount?: IntFilter<"RedditPattern"> | number
+    patternType?: StringFilter<"RedditPattern"> | string
+    extractedPattern?: StringNullableFilter<"RedditPattern"> | string | null
+    niche?: StringFilter<"RedditPattern"> | string
+    keywords?: JsonNullableFilter<"RedditPattern">
+    createdAt?: DateTimeFilter<"RedditPattern"> | Date | string
+  }, "id">
+
+  export type RedditPatternOrderByWithAggregationInput = {
+    id?: SortOrder
+    subreddit?: SortOrder
+    postTitle?: SortOrder
+    postUrl?: SortOrderInput | SortOrder
+    postScore?: SortOrder
+    commentCount?: SortOrder
+    patternType?: SortOrder
+    extractedPattern?: SortOrderInput | SortOrder
+    niche?: SortOrder
+    keywords?: SortOrderInput | SortOrder
+    createdAt?: SortOrder
+    _count?: RedditPatternCountOrderByAggregateInput
+    _avg?: RedditPatternAvgOrderByAggregateInput
+    _max?: RedditPatternMaxOrderByAggregateInput
+    _min?: RedditPatternMinOrderByAggregateInput
+    _sum?: RedditPatternSumOrderByAggregateInput
+  }
+
+  export type RedditPatternScalarWhereWithAggregatesInput = {
+    AND?: RedditPatternScalarWhereWithAggregatesInput | RedditPatternScalarWhereWithAggregatesInput[]
+    OR?: RedditPatternScalarWhereWithAggregatesInput[]
+    NOT?: RedditPatternScalarWhereWithAggregatesInput | RedditPatternScalarWhereWithAggregatesInput[]
+    id?: IntWithAggregatesFilter<"RedditPattern"> | number
+    subreddit?: StringWithAggregatesFilter<"RedditPattern"> | string
+    postTitle?: StringWithAggregatesFilter<"RedditPattern"> | string
+    postUrl?: StringNullableWithAggregatesFilter<"RedditPattern"> | string | null
+    postScore?: IntWithAggregatesFilter<"RedditPattern"> | number
+    commentCount?: IntWithAggregatesFilter<"RedditPattern"> | number
+    patternType?: StringWithAggregatesFilter<"RedditPattern"> | string
+    extractedPattern?: StringNullableWithAggregatesFilter<"RedditPattern"> | string | null
+    niche?: StringWithAggregatesFilter<"RedditPattern"> | string
+    keywords?: JsonNullableWithAggregatesFilter<"RedditPattern">
+    createdAt?: DateTimeWithAggregatesFilter<"RedditPattern"> | Date | string
   }
 
   export type GoogleSearchConsoleConnectionWhereInput = {
@@ -56763,6 +59247,210 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
+  export type NichePromptPatternCreateInput = {
+    niche: string
+    template: string
+    retrievalFrame: string
+    buyerStage: string
+    source?: string | null
+    realExample?: string | null
+    variables?: NullableJsonNullValueInput | InputJsonValue
+    humannessScore?: number
+    usageCount?: number
+    mentionRate?: number | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type NichePromptPatternUncheckedCreateInput = {
+    id?: number
+    niche: string
+    template: string
+    retrievalFrame: string
+    buyerStage: string
+    source?: string | null
+    realExample?: string | null
+    variables?: NullableJsonNullValueInput | InputJsonValue
+    humannessScore?: number
+    usageCount?: number
+    mentionRate?: number | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type NichePromptPatternUpdateInput = {
+    niche?: StringFieldUpdateOperationsInput | string
+    template?: StringFieldUpdateOperationsInput | string
+    retrievalFrame?: StringFieldUpdateOperationsInput | string
+    buyerStage?: StringFieldUpdateOperationsInput | string
+    source?: NullableStringFieldUpdateOperationsInput | string | null
+    realExample?: NullableStringFieldUpdateOperationsInput | string | null
+    variables?: NullableJsonNullValueInput | InputJsonValue
+    humannessScore?: FloatFieldUpdateOperationsInput | number
+    usageCount?: IntFieldUpdateOperationsInput | number
+    mentionRate?: NullableFloatFieldUpdateOperationsInput | number | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type NichePromptPatternUncheckedUpdateInput = {
+    id?: IntFieldUpdateOperationsInput | number
+    niche?: StringFieldUpdateOperationsInput | string
+    template?: StringFieldUpdateOperationsInput | string
+    retrievalFrame?: StringFieldUpdateOperationsInput | string
+    buyerStage?: StringFieldUpdateOperationsInput | string
+    source?: NullableStringFieldUpdateOperationsInput | string | null
+    realExample?: NullableStringFieldUpdateOperationsInput | string | null
+    variables?: NullableJsonNullValueInput | InputJsonValue
+    humannessScore?: FloatFieldUpdateOperationsInput | number
+    usageCount?: IntFieldUpdateOperationsInput | number
+    mentionRate?: NullableFloatFieldUpdateOperationsInput | number | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type NichePromptPatternCreateManyInput = {
+    id?: number
+    niche: string
+    template: string
+    retrievalFrame: string
+    buyerStage: string
+    source?: string | null
+    realExample?: string | null
+    variables?: NullableJsonNullValueInput | InputJsonValue
+    humannessScore?: number
+    usageCount?: number
+    mentionRate?: number | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type NichePromptPatternUpdateManyMutationInput = {
+    niche?: StringFieldUpdateOperationsInput | string
+    template?: StringFieldUpdateOperationsInput | string
+    retrievalFrame?: StringFieldUpdateOperationsInput | string
+    buyerStage?: StringFieldUpdateOperationsInput | string
+    source?: NullableStringFieldUpdateOperationsInput | string | null
+    realExample?: NullableStringFieldUpdateOperationsInput | string | null
+    variables?: NullableJsonNullValueInput | InputJsonValue
+    humannessScore?: FloatFieldUpdateOperationsInput | number
+    usageCount?: IntFieldUpdateOperationsInput | number
+    mentionRate?: NullableFloatFieldUpdateOperationsInput | number | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type NichePromptPatternUncheckedUpdateManyInput = {
+    id?: IntFieldUpdateOperationsInput | number
+    niche?: StringFieldUpdateOperationsInput | string
+    template?: StringFieldUpdateOperationsInput | string
+    retrievalFrame?: StringFieldUpdateOperationsInput | string
+    buyerStage?: StringFieldUpdateOperationsInput | string
+    source?: NullableStringFieldUpdateOperationsInput | string | null
+    realExample?: NullableStringFieldUpdateOperationsInput | string | null
+    variables?: NullableJsonNullValueInput | InputJsonValue
+    humannessScore?: FloatFieldUpdateOperationsInput | number
+    usageCount?: IntFieldUpdateOperationsInput | number
+    mentionRate?: NullableFloatFieldUpdateOperationsInput | number | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type RedditPatternCreateInput = {
+    subreddit: string
+    postTitle: string
+    postUrl?: string | null
+    postScore?: number
+    commentCount?: number
+    patternType: string
+    extractedPattern?: string | null
+    niche: string
+    keywords?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+  }
+
+  export type RedditPatternUncheckedCreateInput = {
+    id?: number
+    subreddit: string
+    postTitle: string
+    postUrl?: string | null
+    postScore?: number
+    commentCount?: number
+    patternType: string
+    extractedPattern?: string | null
+    niche: string
+    keywords?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+  }
+
+  export type RedditPatternUpdateInput = {
+    subreddit?: StringFieldUpdateOperationsInput | string
+    postTitle?: StringFieldUpdateOperationsInput | string
+    postUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    postScore?: IntFieldUpdateOperationsInput | number
+    commentCount?: IntFieldUpdateOperationsInput | number
+    patternType?: StringFieldUpdateOperationsInput | string
+    extractedPattern?: NullableStringFieldUpdateOperationsInput | string | null
+    niche?: StringFieldUpdateOperationsInput | string
+    keywords?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type RedditPatternUncheckedUpdateInput = {
+    id?: IntFieldUpdateOperationsInput | number
+    subreddit?: StringFieldUpdateOperationsInput | string
+    postTitle?: StringFieldUpdateOperationsInput | string
+    postUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    postScore?: IntFieldUpdateOperationsInput | number
+    commentCount?: IntFieldUpdateOperationsInput | number
+    patternType?: StringFieldUpdateOperationsInput | string
+    extractedPattern?: NullableStringFieldUpdateOperationsInput | string | null
+    niche?: StringFieldUpdateOperationsInput | string
+    keywords?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type RedditPatternCreateManyInput = {
+    id?: number
+    subreddit: string
+    postTitle: string
+    postUrl?: string | null
+    postScore?: number
+    commentCount?: number
+    patternType: string
+    extractedPattern?: string | null
+    niche: string
+    keywords?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+  }
+
+  export type RedditPatternUpdateManyMutationInput = {
+    subreddit?: StringFieldUpdateOperationsInput | string
+    postTitle?: StringFieldUpdateOperationsInput | string
+    postUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    postScore?: IntFieldUpdateOperationsInput | number
+    commentCount?: IntFieldUpdateOperationsInput | number
+    patternType?: StringFieldUpdateOperationsInput | string
+    extractedPattern?: NullableStringFieldUpdateOperationsInput | string | null
+    niche?: StringFieldUpdateOperationsInput | string
+    keywords?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type RedditPatternUncheckedUpdateManyInput = {
+    id?: IntFieldUpdateOperationsInput | number
+    subreddit?: StringFieldUpdateOperationsInput | string
+    postTitle?: StringFieldUpdateOperationsInput | string
+    postUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    postScore?: IntFieldUpdateOperationsInput | number
+    commentCount?: IntFieldUpdateOperationsInput | number
+    patternType?: StringFieldUpdateOperationsInput | string
+    extractedPattern?: NullableStringFieldUpdateOperationsInput | string | null
+    niche?: StringFieldUpdateOperationsInput | string
+    keywords?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
   export type GoogleSearchConsoleConnectionCreateInput = {
     googleEmail?: string | null
     googleUserId?: string | null
@@ -59845,6 +62533,118 @@ export namespace Prisma {
     phraseId?: SortOrder
     score?: SortOrder
     tokenUsage?: SortOrder
+  }
+
+  export type NichePromptPatternCountOrderByAggregateInput = {
+    id?: SortOrder
+    niche?: SortOrder
+    template?: SortOrder
+    retrievalFrame?: SortOrder
+    buyerStage?: SortOrder
+    source?: SortOrder
+    realExample?: SortOrder
+    variables?: SortOrder
+    humannessScore?: SortOrder
+    usageCount?: SortOrder
+    mentionRate?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type NichePromptPatternAvgOrderByAggregateInput = {
+    id?: SortOrder
+    humannessScore?: SortOrder
+    usageCount?: SortOrder
+    mentionRate?: SortOrder
+  }
+
+  export type NichePromptPatternMaxOrderByAggregateInput = {
+    id?: SortOrder
+    niche?: SortOrder
+    template?: SortOrder
+    retrievalFrame?: SortOrder
+    buyerStage?: SortOrder
+    source?: SortOrder
+    realExample?: SortOrder
+    humannessScore?: SortOrder
+    usageCount?: SortOrder
+    mentionRate?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type NichePromptPatternMinOrderByAggregateInput = {
+    id?: SortOrder
+    niche?: SortOrder
+    template?: SortOrder
+    retrievalFrame?: SortOrder
+    buyerStage?: SortOrder
+    source?: SortOrder
+    realExample?: SortOrder
+    humannessScore?: SortOrder
+    usageCount?: SortOrder
+    mentionRate?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type NichePromptPatternSumOrderByAggregateInput = {
+    id?: SortOrder
+    humannessScore?: SortOrder
+    usageCount?: SortOrder
+    mentionRate?: SortOrder
+  }
+
+  export type RedditPatternCountOrderByAggregateInput = {
+    id?: SortOrder
+    subreddit?: SortOrder
+    postTitle?: SortOrder
+    postUrl?: SortOrder
+    postScore?: SortOrder
+    commentCount?: SortOrder
+    patternType?: SortOrder
+    extractedPattern?: SortOrder
+    niche?: SortOrder
+    keywords?: SortOrder
+    createdAt?: SortOrder
+  }
+
+  export type RedditPatternAvgOrderByAggregateInput = {
+    id?: SortOrder
+    postScore?: SortOrder
+    commentCount?: SortOrder
+  }
+
+  export type RedditPatternMaxOrderByAggregateInput = {
+    id?: SortOrder
+    subreddit?: SortOrder
+    postTitle?: SortOrder
+    postUrl?: SortOrder
+    postScore?: SortOrder
+    commentCount?: SortOrder
+    patternType?: SortOrder
+    extractedPattern?: SortOrder
+    niche?: SortOrder
+    createdAt?: SortOrder
+  }
+
+  export type RedditPatternMinOrderByAggregateInput = {
+    id?: SortOrder
+    subreddit?: SortOrder
+    postTitle?: SortOrder
+    postUrl?: SortOrder
+    postScore?: SortOrder
+    commentCount?: SortOrder
+    patternType?: SortOrder
+    extractedPattern?: SortOrder
+    niche?: SortOrder
+    createdAt?: SortOrder
+  }
+
+  export type RedditPatternSumOrderByAggregateInput = {
+    id?: SortOrder
+    postScore?: SortOrder
+    commentCount?: SortOrder
   }
 
   export type GoogleSearchConsoleConnectionCountOrderByAggregateInput = {
