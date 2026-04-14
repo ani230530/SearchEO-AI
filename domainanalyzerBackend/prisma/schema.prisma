@@ -169,6 +169,9 @@ model AIQueryResult {
   competitorMentions   Json?
   competitorCount      Int?
   competitorDomains    Json?
+  citations            Json?
+  searchQueries        Json?
+  citationStrength     Float?
   phrase               GeneratedIntentPhrase @relation(fields: [phraseId], references: [id])
 }
 

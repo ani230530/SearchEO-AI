@@ -1,54 +1,490 @@
 import OpenAI from 'openai';
 
+// ── API clients ──────────────────────────────────────────────────────────────
+
+// OpenRouter client – single key for all 3 LLMs with web search
+const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
+
+// Also keep direct OpenAI client for scoring analysis (cheaper, no web search needed)
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
-if (!OPENAI_API_KEY) throw new Error('OPENAI_API_KEY not set in environment variables');
-const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
 
-// Enhanced system prompt that mimics ChatGPT's behavior more closely
-const CHATGPT_SYSTEM_PROMPT = `You are ChatGPT, a large language model trained by OpenAI, based on the GPT-4 architecture. 
+if (!OPENROUTER_API_KEY && !OPENAI_API_KEY) {
+  throw new Error('Either OPENROUTER_API_KEY or OPENAI_API_KEY must be set');
+}
 
-Key behaviors:
-- Always provide comprehensive, well-researched responses
-- Use web search capabilities when needed for current information
-- Structure responses with clear headings and bullet points when appropriate
-- Include specific examples and actionable advice
-- Maintain a conversational but informative tone
-- When discussing tools, software, or services, provide balanced comparisons
-- Always cite sources when making factual claims
-- Format responses in markdown for better readability
+const openrouter = OPENROUTER_API_KEY
+  ? new OpenAI({
+      apiKey: OPENROUTER_API_KEY,
+      baseURL: 'https://openrouter.ai/api/v1',
+      defaultHeaders: {
+        'HTTP-Referer': process.env.APP_URL || 'http://localhost:3002',
+        'X-Title': 'SEO-GPT AI Visibility Analyzer',
+      },
+    })
+  : null;
 
-Current date: ${new Date().toISOString().split('T')[0]}
+const openai = OPENAI_API_KEY
+  ? new OpenAI({ apiKey: OPENAI_API_KEY })
+  : null;
 
-You have access to web search. Use it proactively for:
-- Current events and recent developments
-- Specific product comparisons
-- Latest pricing information
-- Recent reviews or user feedback
-- Technical specifications that may have changed
-- Market trends and statistics`;
+// Model mapping: display name → OpenRouter model ID
+const MODEL_MAP: Record<string, string> = {
+  'GPT-4o': 'openai/gpt-4o',
+  'Claude 3': 'anthropic/claude-sonnet-4-20250514',
+  'Gemini 1.5': 'google/gemini-2.0-flash-001',
+};
 
-// Helper function to extract JSON from AI response
+// ── Shared types ─────────────────────────────────────────────────────────────
+
+export interface Citation {
+  url: string;
+  title: string;
+  citedText?: string;
+  startIndex?: number;
+  endIndex?: number;
+  confidenceScore?: number;
+}
+
+export interface LLMResponse {
+  text: string;
+  model: string;
+  citations: Citation[];
+  searchQueries: string[];
+  cost: number;
+}
+
+// ── Helper: extract JSON from AI response ────────────────────────────────────
+
 function extractJSONFromResponse(aiResponse: string): string | null {
   try {
     let cleanResponse = aiResponse.trim();
-    
     if (cleanResponse.startsWith('```json')) {
       cleanResponse = cleanResponse.replace(/^```json\s*/, '').replace(/\s*```$/, '');
     } else if (cleanResponse.startsWith('```')) {
       cleanResponse = cleanResponse.replace(/^```\s*/, '').replace(/\s*```$/, '');
     }
-    
     const jsonMatch = cleanResponse.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      cleanResponse = jsonMatch[0];
-    }
-    
+    if (jsonMatch) cleanResponse = jsonMatch[0];
     JSON.parse(cleanResponse);
     return cleanResponse;
   } catch {
     return null;
   }
 }
+
+// ── Build user-like prompt (natural, not SEO-optimized) ──────────────────────
+
+function buildNaturalPrompt(phrase: string, location?: string): string {
+  const hasLocation = Boolean(location?.trim());
+  if (hasLocation) {
+    return `${phrase}\n\nI'm based in ${location!.trim()}. Please include location-relevant information where applicable.`;
+  }
+  return phrase;
+}
+
+// ── Unified query via OpenRouter (all 3 LLMs with web search + citations) ────
+
+async function queryViaOpenRouter(
+  phrase: string,
+  displayModel: 'GPT-4o' | 'Claude 3' | 'Gemini 1.5',
+  domain?: string,
+  location?: string
+): Promise<LLMResponse> {
+  const client = openrouter || openai;
+  if (!client) throw new Error('No API client available');
+
+  const userPrompt = buildNaturalPrompt(phrase, location);
+  const isOpenRouter = !!openrouter;
+
+  // Pick model ID
+  const modelId = isOpenRouter ? MODEL_MAP[displayModel] : 'gpt-4o';
+
+  // Build request body
+  const requestBody: any = {
+    model: modelId,
+    messages: [{ role: 'user', content: userPrompt }],
+    max_tokens: 2048,
+    temperature: 0.1,
+  };
+
+  if (isOpenRouter) {
+    // OpenRouter: use web_search server tool – works with ANY model, returns standardized citations
+    requestBody.tools = [
+      {
+        type: 'openrouter:web_search',
+        parameters: {
+          max_results: 8,
+          search_context_size: 'medium',
+        },
+      },
+    ];
+  }
+
+  console.log(`[OpenRouter] Querying ${modelId} with web search...`);
+
+  const response: any = await client.chat.completions.create(requestBody);
+
+  // Parse response – OpenRouter returns standard chat completions format with annotations
+  const choice = response.choices?.[0];
+  const message = choice?.message;
+  const fullText = message?.content || '';
+
+  // Extract citations from annotations (OpenRouter standardized format)
+  const citations: Citation[] = [];
+  const annotations = message?.annotations || [];
+
+  for (const ann of annotations) {
+    if (ann.type === 'url_citation') {
+      const citationData = ann.url_citation || ann;
+      citations.push({
+        url: citationData.url || ann.url || '',
+        title: citationData.title || ann.title || '',
+        citedText: citationData.content || '',
+        startIndex: citationData.start_index ?? ann.start_index,
+        endIndex: citationData.end_index ?? ann.end_index,
+      });
+    }
+  }
+
+  const uniqueCitations = deduplicateCitations(citations);
+
+  // Cost from usage
+  const usage = response.usage || {};
+  const searchRequests = usage.server_tool_use?.web_search_requests || 0;
+  const inputCost = ((usage.prompt_tokens || 0) / 1_000_000) * 3;
+  const outputCost = ((usage.completion_tokens || 0) / 1_000_000) * 15;
+  const searchCost = (searchRequests / 1000) * 10;
+  const cost = inputCost + outputCost + searchCost;
+
+  // Extract search queries from response if available
+  const searchQueries: string[] = [];
+  if (searchRequests > 0) {
+    searchQueries.push(phrase); // OpenRouter doesn't expose individual search queries
+  }
+
+  console.log(`[OpenRouter] ${displayModel} (${modelId}): ${uniqueCitations.length} citations, ${searchRequests} searches`);
+
+  return {
+    text: fullText,
+    model: displayModel,
+    citations: uniqueCitations,
+    searchQueries,
+    cost,
+  };
+}
+
+// ── Citation deduplication ───────────────────────────────────────────────────
+
+function deduplicateCitations(citations: Citation[]): Citation[] {
+  const seen = new Map<string, Citation>();
+  for (const c of citations) {
+    const key = c.url;
+    if (!key) continue;
+    if (!seen.has(key)) {
+      seen.set(key, c);
+    } else {
+      // Merge: keep the one with more data
+      const existing = seen.get(key)!;
+      if (!existing.citedText && c.citedText) existing.citedText = c.citedText;
+      if (!existing.title && c.title) existing.title = c.title;
+      if (c.confidenceScore !== undefined && existing.confidenceScore === undefined) {
+        existing.confidenceScore = c.confidenceScore;
+      }
+    }
+  }
+  return Array.from(seen.values());
+}
+
+// ── Citation-based deterministic scoring ─────────────────────────────────────
+
+function extractDomainPattern(domain: string): string {
+  return domain.toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/$/, '');
+}
+
+function findFirstMentionPosition(text: string, domain: string): number {
+  const pattern = extractDomainPattern(domain);
+  const brandName = pattern.split('.')[0];
+  const lowerText = text.toLowerCase();
+
+  // Check for domain URL first
+  const urlIndex = lowerText.indexOf(pattern);
+  if (urlIndex >= 0) return urlIndex;
+
+  // Check for brand name
+  const brandIndex = lowerText.indexOf(brandName);
+  if (brandIndex >= 0) return brandIndex;
+
+  return -1; // not found
+}
+
+function extractAllBrandsFromText(text: string, citations: Citation[]): string[] {
+  const brands = new Set<string>();
+
+  // From citations
+  for (const c of citations) {
+    try {
+      const hostname = new URL(c.url).hostname.replace(/^www\./, '');
+      brands.add(hostname);
+    } catch { /* skip invalid URLs */ }
+  }
+
+  // From text – look for domain-like patterns
+  const domainRegex = /\b([a-z0-9-]+\.(?:com|io|org|net|co|ai|dev|app|tech|tools|cloud))\b/gi;
+  let match;
+  while ((match = domainRegex.exec(text)) !== null) {
+    brands.add(match[1].toLowerCase());
+  }
+
+  return Array.from(brands);
+}
+
+function classifySentiment(contexts: string[]): 'positive' | 'neutral' | 'negative' {
+  if (contexts.length === 0) return 'neutral';
+
+  const positiveWords = ['best', 'top', 'recommend', 'excellent', 'great', 'leading', 'popular', 'powerful', 'favorite', 'outstanding', 'preferred', 'trusted', 'reliable', 'innovative'];
+  const negativeWords = ['worst', 'avoid', 'poor', 'bad', 'expensive', 'slow', 'outdated', 'unreliable', 'limited', 'disappointing', 'lacks', 'difficult'];
+
+  let positiveCount = 0;
+  let negativeCount = 0;
+  const allText = contexts.join(' ').toLowerCase();
+
+  for (const word of positiveWords) {
+    if (allText.includes(word)) positiveCount++;
+  }
+  for (const word of negativeWords) {
+    if (allText.includes(word)) negativeCount++;
+  }
+
+  if (positiveCount > negativeCount + 1) return 'positive';
+  if (negativeCount > positiveCount + 1) return 'negative';
+  return 'neutral';
+}
+
+function extractMentionContexts(text: string, domain: string): string[] {
+  const pattern = extractDomainPattern(domain);
+  const brandName = pattern.split('.')[0];
+  const lowerText = text.toLowerCase();
+  const contexts: string[] = [];
+
+  // Find all mentions and extract surrounding sentences
+  const searchTerms = [pattern, brandName];
+  for (const term of searchTerms) {
+    let idx = lowerText.indexOf(term);
+    while (idx >= 0) {
+      const start = Math.max(0, text.lastIndexOf('.', idx) + 1);
+      const end = Math.min(text.length, text.indexOf('.', idx + term.length));
+      const sentence = text.substring(start, end > idx ? end : idx + 200).trim();
+      if (sentence) contexts.push(sentence);
+      idx = lowerText.indexOf(term, idx + term.length);
+    }
+  }
+
+  return [...new Set(contexts)];
+}
+
+function scoreResponseDeterministic(
+  llmResponse: LLMResponse,
+  domain: string,
+  phrase: string
+): {
+  presence: number;
+  relevance: number;
+  accuracy: number;
+  sentiment: number;
+  overall: number;
+  domainRank: number;
+  mentions: number;
+  highlightContext: string;
+  detectionMethod: string;
+  domainSentiment: 'positive' | 'neutral' | 'negative';
+  citationStrength: number;
+  competitors: {
+    names: string[];
+    mentions: Array<{
+      name: string;
+      domain: string;
+      position: number;
+      context: string;
+      sentiment: 'positive' | 'neutral' | 'negative';
+      mentionType: 'url' | 'text' | 'brand';
+    }>;
+    totalMentions: number;
+  };
+} {
+  const domainPattern = extractDomainPattern(domain);
+  const brandName = domainPattern.split('.')[0];
+  const lowerText = llmResponse.text.toLowerCase();
+
+  // 1. PRESENCE: check citations first, then text
+  const inCitations = llmResponse.citations.some(c => {
+    try {
+      const host = new URL(c.url).hostname.replace(/^www\./, '');
+      return host.includes(domainPattern) || domainPattern.includes(host);
+    } catch { return false; }
+  });
+  const inText = lowerText.includes(domainPattern) || lowerText.includes(brandName);
+  const presence = inCitations ? 1 : inText ? 1 : 0;
+
+  if (presence === 0) {
+    // Domain not found – extract competitors and return zeros
+    const allBrands = extractAllBrandsFromText(llmResponse.text, llmResponse.citations);
+    const competitorBrands = allBrands.filter(b => b !== domainPattern && !domainPattern.includes(b.split('.')[0]));
+    const competitorMentions = competitorBrands.slice(0, 10).map((brand, i) => ({
+      name: brand.split('.')[0],
+      domain: brand,
+      position: i + 1,
+      context: 'neutral',
+      sentiment: 'neutral' as const,
+      mentionType: 'text' as const,
+    }));
+
+    return {
+      presence: 0,
+      relevance: 0,
+      accuracy: 0,
+      sentiment: 0,
+      overall: 0,
+      domainRank: 0,
+      mentions: 0,
+      highlightContext: '',
+      detectionMethod: 'none',
+      domainSentiment: 'neutral',
+      citationStrength: 0,
+      competitors: {
+        names: competitorBrands.slice(0, 10).map(b => b.split('.')[0]),
+        mentions: competitorMentions,
+        totalMentions: competitorMentions.length,
+      },
+    };
+  }
+
+  // 2. DETECTION METHOD
+  let detectionMethod = 'text';
+  if (inCitations) detectionMethod = 'url';
+  else if (lowerText.includes(brandName) && !lowerText.includes(domainPattern)) detectionMethod = 'brand';
+
+  // 3. RANK: position of first mention relative to all brands
+  const firstMentionPos = findFirstMentionPosition(llmResponse.text, domain);
+  const allBrands = extractAllBrandsFromText(llmResponse.text, llmResponse.citations);
+  const brandPositions = allBrands.map(b => {
+    const pos = llmResponse.text.toLowerCase().indexOf(b.split('.')[0]);
+    return { brand: b, position: pos >= 0 ? pos : Infinity };
+  }).sort((a, b) => a.position - b.position);
+
+  const domainRank = brandPositions.findIndex(bp =>
+    bp.brand.includes(domainPattern.split('.')[0]) || domainPattern.includes(bp.brand.split('.')[0])
+  ) + 1 || 0;
+
+  // 4. MENTIONS COUNT
+  let mentions = 0;
+  let idx = lowerText.indexOf(domainPattern);
+  while (idx >= 0) {
+    mentions++;
+    idx = lowerText.indexOf(domainPattern, idx + domainPattern.length);
+  }
+  idx = lowerText.indexOf(brandName);
+  while (idx >= 0) {
+    mentions++;
+    idx = lowerText.indexOf(brandName, idx + brandName.length);
+  }
+  // Deduplicate overlapping brand/domain mentions roughly
+  mentions = Math.max(1, Math.ceil(mentions / 2));
+
+  // 5. CITATION STRENGTH
+  const domainCitations = llmResponse.citations.filter(c => {
+    try {
+      const host = new URL(c.url).hostname.replace(/^www\./, '');
+      return host.includes(domainPattern) || domainPattern.includes(host);
+    } catch { return false; }
+  });
+  const citationStrength = llmResponse.citations.length > 0
+    ? domainCitations.length / llmResponse.citations.length
+    : 0;
+
+  // 6. SENTIMENT
+  const mentionContexts = extractMentionContexts(llmResponse.text, domain);
+  const domainSentiment = classifySentiment(mentionContexts);
+
+  // 7. HIGHLIGHT CONTEXT
+  let highlightContext = '';
+  if (firstMentionPos >= 0) {
+    const start = Math.max(0, firstMentionPos - 80);
+    const end = Math.min(llmResponse.text.length, firstMentionPos + 200);
+    highlightContext = llmResponse.text.substring(start, end).trim();
+  }
+
+  // 8. RELEVANCE (phrase words present in response)
+  const phraseWords = phrase.toLowerCase().split(/\s+/).filter(w => w.length > 3);
+  const responseWords = new Set(lowerText.split(/\s+/));
+  const matchedWords = phraseWords.filter(w => responseWords.has(w));
+  const baseRelevance = phraseWords.length > 0
+    ? Math.min(5, Math.max(1, Math.round((matchedWords.length / phraseWords.length) * 5)))
+    : 3;
+  const relevance = Math.min(5, Math.max(1,
+    baseRelevance + (domainSentiment === 'positive' ? 1 : domainSentiment === 'negative' ? -1 : 0)
+  ));
+
+  // 9. ACCURACY (based on detection method + citation presence)
+  let accuracy = 3;
+  if (detectionMethod === 'url') accuracy = 5;
+  else if (detectionMethod === 'brand') accuracy = 4;
+  if (inCitations) accuracy = Math.min(5, accuracy + 1);
+
+  // 10. SENTIMENT SCORE (1-5)
+  const sentimentScore = domainSentiment === 'positive' ? 5 : domainSentiment === 'negative' ? 1 : 3;
+
+  // 11. OVERALL: weighted composite
+  const rankScore = domainRank > 0 ? Math.max(1, 6 - domainRank) : 0; // Rank 1 = 5, Rank 5 = 1
+  const overall = Math.min(5, Math.max(1,
+    (rankScore * 0.30) +
+    (citationStrength * 5 * 0.20) +
+    (sentimentScore * 0.20) +
+    (accuracy * 0.15) +
+    (relevance * 0.15)
+  ));
+
+  // 12. COMPETITORS
+  const competitorBrands = allBrands.filter(b =>
+    b !== domainPattern && !domainPattern.includes(b.split('.')[0]) && b.split('.')[0] !== brandName
+  );
+  const competitorMentions = competitorBrands.slice(0, 10).map((brand, i) => {
+    const bName = brand.split('.')[0];
+    const bContexts = extractMentionContexts(llmResponse.text, brand);
+    const bSentiment = classifySentiment(bContexts);
+    const isInCitations = llmResponse.citations.some(c => {
+      try { return new URL(c.url).hostname.replace(/^www\./, '').includes(brand); } catch { return false; }
+    });
+    return {
+      name: bName,
+      domain: brand,
+      position: i + 1,
+      context: bSentiment,
+      sentiment: bSentiment,
+      mentionType: (isInCitations ? 'url' : 'text') as 'url' | 'text' | 'brand',
+    };
+  });
+
+  return {
+    presence,
+    relevance,
+    accuracy,
+    sentiment: sentimentScore,
+    overall: Math.round(overall * 100) / 100,
+    domainRank,
+    mentions,
+    highlightContext,
+    detectionMethod,
+    domainSentiment,
+    citationStrength: Math.round(citationStrength * 100) / 100,
+    competitors: {
+      names: competitorMentions.map(c => c.name),
+      mentions: competitorMentions,
+      totalMentions: competitorMentions.length,
+    },
+  };
+}
+
+// ── AI-based analysis (kept as fallback for edge cases) ──────────────────────
 
 async function analyzeResponseWithAI(response: string, targetDomain: string): Promise<{
   presence: number;
@@ -74,8 +510,8 @@ async function analyzeResponseWithAI(response: string, targetDomain: string): Pr
   try {
     const cleanTarget = targetDomain.toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '');
     const brandName = cleanTarget.split('.')[0];
-    
-               const analysisPrompt = `
+
+    const analysisPrompt = `
        You are to perform HIGH-PRECISION detection of a TARGET DOMAIN and COMPETITORS within the following RESPONSE text.
 
        TASK:
@@ -110,17 +546,17 @@ async function analyzeResponseWithAI(response: string, targetDomain: string): Pr
        {
          "targetDomain": {
            "isPresent": boolean,
-           "rank": number,               // 0 if not found; otherwise 1..N based on first textual occurrence
+           "rank": number,
            "context": "positive|neutral|negative|not_found",
-           "mentions": number,           // integer count of total mentions (all detection types)
-           "highlightContext": string,   // ≤ 280 chars
-           "detectionMethod": "url|text|brand|none" // none only if not found
+           "mentions": number,
+           "highlightContext": string,
+           "detectionMethod": "url|text|brand|none"
          },
          "competitors": [
            {
-             "name": string,             // brand or best-effort readable label
-             "domain": string,           // normalized domain if available, else empty string
-             "position": number,         // 1..N based on first occurrence
+             "name": string,
+             "domain": string,
+             "position": number,
              "context": "positive|neutral|negative",
              "sentiment": "positive|neutral|negative",
              "mentionType": "url|text|brand"
@@ -141,46 +577,36 @@ async function analyzeResponseWithAI(response: string, targetDomain: string): Pr
        TARGET BRAND: ${brandName}
        `;
 
-               const completion = await openai.chat.completions.create({
-             model: 'gpt-4o',
-             messages: [
-               { 
-                 role: 'system', 
-                 content: 'You are an expert at precise text analysis for domain and brand detection. You MUST return ONLY raw JSON, strictly conforming to the provided schema. Do not include markdown. Deterministic output: avoid speculation; never invent domains.' 
-               },
-               { role: 'user', content: analysisPrompt }
-             ],
-             temperature: 0,
-             top_p: 1,
-             frequency_penalty: 0,
-             presence_penalty: 0,
-             max_tokens: 1200
-           });
+    // Use OpenRouter or direct OpenAI for scoring analysis
+    const scoringClient = openai || openrouter;
+    if (!scoringClient) throw new Error('No API client available for scoring');
 
-               const aiResponse = completion.choices[0].message?.content || '';
-           
-           console.log('Raw AI response:', aiResponse.substring(0, 300));
-           
-           // Use helper function to extract clean JSON
-           const cleanResponse = extractJSONFromResponse(aiResponse);
-           if (!cleanResponse) {
-             throw new Error('Could not extract valid JSON from AI response');
-           }
-           
-           console.log('Cleaned AI response:', cleanResponse.substring(0, 200));
-           
-           const analysis = JSON.parse(cleanResponse);
-    
-    console.log('AI Analysis Response:', {
-      targetDomain: analysis.targetDomain,
-      competitors: analysis.competitors,
-      rawResponse: aiResponse.substring(0, 200)
+    const completion = await scoringClient.chat.completions.create({
+      model: openai ? 'gpt-4o' : 'openai/gpt-4o',
+      messages: [
+        {
+          role: 'system',
+          content: 'You are an expert at precise text analysis for domain and brand detection. You MUST return ONLY raw JSON, strictly conforming to the provided schema. Do not include markdown. Deterministic output: avoid speculation; never invent domains.'
+        },
+        { role: 'user', content: analysisPrompt }
+      ],
+      temperature: 0,
+      top_p: 1,
+      frequency_penalty: 0,
+      presence_penalty: 0,
+      max_tokens: 1200
     });
-    
-    // Transform AI response to our format
+
+    const aiResponse = completion.choices[0].message?.content || '';
+    const cleanResponse = extractJSONFromResponse(aiResponse);
+    if (!cleanResponse) {
+      throw new Error('Could not extract valid JSON from AI response');
+    }
+
+    const analysis = JSON.parse(cleanResponse);
     const targetInfo = analysis.targetDomain;
     const competitors = analysis.competitors || [];
-    
+
     const finalCompetitors = {
       names: competitors.map((c: any) => c.name || c.domain).filter(Boolean),
       mentions: competitors.map((c: any) => ({
@@ -193,9 +619,7 @@ async function analyzeResponseWithAI(response: string, targetDomain: string): Pr
       })),
       totalMentions: competitors.length
     };
-    
-    console.log('Final competitor data from AI analysis:', finalCompetitors);
-    
+
     return {
       presence: targetInfo.isPresent ? 1 : 0,
       rank: targetInfo.rank || 0,
@@ -208,74 +632,43 @@ async function analyzeResponseWithAI(response: string, targetDomain: string): Pr
     };
   } catch (error) {
     console.error('AI analysis failed, using fallback:', error);
-    
-    // Simple fallback detection
+
     const cleanTarget = targetDomain.toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '');
     const responseLower = response.toLowerCase();
-    
+
     let presence = 0;
     let rank = 0;
     let mentions = 0;
     let highlightContext = '';
     let detectionMethod = 'none';
-    
+
     if (responseLower.includes(cleanTarget)) {
       presence = 1;
       mentions = 1;
       const index = responseLower.indexOf(cleanTarget);
       rank = Math.ceil((index / response.length) * 10);
-      
       const start = Math.max(0, index - 100);
       const end = Math.min(response.length, index + cleanTarget.length + 100);
       highlightContext = response.substring(start, end);
       detectionMethod = 'text';
     }
-    
-    // Extract competitors from text even in fallback
-    console.log('Fallback: analyzing response text for competitors');
-    console.log('Response preview:', response.substring(0, 200));
-    
+
     const urlRegex = /https?:\/\/[^\s\n\)\]}"']+/g;
     const urls = response.match(urlRegex) || [];
     const domains = urls.map(u => {
       try { return new URL(u).hostname.toLowerCase().replace(/^www\./, ''); } catch { return ''; }
     }).filter(d => d && d !== cleanTarget);
-    
-    // Also look for common brand/competitor indicators
-    const competitorKeywords = [
-      'notion', 'slack', 'trello', 'asana', 'clickup', 'monday', 'airtable', 'figma', 'canva', 'zoom', 'teams',
-      'dropbox', 'google', 'microsoft', 'apple', 'amazon', 'salesforce', 'hubspot', 'mailchimp', 'stripe',
-      'shopify', 'wix', 'squarespace', 'wordpress', 'webflow', 'bubble', 'zapier', 'ifttt', 'automate'
-    ];
-    
-    const foundBrands = competitorKeywords.filter(brand => 
-      response.toLowerCase().includes(brand.toLowerCase()) && brand.toLowerCase() !== cleanTarget
-    );
-    
-    // Combine domains and brands, remove duplicates
-    const allCompetitors = [...new Set([...domains, ...foundBrands])];
-    const competitorNames = allCompetitors.slice(0, 8);
-    
+
+    const competitorNames = [...new Set(domains)].slice(0, 8);
     const competitorMentions = competitorNames.map((name, i) => ({
-      name: name,
+      name,
       domain: name,
       position: i + 1,
       context: 'neutral',
       sentiment: 'neutral' as const,
       mentionType: 'url' as const
     }));
-    
-    const fallbackCompetitors = {
-      names: competitorNames,
-      mentions: competitorMentions,
-      totalMentions: competitorMentions.length
-    };
-    
-    console.log('Fallback competitor data:', fallbackCompetitors);
-    console.log('Found URLs:', urls.slice(0, 5));
-    console.log('Found domains:', domains.slice(0, 5));
-    console.log('Found brands:', foundBrands.slice(0, 5));
-    
+
     return {
       presence,
       rank,
@@ -284,199 +677,31 @@ async function analyzeResponseWithAI(response: string, targetDomain: string): Pr
       highlightContext,
       detectionMethod,
       sentiment: 'neutral',
-      competitors: fallbackCompetitors
-    };
-  }
-}
-
-// Enhanced query function that better mimics ChatGPT web browsing
-async function queryWithGpt4o(phrase: string, modelType: 'GPT-4o' | 'GPT-4o Pro' | 'GPT-4o Advanced' = 'GPT-4o', domain?: string, location?: string): Promise<{ response: string, cost: number, sources?: string[], enhancedData?: any }> {
-  try {
-    const hasLocation = Boolean(location?.trim());
-    const locationGuidance = hasLocation ? `
-
-Location context:
-- The user is in or targeting: ${location!.trim()}
-- For ambiguous queries, assume the user wants an answer relevant to this location.
-- For local-intent requests such as businesses, services, pricing, regulations, events, availability, time, or "near me" style queries, prioritize this location in the answer.
-- If the query is clearly global, conceptual, or not location-sensitive, answer normally without forcing the location.
-- When location affects the answer, mention location-specific details naturally and put the local answer first.` : '';
-
-    // Enhanced prompt that encourages web-search-like behavior
-    const enhancedPrompt = `${phrase}
-
-${locationGuidance}
-
-Please provide a comprehensive response that includes:
-1. Current, up-to-date information
-2. Multiple perspectives or options when relevant
-3. Specific examples and use cases
-4. Comparison with alternatives when appropriate
-5. Actionable recommendations
-6. Source attributions where possible
-
-Format your response with clear structure using markdown headings and bullet points where helpful.`;
-
-    // Try multiple approaches for the most ChatGPT-like experience
-    let responseText = '';
-    let sources: string[] = [];
-    let enhancedData: any = {};
-
-    // First attempt: Use the newer chat completions with enhanced features
-    try {
-      const completion = await openai.chat.completions.create({
-        model: 'gpt-4o',
-        messages: [
-          { 
-            role: 'system', 
-            content: CHATGPT_SYSTEM_PROMPT
-          },
-          { 
-            role: 'user', 
-            content: enhancedPrompt 
-          }
-        ],
-        max_tokens: 2000,
-        temperature: 0.1, // Slightly more deterministic
-        top_p: 0.95,
-        frequency_penalty: 0.1,
-        presence_penalty: 0.1,
-        // Add function calling for web search simulation
-        tools: [
-          {
-            type: "function",
-            function: {
-              name: "web_search",
-              description: "Search the web for current information",
-              parameters: {
-                type: "object",
-                properties: {
-                  query: {
-                    type: "string",
-                    description: "The search query"
-                  }
-                },
-                required: ["query"]
-              }
-            }
-          }
-        ],
-        tool_choice: "auto"
-      });
-
-      responseText = completion.choices[0].message?.content || '';
-      
-      // Check if the model wanted to use web search
-      const toolCalls = completion.choices[0].message?.tool_calls;
-      if (toolCalls && toolCalls.length > 0) {
-        const firstToolCall = toolCalls[0];
-        // Type guard: check if it's a function tool call (not a custom tool call)
-        if (firstToolCall.type === 'function' && 'function' in firstToolCall) {
-          // Simulate web search results by enhancing the response
-          const searchQuery = JSON.parse(firstToolCall.function.arguments).query;
-          
-          // Make a follow-up call with simulated search results
-          const followUpCompletion = await openai.chat.completions.create({
-            model: 'gpt-4o',
-            messages: [
-              { role: 'system', content: CHATGPT_SYSTEM_PROMPT },
-              { role: 'user', content: enhancedPrompt },
-              completion.choices[0].message,
-              {
-                role: 'tool',
-                tool_call_id: firstToolCall.id,
-                content: `Search results for "${searchQuery}": Based on current web information, here are relevant findings that should be incorporated into your response. Please provide comprehensive, current information.`
-              }
-            ],
-            max_tokens: 2000,
-            temperature: 0.1
-          });
-          
-          responseText = followUpCompletion.choices[0].message?.content || responseText;
-          enhancedData.searchPerformed = true;
-          enhancedData.searchQuery = searchQuery;
-        }
+      competitors: {
+        names: competitorNames,
+        mentions: competitorMentions,
+        totalMentions: competitorMentions.length
       }
-
-      // Extract URLs from response for sources
-      const urlRegex = /https?:\/\/[^\s)\]\"'>]+/g;
-      const found = responseText.match(urlRegex) || [];
-      sources = Array.from(new Set(found)).slice(0, 8);
-
-      // Cost calculation
-      const inputTokens = Math.ceil((enhancedPrompt.length + CHATGPT_SYSTEM_PROMPT.length) / 4);
-      const outputTokens = Math.ceil(responseText.length / 4);
-      const cost = (inputTokens * 0.000005 + outputTokens * 0.000015);
-
-      console.log('Enhanced ChatGPT-like response generated successfully');
-      
-      return { 
-        response: responseText, 
-        cost,
-        sources,
-        enhancedData
-      };
-
-    } catch (error) {
-      console.warn('Enhanced completion failed, using standard approach:', error);
-      
-      // Fallback to standard chat completions
-      const completion = await openai.chat.completions.create({
-        model: 'gpt-4o',
-        messages: [
-          { role: 'system', content: CHATGPT_SYSTEM_PROMPT },
-          { role: 'user', content: enhancedPrompt }
-        ],
-        max_tokens: 2000,
-        temperature: 0.1,
-        top_p: 0.95,
-        frequency_penalty: 0.1,
-        presence_penalty: 0.1
-      });
-
-      responseText = completion.choices[0].message?.content || `No response from ${modelType}.`;
-      
-      // Extract URLs for sources
-      const urlRegex = /https?:\/\/[^\s)\]\"'>]+/g;
-      const found = responseText.match(urlRegex) || [];
-      sources = Array.from(new Set(found)).slice(0, 8);
-      
-      // Cost calculation for fallback
-      const inputTokens = Math.ceil((enhancedPrompt.length + CHATGPT_SYSTEM_PROMPT.length) / 4);
-      const outputTokens = Math.ceil(responseText.length / 4);
-      const cost = (inputTokens * 0.000005 + outputTokens * 0.000015);
-      
-      return { 
-        response: responseText, 
-        cost,
-        sources,
-        enhancedData: { fallback: true }
-      };
-    }
-
-  } catch (error) {
-    console.error('Enhanced AI query failed:', error);
-    
-    // Ultimate fallback - simple response
-    const fallbackResponse = `I apologize, but I'm experiencing technical difficulties. Here's a basic response to your query: "${phrase}". Please try again later for a more comprehensive answer.`;
-    
-    return { 
-      response: fallbackResponse, 
-      cost: 0.001, // Minimal cost for fallback
-      sources: [],
-      enhancedData: { confidence: 0.1, error: 'fallback_used' }
     };
   }
 }
 
-// Enhanced AI scoring with proper domain presence handling
-async function scoreResponseWithAI(phrase: string, response: string, model: string, domain?: string, location?: string): Promise<{ 
-  presence: number; 
-  relevance: number; 
-  accuracy: number; 
-  sentiment: number; 
-  overall: number; 
-  domainRank?: number; 
+// ── Score response (hybrid: citation-based when available, AI fallback) ──────
+
+async function scoreResponseWithAI(
+  phrase: string,
+  response: string,
+  model: string,
+  domain?: string,
+  location?: string,
+  llmResponse?: LLMResponse
+): Promise<{
+  presence: number;
+  relevance: number;
+  accuracy: number;
+  sentiment: number;
+  overall: number;
+  domainRank?: number;
   foundDomains?: string[];
   sources: string[];
   competitorUrls: string[];
@@ -506,19 +731,46 @@ async function scoreResponseWithAI(phrase: string, response: string, model: stri
     }>;
     totalMentions: number;
   };
+  citations: Citation[];
+  searchQueries: string[];
 }> {
-  // Use the simplified AI analysis
+  // If we have real LLM response with citations, use deterministic scoring
+  if (llmResponse && llmResponse.citations.length > 0 && domain) {
+    console.log(`[Scoring] Using citation-based deterministic scoring for ${model} (${llmResponse.citations.length} citations)`);
+    const scores = scoreResponseDeterministic(llmResponse, domain, phrase);
+
+    const responseLength = response.length;
+    const comprehensiveness = responseLength > 1000 ? 5 : responseLength > 800 ? 4 : responseLength > 600 ? 3 : responseLength > 400 ? 2 : 1;
+
+    const competitorUrls = scores.competitors.mentions.map(m => `https://${m.domain}`);
+    const sources = llmResponse.citations.map(c => c.url).filter(Boolean);
+
+    return {
+      ...scores,
+      domainRank: scores.domainRank || undefined,
+      foundDomains: scores.presence > 0 ? [domain] : [],
+      sources,
+      competitorUrls,
+      competitorMatchScore: scores.competitors.totalMentions * 10,
+      comprehensiveness,
+      context: scores.domainSentiment === 'positive' ? 'positive' : scores.domainSentiment === 'negative' ? 'negative' : scores.presence > 0 ? 'neutral' : 'not_found',
+      aiConfidence: 95, // High confidence when using real citations
+      rankingFactors: {
+        position: scores.domainRank * 10,
+        prominence: scores.mentions * 20,
+        contextQuality: scores.domainSentiment === 'positive' ? 80 : scores.domainSentiment === 'negative' ? 20 : 50,
+        mentionType: scores.detectionMethod === 'url' ? 100 : scores.detectionMethod === 'brand' ? 80 : 60,
+      },
+      citations: llmResponse.citations,
+      searchQueries: llmResponse.searchQueries,
+    };
+  }
+
+  // Fallback: use AI-based analysis (for responses without citation data)
+  console.log(`[Scoring] Using AI-based fallback scoring for ${model}`);
   const domainAnalysis = await analyzeResponseWithAI(response, domain || '');
-  
-  console.log('Domain analysis result:', {
-    presence: domainAnalysis.presence,
-    rank: domainAnalysis.rank,
-    competitors: domainAnalysis.competitors
-  });
-  
-  // CRITICAL: If domain is not present, return all zeros
+
   if (domainAnalysis.presence === 0) {
-    console.log('Domain not found - returning zero scores');
     return {
       presence: 0,
       relevance: 0,
@@ -527,7 +779,7 @@ async function scoreResponseWithAI(phrase: string, response: string, model: stri
       overall: 0,
       domainRank: 0,
       foundDomains: [],
-      sources: ['AI Analysis'],
+      sources: [],
       competitorUrls: [],
       competitorMatchScore: 0,
       comprehensiveness: 0,
@@ -537,95 +789,52 @@ async function scoreResponseWithAI(phrase: string, response: string, model: stri
       detectionMethod: 'none',
       domainSentiment: 'neutral',
       aiConfidence: 0,
-      rankingFactors: {
-        position: 0,
-        prominence: 0,
-        contextQuality: 0,
-        mentionType: 0
-      },
-      competitors: domainAnalysis.competitors
+      rankingFactors: { position: 0, prominence: 0, contextQuality: 0, mentionType: 0 },
+      competitors: domainAnalysis.competitors,
+      citations: [],
+      searchQueries: [],
     };
   }
-  
-  // Domain is present - calculate quality-based scores
-  console.log('Domain found - calculating quality scores');
-  
-  // Response quality analysis
+
   const responseLength = response.length;
   const comprehensiveness = responseLength > 1000 ? 5 : responseLength > 800 ? 4 : responseLength > 600 ? 3 : responseLength > 400 ? 2 : 1;
-  
-  // Enhanced relevance scoring based on phrase-domain alignment
+
   const phraseWords = phrase.toLowerCase().split(/\s+/).filter(word => word.length > 3);
   const responseWords = response.toLowerCase().split(/\s+/);
   const matchedWords = phraseWords.filter(word => responseWords.includes(word));
   const baseRelevance = Math.min(5, Math.max(1, (matchedWords.length / phraseWords.length) * 5));
-  
-  // Boost relevance if domain context is positive
   const relevanceBoost = domainAnalysis.sentiment === 'positive' ? 1 : domainAnalysis.sentiment === 'negative' ? -1 : 0;
   const relevance = Math.min(5, Math.max(1, baseRelevance + relevanceBoost));
-  
-  // Enhanced accuracy scoring based on domain detection method
-  let accuracy = 3; // Base accuracy
-  if (domainAnalysis.detectionMethod === 'url') {
-    accuracy = 5; // URL mentions are most accurate
-  } else if (domainAnalysis.detectionMethod === 'brand') {
-    accuracy = 4; // Brand mentions are good
-  } else if (domainAnalysis.detectionMethod === 'text') {
-    accuracy = 3; // Text mentions are basic
-  }
-  
-  // Enhanced sentiment scoring
-  let sentiment = 3; // Neutral base
-  if (domainAnalysis.sentiment === 'positive') {
-    sentiment = 5; // High positive sentiment
-  } else if (domainAnalysis.sentiment === 'negative') {
-    sentiment = 1; // Low negative sentiment
-  }
-  
-  // Enhanced overall scoring based on rank, sentiment, and context quality
+
+  let accuracy = 3;
+  if (domainAnalysis.detectionMethod === 'url') accuracy = 5;
+  else if (domainAnalysis.detectionMethod === 'brand') accuracy = 4;
+
+  let sentimentScore = 3;
+  if (domainAnalysis.sentiment === 'positive') sentimentScore = 5;
+  else if (domainAnalysis.sentiment === 'negative') sentimentScore = 1;
+
   let overall = 0;
   if (domainAnalysis.rank > 0) {
-    // Base score from rank (1-10 scale, converted to 1-5)
     const rankScore = Math.min(5, Math.max(1, domainAnalysis.rank));
-    
-    // Sentiment multiplier
-    const sentimentMultiplier = domainAnalysis.sentiment === 'positive' ? 1.2 : 
-                               domainAnalysis.sentiment === 'negative' ? 0.6 : 1.0;
-    
-    // Context quality bonus
-    const contextBonus = domainAnalysis.context === 'positive' ? 0.5 : 
-                        domainAnalysis.context === 'negative' ? -0.5 : 0;
-    
-    // Detection method bonus
-    const detectionBonus = domainAnalysis.detectionMethod === 'url' ? 0.3 :
-                          domainAnalysis.detectionMethod === 'brand' ? 0.2 : 0;
-    
+    const sentimentMultiplier = domainAnalysis.sentiment === 'positive' ? 1.2 : domainAnalysis.sentiment === 'negative' ? 0.6 : 1.0;
+    const contextBonus = domainAnalysis.context === 'positive' ? 0.5 : domainAnalysis.context === 'negative' ? -0.5 : 0;
+    const detectionBonus = domainAnalysis.detectionMethod === 'url' ? 0.3 : domainAnalysis.detectionMethod === 'brand' ? 0.2 : 0;
     overall = Math.min(5, Math.max(1, (rankScore * sentimentMultiplier) + contextBonus + detectionBonus));
   }
-  
-  // Extract competitor URLs from competitor mentions
+
   const competitorUrls = domainAnalysis.competitors.mentions.map(m => `https://${m.domain}`);
-  
-  // Enhanced competitor match score
   const competitorMatchScore = domainAnalysis.competitors.totalMentions * 10;
-  
-  // Enhanced ranking factors
-  const rankingFactors = {
-    position: domainAnalysis.rank * 10,
-    prominence: domainAnalysis.mentions * 20,
-    contextQuality: domainAnalysis.sentiment === 'positive' ? 80 : domainAnalysis.sentiment === 'negative' ? 20 : 50,
-    mentionType: domainAnalysis.detectionMethod === 'url' ? 100 : domainAnalysis.detectionMethod === 'brand' ? 80 : 60
-  };
-  
-  const finalScores = {
+
+  return {
     presence: domainAnalysis.presence,
     relevance,
     accuracy,
-    sentiment,
+    sentiment: sentimentScore,
     overall,
     domainRank: domainAnalysis.rank || undefined,
     foundDomains: [domain || ''],
-    sources: ['AI Analysis'],
+    sources: [],
     competitorUrls,
     competitorMatchScore,
     comprehensiveness,
@@ -634,79 +843,77 @@ async function scoreResponseWithAI(phrase: string, response: string, model: stri
     highlightContext: domainAnalysis.highlightContext,
     detectionMethod: domainAnalysis.detectionMethod,
     domainSentiment: domainAnalysis.sentiment,
-    aiConfidence: 100, // AI confidence is high for this approach
-    rankingFactors,
-    competitors: domainAnalysis.competitors
+    aiConfidence: 75,
+    rankingFactors: {
+      position: domainAnalysis.rank * 10,
+      prominence: domainAnalysis.mentions * 20,
+      contextQuality: domainAnalysis.sentiment === 'positive' ? 80 : domainAnalysis.sentiment === 'negative' ? 20 : 50,
+      mentionType: domainAnalysis.detectionMethod === 'url' ? 100 : domainAnalysis.detectionMethod === 'brand' ? 80 : 60,
+    },
+    competitors: domainAnalysis.competitors,
+    citations: [],
+    searchQueries: [],
   };
-  
-  console.log('Final scores being returned:', {
-    presence: finalScores.presence,
-    overall: finalScores.overall,
-    sentiment: finalScores.sentiment,
-    accuracy: finalScores.accuracy,
-    competitors: finalScores.competitors
-  });
-  
-  return finalScores;
 }
 
+// ── Exported service ─────────────────────────────────────────────────────────
+
 export const aiQueryService = {
-  query: async (phrase: string, model: 'GPT-4o' | 'Claude 3' | 'Gemini 1.5', domain?: string, location?: string): Promise<{ response: string, cost: number, sources?: string[], enhancedData?: any }> => {
-    console.log(`AI Query Service: Processing query with GPT-4o`);
-    return await queryWithGpt4o(phrase, 'GPT-4o', domain, location);
-  },
-  
-  scoreResponse: async (phrase: string, response: string, model: string, domain?: string, location?: string): Promise<{ 
-    presence: number; 
-    relevance: number; 
-    accuracy: number; 
-    sentiment: number; 
-    overall: number; 
-    domainRank?: number; 
-    foundDomains?: string[];
-    sources: string[];
-    competitorUrls: string[];
-    competitorMatchScore: number;
-    comprehensiveness: number;
-    context: string;
-    mentions: number;
-    highlightContext: string;
-    detectionMethod: string;
-    domainSentiment: 'positive' | 'neutral' | 'negative';
-    aiConfidence: number;
-    rankingFactors: {
-      position: number;
-      prominence: number;
-      contextQuality: number;
-      mentionType: number;
+  query: async (
+    phrase: string,
+    model: 'GPT-4o' | 'Claude 3' | 'Gemini 1.5',
+    domain?: string,
+    location?: string
+  ): Promise<{ response: string; cost: number; sources?: string[]; enhancedData?: any; llmResponse?: LLMResponse }> => {
+    console.log(`[aiQueryService] Processing query with REAL ${model} via OpenRouter`);
+
+    let llmResponse: LLMResponse;
+
+    try {
+      llmResponse = await queryViaOpenRouter(phrase, model, domain, location);
+    } catch (error) {
+      console.error(`[aiQueryService] ${model} query failed, trying GPT-4o fallback:`, error);
+      // Fallback to GPT-4o if the specific model fails
+      try {
+        llmResponse = await queryViaOpenRouter(phrase, 'GPT-4o', domain, location);
+        llmResponse.model = model; // Keep the display name
+      } catch (fallbackError) {
+        console.error(`[aiQueryService] GPT-4o fallback also failed:`, fallbackError);
+        throw fallbackError;
+      }
+    }
+
+    console.log(`[aiQueryService] ${model} returned ${llmResponse.citations.length} citations, ${llmResponse.searchQueries.length} searches`);
+
+    return {
+      response: llmResponse.text,
+      cost: llmResponse.cost,
+      sources: llmResponse.citations.map(c => c.url).filter(Boolean),
+      enhancedData: {
+        citations: llmResponse.citations,
+        searchQueries: llmResponse.searchQueries,
+        searchPerformed: llmResponse.searchQueries.length > 0,
+        realModel: true,
+      },
+      llmResponse,
     };
-    competitors: {
-      names: string[];
-      mentions: Array<{
-        name: string;
-        domain: string;
-        position: number;
-        context: string;
-        sentiment: 'positive' | 'neutral' | 'negative';
-        mentionType: 'url' | 'text' | 'brand';
-      }>;
-      totalMentions: number;
-    };
-  }> => {
-    return await scoreResponseWithAI(phrase, response, model, domain, location);
   },
-  
-  // Test function to demonstrate domain detection
+
+  scoreResponse: async (
+    phrase: string,
+    response: string,
+    model: string,
+    domain?: string,
+    location?: string,
+    llmResponse?: LLMResponse
+  ) => {
+    return await scoreResponseWithAI(phrase, response, model, domain, location, llmResponse);
+  },
+
   testDomainDetection: async (response: string, domain: string) => {
     const result = await analyzeResponseWithAI(response, domain);
-    console.log('Domain Detection Test:', {
-      domain,
-      response: response.substring(0, 100) + '...',
-      result
-    });
     return result;
   }
 };
 
-// Export the scoreResponseWithAI and analyzeResponseWithAI functions directly
-export { scoreResponseWithAI, analyzeResponseWithAI }; 
+export { scoreResponseWithAI, analyzeResponseWithAI };

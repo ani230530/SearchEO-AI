@@ -230,7 +230,10 @@ exports.Prisma.AIQueryResultScalarFieldEnum = {
   competitorNames: 'competitorNames',
   competitorMentions: 'competitorMentions',
   competitorCount: 'competitorCount',
-  competitorDomains: 'competitorDomains'
+  competitorDomains: 'competitorDomains',
+  citations: 'citations',
+  searchQueries: 'searchQueries',
+  citationStrength: 'citationStrength'
 };
 
 exports.Prisma.AnalysisReportScalarFieldEnum = {

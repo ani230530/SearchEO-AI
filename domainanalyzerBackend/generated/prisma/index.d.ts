@@ -11533,6 +11533,7 @@ export namespace Prisma {
     mentionTypeScore: number | null
     intelligentScore: number | null
     competitorCount: number | null
+    citationStrength: number | null
   }
 
   export type AIQueryResultSumAggregateOutputType = {
@@ -11557,6 +11558,7 @@ export namespace Prisma {
     mentionTypeScore: number | null
     intelligentScore: number | null
     competitorCount: number | null
+    citationStrength: number | null
   }
 
   export type AIQueryResultMinAggregateOutputType = {
@@ -11588,6 +11590,7 @@ export namespace Prisma {
     mentionTypeScore: number | null
     intelligentScore: number | null
     competitorCount: number | null
+    citationStrength: number | null
   }
 
   export type AIQueryResultMaxAggregateOutputType = {
@@ -11619,6 +11622,7 @@ export namespace Prisma {
     mentionTypeScore: number | null
     intelligentScore: number | null
     competitorCount: number | null
+    citationStrength: number | null
   }
 
   export type AIQueryResultCountAggregateOutputType = {
@@ -11657,6 +11661,9 @@ export namespace Prisma {
     competitorMentions: number
     competitorCount: number
     competitorDomains: number
+    citations: number
+    searchQueries: number
+    citationStrength: number
     _all: number
   }
 
@@ -11683,6 +11690,7 @@ export namespace Prisma {
     mentionTypeScore?: true
     intelligentScore?: true
     competitorCount?: true
+    citationStrength?: true
   }
 
   export type AIQueryResultSumAggregateInputType = {
@@ -11707,6 +11715,7 @@ export namespace Prisma {
     mentionTypeScore?: true
     intelligentScore?: true
     competitorCount?: true
+    citationStrength?: true
   }
 
   export type AIQueryResultMinAggregateInputType = {
@@ -11738,6 +11747,7 @@ export namespace Prisma {
     mentionTypeScore?: true
     intelligentScore?: true
     competitorCount?: true
+    citationStrength?: true
   }
 
   export type AIQueryResultMaxAggregateInputType = {
@@ -11769,6 +11779,7 @@ export namespace Prisma {
     mentionTypeScore?: true
     intelligentScore?: true
     competitorCount?: true
+    citationStrength?: true
   }
 
   export type AIQueryResultCountAggregateInputType = {
@@ -11807,6 +11818,9 @@ export namespace Prisma {
     competitorMentions?: true
     competitorCount?: true
     competitorDomains?: true
+    citations?: true
+    searchQueries?: true
+    citationStrength?: true
     _all?: true
   }
 
@@ -11932,6 +11946,9 @@ export namespace Prisma {
     competitorMentions: JsonValue | null
     competitorCount: number | null
     competitorDomains: JsonValue | null
+    citations: JsonValue | null
+    searchQueries: JsonValue | null
+    citationStrength: number | null
     _count: AIQueryResultCountAggregateOutputType | null
     _avg: AIQueryResultAvgAggregateOutputType | null
     _sum: AIQueryResultSumAggregateOutputType | null
@@ -11989,6 +12006,9 @@ export namespace Prisma {
     competitorMentions?: boolean
     competitorCount?: boolean
     competitorDomains?: boolean
+    citations?: boolean
+    searchQueries?: boolean
+    citationStrength?: boolean
     phrase?: boolean | GeneratedIntentPhraseDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["aIQueryResult"]>
 
@@ -12028,6 +12048,9 @@ export namespace Prisma {
     competitorMentions?: boolean
     competitorCount?: boolean
     competitorDomains?: boolean
+    citations?: boolean
+    searchQueries?: boolean
+    citationStrength?: boolean
     phrase?: boolean | GeneratedIntentPhraseDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["aIQueryResult"]>
 
@@ -12068,9 +12091,12 @@ export namespace Prisma {
     competitorMentions?: boolean
     competitorCount?: boolean
     competitorDomains?: boolean
+    citations?: boolean
+    searchQueries?: boolean
+    citationStrength?: boolean
   }
 
-  export type AIQueryResultOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "phraseId" | "model" | "response" | "latency" | "cost" | "presence" | "relevance" | "accuracy" | "sentiment" | "overall" | "createdAt" | "competitorMatchScore" | "competitorUrls" | "confidence" | "domainRank" | "foundDomains" | "sources" | "highlightContext" | "detectionMethod" | "mentions" | "context" | "comprehensiveness" | "aiConfidence" | "rankingFactors" | "domainSentiment" | "positionScore" | "prominenceScore" | "contextQualityScore" | "mentionTypeScore" | "intelligentScore" | "competitorNames" | "competitorMentions" | "competitorCount" | "competitorDomains", ExtArgs["result"]["aIQueryResult"]>
+  export type AIQueryResultOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "phraseId" | "model" | "response" | "latency" | "cost" | "presence" | "relevance" | "accuracy" | "sentiment" | "overall" | "createdAt" | "competitorMatchScore" | "competitorUrls" | "confidence" | "domainRank" | "foundDomains" | "sources" | "highlightContext" | "detectionMethod" | "mentions" | "context" | "comprehensiveness" | "aiConfidence" | "rankingFactors" | "domainSentiment" | "positionScore" | "prominenceScore" | "contextQualityScore" | "mentionTypeScore" | "intelligentScore" | "competitorNames" | "competitorMentions" | "competitorCount" | "competitorDomains" | "citations" | "searchQueries" | "citationStrength", ExtArgs["result"]["aIQueryResult"]>
   export type AIQueryResultInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     phrase?: boolean | GeneratedIntentPhraseDefaultArgs<ExtArgs>
   }
@@ -12119,6 +12145,9 @@ export namespace Prisma {
       competitorMentions: Prisma.JsonValue | null
       competitorCount: number | null
       competitorDomains: Prisma.JsonValue | null
+      citations: Prisma.JsonValue | null
+      searchQueries: Prisma.JsonValue | null
+      citationStrength: number | null
     }, ExtArgs["result"]["aIQueryResult"]>
     composites: {}
   }
@@ -12548,6 +12577,9 @@ export namespace Prisma {
     readonly competitorMentions: FieldRef<"AIQueryResult", 'Json'>
     readonly competitorCount: FieldRef<"AIQueryResult", 'Int'>
     readonly competitorDomains: FieldRef<"AIQueryResult", 'Json'>
+    readonly citations: FieldRef<"AIQueryResult", 'Json'>
+    readonly searchQueries: FieldRef<"AIQueryResult", 'Json'>
+    readonly citationStrength: FieldRef<"AIQueryResult", 'Float'>
   }
     
 
@@ -49393,7 +49425,10 @@ export namespace Prisma {
     competitorNames: 'competitorNames',
     competitorMentions: 'competitorMentions',
     competitorCount: 'competitorCount',
-    competitorDomains: 'competitorDomains'
+    competitorDomains: 'competitorDomains',
+    citations: 'citations',
+    searchQueries: 'searchQueries',
+    citationStrength: 'citationStrength'
   };
 
   export type AIQueryResultScalarFieldEnum = (typeof AIQueryResultScalarFieldEnum)[keyof typeof AIQueryResultScalarFieldEnum]
@@ -50684,6 +50719,9 @@ export namespace Prisma {
     competitorMentions?: JsonNullableFilter<"AIQueryResult">
     competitorCount?: IntNullableFilter<"AIQueryResult"> | number | null
     competitorDomains?: JsonNullableFilter<"AIQueryResult">
+    citations?: JsonNullableFilter<"AIQueryResult">
+    searchQueries?: JsonNullableFilter<"AIQueryResult">
+    citationStrength?: FloatNullableFilter<"AIQueryResult"> | number | null
     phrase?: XOR<GeneratedIntentPhraseRelationFilter, GeneratedIntentPhraseWhereInput>
   }
 
@@ -50723,6 +50761,9 @@ export namespace Prisma {
     competitorMentions?: SortOrderInput | SortOrder
     competitorCount?: SortOrderInput | SortOrder
     competitorDomains?: SortOrderInput | SortOrder
+    citations?: SortOrderInput | SortOrder
+    searchQueries?: SortOrderInput | SortOrder
+    citationStrength?: SortOrderInput | SortOrder
     phrase?: GeneratedIntentPhraseOrderByWithRelationInput
   }
 
@@ -50765,6 +50806,9 @@ export namespace Prisma {
     competitorMentions?: JsonNullableFilter<"AIQueryResult">
     competitorCount?: IntNullableFilter<"AIQueryResult"> | number | null
     competitorDomains?: JsonNullableFilter<"AIQueryResult">
+    citations?: JsonNullableFilter<"AIQueryResult">
+    searchQueries?: JsonNullableFilter<"AIQueryResult">
+    citationStrength?: FloatNullableFilter<"AIQueryResult"> | number | null
     phrase?: XOR<GeneratedIntentPhraseRelationFilter, GeneratedIntentPhraseWhereInput>
   }, "id">
 
@@ -50804,6 +50848,9 @@ export namespace Prisma {
     competitorMentions?: SortOrderInput | SortOrder
     competitorCount?: SortOrderInput | SortOrder
     competitorDomains?: SortOrderInput | SortOrder
+    citations?: SortOrderInput | SortOrder
+    searchQueries?: SortOrderInput | SortOrder
+    citationStrength?: SortOrderInput | SortOrder
     _count?: AIQueryResultCountOrderByAggregateInput
     _avg?: AIQueryResultAvgOrderByAggregateInput
     _max?: AIQueryResultMaxOrderByAggregateInput
@@ -50850,6 +50897,9 @@ export namespace Prisma {
     competitorMentions?: JsonNullableWithAggregatesFilter<"AIQueryResult">
     competitorCount?: IntNullableWithAggregatesFilter<"AIQueryResult"> | number | null
     competitorDomains?: JsonNullableWithAggregatesFilter<"AIQueryResult">
+    citations?: JsonNullableWithAggregatesFilter<"AIQueryResult">
+    searchQueries?: JsonNullableWithAggregatesFilter<"AIQueryResult">
+    citationStrength?: FloatNullableWithAggregatesFilter<"AIQueryResult"> | number | null
   }
 
   export type AnalysisReportWhereInput = {
@@ -54275,6 +54325,9 @@ export namespace Prisma {
     competitorMentions?: NullableJsonNullValueInput | InputJsonValue
     competitorCount?: number | null
     competitorDomains?: NullableJsonNullValueInput | InputJsonValue
+    citations?: NullableJsonNullValueInput | InputJsonValue
+    searchQueries?: NullableJsonNullValueInput | InputJsonValue
+    citationStrength?: number | null
     phrase: GeneratedIntentPhraseCreateNestedOneWithoutAiQueryResultsInput
   }
 
@@ -54314,6 +54367,9 @@ export namespace Prisma {
     competitorMentions?: NullableJsonNullValueInput | InputJsonValue
     competitorCount?: number | null
     competitorDomains?: NullableJsonNullValueInput | InputJsonValue
+    citations?: NullableJsonNullValueInput | InputJsonValue
+    searchQueries?: NullableJsonNullValueInput | InputJsonValue
+    citationStrength?: number | null
   }
 
   export type AIQueryResultUpdateInput = {
@@ -54350,6 +54406,9 @@ export namespace Prisma {
     competitorMentions?: NullableJsonNullValueInput | InputJsonValue
     competitorCount?: NullableIntFieldUpdateOperationsInput | number | null
     competitorDomains?: NullableJsonNullValueInput | InputJsonValue
+    citations?: NullableJsonNullValueInput | InputJsonValue
+    searchQueries?: NullableJsonNullValueInput | InputJsonValue
+    citationStrength?: NullableFloatFieldUpdateOperationsInput | number | null
     phrase?: GeneratedIntentPhraseUpdateOneRequiredWithoutAiQueryResultsNestedInput
   }
 
@@ -54389,6 +54448,9 @@ export namespace Prisma {
     competitorMentions?: NullableJsonNullValueInput | InputJsonValue
     competitorCount?: NullableIntFieldUpdateOperationsInput | number | null
     competitorDomains?: NullableJsonNullValueInput | InputJsonValue
+    citations?: NullableJsonNullValueInput | InputJsonValue
+    searchQueries?: NullableJsonNullValueInput | InputJsonValue
+    citationStrength?: NullableFloatFieldUpdateOperationsInput | number | null
   }
 
   export type AIQueryResultCreateManyInput = {
@@ -54427,6 +54489,9 @@ export namespace Prisma {
     competitorMentions?: NullableJsonNullValueInput | InputJsonValue
     competitorCount?: number | null
     competitorDomains?: NullableJsonNullValueInput | InputJsonValue
+    citations?: NullableJsonNullValueInput | InputJsonValue
+    searchQueries?: NullableJsonNullValueInput | InputJsonValue
+    citationStrength?: number | null
   }
 
   export type AIQueryResultUpdateManyMutationInput = {
@@ -54463,6 +54528,9 @@ export namespace Prisma {
     competitorMentions?: NullableJsonNullValueInput | InputJsonValue
     competitorCount?: NullableIntFieldUpdateOperationsInput | number | null
     competitorDomains?: NullableJsonNullValueInput | InputJsonValue
+    citations?: NullableJsonNullValueInput | InputJsonValue
+    searchQueries?: NullableJsonNullValueInput | InputJsonValue
+    citationStrength?: NullableFloatFieldUpdateOperationsInput | number | null
   }
 
   export type AIQueryResultUncheckedUpdateManyInput = {
@@ -54501,6 +54569,9 @@ export namespace Prisma {
     competitorMentions?: NullableJsonNullValueInput | InputJsonValue
     competitorCount?: NullableIntFieldUpdateOperationsInput | number | null
     competitorDomains?: NullableJsonNullValueInput | InputJsonValue
+    citations?: NullableJsonNullValueInput | InputJsonValue
+    searchQueries?: NullableJsonNullValueInput | InputJsonValue
+    citationStrength?: NullableFloatFieldUpdateOperationsInput | number | null
   }
 
   export type AnalysisReportCreateInput = {
@@ -58268,6 +58339,9 @@ export namespace Prisma {
     competitorMentions?: SortOrder
     competitorCount?: SortOrder
     competitorDomains?: SortOrder
+    citations?: SortOrder
+    searchQueries?: SortOrder
+    citationStrength?: SortOrder
   }
 
   export type AIQueryResultAvgOrderByAggregateInput = {
@@ -58292,6 +58366,7 @@ export namespace Prisma {
     mentionTypeScore?: SortOrder
     intelligentScore?: SortOrder
     competitorCount?: SortOrder
+    citationStrength?: SortOrder
   }
 
   export type AIQueryResultMaxOrderByAggregateInput = {
@@ -58323,6 +58398,7 @@ export namespace Prisma {
     mentionTypeScore?: SortOrder
     intelligentScore?: SortOrder
     competitorCount?: SortOrder
+    citationStrength?: SortOrder
   }
 
   export type AIQueryResultMinOrderByAggregateInput = {
@@ -58354,6 +58430,7 @@ export namespace Prisma {
     mentionTypeScore?: SortOrder
     intelligentScore?: SortOrder
     competitorCount?: SortOrder
+    citationStrength?: SortOrder
   }
 
   export type AIQueryResultSumOrderByAggregateInput = {
@@ -58378,6 +58455,7 @@ export namespace Prisma {
     mentionTypeScore?: SortOrder
     intelligentScore?: SortOrder
     competitorCount?: SortOrder
+    citationStrength?: SortOrder
   }
 
   export type FloatNullableWithAggregatesFilter<$PrismaModel = never> = {
@@ -71018,6 +71096,9 @@ export namespace Prisma {
     competitorMentions?: NullableJsonNullValueInput | InputJsonValue
     competitorCount?: number | null
     competitorDomains?: NullableJsonNullValueInput | InputJsonValue
+    citations?: NullableJsonNullValueInput | InputJsonValue
+    searchQueries?: NullableJsonNullValueInput | InputJsonValue
+    citationStrength?: number | null
   }
 
   export type AIQueryResultUncheckedCreateWithoutPhraseInput = {
@@ -71055,6 +71136,9 @@ export namespace Prisma {
     competitorMentions?: NullableJsonNullValueInput | InputJsonValue
     competitorCount?: number | null
     competitorDomains?: NullableJsonNullValueInput | InputJsonValue
+    citations?: NullableJsonNullValueInput | InputJsonValue
+    searchQueries?: NullableJsonNullValueInput | InputJsonValue
+    citationStrength?: number | null
   }
 
   export type AIQueryResultCreateOrConnectWithoutPhraseInput = {
@@ -71283,6 +71367,9 @@ export namespace Prisma {
     competitorMentions?: JsonNullableFilter<"AIQueryResult">
     competitorCount?: IntNullableFilter<"AIQueryResult"> | number | null
     competitorDomains?: JsonNullableFilter<"AIQueryResult">
+    citations?: JsonNullableFilter<"AIQueryResult">
+    searchQueries?: JsonNullableFilter<"AIQueryResult">
+    citationStrength?: FloatNullableFilter<"AIQueryResult"> | number | null
   }
 
   export type DomainUpsertWithoutGeneratedIntentPhrasesInput = {
@@ -74915,6 +75002,9 @@ export namespace Prisma {
     competitorMentions?: NullableJsonNullValueInput | InputJsonValue
     competitorCount?: number | null
     competitorDomains?: NullableJsonNullValueInput | InputJsonValue
+    citations?: NullableJsonNullValueInput | InputJsonValue
+    searchQueries?: NullableJsonNullValueInput | InputJsonValue
+    citationStrength?: number | null
   }
 
   export type RelevanceScoreResultCreateManyPhraseInput = {
@@ -74961,6 +75051,9 @@ export namespace Prisma {
     competitorMentions?: NullableJsonNullValueInput | InputJsonValue
     competitorCount?: NullableIntFieldUpdateOperationsInput | number | null
     competitorDomains?: NullableJsonNullValueInput | InputJsonValue
+    citations?: NullableJsonNullValueInput | InputJsonValue
+    searchQueries?: NullableJsonNullValueInput | InputJsonValue
+    citationStrength?: NullableFloatFieldUpdateOperationsInput | number | null
   }
 
   export type AIQueryResultUncheckedUpdateWithoutPhraseInput = {
@@ -74998,6 +75091,9 @@ export namespace Prisma {
     competitorMentions?: NullableJsonNullValueInput | InputJsonValue
     competitorCount?: NullableIntFieldUpdateOperationsInput | number | null
     competitorDomains?: NullableJsonNullValueInput | InputJsonValue
+    citations?: NullableJsonNullValueInput | InputJsonValue
+    searchQueries?: NullableJsonNullValueInput | InputJsonValue
+    citationStrength?: NullableFloatFieldUpdateOperationsInput | number | null
   }
 
   export type AIQueryResultUncheckedUpdateManyWithoutPhraseInput = {
@@ -75035,6 +75131,9 @@ export namespace Prisma {
     competitorMentions?: NullableJsonNullValueInput | InputJsonValue
     competitorCount?: NullableIntFieldUpdateOperationsInput | number | null
     competitorDomains?: NullableJsonNullValueInput | InputJsonValue
+    citations?: NullableJsonNullValueInput | InputJsonValue
+    searchQueries?: NullableJsonNullValueInput | InputJsonValue
+    citationStrength?: NullableFloatFieldUpdateOperationsInput | number | null
   }
 
   export type RelevanceScoreResultUpdateWithoutPhraseInput = {

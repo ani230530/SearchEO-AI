@@ -31,6 +31,8 @@ export const env = {
   isProduction: NODE_ENV === 'production',
   isDevelopment: NODE_ENV === 'development',
   PORT: Number(process.env.PORT || 3002),
+  // LLM API keys – OpenRouter is the primary (single key for all 3 LLMs)
+  OPENROUTER_API_KEY: getOptional('OPENROUTER_API_KEY'),
   JWT_SECRET: getRequired('JWT_SECRET'),
   REFRESH_TOKEN_SECRET: getOptional('REFRESH_TOKEN_SECRET'),
   GOOGLE_ENCRYPTION_KEY: getRequired('GOOGLE_ENCRYPTION_KEY'),

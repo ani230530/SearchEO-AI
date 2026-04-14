@@ -104,4 +104,13 @@ export interface AIQueryResult {
     };
   };
   progress: number;
-} 
+  citations?: Array<{
+    url: string;
+    title: string;
+    citedText?: string;
+    startIndex?: number;
+    endIndex?: number;
+    confidenceScore?: number;
+  }>;
+  searchQueries?: string[];
+}

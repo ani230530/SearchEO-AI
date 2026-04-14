@@ -1197,8 +1197,59 @@ function AIResultsDropdown({ results }: AIResultsDropdownProps) {
                         </div>
                       </div>
                       
-                      {/* Sources */}
-                      {result.scores.sources && result.scores.sources.length > 0 && (
+                      {/* Real Citations from LLM Web Search */}
+                      {result.citations && result.citations.length > 0 ? (
+                        <div>
+                          <h4 className="text-base font-light text-black mb-3">
+                            Sources ({result.citations.length})
+                          </h4>
+                          <div className="space-y-2">
+                            {result.citations.map((citation, citIdx) => (
+                              <a
+                                key={citIdx}
+                                href={citation.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-start gap-3 p-3 bg-white rounded-xl border border-gray-100 hover:border-blue-200 hover:bg-blue-50/30 transition-colors group"
+                              >
+                                <span className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-100 text-blue-700 text-xs font-medium flex items-center justify-center mt-0.5">
+                                  {citIdx + 1}
+                                </span>
+                                <div className="min-w-0 flex-1">
+                                  <div className="text-sm font-medium text-blue-700 group-hover:text-blue-800 truncate">
+                                    {citation.title || new URL(citation.url).hostname}
+                                  </div>
+                                  <div className="text-xs text-gray-400 truncate mt-0.5">
+                                    {citation.url}
+                                  </div>
+                                  {citation.citedText && (
+                                    <p className="text-xs text-gray-500 mt-1 line-clamp-2 leading-relaxed">
+                                      "{citation.citedText}"
+                                    </p>
+                                  )}
+                                  {citation.confidenceScore !== undefined && citation.confidenceScore !== null && (
+                                    <div className="mt-1">
+                                      <span className="text-[10px] px-1.5 py-0.5 bg-green-50 text-green-700 rounded-full">
+                                        {(citation.confidenceScore * 100).toFixed(0)}% confidence
+                                      </span>
+                                    </div>
+                                  )}
+                                </div>
+                              </a>
+                            ))}
+                          </div>
+                          {result.searchQueries && result.searchQueries.length > 0 && (
+                            <div className="mt-3 flex flex-wrap gap-1.5">
+                              <span className="text-xs text-gray-400">Searched:</span>
+                              {result.searchQueries.map((q, qIdx) => (
+                                <span key={qIdx} className="text-xs px-2 py-0.5 bg-gray-50 text-gray-500 rounded-full border border-gray-100">
+                                  {q}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ) : result.scores.sources && result.scores.sources.length > 0 ? (
                         <div>
                           <h4 className="text-base font-light text-black mb-3">Sources:</h4>
                           <div className="flex flex-wrap gap-2">
@@ -1209,7 +1260,7 @@ function AIResultsDropdown({ results }: AIResultsDropdownProps) {
                             ))}
                           </div>
                         </div>
-                      )}
+                      ) : null}
                       
                       {/* Competitor Data */}
                       {result.scores.competitorUrls && result.scores.competitorUrls.length > 0 && (

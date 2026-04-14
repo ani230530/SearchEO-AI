@@ -129,13 +129,14 @@ router.post('/reanalyze-phrases', authenticateToken, async (req: Request, res: R
             location
           );
 
-          // Score the response
+          // Score the response – pass llmResponse for citation-based scoring
           const scoringResult = await aiQueryService.scoreResponse(
             phrase.text,
             queryResult.response,
             model,
             targetDomain,
-            location
+            location,
+            queryResult.llmResponse
           );
 
           // Update the existing AI query result
@@ -159,7 +160,10 @@ router.post('/reanalyze-phrases', authenticateToken, async (req: Request, res: R
               competitorCount: scoringResult.competitors?.totalMentions,
               competitorDomains: scoringResult.competitors?.mentions?.map((m: any) => m.domain),
               competitorUrls: scoringResult.competitorUrls,
-              competitorMatchScore: scoringResult.competitorMatchScore
+              competitorMatchScore: scoringResult.competitorMatchScore,
+              citations: (scoringResult as any).citations || queryResult.llmResponse?.citations || [],
+              searchQueries: (scoringResult as any).searchQueries || queryResult.llmResponse?.searchQueries || [],
+              citationStrength: (scoringResult as any).citationStrength || 0,
             }
           });
 
@@ -250,13 +254,14 @@ router.post('/reanalyze-phrase', authenticateToken, async (req: Request, res: Re
       location
     );
 
-    // Score the response
+    // Score the response – pass llmResponse for citation-based scoring
     const scoringResult = await aiQueryService.scoreResponse(
       phrase.text,
       queryResult.response,
       model,
       targetDomain,
-      location
+      location,
+      queryResult.llmResponse
     );
 
     // Update the existing AI query result
@@ -267,20 +272,22 @@ router.post('/reanalyze-phrase', authenticateToken, async (req: Request, res: Re
       },
       data: {
         response: queryResult.response,
-        latency: 0, // Default latency since it's not returned by the service
+        latency: 0,
         cost: queryResult.cost || 0,
         presence: scoringResult.presence,
         relevance: scoringResult.relevance,
         accuracy: scoringResult.accuracy,
         sentiment: scoringResult.sentiment,
         overall: scoringResult.overall,
-        // Add competitor fields
         competitorNames: scoringResult.competitors?.names,
         competitorMentions: scoringResult.competitors?.mentions,
         competitorCount: scoringResult.competitors?.totalMentions,
         competitorDomains: scoringResult.competitors?.mentions?.map((m: any) => m.domain),
         competitorUrls: scoringResult.competitorUrls,
-        competitorMatchScore: scoringResult.competitorMatchScore
+        competitorMatchScore: scoringResult.competitorMatchScore,
+        citations: (scoringResult as any).citations || queryResult.llmResponse?.citations || [],
+        searchQueries: (scoringResult as any).searchQueries || queryResult.llmResponse?.searchQueries || [],
+        citationStrength: (scoringResult as any).citationStrength || 0,
       }
     });
 
@@ -342,20 +349,20 @@ router.post('/reanalyze-phrase', authenticateToken, async (req: Request, res: Re
 });
 
 // AI-powered scoring logic with timeout
-async function scoreResponseWithAI(phrase: string, response: string, model: string, domain?: string, location?: string) {
-  const timeoutPromise = new Promise((_, reject) => 
+async function scoreResponseWithAI(phrase: string, response: string, model: string, domain?: string, location?: string, llmResponse?: any) {
+  const timeoutPromise = new Promise((_, reject) =>
     setTimeout(() => reject(new Error('Scoring timeout')), 60000)
   );
-  
+
   try {
-    // Use the simplified AI service scoring
+    // Use the simplified AI service scoring – pass llmResponse for citation-based scoring
     const scores = await Promise.race([
-      aiQueryService.scoreResponse(phrase, response, model, domain, location),
+      aiQueryService.scoreResponse(phrase, response, model, domain, location, llmResponse),
       timeoutPromise
     ]);
-    
+
     return scores;
-    
+
   } catch (error) {
     console.log('AI scoring failed, using basic fallback');
     // Use basic fallback scoring
@@ -1132,20 +1139,20 @@ async function processQueryBatch(
           // Send individual query progress with realistic messaging
           res.write(`event: progress\ndata: ${JSON.stringify({ message: `Querying ${model} for "${query.phrase}" - Generating comprehensive search response...` })}\n\n`);
           
-          // Get AI response using GPT-4o under the hood with timeout and domain context
+          // Get AI response with REAL LLM web search (increased timeout for real search)
           const queryPromise = aiQueryService.query(query.phrase, model, domain, location);
-          const timeoutPromise = new Promise<never>((_, reject) => 
-            setTimeout(() => reject(new Error('Query timeout - AI model taking too long to respond')), 20000) // Reduced timeout to 20 seconds
+          const timeoutPromise = new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error('Query timeout - AI model taking too long to respond')), 45000) // 45s for real web search
           );
-          
-          const { response, cost } = await Promise.race([queryPromise, timeoutPromise]);
+
+          const { response, cost, llmResponse: queryLlmResponse } = await Promise.race([queryPromise, timeoutPromise]);
           const latency = (Date.now() - startTime) / 1000;
 
           // Send scoring progress with realistic messaging
           res.write(`event: progress\ndata: ${JSON.stringify({ message: `Evaluating ${model} response for "${query.phrase}" - Analyzing domain presence and SEO ranking potential...` })}\n\n`);
-          
-          // Score the response using AI with timeout and domain context
-          const scores = await scoreResponseWithAI(query.phrase, response, model, domain, location) as {
+
+          // Score the response – pass llmResponse for citation-based scoring
+          const scores = await scoreResponseWithAI(query.phrase, response, model, domain, location, queryLlmResponse) as {
             presence: number;
             relevance: number;
             accuracy: number;
@@ -1167,6 +1174,8 @@ async function processQueryBatch(
               mentions: any[];
               totalMentions: number;
             };
+            citations?: any[];
+            searchQueries?: string[];
           };
 
           // Enforce new policy strictly: overall already reflects presence/rank; no post-adjustment
@@ -1204,7 +1213,11 @@ async function processQueryBatch(
                 competitorNames: scores.competitors?.names,
                 competitorMentions: scores.competitors?.mentions,
                 competitorCount: scores.competitors?.totalMentions,
-                competitorDomains: scores.competitors?.mentions?.map((m: any) => m.domain)
+                competitorDomains: scores.competitors?.mentions?.map((m: any) => m.domain),
+                // Real citation data from LLM web search
+                citations: (scores as any).citations || queryLlmResponse?.citations || [],
+                searchQueries: (scores as any).searchQueries || queryLlmResponse?.searchQueries || [],
+                citationStrength: (scores as any).citationStrength || 0,
               }
             });
             await advanceTestingForPhrase(phraseRecord.id);
@@ -1243,6 +1256,9 @@ async function processQueryBatch(
             competitorMatchScore: scores.competitorMatchScore,
             // Add competitor data at the top level for easy access
             competitors: scoresWithCompetitors.competitors,
+            // Real citations from LLM web search
+            citations: (scores as any).citations || queryLlmResponse?.citations || [],
+            searchQueries: (scores as any).searchQueries || queryLlmResponse?.searchQueries || [],
             aiQueryResultId: aiQueryResultRecord ? aiQueryResultRecord.id : undefined,
             phraseId: phraseRecord ? phraseRecord.id : undefined
           };

@@ -50,6 +50,15 @@ export interface AIQueryResult {
   context?: string;
   mentions?: number;
   expanded?: boolean;
+  citations?: Array<{
+    url: string;
+    title: string;
+    citedText?: string;
+    startIndex?: number;
+    endIndex?: number;
+    confidenceScore?: number;
+  }>;
+  searchQueries?: string[];
 }
 
 export interface AIQueryStats {
@@ -223,7 +232,9 @@ const AIQueryResultsNew: React.FC<AIQueryResultsProps> = ({
         competitorMatchScore: result.scores.competitorMatchScore,
         comprehensiveness: result.scores.comprehensiveness,
         context: result.scores.context,
-        mentions: result.scores.mentions
+        mentions: result.scores.mentions,
+        citations: result.citations || [],
+        searchQueries: result.searchQueries || []
       };
     });
 
