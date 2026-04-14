@@ -1079,10 +1079,30 @@ function generateFallbackPhrases(keyword: string, location?: string): string[] {
   return basePhrases;
 }
 
+// ── Google Autocomplete expansion (free, validates real searches) ────────────
+
+async function fetchGoogleAutocomplete(seed: string): Promise<string[]> {
+  try {
+    const url = `https://suggestqueries.google.com/complete/search?client=firefox&q=${encodeURIComponent(seed)}`;
+    const response = await axios.get(url, { timeout: 5000, responseType: 'json' });
+    // Response format: ["query", ["suggestion1", "suggestion2", ...]]
+    const suggestions: string[] = Array.isArray(response.data?.[1]) ? response.data[1] : [];
+    // Only keep short suggestions (1-4 words)
+    return suggestions
+      .map((s: string) => s.trim().toLowerCase())
+      .filter((s: string) => {
+        const wordCount = s.split(/\s+/).length;
+        return wordCount >= 1 && wordCount <= 4 && s.length > 2;
+      });
+  } catch {
+    return [];
+  }
+}
+
 export async function generateKeywordsForDomain(domain: string, context: string, location?: string): Promise<{ keywords: Array<{ term: string, volume: number, difficulty: string, cpc: number, intent: string }>, tokenUsage: number }> {
   try {
     const locationContext = location ? `\nLocation: ${location}` : '';
-    
+
     // Get location context from database if available
     let locationDomainContext = '';
     try {
@@ -1097,139 +1117,140 @@ export async function generateKeywordsForDomain(domain: string, context: string,
       console.warn('Could not fetch location context from database:', error);
     }
 
-    // Streamlined, Ahrefs-focused prompt
-    const prompt = `Generate 35 SEO keywords with Ahrefs-quality metrics for the following business. These keywords will be used to build phrases that test domain presence in AI responses.
+    // AI-visibility-focused prompt: generate keywords that make good AI prompts
+    const prompt = `Generate 40 SHORT-TAIL KEYWORDS (1-4 words max) for testing AI visibility of the following business. These keywords will be turned into prompts like "What is the best [keyword]?" or "Recommend a [keyword]" to test whether AI models mention this domain.
 
 Business: ${context}${locationContext}${locationDomainContext}
 
-Critical constraints:
-- Do NOT include the domain/brand name "${domain}", any brand variants, company names, or URLs in any keyword
-- Exclude all navigational/brand keywords
-- Focus on generic terms users would search for (services, problems, solutions, comparisons)
+STRICT RULES:
+- Every keyword MUST be 1-4 words. NO phrases longer than 4 words.
+- Do NOT include the brand name "${domain}" or any brand variants
+- Do NOT include navigational terms
+- Keywords should be generic industry/service/product terms that someone would ask an AI about
+- Focus on terms where this business COULD be recommended by an AI
 
-Requirements:
-- Mix of 1-6 word phrases
-- Realistic search volumes (10-100K range)
-- Proper intent classification
-- Accurate difficulty + CPC correlation
+GOOD examples (1-4 words): "project management software", "CRM tool", "email marketing", "web hosting", "data analytics platform"
+BAD examples (too long): "best project management software for remote teams", "how to choose a CRM tool for small business"
 
-Intent Distribution (no navigational intent):
-- Informational (30%): how to, what is, guide, tips
-- Commercial (40%): best, review, compare, top
-- Transactional (30%): buy, price, near me, hire
+Intent Distribution:
+- Informational (30%): category terms, "what is" topics
+- Commercial (40%): "best X", comparison terms, tool categories
+- Transactional (30%): service terms, "near me" if local
 
-Volume Ranges:
-- 10-500: Long-tail, specific
-- 500-5K: Medium competition 
-- 5K-20K: Competitive
-- 20K-100K: High competition
+Difficulty (how competitive is this term in AI responses):
+- Low: niche terms, specific subcategories
+- Medium: established categories, moderate competition
+- High: broad popular terms, many competitors
 
-Difficulty Logic:
-- Low (0-30): New terms, long-tail, local
-- Medium (31-60): Established, moderate competition
-- High (61-100): Popular, highly competitive
-
-CPC Logic:
-- $0.50-2.00: Informational, low commercial intent
-- $2.00-5.00: Commercial research, comparisons
-- $5.00-12.00: High-intent transactional
-- Location keywords: +20-50% CPC premium
-
-Return JSON only:
-[{"term":"keyword","volume":1200,"difficulty":"Medium","cpc":3.45,"intent":"Commercial"}]
-
-Focus on:
-✓ Industry-specific terminology
-✓ Customer pain points
-✓ Service variations
-✓ Competitor comparisons (generic, not brand-specific)
-✓ Location modifiers (if provided)
-✓ Problem-solution matches
-✓ Buyer journey stages
-
-No explanations, JSON only.`;
+Return JSON array only, no explanations:
+[{"term":"keyword","difficulty":"Medium","intent":"Commercial"}]`;
 
     const completion = await openai.chat.completions.create({
       model: 'gpt-4o',
       messages: [
-        { role: 'system', content: 'You are an SEO data analyst who generates precise keyword metrics matching Ahrefs standards. Output clean JSON arrays only.' },
+        { role: 'system', content: 'You are an AI visibility analyst. Generate short-tail keywords (1-4 words) that will be used to build prompts for testing whether AI chatbots mention a specific domain. Output clean JSON arrays only.' },
         { role: 'user', content: prompt }
       ],
-      max_tokens: 1500, // Reduced for faster response
-      temperature: 0.3 // Lower for more consistent data
+      max_tokens: 1500,
+      temperature: 0.4,
+      response_format: { type: 'json_object' }
     });
 
     const text = completion.choices[0].message?.content;
-    if (!text) throw new Error('Empty response from GPT-4o-mini API');
-    
-    // Extract JSON more efficiently
-    const jsonMatch = text.match(/\[[\s\S]*?\]/);
-    if (!jsonMatch) {
-      console.error('No JSON found in response');
+    if (!text) throw new Error('Empty response from keyword generation');
+
+    // Extract JSON array from response
+    let keywords: any[];
+    try {
+      const parsed = JSON.parse(text);
+      keywords = Array.isArray(parsed) ? parsed : (parsed.keywords || parsed.data || []);
+    } catch {
+      const jsonMatch = text.match(/\[[\s\S]*\]/);
+      if (!jsonMatch) {
+        console.error('No JSON found in keyword response');
+        return { keywords: generateDomainFallbackKeywords(domain, context), tokenUsage: completion.usage?.total_tokens || 0 };
+      }
+      keywords = JSON.parse(jsonMatch[0]);
+    }
+
+    if (!Array.isArray(keywords)) {
       return { keywords: generateDomainFallbackKeywords(domain, context), tokenUsage: completion.usage?.total_tokens || 0 };
     }
 
-    try {
-      const keywords = JSON.parse(jsonMatch[0]);
-      if (!Array.isArray(keywords)) {
-        throw new Error('Invalid JSON structure');
-      }
+    // ── Post-generation filtering ──────────────────────────────────────────
+    const seen = new Set<string>();
+    const domainLower = domain.toLowerCase().replace(/\.(com|io|net|org|co)$/, '').replace(/^www\./, '');
 
-      // Enhanced validation and normalization
-      const validatedKeywords = keywords.map((kw: any) => {
-        const term = String(kw.term || '').trim();
-        if (!term) return null;
+    const validatedKeywords = keywords
+      .map((kw: any) => {
+        const term = String(kw.term || '').trim().toLowerCase();
+        if (!term || term.length < 2) return null;
 
-        // Realistic volume bounds
-        let volume = Math.max(10, Math.min(100000, Number(kw.volume) || 1000));
-        
+        // HARD REJECT: more than 4 words
+        const wordCount = term.split(/\s+/).length;
+        if (wordCount > 4) return null;
+
+        // Reject brand terms
+        if (term.includes(domainLower)) return null;
+
+        // Dedup
+        if (seen.has(term)) return null;
+        seen.add(term);
+
         // Validate difficulty
         let difficulty = kw.difficulty;
         if (!['Low', 'Medium', 'High'].includes(difficulty)) {
-          // Auto-assign based on volume and keyword characteristics
-          const termLower = term.toLowerCase();
-          const wordCount = term.split(/\s+/).length;
-          
-          if (volume < 500 || wordCount >= 5 || termLower.includes('near me')) {
-            difficulty = 'Low';
-          } else if (volume < 5000 || wordCount >= 3) {
-            difficulty = 'Medium';
-          } else {
-            difficulty = 'High';
-          }
+          if (wordCount >= 3) difficulty = 'Low';
+          else if (wordCount >= 2) difficulty = 'Medium';
+          else difficulty = 'High';
         }
 
-        // Validate and correlate CPC with difficulty and intent
-        let cpc = Math.max(0.25, Math.min(15.00, Number(kw.cpc) || 2.00));
-        
-        // Intent-based CPC adjustment
-        const intent = ['Informational', 'Commercial', 'Transactional', 'Navigational'].includes(kw.intent) 
-          ? kw.intent 
+        const intent = ['Informational', 'Commercial', 'Transactional'].includes(kw.intent)
+          ? kw.intent
           : determineIntent(term);
-
-        // CPC correlation with difficulty and intent
-        if (difficulty === 'High' && intent === 'Transactional') cpc = Math.max(cpc, 4.00);
-        if (difficulty === 'Low' && intent === 'Informational') cpc = Math.min(cpc, 3.00);
-        if (term.toLowerCase().includes('near me') && location) cpc *= 1.3; // Location premium
 
         return {
           term,
-          volume,
+          volume: 0,       // No hallucinated volume — 0 means "not measured"
           difficulty,
-          cpc: Math.round(cpc * 100) / 100,
+          cpc: 0,          // CPC removed
           intent
         };
-      }).filter(Boolean) as Array<{ term: string, volume: number, difficulty: string, cpc: number, intent: string }>;
+      })
+      .filter(Boolean) as Array<{ term: string, volume: number, difficulty: string, cpc: number, intent: string }>;
 
-      return {
-        keywords: validatedKeywords.slice(0, 35), // Ensure we return max 35
-        tokenUsage: completion.usage?.total_tokens || 0
-      };
+    // ── Google Autocomplete expansion ──────────────────────────────────────
+    // Pick top 8 seed keywords and expand via autocomplete to find real searches
+    const seeds = validatedKeywords.slice(0, 8).map(k => k.term);
+    const autocompleteResults = await Promise.all(seeds.map(s => fetchGoogleAutocomplete(s)));
+    const autocompleteKeywords = new Set<string>();
 
-    } catch (parseError) {
-      console.error('JSON parse error:', parseError);
-      return { keywords: generateDomainFallbackKeywords(domain, context), tokenUsage: completion.usage?.total_tokens || 0 };
+    for (const suggestions of autocompleteResults) {
+      for (const s of suggestions) {
+        const wordCount = s.split(/\s+/).length;
+        if (wordCount <= 4 && !seen.has(s) && !s.includes(domainLower)) {
+          autocompleteKeywords.add(s);
+          seen.add(s);
+        }
+      }
     }
+
+    // Add autocomplete-validated keywords (mark as Medium difficulty, Commercial intent by default)
+    for (const term of autocompleteKeywords) {
+      if (validatedKeywords.length >= 40) break;
+      validatedKeywords.push({
+        term,
+        volume: 0,
+        difficulty: 'Medium',
+        cpc: 0,
+        intent: determineIntent(term),
+      });
+    }
+
+    return {
+      keywords: validatedKeywords.slice(0, 40),
+      tokenUsage: completion.usage?.total_tokens || 0
+    };
 
   } catch (error) {
     console.error('Keyword generation error:', error);
@@ -1261,69 +1282,45 @@ function determineIntent(term: string): string {
 }
 
 function generateDomainFallbackKeywords(domain: string, context: string): Array<{ term: string, volume: number, difficulty: string, cpc: number, intent: string }> {
-  // Enhanced fallback keyword generation with better difficulty distribution for SEO analysis
-  const domainName = domain.replace(/^www\./, '').replace(/\./g, ' ');
-  const words = domainName.split(' ').filter(word => word.length > 2);
-  
-  const baseKeywords = [
-    // Low difficulty keywords (long-tail, specific) - SEO testing friendly
-    ...words.map(word => ({ term: `${word} services near me`, intent: 'Transactional' })),
-    ...words.map(word => ({ term: `${word} company reviews`, intent: 'Commercial' })),
-    ...words.map(word => ({ term: `${word} pricing 2024`, intent: 'Transactional' })),
-    ...words.map(word => ({ term: `${word} contact information`, intent: 'Transactional' })),
-    ...words.map(word => ({ term: `${word} about us`, intent: 'Navigational' })),
-    ...words.map(word => ({ term: `how to choose ${word} provider`, intent: 'Informational' })),
-    ...words.map(word => ({ term: `${word} vs competitors`, intent: 'Commercial' })),
-    
-    // Medium difficulty keywords (industry terms) - SEO analysis focused
-    ...words.map(word => ({ term: `${word} services`, intent: 'Commercial' })),
-    ...words.map(word => ({ term: `${word} company`, intent: 'Commercial' })),
-    ...words.map(word => ({ term: `best ${word}`, intent: 'Commercial' })),
-    ...words.map(word => ({ term: `${word} solutions`, intent: 'Commercial' })),
-    ...words.map(word => ({ term: `${word} experts`, intent: 'Commercial' })),
-    ...words.map(word => ({ term: `${word} alternatives`, intent: 'Commercial' })),
-    ...words.map(word => ({ term: `what is ${word}`, intent: 'Informational' })),
-    
-    // High difficulty keywords (broad terms) - SEO competitive analysis
-    ...words.map(word => ({ term: word, intent: 'Commercial' })),
-    ...words.map(word => ({ term: `${word} near me`, intent: 'Transactional' })),
-    ...words.map(word => ({ term: `${word} reviews`, intent: 'Commercial' })),
-    ...words.map(word => ({ term: `${word} pricing`, intent: 'Transactional' })),
-    ...words.map(word => ({ term: `${word} contact`, intent: 'Transactional' })),
-    ...words.map(word => ({ term: `${word} guide`, intent: 'Informational' }))
-  ];
+  // Extract meaningful words from context for fallback keyword seeds
+  const contextWords = context
+    .toLowerCase()
+    .replace(/[^a-z\s]/g, '')
+    .split(/\s+/)
+    .filter(w => w.length > 3)
+    .filter(w => !['the', 'and', 'for', 'with', 'that', 'this', 'from', 'have', 'been', 'they', 'their', 'about', 'which', 'when', 'make', 'more', 'also', 'into', 'some', 'than', 'them'].includes(w));
 
-  return baseKeywords.slice(0, 25).map((keyword, index) => {
-    // Distribute difficulty levels more realistically for SEO analysis
-    let difficulty: string;
-    let volume: number;
-    let cpc: number;
-    
-    if (index < 8) {
-      // Low difficulty: long-tail, specific terms (good for SEO testing)
-      difficulty = 'Low';
-      volume = Math.max(100, 500 - (index * 50));
-      cpc = Math.max(0.50, 2.00 - (index * 0.15));
-    } else if (index < 16) {
-      // Medium difficulty: industry terms (balanced SEO opportunity)
-      difficulty = 'Medium';
-      volume = Math.max(1000, 5000 - ((index - 8) * 300));
-      cpc = Math.max(1.50, 4.00 - ((index - 8) * 0.25));
-    } else {
-      // High difficulty: broad terms (competitive SEO terms)
-      difficulty = 'High';
-      volume = Math.max(5000, 15000 - ((index - 16) * 500));
-      cpc = Math.max(3.00, 8.00 - ((index - 16) * 0.5));
-    }
-    
-    return {
-      term: keyword.term.toLowerCase(),
-      volume,
-      difficulty,
-      cpc: Math.round(cpc * 100) / 100,
-      intent: keyword.intent
-    };
-  });
+  // Pick up to 5 unique context words as seeds
+  const seeds = [...new Set(contextWords)].slice(0, 5);
+
+  const baseKeywords: Array<{ term: string, difficulty: string, intent: string }> = [];
+
+  for (const word of seeds) {
+    baseKeywords.push(
+      { term: `best ${word}`, difficulty: 'High', intent: 'Commercial' },
+      { term: `${word} software`, difficulty: 'Medium', intent: 'Commercial' },
+      { term: `${word} tools`, difficulty: 'Medium', intent: 'Commercial' },
+      { term: `${word} services`, difficulty: 'Medium', intent: 'Commercial' },
+      { term: `${word} platform`, difficulty: 'Medium', intent: 'Commercial' },
+    );
+  }
+
+  // Dedup and limit
+  const seen = new Set<string>();
+  return baseKeywords
+    .filter(kw => {
+      if (seen.has(kw.term)) return false;
+      seen.add(kw.term);
+      return kw.term.split(/\s+/).length <= 4;
+    })
+    .slice(0, 25)
+    .map(kw => ({
+      term: kw.term,
+      volume: 0,
+      difficulty: kw.difficulty,
+      cpc: 0,
+      intent: kw.intent,
+    }));
 }
 
 export async function analyzeCompetitors(

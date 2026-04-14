@@ -690,7 +690,7 @@ const allSections = [...leftSections, ...rightSections];
                               <div className="bg-white rounded-3xl border border-gray-200 overflow-hidden shadow-sm">
                                 {/* Table Header */}
                                 <div className="bg-gray-50/80 border-b border-gray-200">
-                                  <div className="grid grid-cols-10 gap-4 px-6 py-4 text-sm font-semibold text-gray-700">
+                                  <div className="grid grid-cols-9 gap-4 px-6 py-4 text-sm font-semibold text-gray-700">
                                     <div
                                       className="col-span-3 flex items-center space-x-2 cursor-pointer hover:text-gray-900 transition-colors"
                                       onClick={() => handleSort("keyword")}
@@ -713,14 +713,6 @@ const allSections = [...leftSections, ...rightSections];
                                     >
                                       <span>Competition</span>
                                       {getSortIcon("competition")}
-                                    </div>
-
-                                    <div
-                                      className="col-span-1 flex items-center space-x-2 cursor-pointer hover:text-gray-900 transition-colors justify-center"
-                                      onClick={() => handleSort("cpc")}
-                                    >
-                                      <span>CPC</span>
-                                      {getSortIcon("cpc")}
                                     </div>
 
                                     <div
@@ -754,7 +746,7 @@ const allSections = [...leftSections, ...rightSections];
                                   {currentKeywords.map((keyword) => (
                                     <div
                                       key={keyword.id}
-                                      className="grid grid-cols-10 gap-4 px-6 py-4 hover:bg-gray-50/80 transition-all duration-200"
+                                      className="grid grid-cols-9 gap-4 px-6 py-4 hover:bg-gray-50/80 transition-all duration-200"
                                     >
                                       {/* Keyword Column */}
                                       <div className="col-span-3 flex items-center space-x-3">
@@ -789,13 +781,6 @@ const allSections = [...leftSections, ...rightSections];
                                           )}
                                         >
                                           {keyword.competition}
-                                        </span>
-                                      </div>
-
-                                      {/* CPC Column */}
-                                      <div className="col-span-1 flex items-center justify-center">
-                                        <span className="font-medium text-gray-900 text-sm">
-                                          ${keyword.cpc.toFixed(2)}
                                         </span>
                                       </div>
 

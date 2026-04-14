@@ -152,13 +152,11 @@ Please provide a comprehensive analysis with the following data for a keyword an
 1. **Search Volume**: Estimate monthly search volume (realistic numbers)
 2. **Keyword Difficulty (KD)**: Score from 0-100 based on competition
 3. **Competition Level**: Low, Medium, or High
-4. **Cost Per Click (CPC)**: Estimated cost for paid advertising
-5. **Search Intent**: Informational, Commercial, Transactional, or Navigational
+4. **Search Intent**: Informational, Commercial, Transactional, or Navigational
 6. **Organic Traffic Potential**: Estimated organic traffic based on volume and difficulty
 7. **Paid Traffic Potential**: Estimated paid traffic potential
 8. **Trend**: Rising, Stable, or Declining
 9. **Current Position**: Estimated current ranking position (0 if not ranked)
-10. **Target URL**: Suggested URL for this keyword
 
 Consider the following factors:
 - Keyword length and specificity
@@ -174,13 +172,11 @@ Return ONLY a JSON object with this exact structure:
   "volume": 2500,
   "kd": 65,
   "competition": "Medium",
-  "cpc": 3.50,
   "intent": "Commercial",
   "organic": 150,
   "paid": 75,
   "trend": "Rising",
   "position": 0,
-  "url": "https://domain.com/keyword-page",
   "analysis": "Brief analysis of keyword potential and strategy"
 }
 `;
@@ -219,13 +215,13 @@ Return ONLY a JSON object with this exact structure:
       volume: analysisResult.volume || 1000,
       kd: analysisResult.kd || 50,
       competition: analysisResult.competition || 'Medium',
-      cpc: analysisResult.cpc || 2.50,
+      cpc: 0,
       intent: analysisResult.intent || 'Commercial',
       organic: analysisResult.organic || Math.floor((analysisResult.volume || 1000) * 0.1),
       paid: analysisResult.paid || Math.floor((analysisResult.volume || 1000) * 0.05),
       trend: analysisResult.trend || 'Stable',
       position: analysisResult.position || 0,
-      url: analysisResult.url || `https://${domain}/${keyword.toLowerCase().replace(/\s+/g, '-')}`,
+      url: analysisResult.url || null,
       analysis: analysisResult.analysis || 'AI analysis completed successfully',
       tokenUsage: completion.usage?.total_tokens || 0
     };
@@ -283,7 +279,7 @@ router.post('/:domainId/custom', authenticateToken, async (req: Request, res: Re
         term: keyword,
         volume: volume || 1000,
         difficulty: competition || 'Medium',
-        cpc: cpc || 2.50,
+        cpc: 0,
         intent: intent || 'Commercial',
         domainId: domainId,
         isSelected: false
@@ -304,7 +300,7 @@ router.post('/:domainId/custom', authenticateToken, async (req: Request, res: Re
         paid: paid || Math.floor(newKeyword.volume * 0.05),
         trend: trend || 'Stable',
         position: position || 0,
-        url: url || `https://${domain.url}/${newKeyword.term.toLowerCase().replace(/\s+/g, '-')}`,
+        url: url || null,
         updated: new Date().toISOString().split('T')[0],
         isCustom: true,
         selected: false

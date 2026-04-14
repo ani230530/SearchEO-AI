@@ -1366,7 +1366,7 @@ export default function ReportPDF({ reportData }: ReportPDFProps) {
               <Text style={styles.tableHeaderCell}>Keyword</Text>
               <Text style={styles.tableHeaderCell}>Volume</Text>
               <Text style={styles.tableHeaderCell}>Difficulty</Text>
-              <Text style={styles.tableHeaderCell}>CPC</Text>
+              <Text style={styles.tableHeaderCell}>Intent</Text>
               <Text style={styles.tableHeaderCell}>Status</Text>
             </View>
             {reportData.selectedKeywords.slice(0, 10).map((keyword, idx) => (
@@ -1377,7 +1377,7 @@ export default function ReportPDF({ reportData }: ReportPDFProps) {
                   keyword.difficulty === 'Easy' ? { color: '#059669' } :
                   keyword.difficulty === 'Medium' ? { color: '#D97706' } : { color: '#DC2626' }
                 ]}>{keyword.difficulty}</Text>
-                <Text style={styles.tableCell}>${keyword.cpc.toFixed(2)}</Text>
+                <Text style={styles.tableCell}>{keyword.intent || 'Commercial'}</Text>
                 <Text style={[styles.tableCell, keyword.isSelected ? styles.statusGood : styles.statusHigh]}>
                   {keyword.isSelected ? 'Selected' : 'Not Selected'}
                 </Text>

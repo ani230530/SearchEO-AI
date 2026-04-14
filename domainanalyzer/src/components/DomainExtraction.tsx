@@ -1542,15 +1542,15 @@ const DomainExtraction: React.FC<DomainExtractionProps> = ({
               {getSortIcon('competition')}
             </div>
             
-            <div 
+            <div
               className="col-span-1 flex items-center space-x-2 cursor-pointer hover:text-gray-900 transition-colors justify-center"
-              onClick={() => handleSort('cpc')}
+              onClick={() => handleSort('intent')}
             >
-              <span>CPC</span>
-              {getSortIcon('cpc')}
+              <span>Intent</span>
+              {getSortIcon('intent')}
             </div>
-            
-            <div 
+
+            <div
               className="col-span-1 flex items-center space-x-2 cursor-pointer hover:text-gray-900 transition-colors justify-center"
               onClick={() => handleSort('organic')}
             >
@@ -1634,13 +1634,13 @@ const DomainExtraction: React.FC<DomainExtractionProps> = ({
                   </span>
                 </div>
                 
-                {/* CPC Column */}
+                {/* Intent Column */}
                 <div className="col-span-1 flex items-center justify-center">
-                  <span className="font-semibold text-gray-900 text-sm">
-                    ${keyword.cpc.toFixed(2)}
+                  <span className="font-semibold text-gray-700 text-xs">
+                    {keyword.intent || 'Commercial'}
                   </span>
                 </div>
-                
+
                 {/* Organic Column */}
                 <div className="col-span-1 flex items-center justify-center">
                   <span className="text-gray-700 text-sm">
@@ -2249,7 +2249,7 @@ const DomainExtraction: React.FC<DomainExtractionProps> = ({
                       Processing Metrics
                     </h3>
                     <p className="text-gray-500 text-sm transition-opacity duration-500">
-                      Computing difficulty and CPC values
+                      Computing difficulty and intent values
                     </p>
                   </div>
                   <div className="w-full flex-shrink-0 text-center">

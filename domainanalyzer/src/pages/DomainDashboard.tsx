@@ -3908,7 +3908,7 @@ const DomainDashboard = () => {
                               <div className="mt-1 text-xs text-gray-600 flex items-center gap-2">
                                 <span>Vol {k.volume?.toLocaleString?.() || k.volume}</span>
                                 <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold ${k.difficulty === 'High' ? 'bg-rose-50 text-rose-700' : k.difficulty === 'Medium' ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-700'}`}>{k.difficulty}</span>
-                                <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-blue-50 text-blue-700">CPC ${k.cpc?.toFixed?.(2) || k.cpc}</span>
+                                <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-blue-50 text-blue-700">{k.intent || 'Commercial'}</span>
                                 <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-indigo-50 text-indigo-700">Avg {Math.round(avg)}%</span>
                               </div>
                             </div>
