@@ -72,6 +72,121 @@ function extractMetaMap($: cheerio.CheerioAPI, selectorPrefix: string): Record<s
   return map;
 }
 
+// ── Deep JSON-LD / Schema.org extraction ─────────────────────────────────────
+
+export interface ExtractedSchemaOrg {
+  organizationName?: string;
+  organizationDescription?: string;
+  industry?: string;
+  address?: string;
+  city?: string;
+  country?: string;
+  socialProfiles: string[];
+  products: string[];
+  services: string[];
+  priceRange?: string;
+  logo?: string;
+  foundingDate?: string;
+  numberOfEmployees?: string;
+  contactEmail?: string;
+  contactPhone?: string;
+  sameAs: string[];
+}
+
+export function extractSchemaOrgEntities(jsonLdItems: unknown[]): ExtractedSchemaOrg {
+  const result: ExtractedSchemaOrg = {
+    socialProfiles: [],
+    products: [],
+    services: [],
+    sameAs: [],
+  };
+
+  for (const item of jsonLdItems) {
+    if (!item || typeof item !== 'object') continue;
+    const typed = item as Record<string, any>;
+
+    // Handle @graph arrays (common in WordPress, Yoast, etc.)
+    const entities = typed['@graph'] ? typed['@graph'] : [typed];
+
+    for (const entity of entities) {
+      if (!entity || typeof entity !== 'object') continue;
+      const type = entity['@type'];
+      const types = Array.isArray(type) ? type : [type];
+
+      for (const t of types) {
+        if (!t) continue;
+        const typeLower = String(t).toLowerCase();
+
+        if (typeLower === 'organization' || typeLower === 'localbusiness' || typeLower === 'corporation' || typeLower.includes('business')) {
+          if (entity.name && !result.organizationName) result.organizationName = String(entity.name);
+          if (entity.description && !result.organizationDescription) result.organizationDescription = String(entity.description);
+          if (entity.logo) {
+            result.logo = typeof entity.logo === 'string' ? entity.logo : entity.logo?.url;
+          }
+          if (entity.foundingDate) result.foundingDate = String(entity.foundingDate);
+          if (entity.numberOfEmployees) {
+            const emp = entity.numberOfEmployees;
+            result.numberOfEmployees = emp?.value ? String(emp.value) : String(emp);
+          }
+          if (entity.priceRange) result.priceRange = String(entity.priceRange);
+
+          // Address
+          const addr = entity.address;
+          if (addr) {
+            if (typeof addr === 'string') {
+              result.address = addr;
+            } else {
+              const parts = [addr.streetAddress, addr.addressLocality, addr.addressRegion, addr.postalCode].filter(Boolean);
+              if (parts.length > 0) result.address = parts.join(', ');
+              if (addr.addressLocality) result.city = String(addr.addressLocality);
+              if (addr.addressCountry) result.country = typeof addr.addressCountry === 'string' ? addr.addressCountry : addr.addressCountry?.name;
+            }
+          }
+
+          // Contact
+          const contact = entity.contactPoint;
+          if (contact) {
+            const contacts = Array.isArray(contact) ? contact : [contact];
+            for (const c of contacts) {
+              if (c.email && !result.contactEmail) result.contactEmail = String(c.email);
+              if (c.telephone && !result.contactPhone) result.contactPhone = String(c.telephone);
+            }
+          }
+          if (entity.email && !result.contactEmail) result.contactEmail = String(entity.email);
+          if (entity.telephone && !result.contactPhone) result.contactPhone = String(entity.telephone);
+
+          // Social profiles
+          if (Array.isArray(entity.sameAs)) {
+            result.sameAs.push(...entity.sameAs.map(String));
+            result.socialProfiles.push(...entity.sameAs.map(String));
+          }
+        }
+
+        if (typeLower === 'product') {
+          if (entity.name) result.products.push(String(entity.name));
+        }
+
+        if (typeLower === 'service' || typeLower === 'offer') {
+          const name = entity.name || entity.serviceType || entity.itemOffered?.name;
+          if (name) result.services.push(String(name));
+        }
+
+        if (typeLower === 'website' || typeLower === 'webpage') {
+          if (entity.name && !result.organizationName) result.organizationName = String(entity.name);
+        }
+      }
+    }
+  }
+
+  // Deduplicate
+  result.socialProfiles = [...new Set(result.socialProfiles)];
+  result.products = [...new Set(result.products)];
+  result.services = [...new Set(result.services)];
+  result.sameAs = [...new Set(result.sameAs)];
+
+  return result;
+}
+
 export function extractPageSnapshot(params: {
   html: string;
   requestedUrl: string;

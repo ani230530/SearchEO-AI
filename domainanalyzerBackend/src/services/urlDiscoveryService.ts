@@ -3,17 +3,31 @@ import type { CrawlPolicy, PageSnapshot, UrlCandidate } from './domainContextTyp
 
 const HIGH_VALUE_SEGMENTS = [
   '/about',
+  '/about-us',
   '/company',
   '/services',
   '/solutions',
   '/products',
+  '/what-we-do',
   '/pricing',
+  '/plans',
   '/contact',
+  '/contact-us',
   '/docs',
   '/documentation',
   '/blog',
   '/features',
   '/industries',
+  '/who-we-serve',
+  '/customers',
+  '/use-cases',
+  '/integrations',
+  '/partners',
+  '/careers',
+  '/jobs',
+  '/team',
+  '/testimonials',
+  '/case-studies',
 ];
 
 export function scoreUrl(url: string, baseUrl: string): number {

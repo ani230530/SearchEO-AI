@@ -1,12 +1,24 @@
 import OpenAI from 'openai';
 import type { CrawlPolicy, CrawlQualitySummary, DomainContextClaim, DomainContextJson, DomainContextEntity, PageSnapshot } from './domainContextTypes';
+import { extractSchemaOrgEntities, type ExtractedSchemaOrg } from './pageExtractionService';
 
+// Use OpenRouter if available (same key as aiQueryService), else direct OpenAI
+const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
-if (!OPENAI_API_KEY) {
-  throw new Error('OPENAI_API_KEY not set in environment variables');
+
+if (!OPENROUTER_API_KEY && !OPENAI_API_KEY) {
+  throw new Error('Either OPENROUTER_API_KEY or OPENAI_API_KEY must be set');
 }
 
-const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
+const synthesisClient = OPENROUTER_API_KEY
+  ? new OpenAI({
+      apiKey: OPENROUTER_API_KEY,
+      baseURL: 'https://openrouter.ai/api/v1',
+    })
+  : new OpenAI({ apiKey: OPENAI_API_KEY! });
+
+// Use gpt-4o-mini for extraction (16x cheaper, nearly same quality for structured data)
+const SYNTHESIS_MODEL = OPENROUTER_API_KEY ? 'openai/gpt-4o-mini' : 'gpt-4o-mini';
 
 function trimText(text: string, maxLength: number): string {
   return text.length <= maxLength ? text : `${text.slice(0, maxLength)}...`;
@@ -207,6 +219,10 @@ export async function synthesizeDomainContext(params: {
   quality: CrawlQualitySummary;
 }): Promise<{ contextJson: DomainContextJson; contextText: string; summaryContext: string; tokenUsage: number }> {
   const { domain, location, pages, policy, quality } = params;
+  // Pre-extract structured data from JSON-LD across all pages (deterministic, free)
+  const allJsonLd = pages.flatMap((p) => p.jsonLd || []);
+  const schemaOrgData = extractSchemaOrgEntities(allJsonLd);
+
   const curatedPages = [...pages]
     .sort((a, b) => b.contentScore - a.contentScore)
     .slice(0, 6)
@@ -221,10 +237,11 @@ export async function synthesizeDomainContext(params: {
     }));
 
   try {
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4o',
+    const response = await synthesisClient.chat.completions.create({
+      model: SYNTHESIS_MODEL,
       temperature: 0.2,
-      max_tokens: 2800,
+      max_tokens: 3200,
+      response_format: { type: 'json_object' },
       messages: [
         {
           role: 'system',
@@ -245,12 +262,20 @@ export async function synthesizeDomainContext(params: {
               task: 'Produce structured domain context plus a rich 8-section business analysis grounded in page evidence.',
               domain,
               location: location || null,
-              crawlPolicy: {
-                robotsFetched: policy.robotsFetched,
-                sitemapCount: policy.sitemaps.length,
-                maxPages: policy.maxPages,
+              // Pre-extracted structured data from JSON-LD (use this as ground truth when available)
+              structuredData: {
+                organizationName: schemaOrgData.organizationName || null,
+                organizationDescription: schemaOrgData.organizationDescription || null,
+                address: schemaOrgData.address || null,
+                city: schemaOrgData.city || null,
+                country: schemaOrgData.country || null,
+                products: schemaOrgData.products.length > 0 ? schemaOrgData.products : null,
+                services: schemaOrgData.services.length > 0 ? schemaOrgData.services : null,
+                socialProfiles: schemaOrgData.socialProfiles.length > 0 ? schemaOrgData.socialProfiles.slice(0, 5) : null,
+                priceRange: schemaOrgData.priceRange || null,
+                foundingDate: schemaOrgData.foundingDate || null,
+                numberOfEmployees: schemaOrgData.numberOfEmployees || null,
               },
-              quality,
               pages: curatedPages,
               outputSchema: {
                 companySummary: { text: 'string', evidencePages: ['url'], confidence: 0.0 },

@@ -54,6 +54,34 @@ function looksLikeAppShell(html: string): boolean {
   );
 }
 
+// ── Jina Reader API fallback (handles anti-bot sites, returns clean HTML) ─────
+
+async function fetchWithJinaReader(url: string): Promise<{ html: string; finalUrl: string }> {
+  const JINA_API_KEY = process.env.JINA_API_KEY;
+  const headers: Record<string, string> = {
+    Accept: 'text/html',
+  };
+  if (JINA_API_KEY) {
+    headers['Authorization'] = `Bearer ${JINA_API_KEY}`;
+  }
+
+  const response = await axios.get(`https://r.jina.ai/${url}`, {
+    headers,
+    timeout: 15000,
+    responseType: 'text',
+  });
+
+  // Jina returns markdown by default with text/html accept we get rendered content
+  // Wrap in basic HTML so Cheerio can parse it
+  const content = typeof response.data === 'string' ? response.data : String(response.data);
+  const wrappedHtml = `<!DOCTYPE html><html><head><title></title></head><body><main>${content}</main></body></html>`;
+
+  return {
+    html: wrappedHtml,
+    finalUrl: url,
+  };
+}
+
 async function fetchWithBrowser(url: string, timeoutMs: number): Promise<{ html: string; finalUrl: string }> {
   const browser = await puppeteer.launch({
     args: ['--no-sandbox', '--disable-setuid-sandbox'],
@@ -138,6 +166,22 @@ export async function fetchPageWithFallback(params: {
             headers: responseHeaders,
           };
         } catch (browserError) {
+          // Try Jina Reader as third-level fallback
+          try {
+            console.log(`[pageFetch] Browser failed for ${candidate.url}, trying Jina Reader...`);
+            const jinaResult = await fetchWithJinaReader(candidate.url);
+            return {
+              url: jinaResult.finalUrl,
+              requestedUrl: candidate.url,
+              status: 200,
+              html: jinaResult.html,
+              fetchMode: 'http' as PageFetchMode, // Jina acts as HTTP proxy
+              headers: responseHeaders,
+            };
+          } catch (jinaError) {
+            console.warn(`[pageFetch] Jina Reader also failed for ${candidate.url}`);
+          }
+
           if (previousSnapshot) {
             return buildCachedFallback(candidate, previousSnapshot, 'HTTP timeout; reused cached snapshot');
           }
