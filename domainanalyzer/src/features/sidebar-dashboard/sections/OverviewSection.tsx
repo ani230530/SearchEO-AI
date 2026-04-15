@@ -306,24 +306,7 @@ useEffect(() => {
                 </div>
               )}
 
-              <button
-                onClick={onRunAudit}
-                disabled={auditLoading || !companyDomain}
-                className={cn(
-                  "inline-flex items-center justify-center gap-2 px-6 py-3 text-white rounded-md text-sm font-medium hover:opacity-90 disabled:opacity-60 transition min-h-[52px] min-w-[180px]",
-                  auditLoading && "cursor-not-allowed"
-                )}
-                style={{
-                  background: "linear-gradient(90deg, #2D4059 0%, #4E76C7 100%)",
-                }}
-              >
-                <img
-                  src="https://res.cloudinary.com/dgfzjdi68/image/upload/v1775200251/file-check-02_zg8eno.png"
-                  alt="Check icon"
-                  className="w-5 h-5"
-                />
-                {auditLoading ? "Running audit..." : "Run Audit"}
-              </button>
+              
             </div>
           </div>
         </div>
@@ -373,7 +356,7 @@ useEffect(() => {
   <div className="grid grid-cols-4 gap-4">
   {[
     ["Ranking Keywords", keywordsTableData.length, "https://res.cloudinary.com/dgfzjdi68/image/upload/v1775648922/Frame_1321316715_sku1sv.png"],
-    ["Projects", campaignsCount, "https://res.cloudinary.com/dgfzjdi68/image/upload/v1775648922/Frame_1321316715_sku1sv.png"],
+    ["Projects", campaignsCount, "https://res.cloudinary.com/dgfzjdi68/image/upload/v1776261732/Frame_1321316715_1_xpevty.png"],
     ["WordPress", hasWordpressIntegration ? "Connected" : "Not connected", "https://res.cloudinary.com/dgfzjdi68/image/upload/v1775648922/Frame_1321316715_sku1sv.png"],
     ["Integrations", hasWordpressIntegration ? "WordPress" : "—", "https://res.cloudinary.com/dgfzjdi68/image/upload/v1775648922/Frame_1321316715_sku1sv.png"],
   ].map(([label, value, img]) => {
@@ -561,7 +544,7 @@ useEffect(() => {
           </div>
         
           {/* RIGHT: Overall Score */}
-          <div className="w-48 rounded-xl  p-6 bg-white shadow-sm flex flex-col items-center justify-center">
+          <div className="w-48 rounded-xl  p-6 flex flex-col items-center justify-center">
             <OverallScoreGauge
               size={180}
               score={
@@ -667,7 +650,7 @@ useEffect(() => {
             {keywordsTableData
               .slice()
               .sort((a, b) => (b.volume || 0) - (a.volume || 0)) 
-              .slice(0, 8) 
+              .slice(0, 7) 
               .map((item, idx) => (
                 <div key={idx} className="flex items-center justify-between">
                   <div>
@@ -745,7 +728,7 @@ useEffect(() => {
     )}
   </div>
 
-  {gscConnected && !isLoadingTrends && formattedTrendsData.length > 0 && (
+  {/* {gscConnected && !isLoadingTrends && formattedTrendsData.length > 0 && (
     <div className="mt-4 pt-4 border-t border-gray-100">
       <p className="text-xs text-gray-500 mb-2">Showing trends for top queries:</p>
       <div className="flex flex-wrap gap-2">
@@ -756,7 +739,7 @@ useEffect(() => {
         ))}
       </div>
     </div>
-  )}
+  )} */}
 </div>
         
         </div>
