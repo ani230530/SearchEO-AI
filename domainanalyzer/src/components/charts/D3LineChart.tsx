@@ -36,7 +36,6 @@ const D3LineChart: React.FC<D3LineChartProps> = ({
   useEffect(() => {
     if (!svgRef.current || data.length === 0) return;
 
-    // Clear previous content
     d3.select(svgRef.current).selectAll('*').remove();
 
     const margin = { top: 30, right: 80, bottom: 50, left: 60 };
@@ -44,56 +43,14 @@ const D3LineChart: React.FC<D3LineChartProps> = ({
     const innerHeight = height - margin.top - margin.bottom;
 
     const svg = d3.select(svgRef.current)
-  .attr('viewBox', `0 0 ${width} ${height}`)
-  .attr('preserveAspectRatio', 'none')
-  .style('width', '100%')
-  .style('height', '100%');
-
-    // Create gradient definitions
-    const defs = svg.append('defs');
-
-    // Primary gradient
-    const primaryGradient = defs.append('linearGradient')
-      .attr('id', 'primaryGradient')
-      .attr('x1', '0%')
-      .attr('y1', '0%')
-      .attr('x2', '0%')
-      .attr('y2', '100%');
-    
-    primaryGradient.append('stop')
-      .attr('offset', '0%')
-      .attr('stop-color', primaryColor)
-      .attr('stop-opacity', 0.3);
-    
-    primaryGradient.append('stop')
-      .attr('offset', '100%')
-      .attr('stop-color', primaryColor)
-      .attr('stop-opacity', 0);
-
-    // Secondary gradient
-    if (secondaryData) {
-      const secondaryGradient = defs.append('linearGradient')
-        .attr('id', 'secondaryGradient')
-        .attr('x1', '0%')
-        .attr('y1', '0%')
-        .attr('x2', '0%')
-        .attr('y2', '100%');
-      
-      secondaryGradient.append('stop')
-        .attr('offset', '0%')
-        .attr('stop-color', secondaryColor)
-        .attr('stop-opacity', 0.2);
-      
-      secondaryGradient.append('stop')
-        .attr('offset', '100%')
-        .attr('stop-color', secondaryColor)
-        .attr('stop-opacity', 0);
-    }
+      .attr('viewBox', `0 0 ${width} ${height}`)
+      .attr('preserveAspectRatio', 'none')
+      .style('width', '100%')
+      .style('height', '100%');
 
     const g = svg.append('g')
       .attr('transform', `translate(${margin.left},${margin.top})`);
 
-    // Parse dates and create scales
     const parseDate = d3.timeParse('%Y-%m-%d');
     const formatDate = d3.timeFormat('%b %d');
 
@@ -109,57 +66,46 @@ const D3LineChart: React.FC<D3LineChartProps> = ({
       .domain([0, maxValue * 1.1])
       .range([innerHeight, 0]);
 
-    // Add grid lines
-    g.append('g')
-      .attr('class', 'grid')
-      .attr('opacity', 0.1)
-      .call(d3.axisLeft(yScale)
-        .tickSize(-innerWidth)
-        .tickFormat(() => '')
-      );
+    // Grid
+    // g.append('g')
+    //   .attr('class', 'grid')
+    //   .attr('opacity', 0.1)
+    //   .call(
+    //     d3.axisLeft(yScale)
+    //       .tickSize(-innerWidth)
+    //       .tickFormat(() => '')
+    //   );
 
-    // Add axes
+    // Axes
     g.append('g')
       .attr('transform', `translate(0,${innerHeight})`)
-      .call(d3.axisBottom(xScale)
-        .ticks(7)
-        .tickFormat(d => formatDate(d as Date))
+      .call(
+        d3.axisBottom(xScale)
+          .ticks(7)
+          .tickFormat(d => formatDate(d as Date))
       )
       .selectAll('text')
-      .attr('fill', '#6b7280')
-      .style('font-size', '11px');
+      .attr('fill', '#808a9c')
+      .style('font-size', '9px');
 
     g.append('g')
-      .call(d3.axisLeft(yScale)
-        .ticks(5)
-        .tickFormat(d => d3.format('.2s')(d as number))
+      .call(
+        d3.axisLeft(yScale)
+          .ticks(5)
+          .tickFormat(d => d3.format('.2s')(d as number))
       )
       .selectAll('text')
       .attr('fill', '#6b7280')
-      .style('font-size', '11px');
+      .style('font-size', '9px');
 
-    // Create line generator
+    // Line generator
     const line = d3.line<DataPoint>()
       .x(d => xScale(parseDate(d.date)!))
       .y(d => yScale(d.value))
       .curve(d3.curveMonotoneX);
 
-    // Create area generator
-    const area = d3.area<DataPoint>()
-      .x(d => xScale(parseDate(d.date)!))
-      .y0(innerHeight)
-      .y1(d => yScale(d.value))
-      .curve(d3.curveMonotoneX);
-
-    // Draw secondary line and area first (so primary is on top)
+    // Secondary line (no area)
     if (secondaryData && secondaryData.length > 0) {
-      if (showArea) {
-        g.append('path')
-          .datum(secondaryData)
-          .attr('fill', 'url(#secondaryGradient)')
-          .attr('d', area);
-      }
-
       const secondaryPath = g.append('path')
         .datum(secondaryData)
         .attr('fill', 'none')
@@ -179,15 +125,7 @@ const D3LineChart: React.FC<D3LineChartProps> = ({
       }
     }
 
-    // Draw primary area
-    if (showArea) {
-      g.append('path')
-        .datum(data)
-        .attr('fill', 'url(#primaryGradient)')
-        .attr('d', area);
-    }
-
-    // Draw primary line
+    // Primary line (no area)
     const primaryPath = g.append('path')
       .datum(data)
       .attr('fill', 'none')
@@ -206,57 +144,36 @@ const D3LineChart: React.FC<D3LineChartProps> = ({
         .attr('stroke-dashoffset', 0);
     }
 
-    // Add dots for primary data
-    g.selectAll('.dot-primary')
-      .data(data)
-      .enter()
-      .append('circle')
-      .attr('class', 'dot-primary')
-      .attr('cx', d => xScale(parseDate(d.date)!))
-      .attr('cy', d => yScale(d.value))
-      .attr('r', 3)
-      .attr('fill', primaryColor)
-      .attr('stroke', 'white')
-      .attr('stroke-width', 2)
-      .style('opacity', 0)
-      .transition()
-      .delay(animate ? 1000 : 0)
-      .duration(300)
-      .style('opacity', 1);
-
-    // Add legend
+    // Legend (unchanged)
     const legend = svg.append('g')
-      .attr('transform', `translate(${margin.left + 10}, 10)`);
+  .attr('transform', `translate(${margin.left}, 12)`);
 
-    legend.append('circle')
-      .attr('cx', 0)
-      .attr('cy', 0)
-      .attr('r', 3)
-      .attr('fill', primaryColor);
+const legendItems = [
+  { color: primaryColor, label: primaryLabel },
+  ...(secondaryData ? [{ color: secondaryColor, label: secondaryLabel }] : [])
+];
 
-    legend.append('text')
-      .attr('x', 12)
-      .attr('y', 4)
-      .text(primaryLabel)
-      .style('font-size', '12px')
-      .attr('fill', '#374151');
+const item = legend.selectAll('.legend-item')
+  .data(legendItems)
+  .enter()
+  .append('g')
+  .attr('class', 'legend-item')
+  .attr('transform', (d, i) => `translate(${i * 120}, 0)`); // spacing control
 
-    if (secondaryData) {
-      legend.append('circle')
-        .attr('cx', 100)
-        .attr('cy', 0)
-        .attr('r', 3)
-        .attr('fill', secondaryColor);
+item.append('circle')
+  .attr('r', 4)
+  .attr('cy', 0)
+  .attr('fill', d => d.color);
 
-      legend.append('text')
-        .attr('x', 112)
-        .attr('y', 4)
-        .text(secondaryLabel)
-        .style('font-size', '12px')
-        .attr('fill', '#374151');
-    }
+item.append('text')
+  .attr('x', 10)
+  .attr('y', 4)
+  .text(d => d.label)
+  .style('font-size', '10px')
+  .attr('fill', '#374151')
+  .style('font-weight', 500);
 
-    // Add tooltip functionality
+    // Tooltip
     const tooltip = d3.select('body').append('div')
       .attr('class', 'd3-tooltip')
       .style('position', 'absolute')
@@ -264,30 +181,47 @@ const D3LineChart: React.FC<D3LineChartProps> = ({
       .style('color', 'white')
       .style('padding', '8px 12px')
       .style('border-radius', '6px')
-      .style('font-size', '12px')
+      .style('font-size', '9px')
       .style('pointer-events', 'none')
       .style('opacity', 0)
       .style('z-index', 1000);
 
-    // Add invisible overlay for tooltip
+    // Hover overlay
     g.append('rect')
       .attr('width', innerWidth)
       .attr('height', innerHeight)
       .attr('fill', 'transparent')
-      .on('mousemove', function(event) {
+      .on('mousemove', function (event) {
         const [mouseX] = d3.pointer(event);
         const x0 = xScale.invert(mouseX);
+
         const bisect = d3.bisector((d: DataPoint) => parseDate(d.date)!).left;
         const i = bisect(data, x0, 1);
+
         const d0 = data[i - 1];
         const d1 = data[i];
         if (!d0 || !d1) return;
-        
-        const d = x0.getTime() - parseDate(d0.date)!.getTime() > parseDate(d1.date)!.getTime() - x0.getTime() ? d1 : d0;
-        
+
+        const d =
+          x0.getTime() - parseDate(d0.date)!.getTime() >
+          parseDate(d1.date)!.getTime() - x0.getTime()
+            ? d1
+            : d0;
+
+        let impressionVal: number | null = null;
+
+        if (secondaryData) {
+          const match = secondaryData.find(s => s.date === d.date);
+          if (match) impressionVal = match.value;
+        }
+
         tooltip
           .style('opacity', 1)
-          .html(`<strong>${formatDate(parseDate(d.date)!)}</strong><br/>${primaryLabel}: ${d.value.toLocaleString()}`)
+          .html(`
+            <strong>${formatDate(parseDate(d.date)!)}</strong><br/>
+            ${primaryLabel}: ${d.value.toLocaleString()}
+            ${impressionVal !== null ? `<br/>${secondaryLabel}: ${impressionVal.toLocaleString()}` : ''}
+          `)
           .style('left', (event.pageX + 15) + 'px')
           .style('top', (event.pageY - 28) + 'px');
       })
@@ -295,15 +229,13 @@ const D3LineChart: React.FC<D3LineChartProps> = ({
         tooltip.style('opacity', 0);
       });
 
-    // Cleanup tooltip on unmount
     return () => {
       d3.selectAll('.d3-tooltip').remove();
     };
+
   }, [data, secondaryData, width, height, primaryColor, secondaryColor, primaryLabel, secondaryLabel, showArea, animate]);
 
-  return (
-    <svg ref={svgRef} className="overflow-visible" />
-  );
+  return <svg ref={svgRef} className="overflow-visible" />;
 };
 
 export default D3LineChart;
