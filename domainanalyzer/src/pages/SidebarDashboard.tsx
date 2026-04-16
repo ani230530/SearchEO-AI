@@ -2539,13 +2539,41 @@ useEffect(() => {
         }
 
         .sidebar-header {
-          padding: 0px 12px 0px 24px;
+          padding: 16px 12px 12px 20px;
           border-bottom: 0.5px solid rgba(0, 0, 0, 0.1);
         }
 
         .sidebar.closed .sidebar-header {
-  padding: 4px 24px;
-}
+          padding: 16px 12px 12px 16px;
+        }
+
+        .sidebar-header-inner {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          min-height: 40px;
+        }
+
+        .sidebar-brand {
+          min-width: 0;
+          display: flex;
+          align-items: center;
+        }
+
+        .sidebar-brand-spacer {
+          flex: 1;
+        }
+
+        .sidebar-title {
+          margin: 0;
+          font-size: 24px;
+          font-weight: 400;
+          letter-spacing: -0.022em;
+          color: #1d1d1f;
+          line-height: 1.1;
+        }
+
         .sidebar-content {
           padding: 20px 12px;
         }
@@ -2643,6 +2671,35 @@ useEffect(() => {
           margin-right: 0;
         }
 
+        .sidebar-toggle {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          flex-shrink: 0;
+          width: 36px;
+          height: 36px;
+          border-radius: 10px;
+          border: 0.5px solid rgba(0, 0, 0, 0.1);
+          background: rgba(255, 255, 255, 0.82);
+          color: #1d1d1f;
+          box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+          transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+        }
+
+        .sidebar-toggle:hover {
+          background: rgba(255, 255, 255, 0.96);
+          border-color: rgba(0, 0, 0, 0.16);
+        }
+
+        .sidebar-toggle:active {
+          transform: scale(0.98);
+        }
+
+        .sidebar-toggle:focus-visible {
+          outline: 2px solid rgba(0, 122, 255, 0.45);
+          outline-offset: 2px;
+        }
+
         .main-content {
           margin-left: 280px;
           transition: margin-left 0.3s ease;
@@ -2732,37 +2789,25 @@ useEffect(() => {
 
         @media (max-width: 768px) {
           .sidebar {
-            width: 260px;
-            transform: translateX(-100%);
-          }
-
-          .sidebar.open {
+            width: 78px;
             transform: translateX(0);
           }
 
+          .sidebar.open {
+            width: 78px;
+          }
+
           .sidebar.closed {
-            width: 260px;
-            transform: translateX(-100%);
+            width: 78px;
+            transform: translateX(0);
           }
 
           .main-content {
-            margin-left: 0;
+            margin-left: 78px;
           }
 
           .main-content.sidebar-closed {
-            margin-left: 0;
-          }
-
-          .mobile-sidebar-toggle {
-            display: flex;
-          }
-
-          .mobile-overlay {
-            display: block;
-          }
-
-          .mobile-overlay.active {
-            opacity: 1;
+            margin-left: 78px;
           }
           .desktop-sidebar-toggle {
             display: none;
@@ -2790,6 +2835,7 @@ useEffect(() => {
         activeTab={activeTab}
         isSidebarExpanded={isSidebarExpanded}
         onHoverChange={setIsSidebarHovered}
+        onToggleSidebar={setSidebarOpen}
         onLogout={logout}
         onSelectCompanySubTab={setActiveCompanySubTab}
         onSelectTab={(tabId) => {

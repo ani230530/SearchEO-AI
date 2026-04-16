@@ -268,7 +268,7 @@ useEffect(() => {
         <p className="pl-4 pt-4 text-base text-[#717680]">Free website audit</p>
         <div className="relative p-4 sm:p-4 gap-10 justify-between">
           <div className="min-w-4xl">
-            <h1 className="text-3xl sm:text-2xl font-bold text-gray-900 leading-tight">
+            <h1 className="text-3xl sm:text-3xl font-bold text-gray-900 leading-tight">
               Analyze Your Site&apos;s SEO, Performance, and Visibility in Seconds
             </h1>
             <p className="pt-4 text-base text-[#717680]">
