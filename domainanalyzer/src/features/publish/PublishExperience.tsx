@@ -3992,12 +3992,10 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
                           <div className="w-[360px] rounded-[24px] border border-gray-200/70 bg-white/98 p-5 shadow-2xl backdrop-blur-2xl space-y-3">
                             <div className="flex items-center justify-between">
                               <div>
-                                <p className="text-xs uppercase tracking-[0.3em] text-gray-500 font-medium">
-                                  Image direction
+                                <p className="text-md uppercase text-gray-800 font-medium">
+                                  AI Assistance
                                 </p>
-                                <p className="text-[10px] text-gray-400 mt-0.5">
-                                  ⌘+Enter to submit • Esc to close
-                                </p>
+                                
                               </div>
                               <button
                                 onClick={closeImageTooltip}
@@ -4196,12 +4194,11 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
             <div className="w-[360px] rounded-[24px] border border-gray-200/70 bg-white/98 shadow-[0_20px_60px_rgba(15,23,42,0.15)] backdrop-blur-2xl p-5 space-y-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs uppercase tracking-[0.3em] text-gray-500 font-medium">
-                    Text direction
+                  <div className="bg-gray-100 w-full py-1 px-3 rounded-full mb-1">
+                  <p className="text-md uppercase text-gray-800 font-medium">
+                    AI Assistance
                   </p>
-                  <p className="text-[10px] text-gray-400 mt-0.5">
-                    ⌘+Enter to submit • Esc to close
-                  </p>
+                  </div>
                 </div>
                 <button
                   onClick={closeTextTooltip}
@@ -4214,8 +4211,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
                 </button>
               </div>
               <div className="rounded-xl border border-gray-200/50 bg-gray-50/50 p-3">
-                <p className="text-xs text-gray-500 mb-1.5">Selected text:</p>
-                <p className="text-sm text-gray-900 font-light leading-relaxed line-clamp-2">
+                <p className="text-md text-[#12A717] bg-[#F3FFF3] font-medium  line-clamp-6">
                   {selectedText}
                 </p>
               </div>

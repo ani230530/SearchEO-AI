@@ -45,16 +45,17 @@ export function DashboardHeader({
         </div>
 
         {activeTab === "projects" && selectedCampaignId && (
-          <div className="flex items-center gap-2 bg-gray-100/80 p-1 rounded-lg border border-gray-200/50 mr-4">
+          <div className="mr-4 flex items-center gap-2 rounded-lg border border-gray-200/50 bg-gray-100/80 p-1">
             {VIEW_MODE_OPTIONS.map(({ icon: Icon, label, mode }) => (
               <button
                 key={mode}
                 onClick={() => onCampaignViewModeChange(mode)}
-                className={`p-1.5 rounded-md transition-all flex items-center gap-2 text-xs font-medium ${
+                className={`flex items-center gap-2 rounded-md p-1.5 text-xs font-medium transition-all ${
                   campaignViewMode === mode
                     ? "bg-white text-black shadow-sm"
                     : "text-gray-500 hover:text-gray-700"
                 }`}
+                title={`${label} view`}
               >
                 <Icon className="h-4 w-4" />
                 <span>{label}</span>
@@ -66,8 +67,8 @@ export function DashboardHeader({
           <div className="flex items-center gap-3">
             <button
               onClick={() => onTabChange?.("profile")}
-              className="cursor-pointer hover:opacity-70 transition-opacity"
-              title="Go to Profile"
+              className="cursor-pointer transition-opacity hover:opacity-70"
+              title="Profile"
             >
               <User className="h-5 w-5 text-gray-400" />
             </button>
