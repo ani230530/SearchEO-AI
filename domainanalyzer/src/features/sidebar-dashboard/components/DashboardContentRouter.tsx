@@ -7,7 +7,7 @@ import { PublishSection } from "@/features/sidebar-dashboard/sections/PublishSec
 import { OverviewSection } from "@/features/sidebar-dashboard/sections/OverviewSection";
 import { SettingsSection } from "@/features/sidebar-dashboard/sections/SettingsSection";
 import type { DashboardContentRouterProps } from "@/features/sidebar-dashboard/types";
-
+import CompetitorPage from "../sections/CompetitorPage";
 export function DashboardContentRouter({
   activeTab,
   tabs,
@@ -18,6 +18,7 @@ export function DashboardContentRouter({
   overview,
   publish,
   settings,
+  competitorIntelligence,
 }: DashboardContentRouterProps) {
   switch (activeTab) {
     case "overview":
@@ -32,6 +33,8 @@ export function DashboardContentRouter({
       return <AnalyticsReportSection {...analyticsReport} />;
     case "gsc-analytics":
       return <GscAnalyticsSection {...gscAnalytics} />;
+case "competitor-intelligence":
+  return <CompetitorPage {...competitorIntelligence} />;
     case "profile":
       return <ProfileSection />;
     case "settings":
