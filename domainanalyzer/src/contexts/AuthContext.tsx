@@ -44,19 +44,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   // Check for existing token on app load
   useEffect(() => {
   const storedToken = tokenManager.getAuthToken();
-
-  if (storedToken && !isTokenExpired(storedToken)) {
-    setToken(storedToken);
-    setLoading(false);
-
-    // Verify in background (non-blocking)
-    verifyToken(storedToken);
-  } else if (storedToken) {
-    verifyToken(storedToken);
-  } else {
-    setLoading(false);
-  }
-}, []);
+    if (storedToken) {
+      verifyToken(storedToken);
+    } else {
+      setLoading(false);
+    }
+  }, []);
 
   // Set up automatic token refresh
   useEffect(() => {

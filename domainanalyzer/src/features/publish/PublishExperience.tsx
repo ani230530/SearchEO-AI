@@ -223,6 +223,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
   const textSelectionIntervalRef = useRef<number | null>(null);
   const tooltipAnchorRef = useRef<HTMLSpanElement | null>(null);
   const previewRef = useRef<HTMLDivElement | null>(null);
+  const addImageInputRef = useRef<HTMLInputElement | null>(null);
   
   // Edit mode state
   const [isEditMode, setIsEditMode] = useState(false);
@@ -2297,6 +2298,70 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
     });
   }, [newImageUrl, newImageAlt, publishResult, isEditMode, currentHtmlContent, handleHtmlEditorChange, toast]);
 
+  const handleDeviceImageSelect = useCallback(
+    (event: React.ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0];
+      if (!file) {
+        return;
+      }
+
+      if (!file.type.startsWith('image/')) {
+        toast({
+          title: 'Invalid File',
+          description: 'Please choose an image file.',
+          variant: 'destructive',
+        });
+        event.target.value = '';
+        return;
+      }
+
+      if (!publishResult) {
+        event.target.value = '';
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = () => {
+        const imageSrc = typeof reader.result === 'string' ? reader.result : '';
+        if (!imageSrc) {
+          toast({
+            title: 'Image Upload Failed',
+            description: 'We could not read that image from your device.',
+            variant: 'destructive',
+          });
+          return;
+        }
+
+        const currentHtml = currentHtmlContent;
+        const fallbackAlt = file.name.replace(/\.[^.]+$/, '') || 'Article image';
+        const imgTag = `<img src="${imageSrc}" alt="${fallbackAlt}" />`;
+        const updatedHtml = currentHtml + '\n' + imgTag;
+
+        setEditedHtmlContent(updatedHtml);
+        if (isEditMode) {
+          handleHtmlEditorChange(updatedHtml);
+        }
+
+        toast({
+          title: 'Image Added',
+          description: 'The image has been added. Click Save to persist changes.',
+        });
+      };
+
+      reader.onerror = () => {
+        toast({
+          title: 'Image Upload Failed',
+          description: 'We could not read that image from your device.',
+          variant: 'destructive',
+        });
+      };
+
+      reader.readAsDataURL(file);
+      event.target.value = '';
+    },
+    [currentHtmlContent, handleHtmlEditorChange, isEditMode, publishResult, toast]
+  );
+
   const closeTextTooltip = useCallback(() => {
     if (textSelectionIntervalRef.current) {
       clearInterval(textSelectionIntervalRef.current);
@@ -2974,13 +3039,21 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
                     className="flex items-center gap-2 px-4 py-2.5 rounded-md border border-gray-200 bg-white text-sm font-medium text-gray-900 hover:bg-gray-50 disabled:opacity-60 transition-colors"
                   ><RotateCcw className='h-4 w-4'/>
                   </button>
-                  <button
-                    // onClick={handleGenerateContent} 
-                    title='Add Image'
-                    disabled={publishLoading}
-                    className="flex items-center gap-2 px-4 py-2.5 rounded-md border border-[#2D4059] bg-white text-sm font-medium text-[#2D4059] hover:bg-gray-100 disabled:opacity-60 transition-colors"
-                  ><ImagePlus className='h-4 w-4'/>Add Image
-                  </button>
+                    <button
+                      type="button"
+                      onClick={() => addImageInputRef.current?.click()}
+                      title='Add Image'
+                      disabled={publishLoading || !publishResult}
+                      className="flex items-center gap-2 px-4 py-2.5 rounded-md border border-[#2D4059] bg-white text-sm font-medium text-[#2D4059] hover:bg-gray-100 disabled:opacity-60 transition-colors"
+                    ><ImagePlus className='h-4 w-4'/>Add Image
+                    </button>
+                    <input
+                      ref={addImageInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handleDeviceImageSelect}
+                      className="hidden"
+                    />
                   <button
   onClick={handlePublishToWordpress}
   disabled={publishLoading || !publishResult}
@@ -3371,14 +3444,13 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
                       }}
                       content={
                         selectedImage === image.src ? (
-                          <div className="w-[360px] rounded-[24px] border border-gray-200/70 bg-white/98 p-5 shadow-2xl backdrop-blur-2xl space-y-3">
+                            <div className="w-[360px] rounded-[14px] border border-gray-200/70 bg-white p-5 shadow-2xl backdrop-blur-2xl space-y-3">
                             <div className="flex items-center justify-between">
                           <div>
-                                <p className="text-xs uppercase tracking-[0.3em] text-gray-500 font-medium">
-                                  Image direction
+                                <p className="text-md uppercase text-gray-800 font-medium">
+                                  AI Assistance
                                 </p>
                                 <p className="text-[10px] text-gray-400 mt-0.5">
-                                  ⌘+Enter to submit • Esc to close
                                 </p>
                           </div>
                               <button
@@ -3454,11 +3526,15 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
                       interactive
                       placement="left"
                       theme="light"
+                      className="publish-tippy"
+                      arrow={false}
+                      maxWidth="none"
                       animation="fade"
                       duration={200}
                       offset={[0, 12]}
                       hideOnClick={false}
                       trigger="manual"
+                      appendTo={() => document.body}
                     >
                       <button
                         type="button"
@@ -3989,7 +4065,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
                       }}
                       content={
                         selectedImage === image.src ? (
-                          <div className="w-[360px] rounded-[24px] border border-gray-200/70 bg-white/98 p-5 shadow-2xl backdrop-blur-2xl space-y-3">
+                            <div className="w-[360px] rounded-[14px] border border-gray-200/70 bg-white p-5 shadow-2xl backdrop-blur-2xl space-y-3">
                             <div className="flex items-center justify-between">
                               <div>
                                 <p className="text-md uppercase text-gray-800 font-medium">
@@ -4070,11 +4146,15 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
                       interactive
                       placement="left"
                       theme="light"
+                      className="publish-tippy"
+                      arrow={false}
+                      maxWidth="none"
                       animation="fade"
                       duration={200}
                       offset={[0, 12]}
                       hideOnClick={false}
                       trigger="manual"
+                      appendTo={() => document.body}
                     >
                       <button
                         type="button"
@@ -4191,27 +4271,27 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
             return new DOMRect(0, 0, 0, 0);
           }}
           content={
-            <div className="w-[360px] rounded-[24px] border border-gray-200/70 bg-white/98 shadow-[0_20px_60px_rgba(15,23,42,0.15)] backdrop-blur-2xl p-5 space-y-4">
+            <div className="w-[360px] rounded-[14px] border border-gray-200/70 bg-white shadow-[0_20px_60px_rgba(15,23,42,0.15)] backdrop-blur-2xl p-5 space-y-4">
               <div className="flex items-center justify-between">
-                <div>
-                  <div className="bg-gray-100 w-full py-1 px-3 rounded-full mb-1">
+                <div className='flex justify-between w-full'>
+                  <div className="w-full py-1  mb-1">
                   <p className="text-md uppercase text-gray-800 font-medium">
                     AI Assistance
                   </p>
                   </div>
-                </div>
                 <button
                   onClick={closeTextTooltip}
                   className="text-xs text-gray-400 hover:text-gray-900 transition-colors p-1.5 rounded-full hover:bg-gray-100"
                   aria-label="Close tooltip"
-                >
+                  >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                   </svg>
                 </button>
+                  </div>
               </div>
-              <div className="rounded-xl border border-gray-200/50 bg-gray-50/50 p-3">
-                <p className="text-md text-[#12A717] bg-[#F3FFF3] font-medium  line-clamp-6">
+              <div className="rounded-xl border border-gray-200/50 bg-[#F3FFF3] p-3">
+                <p className="text-md text-[#12A717] font-medium  line-clamp-6">
                   {selectedText}
                 </p>
               </div>
@@ -4254,10 +4334,13 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
             </div>
           }
           visible={selectedText ? true : false}
-          interactive
-          placement="top"
-          theme="light"
-          animation="scale"
+            interactive
+            placement="top"
+            theme="light"
+            className="publish-tippy"
+            arrow={false}
+            maxWidth="none"
+            animation="scale"
           duration={[150, 100]}
           offset={[0, 10]}
           hideOnClick={false}
