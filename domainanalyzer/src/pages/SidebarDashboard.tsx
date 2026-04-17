@@ -59,8 +59,6 @@ import { DashboardSidebar } from "@/features/sidebar-dashboard/components/Dashbo
 import { AnalyticsCompanySection } from "@/features/sidebar-dashboard/sections/AnalyticsCompanySection";
 import { ProjectsSection } from "@/features/sidebar-dashboard/sections/ProjectsSection";
 import { DASHBOARD_TABS } from "@/features/sidebar-dashboard/constants";
-import CompetitorPage from '@/features/sidebar-dashboard/sections/CompetitorPage';
-
 import type {
   CompanySubTabId,
   DashboardCampaignViewMode,
@@ -2503,17 +2501,6 @@ useEffect(() => {
       },
       onConfirmUpdate: handleConfirmUpdateCompanyDomain,
       onOpenConfirm: () => setConfirmUpdateOpen(true),
-    },
-    competitorIntelligence: {
-      domainId: createdDomainId?.toString() || "",
-      loading: false,
-      progress: 0,
-      competitors: [],
-      data: [],
-      onRunAnalysis: (competitorDomain: string) => {
-        // TODO: implement
-        console.log("Run analysis for", competitorDomain);
-      },
     },
   };
 
