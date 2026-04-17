@@ -2,12 +2,13 @@ import { AnalyticsReportSection } from "@/features/sidebar-dashboard/sections/An
 import { AuditSection } from "@/features/sidebar-dashboard/sections/AuditSection";
 import { CompanySection } from "@/features/sidebar-dashboard/sections/CompanySection";
 import { GscAnalyticsSection } from "@/features/sidebar-dashboard/sections/GscAnalyticsSection";
+import KnowledgeBaseSection from "@/features/sidebar-dashboard/sections/KnowledgeBaseSection";
 import { ProfileSection } from "@/features/sidebar-dashboard/sections/ProfileSection";
 import { PublishSection } from "@/features/sidebar-dashboard/sections/PublishSection";
 import { OverviewSection } from "@/features/sidebar-dashboard/sections/OverviewSection";
 import { SettingsSection } from "@/features/sidebar-dashboard/sections/SettingsSection";
 import type { DashboardContentRouterProps } from "@/features/sidebar-dashboard/types";
-
+import CompetitorPage from "../sections/CompetitorPage";
 export function DashboardContentRouter({
   activeTab,
   tabs,
@@ -18,6 +19,7 @@ export function DashboardContentRouter({
   overview,
   publish,
   settings,
+  competitorIntelligence,
 }: DashboardContentRouterProps) {
   switch (activeTab) {
     case "overview":
@@ -32,6 +34,10 @@ export function DashboardContentRouter({
       return <AnalyticsReportSection {...analyticsReport} />;
     case "gsc-analytics":
       return <GscAnalyticsSection {...gscAnalytics} />;
+    case "competitor-intelligence":
+      return <CompetitorPage {...competitorIntelligence} />;
+    case "knowledge-base":
+      return <KnowledgeBaseSection />;
     case "profile":
       return <ProfileSection />;
     case "settings":

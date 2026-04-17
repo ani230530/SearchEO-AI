@@ -7,10 +7,12 @@ import {
   FileChartColumnIncreasing,
   Globe,
   LayoutDashboard,
+  Lightbulb,
   Megaphone,
   Send,
   Settings,
   Sparkles,
+  Target,
   User,
 } from "lucide-react";
 
@@ -22,6 +24,8 @@ export const DASHBOARD_TABS: DashboardTabConfig[] = [
   { id: "ai-checker", label: "AI Visibility", icon: Sparkles },
   { id: "overview", label: "Dashboard", icon: LayoutDashboard },
   { id: "analytics", label: "Company", icon: Building },
+  { id: "competitor-intelligence", label: "Competitor Intelligence", icon: Target },
+  { id: "knowledge-base", label: "Knowledge Base", icon: Lightbulb },
   { id: "projects", label: "All Projects", icon: Send },
   { id: "publish", label: "Publish", icon: Megaphone },
   { id: "gsc-analytics", label: "GSC Analytics", icon: ChartPie },
