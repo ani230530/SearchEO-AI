@@ -214,6 +214,25 @@
     color: #1d4ed8;
   }
 }
+
+.publish-tippy {
+  background: #ffffff !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+}
+
+.publish-tippy > .tippy-content {
+  background: #ffffff !important;
+  padding: 0 !important;
+}
+
+.publish-tippy[data-theme~='light'] {
+  background: #ffffff !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+}
+
 /* ROOT WRAPPER */
 .seo-root {
   width: 100%;
