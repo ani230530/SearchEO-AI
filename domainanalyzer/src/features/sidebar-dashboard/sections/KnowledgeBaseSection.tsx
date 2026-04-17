@@ -1,0 +1,454 @@
+"use client";
+
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import {
+  Search,
+  FolderPlus,
+  Upload,
+  FolderOpen,
+  HelpCircle,
+  UserCircle,
+  Folder,
+  FileText,
+  MoreVertical,
+} from "lucide-react";
+
+const formatBytes = (bytes: number) => {
+  if (bytes === 0) return "0 B";
+  const units = ["B", "KB", "MB", "GB"];
+  const index = Math.floor(Math.log(bytes) / Math.log(1024));
+  return `${(bytes / Math.pow(1024, index)).toFixed(1)} ${units[index]}`;
+};
+
+const createId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+interface FolderItem {
+  id: string;
+  name: string;
+  createdAt: string;
+}
+
+interface FileItem {
+  id: string;
+  name: string;
+  size: string;
+  uploadedAt: string;
+  path: string;
+  folderId?: string;
+}
+
+const KnowledgeBaseSection = () => {
+  const [folders, setFolders] = useState<FolderItem[]>([]);
+  const [files, setFiles] = useState<FileItem[]>([]);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const folderInputRef = useRef<HTMLInputElement | null>(null);
+  const storageKey = "knowledge-base-data";
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const stored = window.localStorage.getItem(storageKey);
+    if (!stored) return;
+    try {
+      const parsed = JSON.parse(stored) as {
+        folders: FolderItem[];
+        files: FileItem[];
+        selectedFolderId?: string | null;
+      };
+      setFolders(parsed.folders || []);
+      setFiles(parsed.files || []);
+      setSelectedFolderId(parsed.selectedFolderId || null);
+    } catch {
+      // ignore invalid saved state
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(
+      storageKey,
+      JSON.stringify({ folders, files, selectedFolderId })
+    );
+  }, [folders, files, selectedFolderId]);
+
+  const handleNewFolder = () => {
+    const folderName = window.prompt("Enter folder name", "New folder");
+    if (!folderName?.trim()) {
+      return;
+    }
+
+    const newFolder: FolderItem = {
+      id: createId(),
+      name: folderName.trim(),
+      createdAt: new Date().toLocaleDateString("en-US", {
+        month: "2-digit",
+        day: "2-digit",
+        year: "numeric",
+      }),
+    };
+
+    setFolders((current) => [newFolder, ...current]);
+    setMessage(`Folder "${newFolder.name}" created.`);
+  };
+
+  const handleFileUploadClick = () => fileInputRef.current?.click();
+  const handleFolderUploadClick = () => {
+    if (!folderInputRef.current) return;
+    folderInputRef.current.setAttribute("webkitdirectory", "");
+    folderInputRef.current.setAttribute("directory", "");
+    folderInputRef.current.click();
+  };
+
+  const handleFilesSelected = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const uploadedFiles = event.target.files;
+    if (!uploadedFiles || !uploadedFiles.length) return;
+
+    const selectedFolder = folders.find((folder) => folder.id === selectedFolderId);
+    const newFiles = Array.from(uploadedFiles).map((file) => ({
+      id: createId(),
+      name: file.name,
+      size: formatBytes(file.size),
+      uploadedAt: new Date().toLocaleDateString("en-US", {
+        month: "2-digit",
+        day: "2-digit",
+        year: "numeric",
+      }),
+      path: selectedFolder ? `${selectedFolder.name}/${file.name}` : file.webkitRelativePath || file.name,
+      folderId: selectedFolder ? selectedFolder.id : undefined,
+    }));
+
+    setFiles((current) => [...newFiles, ...current]);
+    setMessage(`${newFiles.length} file${newFiles.length === 1 ? "" : "s"} uploaded.`);
+    event.target.value = "";
+  };
+
+  const handleFolderFilesSelected = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const uploadedFiles = event.target.files;
+    if (!uploadedFiles || !uploadedFiles.length) return;
+
+    const fileArray = Array.from(uploadedFiles);
+    const existingFolderMap = new Map(folders.map((folder) => [folder.name.toLowerCase(), folder.id]));
+    const newFolders: FolderItem[] = [];
+
+    const newFiles = fileArray.map((file) => {
+      const path = file.webkitRelativePath || file.name;
+      const rootFolder = path.split("/")[0] || file.name;
+      const normalizedRoot = rootFolder.toLowerCase();
+      let folderId = existingFolderMap.get(normalizedRoot);
+      if (!folderId) {
+        const created = {
+          id: createId(),
+          name: rootFolder,
+          createdAt: new Date().toLocaleDateString("en-US", {
+            month: "2-digit",
+            day: "2-digit",
+            year: "numeric",
+          }),
+        };
+        folderId = created.id;
+        existingFolderMap.set(normalizedRoot, created.id);
+        newFolders.push(created);
+      }
+      return {
+        id: createId(),
+        name: file.name,
+        size: formatBytes(file.size),
+        uploadedAt: new Date().toLocaleDateString("en-US", {
+          month: "2-digit",
+          day: "2-digit",
+          year: "numeric",
+        }),
+        path,
+        folderId,
+      };
+    });
+
+    setFiles((current) => [...newFiles, ...current]);
+    setFolders((current) => [...newFolders, ...current]);
+    setMessage(`${fileArray.length} file${fileArray.length === 1 ? "" : "s"} uploaded from folder.`);
+    event.target.value = "";
+  };
+
+  const moveFileToFolder = (fileId: string, folderId?: string) => {
+    setFiles((current) =>
+      current.map((item) => {
+        if (item.id !== fileId) return item;
+        const folder = folders.find((folderItem) => folderItem.id === folderId);
+        return {
+          ...item,
+          folderId,
+          path: folder ? `${folder.name}/${item.name}` : item.name,
+        };
+      })
+    );
+  };
+
+  const filteredFiles = useMemo(() => {
+    const currentFiles = selectedFolderId
+      ? files.filter((file) => file.folderId === selectedFolderId)
+      : files;
+
+    return currentFiles.filter(
+      (file) =>
+        file.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        file.path.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [files, searchTerm, selectedFolderId]);
+
+  const filteredFolders = useMemo(() => {
+    return folders
+      .filter((folder) =>
+        folder.name.toLowerCase().includes(searchTerm.toLowerCase())
+      )
+      .map((folder) => ({
+        ...folder,
+        fileCount: files.filter((file) => file.folderId === folder.id).length,
+      }));
+  }, [folders, files, searchTerm]);
+
+  return (
+    <div className="min-h-screen bg-slate-100 p-6">
+      <div className="mx-auto max-w-7xl">
+        <div className="mb-6 rounded-[30px] border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="flex items-center justify-between gap-6">
+            <div>
+              <p className="text-xs uppercase tracking-[0.28em] text-slate-500">My Drive</p>
+              <h1 className="mt-3 text-3xl font-semibold tracking-tight text-slate-900">
+                Knowledge Base
+              </h1>
+            </div>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={handleNewFolder}
+                className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
+              >
+                <FolderPlus className="h-4 w-4" />
+                New Folder
+              </button>
+              <button
+                type="button"
+                onClick={handleFileUploadClick}
+                className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+              >
+                <Upload className="h-4 w-4" />
+                File Upload
+              </button>
+              <button
+                type="button"
+                onClick={handleFolderUploadClick}
+                className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+              >
+                <FolderOpen className="h-4 w-4" />
+                Upload Folder
+              </button>
+            </div>
+          </div>
+          <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-500">
+            Store and organize your SEO research in a Drive-style workspace with folders, uploads, and file previews.
+          </p>
+        </div>
+
+        <div className="space-y-6">
+          <main className="space-y-6">
+            <div className="rounded-[30px] border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                <div className="flex items-center gap-3 rounded-full border border-slate-200 bg-slate-50 px-4 py-3 shadow-sm">
+                  <Search className="h-4 w-4 text-slate-500" />
+                  <input
+                    type="search"
+                    value={searchTerm}
+                    onChange={(event) => setSearchTerm(event.target.value)}
+                    placeholder="Search in drive"
+                    className="w-full border-none bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400"
+                  />
+                </div>
+                <div className="rounded-3xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                  Last scanned 10/01/2026
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-[30px] border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Folders</p>
+                  <h3 className="mt-1 text-xl font-semibold text-slate-900">All folders</h3>
+                </div>
+                {selectedFolderId ? (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedFolderId(null)}
+                    className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
+                  >
+                    Back to all folders
+                  </button>
+                ) : null}
+              </div>
+
+              <div className="mt-5 grid gap-4 xl:grid-cols-5">
+                {filteredFolders.length > 0 ? (
+                  filteredFolders.map((folder) => (
+                    <div
+                      key={folder.id}
+                      className={`relative rounded-[28px] border p-4 transition ${
+                        selectedFolderId === folder.id
+                          ? "border-slate-900 bg-slate-950 text-white"
+                          : "border-slate-200 bg-slate-50 text-slate-900 hover:border-slate-300 hover:bg-white"
+                      }`}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => setSelectedFolderId(folder.id)}
+                        className="w-full text-left"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-11 w-11 items-center justify-center rounded-3xl bg-white text-slate-700 shadow-sm">
+                            <Folder className="h-5 w-5" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-sm font-semibold truncate">{folder.name}</p>
+                            <p className="mt-1 text-xs text-slate-500 truncate">{folder.fileCount} file{folder.fileCount === 1 ? "" : "s"}</p>
+                          </div>
+                        </div>
+                      </button>
+                      <button
+                        type="button"
+                        aria-label="Folder menu"
+                        className="absolute right-4 top-4 inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:border-slate-300 hover:text-slate-700"
+                      >
+                        <MoreVertical className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ))
+                ) : (
+                  <div className="col-span-full rounded-[28px] border border-dashed border-slate-200 bg-slate-50 px-8 py-10 text-center text-sm text-slate-500">
+                    Create a folder to display it here.
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              className="hidden"
+              onChange={handleFilesSelected}
+            />
+            <input
+              ref={folderInputRef}
+              type="file"
+              multiple
+              className="hidden"
+              onChange={handleFolderFilesSelected}
+            />
+
+            {message && (
+              <div className="rounded-[30px] border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+                {message}
+              </div>
+            )}
+
+            {folders.length > 0 || files.length > 0 ? (
+              <>
+                <div className="rounded-[30px] border border-slate-200 bg-white p-5 shadow-sm">
+                  <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Files</p>
+                      <h2 className="mt-1 text-xl font-semibold text-slate-900">
+                        {selectedFolderId
+                          ? folders.find((folder) => folder.id === selectedFolderId)?.name || "Folder contents"
+                          : "Recent files"}
+                      </h2>
+                    </div>
+                    <div className="rounded-3xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
+                      Sorted by recent upload
+                    </div>
+                  </div>
+
+                  <div className="mt-5 grid gap-4 xl:grid-cols-4">
+                    {filteredFiles.length > 0 ? (
+                      filteredFiles.map((file) => (
+                        <div
+                          key={file.id}
+                          className="rounded-[28px] border border-slate-200 bg-slate-50 p-5 shadow-sm transition hover:border-slate-300 hover:bg-white"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="flex h-12 w-12 items-center justify-center rounded-3xl bg-white text-slate-700 shadow-sm">
+                              <FileText className="h-5 w-5" />
+                            </div>
+                            <div className="min-w-0">
+                              <p className="truncate text-base font-semibold text-slate-900">{file.name}</p>
+                              <p className="mt-2 text-sm text-slate-500 truncate">{file.path}</p>
+                            </div>
+                          </div>
+
+                          <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                            <div className="rounded-3xl border border-slate-200 bg-white px-4 py-4">
+                              <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Folder</p>
+                              <p className="mt-2 text-sm font-medium text-slate-700">
+                                {folders.find((folder) => folder.id === file.folderId)?.name || "Unsorted"}
+                              </p>
+                            </div>
+                            <div className="rounded-3xl border border-slate-200 bg-white px-4 py-4">
+                              <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Uploaded</p>
+                              <p className="mt-2 text-sm font-medium text-slate-700">{file.uploadedAt}</p>
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="col-span-full rounded-[28px] border border-dashed border-slate-200 bg-slate-50 px-8 py-10 text-center text-sm text-slate-500">
+                        No files found in this folder yet.
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div className="rounded-[30px] border border-slate-200 bg-white p-10 text-center shadow-sm">
+                <div className="mx-auto mb-8 flex h-48 w-48 items-center justify-center rounded-[36px] bg-slate-50 text-slate-400 shadow-sm">
+                  <div className="grid h-28 w-28 place-items-center rounded-3xl border border-dashed border-slate-200 bg-white text-slate-400">
+                    <Upload className="h-10 w-10" />
+                  </div>
+                </div>
+                <h2 className="text-4xl font-semibold text-slate-900">No files yet</h2>
+                <p className="mx-auto mt-4 max-w-xl text-sm leading-6 text-slate-500">
+                  Create a folder to organize your documents and help AI generate more professional SEO content.
+                </p>
+                <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
+                  <button
+                    type="button"
+                    onClick={handleNewFolder}
+                    className="inline-flex items-center justify-center rounded-full bg-slate-900 px-6 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
+                  >
+                    New Folder
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleFileUploadClick}
+                    className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-6 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                  >
+                    File Upload
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleFolderUploadClick}
+                    className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-6 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                  >
+                    Upload Folder
+                  </button>
+                </div>
+              </div>
+            )}
+          </main>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default KnowledgeBaseSection;
