@@ -13,7 +13,8 @@ export type TabId =
   | "ai-checker"
   | "gsc-analytics"
   | "audit"
-  | "analytics-report";
+  | "analytics-report"
+  | "competitor-intelligence";
 
 export type CompanySubTabId = "company-info" | "integration";
 
@@ -129,6 +130,38 @@ export interface AuditSectionProps {
   onSelectedMetricChange: (metric: string) => void;
 }
 
+
+
+export interface CompetitorIntelligenceProps {
+  domainId: string;
+
+  // State
+  loading: boolean;
+  progress: number;
+
+  // Data
+  competitors: string[];
+  data: {
+    domain: string;
+    keywords: number;
+    overlap: number;
+    traffic: number | string;
+  }[];
+
+  // Optional UI
+  title?: string;
+  subtitle?: string;
+
+  // Ref (optional like audit)
+  tableRef?: RefObject<HTMLDivElement | null>;
+
+  // Actions
+  onRunAnalysis: (competitorDomain: string) => void;
+  onRefresh?: () => void;
+  onExport?: () => void;
+  onImport?: () => void;
+}
+
 export interface SettingsSectionProps {
   confirmUpdateOpen: boolean;
   updateLoading: boolean;
@@ -144,6 +177,7 @@ export interface DashboardContentRouterProps {
   company: CompanySectionProps;
   analyticsReport: AnalyticsReportSectionProps;
   gscAnalytics: GscAnalyticsSectionProps;
+  competitorIntelligence: CompetitorIntelligenceProps;
   overview: OverviewSectionProps;
   publish: PublishSectionProps;
   settings: SettingsSectionProps;
