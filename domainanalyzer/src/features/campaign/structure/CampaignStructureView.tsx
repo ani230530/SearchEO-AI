@@ -14,6 +14,7 @@ import {
   Plus,
   RefreshCw,
   Search,
+  Send,
   Sparkles,
   Table,
   Trash2,
@@ -2334,4 +2335,3 @@ export default function CampaignStructureView({
     />
   );
 };
-
