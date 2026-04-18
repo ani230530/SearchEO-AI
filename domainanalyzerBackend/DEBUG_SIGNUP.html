@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Sign Up Debug Tool</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 600px;
+      margin: 50px auto;
+      padding: 20px;
+    }
+    .section {
+      border: 1px solid #ddd;
+      padding: 15px;
+      margin: 15px 0;
+      border-radius: 5px;
+    }
+    input, button {
+      padding: 10px;
+      margin: 5px 0;
+      width: 100%;
+      font-size: 14px;
+    }
+    button {
+      background: #007bff;
+      color: white;
+      border: none;
+      border-radius: 3px;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #0056b3;
+    }
+    .success {
+      background: #d4edda;
+      color: #155724;
+      padding: 10px;
+      border-radius: 3px;
+      margin: 10px 0;
+    }
+    .error {
+      background: #f8d7da;
+      color: #721c24;
+      padding: 10px;
+      border-radius: 3px;
+      margin: 10px 0;
+    }
+    .info {
+      background: #d1ecf1;
+      color: #0c5460;
+      padding: 10px;
+      border-radius: 3px;
+      margin: 10px 0;
+    }
+    .response {
+      background: #f5f5f5;
+      padding: 10px;
+      border-radius: 3px;
+      margin: 10px 0;
+      max-height: 300px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+  </style>
+</head>
+<body>
+  <h1>🔧 Sign Up Debug Tool</h1>
+
+  <div class="section">
+    <h2>Step 1: Check Backend Connection</h2>
+    <button onclick="checkBackendHealth()">🏥 Check Backend Health</button>
+    <div id="healthResult"></div>
+  </div>
+
+  <div class="section">
+    <h2>Step 2: Test Sign Up</h2>
+    <input type="email" id="email" placeholder="Email" value="test@example.com" />
+    <input type="password" id="password" placeholder="Password" value="password123" />
+    <input type="text" id="name" placeholder="Full Name" value="Test User" />
+    <button onclick="testSignUp()">📝 Test Sign Up</button>
+    <div id="signupResult"></div>
+  </div>
+
+  <div class="section">
+    <h2>Step 3: View Configuration</h2>
+    <button onclick="showConfig()">⚙️ Show Configuration</button>
+    <div id="configResult"></div>
+  </div>
+
+  <script>
+    const API_BASE_URL = 'http://localhost:3002/api';
+    
+    function log(elementId, message, type = 'info') {
+      const element = document.getElementById(elementId);
+      const className = type === 'success' ? 'success' : type === 'error' ? 'error' : 'info';
+      
+      if (message instanceof Object) {
+        element.innerHTML = `<div class="${className}"><strong>${type.toUpperCase()}:</strong></div><div class="response">${JSON.stringify(message, null, 2)}</div>`;
+      } else {
+        element.innerHTML = `<div class="${className}">${message}</div>`;
+      }
+    }
+
+    async function checkBackendHealth() {
+      const resultId = 'healthResult';
+      try {
+        log(resultId, '⏳ Checking backend health...', 'info');
+        
+        const response = await fetch(`${API_BASE_URL.replace('/api', '')}/api/health`, {
+          method: 'GET',
+          mode: 'cors'
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+          log(resultId, `✅ Backend is running! Status: ${response.status}`, 'success');
+          log(resultId, data, 'success');
+        } else {
+          log(resultId, `⚠️ Backend returned: ${response.status}`, 'error');
+          log(resultId, data, 'error');
+        }
+      } catch (error) {
+        log(resultId, `❌ Cannot connect to backend\n\nError: ${error.message}\n\nTroubleshooting:\n- Is the backend running on http://localhost:3002?\n- Run: npm run dev`, 'error');
+      }
+    }
+
+    async function testSignUp() {
+      const resultId = 'signupResult';
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('password').value;
+      const name = document.getElementById('name').value;
+
+      if (!email || !password) {
+        log(resultId, '❌ Email and password are required', 'error');
+        return;
+      }
+
+      try {
+        log(resultId, '⏳ Registering user...', 'info');
+
+        const response = await fetch(`${API_BASE_URL}/auth/register`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          mode: 'cors',
+          credentials: 'include',
+          body: JSON.stringify({
+            email: email.trim().toLowerCase(),
+            password,
+            name
+          })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+          log(resultId, `✅ Sign up successful! User ID: ${data.user.id}`, 'success');
+          log(resultId, data, 'success');
+        } else {
+          log(resultId, `⚠️ Sign up failed: ${response.status} ${response.statusText}`, 'error');
+          log(resultId, data, 'error');
+        }
+      } catch (error) {
+        log(resultId, `❌ Network error: ${error.message}`, 'error');
+      }
+    }
+
+    function showConfig() {
+      const resultId = 'configResult';
+      const config = {
+        'API Base URL': API_BASE_URL,
+        'Backend URL': API_BASE_URL.replace('/api', ''),
+        'Current URL': window.location.origin,
+        'Environment': 'Browser Console Test',
+        'CORS Mode': 'cors',
+        'Credentials': 'include'
+      };
+      log(resultId, config, 'info');
+    }
+
+    // Auto-check health on page load
+    window.addEventListener('load', () => {
+      setTimeout(checkBackendHealth, 500);
+    });
+  </script>
+</body>
+</html>

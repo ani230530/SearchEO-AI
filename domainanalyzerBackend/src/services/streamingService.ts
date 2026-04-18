@@ -1,10 +1,15 @@
 import IORedis from 'ioredis';
+import { formatRedisError, getRedisUrl } from '../lib/redisConfig';
 import type { CanonicalStreamingEvent } from './contentFlowService';
 
 // Reuse the Redis connection from existing infrastructure if possible, or create new
-const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
+const REDIS_URL = getRedisUrl(process.env.REDIS_URL);
 const redis = new IORedis(REDIS_URL, {
     maxRetriesPerRequest: null,
+});
+
+redis.on('error', (error) => {
+    console.warn(`[StreamingService] Redis unavailable at ${REDIS_URL}: ${formatRedisError(error)}`);
 });
 
 const MESSAGE_TTL_SECONDS = 86400; // 24 hours
@@ -16,6 +21,23 @@ export interface StreamingMessage {
 
 export interface StreamingEvent extends CanonicalStreamingEvent {}
 
+const safeRedisWrite = async (operation: () => Promise<void>): Promise<void> => {
+    try {
+        await operation();
+    } catch (error) {
+        console.warn(`[StreamingService] Redis write skipped: ${formatRedisError(error)}`);
+    }
+};
+
+const safeRedisRead = async <T>(operation: () => Promise<T>, fallback: T): Promise<T> => {
+    try {
+        return await operation();
+    } catch (error) {
+        console.warn(`[StreamingService] Redis read failed, using fallback: ${formatRedisError(error)}`);
+        return fallback;
+    }
+};
+
 /**
  * Saves a streaming progress message for a specific job.
  */
@@ -23,14 +45,18 @@ export const saveStreamingMessage = async (jobId: string, message: string, times
     const key = `streaming:${jobId}:messages`;
     const messageObj: StreamingMessage = { message, timestamp };
 
-    await redis.rpush(key, JSON.stringify(messageObj));
-    await redis.expire(key, MESSAGE_TTL_SECONDS); // Refresh TTL on every new message
+    await safeRedisWrite(async () => {
+        await redis.rpush(key, JSON.stringify(messageObj));
+        await redis.expire(key, MESSAGE_TTL_SECONDS); // Refresh TTL on every new message
+    });
 };
 
 export const saveStreamingEvent = async (jobId: string, event: StreamingEvent) => {
     const key = `streaming:${jobId}:messages`;
-    await redis.rpush(key, JSON.stringify(event));
-    await redis.expire(key, MESSAGE_TTL_SECONDS);
+    await safeRedisWrite(async () => {
+        await redis.rpush(key, JSON.stringify(event));
+        await redis.expire(key, MESSAGE_TTL_SECONDS);
+    });
 };
 
 /**
@@ -38,7 +64,7 @@ export const saveStreamingEvent = async (jobId: string, event: StreamingEvent) =
  */
 export const getStreamingMessages = async (jobId: string): Promise<StreamingMessage[]> => {
     const key = `streaming:${jobId}:messages`;
-    const rawMessages = await redis.lrange(key, 0, -1);
+    const rawMessages = await safeRedisRead(() => redis.lrange(key, 0, -1), [] as string[]);
 
     return rawMessages.map(raw => {
         try {
@@ -51,7 +77,7 @@ export const getStreamingMessages = async (jobId: string): Promise<StreamingMess
 
 export const getStreamingEvents = async (jobId: string): Promise<StreamingEvent[]> => {
     const key = `streaming:${jobId}:messages`;
-    const rawMessages = await redis.lrange(key, 0, -1);
+    const rawMessages = await safeRedisRead(() => redis.lrange(key, 0, -1), [] as string[]);
 
     return rawMessages.map((raw) => {
         try {
@@ -90,5 +116,7 @@ export const getStreamingEvents = async (jobId: string): Promise<StreamingEvent[
  */
 export const clearStreamingMessages = async (jobId: string) => {
     const key = `streaming:${jobId}:messages`;
-    await redis.del(key);
+    await safeRedisWrite(async () => {
+        await redis.del(key);
+    });
 };

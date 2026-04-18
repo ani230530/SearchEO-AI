@@ -2,13 +2,18 @@ import { Queue, Worker, Job } from 'bullmq';
 import IORedis from 'ioredis';
 import axios from 'axios';
 import { PrismaClient } from '../../generated/prisma';
+import { formatRedisError, getRedisUrl } from '../lib/redisConfig';
 
 const prisma = new PrismaClient();
 
 // Redis Connection
-const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
+const REDIS_URL = getRedisUrl(process.env.REDIS_URL);
 const connection = new IORedis(REDIS_URL, {
     maxRetriesPerRequest: null,
+});
+
+connection.on('error', (error) => {
+    console.warn(`[Queue] Redis unavailable at ${REDIS_URL}: ${formatRedisError(error)}`);
 });
 
 // Queue Name

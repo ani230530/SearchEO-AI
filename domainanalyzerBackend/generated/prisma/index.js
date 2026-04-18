@@ -752,7 +752,7 @@ const config = {
       "value": "prisma-client-js"
     },
     "output": {
-      "value": "/Users/rachit/Documents/ai-tool/seo-gpt/domainanalyzerBackend/generated/prisma",
+      "value": "C:\\GPT\\seo-gpt\\domainanalyzerBackend\\generated\\prisma",
       "fromEnvVar": null
     },
     "config": {
@@ -761,12 +761,12 @@ const config = {
     "binaryTargets": [
       {
         "fromEnvVar": null,
-        "value": "darwin-arm64",
+        "value": "windows",
         "native": true
       }
     ],
     "previewFeatures": [],
-    "sourceFilePath": "/Users/rachit/Documents/ai-tool/seo-gpt/domainanalyzerBackend/prisma/schema.prisma",
+    "sourceFilePath": "C:\\GPT\\seo-gpt\\domainanalyzerBackend\\prisma\\schema.prisma",
     "isCustomOutput": true
   },
   "relativeEnvPaths": {
@@ -828,8 +828,8 @@ exports.PrismaClient = PrismaClient
 Object.assign(exports, Prisma)
 
 // file annotations for bundling tools to include these files
-path.join(__dirname, "libquery_engine-darwin-arm64.dylib.node");
-path.join(process.cwd(), "generated/prisma/libquery_engine-darwin-arm64.dylib.node")
+path.join(__dirname, "query_engine-windows.dll.node");
+path.join(process.cwd(), "generated/prisma/query_engine-windows.dll.node")
 // file annotations for bundling tools to include these files
 path.join(__dirname, "schema.prisma");
 path.join(process.cwd(), "generated/prisma/schema.prisma")

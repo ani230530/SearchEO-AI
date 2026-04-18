@@ -1,9 +1,10 @@
 import Redis from 'ioredis';
+import { formatRedisError, getRedisUrl } from '../lib/redisConfig';
 import type { DomainContextJson } from './domainContextTypes';
 
 // ── Redis client ─────────────────────────────────────────────────────────────
 
-const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
+const REDIS_URL = getRedisUrl(process.env.REDIS_URL);
 let redis: Redis | null = null;
 
 try {
@@ -13,11 +14,11 @@ try {
     lazyConnect: true,
   });
   redis.connect().catch((err) => {
-    console.warn('[DomainContextCache] Redis connection failed, caching disabled:', err.message);
+    console.warn(`[DomainContextCache] Redis connection failed for ${REDIS_URL}, caching disabled: ${formatRedisError(err)}`);
     redis = null;
   });
 } catch (err) {
-  console.warn('[DomainContextCache] Redis init failed, caching disabled');
+  console.warn(`[DomainContextCache] Redis init failed for ${REDIS_URL}, caching disabled: ${formatRedisError(err)}`);
   redis = null;
 }
 
