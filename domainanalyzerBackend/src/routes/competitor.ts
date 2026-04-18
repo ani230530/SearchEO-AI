@@ -15,7 +15,8 @@ function asyncHandler(fn: any) {
 // GET /api/competitor/:domainId - Get competitor analysis for a domain
 router.get('/:domainId', authenticateToken, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { domainId } = req.params;
+    const domainIdParam = Array.isArray(req.params.domainId) ? req.params.domainId[0] : req.params.domainId;
+    const domainId = String(domainIdParam);
 
     // Check domain ownership
     const domain = await prisma.domain.findUnique({
@@ -61,7 +62,8 @@ router.get('/:domainId', authenticateToken, asyncHandler(async (req: Authenticat
 // POST /api/competitor/:domainId - Generate competitor analysis
 router.post('/:domainId', authenticateToken, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { domainId } = req.params;
+    const domainIdParam = Array.isArray(req.params.domainId) ? req.params.domainId[0] : req.params.domainId;
+    const domainId = String(domainIdParam);
     const { competitors } = req.body;
 
     // Check domain ownership
@@ -127,23 +129,45 @@ router.post('/analyze', authenticateToken, asyncHandler(async (req: Authenticate
     sendEvent({ event: 'progress', message: 'Starting competitor analysis...', progress: 10 });
 
     // Get target domain data from database and verify ownership
-    const targetDomainData = await prisma.domain.findFirst({
-      where: { 
-        url: targetDomain,
-        userId: req.user.userId
-      },
-      include: {
-        keywords: {
-          include: {
-            generatedIntentPhrases: {
-              include: {
-                aiQueryResults: true
+    let targetDomainData = null;
+    const targetDomainAsId = Number(targetDomain);
+
+    if (targetDomain && Number.isInteger(targetDomainAsId)) {
+      targetDomainData = await prisma.domain.findUnique({
+        where: { id: targetDomainAsId },
+        include: {
+          keywords: {
+            include: {
+              generatedIntentPhrases: {
+                include: {
+                  aiQueryResults: true
+                }
               }
             }
           }
         }
-      }
-    });
+      });
+    }
+
+    if (!targetDomainData) {
+      targetDomainData = await prisma.domain.findFirst({
+        where: {
+          url: String(targetDomain),
+          userId: req.user.userId
+        },
+        include: {
+          keywords: {
+            include: {
+              generatedIntentPhrases: {
+                include: {
+                  aiQueryResults: true
+                }
+              }
+            }
+          }
+        }
+      });
+    }
 
     if (!targetDomainData) {
       sendEvent({ event: 'error', error: 'Target domain not found or access denied' });
@@ -247,4 +271,4 @@ Be realistic, use all provided data, and do not add any extra text.
   }
 }));
 
-export default router; 
+export default router;
