@@ -124,7 +124,6 @@ router.post('/validate-domain', authenticateToken, asyncHandler(async (req: Requ
         analyzedUrls: JSON.stringify([]),
         pageSnapshots: JSON.stringify([]),
         contextJson: contextJson,
-        crawlPolicy: null,
         quality: {
           contentQuality: 85,
           crawlEfficiency: 100,

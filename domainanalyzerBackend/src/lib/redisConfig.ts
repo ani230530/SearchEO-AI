@@ -16,9 +16,10 @@ export const getRedisUrl = (rawUrl?: string): string => {
 };
 
 export const formatRedisError = (error: unknown): string => {
-  if (error instanceof AggregateError) {
-    const nestedMessages = error.errors
-      .map((nestedError) => {
+  const maybeAggregate = error as { errors?: unknown } | null;
+  if (maybeAggregate && Array.isArray(maybeAggregate.errors)) {
+    const nestedMessages = maybeAggregate.errors
+      .map((nestedError: unknown) => {
         if (nestedError instanceof Error && nestedError.message) {
           return nestedError.message;
         }
