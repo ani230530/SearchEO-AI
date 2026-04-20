@@ -73,15 +73,27 @@ const KnowledgeBaseSection = () => {
     );
   }, [folders, files, selectedFolderId]);
 
+  const [showNewFolderModal, setShowNewFolderModal] = useState(false);
+  const [newFolderName, setNewFolderName] = useState("Untitled folder");
+  const [editingFolderId, setEditingFolderId] = useState<string | null>(null);
+  const [renameFolderName, setRenameFolderName] = useState("");
+  const [showDeleteFolderModal, setShowDeleteFolderModal] = useState(false);
+  const [folderToDelete, setFolderToDelete] = useState<FolderItem | null>(null);
+  const [openFolderMenuId, setOpenFolderMenuId] = useState<string | null>(null);
+
+  const openNewFolderModal = () => {
+    setNewFolderName("Untitled folder");
+    setShowNewFolderModal(true);
+  };
+
   const handleNewFolder = () => {
-    const folderName = window.prompt("Enter folder name", "New folder");
-    if (!folderName?.trim()) {
+    if (!newFolderName?.trim()) {
       return;
     }
 
     const newFolder: FolderItem = {
       id: createId(),
-      name: folderName.trim(),
+      name: newFolderName.trim(),
       createdAt: new Date().toLocaleDateString("en-US", {
         month: "2-digit",
         day: "2-digit",
@@ -90,8 +102,70 @@ const KnowledgeBaseSection = () => {
     };
 
     setFolders((current) => [newFolder, ...current]);
-    setMessage(`Folder "${newFolder.name}" created.`);
+    setShowNewFolderModal(false);
+    setNewFolderName("Untitled folder");
   };
+
+  const cancelNewFolder = () => {
+    setShowNewFolderModal(false);
+    setNewFolderName("Untitled folder");
+  };
+
+  const openRenameFolderModal = (folderId: string, folderName: string) => {
+    setEditingFolderId(folderId);
+    setRenameFolderName(folderName);
+  };
+
+  const handleRenameFolder = () => {
+    if (!editingFolderId || !renameFolderName?.trim()) return;
+
+    setFolders((current) =>
+      current.map((folder) =>
+        folder.id === editingFolderId
+          ? { ...folder, name: renameFolderName.trim() }
+          : folder
+      )
+    );
+    setEditingFolderId(null);
+    setRenameFolderName("");
+  };
+
+  const cancelRenameFolder = () => {
+    setEditingFolderId(null);
+    setRenameFolderName("");
+  };
+
+  const openDeleteFolderModal = (folder: FolderItem) => {
+    setFolderToDelete(folder);
+    setShowDeleteFolderModal(true);
+  };
+
+  const handleDeleteFolder = () => {
+    if (!folderToDelete) return;
+
+    setFolders((current) => current.filter((item) => item.id !== folderToDelete.id));
+    setFiles((current) => current.filter((file) => file.folderId !== folderToDelete.id));
+    if (selectedFolderId === folderToDelete.id) {
+      setSelectedFolderId(null);
+    }
+    setFolderToDelete(null);
+    setShowDeleteFolderModal(false);
+    setOpenFolderMenuId(null);
+  };
+
+  const cancelDeleteFolder = () => {
+    setFolderToDelete(null);
+    setShowDeleteFolderModal(false);
+    setOpenFolderMenuId(null);
+  };
+
+  React.useEffect(() => {
+    if (!openFolderMenuId) return;
+
+    const handleClickOutside = () => setOpenFolderMenuId(null);
+    window.addEventListener("click", handleClickOutside);
+    return () => window.removeEventListener("click", handleClickOutside);
+  }, [openFolderMenuId]);
 
   const handleFileUploadClick = () => fileInputRef.current?.click();
   const handleFolderUploadClick = () => {
@@ -222,7 +296,7 @@ const KnowledgeBaseSection = () => {
             <div className="flex items-center gap-3">
               <button
                 type="button"
-                onClick={handleNewFolder}
+                onClick={openNewFolderModal}
                 className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
               >
                 <FolderPlus className="h-4 w-4" />
@@ -268,15 +342,19 @@ const KnowledgeBaseSection = () => {
                 <div className="rounded-3xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
                   Last scanned 10/01/2026
                 </div>
+
+
+
+
+
+
+
               </div>
             </div>
 
+            {folders.length > 0 && (
             <div className="rounded-[30px] border border-slate-200 bg-white p-5 shadow-sm">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Folders</p>
-                  <h3 className="mt-1 text-xl font-semibold text-slate-900">All folders</h3>
-                </div>
+              <div className="flex items-center justify-end gap-3">
                 {selectedFolderId ? (
                   <button
                     type="button"
@@ -316,20 +394,54 @@ const KnowledgeBaseSection = () => {
                       </button>
                       <button
                         type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setOpenFolderMenuId((current) =>
+                            current === folder.id ? null : folder.id
+                          );
+                        }}
                         aria-label="Folder menu"
                         className="absolute right-4 top-4 inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:border-slate-300 hover:text-slate-700"
                       >
                         <MoreVertical className="h-4 w-4" />
                       </button>
+                      {openFolderMenuId === folder.id && (
+                        <div
+                          onClick={(event) => event.stopPropagation()}
+                          className="absolute right-4 top-16 z-20 w-40 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl"
+                        >
+                          <button
+                            type="button"
+                            onClick={() => {
+                              openRenameFolderModal(folder.id, folder.name);
+                              setOpenFolderMenuId(null);
+                            }}
+                            className="w-full px-4 py-3 text-left text-sm text-slate-700 hover:bg-slate-50"
+                          >
+                            Rename
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              openDeleteFolderModal(folder);
+                              setOpenFolderMenuId(null);
+                            }}
+                            className="w-full px-4 py-3 text-left text-sm text-red-600 hover:bg-slate-50"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      )}
                     </div>
                   ))
                 ) : (
                   <div className="col-span-full rounded-[28px] border border-dashed border-slate-200 bg-slate-50 px-8 py-10 text-center text-sm text-slate-500">
-                    Create a folder to display it here.
+                    No folders found.
                   </div>
                 )}
               </div>
             </div>
+            )}
 
             <input
               ref={fileInputRef}
@@ -345,6 +457,147 @@ const KnowledgeBaseSection = () => {
               className="hidden"
               onChange={handleFolderFilesSelected}
             />
+
+            {showNewFolderModal && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                <div
+                  className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+                  onClick={cancelNewFolder}
+                />
+                <div className="relative w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-8 shadow-xl">
+                  <h3 className="text-xl font-light tracking-tight text-slate-900 mb-6">
+                    Create New Folder
+                  </h3>
+                  <form
+                    onSubmit={(event) => {
+                      event.preventDefault();
+                      handleNewFolder();
+                    }}
+                    className="space-y-6"
+                  >
+                    <div>
+                      <label className="block text-base font-light text-slate-900 mb-2">
+                        Title
+                      </label>
+                      <input
+                        type="text"
+                        value={newFolderName}
+                        onChange={(event) => setNewFolderName(event.target.value)}
+                        placeholder="Enter folder name"
+                        className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 focus:border-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900"
+                        required
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-end gap-4">
+                      <button
+                        type="button"
+                        onClick={cancelNewFolder}
+                        className="px-6 py-3 rounded-2xl border border-slate-200 text-slate-700 hover:bg-slate-100"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        className="px-6 py-3 rounded-2xl bg-slate-900 text-white hover:opacity-90"
+                        style={{
+                          background: "linear-gradient(90deg, #2D4059 0%, #4E76C7 100%)",
+                        }}
+                      >
+                        Create Folder
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            )}
+
+            {editingFolderId && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                <div
+                  className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+                  onClick={cancelRenameFolder}
+                />
+                <div className="relative w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-8 shadow-xl">
+                  <h3 className="text-xl font-light tracking-tight text-slate-900 mb-6">
+                    Rename Folder
+                  </h3>
+                  <form
+                    onSubmit={(event) => {
+                      event.preventDefault();
+                      handleRenameFolder();
+                    }}
+                    className="space-y-6"
+                  >
+                    <div>
+                      <label className="block text-base font-light text-slate-900 mb-2">
+                        Folder name
+                      </label>
+                      <input
+                        type="text"
+                        value={renameFolderName}
+                        onChange={(event) => setRenameFolderName(event.target.value)}
+                        placeholder="Enter folder name"
+                        className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 focus:border-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900"
+                        required
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-end gap-4">
+                      <button
+                        type="button"
+                        onClick={cancelRenameFolder}
+                        className="px-6 py-3 rounded-2xl border border-slate-200 text-slate-700 hover:bg-slate-100"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        className="px-6 py-3 rounded-2xl bg-slate-900 text-white hover:opacity-90"
+                        style={{
+                          background: "linear-gradient(90deg, #2D4059 0%, #4E76C7 100%)",
+                        }}
+                      >
+                        Save
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            )}
+
+            {showDeleteFolderModal && folderToDelete && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                <div
+                  className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+                  onClick={cancelDeleteFolder}
+                />
+                <div className="relative w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-8 shadow-xl">
+                  <h3 className="text-xl font-light tracking-tight text-slate-900 mb-6">
+                    Delete Folder
+                  </h3>
+                  <p className="mb-6 text-sm leading-6 text-slate-600">
+                    Are you sure you want to delete "{folderToDelete.name}"? This will remove any files inside it.
+                  </p>
+                  <div className="flex items-center justify-end gap-4">
+                    <button
+                      type="button"
+                      onClick={cancelDeleteFolder}
+                      className="px-6 py-3 rounded-2xl border border-slate-200 text-slate-700 hover:bg-slate-100"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleDeleteFolder}
+                      className="px-6 py-3 rounded-2xl bg-red-600 text-white hover:opacity-90"
+                    >
+                      Delete Folder
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {message && (
               <div className="rounded-[30px] border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
@@ -386,18 +639,6 @@ const KnowledgeBaseSection = () => {
                             </div>
                           </div>
 
-                          <div className="mt-5 grid gap-3 sm:grid-cols-2">
-                            <div className="rounded-3xl border border-slate-200 bg-white px-4 py-4">
-                              <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Folder</p>
-                              <p className="mt-2 text-sm font-medium text-slate-700">
-                                {folders.find((folder) => folder.id === file.folderId)?.name || "Unsorted"}
-                              </p>
-                            </div>
-                            <div className="rounded-3xl border border-slate-200 bg-white px-4 py-4">
-                              <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Uploaded</p>
-                              <p className="mt-2 text-sm font-medium text-slate-700">{file.uploadedAt}</p>
-                            </div>
-                          </div>
                         </div>
                       ))
                     ) : (
@@ -422,7 +663,7 @@ const KnowledgeBaseSection = () => {
                 <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
                   <button
                     type="button"
-                    onClick={handleNewFolder}
+                    onClick={openNewFolderModal}
                     className="inline-flex items-center justify-center rounded-full bg-slate-900 px-6 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
                   >
                     New Folder
