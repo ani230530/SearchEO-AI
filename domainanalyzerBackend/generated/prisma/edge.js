@@ -751,7 +751,7 @@ const config = {
       "value": "prisma-client-js"
     },
     "output": {
-      "value": "/Users/rachit/Documents/ai-tool/seo-gpt/domainanalyzerBackend/generated/prisma",
+      "value": "C:\\GPT\\seo-gpt\\domainanalyzerBackend\\generated\\prisma",
       "fromEnvVar": null
     },
     "config": {
@@ -760,12 +760,12 @@ const config = {
     "binaryTargets": [
       {
         "fromEnvVar": null,
-        "value": "darwin-arm64",
+        "value": "windows",
         "native": true
       }
     ],
     "previewFeatures": [],
-    "sourceFilePath": "/Users/rachit/Documents/ai-tool/seo-gpt/domainanalyzerBackend/prisma/schema.prisma",
+    "sourceFilePath": "C:\\GPT\\seo-gpt\\domainanalyzerBackend\\prisma\\schema.prisma",
     "isCustomOutput": true
   },
   "relativeEnvPaths": {
