@@ -444,8 +444,7 @@ const filteredReports = reportHistory.filter((report) =>
   {/* Generate Report Modal Trigger */}
 <button
   className={cn(
-    "inline-flex items-center gap-2 px-6 py-2.5 text-white rounded-xl text-sm font-medium hover:opacity-90 disabled:opacity-60 transition",
-    "cursor-not-allowed"
+    "inline-flex items-center gap-2 px-6 py-2.5 text-white rounded-xl text-sm font-medium hover:opacity-90 disabled:opacity-60 transition"
   )}
   style={{ background: "linear-gradient(90deg, #2D4059 0%, #4E76C7 100%)" }}
   onClick={() => setIsModalOpen(true)}

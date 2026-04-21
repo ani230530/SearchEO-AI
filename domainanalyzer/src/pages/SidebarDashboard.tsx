@@ -2878,6 +2878,7 @@ useEffect(() => {
           tabs={tabs}
           userEmail={user?.email}
           onCampaignViewModeChange={setCampaignViewMode}
+          onTabChange={setActiveTab}
         />
 
         {/* Content Body */}

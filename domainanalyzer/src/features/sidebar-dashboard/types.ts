@@ -56,6 +56,7 @@ export interface DashboardHeaderProps {
   tabs: DashboardSidebarTab[];
   userEmail?: string | null;
   onCampaignViewModeChange: (mode: DashboardCampaignViewMode) => void;
+  onTabChange?: (tab: TabId) => void;
 }
 
 export interface AnalyticsReportSectionProps {
