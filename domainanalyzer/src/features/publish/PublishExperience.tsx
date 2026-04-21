@@ -3071,7 +3071,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
 
           <div className="flex overflow-hidden" style={{ height: 'calc(100vh - 80px)' }}>
             {/* Left Sidebar - Article Stats */}
-            {/* {publishResult && (
+            {publishResult && (
               <div className="w-80 border-r border-gray-200 bg-gray-50/50 overflow-y-auto">
                 <div className="p-6 space-y-6">
                   <div>
@@ -3120,10 +3120,10 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
                         )}
                       </div>
                     </div>
-                  </div> */}
+                  </div>
 
                   {/* Image Management Panel - Below Article Stats */}
-                  {/* {isEditMode && (
+                  {isEditMode && (
                     <div>
                       <h4 className="text-xs uppercase tracking-[0.3em] text-gray-500 mb-3">Image Management</h4>
                       <div className="rounded-2xl border border-gray-200 bg-white overflow-hidden flex flex-col max-h-[calc(100vh-400px)]">
@@ -3178,7 +3178,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
                   )}
                 </div>
               </div>
-            )} */}
+            )}
             
             {/* Main Content Area */}
             <div className="flex-1 overflow-y-auto">
