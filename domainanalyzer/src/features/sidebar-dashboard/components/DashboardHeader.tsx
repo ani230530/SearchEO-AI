@@ -3,7 +3,6 @@ import { List, Network, Table, User } from "lucide-react";
 import type {
   DashboardCampaignViewMode,
   DashboardHeaderProps,
-  TabId,
 } from "@/features/sidebar-dashboard/types";
 
 const VIEW_MODE_OPTIONS: Array<{

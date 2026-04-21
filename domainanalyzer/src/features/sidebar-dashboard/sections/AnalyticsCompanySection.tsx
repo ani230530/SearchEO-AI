@@ -643,7 +643,7 @@ const allSections = [...leftSections, ...rightSections];
                                       disabled={itemsPerPage <= 5}
                                       aria-label="Decrease rows"
                                     >
-                                      âˆ’
+                                      -
                                     </button>
                                     <input
                                       type="number"
