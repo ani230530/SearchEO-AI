@@ -546,7 +546,7 @@ useEffect(() => {
           {/* RIGHT: Overall Score */}
           <div className="w-48 rounded-xl  p-6 flex flex-col items-center justify-center">
             <OverallScoreGauge
-              size={180}
+              size={200}
               score={
                 (
                   auditResult.performance +
@@ -589,16 +589,16 @@ useEffect(() => {
       <D3LineChart
         data={blogClicksData}
         secondaryData={blogImpressionsData}
-        width={650}
+        width={500}
         height={180}
         primaryColor="#111111"
-        secondaryColor="#3b82f6"
+        secondaryColor="#4E76C7"
         primaryLabel="Clicks"
         secondaryLabel="Impressions"
       />
 
       {/* Mini stats below the chart */}
-      <div className="mt-4 pt-4 border-t border-gray-100 grid grid-cols-3 gap-4">
+      {/* <div className="mt-4 pt-4 border-t border-gray-100 grid grid-cols-3 gap-4">
         <div>
           <p className="text-xs text-gray-500">Total Clicks</p>
           <p className="text-lg font-semibold text-gray-900">
@@ -617,7 +617,7 @@ useEffect(() => {
             {blogAggregateData.avgPosition.toFixed(1)}
           </p>
         </div>
-      </div>
+      </div> */}
     </div>
   )
 )}

@@ -8,6 +8,7 @@ import type { Keyword, KeywordTableItem } from "@/types";
 const VALID_TABS: readonly TabId[] = [
   "overview",
   "analytics",
+  "integration",
   "projects",
   "publish",
   "settings",
@@ -21,6 +22,7 @@ const VALID_TABS: readonly TabId[] = [
 const VALID_QUERY_TABS: readonly TabId[] = [
   "overview",
   "analytics",
+  "integration",
   "projects",
   "publish",
   "settings",

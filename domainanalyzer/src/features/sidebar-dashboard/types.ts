@@ -6,6 +6,7 @@ import type { WordpressIntegration } from "@/types/publish";
 export type TabId =
   | "overview"
   | "analytics"
+  | "integration"
   | "projects"
   | "publish"
   | "settings"

@@ -2430,7 +2430,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
     <div className="space-y-8">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h2 className="text-3xl font-thin text-black tracking-tight mb-2">Publish</h2>
+          <h2 className="text-3xl font-thin text-black tracking-tight mb-2">Publish History</h2>
           <p className="text-base font-light text-gray-600">
             Generate, refine, and push articles directly to WordPress
           </p>
