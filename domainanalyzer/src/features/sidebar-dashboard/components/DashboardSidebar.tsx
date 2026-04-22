@@ -1,11 +1,22 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
+  BarChart3,
   ChevronRight,
-  ChevronDown,
+  Globe,
   Info,
+  Lightbulb,
   Link,
   LogOut,
   Menu,
+  Plus,
+  Send,
+  CopyCheck,
+  Sparkles,
+  Tag,
+  LayoutDashboard,
+  ClipboardList,
+  PieChart,
+  Settings,
 } from "lucide-react";
 import {
   Tooltip,
@@ -33,8 +44,22 @@ interface DashboardSidebarProps {
   tabs: DashboardSidebarTab[];
 }
 
+type SidebarActionItem = {
+  key: string;
+  label: string;
+  icon: ReactNode;
+  isActive?: boolean;
+  onClick: () => void;
+  variant?: "standard" | "primary";
+};
+
+type SidebarSection = {
+  title: string;
+  items: SidebarActionItem[];
+};
+
 export function DashboardSidebar({
-  activeCompanySubTab,
+  activeCompanySubTab: _activeCompanySubTab,
   activeTab,
   isSidebarExpanded,
   onHoverChange,
@@ -42,11 +67,14 @@ export function DashboardSidebar({
   onLogout,
   onSelectCompanySubTab,
   onSelectTab,
-  showResults,
+  showResults: _showResults,
   sidebarOpen,
-  tabs,
+  tabs: _tabs,
 }: DashboardSidebarProps) {
   const [isCompactViewport, setIsCompactViewport] = useState(false);
+  void _tabs;
+  void _activeCompanySubTab;
+  void _showResults;
 
   useEffect(() => {
     const check = () => {
@@ -72,6 +100,140 @@ export function DashboardSidebar({
     ? "sidebar closed compact"
     : `sidebar ${isSidebarExpanded ? "open" : "closed"}`;
 
+  const sections = useMemo<SidebarSection[]>(() => {
+    return [
+      {
+        title: "",
+        items: [
+          {
+            key: "dashboard",
+            label: "Dashboard",
+            icon: <LayoutDashboard className="h-4 w-4" />,
+            isActive: activeTab === "overview",
+            onClick: () => onSelectTab("overview"),
+            variant: "primary",
+          },
+          {
+            key: "ai-visibility",
+            label: "AI Visibility",
+            icon: <Sparkles className="h-4 w-4" />,
+            isActive: activeTab === "ai-checker",
+            onClick: () => onSelectTab("ai-checker"),
+          },
+        ],
+      },
+      {
+        title: "Projects",
+        items: [
+          {
+            key: "create-project",
+            label: "Create New Project",
+            icon: <Plus className="h-4 w-4" />,
+            onClick: () => onSelectTab("projects"),
+          },
+          {
+            key: "all-projects",
+            label: "All Projects",
+            icon: <Send className="h-4 w-4" />,
+            isActive: activeTab === "projects",
+            onClick: () => onSelectTab("projects"),
+          },
+          {
+            key: "publish",
+            label: "Publish",
+            icon: <CopyCheck className="h-4 w-4" />,
+            isActive: activeTab === "publish",
+            onClick: () => onSelectTab("publish"),
+          },
+        ],
+      },
+      {
+        title: "Company Tools",
+        items: [
+          {
+            key: "domain-info",
+            label: "Domain Info",
+            icon: <Info className="h-4 w-4" />,
+            isActive: activeTab === "analytics",
+            onClick: () => {
+              onSelectTab("analytics");
+              onSelectCompanySubTab("company-info");
+            },
+          },
+          {
+            key: "site-auditor",
+            label: "Site Auditor",
+            icon: <Globe className="h-4 w-4" />,
+            isActive: activeTab === "audit",
+            onClick: () => onSelectTab("audit"),
+          },
+          {
+            key: "competitor-analysis",
+            label: "Competitor analysis",
+            icon: <ClipboardList className="h-4 w-4" />,
+            isActive: activeTab === "competitor-intelligence",
+            onClick: () => onSelectTab("competitor-intelligence"),
+          },
+          {
+            key: "gsc-analytics",
+            label: "GSC Analytics",
+            icon: <PieChart className="h-4 w-4" />,
+            isActive: activeTab === "gsc-analytics",
+            onClick: () => onSelectTab("gsc-analytics"),
+          },
+          {
+            key: "performance-reports",
+            label: "Performance Reports",
+            icon: <BarChart3 className="h-4 w-4" />,
+            isActive: activeTab === "analytics-report",
+            onClick: () => onSelectTab("analytics-report"),
+          },
+          {
+            key: "integration",
+            label: "Integration",
+            icon: <Link className="h-4 w-4" />,
+            isActive: activeTab === "integration",
+            onClick: () => {
+              onSelectTab("integration");
+              onSelectCompanySubTab("integration");
+            },
+          },
+        ],
+      },
+      {
+        title: "Drive & Data",
+        items: [
+          {
+            key: "knowledge-base",
+            label: "Knowledge Base",
+            icon: <Lightbulb className="h-4 w-4" />,
+            isActive: activeTab === "knowledge-base",
+            onClick: () => onSelectTab("knowledge-base"),
+          },
+        ],
+      },
+      {
+        title: "Billing",
+        items: [
+           {
+            key: "Pricing",
+            label: "Pricing",
+            icon: <Tag className="h-4 w-4" />,
+            isActive: activeTab === "pricing",
+            onClick: () => onSelectTab("pricing"),
+          },
+          {
+            key: "settings",
+            label: "Settings",
+            icon: <Settings className="h-4 w-4" />,
+            isActive: activeTab === "settings",
+            onClick: () => onSelectTab("settings"),
+          },
+        ],
+      },
+    ];
+  }, [activeTab, onSelectCompanySubTab, onSelectTab]);
+
   return (
     <TooltipProvider delayDuration={180}>
       <aside className={sidebarClass}>
@@ -79,7 +241,7 @@ export function DashboardSidebar({
           <div className="sidebar-header-inner">
             {isSidebarExpanded ? (
               <div className="sidebar-brand">
-                <h1 className="sidebar-title">SEO Tool</h1>
+                <h1 className="sidebar-title">SearchEO.ai</h1>
               </div>
             ) : (
               <div className="sidebar-brand-spacer" aria-hidden="true" />
@@ -98,9 +260,9 @@ export function DashboardSidebar({
                     aria-label={isSidebarExpanded ? "Collapse sidebar" : "Expand sidebar"}
                   >
                     {isSidebarExpanded ? (
-                      <ChevronRight className="h-4 w-4" />
+                      <ChevronRight className="h-6 w-6" />
                     ) : (
-                      <Menu className="h-4 w-4" />
+                      <Menu className="h-6 w-6" />
                     )}
                   </button>
                 </TooltipTrigger>
@@ -113,91 +275,40 @@ export function DashboardSidebar({
         </div>
 
         <div className="sidebar-content">
-          <nav className="space-y-2">
-            {tabs.map((tab) => (
-              <div key={tab.id}>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button
-                      className={`sidebar-tab ${
-                        activeTab === tab.id ? "active" : ""
-                      } ${tab.id === "ai-checker" ? "ai-checker-tab" : ""}`}
-                      onClick={() => onSelectTab(tab.id)}
-                    >
-                      <span className="sidebar-tab-icon">{tab.icon}</span>
-                      <span className="sidebar-tab-label">{tab.label}</span>
+          <nav>
+            {sections.map((section) => (
+              <div key={section.title || "primary"} className="sidebar-section">
+                {section.title ? (
+                  <h2 className="sidebar-section-title">{section.title}</h2>
+                ) : null}
 
-                      {tab.id === "analytics" && (
-                        <ChevronDown
-                          className={`sidebar-tab-chevron ml-auto h-4 w-4 transition-transform ${
-                            activeTab === "analytics" && showResults ? "rotate-180" : ""
-                          }`}
-                        />
-                      )}
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent side="right">{tab.label}</TooltipContent>
-                </Tooltip>
-
-                {tab.id === "analytics" && activeTab === "analytics" && showResults && (
-                  <div className="sidebar-subtabs ml-8 mt-1 space-y-1">
-                    <Tooltip>
+                <div className="sidebar-section-items">
+                  {section.items.map((item) => (
+                    <Tooltip key={item.key}>
                       <TooltipTrigger asChild>
                         <button
-                          onClick={() => onSelectCompanySubTab("company-info")}
-                          className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm font-light transition-all duration-200 ${
-                            activeCompanySubTab === "company-info"
-                              ? "bg-blue-50 text-blue-700"
-                              : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                          className={`sidebar-tab ${item.isActive ? "active" : ""} ${
+                            item.variant === "primary" ? "sidebar-tab-primary" : ""
                           }`}
+                          onClick={item.onClick}
                         >
-                          <Info className="h-4 w-4" />
-                          <span>Domain Info</span>
+                          <span className="sidebar-tab-icon">{item.icon}</span>
+                          <span className="sidebar-tab-label">{item.label}</span>
                         </button>
                       </TooltipTrigger>
-                      <TooltipContent side="right">Domain Info</TooltipContent>
+                      <TooltipContent side="right">{item.label}</TooltipContent>
                     </Tooltip>
-
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <button
-                          onClick={() => onSelectCompanySubTab("integration")}
-                          className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm font-light transition-all duration-200 ${
-                            activeCompanySubTab === "integration"
-                              ? "bg-blue-50 text-blue-700"
-                              : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
-                          }`}
-                        >
-                          <Link className="h-4 w-4" />
-                          <span>Integration</span>
-                        </button>
-                      </TooltipTrigger>
-                      <TooltipContent side="right">Integration</TooltipContent>
-                    </Tooltip>
-                  </div>
-                )}
+                  ))}
+                </div>
               </div>
             ))}
           </nav>
 
-          <div
-            style={{
-              marginTop: "32px",
-              paddingTop: "32px",
-              borderTop: "0.5px solid rgba(0, 0, 0, 0.1)",
-            }}
-          >
+          <div className="sidebar-footer-actions">
             <Tooltip>
               <TooltipTrigger asChild>
-                <button
-                  onClick={onLogout}
-                  className="sidebar-tab"
-                  style={{ color: "#FF3B30" }}
-                >
-                  <LogOut
-                    className="sidebar-tab-icon h-5 w-5"
-                    style={{ color: "#FF3B30" }}
-                  />
+                <button onClick={onLogout} className="sidebar-tab sidebar-logout-tab">
+                  <LogOut className="sidebar-tab-icon h-4 w-4" />
                   <span className="sidebar-tab-label sidebar-logout-label">Logout</span>
                 </button>
               </TooltipTrigger>

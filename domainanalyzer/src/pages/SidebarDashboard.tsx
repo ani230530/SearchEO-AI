@@ -53,7 +53,6 @@ import { WordpressIntegration } from '@/types/publish';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@radix-ui/react-accordion';
 import {AnimatePresence, motion} from 'framer-motion'
 import TrendsChart, { TrendDataPoint } from "@/components/gsc/TrendsChart";
-import IntegrationsDashboard from './IntegrationsDashboard';
 import { DashboardContentRouter } from "@/features/sidebar-dashboard/components/DashboardContentRouter";
 import { DashboardHeader } from "@/features/sidebar-dashboard/components/DashboardHeader";
 import { DashboardSidebar } from "@/features/sidebar-dashboard/components/DashboardSidebar";
@@ -1466,7 +1465,7 @@ useEffect(() => {
     const success = urlParams.get('success');
     const error = urlParams.get('error');
       
-    if (activeTab === 'analytics' && activeCompanySubTab === 'integration') {
+    if (activeTab === 'integration' || (activeTab === 'analytics' && activeCompanySubTab === 'integration')) {
       if (success === 'true') {
       toast({
           title: "Connected Successfully",
@@ -1736,7 +1735,7 @@ useEffect(() => {
   };
 
   const handleConfigureWordpress = useCallback(() => {
-    setActiveTab('analytics');
+    setActiveTab('integration');
     setActiveCompanySubTab('integration');
   }, []);
 
@@ -2535,11 +2534,9 @@ useEffect(() => {
           height: 100vh;
           width: 280px;
           background: rgba(255, 255, 255, 0.72);
-          backdrop-filter: saturate(180%) blur(20px);
-          -webkit-backdrop-filter: saturate(180%) blur(20px);
-          border-right: 0.5px solid rgba(0, 0, 0, 0.1);
+          border-right: 1px solid #d9dde3;
           z-index: 50;
-          transition: width 0.3s ease, transform 0.3s ease;
+          transition: width 0.26s ease, transform 0.26s ease;
           overflow-y: auto;
           transform: translateX(0);
         }
@@ -2553,19 +2550,22 @@ useEffect(() => {
         }
 
         .sidebar-header {
-          padding: 20px 12px 12px 20px;
-          border-bottom: 0.5px solid rgba(0, 0, 0, 0.1);
+          padding: 18px 12px 8px 16px;
         }
 
         .sidebar.closed .sidebar-header {
-          padding: 20px 12px 12px 16px;
+          padding: 18px 10px 8px 14px;
         }
 
         .sidebar-header-inner {
           display: flex;
           align-items: center;
           justify-content: space-between;
-          min-height: 40px;
+          min-height: 36px;
+        }
+
+        .sidebar.closed .sidebar-header-inner {
+          justify-content: center;
         }
 
         .sidebar-brand {
@@ -2578,36 +2578,56 @@ useEffect(() => {
           flex: 1;
         }
 
+        .sidebar.closed .sidebar-brand-spacer {
+          display: none;
+        }
+
         .sidebar-title {
           margin: 0;
-          font-size: 24px;
-          font-weight: 400;
-          letter-spacing: -0.022em;
-          color: #1d1d1f;
-          line-height: 1.1;
+          font-size: 28px;
+          font-weight: 500;
+          letter-spacing: -0.03em;
+          color: #141414;
+          line-height: 1;
         }
 
         .sidebar-content {
-          padding: 20px 12px;
+          min-height: calc(100vh - 72px);
+          padding: 8px 10px 12px;
+          display: flex;
+          flex-direction: column;
         }
 
         .sidebar.closed .sidebar-content {
-          padding: 20px 8px;
+          padding: 8px 6px 10px;
+        }
+
+        .sidebar-section {
+          margin-bottom: 14px;
+        }
+
+        .sidebar-section-title {
+          margin: 0 0 6px;
+          padding: 0 10px;
+          font-size: 12px;
+          line-height: 1.3;
+          font-weight: 500;
+          color: #7b828d;
+          letter-spacing: 0.01em;
         }
 
         .sidebar-tab {
           display: flex;
           align-items: center;
-          gap: 12px;
-          padding: 12px 16px;
-          margin-bottom: 4px;
-          border-radius: 12px;
+          gap: 10px;
+          padding: 9px 10px;
+          margin-bottom: 3px;
+          border-radius: 8px;
           cursor: pointer;
-          transition: all 0.2s ease;
-          color: #1d1d1f;
-          font-size: 15px;
-          font-weight: 400;
-          letter-spacing: -0.022em;
+          transition: all 0.16s ease;
+          color: #020202;
+          font-size: 14px;
+          font-weight: 500;
           background: transparent;
           border: none;
           width: 100%;
@@ -2615,11 +2635,12 @@ useEffect(() => {
         }
 
         .sidebar-tab:hover {
-          background: rgba(0, 0, 0, 0.05);
+          background: #e6e9ee;
         }
 
-        .sidebar-tab.active {
-          background: #2D4059;
+        .sidebar-tab.active,
+        .sidebar-tab.sidebar-tab-primary.active {
+          background: #2f4462;
           color: #ffffff;
         }
 
@@ -2627,61 +2648,42 @@ useEffect(() => {
           color: #ffffff;
         }
 
-        .sidebar-tab.ai-checker-tab {
-          margin-top: 12px;
-          background: rgba(255, 255, 255, 0.6);
-          border: 1px solid rgba(255, 255, 255, 0.6);
-          color: #052d7c;
-          box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.4);
-        }
-
-        .sidebar-tab.ai-checker-tab .sidebar-tab-icon {
-          color: #052d7c;
-        }
-
-        .sidebar-tab.ai-checker-tab:hover {
-          background: rgba(0, 0, 0, 0.05);
-        }
-
-        .ai-checker-badge {
-          margin-left: auto;
-          font-size: 11px;
-          font-weight: 600;
-          padding: 4px 8px;
-          border-radius: 999px;
-          background: rgba(255, 255, 255, 0.6);
-          color: #b83280;
-          letter-spacing: 0.04em;
-          text-transform: uppercase;
-        }
-
         .sidebar-tab-icon {
-          color: #86868b;
-          transition: color 0.2s ease;
+          color: #6d7480;
+          transition: color 0.16s ease;
           display: inline-flex;
         }
 
         .sidebar-tab-label {
           white-space: nowrap;
-          transition: opacity 0.2s ease;
+          transition: opacity 0.16s ease;
+        }
+
+        .sidebar-footer-actions {
+          margin-top: auto;
+          padding-top: 12px;
+          border-top: 1px solid #d9dde3;
+        }
+
+        .sidebar-logout-tab {
+          color: #b83030;
+        }
+
+        .sidebar-logout-tab .sidebar-tab-icon {
+          color: #b83030;
         }
 
         .sidebar.closed .sidebar-tab {
           justify-content: center;
           gap: 0;
+          padding: 10px 0;
         }
 
         .sidebar.closed .sidebar-tab-label,
-        .sidebar.closed .sidebar-tab-chevron,
-        .sidebar.closed .sidebar-subtabs,
         .sidebar.closed .sidebar-title,
-        .sidebar.closed .sidebar-logout-label,
-        .sidebar.closed .ai-checker-badge {
+        .sidebar.closed .sidebar-section-title,
+        .sidebar.closed .sidebar-logout-label {
           display: none;
-        }
-
-        .sidebar.closed .sidebar-tab-icon {
-          margin-right: 0;
         }
 
         .sidebar-toggle {
@@ -2689,19 +2691,19 @@ useEffect(() => {
           align-items: center;
           justify-content: center;
           flex-shrink: 0;
-          width: 36px;
-          height: 36px;
-          border-radius: 10px;
-          border: 0.5px solid rgba(0, 0, 0, 0.1);
-          background: rgba(255, 255, 255, 0.82);
-          color: #1d1d1f;
-          box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
-          transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+          width: 40px;
+          height: 30px;
+          background: #fafbfc;
+          color: #4f5561;
+          transition: background 0.16s ease, transform 0.16s ease;
+        }
+
+        .sidebar.closed .sidebar-toggle {
+          margin: 0 auto;
         }
 
         .sidebar-toggle:hover {
-          background: rgba(255, 255, 255, 0.96);
-          border-color: rgba(0, 0, 0, 0.16);
+          background: #eceff3;
         }
 
         .sidebar-toggle:active {
@@ -2709,7 +2711,7 @@ useEffect(() => {
         }
 
         .sidebar-toggle:focus-visible {
-          outline: 2px solid rgba(0, 122, 255, 0.45);
+          outline: 2px solid rgba(42, 88, 173, 0.4);
           outline-offset: 2px;
         }
 
@@ -2857,7 +2859,10 @@ useEffect(() => {
             return;
           }
           setActiveTab(tabId);
-          if (tabId === "analytics" && !showResults) {
+          if (tabId === "integration") {
+            setActiveCompanySubTab("integration");
+          }
+          if (tabId === "analytics") {
             setActiveCompanySubTab("company-info");
           }
         }}
@@ -2883,12 +2888,14 @@ useEffect(() => {
 
         {/* Content Body */}
         <div className={activeTab === 'projects' && selectedCampaignId ? "flex-1 min-h-[calc(100vh-80px)] bg-white" : "content-body"}>
-          {activeTab === "analytics" ? (
+          {activeTab === "analytics" || activeTab === "integration" ? (
             <AnalyticsCompanySection
               companyDomainLoading={companyDomainLoading}
               isLoading={isLoading}
               showResults={showResults}
-              activeCompanySubTab={activeCompanySubTab}
+              activeCompanySubTab={
+                activeTab === "integration" ? "integration" : activeCompanySubTab
+              }
               domainContext={domainContext}
               normalizedDomain={normalizedDomain}
               companyDomain={companyDomain}

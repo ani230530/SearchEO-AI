@@ -38,15 +38,15 @@ const D3LineChart: React.FC<D3LineChartProps> = ({
 
     d3.select(svgRef.current).selectAll('*').remove();
 
-    const margin = { top: 30, right: 80, bottom: 50, left: 60 };
+    const margin = { top: 30, right: 80, bottom: 20, left: 60 };
     const innerWidth = width - margin.left - margin.right;
     const innerHeight = height - margin.top - margin.bottom;
 
     const svg = d3.select(svgRef.current)
       .attr('viewBox', `0 0 ${width} ${height}`)
-      .attr('preserveAspectRatio', 'none')
+      .attr('preserveAspectRatio', 'xMidYMid meet')
       .style('width', '100%')
-      .style('height', '100%');
+.style('height', 'auto')
 
     const g = svg.append('g')
       .attr('transform', `translate(${margin.left},${margin.top})`);
@@ -171,7 +171,7 @@ item.append('text')
   .text(d => d.label)
   .style('font-size', '10px')
   .attr('fill', '#374151')
-  .style('font-weight', 500);
+  .style('font-weight', 200);
 
     // Tooltip
     const tooltip = d3.select('body').append('div')

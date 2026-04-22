@@ -1131,7 +1131,7 @@ const allSections = [...leftSections, ...rightSections];
                               Disconnect
                             </button>
                           </div>
-                          <p className="text-sm text-neutral-400 font-light max-w-xl mb-2">
+                          <p className="text-sm text-neutral-400 font-light max-w-xl mb-4">
                              Connect Google Search Console to analyze your content and SEO automatically.
                             </p>
                           <div className="relative w-full aspect-video rounded-2xl overflow-hidden border border-gray-100 mb-4">
@@ -1230,7 +1230,7 @@ const allSections = [...leftSections, ...rightSections];
                                 Change
                               </button>
                             </div>
-                            <p className="text-sm text-neutral-400 font-light max-w-xl mb-2">
+                            <p className="text-sm text-neutral-400 font-light mb-4">
                               Search Console data will be available for this
                               property, and the same Google connection now
                               includes Analytics read access for reporting.
@@ -1267,7 +1267,7 @@ const allSections = [...leftSections, ...rightSections];
       )}
     </div>
 
-    <p className="text-sm text-neutral-400 font-light max-w-xl mb-2">
+    <p className="text-sm text-neutral-400 font-light max-w-xl mb-4 mt-2">
       Connect Google for Search Console, then add your GA4 ID for reporting.
     </p>
   </div>
@@ -1334,7 +1334,7 @@ const allSections = [...leftSections, ...rightSections];
                           <h3 className="text-2xl font-light text-black tracking-tight">
                             WordPress Publishing
                           </h3></div>
-                          <p className="text-sm text-neutral-400 font-light max-w-xl mb-2">
+                          <p className="text-sm text-neutral-400 font-light max-w-xl mb-4 mt-2">
                             Securely store credentials to auto-publish generated content
                           </p>
                         </div>

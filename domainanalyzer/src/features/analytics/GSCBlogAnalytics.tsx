@@ -421,7 +421,7 @@ const GSCBlogAnalytics: React.FC = () => {
               width={500}
               height={280}
               primaryColor="#111111"
-              secondaryColor="#3b82f6"
+              secondaryColor="#4E76C7"
               primaryLabel="Clicks"
               secondaryLabel="Impressions"
             />
