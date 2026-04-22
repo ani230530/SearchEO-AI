@@ -2648,6 +2648,29 @@ useEffect(() => {
           color: #ffffff;
         }
 
+        .sidebar-tab.sidebar-tab-premium .sidebar-tab-label {
+          font-weight: 700;
+          background: linear-gradient(90deg, #2D4059 0%, #4C74C2 100%);
+          -webkit-background-clip: text;
+          background-clip: text;
+          -webkit-text-fill-color: transparent;
+          color: transparent;
+        }
+
+        .sidebar-tab.sidebar-tab-premium .sidebar-tab-icon {
+          color: #3f62ab;
+        }
+
+        .sidebar-tab.sidebar-tab-premium .sidebar-tab-icon svg {
+          stroke-width: 2.4;
+        }
+
+        .sidebar-tab.sidebar-tab-premium.active .sidebar-tab-label {
+          background: none;
+          -webkit-text-fill-color: currentColor;
+          color: currentColor;
+        }
+
         .sidebar-tab-icon {
           color: #6d7480;
           transition: color 0.16s ease;

@@ -50,7 +50,7 @@ type SidebarActionItem = {
   icon: ReactNode;
   isActive?: boolean;
   onClick: () => void;
-  variant?: "standard" | "primary";
+  variant?: "standard" | "primary" | "premium";
 };
 
 type SidebarSection = {
@@ -119,6 +119,7 @@ export function DashboardSidebar({
             icon: <Sparkles className="h-4 w-4" />,
             isActive: activeTab === "ai-checker",
             onClick: () => onSelectTab("ai-checker"),
+            variant: "premium",
           },
         ],
       },
@@ -288,7 +289,11 @@ export function DashboardSidebar({
                       <TooltipTrigger asChild>
                         <button
                           className={`sidebar-tab ${item.isActive ? "active" : ""} ${
-                            item.variant === "primary" ? "sidebar-tab-primary" : ""
+                            item.variant === "primary"
+                              ? "sidebar-tab-primary"
+                              : item.variant === "premium"
+                                ? "sidebar-tab-premium"
+                                : ""
                           }`}
                           onClick={item.onClick}
                         >
