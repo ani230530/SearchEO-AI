@@ -23,12 +23,14 @@ interface KeywordData {
 
 interface CompetitorDetailPageProps {
   competitorDomain: string;
+  lastScanned?: string;
   keywords?: KeywordData[];
   onBack?: () => void;
 }
 
 const CompetitorDetailPage: React.FC<CompetitorDetailPageProps> = ({
   competitorDomain,
+  lastScanned = "10/01/2026, 19:36:50",
   keywords = [
     {
       id: "1",
@@ -194,166 +196,160 @@ const CompetitorDetailPage: React.FC<CompetitorDetailPageProps> = ({
               {competitorDomain}
             </h1>
           </div>
-          <p className="flex items-center gap-2 mt-2 text-sm font-light text-gray-600 ml-8">
-              Last scanned at {new Date().toLocaleString()}
-            </p>
+          <p className="text-sm text-slate-500">
+            Last scanned at {lastScanned}
+          </p>
         </div>
 
         {/* Main Content Card */}
-        <div className="overflow-hidden">
-          {/* Section Title and Controls */}
-          <div className="px-6 py-4 ">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-slate-900">
-                {competitorDomain}
-              </h2>
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:gap-4">
-                {/* Search and Filter */}
-                <div className="flex flex-1 items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-4 py-2 shadow-sm">
-                  <Search className="h-4 w-4 text-slate-500" />
-                  <input
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    placeholder="Find Keyword..."
-                    className="flex-1 bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400"
-                  />
-                </div>
-                {/* Action Buttons */}
-                <div className="flex gap-2 lg:gap-3">
-                  <button
-                    type="button"
-                    className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50"
-                    title="Filter"
-                  >
-                    <Filter className="h-4 w-4" />
-                  </button>
-                  <button
-                    type="button"
-                    className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50"
-                    title="Sort"
-                  >
-                    <ArrowUpDown className="h-4 w-4" />
-                  </button>
-                  <button
-                    type="button"
-                    className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 whitespace-nowrap"
-                  >
-                    <RefreshCw className="h-4 w-4" />
-                    Refresh
-                  </button>
-                  <button
-                    type="button"
-                    className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 whitespace-nowrap"
-                  >
-                    <Upload className="h-4 w-4" />
-                    Import file
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleExportData}
-                    className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 whitespace-nowrap"
-                  >
-                      <img src="/export-icon.png" alt="Export" className="h-4 w-4" />
-                    Export Data
-                  </button>
-                </div>
+        <div className="rounded-[24px] border border-slate-200 bg-white shadow-sm overflow-hidden">
+          {/* Section Title */}
+          <div className="px-6 pt-6 pb-4 border-b border-slate-200">
+            <h2 className="text-lg font-semibold text-slate-900">
+              {competitorDomain}
+            </h2>
+          </div>
+
+          {/* Controls */}
+          <div className="px-6 py-4 border-b border-slate-200">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              {/* Search and Filter */}
+              <div className="flex flex-1 items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-4 py-2 shadow-sm">
+                <Search className="h-4 w-4 text-slate-500" />
+                <input
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  placeholder="Find Keyword..."
+                  className="flex-1 bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400"
+                />
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-2 lg:gap-3">
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50"
+                  title="Filter"
+                >
+                  <Filter className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50"
+                  title="Sort"
+                >
+                  <ArrowUpDown className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 whitespace-nowrap"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                  Refresh
+                </button>
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 whitespace-nowrap"
+                >
+                  <Upload className="h-4 w-4" />
+                  Import file
+                </button>
+                <button
+                  type="button"
+                  onClick={handleExportData}
+                  className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 whitespace-nowrap"
+                >
+                  <Download className="h-4 w-4" />
+                  Export Data
+                </button>
               </div>
             </div>
           </div>
 
           {/* Table */}
-         <div className="mt-10 px-4">
-  <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.03)]">
-    
-    <div className="overflow-x-auto">
-      <table className="min-w-full text-sm">
-        
-        {/* HEADER */}
-        <thead className="text-left text-xs font-medium tracking-wider text-gray-600 bg-gray-200">
-          <tr>
-            <th onClick={() => toggleSort("keyword")} className="px-6 py-4 font-medium cursor-pointer hover:bg-slate-200/60 transition">
-              Keywords
-            </th>
-            <th onClick={() => toggleSort("rank")} className="px-6 py-4 font-medium cursor-pointer hover:bg-slate-200/60 transition">
-              Rank
-            </th>
-            <th onClick={() => toggleSort("myRank")} className="px-6 py-4 font-medium cursor-pointer hover:bg-slate-200/60 transition">
-              My rank
-            </th>
-            <th onClick={() => toggleSort("volume")} className="px-6 py-4 font-medium cursor-pointer hover:bg-slate-200/60 transition">
-              Volume
-            </th>
-            <th onClick={() => toggleSort("landingPage")} className="px-6 py-4 font-medium cursor-pointer hover:bg-slate-200/60 transition">
-              Landing Page
-            </th>
-            <th onClick={() => toggleSort("lastUpdated")} className="px-6 py-4 font-medium cursor-pointer hover:bg-slate-200/60 transition">
-              Last Updated
-            </th>
-          </tr>
-        </thead>
-
-        {/* BODY */}
-        <tbody className="divide-y divide-slate-100">
-          {filteredAndSortedData.length > 0 ? (
-            filteredAndSortedData.map((item) => (
-              <tr key={item.id} className="hover:bg-slate-50 transition">
-                
-                {/* Keyword */}
-                <td className="px-6 py-5 text-slate-900 font-medium">
-                  {item.keyword}
-                </td>
-
-                {/* Rank */}
-                <td className="px-6 py-5 text-slate-700">
-                  {item.rank}
-                </td>
-
-                {/* My Rank */}
-                <td className="px-6 py-5 text-slate-700">
-                  {item.myRank}
-                </td>
-
-                {/* Volume */}
-                <td className="px-6 py-5 text-slate-700">
-                  {item.volume}
-                </td>
-
-                {/* Landing Page */}
-                <td className="px-6 py-5 text-slate-700">
-                  <a
-                    href={`https://${item.landingPage.split("/")[0]}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-blue-600 hover:underline break-all"
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead className="bg-slate-50 text-slate-700 border-b border-slate-200">
+                <tr>
+                  <th
+                    onClick={() => toggleSort("keyword")}
+                    className="px-6 py-4 font-semibold text-slate-600 cursor-pointer hover:bg-slate-100 transition"
                   >
-                    {item.landingPage}
-                  </a>
-                </td>
-
-                {/* Last Updated */}
-                <td className="px-6 py-5 text-slate-700">
-                  {item.lastUpdated}
-                </td>
-
-              </tr>
-            ))
-          ) : (
-            <tr>
-              <td colSpan={6} className="px-6 py-16 text-center text-slate-500">
-                No keywords found matching your search.
-              </td>
-            </tr>
-          )}
-        </tbody>
-
-      </table>
-    </div>
-  </div>
-</div>
+                    Keywords
+                  </th>
+                  <th
+                    onClick={() => toggleSort("rank")}
+                    className="px-6 py-4 font-semibold text-slate-600 cursor-pointer hover:bg-slate-100 transition"
+                  >
+                    Rank
+                  </th>
+                  <th
+                    onClick={() => toggleSort("myRank")}
+                    className="px-6 py-4 font-semibold text-slate-600 cursor-pointer hover:bg-slate-100 transition"
+                  >
+                    My rank
+                  </th>
+                  <th
+                    onClick={() => toggleSort("volume")}
+                    className="px-6 py-4 font-semibold text-slate-600 cursor-pointer hover:bg-slate-100 transition"
+                  >
+                    Volume
+                  </th>
+                  <th
+                    onClick={() => toggleSort("landingPage")}
+                    className="px-6 py-4 font-semibold text-slate-600 cursor-pointer hover:bg-slate-100 transition"
+                  >
+                    Landing Page
+                  </th>
+                  <th
+                    onClick={() => toggleSort("lastUpdated")}
+                    className="px-6 py-4 font-semibold text-slate-600 cursor-pointer hover:bg-slate-100 transition"
+                  >
+                    Last Updated
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-200">
+                {filteredAndSortedData.length > 0 ? (
+                  filteredAndSortedData.map((item) => (
+                    <tr
+                      key={item.id}
+                      className="hover:bg-slate-50 transition"
+                    >
+                      <td className="px-6 py-4 text-slate-900 font-medium">
+                        {item.keyword}
+                      </td>
+                      <td className="px-6 py-4 text-slate-700">{item.rank}</td>
+                      <td className="px-6 py-4 text-slate-700">{item.myRank}</td>
+                      <td className="px-6 py-4 text-slate-700">{item.volume}</td>
+                      <td className="px-6 py-4 text-slate-700">
+                        <a
+                          href={`https://${item.landingPage.split("/")[0]}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-600 hover:underline break-all"
+                        >
+                          {item.landingPage}
+                        </a>
+                      </td>
+                      <td className="px-6 py-4 text-slate-700">
+                        {item.lastUpdated}
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={6} className="px-6 py-16 text-center text-slate-500">
+                      No keywords found matching your search.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
       </div>
-   
+    </div>
   );
 };
 

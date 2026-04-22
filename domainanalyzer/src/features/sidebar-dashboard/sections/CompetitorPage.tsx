@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { fetchEventSource } from "@microsoft/fetch-event-source";
 import {
   ArrowUpDown,
+  Download,
   Filter,
   RefreshCw,
   Search,
@@ -329,21 +330,21 @@ const CompetitorPage: React.FC<Props> = ({ domainId }) => {
   }, [competitors, data, searchTerm]);
 
   return (
-    <div className="competitor-page p-6  min-h-screen">
+    <div className="competitor-page p-6 bg-slate-50 min-h-screen">
       {selectedCompetitor ? (
         <CompetitorDetailPage
           competitorDomain={selectedCompetitor}
           onBack={() => setSelectedCompetitor(null)}
         />
       ) : (
-        <div className="mx-auto max-w-7xl p-6">
+        <div className="mx-auto max-w-7xl rounded-[30px] border border-slate-200 bg-white p-6 shadow-sm">
         <div className="flex flex-col gap-6 xl:flex-row xl:items-center xl:justify-between">
           <div>
             <h2 className="text-2xl font-semibold text-slate-900">
               Competitor Landscape
             </h2>
-            <p className="flex items-center gap-2 mt-2 text-sm font-light text-gray-600">
-              Last scanned at {new Date().toLocaleString()}
+            <p className="mt-2 text-sm text-slate-500">
+              Track competitor domains, keyword volume, overlap, and estimated traffic in one place.
             </p>
           </div>
 
@@ -392,7 +393,7 @@ const CompetitorPage: React.FC<Props> = ({ domainId }) => {
                 onClick={handleExportData}
                 className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 whitespace-nowrap"
               >
-                <img src="/export-icon.png" alt="Export" className="h-4 w-4" />
+                <Download className="h-4 w-4" />
                 Export Data
               </button>
             </div>
@@ -404,6 +405,28 @@ const CompetitorPage: React.FC<Props> = ({ domainId }) => {
             {errorMessage}
           </div>
         )}
+
+        {competitors.length > 0 && (
+          <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {competitors.map((competitor) => (
+              <div
+                key={competitor}
+                className="flex items-center justify-between rounded-3xl border border-slate-200 bg-slate-50 px-4 py-3"
+              >
+                <span className="truncate text-sm text-slate-700">{competitor}</span>
+                <button
+                  type="button"
+                  onClick={() => runAnalysis(competitor)}
+                  disabled={loading}
+                  className="ml-3 inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  Analyze
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
         <input
           ref={fileInputRef}
           type="file"
@@ -418,75 +441,60 @@ const CompetitorPage: React.FC<Props> = ({ domainId }) => {
           </div>
         )}
 
-       <div className="mt-10">
-  <div className="overflow-hidden rounded-lg bg-gray-100 shadow-[0_8px_24px_rgba(15,23,42,0.03)] border border-gray-200">
-    <div className="overflow-x-auto">
-      <table className="min-w-full text-sm">
-        
-        {/* HEADER */}
-        <thead>
-          <tr className="text-left text-xs font-semibold tracking-wider text-gray-700 bg-gray-200">
-            <th className="px-6 py-4 w-[40%]">Domain</th>
-            <th className="px-6 py-4 w-[20%]">Keyword</th>
-            <th className="px-6 py-4 text-right w-[20%]">Overlap</th>
-            <th className="px-6 py-4 text-right w-[20%]">Est. Traffic</th>
-          </tr>
-        </thead>
-
-        {/* BODY */}
-        <tbody className="divide-y divide-gray-100 bg-white">
-          {tableRows.length > 0 ? (
-            tableRows.map((item, index) => (
-              <tr
-                key={index}
-                onClick={() => setSelectedCompetitor(item.brand)}
-                className="hover:bg-gray-50 transition-colors"
-              >
-                
-                {/* Domain */}
-                <td className="whitespace-nowrap px-6 py-5 font-medium text-gray-800">
-                  <span className="flex items-center gap-2">
-                    <span className="text-gray-400">↗</span>
-                    <span className="truncate max-w-[220px] text-blue-600 hover:underline">
-                      {item.brand}
-                    </span>
-                  </span>
-                </td>
-
-                {/* Keywords */}
-                <td className="px-6 py-5 text-gray-700">
-                  {item.keywords.toLocaleString()}
-                </td>
-
-                {/* Overlap */}
-                <td className="px-6 py-5 text-right">
-                  <span className="inline-flex items-center rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-600">
-                    {item.overlap}%
-                  </span>
-                </td>
-
-                {/* Traffic */}
-                <td className="px-6 py-5 text-gray-700 text-right">
-                  {typeof item.estimatedTraffic === "number"
-                    ? item.estimatedTraffic.toLocaleString()
-                    : item.estimatedTraffic}
-                </td>
-
+        <div className="mt-6 overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-sm">
+          <table className="min-w-full border-separate border-spacing-0 text-left text-sm">
+            <thead className="bg-slate-50 text-slate-500">
+              <tr>
+                <th className="px-6 py-4 font-semibold uppercase tracking-[0.12em] text-slate-600">
+                  Domain
+                </th>
+                <th className="px-6 py-4 font-semibold uppercase tracking-[0.12em] text-slate-600">
+                  Key words
+                </th>
+                <th className="px-6 py-4 font-semibold uppercase tracking-[0.12em] text-slate-600">
+                  Overlap
+                </th>
+                <th className="px-6 py-4 font-semibold uppercase tracking-[0.12em] text-slate-600">
+                  Est. Traffic
+                </th>
               </tr>
-            ))
-          ) : (
-            <tr>
-              <td colSpan={4} className="px-6 py-16 text-center text-sm text-gray-500">
-                No data available. Run analysis.
-              </td>
-            </tr>
-          )}
-        </tbody>
-
-      </table>
-    </div>
-  </div>
-</div>
+            </thead>
+            <tbody className="divide-y divide-slate-200">
+              {tableRows.length > 0 ? (
+                tableRows.map((item, index) => (
+                  <tr
+                    key={index}
+                    onClick={() => setSelectedCompetitor(item.brand)}
+                    className="hover:bg-slate-50 cursor-pointer transition"
+                  >
+                    <td className="whitespace-nowrap px-6 py-4 font-medium text-blue-600 hover:underline">
+                      {item.brand}
+                    </td>
+                    <td className="px-6 py-4 text-slate-700">
+                      {item.keywords.toLocaleString()}
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="inline-flex rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
+                        {item.overlap}%
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-slate-700">
+                      {typeof item.estimatedTraffic === "number"
+                        ? item.estimatedTraffic.toLocaleString()
+                        : item.estimatedTraffic}
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={4} className="px-6 py-16 text-center text-sm text-slate-500">
+                    No data available. Run analysis.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
       )}
     </div>

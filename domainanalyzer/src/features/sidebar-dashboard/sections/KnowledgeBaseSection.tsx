@@ -80,12 +80,6 @@ const KnowledgeBaseSection = () => {
   const [showDeleteFolderModal, setShowDeleteFolderModal] = useState(false);
   const [folderToDelete, setFolderToDelete] = useState<FolderItem | null>(null);
   const [openFolderMenuId, setOpenFolderMenuId] = useState<string | null>(null);
-  const [editingFileId, setEditingFileId] = useState<string | null>(null);
-  const [renameFileName, setRenameFileName] = useState("");
-  const [showDeleteFileModal, setShowDeleteFileModal] = useState(false);
-  const [fileToDelete, setFileToDelete] = useState<FileItem | null>(null);
-  const [openFileMenuId, setOpenFileMenuId] = useState<string | null>(null);
-  const [selectedFileId, setSelectedFileId] = useState<string | null>(null);
 
   const openNewFolderModal = () => {
     setNewFolderName("Untitled folder");
@@ -165,82 +159,13 @@ const KnowledgeBaseSection = () => {
     setOpenFolderMenuId(null);
   };
 
-  const openRenameFileModal = (fileId: string, fileName: string) => {
-    setEditingFileId(fileId);
-    setRenameFileName(fileName);
-    setOpenFileMenuId(null);
-  };
-
-  const handleRenameFile = () => {
-    if (!editingFileId || !renameFileName?.trim()) return;
-
-    setFiles((current) =>
-      current.map((file) => {
-        if (file.id !== editingFileId) return file;
-        const updatedName = renameFileName.trim();
-        const folder = file.folderId
-          ? folders.find((folderItem) => folderItem.id === file.folderId)
-          : undefined;
-        return {
-          ...file,
-          name: updatedName,
-          path: folder ? `${folder.name}/${updatedName}` : updatedName,
-        };
-      })
-    );
-
-    setEditingFileId(null);
-    setRenameFileName("");
-  };
-
-  const cancelRenameFile = () => {
-    setEditingFileId(null);
-    setRenameFileName("");
-  };
-
-  const openDeleteFileModal = (file: FileItem) => {
-    setFileToDelete(file);
-    setShowDeleteFileModal(true);
-    setOpenFileMenuId(null);
-  };
-
-  const handleDeleteFile = () => {
-    if (!fileToDelete) return;
-
-    setFiles((current) => current.filter((file) => file.id !== fileToDelete.id));
-    if (selectedFileId === fileToDelete.id) {
-      setSelectedFileId(null);
-    }
-    setFileToDelete(null);
-    setShowDeleteFileModal(false);
-    setOpenFileMenuId(null);
-  };
-
-  const cancelDeleteFile = () => {
-    setFileToDelete(null);
-    setShowDeleteFileModal(false);
-    setOpenFileMenuId(null);
-  };
-
-  const handleOpenFile = (fileId: string) => {
-    const file = files.find((item) => item.id === fileId);
-    if (!file) return;
-    setSelectedFileId(fileId);
-    if (file.folderId) {
-      setSelectedFolderId(file.folderId);
-    }
-  };
-
   React.useEffect(() => {
-    if (!openFolderMenuId && !openFileMenuId) return;
+    if (!openFolderMenuId) return;
 
-    const handleClickOutside = () => {
-      setOpenFolderMenuId(null);
-      setOpenFileMenuId(null);
-    };
+    const handleClickOutside = () => setOpenFolderMenuId(null);
     window.addEventListener("click", handleClickOutside);
     return () => window.removeEventListener("click", handleClickOutside);
-  }, [openFolderMenuId, openFileMenuId]);
+  }, [openFolderMenuId]);
 
   const handleFileUploadClick = () => fileInputRef.current?.click();
   const handleFolderUploadClick = () => {
@@ -446,14 +371,17 @@ const KnowledgeBaseSection = () => {
                   filteredFolders.map((folder) => (
                     <div
                       key={folder.id}
-                      onClick={() => setSelectedFolderId(folder.id)}
-                      className={`relative cursor-pointer rounded-[28px] border p-4 transition ${
+                      className={`relative rounded-[28px] border p-4 transition ${
                         selectedFolderId === folder.id
                           ? "border-slate-900 bg-slate-950 text-white"
                           : "border-slate-200 bg-slate-50 text-slate-900 hover:border-slate-300 hover:bg-white"
                       }`}
                     >
-                      <div className="w-full text-left">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedFolderId(folder.id)}
+                        className="w-full text-left"
+                      >
                         <div className="flex items-center gap-3">
                           <div className="flex h-11 w-11 items-center justify-center rounded-3xl bg-white text-slate-700 shadow-sm">
                             <Folder className="h-5 w-5" />
@@ -463,7 +391,7 @@ const KnowledgeBaseSection = () => {
                             <p className="mt-1 text-xs text-slate-500 truncate">{folder.fileCount} file{folder.fileCount === 1 ? "" : "s"}</p>
                           </div>
                         </div>
-                      </div>
+                      </button>
                       <button
                         type="button"
                         onClick={(event) => {
@@ -671,93 +599,6 @@ const KnowledgeBaseSection = () => {
               </div>
             )}
 
-            {editingFileId && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-                <div
-                  className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-                  onClick={cancelRenameFile}
-                />
-                <div className="relative w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-8 shadow-xl">
-                  <h3 className="text-xl font-light tracking-tight text-slate-900 mb-6">
-                    Rename File
-                  </h3>
-                  <form
-                    onSubmit={(event) => {
-                      event.preventDefault();
-                      handleRenameFile();
-                    }}
-                    className="space-y-6"
-                  >
-                    <div>
-                      <label className="block text-base font-light text-slate-900 mb-2">
-                        File name
-                      </label>
-                      <input
-                        type="text"
-                        value={renameFileName}
-                        onChange={(event) => setRenameFileName(event.target.value)}
-                        placeholder="Enter file name"
-                        className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 focus:border-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900"
-                        required
-                      />
-                    </div>
-
-                    <div className="flex items-center justify-end gap-4">
-                      <button
-                        type="button"
-                        onClick={cancelRenameFile}
-                        className="px-6 py-3 rounded-2xl border border-slate-200 text-slate-700 hover:bg-slate-100"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        type="submit"
-                        className="px-6 py-3 rounded-2xl bg-slate-900 text-white hover:opacity-90"
-                        style={{
-                          background: "linear-gradient(90deg, #2D4059 0%, #4E76C7 100%)",
-                        }}
-                      >
-                        Save
-                      </button>
-                    </div>
-                  </form>
-                </div>
-              </div>
-            )}
-
-            {showDeleteFileModal && fileToDelete && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-                <div
-                  className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-                  onClick={cancelDeleteFile}
-                />
-                <div className="relative w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-8 shadow-xl">
-                  <h3 className="text-xl font-light tracking-tight text-slate-900 mb-6">
-                    Delete File
-                  </h3>
-                  <p className="mb-6 text-sm leading-6 text-slate-600">
-                    Are you sure you want to delete "{fileToDelete.name}"?
-                  </p>
-                  <div className="flex items-center justify-end gap-4">
-                    <button
-                      type="button"
-                      onClick={cancelDeleteFile}
-                      className="px-6 py-3 rounded-2xl border border-slate-200 text-slate-700 hover:bg-slate-100"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleDeleteFile}
-                      className="px-6 py-3 rounded-2xl bg-red-600 text-white hover:opacity-90"
-                    >
-                      Delete File
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-
             {message && (
               <div className="rounded-[30px] border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
                 {message}
@@ -781,94 +622,23 @@ const KnowledgeBaseSection = () => {
                     </div>
                   </div>
 
-                  {selectedFileId && (
-                    <div className="mt-5 rounded-[28px] border border-slate-200 bg-slate-50 p-5 shadow-sm">
-                      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                        <div>
-                          <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Opened file</p>
-                          <h3 className="mt-1 text-lg font-semibold text-slate-900">
-                            {files.find((file) => file.id === selectedFileId)?.name || "Selected file"}
-                          </h3>
-                          <p className="mt-2 text-sm text-slate-600">
-                            {files.find((file) => file.id === selectedFileId)?.path}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <div className="rounded-3xl border border-slate-200 bg-white px-4 py-2 text-sm text-slate-700">
-                            Size: {files.find((file) => file.id === selectedFileId)?.size}
-                          </div>
-                          <div className="rounded-3xl border border-slate-200 bg-white px-4 py-2 text-sm text-slate-700">
-                            Uploaded: {files.find((file) => file.id === selectedFileId)?.uploadedAt}
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => setSelectedFileId(null)}
-                            className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm text-slate-700 hover:bg-slate-100"
-                          >
-                            Close
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
                   <div className="mt-5 grid gap-4 xl:grid-cols-4">
                     {filteredFiles.length > 0 ? (
                       filteredFiles.map((file) => (
                         <div
                           key={file.id}
-                          onClick={() => handleOpenFile(file.id)}
-                          className={`relative rounded-[28px] border p-5 shadow-sm transition cursor-pointer ${
-                            selectedFileId === file.id
-                              ? "border-slate-900 bg-slate-950 text-white"
-                              : "border-slate-200 bg-slate-50 text-slate-900 hover:border-slate-300 hover:bg-white"
-                          }`}
+                          className="rounded-[28px] border border-slate-200 bg-slate-50 p-5 shadow-sm transition hover:border-slate-300 hover:bg-white"
                         >
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="flex items-center gap-3 min-w-0">
-                              <div className="flex h-12 w-12 items-center justify-center flex-shrink-0 rounded-3xl bg-white text-slate-700 shadow-sm">
-                                <FileText className="h-5 w-5" />
-                              </div>
-                              <div className="min-w-0">
-                                <p className="truncate text-base font-semibold">{file.name}</p>
-                                <p className="mt-2 text-sm truncate">{file.path}</p>
-                              </div>
+                          <div className="flex items-center gap-3">
+                            <div className="flex h-12 w-12 items-center justify-center rounded-3xl bg-white text-slate-700 shadow-sm">
+                              <FileText className="h-5 w-5" />
                             </div>
-                            <button
-                              type="button"
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                setOpenFileMenuId((current) =>
-                                  current === file.id ? null : file.id
-                                );
-                              }}
-                              aria-label="File menu"
-                              className="inline-flex h-9 w-9 items-center justify-center flex-shrink-0 rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:border-slate-300 hover:text-slate-700"
-                            >
-                              <MoreVertical className="h-4 w-4" />
-                            </button>
+                            <div className="min-w-0">
+                              <p className="truncate text-base font-semibold text-slate-900">{file.name}</p>
+                              <p className="mt-2 text-sm text-slate-500 truncate">{file.path}</p>
+                            </div>
                           </div>
-                          {openFileMenuId === file.id && (
-                            <div
-                              onClick={(event) => event.stopPropagation()}
-                              className="absolute right-4 top-14 z-20 w-40 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl"
-                            >
-                              <button
-                                type="button"
-                                onClick={() => openRenameFileModal(file.id, file.name)}
-                                className="w-full px-4 py-3 text-left text-sm text-slate-700 hover:bg-slate-50"
-                              >
-                                Rename
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => openDeleteFileModal(file)}
-                                className="w-full px-4 py-3 text-left text-sm text-red-600 hover:bg-slate-50"
-                              >
-                                Delete
-                              </button>
-                            </div>
-                          )}
+
                         </div>
                       ))
                     ) : (
