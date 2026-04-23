@@ -38,7 +38,7 @@ export function SettingsNotificationSection() {
                 aria-pressed={receiveAlerts}
                 onClick={() => setReceiveAlerts((prev) => !prev)}
                 className={`relative mt-1 h-8 w-16 rounded-full transition ${
-                  receiveAlerts ? "bg-[#8ca4d4]" : "bg-[#e6e6e6]"
+                  receiveAlerts ? "bg-[#7E9BD7]" : "bg-[#e6e6e6]"
                 }`}
               >
                 <span
@@ -66,7 +66,7 @@ export function SettingsNotificationSection() {
                 aria-pressed={weeklySummary}
                 onClick={() => setWeeklySummary((prev) => !prev)}
                 className={`relative mt-1 h-8 w-16 rounded-full transition ${
-                  weeklySummary ? "bg-[#8ca4d4]" : "bg-[#e6e6e6]"
+                  weeklySummary ? "bg-[#7E9BD7]" : "bg-[#e6e6e6]"
                 }`}
               >
                 <span
@@ -90,7 +90,7 @@ export function SettingsNotificationSection() {
                 aria-pressed={dailyAlerts}
                 onClick={() => setDailyAlerts((prev) => !prev)}
                 className={`relative mt-1 h-8 w-16 rounded-full transition ${
-                  dailyAlerts ? "bg-[#8ca4d4]" : "bg-[#e6e6e6]"
+                  dailyAlerts ? "bg-[#7E9BD7]" : "bg-[#e6e6e6]"
                 }`}
               >
                 <span
@@ -122,7 +122,7 @@ export function SettingsNotificationSection() {
                 aria-pressed={browserNotifications}
                 onClick={() => setBrowserNotifications((prev) => !prev)}
                 className={`relative mt-1 h-8 w-16 rounded-full transition ${
-                  browserNotifications ? "bg-[#8ca4d4]" : "bg-[#e6e6e6]"
+                  browserNotifications ? "bg-[#7E9BD7]" : "bg-[#e6e6e6]"
                 }`}
               >
                 <span
@@ -146,7 +146,7 @@ export function SettingsNotificationSection() {
                 aria-pressed={customAlerts}
                 onClick={() => setCustomAlerts((prev) => !prev)}
                 className={`relative mt-1 h-8 w-16 rounded-full transition ${
-                  customAlerts ? "bg-[#8ca4d4]" : "bg-[#e6e6e6]"
+                  customAlerts ? "bg-[#7E9BD7]" : "bg-[#e6e6e6]"
                 }`}
               >
                 <span

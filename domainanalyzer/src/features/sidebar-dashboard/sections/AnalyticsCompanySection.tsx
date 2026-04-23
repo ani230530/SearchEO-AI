@@ -1,5 +1,4 @@
-﻿import React, { type Dispatch, type FormEvent, type ReactNode, type SetStateAction } from 'react';
-import { useNavigate } from 'react-router-dom';
+﻿import React, { useEffect, useState, type Dispatch, type FormEvent, type ReactNode, type SetStateAction } from 'react';
 import {
   BarChart3,
   CheckCircle,
@@ -192,9 +191,14 @@ export function AnalyticsCompanySection({
   currentTaskIndex,
   handleDomainChange,
 }: AnalyticsCompanySectionProps) {
-  const navigate = useNavigate();
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + currentKeywords.length;
+  const [showWordpressConnectionView, setShowWordpressConnectionView] = useState(false);
+  useEffect(() => {
+    if (activeCompanySubTab !== 'integration') {
+      setShowWordpressConnectionView(false);
+    }
+  }, [activeCompanySubTab]);
 
   return (
             <CompanySection
@@ -1086,7 +1090,116 @@ const allSections = [...leftSections, ...rightSections];
                 {/* Integration Tab Content */}
                 {activeCompanySubTab === 'integration' && (
                   <div className="min-w-6xl mx-auto space-y-6">
-                    {gscStatusLoading ? (
+                    {showWordpressConnectionView ? (
+                      <div className="space-y-4">
+                        <div className="flex items-center gap-2 text-sm text-gray-500">
+                          <button
+                            onClick={() => setShowWordpressConnectionView(false)}
+                            className="inline-flex items-center gap-1.5 text-gray-600 hover:text-gray-900 transition-colors"
+                          >
+                            <ChevronLeft className="h-4 w-4" />
+                            Integration
+                          </button>
+                          <span>/</span>
+                          <span className="text-gray-900 font-medium">Connect your WordPress site</span>
+                        </div>
+
+                        <div className="bg-white rounded-2xl border border-gray-200 p-6">
+                          <div className="mb-6">
+                            <div className="flex items-center gap-2 mb-2">
+                              <img src="/skill-icons_wordpress.png" alt="" />
+                              <h2 className="text-2xl font-medium text-gray-900">Connect Your WordPress Site!</h2>
+                            </div>
+                            <p className="text-sm text-gray-500 font-light">
+                              To upload it directly to your website, please connect your WordPress account. Once connected, we&apos;ll be able to publish your content with the correct formatting and SEO settings. You remain in full control of what goes live.
+                            </p>
+                          </div>
+
+                          <div
+                            className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-medium border uppercase tracking-wider mb-6 ${
+                              hasWordpressIntegration
+                                ? 'bg-green-100 text-green-700 border-green-100'
+                                : 'bg-red-100 text-red-700 border-red-100'
+                            }`}
+                          >
+                            {hasWordpressIntegration ? 'Connected' : 'Not Connected'}
+                          </div>
+
+                          {wpIntegrationLoading ? (
+                            <div className="animate-pulse space-y-3">
+                              <div className="h-4 bg-gray-100 rounded"></div>
+                              <div className="h-4 bg-gray-100 rounded"></div>
+                              <div className="h-4 bg-gray-100 rounded w-1/2"></div>
+                            </div>
+                          ) : (
+                            <div className="space-y-4">
+                              <div>
+                                <label className="text-sm font-medium text-gray-900 mb-2 block">
+                                  WordPress URL <span className="text-red-700">*</span>
+                                </label>
+                                <input
+                                  type="text"
+                                  value={wpForm.siteUrl}
+                                  onChange={(e) => setWpForm((prev) => ({ ...prev, siteUrl: e.target.value }))}
+                                  placeholder="https://example.org"
+                                  className="w-full px-4 py-3 text-sm rounded-md border border-gray-300 bg-white focus:outline-none focus:ring-2 focus:ring-gray-900 font-light"
+                                />
+                              </div>
+
+                              <div>
+                                <label className="text-sm font-medium text-gray-900 mb-2 block">
+                                  WordPress Username <span className="text-red-700">*</span>
+                                </label>
+                                <input
+                                  type="text"
+                                  value={wpForm.username}
+                                  onChange={(e) => setWpForm((prev) => ({ ...prev, username: e.target.value }))}
+                                  placeholder="admin"
+                                  className="w-full px-4 py-3 text-sm rounded-md border border-gray-300 bg-white focus:outline-none focus:ring-2 focus:ring-gray-900 font-light"
+                                />
+                              </div>
+
+                              <div>
+                                <label className="text-sm font-medium text-gray-900 mb-2 block">
+                                  Application Password <span className="text-red-700">*</span>
+                                </label>
+                                <input
+                                  type="password"
+                                  value={wpForm.password}
+                                  onChange={(e) => setWpForm((prev) => ({ ...prev, password: e.target.value }))}
+                                  placeholder={hasWordpressIntegration ? 'Enter password to update' : '••••••••'}
+                                  className="w-full px-4 py-3 text-sm rounded-md border border-gray-300 bg-white focus:outline-none focus:ring-2 focus:ring-gray-900 font-light"
+                                />
+                                <p className="text-xs font-light text-gray-500 mt-2">
+                                  For security, use a WordPress application password instead of your main login password.
+                                </p>
+                              </div>
+
+                              <div className="flex flex-wrap gap-3 pt-2">
+                                <button
+                                  onClick={handleSaveWordpressIntegration}
+                                  disabled={wpIntegrationSaving}
+                                  className="h-11 px-6 inline-flex items-center justify-center gap-2 rounded-md bg-[#2D4059] text-sm font-medium text-white transition disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                  {wpIntegrationSaving ? 'Saving...' : hasWordpressIntegration ? 'Update Connection' : 'Connect WordPress'}
+                                  <ArrowRight className="h-4 w-4" />
+                                </button>
+
+                                {hasWordpressIntegration && (
+                                  <button
+                                    onClick={handleDisconnectWordpress}
+                                    disabled={wpIntegrationDeleting}
+                                    className="h-11 px-6 rounded-md border border-gray-300 text-gray-700 bg-white text-sm font-medium hover:bg-gray-100 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                                  >
+                                    {wpIntegrationDeleting ? 'Removing...' : 'Disconnect'}
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ) : gscStatusLoading ? (
                       <IntegrationSkeleton />
                     ) : !gscConnected ? (
                       <div className="bg-white rounded-3xl p-12 border border-gray-100 shadow-sm text-center">
@@ -1211,7 +1324,7 @@ const allSections = [...leftSections, ...rightSections];
                             <div className="flex items-center justify-between mb-6">
                               <div>
                               <div className="flex items-center gap-3">
-                                <img src="/public/gsc-icon.png" alt="" srcset="" />
+                                <img src="/gsc-icon.png" alt="" srcSet="" />
                                 <h3 className="text-xl font-light text-black tracking-tight mb-1">
                                   Selected Property
                                 </h3>
@@ -1255,7 +1368,7 @@ const allSections = [...leftSections, ...rightSections];
   <div>
     <div className="flex items-center justify-between">
       <div className="flex items-center gap-3">
-      <img src="icons8-google-analytics-24.png" alt="" srcset="" />
+      <img src="icons8-google-analytics-24.png" alt="" srcSet="" />
       <h3 className="text-2xl font-light text-black tracking-tight">
         Google Analytics
       </h3>
@@ -1272,7 +1385,7 @@ const allSections = [...leftSections, ...rightSections];
     </p>
   </div>
 
-  {/* ✅ Bigger Video */}
+  {/* ? Bigger Video */}
   <div className="w-full aspect-video rounded-2xl overflow-hidden border border-gray-100">
     <iframe
       className="w-full h-full"
@@ -1284,7 +1397,7 @@ const allSections = [...leftSections, ...rightSections];
     ></iframe>
   </div>
 
-  {/* ✅ Input + Button Row */}
+  {/* ? Input + Button Row */}
   <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center py-3">
 
     {/* Input */}
@@ -1330,7 +1443,7 @@ const allSections = [...leftSections, ...rightSections];
                       <div className="flex flex-wrap items-center justify-between gap-4 ">
                         <div>
                           <div className="flex items-center gap-3">
-                          <img src="/public/skill-icons_wordpress.png" alt="" srcset="" />
+                          <img src="/skill-icons_wordpress.png" alt="" srcSet="" />
                           <h3 className="text-2xl font-light text-black tracking-tight">
                             WordPress Publishing
                           </h3></div>
@@ -1367,7 +1480,7 @@ const allSections = [...leftSections, ...rightSections];
     ></iframe>
   </div>
   <button
-    onClick={() => navigate('/wordpress-connection')}
+    onClick={() => setShowWordpressConnectionView(true)}
     className={cn(
       "h-12 px-6 whitespace-nowrap inline-flex items-center justify-center gap-2 rounded-md bg-[#2D4059] text-md font-medium transition text-white shadow-md hover:shadow-lg active:scale-95",
       
@@ -1583,4 +1696,6 @@ const allSections = [...leftSections, ...rightSections];
             />
   );
 }
+
+
 
