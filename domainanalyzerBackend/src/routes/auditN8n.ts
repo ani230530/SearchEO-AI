@@ -6,7 +6,10 @@ import { decryptToken } from '../services/tokenEncryption';
 const router = express.Router();
 const prisma = new PrismaClient();
 
-const N8N_WEBHOOK_URL = process.env.N8N_ANALYTICS_REPORTING_WEBHOOK_URL || 'https://n8n.srv891599.hstgr.cloud/webhook/analytics-reporting';
+const N8N_WEBHOOK_URL =
+    process.env.N8N_ANALYTICS_REPORTING_WEBHOOK_URL ||
+    process.env.N8N_AUDIT_WEBHOOK_URL ||
+    'https://n8n.srv891599.hstgr.cloud/webhook/analytics-reporting';
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
 
@@ -138,12 +141,31 @@ router.post('/send', authenticateToken, async (req: Request, res: Response) => {
             },
             body: JSON.stringify(finalPayload),
         });
+        const responseText = await n8nResponse.text().catch(() => '');
+        const responseData = responseText
+            ? (() => {
+                try {
+                    return JSON.parse(responseText);
+                } catch {
+                    return { raw: responseText };
+                }
+            })()
+            : {};
 
-        console.log({
-            ...finalPayload,
-            refresh_token: '***',
-            client_id: '***',
-            client_secret: '***',
+        console.log('[audit-n8n] webhook request', {
+            webhookUrl: N8N_WEBHOOK_URL,
+            payload: {
+                ...finalPayload,
+                refresh_token: '***',
+                client_id: '***',
+                client_secret: '***',
+            }
+        });
+
+        console.log('[audit-n8n] webhook response', {
+            status: n8nResponse.status,
+            statusText: n8nResponse.statusText,
+            body: responseData,
         });
 
         if (!n8nResponse.ok) {
@@ -154,7 +176,8 @@ router.post('/send', authenticateToken, async (req: Request, res: Response) => {
                     status: 'failed',
                     responseData: {
                         error: `N8n webhook returned ${n8nResponse.status}`,
-                        statusText: n8nResponse.statusText
+                        statusText: n8nResponse.statusText,
+                        body: responseData
                     } as any
                 }
             });
@@ -173,7 +196,9 @@ router.post('/send', authenticateToken, async (req: Request, res: Response) => {
             return res.status(500).json({
                 success: false,
                 error: 'Failed to send data to n8n webhook',
-                details: `Status: ${n8nResponse.status}`
+                details: `Status: ${n8nResponse.status}`,
+                n8nStatusText: n8nResponse.statusText,
+                n8nResponse: responseData
             });
         }
 
@@ -192,8 +217,6 @@ router.post('/send', authenticateToken, async (req: Request, res: Response) => {
                 status: 'processing'
             }
         });
-
-        const responseData = await n8nResponse.json().catch(() => ({}));
 
         return res.json({
             success: true,
