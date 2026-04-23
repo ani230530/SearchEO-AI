@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { PrismaClient } from '../../generated/prisma';
 import { authenticateToken, AuthenticatedRequest } from '../middleware/auth';
+import { analyzeStandalonePeerCompetitors } from '../services/standaloneCompetitorAnalysisService';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -10,6 +11,55 @@ function asyncHandler(fn: any) {
   return (req: Request, res: Response, next: any) => {
     Promise.resolve(fn(req, res, next)).catch(next);
   };
+}
+
+function safeParseJson(value: any, fallback: any) {
+  if (value === null || value === undefined) return fallback;
+  if (typeof value !== 'string') return value;
+
+  try {
+    return JSON.parse(value);
+  } catch {
+    return fallback;
+  }
+}
+
+function safeParseArray(value: any): any[] {
+  const parsed = safeParseJson(value, []);
+  return Array.isArray(parsed) ? parsed : [];
+}
+
+function safeParseObject(value: any): Record<string, any> {
+  const parsed = safeParseJson(value, {});
+  return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+}
+
+function buildCompetitorListArray(competitorList: string | null | undefined): string[] {
+  if (!competitorList) return [];
+  return competitorList
+    .split('\n')
+    .map((s: string) => s.replace(/^[-\s]+/, '').trim())
+    .filter(Boolean);
+}
+
+function parseCompetitorAnalysisResponse(analysis: any) {
+  return {
+    ...analysis,
+    competitorListArr: buildCompetitorListArray(analysis.competitorList),
+    competitors: safeParseArray(analysis.competitors),
+    marketInsights: safeParseObject(analysis.marketInsights),
+    strategicRecommendations: safeParseArray(analysis.strategicRecommendations),
+    competitiveAnalysis: safeParseObject(analysis.competitiveAnalysis),
+  };
+}
+
+function isStandalonePeerAnalysis(analysis: any): boolean {
+  return safeParseObject(analysis?.competitiveAnalysis).analysisType === 'standalone_peer';
+}
+
+function getSummaryContext(contextJson: any): string {
+  const summaryContext = safeParseObject(contextJson).summaryContext;
+  return typeof summaryContext === 'string' ? summaryContext.trim() : '';
 }
 
 // GET /api/competitor/:domainId - Get competitor analysis for a domain
@@ -24,7 +74,7 @@ router.get('/:domainId', authenticateToken, asyncHandler(async (req: Authenticat
       include: {
         competitorAnalyses: {
           orderBy: { updatedAt: 'desc' },
-          take: 1
+          take: 10
         }
       }
     });
@@ -41,21 +91,104 @@ router.get('/:domainId', authenticateToken, asyncHandler(async (req: Authenticat
       return res.status(404).json({ error: 'No competitor analysis found' });
     }
 
-    const analysis = domain.competitorAnalyses[0];
-    
-    // Parse competitorList string to array
-    let competitorListArr: string[] = [];
-    if (analysis.competitorList) {
-      competitorListArr = analysis.competitorList
-        .split('\n')
-        .map((s: string) => s.replace(/^[-\s]+/, '').trim())
-        .filter(Boolean);
-    }
-
-    res.json({ ...analysis, competitorListArr });
+    const analysis = domain.competitorAnalyses.find(isStandalonePeerAnalysis) || domain.competitorAnalyses[0];
+    res.json(parseCompetitorAnalysisResponse(analysis));
   } catch (error) {
     console.error('Error fetching competitor analysis:', error);
     res.status(500).json({ error: 'Failed to fetch competitor analysis' });
+  }
+}));
+
+// POST /api/competitor/:domainId/standalone - Generate standalone same-tier competitor analysis
+router.post('/:domainId/standalone', authenticateToken, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const domainIdParam = Array.isArray(req.params.domainId) ? req.params.domainId[0] : req.params.domainId;
+    const domainId = Number(domainIdParam);
+    const force = req.body?.force === true || String(req.query.force).toLowerCase() === 'true';
+
+    if (!domainId || Number.isNaN(domainId)) {
+      return res.status(400).json({ error: 'Invalid domain ID' });
+    }
+
+    const domain = await prisma.domain.findUnique({
+      where: { id: domainId },
+      include: {
+        competitorAnalyses: {
+          orderBy: { updatedAt: 'desc' },
+          take: 5
+        },
+        crawlResults: {
+          orderBy: { createdAt: 'desc' },
+          take: 1
+        }
+      }
+    });
+
+    if (!domain) {
+      return res.status(404).json({ error: 'Domain not found' });
+    }
+
+    if (domain.userId !== req.user.userId) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    const cachedStandaloneAnalysis = domain.competitorAnalyses.find(isStandalonePeerAnalysis);
+    if (cachedStandaloneAnalysis && !force) {
+      return res.json({
+        ...parseCompetitorAnalysisResponse(cachedStandaloneAnalysis),
+        cached: true,
+        tokenUsage: 0
+      });
+    }
+
+    const domainContext = [
+      typeof domain.context === 'string' ? domain.context.trim() : '',
+      getSummaryContext(domain.contextJson),
+      domain.crawlResults[0]?.extractedContext?.trim() || ''
+    ].find((context) => context && context.length >= 50);
+
+    if (!domainContext) {
+      return res.status(400).json({
+        error: 'Domain context is required before standalone competitor analysis',
+        message: 'Run domain extraction first so the system has enough context to identify realistic peer competitors.'
+      });
+    }
+
+    const analysisResult = await analyzeStandalonePeerCompetitors({
+      domain: domain.url,
+      context: domainContext,
+      location: domain.location || undefined
+    });
+
+    const analysisData = {
+      domainId,
+      competitorList: analysisResult.competitorList,
+      competitors: analysisResult.competitors as any,
+      marketInsights: analysisResult.marketInsights as any,
+      strategicRecommendations: analysisResult.strategicRecommendations as any,
+      competitiveAnalysis: analysisResult.competitiveAnalysis as any
+    };
+
+    const savedAnalysis = cachedStandaloneAnalysis
+      ? await prisma.competitorAnalysis.update({
+          where: { id: cachedStandaloneAnalysis.id },
+          data: analysisData
+        })
+      : await prisma.competitorAnalysis.create({
+          data: analysisData
+        });
+
+    return res.json({
+      ...parseCompetitorAnalysisResponse(savedAnalysis),
+      cached: false,
+      tokenUsage: analysisResult.tokenUsage
+    });
+  } catch (error) {
+    console.error('Error generating standalone competitor analysis:', error);
+    res.status(500).json({
+      error: 'Failed to generate standalone competitor analysis',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
   }
 }));
 

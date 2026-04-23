@@ -10,13 +10,41 @@ Simple API for sending audit data to n8n and receiving results back.
 
 Send the latest audit data to n8n webhook.
 
+**Webhook URL configuration:**
+
+The backend sends to the first configured value in this order:
+
+1. `N8N_ANALYTICS_REPORTING_WEBHOOK_URL`
+2. `N8N_AUDIT_WEBHOOK_URL`
+3. Hardcoded fallback: `https://n8n.srv891599.hstgr.cloud/webhook/analytics-reporting`
+
+Set one of the environment variables above in `.env` to avoid accidentally sending report payloads to the wrong n8n workflow.
+
 **Headers:**
 ```
 Authorization: Bearer <token>
 Content-Type: application/json
 ```
 
-**Request Body:** None (automatically fetches latest audit)
+**Request Body:**
+```json
+{
+  "reportMonth": "2026-04-01",
+  "analyticsProperty": "sc-domain:example.com",
+  "orgName": "Example Inc",
+  "name": "Example SEO Report"
+}
+```
+
+Required fields:
+
+- `reportMonth`
+- `analyticsProperty`
+
+Optional fields:
+
+- `orgName`
+- `name`
 
 **Response:**
 ```json
