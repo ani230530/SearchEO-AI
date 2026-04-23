@@ -7,7 +7,11 @@ import { useToast } from "@/components/ui/use-toast";
 import { User as UserIcon, Mail, Lock, ShieldCheck, LogOut, Save } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
-const Profile: React.FC = () => {
+interface ProfileProps {
+  compact?: boolean;
+}
+
+const Profile: React.FC<ProfileProps> = ({ compact = false }) => {
   const { user, updateProfile, changePassword, logout, loading } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -100,39 +104,49 @@ const Profile: React.FC = () => {
   return (
     <div className="relative w-full">
       {/* Background Layer */}
-      <div className="fixed inset-0 pointer-events-none">
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-gray-100 rounded-full blur-3xl opacity-20" />
-        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-gray-100 rounded-full blur-3xl opacity-20" />
-      </div>
+      {!compact ? (
+        <div className="fixed inset-0 pointer-events-none">
+          <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-gray-100 rounded-full blur-3xl opacity-20" />
+          <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-gray-100 rounded-full blur-3xl opacity-20" />
+        </div>
+      ) : null}
 
       {/* Content Layer */}
-      <div className="relative z-10 min-w-7xl mx-auto px-4 sm:px-6 py-2 sm:py-2">
+      <div
+        className={`relative z-10 mx-auto ${
+          compact ? "w-full px-0 py-0" : "min-w-7xl px-4 sm:px-6 py-2 sm:py-2"
+        }`}
+      >
         {/* Hero Section */}
         
 
         {/* Profile and Security Cards */}
-        <div className="space-y-6">
+        <div className={compact ? "space-y-4" : "space-y-6"}>
           {/* Profile Information Card */}
-          <div
-            className="bg-white/70 backdrop-blur-md rounded-2xl border border-gray-200 p-8 hover:shadow-lg"
-            style={{ borderWidth: '0.5px' }}
-          >
-            <div className="mb-8">
+            <div className={compact ? "mb-5" : "mb-8"}>
               <h2
-                className="text-2xl font-light text-gray-900 mb-2"
-                style={{ letterSpacing: '-0.003em' }}
+                className={`mb-2 ${
+                  compact ? "text-lg font-medium text-slate-800" : "text-2xl font-light text-gray-900"
+                }`}
+                style={compact ? undefined : { letterSpacing: "-0.003em" }}
               >
                 Profile Information
               </h2>
               <p
-                className="text-sm font-light text-gray-500"
-                style={{ letterSpacing: '0.011em' }}
+                className={compact ? "text-sm text-gray-600" : "text-sm font-light text-gray-500"}
+                style={compact ? undefined : { letterSpacing: "0.011em" }}
               >
                 Your account identifiers and personal information
               </p>
             </div>
+          <div
+            className={`bg-white/70 backdrop-blur-md rounded-2xl border border-gray-200 ${
+              compact ? "p-5 hover:shadow-sm" : "p-8 hover:shadow-lg"
+            }`}
+            style={{ borderWidth: '0.5px' }}
+          >
 
-            <form onSubmit={handleProfileSubmit} className="space-y-6">
+            <form onSubmit={handleProfileSubmit} className={compact ? "space-y-4" : "space-y-6"}>
               {/* Email Field (Read-only) */}
               <div>
                 <Label htmlFor="email" className="text-sm font-light text-gray-900 mb-2 block" style={{ letterSpacing: '0.011em' }}>
@@ -187,10 +201,12 @@ const Profile: React.FC = () => {
 
           {/* Security Card */}
           <div
-            className="bg-white/70 backdrop-blur-md rounded-2xl border border-gray-200 p-8 hover:shadow-lg"
+            className={`bg-white/70 backdrop-blur-md rounded-2xl border border-gray-200 ${
+              compact ? "p-5 hover:shadow-sm" : "p-8 hover:shadow-lg"
+            }`}
             style={{ borderWidth: '0.5px' }}
           >
-            <div className="mb-8">
+            <div className={compact ? "mb-5" : "mb-8"}>
               <div className="flex items-center gap-2 mb-2">
                 <ShieldCheck className="h-5 w-5 text-gray-600" />
                 <h2
@@ -208,7 +224,7 @@ const Profile: React.FC = () => {
               </p>
             </div>
 
-            <form onSubmit={handlePasswordSubmit} className="space-y-6">
+            <form onSubmit={handlePasswordSubmit} className={compact ? "space-y-4" : "space-y-6"}>
               {/* Current Password */}
               <div>
                 <Label htmlFor="currentPassword" className="text-sm font-light text-gray-900 mb-2 block" style={{ letterSpacing: '0.011em' }}>

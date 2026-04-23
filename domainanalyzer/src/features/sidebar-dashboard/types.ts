@@ -48,6 +48,7 @@ export interface DashboardSearchState {
   redirectToAiChecker: boolean;
   activeTab?: TabId;
   activeCompanySubTab?: CompanySubTabId;
+  openWordpressConnection?: boolean;
 }
 
 export interface DashboardHeaderProps {

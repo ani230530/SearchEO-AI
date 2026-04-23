@@ -64,6 +64,7 @@ export function parseDashboardSearchState(search: string): DashboardSearchState 
   const params = new URLSearchParams(search);
   const tabParam = params.get("tab");
   const subtabParam = params.get("subtab");
+  const wordpressParam = params.get("wordpress");
 
   if (tabParam === "ai-checker") {
     return { redirectToAiChecker: true };
@@ -79,6 +80,7 @@ export function parseDashboardSearchState(search: string): DashboardSearchState 
       subtabParam && VALID_COMPANY_SUB_TABS.includes(subtabParam as CompanySubTabId)
         ? (subtabParam as CompanySubTabId)
         : undefined,
+    openWordpressConnection: wordpressParam === "1" || wordpressParam === "true",
   };
 }
 

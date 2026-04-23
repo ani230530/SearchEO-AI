@@ -198,6 +198,7 @@ const sseRef = useRef<EventSource | null>(null);
   const [isAddingKeyword, setIsAddingKeyword] = useState(false);
   const [confirmUpdateOpen, setConfirmUpdateOpen] = useState(false);
   const [updateLoading, setUpdateLoading] = useState(false);
+  const [awaitingNewDomain, setAwaitingNewDomain] = useState(false);
   const [showCountByCompetition, setShowCountByCompetition] = useState<
     Record<string, number>
   >({
@@ -241,6 +242,7 @@ const [improvedContent, setImprovedContent] = useState("");
   const [wpIntegrationLoading, setWpIntegrationLoading] = useState(false);
   const [wpIntegrationSaving, setWpIntegrationSaving] = useState(false);
   const [wpIntegrationDeleting, setWpIntegrationDeleting] = useState(false);
+  const [openWordpressConnectionView, setOpenWordpressConnectionView] = useState(false);
   const [wpForm, setWpForm] = useState({ siteUrl: '', username: '', password: '' });
   const [campaigns, setCampaigns] = useState<Array<{ id: number; title: string; description: string | null; createdAt: string; updatedAt: string }>>([]);
   const [campaignsLoading, setCampaignsLoading] = useState(false);
@@ -800,6 +802,12 @@ useEffect(() => {
     if (searchState.activeCompanySubTab) {
       setActiveCompanySubTab(searchState.activeCompanySubTab);
     }
+
+    if (searchState.openWordpressConnection) {
+      setActiveTab('integration');
+      setActiveCompanySubTab('integration');
+      setOpenWordpressConnectionView(true);
+    }
   }, [navigate]);
 
 
@@ -825,6 +833,9 @@ useEffect(() => {
   const fetchCompanyDomain = useCallback(async (force = false) => {
     // If we already have keywords and we're not forcing a refresh, we might want to skip
     // But for now, let's just make sure we don't clear them on error.
+    if (awaitingNewDomain && !force) {
+      return;
+    }
     
     try {
       setCompanyDomainLoading(true);
@@ -885,7 +896,7 @@ useEffect(() => {
     } finally {
       setCompanyDomainLoading(false);
     }
-  }, []); // Intentionally empty dependencies to keep it stable
+  }, [awaitingNewDomain]);
 
   // Fetch all campaign tab data in parallel when campaign tab is active
   const fetchCampaignTabData = useCallback(async () => {
@@ -914,7 +925,7 @@ useEffect(() => {
       // Process company domain data
       if (domainResponse.ok) {
         const domainData = await domainResponse.json();
-        if (domainData.success && domainData.domain) {
+        if (!awaitingNewDomain && domainData.success && domainData.domain) {
           setCompanyDomain(domainData.domain.url);
           setDomainContext(domainData.domain.context || '');
           if (domainData.keywords) {
@@ -944,7 +955,7 @@ useEffect(() => {
     } finally {
       setCampaignTabDataLoading(false);
     }
-  }, [activeTab]);
+  }, [activeTab, awaitingNewDomain]);
 
   useEffect(() => {
     if (activeTab === 'projects') {
@@ -1737,6 +1748,7 @@ useEffect(() => {
   const handleConfigureWordpress = useCallback(() => {
     setActiveTab('integration');
     setActiveCompanySubTab('integration');
+    setOpenWordpressConnectionView(true);
   }, []);
 
 
@@ -1991,6 +2003,7 @@ useEffect(() => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setAwaitingNewDomain(false);
 
     const parsedDomain = validateDomain(companyDomain);
     if (!parsedDomain) {
@@ -2381,6 +2394,7 @@ useEffect(() => {
 
     setActiveTab("analytics");
     setActiveCompanySubTab("company-info");
+    setAwaitingNewDomain(true);
     setShowResults(false);
     setCompanyDomain("");
     setDomainError("");
@@ -2881,6 +2895,7 @@ useEffect(() => {
             navigate("/ai-checker");
             return;
           }
+          setOpenWordpressConnectionView(false);
           setActiveTab(tabId);
           if (tabId === "integration") {
             setActiveCompanySubTab("integration");
@@ -2982,6 +2997,7 @@ useEffect(() => {
               loadingSteps={loadingSteps}
               currentTaskIndex={currentTaskIndex}
               handleDomainChange={handleDomainChange}
+              openWordpressConnectionView={openWordpressConnectionView}
             />
           ) : activeTab === "projects" ? (
             <ProjectsSection

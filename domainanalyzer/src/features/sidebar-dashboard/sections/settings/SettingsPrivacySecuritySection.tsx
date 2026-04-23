@@ -35,7 +35,7 @@ export function SettingsPrivacySecuritySection() {
                 aria-pressed={allowResearchData}
                 onClick={() => setAllowResearchData((prev) => !prev)}
                 className={`relative mt-1 h-8 w-16 rounded-full transition ${
-                  allowResearchData ? "bg-[#8ca4d4]" : "bg-[#e6e6e6]"
+                  allowResearchData ? "bg-[#7E9BD7]" : "bg-[#e6e6e6]"
                 }`}
               >
                 <span
@@ -59,7 +59,7 @@ export function SettingsPrivacySecuritySection() {
                 aria-pressed={twoFactorEnabled}
                 onClick={() => setTwoFactorEnabled((prev) => !prev)}
                 className={`relative mt-1 h-8 w-16 rounded-full transition ${
-                  twoFactorEnabled ? "bg-[#8ca4d4]" : "bg-[#e6e6e6]"
+                  twoFactorEnabled ? "bg-[#7E9BD7]" : "bg-[#e6e6e6]"
                 }`}
               >
                 <span

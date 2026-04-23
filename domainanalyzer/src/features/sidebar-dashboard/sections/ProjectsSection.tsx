@@ -265,10 +265,12 @@ export function ProjectsSection(props: any) {
                       </p>
                       <button
                         onClick={() => setShowCreateCampaign(true)}
-                        className="px-6 py-3 bg-black text-white rounded-full hover:bg-black/90 focus:outline-none focus:ring-4 focus:ring-black/10 transition-all shadow text-base font-medium flex items-center gap-2 mx-auto"
-                      >
+                        className="inline-flex items-center gap-2 px-6 py-3 bg-black text-white rounded-md hover:opacity-90"
+            style={{
+    background: "linear-gradient(90deg, #2D4059 0%, #4E76C7 100%)",
+  }} >
                         <Plus className="h-5 w-5" />
-                        Create Project
+                        Create New
                       </button>
                     </div>
                   );

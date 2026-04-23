@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import Index from "./pages/Index";
@@ -13,7 +13,6 @@ import NotFound from "./pages/NotFound";
 import Profile from "./pages/Profile";
 import LandingPage from "./pages/LandingPage";
 import SidebarDashboard from "./pages/SidebarDashboard";
-import WordPressConnection from "./pages/WordPressConnection";
 import KnowledgeBase from "./pages/KnowledgeBase";
 
 const queryClient = new QueryClient();
@@ -68,7 +67,7 @@ const App = () => (
             } />
             <Route path="/wordpress-connection" element={
               <ProtectedRoute>
-                <WordPressConnection />
+                <Navigate to="/dashboard?tab=integration&subtab=integration&wordpress=1" replace />
               </ProtectedRoute>
             } />
             
