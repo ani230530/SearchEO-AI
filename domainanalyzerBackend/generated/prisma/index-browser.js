@@ -319,11 +319,10 @@ exports.Prisma.CompetitorAnalysisScalarFieldEnum = {
 
 exports.Prisma.SuggestedCompetitorScalarFieldEnum = {
   id: 'id',
-  name: 'name',
-  competitorDomain: 'competitorDomain',
-  reason: 'reason',
-  type: 'type',
+  analysis: 'analysis',
+  tokenUsage: 'tokenUsage',
   createdAt: 'createdAt',
+  updatedAt: 'updatedAt',
   domainId: 'domainId'
 };
 

@@ -2,7 +2,8 @@ import { Router, Request, Response } from 'express';
 import { PrismaClient } from '../../generated/prisma';
 import { aiQueryService, scoreResponseWithAI, analyzeResponseWithAI } from '../services/aiQueryService';
 import { authenticateToken, AuthenticatedRequest } from '../middleware/auth';
-import { analyzeCompetitors, suggestCompetitors } from '../services/geminiService';
+import { analyzeCompetitors } from '../services/geminiService';
+import { analyzeStandalonePeerCompetitors } from '../services/standaloneCompetitorAnalysisService';
 import { advanceDomainStep, syncDomainCurrentStep } from './domain';
 import { parseContextJson, parseCrawlPolicy, parseCrawlQuality, parsePageSnapshots, parseStringArray } from '../services/crawlResultUtils';
 
@@ -14,6 +15,25 @@ function asyncHandler(fn: (req: any, res: any, next: any) => Promise<any>) {
   return function (req: any, res: any, next: any) {
     Promise.resolve(fn(req, res, next)).catch(next);
   };
+}
+
+function safeParseObject(value: any): Record<string, any> {
+  if (value === null || value === undefined) return {};
+  if (typeof value !== 'string') {
+    return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+  }
+
+  try {
+    const parsed = JSON.parse(value);
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function getSummaryContext(contextJson: any): string {
+  const summaryContext = safeParseObject(contextJson).summaryContext;
+  return typeof summaryContext === 'string' ? summaryContext.trim() : '';
 }
 
 // GET /api/dashboard/debug - Debug endpoint to check user's domains
@@ -1365,6 +1385,10 @@ router.get('/:domainId/suggested-competitors', authenticateToken, async (req: an
         keywords: {
           where: { isSelected: true },
           take: 5
+        },
+        crawlResults: {
+          orderBy: { createdAt: 'desc' },
+          take: 1
         }
       }
     });
@@ -1377,18 +1401,75 @@ router.get('/:domainId/suggested-competitors', authenticateToken, async (req: an
       return res.status(403).json({ error: 'Access denied' });
     }
 
-    // Generate AI-powered suggested competitors based on domain context
-    console.log(`Generating AI competitor suggestions for domain: ${domain.url}, context: ${domain.context}`);
-    
-    const keywords = domain.keywords.map(keyword => keyword.term);
-         const suggestionResult = await suggestCompetitors(
-       domain.url,
-       domain.context || 'No context provided',
-       keywords,
-       domain.location || undefined
-     );
+    const domainContext = [
+      typeof domain.context === 'string' ? domain.context.trim() : '',
+      getSummaryContext(domain.contextJson),
+      domain.crawlResults[0]?.extractedContext?.trim() || ''
+    ].find((context) => context && context.length >= 50);
 
-    console.log(`AI competitor suggestions generated with ${suggestionResult.tokenUsage} tokens used`);
+    if (!domainContext) {
+      return res.status(400).json({
+        error: 'Domain context is required before standalone competitor analysis',
+        message: 'Run domain extraction first so the system has enough context to identify realistic peer competitors.'
+      });
+    }
+
+    console.log(`Generating standalone-based competitor suggestions for domain: ${domain.url}`);
+
+    const analysisResult = await analyzeStandalonePeerCompetitors({
+      domain: domain.url,
+      context: domainContext,
+      location: domain.location || undefined
+    });
+
+    const storedAnalysis = {
+      competitors: analysisResult.competitors,
+      marketInsights: analysisResult.marketInsights,
+      strategicRecommendations: analysisResult.strategicRecommendations,
+      competitiveAnalysis: analysisResult.competitiveAnalysis
+    };
+
+    const existingSuggestedCompetitor = await prisma.suggestedCompetitor.findFirst({
+      where: { domainId: domain.id },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    if (existingSuggestedCompetitor) {
+      await prisma.suggestedCompetitor.update({
+        where: { id: existingSuggestedCompetitor.id },
+        data: {
+          analysis: storedAnalysis as any,
+          tokenUsage: analysisResult.tokenUsage,
+          domainId: domain.id
+        }
+      });
+    } else {
+      await prisma.suggestedCompetitor.create({
+        data: {
+          analysis: storedAnalysis as any,
+          tokenUsage: analysisResult.tokenUsage,
+          domainId: domain.id
+        }
+      });
+    }
+
+    const suggestionResult = {
+      suggestedCompetitors: analysisResult.competitors.map((competitor) => ({
+        name: competitor.name,
+        domain: competitor.domain,
+        reason: competitor.peerFitReason,
+        type: competitor.type
+      })),
+      dbStats: {
+        totalSuggestedCompetitors: analysisResult.competitors.length,
+        targetMarket: analysisResult.marketInsights.targetMarket,
+        targetTier: analysisResult.marketInsights.targetTier,
+        analysisGenerated: analysisResult.competitiveAnalysis.dataSource.generatedAt
+      },
+      tokenUsage: analysisResult.tokenUsage
+    };
+
+    console.log(`Standalone competitor suggestions generated with ${suggestionResult.tokenUsage} tokens used`);
 
     res.json({
       suggestedCompetitors: suggestionResult.suggestedCompetitors,

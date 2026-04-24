@@ -276,14 +276,13 @@ model CompetitorAnalysis {
 }
 
 model SuggestedCompetitor {
-  id               Int      @id @default(autoincrement())
-  name             String
-  competitorDomain String
-  reason           String
-  type             String
-  createdAt        DateTime @default(now())
-  domainId         Int?
-  domain           Domain?  @relation(fields: [domainId], references: [id])
+  id         Int      @id @default(autoincrement())
+  analysis   Json
+  tokenUsage Int?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  domainId   Int?
+  domain     Domain?  @relation(fields: [domainId], references: [id])
 
   @@index([domainId])
 }
