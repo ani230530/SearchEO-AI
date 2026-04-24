@@ -900,7 +900,7 @@ useEffect(() => {
 
   // Fetch all campaign tab data in parallel when campaign tab is active
   const fetchCampaignTabData = useCallback(async () => {
-    if (activeTab !== 'projects') return;
+    if (activeTab !== 'projects' && activeTab !== 'create-project') return;
     
     setCampaignTabDataLoading(true);
     try {
@@ -958,7 +958,7 @@ useEffect(() => {
   }, [activeTab, awaitingNewDomain]);
 
   useEffect(() => {
-    if (activeTab === 'projects') {
+    if (activeTab === 'projects' || activeTab === 'create-project') {
       fetchCampaignTabData();
     }
   }, [activeTab, fetchCampaignTabData]);
@@ -1758,7 +1758,7 @@ useEffect(() => {
       fetchWordpressIntegration();
     
     // Also refresh campaign tab data if we're on campaign tab and WordPress integration might have changed
-    if (activeTab === 'projects' && activeCompanySubTab === 'integration') {
+    if ((activeTab === 'projects' || activeTab === 'create-project') && activeCompanySubTab === 'integration') {
       fetchCampaignTabData();
     }
   }, [activeTab, activeCompanySubTab, fetchGscStatus, fetchWordpressIntegration, fetchCampaignTabData]);
@@ -1801,7 +1801,7 @@ useEffect(() => {
   }, [toast]);
 
   useEffect(() => {
-    if (activeTab === 'projects' || activeTab === 'overview') {
+    if (activeTab === 'projects' || activeTab === 'create-project' || activeTab === 'overview') {
       // Fetch campaigns for both the Campaign tab and the Overview
       // so Overview can show recent campaigns/quick access.
       fetchCampaigns();
@@ -2897,6 +2897,10 @@ useEffect(() => {
           }
           setOpenWordpressConnectionView(false);
           setActiveTab(tabId);
+          if (tabId === "create-project") {
+            setSelectedCampaignId(null);
+            setShowCreateCampaign(false);
+          }
           if (tabId === "integration") {
             setActiveCompanySubTab("integration");
           }
@@ -2925,7 +2929,7 @@ useEffect(() => {
         />
 
         {/* Content Body */}
-        <div className={activeTab === 'projects' && selectedCampaignId ? "flex-1 min-h-[calc(100vh-80px)] bg-white" : "content-body"}>
+        <div className={(activeTab === 'projects' || activeTab === 'create-project') && selectedCampaignId ? "flex-1 min-h-[calc(100vh-80px)] bg-white" : "content-body"}>
           {activeTab === "analytics" || activeTab === "integration" ? (
             <AnalyticsCompanySection
               companyDomainLoading={companyDomainLoading}
@@ -2999,7 +3003,7 @@ useEffect(() => {
               handleDomainChange={handleDomainChange}
               openWordpressConnectionView={openWordpressConnectionView}
             />
-          ) : activeTab === "projects" ? (
+          ) : activeTab === "projects" || activeTab === "create-project" ? (
             <ProjectsSection
               selectedCampaignId={selectedCampaignId}
               campaigns={campaigns}
