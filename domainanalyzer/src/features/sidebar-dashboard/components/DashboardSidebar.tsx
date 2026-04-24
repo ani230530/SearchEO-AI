@@ -130,7 +130,8 @@ export function DashboardSidebar({
             key: "create-project",
             label: "Create New Project",
             icon: <Plus className="h-4 w-4" />,
-            onClick: () => onSelectTab("projects"),
+            isActive: activeTab === "create-project",
+            onClick: () => onSelectTab("create-project"),
           },
           {
             key: "all-projects",
