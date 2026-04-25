@@ -15,7 +15,7 @@ import LandingPage from "./pages/LandingPage";
 import SidebarDashboard from "./pages/SidebarDashboard";
 import WordPressConnection from "./pages/WordPressConnection";
 import KnowledgeBase from "./pages/KnowledgeBase";
-
+import AIChecker from "./pages/AIChecker";
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -41,9 +41,14 @@ const App = () => (
                 <MainDashboard />
               </ProtectedRoute>
             } />
-            <Route path="/analyze" element={
+            {/* <Route path="/analyze" element={
               <ProtectedRoute>
                 <Index />
+              </ProtectedRoute>
+            } /> */}
+             <Route path="/ai-checker-page" element={
+              <ProtectedRoute>
+                <AIChecker/>
               </ProtectedRoute>
             } />
             <Route path="/dashboard/:domain" element={

@@ -18,6 +18,7 @@ import {
 import { useAuth } from '@/contexts/AuthContext';
 import { maskDomainId } from '@/lib/domainUtils';
 
+
 interface DashboardDomain {
   id: number;
   url: string;
@@ -582,7 +583,7 @@ const ProfessionalDashboard = () => {
             </div>
             
             <button 
-              onClick={() => navigate('/analyze')} 
+              onClick={() => navigate('/ai-checker-page')} 
               className="apple-button w-full sm:w-auto"
             >
               <Plus className="h-4 w-4 mr-2" />
