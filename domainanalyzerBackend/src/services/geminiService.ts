@@ -1099,9 +1099,75 @@ async function fetchGoogleAutocomplete(seed: string): Promise<string[]> {
   }
 }
 
+export const GENERIC_ANALYSIS_KEYWORDS = [
+  'business analysis',
+  'market trends',
+  'seo strategy',
+  'competitive analysis',
+  'industry insights',
+  'customer profiling',
+  'brand positioning',
+  'content strategy',
+  'market dynamics',
+  'seo opportunities',
+  'local seo',
+  'market leaders',
+  'value proposition',
+  'competitive gaps',
+  'industry classification',
+  'customer journey',
+  'geographic scope',
+  'solution categories',
+  'local market',
+  'content themes',
+  'market size',
+  'decision factors',
+  'authority building',
+  'direct competitors',
+  'indirect competitors',
+  'competitive advantages',
+  'vulnerability areas',
+  'seasonal patterns',
+  'cultural considerations',
+  'local search behavior',
+  'content gaps',
+  'keyword opportunities',
+  'content opportunities',
+  'long-tail opportunities',
+  'local seo strategy',
+  'market positioning',
+  'key benefits',
+  'expertise areas',
+  'geographic considerations',
+];
+
+const GENERIC_ANALYSIS_KEYWORD_SET = new Set(GENERIC_ANALYSIS_KEYWORDS);
+
+export function isGenericAnalysisKeyword(term: string): boolean {
+  return GENERIC_ANALYSIS_KEYWORD_SET.has(term.trim().toLowerCase());
+}
+
+function hasWeakDomainContext(context: string): boolean {
+  const weakEvidenceMatches = context.match(/not clearly established from website evidence/gi) || [];
+  return weakEvidenceMatches.length >= 3;
+}
+
+function getHostnameLabel(domain: string): string {
+  try {
+    const withProtocol = /^https?:\/\//i.test(domain) ? domain : `https://${domain}`;
+    return new URL(withProtocol).hostname.replace(/^www\./, '').split('.')[0].replace(/[-_]/g, ' ');
+  } catch {
+    return domain.replace(/^https?:\/\//i, '').replace(/^www\./i, '').split('.')[0].replace(/[-_]/g, ' ');
+  }
+}
+
 export async function generateKeywordsForDomain(domain: string, context: string, location?: string): Promise<{ keywords: Array<{ term: string, volume: number, difficulty: string, cpc: number, intent: string }>, tokenUsage: number }> {
   try {
     const locationContext = location ? `\nLocation: ${location}` : '';
+    const weakContext = hasWeakDomainContext(context);
+    const businessContext = weakContext
+      ? `Domain: ${domain}\nBusiness or brand cue: ${getHostnameLabel(domain)}`
+      : context;
 
     // Get location context from database if available
     let locationDomainContext = '';
@@ -1120,12 +1186,13 @@ export async function generateKeywordsForDomain(domain: string, context: string,
     // AI-visibility-focused prompt: generate keywords that make good AI prompts
     const prompt = `Generate 40 SHORT-TAIL KEYWORDS (1-4 words max) for testing AI visibility of the following business. These keywords will be turned into prompts like "What is the best [keyword]?" or "Recommend a [keyword]" to test whether AI models mention this domain.
 
-Business: ${context}${locationContext}${locationDomainContext}
+Business: ${businessContext}${locationContext}${locationDomainContext}
 
 STRICT RULES:
 - Every keyword MUST be 1-4 words. NO phrases longer than 4 words.
 - Do NOT include the brand name "${domain}" or any brand variants
 - Do NOT include navigational terms
+- Do NOT include generic strategy/report headings such as "business analysis", "market trends", "seo strategy", "customer profiling", "brand positioning", or "competitive analysis"
 - Keywords should be generic industry/service/product terms that someone would ask an AI about
 - Focus on terms where this business COULD be recommended by an AI
 
@@ -1168,18 +1235,18 @@ Return JSON array only, no explanations:
       const jsonMatch = text.match(/\[[\s\S]*\]/);
       if (!jsonMatch) {
         console.error('No JSON found in keyword response');
-        return { keywords: generateDomainFallbackKeywords(domain, context), tokenUsage: completion.usage?.total_tokens || 0 };
+        return { keywords: generateDomainFallbackKeywords(domain, businessContext), tokenUsage: completion.usage?.total_tokens || 0 };
       }
       keywords = JSON.parse(jsonMatch[0]);
     }
 
     if (!Array.isArray(keywords)) {
-      return { keywords: generateDomainFallbackKeywords(domain, context), tokenUsage: completion.usage?.total_tokens || 0 };
+      return { keywords: generateDomainFallbackKeywords(domain, businessContext), tokenUsage: completion.usage?.total_tokens || 0 };
     }
 
     // ── Post-generation filtering ──────────────────────────────────────────
     const seen = new Set<string>();
-    const domainLower = domain.toLowerCase().replace(/\.(com|io|net|org|co)$/, '').replace(/^www\./, '');
+    const domainLower = getHostnameLabel(domain).toLowerCase();
 
     const validatedKeywords = keywords
       .map((kw: any) => {
@@ -1189,6 +1256,8 @@ Return JSON array only, no explanations:
         // HARD REJECT: more than 4 words
         const wordCount = term.split(/\s+/).length;
         if (wordCount > 4) return null;
+
+        if (isGenericAnalysisKeyword(term)) return null;
 
         // Reject brand terms
         if (term.includes(domainLower)) return null;
@@ -1228,7 +1297,7 @@ Return JSON array only, no explanations:
     for (const suggestions of autocompleteResults) {
       for (const s of suggestions) {
         const wordCount = s.split(/\s+/).length;
-        if (wordCount <= 4 && !seen.has(s) && !s.includes(domainLower)) {
+        if (wordCount <= 4 && !seen.has(s) && !s.includes(domainLower) && !isGenericAnalysisKeyword(s)) {
           autocompleteKeywords.add(s);
           seen.add(s);
         }
@@ -1254,7 +1323,10 @@ Return JSON array only, no explanations:
 
   } catch (error) {
     console.error('Keyword generation error:', error);
-    return { keywords: generateDomainFallbackKeywords(domain, context), tokenUsage: 0 };
+    const fallbackContext = hasWeakDomainContext(context)
+      ? `Domain: ${domain}\nBusiness or brand cue: ${getHostnameLabel(domain)}`
+      : context;
+    return { keywords: generateDomainFallbackKeywords(domain, fallbackContext), tokenUsage: 0 };
   }
 }
 
@@ -1310,6 +1382,7 @@ function generateDomainFallbackKeywords(domain: string, context: string): Array<
   return baseKeywords
     .filter(kw => {
       if (seen.has(kw.term)) return false;
+      if (isGenericAnalysisKeyword(kw.term)) return false;
       seen.add(kw.term);
       return kw.term.split(/\s+/).length <= 4;
     })

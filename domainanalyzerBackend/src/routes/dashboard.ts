@@ -1408,48 +1408,40 @@ router.get('/:domainId/suggested-competitors', authenticateToken, async (req: an
     ].find((context) => context && context.length >= 50);
 
     if (!domainContext) {
-      return res.status(400).json({
-        error: 'Domain context is required before standalone competitor analysis',
-        message: 'Run domain extraction first so the system has enough context to identify realistic peer competitors.'
+      return res.json({
+        suggestedCompetitors: [],
+        dbStats: {
+          totalSuggestedCompetitors: 0,
+          targetMarket: domain.location || 'Global',
+          targetTier: null,
+          analysisGenerated: new Date().toISOString()
+        },
+        tokenUsage: 0,
+        message: 'Competitor suggestions are unavailable until domain context is ready.'
       });
     }
 
     console.log(`Generating standalone-based competitor suggestions for domain: ${domain.url}`);
 
-    const analysisResult = await analyzeStandalonePeerCompetitors({
-      domain: domain.url,
-      context: domainContext,
-      location: domain.location || undefined
-    });
-
-    const storedAnalysis = {
-      competitors: analysisResult.competitors,
-      marketInsights: analysisResult.marketInsights,
-      strategicRecommendations: analysisResult.strategicRecommendations,
-      competitiveAnalysis: analysisResult.competitiveAnalysis
-    };
-
-    const existingSuggestedCompetitor = await prisma.suggestedCompetitor.findFirst({
-      where: { domainId: domain.id },
-      orderBy: { createdAt: 'desc' }
-    });
-
-    if (existingSuggestedCompetitor) {
-      await prisma.suggestedCompetitor.update({
-        where: { id: existingSuggestedCompetitor.id },
-        data: {
-          analysis: storedAnalysis as any,
-          tokenUsage: analysisResult.tokenUsage,
-          domainId: domain.id
-        }
+    let analysisResult;
+    try {
+      analysisResult = await analyzeStandalonePeerCompetitors({
+        domain: domain.url,
+        context: domainContext,
+        location: domain.location || undefined
       });
-    } else {
-      await prisma.suggestedCompetitor.create({
-        data: {
-          analysis: storedAnalysis as any,
-          tokenUsage: analysisResult.tokenUsage,
-          domainId: domain.id
-        }
+    } catch (analysisError) {
+      console.error('Suggested competitor generation failed:', analysisError);
+      return res.json({
+        suggestedCompetitors: [],
+        dbStats: {
+          totalSuggestedCompetitors: 0,
+          targetMarket: domain.location || 'Global',
+          targetTier: null,
+          analysisGenerated: new Date().toISOString()
+        },
+        tokenUsage: 0,
+        message: 'Competitor suggestions are unavailable right now. Add competitors manually to continue.'
       });
     }
 
@@ -1478,7 +1470,17 @@ router.get('/:domainId/suggested-competitors', authenticateToken, async (req: an
     });
   } catch (error) {
     console.error('Error fetching suggested competitors:', error);
-    res.status(500).json({ error: 'Failed to fetch suggested competitors' });
+    res.json({
+      suggestedCompetitors: [],
+      dbStats: {
+        totalSuggestedCompetitors: 0,
+        targetMarket: null,
+        targetTier: null,
+        analysisGenerated: new Date().toISOString()
+      },
+      tokenUsage: 0,
+      message: 'Competitor suggestions are unavailable right now. Add competitors manually to continue.'
+    });
   }
 });
 

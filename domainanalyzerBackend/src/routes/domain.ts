@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { PrismaClient } from '../../generated/prisma';
-import { crawlAndExtractWithGpt4o, ProgressCallback, generateKeywordsForDomain } from '../services/geminiService';
+import { crawlAndExtractWithGpt4o, ProgressCallback, generateKeywordsForDomain, isGenericAnalysisKeyword } from '../services/geminiService';
 import { generateSeedKeywords } from '../services/googleAdsService';
 import { authenticateToken, AuthenticatedRequest } from '../middleware/auth';
 import { parseContextJson, parseCrawlPolicy, parseCrawlQuality, parsePageSnapshots, parseStringArray } from '../services/crawlResultUtils';
@@ -376,25 +376,34 @@ router.post('/', authenticateToken, asyncHandler(async (req: Request, res: Respo
       sendEvent({ type: 'progress', phase: 'keyword_generation', step: 'Saving keywords to database...', progress: 70 });
 
       // Save keywords to database
-      const keywordData = keywords.map((keyword: any) => ({
-        term: keyword.term,
-        volume: keyword.volume,
-        difficulty: keyword.difficulty,
-        cpc: keyword.cpc,
-        intent: keyword.intent || 'Commercial',
-        domainId: domain.id,
-        isSelected: false,
-      }));
+      const keywordData = keywords
+        .filter((keyword: any) => {
+          const term = String(keyword.term || '').trim();
+          return term && !isGenericAnalysisKeyword(term);
+        })
+        .map((keyword: any) => ({
+          term: keyword.term,
+          volume: keyword.volume,
+          difficulty: keyword.difficulty,
+          cpc: keyword.cpc,
+          intent: keyword.intent || 'Commercial',
+          domainId: domain.id,
+          isSelected: false,
+        }));
 
-      await prisma.keyword.createMany({
-        data: keywordData,
-        skipDuplicates: true,
-      });
+      if (keywordData.length > 0) {
+        await prisma.keyword.createMany({
+          data: keywordData,
+          skipDuplicates: true,
+        });
+      } else {
+        console.warn(`No valid domain keywords to save for domain ${domain.id}; skipped generic keyword insert.`);
+      }
 
       const keywordAnalysis = await prisma.keywordAnalysis.create({
         data: {
           domainId: domain.id,
-          keywords: keywords,
+          keywords: keywordData,
           searchVolumeData: {},
           intentClassification: {},
           competitiveAnalysis: {},
