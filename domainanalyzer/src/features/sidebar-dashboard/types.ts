@@ -7,6 +7,7 @@ export type TabId =
   | "overview"
   | "analytics"
   | "integration"
+  | "create-project"
   | "projects"
   | "publish"
   | "settings"

@@ -283,21 +283,29 @@ const KnowledgeBaseSection = () => {
   }, [folders, files, searchTerm]);
 
   return (
-    <div className="min-h-screen bg-slate-100 p-6">
+    <div className="pt-6">
       <div className="mx-auto max-w-7xl">
-        <div className="mb-6 rounded-[30px] border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="mb-6  p-6">
           <div className="flex items-center justify-between gap-6">
             <div>
-              <p className="text-xs uppercase tracking-[0.28em] text-slate-500">My Drive</p>
-              <h1 className="mt-3 text-3xl font-semibold tracking-tight text-slate-900">
-                Knowledge Base
-              </h1>
+              <h1 className="mt-3 text-3xl font-semibold tracking-tight text-slate-900">My Drive</h1>
             </div>
+            
             <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 shadow-sm">
+                <Search className="h-4 w-4 text-slate-500" />
+                <input
+                  type="search"
+                  value={searchTerm}
+                  onChange={(event) => setSearchTerm(event.target.value)}
+                  placeholder="Search in drive"
+                  className="w-full border-none bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400"
+                />
+              </div>
               <button
                 type="button"
                 onClick={openNewFolderModal}
-                className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
+                className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
               >
                 <FolderPlus className="h-4 w-4" />
                 New Folder
@@ -305,7 +313,7 @@ const KnowledgeBaseSection = () => {
               <button
                 type="button"
                 onClick={handleFileUploadClick}
-                className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
               >
                 <Upload className="h-4 w-4" />
                 File Upload
@@ -313,47 +321,20 @@ const KnowledgeBaseSection = () => {
               <button
                 type="button"
                 onClick={handleFolderUploadClick}
-                className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
               >
                 <FolderOpen className="h-4 w-4" />
                 Upload Folder
               </button>
             </div>
           </div>
-          <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-500">
-            Store and organize your SEO research in a Drive-style workspace with folders, uploads, and file previews.
-          </p>
         </div>
 
         <div className="space-y-6">
           <main className="space-y-6">
-            <div className="rounded-[30px] border border-slate-200 bg-white p-5 shadow-sm">
-              <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                <div className="flex items-center gap-3 rounded-full border border-slate-200 bg-slate-50 px-4 py-3 shadow-sm">
-                  <Search className="h-4 w-4 text-slate-500" />
-                  <input
-                    type="search"
-                    value={searchTerm}
-                    onChange={(event) => setSearchTerm(event.target.value)}
-                    placeholder="Search in drive"
-                    className="w-full border-none bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400"
-                  />
-                </div>
-                <div className="rounded-3xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-                  Last scanned 10/01/2026
-                </div>
-
-
-
-
-
-
-
-              </div>
-            </div>
 
             {folders.length > 0 && (
-            <div className="rounded-[30px] border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="p-5 pt-0">
               <div className="flex items-center justify-end gap-3">
                 {selectedFolderId ? (
                   <button
@@ -371,10 +352,10 @@ const KnowledgeBaseSection = () => {
                   filteredFolders.map((folder) => (
                     <div
                       key={folder.id}
-                      className={`relative rounded-[28px] border p-4 transition ${
+                      className={`relative  p-4 transition ${
                         selectedFolderId === folder.id
-                          ? "border-slate-900 bg-slate-950 text-white"
-                          : "border-slate-200 bg-slate-50 text-slate-900 hover:border-slate-300 hover:bg-white"
+                          ? "border-slate-900 bg-slate-950 text-white rounded-lg"
+                          : "border-slate-200 bg-slate-50 text-slate-900 hover:border-slate-300 hover:bg-white rounded-lg"
                       }`}
                     >
                       <button
@@ -401,14 +382,14 @@ const KnowledgeBaseSection = () => {
                           );
                         }}
                         aria-label="Folder menu"
-                        className="absolute right-4 top-4 inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:border-slate-300 hover:text-slate-700"
+                        className="absolute right-2 top-4 inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:border-slate-300 hover:text-slate-700"
                       >
                         <MoreVertical className="h-4 w-4" />
                       </button>
                       {openFolderMenuId === folder.id && (
                         <div
                           onClick={(event) => event.stopPropagation()}
-                          className="absolute right-4 top-16 z-20 w-40 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl"
+                          className="absolute right-4 top-16 z-20 w-40 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-xl"
                         >
                           <button
                             type="button"
@@ -607,7 +588,7 @@ const KnowledgeBaseSection = () => {
 
             {folders.length > 0 || files.length > 0 ? (
               <>
-                <div className="rounded-[30px] border border-slate-200 bg-white p-5 shadow-sm">
+                <div className="p-5">
                   <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                     <div>
                       <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Files</p>
@@ -650,39 +631,16 @@ const KnowledgeBaseSection = () => {
                 </div>
               </>
             ) : (
-              <div className="rounded-[30px] border border-slate-200 bg-white p-10 text-center shadow-sm">
+              <div className=" p-10 text-center">
                 <div className="mx-auto mb-8 flex h-48 w-48 items-center justify-center rounded-[36px] bg-slate-50 text-slate-400 shadow-sm">
-                  <div className="grid h-28 w-28 place-items-center rounded-3xl border border-dashed border-slate-200 bg-white text-slate-400">
-                    <Upload className="h-10 w-10" />
+                  <div className="grid h-full w-full place-items-center rounded-3xl border border-dashed border-slate-200 bg-white text-slate-400">
+                   <img src="/file-upload.png" alt="Empty drive" className="h-full w-full" />
                   </div>
                 </div>
                 <h2 className="text-4xl font-semibold text-slate-900">No files yet</h2>
                 <p className="mx-auto mt-4 max-w-xl text-sm leading-6 text-slate-500">
                   Create a folder to organize your documents and help AI generate more professional SEO content.
                 </p>
-                <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
-                  <button
-                    type="button"
-                    onClick={openNewFolderModal}
-                    className="inline-flex items-center justify-center rounded-full bg-slate-900 px-6 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
-                  >
-                    New Folder
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleFileUploadClick}
-                    className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-6 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
-                  >
-                    File Upload
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleFolderUploadClick}
-                    className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-6 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
-                  >
-                    Upload Folder
-                  </button>
-                </div>
               </div>
             )}
           </main>

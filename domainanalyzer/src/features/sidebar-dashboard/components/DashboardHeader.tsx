@@ -43,7 +43,7 @@ export function DashboardHeader({
           </h2>
         </div>
 
-        {activeTab === "projects" && selectedCampaignId && (
+        {(activeTab === "projects" || activeTab === "create-project") && selectedCampaignId && (
           <div className="mr-4 flex items-center gap-2 rounded-lg border border-gray-200/50 bg-gray-100/80 p-1">
             {VIEW_MODE_OPTIONS.map(({ icon: Icon, label, mode }) => (
               <button
