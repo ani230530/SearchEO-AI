@@ -29,6 +29,7 @@ export const DASHBOARD_TABS: DashboardTabConfig[] = [
   { id: "integration", label: "Integration", icon: Link },
   { id: "competitor-intelligence", label: "Competitor Intelligence", icon: Target },
   { id: "knowledge-base", label: "Knowledge Base", icon: Lightbulb },
+  { id: "domain-history", label: "Domain History", icon: Lightbulb },
   { id: "create-project", label: "Create New Project", icon: Plus },
   { id: "projects", label: "All Projects", icon: Send },
   { id: "publish", label: "Publish", icon: Megaphone },
