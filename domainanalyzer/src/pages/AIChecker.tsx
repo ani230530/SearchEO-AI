@@ -2,7 +2,6 @@ import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Country, State } from 'country-state-city';
 import { ChevronDown, Sparkles, Check, Plus, RefreshCcw } from 'lucide-react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Cell } from 'recharts';
 import { useToast } from '@/hooks/use-toast';
 import { validateDomainInput } from '@/lib/domainValidation';
 import { maskDomainId } from '@/lib/domainUtils';
@@ -25,6 +24,10 @@ type AnalysisItem = {
   label: string;
   phraseId?: number;
   keywordId?: number;
+  isCustom?: boolean;
+  parentKeyword?: string;
+  sources?: string[];
+  createdAt?: string;
 };
 
 type DomainWorkspace = {
@@ -34,14 +37,15 @@ type DomainWorkspace = {
   location: string;
 };
 
-type DashboardData = {
-  metrics?: {
-    performanceData?: Array<Record<string, any>>;
-    modelPerformance?: Array<Record<string, any>>;
-  };
+type LoadedStepData = {
+  keywordCount: number;
+  promptCount: number;
+  itemCount: number;
 };
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3002';
+const MIN_PROMPTS_BEFORE_STEP_THREE = 3;
+const BASE_STEP_ITEM_LIMIT = 7;
 
 const industryOptions = [
   'Agriculture',
@@ -111,9 +115,6 @@ const genericAnalysisKeywords = new Set([
 
 const isGenericAnalysisKeyword = (term: string) => genericAnalysisKeywords.has(term.trim().toLowerCase());
 
-const emptyPerformanceData = [{ month: 'No data', score: 0, mentions: 0, queries: 0 }];
-const emptyModelData = [{ model: 'No report data', avgConfidence: 0, responses: 0 }];
-
 const AIChecker = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -135,7 +136,6 @@ const AIChecker = () => {
   const [newCompetitor, setNewCompetitor] = useState('');
   const [stepItems, setStepItems] = useState<AnalysisItem[]>([]);
   const [workspace, setWorkspace] = useState<DomainWorkspace | null>(null);
-  const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
   const [status, setStatus] = useState('');
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState('');
@@ -152,23 +152,74 @@ const AIChecker = () => {
     [country]
   );
 
-  const performanceData = dashboardData?.metrics?.performanceData?.length
-    ? dashboardData.metrics.performanceData
-    : emptyPerformanceData;
-  const modelPerformanceData = dashboardData?.metrics?.modelPerformance?.length
-    ? dashboardData.metrics.modelPerformance
-    : emptyModelData;
-
   const getAuthHeaders = () => {
     const token = localStorage.getItem('authToken');
     if (!token) throw new Error('Please log in before generating a report.');
     return { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
   };
 
+  const getUserFacingStatus = (message: string) => {
+    const normalized = message.toLowerCase();
+
+    if (
+      normalized.includes('ready') ||
+      normalized.includes('loaded') ||
+      normalized.includes('complete') ||
+      normalized.includes('opening report')
+    ) {
+      return 'Ready';
+    }
+
+    if (
+      normalized.includes('competitor') ||
+      normalized.includes('competitors')
+    ) {
+      return 'Finding competitors';
+    }
+
+    if (
+      normalized.includes('keyword') ||
+      normalized.includes('keywords') ||
+      normalized.includes('prompt') ||
+      normalized.includes('prompts') ||
+      normalized.includes('phrase') ||
+      normalized.includes('phrases')
+    ) {
+      if (normalized.includes('saving')) return 'Saving your inputs';
+      return 'Preparing prompts and keywords';
+    }
+
+    if (
+      normalized.includes('ai visibility') ||
+      normalized.includes('ai responses') ||
+      normalized.includes('report') ||
+      normalized.includes('compiling')
+    ) {
+      return 'Generating your report';
+    }
+
+    if (
+      normalized.includes('domain') ||
+      normalized.includes('analyzing') ||
+      normalized.includes('fetching') ||
+      normalized.includes('candidate') ||
+      normalized.includes('crawl') ||
+      normalized.includes('page')
+    ) {
+      return 'Preparing your domain';
+    }
+
+    return 'Working on it';
+  };
+
   const setAnalysisState = (message: string, nextProgress: number) => {
-    setStatus(message);
+    setStatus(getUserFacingStatus(message));
     setProgress(Math.max(0, Math.min(100, nextProgress)));
   };
+
+  const hasCustomSource = (sources?: string[]) => (sources || []).some((source) => source.toLowerCase().includes('custom'));
+  const normalizeInput = (value: string) => value.trim().replace(/\s+/g, ' ');
+  const uniqueInputs = (items: string[]) => Array.from(new Map(items.map((item) => [normalizeInput(item).toLowerCase(), normalizeInput(item)])).values()).filter(Boolean);
 
   const getLocationLabel = () => {
     const countryLabel = countryOptions.find((item) => item.code === country)?.name || '';
@@ -244,22 +295,12 @@ const AIChecker = () => {
 
   const resetWorkspaceData = () => {
     setWorkspace(null);
-    setDashboardData(null);
     setCompetitors([]);
     setStepItems([]);
     setSelectedStepItems([]);
     setError('');
     setStatus('');
     setProgress(0);
-  };
-
-  const fetchDashboardData = async (domainId: number) => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/dashboard/${domainId}`, { headers: getAuthHeaders() });
-      if (response.ok) setDashboardData(await response.json());
-    } catch (dashboardError) {
-      console.warn('Unable to load dashboard chart data:', dashboardError);
-    }
   };
 
   const ensureDomain = async () => {
@@ -332,11 +373,14 @@ const AIChecker = () => {
     }
   };
 
-  const loadKeywordsAndPhrases = async (currentWorkspace: DomainWorkspace) => {
+  const loadKeywordsAndPhrases = async (currentWorkspace: DomainWorkspace): Promise<LoadedStepData> => {
     setIsLoadingStepItems(true);
     setStepItems([]);
     setSelectedStepItems([]);
     setError('');
+
+    let keywordCount = 0;
+    let promptCount = 0;
 
     try {
       setAnalysisState('Loading domain keywords...', 60);
@@ -353,7 +397,10 @@ const AIChecker = () => {
           type: 'keyword',
           label: keyword.term,
           keywordId: Number(keyword.id),
+          isCustom: Boolean(keyword.isCustom),
+          createdAt: keyword.createdAt,
         }));
+      keywordCount = allKeywordItems.length;
 
       setAnalysisState('Loading generated prompts...', 68);
       let promptItems: AnalysisItem[] = [];
@@ -369,36 +416,56 @@ const AIChecker = () => {
             label: phrase.phrase,
             phraseId: Number(phrase.id),
             keywordId: Number(phrase.keywordId),
+            isCustom: hasCustomSource(phrase.sources) || Boolean(phrase.parentKeywordIsCustom),
+            parentKeyword: phrase.parentKeyword,
+            sources: Array.isArray(phrase.sources) ? phrase.sources : [],
+            createdAt: phrase.createdAt,
           }));
         }
       } catch (phraseError) {
         console.warn('Unable to load existing prompts:', phraseError);
       }
+      promptCount = promptItems.length;
 
-      const selectedPrompts = promptItems.slice(0, 2);
-      const preferredKeywordCount = selectedPrompts.length < 2 ? 7 - selectedPrompts.length : 3;
-      const selectedKeywords = allKeywordItems.slice(0, Math.min(preferredKeywordCount, 7 - selectedPrompts.length));
-      const combined = [...selectedPrompts, ...selectedKeywords].slice(0, 7);
+      const customPromptItems = promptItems.filter((item) => hasCustomSource(item.sources));
+      const customKeywordPromptItems = promptItems.filter((item) => item.isCustom && !hasCustomSource(item.sources));
+      const backendPromptItems = promptItems.filter((item) => !item.isCustom);
+      const customKeywordItems = allKeywordItems.filter((item) => item.isCustom);
+      const backendKeywordItems = allKeywordItems.filter((item) => !item.isCustom);
+
+      const prioritizedItems = [
+        ...customPromptItems,
+        ...customKeywordPromptItems,
+        ...customKeywordItems,
+        ...backendPromptItems,
+        ...backendKeywordItems,
+      ];
+      const uniquePrioritizedItems = prioritizedItems.filter((item, index, list) => list.findIndex((candidate) => candidate.id === item.id) === index);
+      const customItemCount = uniquePrioritizedItems.filter((item) => item.isCustom || hasCustomSource(item.sources)).length;
+      const combined = uniquePrioritizedItems.slice(0, Math.max(BASE_STEP_ITEM_LIMIT, customItemCount));
+      const customSelectionIds = combined
+        .filter((item) => item.isCustom || hasCustomSource(item.sources))
+        .map((item) => item.id);
+      const defaultSelectionIds = combined
+        .filter((item) => !customSelectionIds.includes(item.id))
+        .slice(0, Math.max(0, 6 - customSelectionIds.length))
+        .map((item) => item.id);
       setStepItems(combined);
-      setSelectedStepItems(combined.slice(0, Math.min(6, combined.length)).map((item) => item.id));
+      setSelectedStepItems([...customSelectionIds, ...defaultSelectionIds]);
       setAnalysisState(combined.length ? 'Backend keywords and prompts loaded.' : 'No backend keywords or prompts found yet.', 75);
+      return { keywordCount, promptCount, itemCount: combined.length };
     } finally {
       setIsLoadingStepItems(false);
     }
   };
 
-  const generatePromptsAndReload = async () => {
-    if (!workspace) {
-      setError('Finish domain setup before generating prompts.');
-      return;
-    }
-
+  const generatePromptsForWorkspace = async (currentWorkspace: DomainWorkspace, reloadAfter = true) => {
     setIsLoadingStepItems(true);
     setError('');
 
     try {
       setAnalysisState('Generating prompts...', 62);
-      const response = await fetch(`${API_BASE_URL}/api/enhanced-phrases/${workspace.domainId}/step3/generate`, {
+      const response = await fetch(`${API_BASE_URL}/api/enhanced-phrases/${currentWorkspace.domainId}/step3/generate`, {
         method: 'POST',
         headers: getAuthHeaders(),
       });
@@ -418,19 +485,33 @@ const AIChecker = () => {
             label,
             phraseId,
             keywordId: Number(phrase.keywordId),
+            isCustom: hasCustomSource(phrase.sources) || Boolean(phrase.parentKeywordIsCustom),
+            parentKeyword: phrase.parentKeyword,
+            sources: Array.isArray(phrase.sources) ? phrase.sources : [],
+            createdAt: phrase.createdAt,
           };
           setStepItems((prev) => prev.some((existing) => existing.id === item.id) ? prev : [item, ...prev]);
         }
       });
 
-      await loadKeywordsAndPhrases(workspace);
+      if (reloadAfter) await loadKeywordsAndPhrases(currentWorkspace);
     } catch (promptError) {
       const message = promptError instanceof Error ? promptError.message : 'Prompt generation failed.';
       setError(message);
       toast({ title: 'Prompt generation failed', description: message, variant: 'destructive' });
+      throw promptError;
     } finally {
       setIsLoadingStepItems(false);
     }
+  };
+
+  const generatePromptsAndReload = async () => {
+    if (!workspace) {
+      setError('Finish domain setup before generating prompts.');
+      return;
+    }
+
+    await generatePromptsForWorkspace(workspace, true).catch(() => undefined);
   };
 
   const saveSelectedCompetitors = async () => {
@@ -503,6 +584,40 @@ const AIChecker = () => {
 
     const data = await response.json();
     return data?.phrase?.id ? Number(data.phrase.id) : null;
+  };
+
+  const savePendingCustomInputs = async () => {
+    const pendingKeywords = customKeywords.split(',').map(normalizeInput).filter(Boolean);
+    const pendingPrompts = customPrompts.split(',').map(normalizeInput).filter(Boolean);
+    const keywordsToSave = uniqueInputs([...keywordTags, ...pendingKeywords]);
+    const promptsToSave = uniqueInputs([...promptTags, ...pendingPrompts]);
+    const keywordIds: number[] = [];
+    const phraseIds: number[] = [];
+
+    if (keywordsToSave.length > 0) {
+      setAnalysisState('Saving custom keywords...', 70);
+      for (const keyword of keywordsToSave) {
+        const keywordId = await analyzeAndSaveKeyword(keyword);
+        if (keywordId) keywordIds.push(keywordId);
+      }
+      setKeywordTags(keywordsToSave);
+      setCustomKeywords('');
+    }
+
+    if (promptsToSave.length > 0) {
+      setAnalysisState('Saving custom prompts...', 74);
+      for (const phrase of promptsToSave) {
+        const phraseId = await saveCustomPrompt(phrase);
+        if (phraseId) phraseIds.push(phraseId);
+      }
+      setPromptTags(promptsToSave);
+      setCustomPrompts('');
+    }
+
+    return {
+      keywordIds: Array.from(new Set(keywordIds)),
+      phraseIds: Array.from(new Set(phraseIds)),
+    };
   };
 
   const selectKeywords = async (keywordIds: number[]) => {
@@ -609,7 +724,6 @@ const AIChecker = () => {
     try {
       const nextWorkspace = await ensureDomain();
       setWorkspace(nextWorkspace);
-      await fetchDashboardData(nextWorkspace.domainId);
       await loadSuggestedCompetitors(nextWorkspace.domainId);
       setStep(2);
       setAnalysisState('Competitor suggestions loaded.', 60);
@@ -634,7 +748,12 @@ const AIChecker = () => {
 
     try {
       await saveSelectedCompetitors();
-      await loadKeywordsAndPhrases(workspace);
+      await savePendingCustomInputs();
+      let loadedStepData = await loadKeywordsAndPhrases(workspace);
+      if (loadedStepData.keywordCount > 0 && loadedStepData.promptCount < MIN_PROMPTS_BEFORE_STEP_THREE) {
+        await generatePromptsForWorkspace(workspace, false);
+        await loadKeywordsAndPhrases(workspace);
+      }
       setStep(3);
     } catch (stepError) {
       const message = stepError instanceof Error ? stepError.message : 'Unable to load backend keywords and prompts.';
@@ -671,16 +790,10 @@ const AIChecker = () => {
       const keywordIds = [...selectedKeywordIds];
       const phraseIds = [...selectedPhraseIds];
 
-      setAnalysisState('Saving custom keywords...', 70);
-      for (const keyword of Array.from(new Set([...keywordTags, ...pendingKeywords]))) {
-        const keywordId = await analyzeAndSaveKeyword(keyword);
-        if (keywordId) keywordIds.push(keywordId);
-      }
-
-      setAnalysisState('Saving custom prompts...', 74);
-      for (const phrase of Array.from(new Set([...promptTags, ...pendingPrompts]))) {
-        const phraseId = await saveCustomPrompt(phrase);
-        if (phraseId) phraseIds.push(phraseId);
+      if (pendingKeywords.length > 0 || pendingPrompts.length > 0 || keywordTags.length > 0 || promptTags.length > 0) {
+        const savedCustomInputs = await savePendingCustomInputs();
+        keywordIds.push(...savedCustomInputs.keywordIds);
+        phraseIds.push(...savedCustomInputs.phraseIds);
       }
 
       if (keywordIds.length === 0 && phraseIds.length === 0) throw new Error('Select at least one backend keyword, prompt, or custom input.');
@@ -947,42 +1060,6 @@ const AIChecker = () => {
 
         <div className="w-1/2 space-y-6">
           <div className="mb-6"><img src="/ai-checker.png" alt="AI Checker" className="w-full h-auto rounded-lg shadow-sm" /></div>
-
-          {step !== 3 && (
-            <>
-              <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-                <p className="mb-4 text-sm font-semibold text-slate-700">Visibility trend</p>
-                <div className="h-56">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={performanceData}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="month" />
-                      <YAxis />
-                      <Tooltip />
-                      <Line type="monotone" dataKey="score" stroke="#3b82f6" strokeWidth={2} dot={false} />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-
-              <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-                <p className="mb-4 text-sm font-semibold text-slate-700">Model performance</p>
-                <div className="h-56">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={modelPerformanceData}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="model" />
-                      <YAxis />
-                      <Tooltip />
-                      <Bar dataKey="avgConfidence">
-                        {modelPerformanceData.map((_, index) => <Cell key={`cell-${index}`} fill={['#3b82f6', '#10b981', '#f59e0b'][index % 3]} />)}
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-            </>
-          )}
         </div>
       </div>
     </div>
