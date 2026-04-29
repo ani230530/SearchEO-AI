@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   BarChart3,
   ChevronRight,
+  History,
   Globe,
   Info,
   Lightbulb,
@@ -163,11 +164,18 @@ export function DashboardSidebar({
             },
           },
           {
-            key: "site-auditor",
-            label: "Site Auditor",
+            key: "website-audit",
+            label: "Website Audit",
             icon: <Globe className="h-4 w-4" />,
             isActive: activeTab === "audit",
             onClick: () => onSelectTab("audit"),
+          },
+           {
+            key: "domain-history",
+            label: "Domain History",
+            icon: <History  className="h-4 w-4" />,
+            isActive: activeTab === "domain-history",
+            onClick: () => onSelectTab("domain-history"),
           },
           {
             key: "competitor-analysis",
@@ -212,6 +220,7 @@ export function DashboardSidebar({
             isActive: activeTab === "knowledge-base",
             onClick: () => onSelectTab("knowledge-base"),
           },
+         
         ],
       },
       {
