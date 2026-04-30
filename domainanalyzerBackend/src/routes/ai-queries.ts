@@ -2350,26 +2350,83 @@ router.post('/:domainId', authenticateToken, async (req, res) => {
         console.log('AI Queries - Found selected phrases:', selectedPhrases.length);
         console.log('AI Queries - Selected phrases:', selectedPhrases.map(p => ({ id: p.id, phrase: p.phrase, keyword: p.keyword?.term || 'Unknown' })));
 
-        if (selectedPhrases.length === 0) {
-            res.write(`event: error\ndata: ${JSON.stringify({ error: 'No selected phrases found for this domain. Please go back and select phrases first.' })}\n\n`);
-            res.end();
-            return;
+        let phrases: Array<{ keyword: string; phrases: string[] }>;
+
+        if (selectedPhrases.length > 0) {
+            // Group phrases by keyword
+            const phrasesByKeyword = selectedPhrases.reduce((acc, phrase) => {
+                const keyword = phrase.keyword?.term || 'Unknown';
+                if (!acc[keyword]) {
+                    acc[keyword] = [];
+                }
+                acc[keyword].push(phrase.phrase);
+                return acc;
+            }, {} as Record<string, string[]>);
+
+            phrases = Object.entries(phrasesByKeyword).map(([keyword, phrases]) => ({
+                keyword,
+                phrases
+            }));
+        } else {
+            const selectedKeywords = await prisma.keyword.findMany({
+                where: {
+                    domainId,
+                    isSelected: true
+                },
+                select: {
+                    term: true,
+                    intent: true
+                },
+                take: 20
+            });
+
+            console.log('AI Queries - Falling back to selected keywords:', selectedKeywords.map(keyword => keyword.term));
+
+            if (selectedKeywords.length === 0) {
+                res.write(`event: error\ndata: ${JSON.stringify({ error: 'No selected keywords or prompts found for this domain. Please select keywords or prompts first.' })}\n\n`);
+                res.end();
+                return;
+            }
+
+            phrases = selectedKeywords.map(keyword => ({
+                keyword: keyword.term,
+                phrases: [
+                    keyword.intent === 'Transactional'
+                        ? `Where can I find ${keyword.term}?`
+                        : `What are the best ${keyword.term}?`
+                ]
+            }));
         }
 
-        // Group phrases by keyword
-        const phrasesByKeyword = selectedPhrases.reduce((acc, phrase) => {
-            const keyword = phrase.keyword?.term || 'Unknown';
-            if (!acc[keyword]) {
-                acc[keyword] = [];
-            }
-            acc[keyword].push(phrase.phrase);
-            return acc;
-        }, {} as Record<string, string[]>);
+        if (selectedPhrases.length > 0) {
+            const selectedKeywords = await prisma.keyword.findMany({
+                where: {
+                    domainId,
+                    isSelected: true
+                },
+                select: {
+                    term: true,
+                    intent: true
+                },
+                take: 20
+            });
+            const existingKeywords = new Set(phrases.map(item => item.keyword.toLowerCase()));
+            const keywordOnlyQueries = selectedKeywords
+                .filter(keyword => !existingKeywords.has(keyword.term.toLowerCase()))
+                .map(keyword => ({
+                    keyword: keyword.term,
+                    phrases: [
+                        keyword.intent === 'Transactional'
+                            ? `Where can I find ${keyword.term}?`
+                            : `What are the best ${keyword.term}?`
+                    ]
+                }));
 
-        const phrases = Object.entries(phrasesByKeyword).map(([keyword, phrases]) => ({
-            keyword,
-            phrases
-        }));
+            if (keywordOnlyQueries.length > 0) {
+                console.log('AI Queries - Adding selected keyword queries:', keywordOnlyQueries.map(item => item.keyword));
+                phrases = [...phrases, ...keywordOnlyQueries];
+            }
+        }
 
         // Validate input size to prevent overwhelming the system
         const totalPhrasesToProcess = phrases.reduce((sum, item) => sum + item.phrases.length, 0);

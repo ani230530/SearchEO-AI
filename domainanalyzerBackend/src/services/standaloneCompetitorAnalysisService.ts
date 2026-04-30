@@ -310,8 +310,8 @@ Domain context:
 ${params.context}
 
 Critical peer-matching rules:
-- Return EXACTLY 10 competitors. The UI requires 10 rows, so do not return fewer than 10.
-- Do not stop at 3-5 obvious competitors. Expand to adjacent but still same-tier peers until there are exactly 10.
+- Return up to 10 competitors. Prefer quality and same-tier fit over forcing a full list.
+- Do not stop at 3-5 obvious competitors if more strong same-tier peers are available.
 - Competitors must be in the same playing field: same business category, comparable offering, similar customer segment, relevant geography, and similar company scale/tier.
 - Competitors must currently operate in, sell to, or directly serve the target location. Do not include companies that are famous globally but unavailable in the target market.
 - For every competitor, set "operatesInTargetLocation" to true only when there is current active availability in the target location.
@@ -421,8 +421,8 @@ export async function analyzeStandalonePeerCompetitors(params: {
     domain: params.domain,
   });
 
-  if (competitors.length < 10) {
-    throw new Error(`AI response included ${competitors.length} valid same-tier competitors; exactly 10 are required`);
+  if (competitors.length === 0) {
+    throw new Error('AI response did not include any valid same-tier competitors');
   }
 
   const marketInsightsInput = parsed.marketInsights && typeof parsed.marketInsights === 'object'

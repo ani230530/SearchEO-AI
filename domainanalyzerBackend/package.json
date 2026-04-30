@@ -7,6 +7,7 @@
     "build": "npx prisma generate && tsc",
     "start": "node dist/index.js",
     "clean": "rm -rf dist",
+    "cleanup:generic-keywords": "node scripts/cleanup-generic-keywords.js",
     "postinstall": "prisma generate"
   },
   "dependencies": {

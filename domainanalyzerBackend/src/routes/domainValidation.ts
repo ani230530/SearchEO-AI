@@ -8,7 +8,7 @@ import OpenAI from 'openai';
 import puppeteer from 'puppeteer';
 import axios from 'axios';
 import { getDomainLookupCandidates, parseDomainInput } from '../utils/domainValidation';
-import { generateKeywordsForDomain } from '../services/geminiService';
+import { generateKeywordsForDomain, isGenericAnalysisKeyword } from '../services/geminiService';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -203,15 +203,20 @@ async function bootstrapKeywordsForDomain(
   }
 
   const aiKeywordResult = await generateKeywordsForDomain(domainUrl, contextText || domainUrl, location);
-  const keywords = aiKeywordResult.keywords.map((kw: any) => ({
-    term: kw.term,
-    volume: kw.volume,
-    difficulty: kw.difficulty,
-    cpc: kw.cpc,
-    intent: kw.intent || 'Commercial',
-    domainId,
-    isSelected: false,
-  }));
+  const keywords = aiKeywordResult.keywords
+    .filter((kw: any) => {
+      const term = String(kw.term || '').trim();
+      return term && !isGenericAnalysisKeyword(term);
+    })
+    .map((kw: any) => ({
+      term: kw.term,
+      volume: kw.volume,
+      difficulty: kw.difficulty,
+      cpc: kw.cpc,
+      intent: kw.intent || 'Commercial',
+      domainId,
+      isSelected: false,
+    }));
 
   if (keywords.length === 0) {
     return;

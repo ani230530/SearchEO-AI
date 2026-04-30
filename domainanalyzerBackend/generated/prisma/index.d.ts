@@ -19760,41 +19760,38 @@ export namespace Prisma {
 
   export type SuggestedCompetitorAvgAggregateOutputType = {
     id: number | null
+    tokenUsage: number | null
     domainId: number | null
   }
 
   export type SuggestedCompetitorSumAggregateOutputType = {
     id: number | null
+    tokenUsage: number | null
     domainId: number | null
   }
 
   export type SuggestedCompetitorMinAggregateOutputType = {
     id: number | null
-    name: string | null
-    competitorDomain: string | null
-    reason: string | null
-    type: string | null
+    tokenUsage: number | null
     createdAt: Date | null
+    updatedAt: Date | null
     domainId: number | null
   }
 
   export type SuggestedCompetitorMaxAggregateOutputType = {
     id: number | null
-    name: string | null
-    competitorDomain: string | null
-    reason: string | null
-    type: string | null
+    tokenUsage: number | null
     createdAt: Date | null
+    updatedAt: Date | null
     domainId: number | null
   }
 
   export type SuggestedCompetitorCountAggregateOutputType = {
     id: number
-    name: number
-    competitorDomain: number
-    reason: number
-    type: number
+    analysis: number
+    tokenUsage: number
     createdAt: number
+    updatedAt: number
     domainId: number
     _all: number
   }
@@ -19802,41 +19799,38 @@ export namespace Prisma {
 
   export type SuggestedCompetitorAvgAggregateInputType = {
     id?: true
+    tokenUsage?: true
     domainId?: true
   }
 
   export type SuggestedCompetitorSumAggregateInputType = {
     id?: true
+    tokenUsage?: true
     domainId?: true
   }
 
   export type SuggestedCompetitorMinAggregateInputType = {
     id?: true
-    name?: true
-    competitorDomain?: true
-    reason?: true
-    type?: true
+    tokenUsage?: true
     createdAt?: true
+    updatedAt?: true
     domainId?: true
   }
 
   export type SuggestedCompetitorMaxAggregateInputType = {
     id?: true
-    name?: true
-    competitorDomain?: true
-    reason?: true
-    type?: true
+    tokenUsage?: true
     createdAt?: true
+    updatedAt?: true
     domainId?: true
   }
 
   export type SuggestedCompetitorCountAggregateInputType = {
     id?: true
-    name?: true
-    competitorDomain?: true
-    reason?: true
-    type?: true
+    analysis?: true
+    tokenUsage?: true
     createdAt?: true
+    updatedAt?: true
     domainId?: true
     _all?: true
   }
@@ -19929,11 +19923,10 @@ export namespace Prisma {
 
   export type SuggestedCompetitorGroupByOutputType = {
     id: number
-    name: string
-    competitorDomain: string
-    reason: string
-    type: string
+    analysis: JsonValue
+    tokenUsage: number | null
     createdAt: Date
+    updatedAt: Date
     domainId: number | null
     _count: SuggestedCompetitorCountAggregateOutputType | null
     _avg: SuggestedCompetitorAvgAggregateOutputType | null
@@ -19958,22 +19951,20 @@ export namespace Prisma {
 
   export type SuggestedCompetitorSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
     id?: boolean
-    name?: boolean
-    competitorDomain?: boolean
-    reason?: boolean
-    type?: boolean
+    analysis?: boolean
+    tokenUsage?: boolean
     createdAt?: boolean
+    updatedAt?: boolean
     domainId?: boolean
     domain?: boolean | SuggestedCompetitor$domainArgs<ExtArgs>
   }, ExtArgs["result"]["suggestedCompetitor"]>
 
   export type SuggestedCompetitorSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
     id?: boolean
-    name?: boolean
-    competitorDomain?: boolean
-    reason?: boolean
-    type?: boolean
+    analysis?: boolean
+    tokenUsage?: boolean
     createdAt?: boolean
+    updatedAt?: boolean
     domainId?: boolean
     domain?: boolean | SuggestedCompetitor$domainArgs<ExtArgs>
   }, ExtArgs["result"]["suggestedCompetitor"]>
@@ -19981,15 +19972,14 @@ export namespace Prisma {
 
   export type SuggestedCompetitorSelectScalar = {
     id?: boolean
-    name?: boolean
-    competitorDomain?: boolean
-    reason?: boolean
-    type?: boolean
+    analysis?: boolean
+    tokenUsage?: boolean
     createdAt?: boolean
+    updatedAt?: boolean
     domainId?: boolean
   }
 
-  export type SuggestedCompetitorOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "name" | "competitorDomain" | "reason" | "type" | "createdAt" | "domainId", ExtArgs["result"]["suggestedCompetitor"]>
+  export type SuggestedCompetitorOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "analysis" | "tokenUsage" | "createdAt" | "updatedAt" | "domainId", ExtArgs["result"]["suggestedCompetitor"]>
   export type SuggestedCompetitorInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     domain?: boolean | SuggestedCompetitor$domainArgs<ExtArgs>
   }
@@ -20004,11 +19994,10 @@ export namespace Prisma {
     }
     scalars: $Extensions.GetPayloadResult<{
       id: number
-      name: string
-      competitorDomain: string
-      reason: string
-      type: string
+      analysis: Prisma.JsonValue
+      tokenUsage: number | null
       createdAt: Date
+      updatedAt: Date
       domainId: number | null
     }, ExtArgs["result"]["suggestedCompetitor"]>
     composites: {}
@@ -20405,11 +20394,10 @@ export namespace Prisma {
    */
   interface SuggestedCompetitorFieldRefs {
     readonly id: FieldRef<"SuggestedCompetitor", 'Int'>
-    readonly name: FieldRef<"SuggestedCompetitor", 'String'>
-    readonly competitorDomain: FieldRef<"SuggestedCompetitor", 'String'>
-    readonly reason: FieldRef<"SuggestedCompetitor", 'String'>
-    readonly type: FieldRef<"SuggestedCompetitor", 'String'>
+    readonly analysis: FieldRef<"SuggestedCompetitor", 'Json'>
+    readonly tokenUsage: FieldRef<"SuggestedCompetitor", 'Int'>
     readonly createdAt: FieldRef<"SuggestedCompetitor", 'DateTime'>
+    readonly updatedAt: FieldRef<"SuggestedCompetitor", 'DateTime'>
     readonly domainId: FieldRef<"SuggestedCompetitor", 'Int'>
   }
     
@@ -51805,11 +51793,10 @@ export namespace Prisma {
 
   export const SuggestedCompetitorScalarFieldEnum: {
     id: 'id',
-    name: 'name',
-    competitorDomain: 'competitorDomain',
-    reason: 'reason',
-    type: 'type',
+    analysis: 'analysis',
+    tokenUsage: 'tokenUsage',
     createdAt: 'createdAt',
+    updatedAt: 'updatedAt',
     domainId: 'domainId'
   };
 
@@ -53722,22 +53709,20 @@ export namespace Prisma {
     OR?: SuggestedCompetitorWhereInput[]
     NOT?: SuggestedCompetitorWhereInput | SuggestedCompetitorWhereInput[]
     id?: IntFilter<"SuggestedCompetitor"> | number
-    name?: StringFilter<"SuggestedCompetitor"> | string
-    competitorDomain?: StringFilter<"SuggestedCompetitor"> | string
-    reason?: StringFilter<"SuggestedCompetitor"> | string
-    type?: StringFilter<"SuggestedCompetitor"> | string
+    analysis?: JsonFilter<"SuggestedCompetitor">
+    tokenUsage?: IntNullableFilter<"SuggestedCompetitor"> | number | null
     createdAt?: DateTimeFilter<"SuggestedCompetitor"> | Date | string
+    updatedAt?: DateTimeFilter<"SuggestedCompetitor"> | Date | string
     domainId?: IntNullableFilter<"SuggestedCompetitor"> | number | null
     domain?: XOR<DomainNullableRelationFilter, DomainWhereInput> | null
   }
 
   export type SuggestedCompetitorOrderByWithRelationInput = {
     id?: SortOrder
-    name?: SortOrder
-    competitorDomain?: SortOrder
-    reason?: SortOrder
-    type?: SortOrder
+    analysis?: SortOrder
+    tokenUsage?: SortOrderInput | SortOrder
     createdAt?: SortOrder
+    updatedAt?: SortOrder
     domainId?: SortOrderInput | SortOrder
     domain?: DomainOrderByWithRelationInput
   }
@@ -53747,22 +53732,20 @@ export namespace Prisma {
     AND?: SuggestedCompetitorWhereInput | SuggestedCompetitorWhereInput[]
     OR?: SuggestedCompetitorWhereInput[]
     NOT?: SuggestedCompetitorWhereInput | SuggestedCompetitorWhereInput[]
-    name?: StringFilter<"SuggestedCompetitor"> | string
-    competitorDomain?: StringFilter<"SuggestedCompetitor"> | string
-    reason?: StringFilter<"SuggestedCompetitor"> | string
-    type?: StringFilter<"SuggestedCompetitor"> | string
+    analysis?: JsonFilter<"SuggestedCompetitor">
+    tokenUsage?: IntNullableFilter<"SuggestedCompetitor"> | number | null
     createdAt?: DateTimeFilter<"SuggestedCompetitor"> | Date | string
+    updatedAt?: DateTimeFilter<"SuggestedCompetitor"> | Date | string
     domainId?: IntNullableFilter<"SuggestedCompetitor"> | number | null
     domain?: XOR<DomainNullableRelationFilter, DomainWhereInput> | null
   }, "id">
 
   export type SuggestedCompetitorOrderByWithAggregationInput = {
     id?: SortOrder
-    name?: SortOrder
-    competitorDomain?: SortOrder
-    reason?: SortOrder
-    type?: SortOrder
+    analysis?: SortOrder
+    tokenUsage?: SortOrderInput | SortOrder
     createdAt?: SortOrder
+    updatedAt?: SortOrder
     domainId?: SortOrderInput | SortOrder
     _count?: SuggestedCompetitorCountOrderByAggregateInput
     _avg?: SuggestedCompetitorAvgOrderByAggregateInput
@@ -53776,11 +53759,10 @@ export namespace Prisma {
     OR?: SuggestedCompetitorScalarWhereWithAggregatesInput[]
     NOT?: SuggestedCompetitorScalarWhereWithAggregatesInput | SuggestedCompetitorScalarWhereWithAggregatesInput[]
     id?: IntWithAggregatesFilter<"SuggestedCompetitor"> | number
-    name?: StringWithAggregatesFilter<"SuggestedCompetitor"> | string
-    competitorDomain?: StringWithAggregatesFilter<"SuggestedCompetitor"> | string
-    reason?: StringWithAggregatesFilter<"SuggestedCompetitor"> | string
-    type?: StringWithAggregatesFilter<"SuggestedCompetitor"> | string
+    analysis?: JsonWithAggregatesFilter<"SuggestedCompetitor">
+    tokenUsage?: IntNullableWithAggregatesFilter<"SuggestedCompetitor"> | number | null
     createdAt?: DateTimeWithAggregatesFilter<"SuggestedCompetitor"> | Date | string
+    updatedAt?: DateTimeWithAggregatesFilter<"SuggestedCompetitor"> | Date | string
     domainId?: IntNullableWithAggregatesFilter<"SuggestedCompetitor"> | number | null
   }
 
@@ -57602,68 +57584,61 @@ export namespace Prisma {
   }
 
   export type SuggestedCompetitorCreateInput = {
-    name: string
-    competitorDomain: string
-    reason: string
-    type: string
+    analysis: JsonNullValueInput | InputJsonValue
+    tokenUsage?: number | null
     createdAt?: Date | string
+    updatedAt?: Date | string
     domain?: DomainCreateNestedOneWithoutSuggestedCompetitorsInput
   }
 
   export type SuggestedCompetitorUncheckedCreateInput = {
     id?: number
-    name: string
-    competitorDomain: string
-    reason: string
-    type: string
+    analysis: JsonNullValueInput | InputJsonValue
+    tokenUsage?: number | null
     createdAt?: Date | string
+    updatedAt?: Date | string
     domainId?: number | null
   }
 
   export type SuggestedCompetitorUpdateInput = {
-    name?: StringFieldUpdateOperationsInput | string
-    competitorDomain?: StringFieldUpdateOperationsInput | string
-    reason?: StringFieldUpdateOperationsInput | string
-    type?: StringFieldUpdateOperationsInput | string
+    analysis?: JsonNullValueInput | InputJsonValue
+    tokenUsage?: NullableIntFieldUpdateOperationsInput | number | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     domain?: DomainUpdateOneWithoutSuggestedCompetitorsNestedInput
   }
 
   export type SuggestedCompetitorUncheckedUpdateInput = {
     id?: IntFieldUpdateOperationsInput | number
-    name?: StringFieldUpdateOperationsInput | string
-    competitorDomain?: StringFieldUpdateOperationsInput | string
-    reason?: StringFieldUpdateOperationsInput | string
-    type?: StringFieldUpdateOperationsInput | string
+    analysis?: JsonNullValueInput | InputJsonValue
+    tokenUsage?: NullableIntFieldUpdateOperationsInput | number | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     domainId?: NullableIntFieldUpdateOperationsInput | number | null
   }
 
   export type SuggestedCompetitorCreateManyInput = {
     id?: number
-    name: string
-    competitorDomain: string
-    reason: string
-    type: string
+    analysis: JsonNullValueInput | InputJsonValue
+    tokenUsage?: number | null
     createdAt?: Date | string
+    updatedAt?: Date | string
     domainId?: number | null
   }
 
   export type SuggestedCompetitorUpdateManyMutationInput = {
-    name?: StringFieldUpdateOperationsInput | string
-    competitorDomain?: StringFieldUpdateOperationsInput | string
-    reason?: StringFieldUpdateOperationsInput | string
-    type?: StringFieldUpdateOperationsInput | string
+    analysis?: JsonNullValueInput | InputJsonValue
+    tokenUsage?: NullableIntFieldUpdateOperationsInput | number | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
   export type SuggestedCompetitorUncheckedUpdateManyInput = {
     id?: IntFieldUpdateOperationsInput | number
-    name?: StringFieldUpdateOperationsInput | string
-    competitorDomain?: StringFieldUpdateOperationsInput | string
-    reason?: StringFieldUpdateOperationsInput | string
-    type?: StringFieldUpdateOperationsInput | string
+    analysis?: JsonNullValueInput | InputJsonValue
+    tokenUsage?: NullableIntFieldUpdateOperationsInput | number | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     domainId?: NullableIntFieldUpdateOperationsInput | number | null
   }
 
@@ -61526,41 +61501,38 @@ export namespace Prisma {
 
   export type SuggestedCompetitorCountOrderByAggregateInput = {
     id?: SortOrder
-    name?: SortOrder
-    competitorDomain?: SortOrder
-    reason?: SortOrder
-    type?: SortOrder
+    analysis?: SortOrder
+    tokenUsage?: SortOrder
     createdAt?: SortOrder
+    updatedAt?: SortOrder
     domainId?: SortOrder
   }
 
   export type SuggestedCompetitorAvgOrderByAggregateInput = {
     id?: SortOrder
+    tokenUsage?: SortOrder
     domainId?: SortOrder
   }
 
   export type SuggestedCompetitorMaxOrderByAggregateInput = {
     id?: SortOrder
-    name?: SortOrder
-    competitorDomain?: SortOrder
-    reason?: SortOrder
-    type?: SortOrder
+    tokenUsage?: SortOrder
     createdAt?: SortOrder
+    updatedAt?: SortOrder
     domainId?: SortOrder
   }
 
   export type SuggestedCompetitorMinOrderByAggregateInput = {
     id?: SortOrder
-    name?: SortOrder
-    competitorDomain?: SortOrder
-    reason?: SortOrder
-    type?: SortOrder
+    tokenUsage?: SortOrder
     createdAt?: SortOrder
+    updatedAt?: SortOrder
     domainId?: SortOrder
   }
 
   export type SuggestedCompetitorSumOrderByAggregateInput = {
     id?: SortOrder
+    tokenUsage?: SortOrder
     domainId?: SortOrder
   }
 
@@ -67406,20 +67378,18 @@ export namespace Prisma {
   }
 
   export type SuggestedCompetitorCreateWithoutDomainInput = {
-    name: string
-    competitorDomain: string
-    reason: string
-    type: string
+    analysis: JsonNullValueInput | InputJsonValue
+    tokenUsage?: number | null
     createdAt?: Date | string
+    updatedAt?: Date | string
   }
 
   export type SuggestedCompetitorUncheckedCreateWithoutDomainInput = {
     id?: number
-    name: string
-    competitorDomain: string
-    reason: string
-    type: string
+    analysis: JsonNullValueInput | InputJsonValue
+    tokenUsage?: number | null
     createdAt?: Date | string
+    updatedAt?: Date | string
   }
 
   export type SuggestedCompetitorCreateOrConnectWithoutDomainInput = {
@@ -68236,11 +68206,10 @@ export namespace Prisma {
     OR?: SuggestedCompetitorScalarWhereInput[]
     NOT?: SuggestedCompetitorScalarWhereInput | SuggestedCompetitorScalarWhereInput[]
     id?: IntFilter<"SuggestedCompetitor"> | number
-    name?: StringFilter<"SuggestedCompetitor"> | string
-    competitorDomain?: StringFilter<"SuggestedCompetitor"> | string
-    reason?: StringFilter<"SuggestedCompetitor"> | string
-    type?: StringFilter<"SuggestedCompetitor"> | string
+    analysis?: JsonFilter<"SuggestedCompetitor">
+    tokenUsage?: IntNullableFilter<"SuggestedCompetitor"> | number | null
     createdAt?: DateTimeFilter<"SuggestedCompetitor"> | Date | string
+    updatedAt?: DateTimeFilter<"SuggestedCompetitor"> | Date | string
     domainId?: IntNullableFilter<"SuggestedCompetitor"> | number | null
   }
 
@@ -76328,11 +76297,10 @@ export namespace Prisma {
 
   export type SuggestedCompetitorCreateManyDomainInput = {
     id?: number
-    name: string
-    competitorDomain: string
-    reason: string
-    type: string
+    analysis: JsonNullValueInput | InputJsonValue
+    tokenUsage?: number | null
     createdAt?: Date | string
+    updatedAt?: Date | string
   }
 
   export type CampaignCreateManyDomainInput = {
@@ -77113,29 +77081,26 @@ export namespace Prisma {
   }
 
   export type SuggestedCompetitorUpdateWithoutDomainInput = {
-    name?: StringFieldUpdateOperationsInput | string
-    competitorDomain?: StringFieldUpdateOperationsInput | string
-    reason?: StringFieldUpdateOperationsInput | string
-    type?: StringFieldUpdateOperationsInput | string
+    analysis?: JsonNullValueInput | InputJsonValue
+    tokenUsage?: NullableIntFieldUpdateOperationsInput | number | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
   export type SuggestedCompetitorUncheckedUpdateWithoutDomainInput = {
     id?: IntFieldUpdateOperationsInput | number
-    name?: StringFieldUpdateOperationsInput | string
-    competitorDomain?: StringFieldUpdateOperationsInput | string
-    reason?: StringFieldUpdateOperationsInput | string
-    type?: StringFieldUpdateOperationsInput | string
+    analysis?: JsonNullValueInput | InputJsonValue
+    tokenUsage?: NullableIntFieldUpdateOperationsInput | number | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
   export type SuggestedCompetitorUncheckedUpdateManyWithoutDomainInput = {
     id?: IntFieldUpdateOperationsInput | number
-    name?: StringFieldUpdateOperationsInput | string
-    competitorDomain?: StringFieldUpdateOperationsInput | string
-    reason?: StringFieldUpdateOperationsInput | string
-    type?: StringFieldUpdateOperationsInput | string
+    analysis?: JsonNullValueInput | InputJsonValue
+    tokenUsage?: NullableIntFieldUpdateOperationsInput | number | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
   export type CampaignUpdateWithoutDomainInput = {

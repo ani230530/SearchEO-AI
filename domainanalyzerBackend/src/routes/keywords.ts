@@ -11,6 +11,60 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
+const normalizePhraseText = (value: string) => value.trim().replace(/\s+/g, ' ').toLowerCase();
+
+async function ensureCustomKeywordPhrases(domainId: number, keywordId: number, keyword: string, intent?: string | null) {
+  const existingPhrases = await prisma.generatedIntentPhrase.findMany({
+    where: { domainId, keywordId },
+    select: { phrase: true }
+  });
+
+  const existingNormalized = new Set(existingPhrases.map((item) => normalizePhraseText(item.phrase)));
+  const phraseTemplates = [
+    {
+      phrase: `What are the best ${keyword} options for my needs?`,
+      intent: 'Commercial',
+      intentConfidence: 86,
+      relevanceScore: 88
+    },
+    {
+      phrase: `How do I choose the right ${keyword}?`,
+      intent: 'Informational',
+      intentConfidence: 84,
+      relevanceScore: 86
+    },
+    {
+      phrase: `Where can I find reliable ${keyword} providers?`,
+      intent: 'Transactional',
+      intentConfidence: 85,
+      relevanceScore: 87
+    }
+  ];
+
+  const phrasesToCreate = phraseTemplates
+    .filter((item) => !existingNormalized.has(normalizePhraseText(item.phrase)))
+    .map((item) => ({
+      domainId,
+      keywordId,
+      phrase: item.phrase,
+      intent: item.intent || intent || 'Commercial',
+      intentConfidence: item.intentConfidence,
+      relevanceScore: item.relevanceScore,
+      sources: ['Custom Keyword', 'AI Generated'],
+      trend: 'Rising',
+      isSelected: false,
+      tokenUsage: 0
+    }));
+
+  if (phrasesToCreate.length === 0) return existingPhrases.length;
+
+  await prisma.generatedIntentPhrase.createMany({
+    data: phrasesToCreate
+  });
+
+  return existingPhrases.length + phrasesToCreate.length;
+}
+
 // GET /api/keywords/:domainId - Get keywords for a domain
 router.get('/:domainId', authenticateToken, async (req: Request, res: Response) => {
   const authReq = req as AuthenticatedRequest;
@@ -51,6 +105,8 @@ router.get('/:domainId', authenticateToken, async (req: Request, res: Response) 
         cpc: true,
         domainId: true,
         isSelected: true,
+        isCustom: true,
+        intent: true,
         createdAt: true,
         updatedAt: true
       }
@@ -270,7 +326,32 @@ router.post('/:domainId/custom', authenticateToken, async (req: Request, res: Re
     });
 
     if (existingKeyword) {
-      return res.status(400).json({ error: 'Keyword already exists for this domain' });
+      const updatedKeyword = await prisma.keyword.update({
+        where: { id: existingKeyword.id },
+        data: { isCustom: true }
+      });
+      await ensureCustomKeywordPhrases(domainId, updatedKeyword.id, updatedKeyword.term, updatedKeyword.intent);
+
+      return res.json({
+        success: true,
+        keyword: {
+          id: updatedKeyword.id.toString(),
+          keyword: updatedKeyword.term,
+          intent: updatedKeyword.intent || 'Commercial',
+          volume: updatedKeyword.volume,
+          kd: parseInt(updatedKeyword.difficulty) || 50,
+          competition: updatedKeyword.difficulty === 'High' ? 'High' : updatedKeyword.difficulty === 'Low' ? 'Low' : 'Medium',
+          cpc: updatedKeyword.cpc,
+          organic: organic || Math.floor(updatedKeyword.volume * 0.1),
+          paid: paid || Math.floor(updatedKeyword.volume * 0.05),
+          trend: trend || 'Stable',
+          position: position || 0,
+          url: url || null,
+          updated: new Date().toISOString().split('T')[0],
+          isCustom: true,
+          selected: updatedKeyword.isSelected
+        }
+      });
     }
 
     // Create the custom keyword
@@ -282,9 +363,12 @@ router.post('/:domainId/custom', authenticateToken, async (req: Request, res: Re
         cpc: 0,
         intent: intent || 'Commercial',
         domainId: domainId,
-        isSelected: false
+        isSelected: false,
+        isCustom: true
       }
     });
+
+    await ensureCustomKeywordPhrases(domainId, newKeyword.id, newKeyword.term, newKeyword.intent);
 
     res.json({
       success: true,
