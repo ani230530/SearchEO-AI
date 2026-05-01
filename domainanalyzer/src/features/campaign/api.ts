@@ -145,6 +145,20 @@ export async function aiSuggestTopic(
   return data.structure.topics.map(normalizeTopic);
 }
 
+/**
+ * In-place AI suggestion for an existing topic — generates a title + summary
+ * from the topic's current keywords and writes them onto the row. Does not
+ * create a new topic.
+ */
+export async function aiSuggestTopicTitle(topicId: number): Promise<WorksheetTopic[]> {
+  const res = await fetch(
+    `${API_BASE_URL}/api/campaigns/topics/${topicId}/title/ai`,
+    { method: 'POST', headers: authHeaders() }
+  );
+  const data = await handle<StructureResponse>(res);
+  return data.structure.topics.map(normalizeTopic);
+}
+
 export async function updateTopicTitle(
   topicId: number,
   title: string

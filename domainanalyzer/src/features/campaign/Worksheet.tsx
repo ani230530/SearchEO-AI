@@ -26,6 +26,7 @@ import {
   fetchCampaignTopics,
   createTopic,
   aiSuggestTopic,
+  aiSuggestTopicTitle,
   updateTopicTitle,
   deleteTopic,
   addTopicKeyword,
@@ -188,10 +189,9 @@ export default function Worksheet({ campaignId, keywordsTableData = [] }: Worksh
   };
 
   const handleAiSuggestTopicForRow = async (topic: WorksheetTopic) => {
-    const focus = topic.keywords.map((k) => k.term).join(', ') || undefined;
     setAiSuggestingTopicForRow(topic.id);
     try {
-      await withBusy(topic.id, () => aiSuggestTopic(campaignId, { count: 1, focus }));
+      await withBusy(topic.id, () => aiSuggestTopicTitle(topic.id));
     } finally {
       setAiSuggestingTopicForRow(null);
     }

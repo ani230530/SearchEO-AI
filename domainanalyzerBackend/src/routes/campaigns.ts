@@ -18,6 +18,7 @@ import { authenticateToken, AuthenticatedRequest } from '../middleware/auth';
 import {
   generateCampaignTopics,
   generateKeywordsSuggestion,
+  generateTopicTitleSuggestion,
   GeneratedTopic,
 } from '../services/campaignAiService';
 import { authService } from '../services/authService';
@@ -727,6 +728,93 @@ router.post(
     });
 
     return respondWithStructure(res, campaignId, userId, 201);
+  })
+);
+
+/**
+ * POST /api/campaigns/topics/:topicId/title/ai
+ *
+ * In-place AI title suggestion for an existing topic. Uses the topic's
+ * keywords + campaign + domain context to generate a title and short
+ * summary, then writes them onto the row. Does NOT create a new topic.
+ */
+router.post(
+  '/topics/:topicId/title/ai',
+  authenticateToken,
+  asyncHandler(async (req: Request, res: Response) => {
+    const userId = (req as AuthenticatedRequest).user.userId;
+    const topicId = parseInt(req.params.topicId, 10);
+
+    if (isNaN(topicId)) {
+      return res.status(400).json({ success: false, error: 'Invalid topic ID' });
+    }
+
+    const topic = await prisma.campaignTopic.findFirst({
+      where: {
+        id: topicId,
+        campaign: { domain: { userId, isCompanyDomain: true } },
+      },
+      include: {
+        keywords: true,
+        campaign: { include: { domain: true } },
+      },
+    });
+
+    if (!topic) {
+      return res.status(404).json({ success: false, error: 'Topic not found' });
+    }
+
+    // Surface the primary keyword first so the prompt can lean on it.
+    const sortedKeywords = topic.keywords
+      .slice()
+      .sort((a, b) => {
+        const ap = (a.aiMetadata as any)?.isPrimary ? 0 : 1;
+        const bp = (b.aiMetadata as any)?.isPrimary ? 0 : 1;
+        if (ap !== bp) return ap - bp;
+        return a.id - b.id;
+      })
+      .map((k) => k.term);
+
+    const semanticAnalysis = await prisma.semanticAnalysis.findFirst({
+      where: { domainId: topic.campaign.domain.id },
+      orderBy: { createdAt: 'desc' },
+      select: { contentSummary: true },
+    });
+    let brandVoice: any;
+    let targetAudience: any;
+    if (semanticAnalysis?.contentSummary) {
+      try {
+        const parsed = JSON.parse(semanticAnalysis.contentSummary);
+        brandVoice = parsed.brandVoice;
+        targetAudience = parsed.targetAudience;
+      } catch {
+        /* ignore */
+      }
+    }
+
+    const suggestion = await generateTopicTitleSuggestion({
+      domainUrl: topic.campaign.domain.url,
+      domainContext: topic.campaign.domain.context,
+      keywordTerms: sortedKeywords,
+      campaignTitle: topic.campaign.title,
+      campaignDescription: topic.campaign.description || undefined,
+      currentTitle: topic.title,
+      location: (topic.campaign.domain as any).location,
+      locationContext: (topic.campaign.domain as any).locationContext,
+      brandVoice,
+      targetAudience,
+    });
+
+    await prisma.campaignTopic.update({
+      where: { id: topicId },
+      data: {
+        title: suggestion.title,
+        summary: suggestion.summary || topic.summary,
+        source: CampaignNodeSource.AI,
+      },
+    });
+
+    return respondWithStructure(res, topic.campaignId, userId);
   })
 );
 

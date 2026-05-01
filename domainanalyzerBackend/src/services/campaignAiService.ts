@@ -234,6 +234,89 @@ Only return JSON. Ensure titles are distinct from the excluded list.`;
   );
 }
 
+/**
+ * Suggests a title (and short summary) for an existing worksheet row, using
+ * the row's keywords + campaign/domain context. Used by the row-level
+ * "AI Suggest" button — does NOT create a new topic, only proposes content
+ * for an existing one.
+ */
+export async function generateTopicTitleSuggestion(
+  context: BaseAiContext & {
+    /** Keywords already on the topic — primary first if present. */
+    keywordTerms: string[];
+    campaignTitle?: string;
+    campaignDescription?: string;
+    /** Existing title, if the user wants the AI to "rewrite" rather than fill in. */
+    currentTitle?: string;
+  }
+): Promise<{ title: string; summary: string }> {
+  const {
+    domainUrl,
+    domainContext,
+    keywordTerms,
+    campaignTitle,
+    campaignDescription,
+    currentTitle,
+    location,
+    locationContext,
+    brandVoice,
+    targetAudience,
+  } = context;
+
+  const geoContext = location
+    ? `\nTarget Location: ${location}${locationContext ? `\nLocation Context: ${locationContext}` : ''}`
+    : '';
+  const voiceContext = brandVoice
+    ? `\nBrand Voice: ${typeof brandVoice === 'object' ? JSON.stringify(brandVoice) : brandVoice}`
+    : '';
+  const audienceContext = targetAudience
+    ? `\nTarget Audience: ${typeof targetAudience === 'object' ? JSON.stringify(targetAudience) : targetAudience}`
+    : '';
+  const campaignContext = campaignTitle
+    ? `\nCampaign Name: ${campaignTitle}\nCampaign Goal: ${campaignDescription || 'Not provided'}`
+    : '';
+
+  const seedKeywords = keywordTerms.filter(Boolean).slice(0, 8);
+  const currentTitleHint =
+    currentTitle && currentTitle.trim()
+      ? `\nThe row currently has the working title "${currentTitle.trim()}". You may improve it or replace it.`
+      : '';
+
+  const prompt = `
+Propose a single, distinct content title and a one-sentence summary for a worksheet row on ${domainUrl}.
+The row will become one piece of generated content, so the title must be specific and indexable, not a category name.
+Context: ${domainContext || 'Not provided'}${geoContext}${voiceContext}${audienceContext}${campaignContext}${currentTitleHint}
+Keywords already attached to this row: ${seedKeywords.length ? seedKeywords.join(', ') : 'none yet'}.
+- If keywords are present, the title MUST be relevant to them. The first keyword is the primary search term and should drive the angle.
+- If no keywords, lean on the campaign + brand context.
+- Avoid generic phrasings like "Ultimate Guide to X" — be specific and action-oriented.
+
+Random Seed: ${Date.now()}
+
+Return JSON:
+{
+  "title": "string",
+  "summary": "string"
+}
+Only return JSON.`;
+
+  const fallback = () => {
+    const seed = seedKeywords[0] || campaignTitle || domainUrl;
+    return {
+      title: `How ${seed} drives measurable outcomes`,
+      summary: `A focused take on ${seed} for ${campaignTitle || 'this campaign'}.`,
+    };
+  };
+
+  const aiResponse = await callOpenAiJson<{ title?: string; summary?: string }>(
+    prompt,
+    fallback
+  );
+  const title = (aiResponse?.title || '').trim() || fallback().title;
+  const summary = (aiResponse?.summary || '').trim() || '';
+  return { title, summary };
+}
+
 export async function generateKeywordsSuggestion(
   context: BaseAiContext & { topicTitle?: string; count?: number }
 ): Promise<GeneratedKeyword[]> {
