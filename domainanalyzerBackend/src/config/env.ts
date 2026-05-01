@@ -47,7 +47,13 @@ export const env = {
   N8N_API_KEY: getRequired('N8N_API_KEY'),
   N8N_API_KEY_HEADER: getOptional('N8N_API_KEY_HEADER', 'key')!,
   N8N_TIMEOUT_MS: Number(process.env.N8N_TIMEOUT_MS || 300000),
-  N8N_PILLAR_WEBHOOK_URL: getRequired('N8N_PILLAR_WEBHOOK_URL'),
+  /** @deprecated Replaced by the universal webhook in the worksheet refactor. Optional for backwards compatibility. */
+  N8N_PILLAR_WEBHOOK_URL: getOptional('N8N_PILLAR_WEBHOOK_URL'),
+  /** Universal n8n template webhook used by the worksheet generate flow (Phase B). */
+  N8N_UNIVERSAL_WEBHOOK_URL: getOptional(
+    'N8N_UNIVERSAL_WEBHOOK_URL',
+    'https://n8n.srv891599.hstgr.cloud/webhook/universal'
+  ),
   N8N_REVIEW_WEBHOOK_URL: getRequired('N8N_REVIEW_WEBHOOK_URL'),
   N8N_PUBLISH_WEBHOOK_URL: getRequired('N8N_PUBLISH_WEBHOOK_URL'),
   N8N_EDIT_TEXT_WEBHOOK_URL: getRequired('N8N_EDIT_TEXT_WEBHOOK_URL'),

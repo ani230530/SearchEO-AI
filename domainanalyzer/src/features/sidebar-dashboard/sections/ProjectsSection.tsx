@@ -46,7 +46,7 @@ export function ProjectsSection(props: any) {
           <div />
         </div>
         <Worksheet
-          titleContext={selectedCampaign.title || ''}
+          campaignId={selectedCampaign.id}
           keywordsTableData={keywordsTableData}
         />
       </div>

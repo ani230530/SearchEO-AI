@@ -145,3 +145,6 @@ vite.config.ts.timestamp-*
 
 # Prisma generated client
 generated/prisma
+
+# Local DB backups taken before destructive migrations
+backups/

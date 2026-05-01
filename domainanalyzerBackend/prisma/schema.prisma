@@ -432,7 +432,10 @@ model WordpressPublishLog {
   primaryKeyword String?
   normalizedPrimaryKeyword String?
   generationJobId String?
+  /// @deprecated Use generationTopicId. Retained for forensics on legacy rows.
   generationPageId Int?
+  /// Worksheet-model link (added in flatten-topics migration).
+  generationTopicId Int?
   title         String?
   slug          String?
   status        String?
@@ -442,12 +445,15 @@ model WordpressPublishLog {
   user          User     @relation(fields: [userId], references: [id])
   integration   WordpressIntegration? @relation(fields: [integrationId], references: [id])
   integrationId Int?
+  /// @deprecated Frozen archive — retained for forensics.
   campaignPages CampaignPage[] @relation("PageLatestDraft")
+  campaignTopics CampaignTopic[] @relation("TopicLatestDraft")
 
   @@index([userId])
   @@index([generationJobId])
   @@index([generationJobId, normalizedPrimaryKeyword])
   @@index([generationPageId])
+  @@index([generationTopicId])
 }
 
 model GenerationJob {
@@ -467,6 +473,7 @@ model GenerationJob {
   @@index([userId])
 }
 
+/// @deprecated Frozen archive — replaced by direct status fields on GenerationJob in the flat topic model.
 model GenerationJobPage {
   id          Int      @id @default(autoincrement())
   jobId       String
@@ -690,6 +697,8 @@ enum CampaignNodeSource {
   AI
 }
 
+/// @deprecated Worksheet-model refactor flattened pillar/subpage into a single topic.
+/// Enum retained because frozen CampaignPage rows still reference it.
 enum CampaignPageType {
   PILLAR
   SUBPAGE
@@ -701,19 +710,34 @@ model CampaignTopic {
   campaign    Campaign           @relation(fields: [campaignId], references: [id], onDelete: Cascade)
   title       String
   description String?
+  /// Worksheet-model fields (added in flatten-topics migration). Replace data previously
+  /// stored on CampaignPage. Old CampaignPage rows remain in the DB for forensics but
+  /// are not read or written by application code.
+  summary     String?
+  aiSummary   String?
+  /// Latest draft for this topic. Was previously CampaignPage.latestDraftId.
+  latestDraftId Int?
+  latestDraft WordpressPublishLog? @relation("TopicLatestDraft", fields: [latestDraftId], references: [id])
+  /// Provenance: if this topic was split off from a CampaignPage during the flatten-topics
+  /// migration, this records the source page id. Null for topics created in the new model.
+  archivedFromPageId Int?
   status      String             @default("active")
   source      CampaignNodeSource @default(MANUAL)
   order       Int                @default(0)
   aiMetadata  Json?
   createdAt   DateTime           @default(now())
   updatedAt   DateTime           @updatedAt
+  /// @deprecated Frozen archive — retained for forensics, never written by new code.
   pages       CampaignPage[]
   keywords    CampaignKeyword[]
   generationJobs GenerationJob[]
 
   @@index([campaignId])
+  @@index([latestDraftId])
 }
 
+/// @deprecated Frozen archive — pillar/subpage was replaced by the flat topic model.
+/// Rows are retained read-only for forensics. Application code must not write to this table.
 model CampaignPage {
   id          Int                @id @default(autoincrement())
   topicId     Int
@@ -738,8 +762,10 @@ model CampaignPage {
 
 model CampaignKeyword {
   id         Int                @id @default(autoincrement())
+  /// Worksheet-model link. Always set by new code. Nullable for legacy rows only.
   topicId    Int?
   topic      CampaignTopic?     @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  /// @deprecated Use topicId. Retained for forensics on legacy rows.
   pageId     Int?
   page       CampaignPage?      @relation(fields: [pageId], references: [id], onDelete: Cascade)
   term       String
