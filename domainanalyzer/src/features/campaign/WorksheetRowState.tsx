@@ -105,10 +105,19 @@ export interface RowActionHandlers {
 export function RowAction({
   state,
   handlers,
+  isOpeningDraft = false,
 }: {
   state: RowState;
   handlers: RowActionHandlers;
+  /** True briefly between an "open draft" click and the drawer mounting,
+   *  so the action button can render its own loading state. */
+  isOpeningDraft?: boolean;
 }) {
+  // Spinner override: while a draft is being opened from THIS row, swap the
+  // action's icon for a spinner and freeze interactions to acknowledge the
+  // click immediately.
+  const draftSpinner = isOpeningDraft && (state.kind === 'completed' || state.kind === 'published');
+
   switch (state.kind) {
     case 'not-started':
     case 'in-progress':
@@ -137,7 +146,14 @@ export function RowAction({
         <ActionPill
           label="Draft Blog"
           onClick={() => handlers.onOpenDraft(state.draftId)}
-          icon={<FileText className="h-4 w-4" />}
+          disabled={draftSpinner}
+          icon={
+            draftSpinner ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <FileText className="h-4 w-4" />
+            )
+          }
         />
       );
 
@@ -155,7 +171,14 @@ export function RowAction({
         <ActionPill
           label="Publish"
           onClick={() => handlers.onOpenDraft(state.draftId)}
-          icon={<Send className="h-4 w-4" />}
+          disabled={draftSpinner}
+          icon={
+            draftSpinner ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Send className="h-4 w-4" />
+            )
+          }
         />
       );
   }

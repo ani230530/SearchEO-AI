@@ -331,6 +331,35 @@ export async function generateTopic(
   return data.job;
 }
 
+/* ---------- Draft fetch ---------- */
+
+export interface WorksheetDraft {
+  id: number;
+  topicId: number | null;
+  htmlContent: string;
+  title: string;
+  metaDescription: string;
+  slug: string;
+  primaryKeyword: string;
+  longtailKeywords: string;
+  featuredImageEnabled: boolean;
+  featuredImageUrl: string | null;
+  status: string;
+  wordpressUrl: string | null;
+  wordpressPostId?: number | null;
+  error: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export async function getDraft(draftId: number): Promise<WorksheetDraft> {
+  const res = await fetch(`${API_BASE_URL}/api/campaigns/drafts/${draftId}`, {
+    headers: authHeaders(),
+  });
+  const data = await handle<{ success: boolean; draft: WorksheetDraft }>(res);
+  return data.draft;
+}
+
 export async function getGenerationJob(topicId: number): Promise<GenerationJob | null> {
   const res = await fetch(
     `${API_BASE_URL}/api/campaigns/topics/${topicId}/generation-job`,

@@ -403,6 +403,12 @@ async function runGenerationJob(jobId: string, input: RunGenerationInput): Promi
     return;
   }
 
+  // n8n returns an array of one item; unwrap so serializeDraftContent on
+  // read can index keys directly.
+  const rawForStorage = Array.isArray(webhookResponse)
+    ? webhookResponse[0] ?? webhookResponse
+    : webhookResponse;
+
   try {
     const draft = await prisma.$transaction(async (tx) => {
       const created = await tx.wordpressPublishLog.create({
@@ -414,7 +420,7 @@ async function runGenerationJob(jobId: string, input: RunGenerationInput): Promi
           title: content.title || topic.title,
           slug: content.slug || null,
           status: content.status || 'draft',
-          response: webhookResponse as any,
+          response: rawForStorage as any,
           generationJobId: jobId,
           generationTopicId: topicId,
           integrationId: integration.id,

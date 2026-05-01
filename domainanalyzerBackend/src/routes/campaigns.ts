@@ -34,6 +34,7 @@ import {
   GenerationJobValidationError,
   SerializedGenerationJob,
 } from '../services/generationJobService';
+import { serializeDraftContent } from '../services/contentFlowService';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -1294,19 +1295,18 @@ router.get(
       return res.status(404).json({ success: false, error: 'Draft not found' });
     }
 
+    // serializeDraftContent picks out normalized fields (htmlContent, title,
+    // metaDescription, slug, featuredImage*, status) from the persisted
+    // n8n response — matching the publish flow's draft shape.
+    const content = serializeDraftContent(draft);
+
     res.json({
       success: true,
       draft: {
+        ...content, // includes updatedAt from serializeDraftContent
         id: draft.id,
-        title: draft.title,
-        slug: draft.slug,
-        status: draft.status,
-        wordpressUrl: draft.wordpressUrl,
-        wordpressPostId: draft.wordpressPostId,
-        primaryKeyword: draft.primaryKeyword,
-        response: draft.response,
-        createdAt: draft.createdAt,
-        updatedAt: draft.updatedAt,
+        topicId: draft.generationTopicId,
+        createdAt: draft.createdAt.toISOString(),
       },
     });
   })

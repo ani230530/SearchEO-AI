@@ -37,6 +37,7 @@ import {
   subscribeGenerationUpdates,
 } from './api';
 import WorksheetGenerateDrawer from './WorksheetGenerateDrawer';
+import WorksheetDraftDrawer from './WorksheetDraftDrawer';
 import { RowStatus, RowAction } from './WorksheetRowState';
 
 type WorksheetColumnKey = 'topic' | 'keywords' | 'status' | 'action' | 'more';
@@ -55,6 +56,10 @@ export default function Worksheet({ campaignId }: WorksheetProps) {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [topicForGenerate, setTopicForGenerate] = useState<WorksheetTopic | null>(null);
+  /** Draft drawer state. `openingDraftRowId` is set briefly between click and
+   *  drawer mount so the row's action button can show its own loading. */
+  const [openingDraftRowId, setOpeningDraftRowId] = useState<number | null>(null);
+  const [draftIdForViewer, setDraftIdForViewer] = useState<number | null>(null);
 
   const [search, setSearch] = useState('');
   const [openColumnMenu, setOpenColumnMenu] = useState<WorksheetColumnKey | null>(null);
@@ -596,11 +601,17 @@ export default function Worksheet({ campaignId }: WorksheetProps) {
                         <td className="border-r border-[#c8cfdb] px-4 align-middle text-center">
                           <RowAction
                             state={rowState}
+                            isOpeningDraft={openingDraftRowId === topic.id}
                             handlers={{
                               onGenerate: () => setTopicForGenerate(topic),
                               onRetry: () => setTopicForGenerate(topic),
-                              onOpenDraft: () => {
-                                setNotice('Draft viewer wiring is on the way.');
+                              onOpenDraft: (draftId) => {
+                                setOpeningDraftRowId(topic.id);
+                                setDraftIdForViewer(draftId);
+                                // Drop the per-row loading flag on the next
+                                // tick so the spinner is visible briefly even
+                                // when the drawer mounts instantly.
+                                setTimeout(() => setOpeningDraftRowId(null), 250);
                               },
                             }}
                           />
@@ -773,6 +784,13 @@ export default function Worksheet({ campaignId }: WorksheetProps) {
           setNotice('Generation started. Status updates will appear inline.');
           setTopicForGenerate(null);
         }}
+      />
+
+      {/* Draft viewer */}
+      <WorksheetDraftDrawer
+        draftId={draftIdForViewer}
+        open={draftIdForViewer !== null}
+        onClose={() => setDraftIdForViewer(null)}
       />
     </>
   );
