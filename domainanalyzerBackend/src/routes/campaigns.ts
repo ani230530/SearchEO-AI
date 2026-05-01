@@ -653,18 +653,27 @@ const insertGeneratedTopics = async (
   };
 
   for (const t of topics) {
-    // Pillar contribution -> one topic. Keys: prefer pillarPage.title (the
-    // legacy prompt produces this), fall back to topic.title.
+    // Worksheet model: one AI suggestion -> exactly one topic row.
+    // The AI prompt still returns the legacy shape (topic + pillarPage + subPages);
+    // we collapse it: prefer the pillar's title/summary, merge keywords from the
+    // pillar and any subpages so nothing the AI generated is wasted.
     const pillar = t.pillarPage;
-    const pillarTitle = pillar?.title?.trim() || t.title?.trim();
-    const pillarSummary = pillar?.summary || undefined;
-    const pillarKeywords = pillar?.keywords?.length ? pillar.keywords : t.keywords || [];
-    await insertOne(pillarTitle!, pillarSummary, t.description, pillarKeywords);
+    const title = pillar?.title?.trim() || t.title?.trim();
+    if (!title) continue;
+    const summary = pillar?.summary || undefined;
 
-    // Each subpage -> additional sibling topic.
-    for (const sp of t.subPages || []) {
-      await insertOne(sp.title, sp.summary, undefined, sp.keywords || []);
-    }
+    const collected = new Map<string, GeneratedKeyword>();
+    const seedKeywords = (kws?: GeneratedKeyword[]) => {
+      for (const kw of kws || []) {
+        const key = kw.term.trim().toLowerCase();
+        if (key && !collected.has(key)) collected.set(key, kw);
+      }
+    };
+    seedKeywords(pillar?.keywords);
+    seedKeywords(t.keywords);
+    for (const sp of t.subPages || []) seedKeywords(sp.keywords);
+
+    await insertOne(title, summary, t.description, Array.from(collected.values()));
   }
 };
 
