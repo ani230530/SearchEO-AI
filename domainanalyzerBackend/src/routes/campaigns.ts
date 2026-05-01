@@ -19,7 +19,6 @@ import {
   generateCampaignTopics,
   generateKeywordsSuggestion,
   GeneratedTopic,
-  GeneratedKeyword,
 } from '../services/campaignAiService';
 import { authService } from '../services/authService';
 import {
@@ -599,9 +598,7 @@ router.delete(
 );
 
 /* ----------------------------------------------------------------------------
- * Topic AI suggest — produces flat topics. Each AI suggestion contributes a
- * single new topic carrying its keywords, plus one extra topic per former
- * "subpage" suggestion the AI returns (legacy prompt shape).
+ * Topic AI suggest — each AI suggestion becomes exactly one worksheet row.
  * --------------------------------------------------------------------------*/
 
 const insertGeneratedTopics = async (
@@ -613,29 +610,26 @@ const insertGeneratedTopics = async (
   let order = baseOrder;
   const aiMeta = { generatedAt: new Date().toISOString(), origin: 'topics_ai' };
 
-  const insertOne = async (
-    title: string,
-    summary: string | undefined,
-    description: string | undefined,
-    keywords: GeneratedKeyword[]
-  ) => {
-    if (!title?.trim()) return;
+  for (const t of topics) {
+    const title = t.title?.trim();
+    if (!title) continue;
     order += 1;
+
     const topic = await tx.campaignTopic.create({
       data: {
         campaignId,
-        title: title.trim(),
-        description: description?.trim() || null,
-        summary: summary?.trim() || null,
+        title,
+        description: t.description?.trim() || null,
+        summary: t.summary?.trim() || null,
         order,
         source: CampaignNodeSource.AI,
         aiMetadata: aiMeta,
       },
     });
 
-    if (keywords.length) {
+    if (t.keywords?.length) {
       await tx.campaignKeyword.createMany({
-        data: keywords.map((kw, idx) => ({
+        data: t.keywords.map((kw, idx) => ({
           term: kw.term,
           volume: kw.volume ?? null,
           difficulty: kw.difficulty || DEFAULT_KEYWORD_DIFFICULTY,
@@ -650,30 +644,6 @@ const insertGeneratedTopics = async (
         })),
       });
     }
-  };
-
-  for (const t of topics) {
-    // Worksheet model: one AI suggestion -> exactly one topic row.
-    // The AI prompt still returns the legacy shape (topic + pillarPage + subPages);
-    // we collapse it: prefer the pillar's title/summary, merge keywords from the
-    // pillar and any subpages so nothing the AI generated is wasted.
-    const pillar = t.pillarPage;
-    const title = pillar?.title?.trim() || t.title?.trim();
-    if (!title) continue;
-    const summary = pillar?.summary || undefined;
-
-    const collected = new Map<string, GeneratedKeyword>();
-    const seedKeywords = (kws?: GeneratedKeyword[]) => {
-      for (const kw of kws || []) {
-        const key = kw.term.trim().toLowerCase();
-        if (key && !collected.has(key)) collected.set(key, kw);
-      }
-    };
-    seedKeywords(pillar?.keywords);
-    seedKeywords(t.keywords);
-    for (const sp of t.subPages || []) seedKeywords(sp.keywords);
-
-    await insertOne(title, summary, t.description, Array.from(collected.values()));
   }
 };
 
