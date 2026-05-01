@@ -224,6 +224,73 @@ export async function deleteKeyword(keywordId: number): Promise<WorksheetTopic[]
   return data.structure.topics.map(normalizeTopic);
 }
 
+/* ---------- Generate (universal n8n template) ---------- */
+
+export type TemplateType =
+  | 'blog'
+  | 'faq'
+  | 'case_study'
+  | 'press_release'
+  | 'landing_page'
+  | 'report'
+  | 'custom';
+
+export interface GenerateTopicPayload {
+  template_type: TemplateType;
+  project_goal: string;
+  target_audience: string;
+  custom_audience_text?: string;
+  tone: string;
+  custom_tone_text?: string;
+  word_count: number;
+  language?: string;
+  cta?: string;
+  images?: number;
+  featured_image?: boolean;
+  /** Template-specific fields (e.g. `topic` for blog, `faq_topic_focus` for faq). */
+  template_fields?: Record<string, unknown>;
+}
+
+export interface GenerateTopicResult {
+  topics: WorksheetTopic[];
+  draftId: number;
+  content: {
+    title?: string;
+    htmlContent: string;
+    metaDescription?: string;
+    slug?: string;
+    primaryKeyword?: string;
+    longtailKeywords?: string;
+    featuredImageUrl?: string | null;
+    featuredImageEnabled?: boolean;
+    wordpressUrl?: string;
+    wordpressPostId?: number | null;
+    status?: string;
+  };
+}
+
+export async function generateTopic(
+  topicId: number,
+  payload: GenerateTopicPayload
+): Promise<GenerateTopicResult> {
+  const res = await fetch(`${API_BASE_URL}/api/campaigns/topics/${topicId}/generate`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify(payload),
+  });
+  const data = await handle<{
+    success: boolean;
+    structure: { topics: SerializedTopic[] };
+    draftId: number;
+    content: GenerateTopicResult['content'];
+  }>(res);
+  return {
+    topics: data.structure.topics.map(normalizeTopic),
+    draftId: data.draftId,
+    content: data.content,
+  };
+}
+
 /* ---------- Status helper ---------- */
 
 export type WorksheetStatus =

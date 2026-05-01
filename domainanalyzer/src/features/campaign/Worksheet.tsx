@@ -35,6 +35,7 @@ import {
   deleteKeyword,
   deriveWorksheetStatus,
 } from './api';
+import WorksheetGenerateDrawer from './WorksheetGenerateDrawer';
 
 type WorksheetColumnKey = 'topic' | 'keywords' | 'status' | 'action' | 'more';
 
@@ -42,8 +43,6 @@ interface WorksheetProps {
   campaignId: number;
   /** Optional pool of seed keywords used for AI suggestions. */
   keywordsTableData?: Array<{ keyword?: string }>;
-  /** Called whenever a generation is requested for a topic (Phase B). */
-  onGenerate?: (topic: WorksheetTopic) => void;
 }
 
 const STATUS_STYLES: Record<WorksheetStatus, { label: string; icon: React.ReactNode; className: string }> = {
@@ -79,7 +78,7 @@ const STATUS_STYLES: Record<WorksheetStatus, { label: string; icon: React.ReactN
   },
 };
 
-export default function Worksheet({ campaignId, keywordsTableData = [], onGenerate }: WorksheetProps) {
+export default function Worksheet({ campaignId, keywordsTableData = [] }: WorksheetProps) {
   const [topics, setTopics] = useState<WorksheetTopic[]>([]);
   const [loading, setLoading] = useState(true);
   const [busyTopicId, setBusyTopicId] = useState<number | null>(null);
@@ -87,6 +86,7 @@ export default function Worksheet({ campaignId, keywordsTableData = [], onGenera
   const [aiSuggestingNewTopic, setAiSuggestingNewTopic] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [topicForGenerate, setTopicForGenerate] = useState<WorksheetTopic | null>(null);
 
   const [search, setSearch] = useState('');
   const [openColumnMenu, setOpenColumnMenu] = useState<WorksheetColumnKey | null>(null);
@@ -627,14 +627,12 @@ export default function Worksheet({ campaignId, keywordsTableData = [], onGenera
                         <td className="border-r border-[#c8cfdb] px-4 align-middle text-center">
                           <button
                             type="button"
-                            disabled={!canGenerate || !onGenerate}
-                            onClick={() => onGenerate?.(topic)}
+                            disabled={!canGenerate}
+                            onClick={() => setTopicForGenerate(topic)}
                             className="h-9 px-5 inline-flex items-center gap-2 rounded-xl border border-[#4E76C7] text-sm font-medium bg-[#f4f8ff] hover:bg-[#eaf1ff] disabled:opacity-50 disabled:cursor-not-allowed"
                             title={
                               !canGenerate
                                 ? 'Add a topic and mark a primary keyword to enable generate'
-                                : !onGenerate
-                                ? 'Generate is not yet wired up'
                                 : 'Generate content for this topic'
                             }
                           >
@@ -803,6 +801,18 @@ export default function Worksheet({ campaignId, keywordsTableData = [], onGenera
           </div>
         </Modal>
       )}
+
+      {/* Generate drawer */}
+      <WorksheetGenerateDrawer
+        topic={topicForGenerate}
+        open={topicForGenerate !== null}
+        onClose={() => setTopicForGenerate(null)}
+        onSuccess={(result) => {
+          setTopics(result.topics);
+          setNotice(`Draft ready: ${result.content.title || 'Untitled'}.`);
+          setTopicForGenerate(null);
+        }}
+      />
     </>
   );
 }
