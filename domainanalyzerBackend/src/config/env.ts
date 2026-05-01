@@ -52,7 +52,7 @@ export const env = {
   /** Universal n8n template webhook used by the worksheet generate flow (Phase B). */
   N8N_UNIVERSAL_WEBHOOK_URL: getOptional(
     'N8N_UNIVERSAL_WEBHOOK_URL',
-    'https://n8n.srv891599.hstgr.cloud/webhook/universal'
+    'https://n8n.srv891599.hstgr.cloud/webhook/universal%20workflow'
   ),
   N8N_REVIEW_WEBHOOK_URL: getRequired('N8N_REVIEW_WEBHOOK_URL'),
   N8N_PUBLISH_WEBHOOK_URL: getRequired('N8N_PUBLISH_WEBHOOK_URL'),

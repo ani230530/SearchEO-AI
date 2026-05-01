@@ -1170,7 +1170,7 @@ router.delete(
 
 const N8N_UNIVERSAL_WEBHOOK_URL =
   process.env.N8N_UNIVERSAL_WEBHOOK_URL ||
-  'https://n8n.srv891599.hstgr.cloud/webhook/universal';
+  'https://n8n.srv891599.hstgr.cloud/webhook/universal%20workflow';
 const N8N_API_KEY = process.env.N8N_API_KEY || '1234';
 const N8N_API_KEY_HEADER = process.env.N8N_API_KEY_HEADER || 'key';
 const N8N_TIMEOUT_MS = Number(process.env.N8N_TIMEOUT_MS) || 300000;
