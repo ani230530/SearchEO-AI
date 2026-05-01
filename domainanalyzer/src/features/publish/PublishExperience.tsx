@@ -1081,21 +1081,24 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
   }, [applyFeaturedImageState, extractEditedImage, featuredImageEditNote, publishResult, toast]);
 
   /**
-   * Read-only metadata card shown in preview mode. Mirrors the editable
-   * fields from renderMetadataEditor (title, meta description, slug) plus
-   * the publish status, so users can see all of the draft's metadata at
-   * a glance without entering edit mode.
+   * Always-on metadata editor. Title, meta description, and slug are
+   * editable in any mode (preview or content-edit). Status pill and the
+   * live URL are folded in here so users see everything in one card and
+   * don't need to flip into edit mode just to see/edit metadata.
    */
-  const renderMetadataReadout = () => {
-    if (!publishResult || isEditMode) return null;
+  const renderMetadataEditor = () => {
+    if (!publishResult) return null;
 
     const status = publishResult.status || 'draft';
     const isPublished = status.toLowerCase() === 'published';
 
     return (
-      <div className="rounded-2xl border border-gray-200 bg-white p-4 space-y-3">
-        <div className="flex items-center justify-between">
-          <p className="text-xs uppercase tracking-[0.2em] text-gray-500">Metadata</p>
+      <div className="rounded-2xl border border-gray-200 bg-white p-4 space-y-4">
+        <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+          <div>
+            <p className="text-xs text-gray-500 mb-1">Draft metadata</p>
+            <p className="text-sm font-medium text-gray-900">Title, description, and slug</p>
+          </div>
           <span
             className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${
               isPublished
@@ -1107,76 +1110,24 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
           </span>
         </div>
 
-        <div className="space-y-1">
-          <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-gray-400">
-            Title
-          </p>
-          <p className="text-sm text-gray-900 break-words">
-            {publishResult.title || (
-              <span className="italic text-gray-400">No title</span>
-            )}
-          </p>
-        </div>
-
-        <div className="space-y-1">
-          <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-gray-400">
-            Meta Description
-          </p>
-          <p className="text-sm text-gray-700 break-words">
-            {publishResult.metaDescription || (
-              <span className="italic text-gray-400">No meta description</span>
-            )}
-          </p>
-        </div>
-
-        <div className="space-y-1">
-          <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-gray-400">
-            Slug
-          </p>
-          <p className="text-sm font-mono text-gray-700 break-all">
-            {publishResult.slug || (
-              <span className="italic font-sans text-gray-400">No slug set</span>
-            )}
-          </p>
-        </div>
-
         {isPublished && publishResult.wordpressUrl && (
-          <div className="space-y-1">
-            <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-gray-400">
-              Live URL
-            </p>
-            <a
-              href={publishResult.wordpressUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="text-sm text-blue-600 hover:underline break-all"
-            >
-              {publishResult.wordpressUrl}
-            </a>
-          </div>
-        )}
-      </div>
-    );
-  };
-
-  const renderMetadataEditor = () => {
-    if (!publishResult || !isEditMode) return null;
-
-    return (
-      <div className="rounded-2xl border border-gray-200 bg-white p-4 space-y-4">
-        <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
-          <div>
-            <p className="text-xs text-gray-500 mb-1">Draft metadata</p>
-            <p className="text-sm font-medium text-gray-900">Title, description, and slug</p>
-          </div>
-          <button
-            type="button"
-            onClick={syncSlugFromTitle}
-            className="w-full sm:w-auto rounded-xl border border-[#2D4059]/20  px-3 py-1.5 text-center text-[12px] font-semibold text-[#2D4059] hover:bg-[#2D4059]/10 transition-colors"
+          <a
+            href={publishResult.wordpressUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="block text-xs text-blue-600 hover:underline break-all"
           >
-            Use title for slug
-          </button>
-        </div>
+            {publishResult.wordpressUrl}
+          </a>
+        )}
+
+        <button
+          type="button"
+          onClick={syncSlugFromTitle}
+          className="w-full rounded-xl border border-[#2D4059]/20 px-3 py-1.5 text-center text-[12px] font-semibold text-[#2D4059] hover:bg-[#2D4059]/10 transition-colors"
+        >
+          Use title for slug
+        </button>
 
         <div className="space-y-2">
           <label className="text-xs font-medium uppercase tracking-[0.2em] text-gray-500">Title</label>
@@ -3182,7 +3133,6 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
                         </p>
                       </div>
 
-                      {renderMetadataReadout()}
                       {renderMetadataEditor()}
                       {renderFeaturedImageEditor()}
                       

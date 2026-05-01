@@ -1163,6 +1163,50 @@ router.post(
   })
 );
 
+/**
+ * PATCH /api/campaigns/keywords/:keywordId
+ *
+ * Update the term on an existing keyword. Other fields (volume, difficulty,
+ * intent) are also accepted but optional. Inline edits from the worksheet
+ * call this — the keyword's primary/longtail tag is left alone.
+ */
+router.patch(
+  '/keywords/:keywordId',
+  authenticateToken,
+  asyncHandler(async (req: Request, res: Response) => {
+    const userId = (req as AuthenticatedRequest).user.userId;
+    const keywordId = parseInt(req.params.keywordId, 10);
+    const { term, volume, difficulty, intent } = req.body || {};
+
+    if (isNaN(keywordId)) {
+      return res.status(400).json({ success: false, error: 'Invalid keyword ID' });
+    }
+    if (term !== undefined && (!term || !String(term).trim())) {
+      return res.status(400).json({ success: false, error: 'Keyword term cannot be empty' });
+    }
+
+    const keyword = await ensureKeywordOwnership(keywordId, userId);
+    if (!keyword) {
+      return res.status(404).json({ success: false, error: 'Keyword not found' });
+    }
+
+    const data: Prisma.CampaignKeywordUpdateInput = {};
+    if (term !== undefined) data.term = String(term).trim();
+    if (volume !== undefined) data.volume = Number.isFinite(volume) ? Number(volume) : null;
+    if (difficulty !== undefined) data.difficulty = difficulty || DEFAULT_KEYWORD_DIFFICULTY;
+    if (intent !== undefined) data.intent = intent || null;
+
+    if (Object.keys(data).length === 0) {
+      return res
+        .status(400)
+        .json({ success: false, error: 'No editable fields supplied' });
+    }
+
+    await prisma.campaignKeyword.update({ where: { id: keywordId }, data });
+    return respondWithStructure(res, keyword.topic!.campaignId, userId);
+  })
+);
+
 router.delete(
   '/keywords/:keywordId',
   authenticateToken,

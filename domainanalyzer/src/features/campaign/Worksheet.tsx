@@ -33,10 +33,12 @@ import {
   selectPrimaryKeyword,
   selectLongtailKeyword,
   deleteKeyword,
+  updateKeywordTerm,
   resolveRowState,
   subscribeGenerationUpdates,
 } from './api';
 import WorksheetGenerateDrawer from './WorksheetGenerateDrawer';
+import InlineEditable from './InlineEditable';
 import { RowStatus, RowAction } from './WorksheetRowState';
 
 type WorksheetColumnKey = 'topic' | 'keywords' | 'status' | 'action' | 'more';
@@ -84,7 +86,7 @@ export default function Worksheet({ campaignId, onOpenDraftInPublish }: Workshee
   const [renameColumnValue, setRenameColumnValue] = useState('');
 
   // Modal state
-  const [topicEditor, setTopicEditor] = useState<{ topicId: number; value: string } | null>(null);
+  // Topic title is edited inline via <InlineEditable>; no modal state needed.
   const [keywordEditor, setKeywordEditor] = useState<{
     topicId: number;
     value: string;
@@ -196,15 +198,6 @@ export default function Worksheet({ campaignId, onOpenDraftInPublish }: Workshee
     } finally {
       setAiSuggestingTopicForRow(null);
     }
-  };
-
-  const handleSubmitTopicEditor = async () => {
-    if (!topicEditor) return;
-    const value = topicEditor.value.trim();
-    if (!value) return;
-    const { topicId } = topicEditor;
-    setTopicEditor(null);
-    await withBusy(topicId, () => updateTopicTitle(topicId, value));
   };
 
   const handleSubmitKeywordEditor = async () => {
@@ -509,15 +502,23 @@ export default function Worksheet({ campaignId, onOpenDraftInPublish }: Workshee
                       {columnVisibility.topic && (
                         <td className="border-r border-[#c8cfdb] px-4 py-3 align-middle">
                           <div className="flex flex-col gap-2">
-                            <button
-                              type="button"
-                              onClick={() => setTopicEditor({ topicId: topic.id, value: topic.title })}
-                              className="text-left text-[15px] leading-[1.3] text-[#2b3548] hover:text-[#1e2f4f]"
+                            <InlineEditable
+                              value={topic.title}
+                              placeholder="+ Add topic name"
+                              onCommit={(next) =>
+                                withBusy(topic.id, () => updateTopicTitle(topic.id, next))
+                              }
+                              className="block text-left text-[15px] leading-[1.3] text-[#2b3548] hover:text-[#1e2f4f] cursor-text whitespace-pre-wrap break-words rounded-sm focus:outline-none focus:ring-2 focus:ring-[#9cb0d9]"
+                              inputClassName="w-full rounded-md border border-[#9cb0d9] bg-white px-2 py-1 text-[15px] leading-[1.3] text-[#2b3548] focus:outline-none focus:ring-2 focus:ring-[#4E76C7]"
                             >
-                              {topic.title || (
-                                <span className="text-[#9aa3b2] italic">+ Add topic name</span>
-                              )}
-                            </button>
+                              {(display) =>
+                                topic.title ? (
+                                  display
+                                ) : (
+                                  <span className="text-[#9aa3b2] italic">{display}</span>
+                                )
+                              }
+                            </InlineEditable>
                             <button
                               type="button"
                               onClick={() => handleAiSuggestTopicForRow(topic)}
@@ -587,6 +588,9 @@ export default function Worksheet({ campaignId, onOpenDraftInPublish }: Workshee
                                   onSetPrimary={() => handleSetPrimary(kw.id, topic.id)}
                                   onSetLongtail={() => handleSetLongtail(kw.id, topic.id)}
                                   onRemove={() => handleRemoveKeyword(kw.id, topic.id)}
+                                  onRename={(next) =>
+                                    withBusy(topic.id, () => updateKeywordTerm(kw.id, next))
+                                  }
                                 />
                               ))}
                             </div>
@@ -656,27 +660,6 @@ export default function Worksheet({ campaignId, onOpenDraftInPublish }: Workshee
           </div>
         </div>
       </div>
-
-      {/* Topic editor modal */}
-      {topicEditor && (
-        <Modal title="Edit topic" onClose={() => setTopicEditor(null)}>
-          <input
-            type="text"
-            value={topicEditor.value}
-            onChange={(e) =>
-              setTopicEditor((prev) => (prev ? { ...prev, value: e.target.value } : prev))
-            }
-            placeholder="e.g. How to rank on different digital channels"
-            className="w-full px-4 py-3 rounded-2xl border border-gray-200 bg-gray-50 focus:ring-2 focus:ring-black focus:outline-none"
-            autoFocus
-          />
-          <ModalActions
-            onCancel={() => setTopicEditor(null)}
-            onConfirm={handleSubmitTopicEditor}
-            confirmLabel="Save"
-          />
-        </Modal>
-      )}
 
       {/* Keyword editor modal */}
       {keywordEditor && (
@@ -827,6 +810,7 @@ function KeywordChip({
   onSetPrimary,
   onSetLongtail,
   onRemove,
+  onRename,
 }: {
   keyword: WorksheetKeyword;
   isPopoverOpen: boolean;
@@ -834,24 +818,38 @@ function KeywordChip({
   onSetPrimary: () => void;
   onSetLongtail: () => void;
   onRemove: () => void;
+  /** Commit a renamed term. */
+  onRename: (next: string) => void | Promise<void>;
 }) {
   // Worksheet invariant: every keyword is Primary or Longtail.
   // Primary uses a saturated lavender; Longtail uses a soft tint of the same
-  // hue. The chevron is the affordance for the actions popover.
+  // hue. The chevron is the affordance for the actions popover; the term
+  // itself is click-to-edit via <InlineEditable>.
   const variantClass = keyword.isPrimary
     ? 'bg-[#7281c4] border-[#7281c4] text-white hover:bg-[#6573ba]'
     : 'bg-[#dde2f5] border-[#cdd5ed] text-[#4c5a8c] hover:bg-[#d3daf0]';
 
   return (
-    <span className="relative inline-flex">
+    <span
+      className={`relative inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[12px] font-medium transition-colors ${variantClass}`}
+    >
+      <InlineEditable
+        value={keyword.term}
+        onCommit={onRename}
+        placeholder="keyword"
+        className="cursor-text whitespace-nowrap focus:outline-none"
+        inputClassName={`min-w-[60px] max-w-[260px] rounded-sm bg-transparent text-[12px] font-medium focus:outline-none ${
+          keyword.isPrimary ? 'placeholder:text-white/50' : 'placeholder:text-[#7d87a7]'
+        }`}
+      />
       <button
         type="button"
         onClick={onTogglePopover}
-        className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[12px] font-medium transition-colors ${variantClass}`}
+        aria-label="Keyword actions"
         aria-haspopup="menu"
         aria-expanded={isPopoverOpen}
+        className="inline-flex h-4 w-4 items-center justify-center rounded-sm hover:bg-black/10 focus:outline-none focus:ring-1 focus:ring-current"
       >
-        <span className="whitespace-nowrap">{keyword.term}</span>
         <ChevronLeft className="h-3 w-3 shrink-0" />
       </button>
 

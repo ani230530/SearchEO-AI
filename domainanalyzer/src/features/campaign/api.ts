@@ -274,6 +274,19 @@ export async function deselectKeyword(keywordId: number): Promise<WorksheetTopic
   return data.structure.topics.map(normalizeTopic);
 }
 
+export async function updateKeywordTerm(
+  keywordId: number,
+  term: string
+): Promise<WorksheetTopic[]> {
+  const res = await fetch(`${API_BASE_URL}/api/campaigns/keywords/${keywordId}`, {
+    method: 'PATCH',
+    headers: authHeaders(),
+    body: JSON.stringify({ term }),
+  });
+  const data = await handle<StructureResponse>(res);
+  return data.structure.topics.map(normalizeTopic);
+}
+
 export async function deleteKeyword(keywordId: number): Promise<WorksheetTopic[]> {
   const res = await fetch(`${API_BASE_URL}/api/campaigns/keywords/${keywordId}`, {
     method: 'DELETE',
