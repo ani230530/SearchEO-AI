@@ -199,6 +199,13 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
   // savingDraft removed - using 'saving' state instead
   const [currentDraftId, setCurrentDraftId] = useState<number | null>(initialDraftId || null);
   const [currentDraftStatus, setCurrentDraftStatus] = useState<string | null>(null);
+  /**
+   * Specific to the WordPress publish action so its loading state can be
+   * distinguished from `publishLoading` (which is also true during content
+   * generation, regenerate, edits, etc.). Set in handlePublishToWordpress;
+   * cleared by applyTerminalPublishState on the resulting SSE event.
+   */
+  const [isPublishing, setIsPublishing] = useState(false);
   const [selectedText, setSelectedText] = useState('');
   const [textEditNote, setTextEditNote] = useState('');
   const [textEditing, setTextEditing] = useState(false);
@@ -278,6 +285,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
     const { status, draftId, publishedUrl, wordpressPostId, error, notify = false } = params;
 
     setPublishLoading(false);
+    setIsPublishing(false);
 
     if (status === 'published') {
       setPublishError('');
@@ -1079,6 +1087,111 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
       setFeaturedImageEditing(false);
     }
   }, [applyFeaturedImageState, extractEditedImage, featuredImageEditNote, publishResult, toast]);
+
+  /**
+   * Publish button state machine.
+   *
+   * Single source of truth for what the Publish button should render.
+   * Distinguishes between background-queued publishes (n8n still running
+   * server-side, page can be navigated away from) and the in-flight
+   * client-side request that fires it. Cleared on terminal SSE updates
+   * via applyTerminalPublishState.
+   */
+  type PublishButtonState =
+    | 'hidden'
+    | 'idle-fresh'
+    | 'idle-republish'
+    | 'publishing'
+    | 'queued'
+    | 'failed';
+
+  const computePublishButtonState = (): PublishButtonState => {
+    if (!publishResult) return 'hidden';
+    if (currentDraftStatus === 'generating' && isPublishing) return 'queued';
+    if (isPublishing) return 'publishing';
+    if (currentDraftStatus === 'failed') return 'failed';
+    if (publishResult.wordpressUrl?.startsWith('http')) return 'idle-republish';
+    return 'idle-fresh';
+  };
+
+  const renderPublishButton = (variant: 'compact' | 'full' = 'compact') => {
+    const state = computePublishButtonState();
+    if (state === 'hidden') return null;
+
+    const baseCompact =
+      'px-4 py-2.5 rounded-md text-white text-sm font-medium shadow-lg transition-colors flex items-center gap-2';
+    const baseFull =
+      'px-6 py-2.5 rounded-full text-white text-sm font-medium shadow-lg transition-all flex items-center gap-2';
+    const base = variant === 'full' ? baseFull : baseCompact;
+
+    type ButtonConfig = {
+      label: string;
+      icon: React.ReactNode;
+      tone: string;
+      disabled: boolean;
+      title?: string;
+    };
+
+    const configByState: Record<Exclude<PublishButtonState, 'hidden'>, ButtonConfig> = {
+      'idle-fresh': {
+        label: 'Publish',
+        icon: <Send className="h-4 w-4" />,
+        tone:
+          variant === 'full'
+            ? 'bg-black hover:bg-gray-800'
+            : 'bg-[#2D4059] hover:bg-[#2D4059]/90',
+        disabled: false,
+      },
+      'idle-republish': {
+        label: 'Re-publish',
+        icon: <Send className="h-4 w-4" />,
+        tone:
+          variant === 'full'
+            ? 'bg-black hover:bg-gray-800'
+            : 'bg-[#2D4059] hover:bg-[#2D4059]/90',
+        disabled: false,
+        title: 'Republish to WordPress (overwrites the live post)',
+      },
+      publishing: {
+        label: 'Publishing…',
+        icon: <ButtonSpinner />,
+        tone:
+          variant === 'full'
+            ? 'bg-black hover:bg-gray-800'
+            : 'bg-[#2D4059] hover:bg-[#2D4059]/90',
+        disabled: true,
+      },
+      queued: {
+        label: 'Publishing in background…',
+        icon: <ButtonSpinner />,
+        tone: 'bg-[#5f6dab] hover:bg-[#5f6dab]',
+        disabled: true,
+        title: 'WordPress is processing this publish in the background',
+      },
+      failed: {
+        label: 'Retry publish',
+        icon: <Send className="h-4 w-4" />,
+        tone: 'bg-red-600 hover:bg-red-700',
+        disabled: false,
+        title: 'The last publish failed. Click to try again.',
+      },
+    };
+
+    const cfg = configByState[state];
+
+    return (
+      <button
+        type="button"
+        onClick={handlePublishToWordpress}
+        disabled={cfg.disabled || !publishResult}
+        title={cfg.title}
+        className={`${base} ${cfg.tone} disabled:opacity-60 disabled:cursor-not-allowed`}
+      >
+        {cfg.icon}
+        <span>{cfg.label}</span>
+      </button>
+    );
+  };
 
   /**
    * Always-on metadata editor. Title, meta description, and slug are
@@ -2023,6 +2136,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
     }
 
     setPublishLoading(true);
+    setIsPublishing(true);
     try {
       // SIMPLE: Just use currentHtmlContent - user should save manually before publishing
       const latestHtmlContent = currentHtmlContent;
@@ -2099,7 +2213,8 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
         fetchPublishHistory();
         onRefreshWordpressIntegration();
         setPublishLoading(false); // Stop loading on success
-      } 
+        setIsPublishing(false);
+      }
       // Handle Queued/Generating Status
       else if (data.status === 'generating') {
         console.log('[Publish:Debug] Job queued, setting currentDraftId:', data.draftId);
@@ -2126,6 +2241,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
         variant: 'destructive',
       });
       setPublishLoading(false); // Stop loading on error
+      setIsPublishing(false);
     }
   };
 
@@ -3090,16 +3206,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
                       onChange={handleDeviceImageSelect}
                       className="hidden"
                     />
-                  <button
-  onClick={handlePublishToWordpress}
-  disabled={publishLoading || !publishResult}
-  className="px-4 py-2.5 rounded-md bg-[#2D4059] text-white text-sm font-medium shadow-lg hover:bg-[#2D4059]/90 disabled:opacity-60 transition-colors flex items-center gap-2"
->
-  <Send className="h-4 w-4" />
-  {publishLoading
-    ? 'Working…'
-    : (publishResult?.wordpressUrl?.startsWith('http') ? 'Re-publish' : 'Publish')}
-</button>
+                  {renderPublishButton('compact')}
                 </div>
               </div>
             </div>
@@ -3703,23 +3810,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
                         </a>
                       </div>
                     ) : (
-                      <button
-                        onClick={handlePublishToWordpress}
-                        disabled={publishLoading || !publishResult}
-                        className="px-6 py-2.5 rounded-full bg-black text-white text-sm font-medium shadow-lg hover:bg-gray-800 disabled:opacity-60 transition-all flex items-center gap-2"
-                      >
-                        {publishLoading ? (
-                          <>
-                            <ButtonSpinner />
-                            <span>Publishing…</span>
-                          </>
-                        ) : (
-                          <>
-                            <Send className="h-4 w-4" />
-                            <span>Publish to WordPress</span>
-                          </>
-                        )}
-                      </button>
+                      renderPublishButton('full')
                     )}
                   </div>
                 </div>
