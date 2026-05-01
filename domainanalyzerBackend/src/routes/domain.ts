@@ -304,9 +304,16 @@ router.post('/', authenticateToken, asyncHandler(async (req: Request, res: Respo
 
     try {
       if (!hasPriorityUrls && !hasCustomPaths) {
-        extraction = await crawlAndExtractWithGpt4o(domainName, onProgress, undefined, undefined, location);
+        const defaultPriorityUrls = [
+          `https://${domainName}/about`,
+          `https://${domainName}/services`,
+          `https://${domainName}/contact`,
+          `https://${domainName}/solutions`,
+          `https://${domainName}/products`
+        ];
+        extraction = await crawlAndExtractWithGpt4o(domainName, onProgress, undefined, defaultPriorityUrls, location, { maxPages: 15 });
       } else {
-        extraction = await crawlAndExtractWithGpt4o(domainName, onProgress, customPaths, priorityUrls, location);
+        extraction = await crawlAndExtractWithGpt4o(domainName, onProgress, customPaths, priorityUrls, location, { maxPages: 15 });
       }
       totalTokenUsage += extraction.tokenUsage || 0;
     } catch (extractionError) {
@@ -319,7 +326,7 @@ router.post('/', authenticateToken, asyncHandler(async (req: Request, res: Respo
     // Save crawl result
     sendEvent({ type: 'progress', phase: 'domain_extraction', step: 'Saving domain extraction results...', progress: 95 });
 
-      const crawlResult = await prisma.crawlResult.create({
+    const crawlResult = await prisma.crawlResult.create({
       data: {
         domainId: domain.id,
         pagesScanned: extraction.pagesScanned,

@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useMemo, useState, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Country, State } from 'country-state-city';
 import { ChevronDown, Sparkles, Check, Plus, RefreshCcw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -117,6 +117,7 @@ const isGenericAnalysisKeyword = (term: string) => genericAnalysisKeywords.has(t
 
 const AIChecker = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { toast } = useToast();
 
   const [domain, setDomain] = useState('');
@@ -142,6 +143,67 @@ const AIChecker = () => {
   const [isBusy, setIsBusy] = useState(false);
   const [isLoadingCompetitors, setIsLoadingCompetitors] = useState(false);
   const [isLoadingStepItems, setIsLoadingStepItems] = useState(false);
+  const [isInitializing, setIsInitializing] = useState(false);
+
+  // Load initial data from domainId query param
+  useEffect(() => {
+    const domainId = searchParams.get('domainId');
+    const reanalyze = searchParams.get('reanalyze') === '1';
+    
+    if (domainId && !workspace) {
+      const initDomain = async () => {
+        setIsInitializing(true);
+        try {
+          const headers = getAuthHeaders();
+          const response = await fetch(`${API_BASE_URL}/api/domain/${domainId}`, { headers });
+          
+          if (!response.ok) {
+            throw new Error('Could not load existing domain data.');
+          }
+          
+          const data = await response.json();
+          if (data) {
+            const nextWorkspace = {
+              domainId: Number(data.id),
+              normalizedHostname: data.url.replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0],
+              normalizedUrl: data.url,
+              location: data.location || 'Global'
+            };
+            
+            setDomain(data.url);
+            setCountry(''); // We don't have isoCode here easily, but normalizedHostname is set
+            setWorkspace(nextWorkspace);
+            
+            // Load competitors
+            await loadSuggestedCompetitors(nextWorkspace.domainId);
+            
+            if (reanalyze) {
+              setStep(1);
+            } else if (data.currentStep >= 3) {
+              setStep(3);
+              await loadKeywordsAndPhrases(nextWorkspace);
+            } else if (data.currentStep >= 2) {
+              setStep(3); // Go to step 3 if we already have competitors
+              await loadKeywordsAndPhrases(nextWorkspace);
+            } else if (data.currentStep >= 1) {
+              setStep(2);
+            }
+          }
+        } catch (err) {
+          console.error('Initialization error:', err);
+          toast({
+            title: 'Failed to load domain',
+            description: err instanceof Error ? err.message : 'Unknown error',
+            variant: 'destructive'
+          });
+        } finally {
+          setIsInitializing(false);
+        }
+      };
+      
+      initDomain();
+    }
+  }, [searchParams]);
 
   const countryOptions = useMemo(
     () => Country.getAllCountries().map((item) => ({ code: item.isoCode, name: item.name })),

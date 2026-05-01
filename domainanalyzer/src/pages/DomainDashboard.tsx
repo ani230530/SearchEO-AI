@@ -1894,10 +1894,6 @@ const ModernAIResultsTable: React.FC<{ results: FlatAIQueryResult[]; onBulkReana
 };
 
 const AIResultsTable: React.FC<{ results: FlatAIQueryResult[]; onBulkReanalyze?: (phraseIds: number[]) => void; bulkReanalyzing?: boolean }> = ({ results, onBulkReanalyze, bulkReanalyzing = false }) => {
-  // Debug: log the first result to inspect fields
-  if (results && results.length > 0) {
-    console.log('AIResultsTable first result:', results[0]);
-  }
   const [page, setPage] = useState(1);
   const perPage = 25;
   const totalPages = Math.ceil(results.length / perPage);
@@ -2635,8 +2631,7 @@ const DomainDashboard = () => {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
 
-  // Debug state
-  console.log('Current state:', { paymentPopupOpen, lockedFeature, allUnlocked });
+
 
   // Extract domain ID from URL - handle masked domain identifiers
   const getDomainId = () => {
@@ -2720,8 +2715,6 @@ const DomainDashboard = () => {
       setError(null);
       setDomainData(null); // Clear previous data to prevent showing stale data
       
-      console.log('Fetching domain data for domain');
-      
       // Fetch domain data directly without version
       const url = `${import.meta.env.VITE_API_URL}/api/dashboard/${domainId}`;
       
@@ -2739,18 +2732,7 @@ const DomainDashboard = () => {
       }
       
       const data = await response.json();
-      console.log('Domain data received:', data);
-      console.log('Data keys:', Object.keys(data));
-      console.log('Metrics keys:', Object.keys(data.metrics || {}));
       setShowingFallbackData(false);
-      
-      // Debug keyword analytics specifically
-      if (data.metrics?.keywordAnalytics) {
-        console.log('Keyword analytics data:', data.metrics.keywordAnalytics);
-        console.log('High volume keywords:', data.metrics.keywordAnalytics.highVolume);
-        console.log('Medium volume keywords:', data.metrics.keywordAnalytics.mediumVolume);
-        console.log('Low volume keywords:', data.metrics.keywordAnalytics.lowVolume);
-      }
 
       // Calculate keyword analytics if not provided
       if (!data.metrics.keywordAnalytics && data.keywords) {
@@ -2857,14 +2839,10 @@ const DomainDashboard = () => {
       await new Promise(resolve => setTimeout(resolve, 100));
       
       setDomainData(data);
-      console.log('Domain data set successfully');
-      // Debug: log token usage after setting domain data
-      console.log('Token usage from API:', data.extraction?.tokenUsage);
-      
+
       // Set competitor data if available
       if (data.competitorData) {
         setCompetitorData(data.competitorData);
-        console.log('Competitor data set from dashboard response');
       }
       
       // Transform the data to match the expected structure
@@ -2885,7 +2863,6 @@ const DomainDashboard = () => {
       setDomainData(null);
     } finally {
       setLoading(false);
-      console.log('Loading state set to false');
     }
   };
 
@@ -3035,15 +3012,11 @@ const DomainDashboard = () => {
       const result = await response.json();
       
       if (result.success) {
-        console.log(`Bulk re-analysis completed: ${result.summary.successful} successful, ${result.summary.failed} failed`);
-        
         // Refresh the domain data to get updated results
         await fetchDomainData(domainId);
         
         // Show success message
-        if (result.summary.failed === 0) {
-          console.log('All phrases reanalyzed successfully');
-        } else {
+        if (result.summary.failed > 0) {
           console.warn(`${result.summary.failed} phrases failed to reanalyze`);
         }
       }
@@ -3098,8 +3071,6 @@ const DomainDashboard = () => {
         throw new Error(result.error || 'Analysis failed');
       }
 
-      console.log('Custom phrase analyzed successfully:', result);
-
       // Get the extracted keyword from the result
       const extractedKeyword = result.keyword?.term || result.analysis?.extractedKeyword || phraseToAnalyze;
 
@@ -3117,8 +3088,6 @@ const DomainDashboard = () => {
       setNewCustomPhrase('');
       setIsAddingCustomPhrase(false);
       setCustomPhrasesLoading(false);
-
-      console.log(`Successfully analyzed custom phrase: "${phraseToAnalyze}" with keyword: "${extractedKeyword}"`);
 
     } catch (error) {
       console.error('Custom phrase analysis error:', error);
@@ -3265,8 +3234,6 @@ const DomainDashboard = () => {
         throw new Error('Failed to create AI query results');
       }
 
-      console.log('AI query analysis completed for custom phrases');
-
       // Refresh dashboard to show new results
       await fetchDomainData(domainId);
 
@@ -3367,7 +3334,6 @@ const DomainDashboard = () => {
 
   // Handle Load More phrases for keyword
   const handleLoadMorePhrases = async (keyword: string, keywordId: number) => {
-    console.log('handleLoadMorePhrases called with:', { keyword, keywordId, domainId });
     try {
       // Auto-expand this keyword's section so new phrases are visible immediately
       setExpandedKeywordTerms(prev => {
@@ -3384,8 +3350,6 @@ const DomainDashboard = () => {
           'Content-Type': 'application/json',
         },
       });
-
-      console.log('Load more response status:', response.status);
 
       if (!response.ok) {
         throw new Error('Failed to generate additional phrases');
@@ -3558,13 +3522,10 @@ const DomainDashboard = () => {
 
   // Handle navigation item click
   const handleNavigationClick = (item: typeof navigationItems[0]) => {
-    console.log('Navigation clicked:', item.label, 'Locked:', item.locked);
     if (item.locked) {
-      console.log('Opening payment popup for:', item.label);
       setLockedFeature(item.label);
       setPaymentPopupOpen(true);
     } else {
-      console.log('Setting active section to:', item.id);
       setActiveSection(item.id);
     }
   };
@@ -3616,8 +3577,6 @@ const DomainDashboard = () => {
   const { metrics } = domainData;
 
   // Debug: log token usage in render
-  console.log('Token usage in render:', domainData.extraction?.tokenUsage);
-
   // Safety check to ensure metrics exists
   if (!metrics) {
     return (
@@ -4906,11 +4865,8 @@ const DomainDashboard = () => {
                                       <div className="flex items-center justify-end pb-3 border-b border-gray-100">
                                         <div className="flex items-center space-x-2">
                                           {kwObj && (
-                                            <button 
-                                              onClick={() => {
-                                                console.log('Load More button clicked for:', { keyword: keyword.keyword, keywordId: kwObj.id });
-                                                handleLoadMorePhrases(keyword.keyword, kwObj.id);
-                                              }}
+                                            <button
+                                              onClick={() => handleLoadMorePhrases(keyword.keyword, kwObj.id)}
                                               disabled={loadingMorePhrases[keyword.keyword]}
                                               className="inline-flex items-center px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-xs font-medium transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                                             >
@@ -5318,7 +5274,7 @@ const DomainDashboard = () => {
                         allowDuplicatedCategory={false}
                         height={96} 
                         tickMargin={12} 
-                        tick={<PhraseTick />} 
+                        tick={(props: { x: number; y: number; payload: { value: string; index: number } }) => <PhraseTick {...props} />}
                       />
                       <YAxis yAxisId="left" domain={[0, 100]} tick={{ fill: '#64748b', fontSize: 12 }} />
                       <YAxis yAxisId="right" orientation="right" allowDecimals={false} tick={{ fill: '#64748b', fontSize: 12 }} />
@@ -5582,8 +5538,8 @@ const DomainDashboard = () => {
             </Card>
 
             {/* Competitor Ranking Table - Only show for response-based analysis */}
-            {competitorData && competitorData.competitors && Array.isArray(competitorData.competitors) && competitorData.competitors.length > 0 && 
-             competitorData.competitors[0] && 'competitor' in competitorData.competitors[0] && (
+            {competitorData && competitorData.competitors && Array.isArray(competitorData.competitors) && competitorData.competitors.length > 0 &&
+             competitorData.competitors[0] && typeof competitorData.competitors[0] === 'object' && 'competitor' in competitorData.competitors[0] && (
               <div className="space-y-8">
                  <CompetitorRankingTable 
                    competitors={competitorData.competitors as unknown as Array<{

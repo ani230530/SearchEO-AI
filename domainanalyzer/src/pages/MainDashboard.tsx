@@ -77,7 +77,7 @@ const ProfessionalDashboard = () => {
       navigate(`/dashboard/${maskedId}`);
     } else {
       // Otherwise, go to the analysis flow at the current step
-      navigate(`/analyze?domainId=${domain.id}`);
+      navigate(`/ai-checker-page?domainId=${domain.id}`);
     }
   };
 
@@ -1303,7 +1303,7 @@ const ProfessionalDashboard = () => {
                   </span>
                   <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button
-                      onClick={(e) => { e.stopPropagation(); navigate(`/analyze?domainId=${domain.id}&reanalyze=1`); }}
+                      onClick={(e) => { e.stopPropagation(); navigate(`/ai-checker-page?domainId=${domain.id}&reanalyze=1`); }}
                       className="px-3 py-1.5 text-xs rounded-full border border-gray-200 text-gray-700 hover:bg-gray-50"
                     >
                       Re-analyze
@@ -1359,7 +1359,7 @@ const ProfessionalDashboard = () => {
               </p>
               <button 
                 className="apple-button"
-                onClick={() => navigate('/analyze')}
+                onClick={() => navigate('/ai-checker-page')}
               >
                 <Plus className="h-4 w-4 mr-2" />
                 Add Domain

@@ -25,6 +25,7 @@ import { Router, Request, Response } from 'express';
 import { PrismaClient } from '../../generated/prisma';
 import OpenAI from 'openai';
 import { authenticateToken, AuthenticatedRequest } from '../middleware/auth';
+import { INTENT_PHRASE_PHASES } from './intentPhrases';
 
 /**
  * FIXED REDDIT DATA MINING
@@ -40,6 +41,160 @@ import { authenticateToken, AuthenticatedRequest } from '../middleware/auth';
 // FIXED REDDIT API CONFIGURATION & HELPERS
 // ===============================================
 
+// ===============================================
+// TYPES & INTERFACES
+// ===============================================
+
+interface SemanticData {
+  searchTerms?: string[];
+  keyProblems?: string[];
+  primaryServices?: string[];
+  location?: string;
+  contentSummary?: string;
+}
+
+interface RedditPost {
+  title: string;
+  selftext: string;
+  subreddit: string;
+  permalink: string;
+  score: number;
+  num_comments: number;
+  created_utc: number;
+  url: string;
+}
+
+interface RedditSearchResponse {
+  posts: RedditPost[];
+  isEmpty: boolean;
+  rateLimited?: boolean;
+  error?: string;
+  failed?: boolean;
+}
+
+interface ExtractedRedditPost {
+  title: string;
+  content: string;
+  subreddit: string;
+  url: string;
+  score: number;
+  comments: number;
+  created: string;
+  relevanceScore: number;
+  platform: string;
+  fullText: string;
+  hasQuestion: boolean;
+  hasProblem: boolean;
+  hasSolution: boolean;
+  hasComparison: boolean;
+}
+
+interface RedditMetadata {
+  score: number;
+  comments: number;
+  subreddit: string;
+}
+
+interface DataQuality {
+  totalQueries: number;
+  successfulQueries: number;
+  failedQueries: number;
+  redditResults: number;
+  totalResults: number;
+  averageRelevance: number;
+  qualityRating: string;
+  hasQuestions: number;
+  hasProblems: number;
+  hasSolutions: number;
+}
+
+interface MiningSummary {
+  redditData: ExtractedRedditPost[];
+  dataQuality: DataQuality;
+  allData: ExtractedRedditPost[];
+}
+
+interface Keyword {
+  id: number;
+  term: string;
+  domainId: number;
+  [key: string]: any; // Allow for other prisma properties
+}
+
+interface Domain {
+  id: number;
+  url: string;
+  userId: number;
+  location?: string;
+  context?: string;
+  [key: string]: any; // Allow for other prisma properties
+}
+
+interface IntentValidation {
+  isValid: boolean;
+  issues: string[];
+  confidence: number;
+}
+
+interface PhraseAnalysisResult {
+  phrase: string;
+  intent: string;
+  intentConfidence: number;
+  relevanceScore: number;
+  [key: string]: any;
+}
+
+interface KeywordWithRelations extends Keyword {
+  generatedIntentPhrases?: any[];
+  communityInsights?: any[];
+  searchPatterns?: any[];
+}
+
+interface UserLanguagePatterns {
+  questionStarters?: string[];
+  problemDescriptors?: string[];
+  solutionSeekers?: string[];
+  qualityIndicators?: string[];
+  urgencyMarkers?: string[];
+  comparisonLanguage?: string[];
+  emotionalTriggers?: string[];
+}
+
+interface RealQuestion {
+  question: string;
+  relevanceScore: number;
+  engagement: number;
+  hasCommercialIntent: boolean;
+  hasInformationalIntent: boolean;
+  platform: string;
+}
+
+interface RealPhrase {
+  phrase: string;
+  context: string;
+  relevanceScore: number;
+  engagement: number;
+  type: string;
+  platform?: string;
+}
+
+interface SearchPattern {
+  domainId: number;
+  keywordId: number;
+  patterns: string[];
+  summary: string;
+  tokenUsage: number;
+}
+
+interface AuthenticatedRequest extends Request {
+  user: {
+    userId: number;
+    email: string;
+  };
+}
+
+type EventSender = (event: string, data: any) => void;
+
 const REDDIT_API_CONFIG = {
   baseUrl: 'https://www.reddit.com',
   userAgent: 'SEOAnalysisBot/1.0',
@@ -50,7 +205,7 @@ const REDDIT_API_CONFIG = {
 };
 
 // ENHANCED: Better subreddit targeting for quality data
-const getTargetSubreddits = (businessContext: string) => {
+const getTargetSubreddits = (businessContext: string): string[] => {
   const contextLower = businessContext.toLowerCase();
   
   // Business-specific subreddits
@@ -73,33 +228,58 @@ const getTargetSubreddits = (businessContext: string) => {
 };
 
 // OPTIMIZED: Smarter query generation using semantic data - Reduced for faster processing
-const generateStrategicQueries = (semanticData: any, businessContext: string): string[] => {
-  const queries = new Set<string>();
-  
+const generateStrategicQueries = (semanticData: SemanticData | null | undefined, businessContext: string): string[] => {
+  // Use semantic data if available, otherwise fall back to business context
   const searchTerms = semanticData?.searchTerms || [];
   const keyProblems = semanticData?.keyProblems || [];
   const primaryServices = semanticData?.primaryServices || [];
+  const location = semanticData?.location || '';
   
-  const baseContext = businessContext.toLowerCase().replace(/[^\w\s]/g, '').trim();
+  const queries = new Set<string>();
   
-  // OPTIMIZATION: Reduce to most effective query types
+  // 1. Semantic search terms (highest priority)
+  if (searchTerms.length > 0) {
+    searchTerms.slice(0, 3).forEach((term: string) => {
+      queries.add(`${term} problems`);
+      queries.add(`best ${term}`);
+    });
+  }
+  
+  // 2. Key problems
   if (keyProblems.length > 0) {
-    queries.add(`${keyProblems[0]} help`); // Only use top problem
+    keyProblems.slice(0, 2).forEach((problem: string) => {
+      queries.add(`${problem} solutions`);
+      queries.add(`fix ${problem}`);
+    });
   }
   
+  // 3. Primary services
   if (primaryServices.length > 0) {
-    queries.add(`best ${primaryServices[0]}`); // Only use top service
+    primaryServices.slice(0, 2).forEach((service: string) => {
+      queries.add(`${service} help`);
+      queries.add(`${service} tips`);
+    });
   }
   
-  // Essential base queries
-  queries.add(`${baseContext} problems`);
-  queries.add(`how to ${baseContext}`);
+  // 4. Location specific
+  if (location && location !== 'Global' && location.trim() !== '') {
+    queries.add(`${businessContext} ${location}`);
+  }
   
-  return Array.from(queries).slice(0, 3); // Reduced from 6 to 3
+  // 5. Fallback/Essential base queries
+  const cleanContext = businessContext.toLowerCase().replace(/[^\w\s]/g, ' ').trim();
+  queries.add(`${cleanContext} problems`);
+  queries.add(`how to ${cleanContext}`);
+  queries.add(`best ${cleanContext}`);
+
+  // Filter and return
+  return Array.from(queries)
+    .filter(query => query.length > 0 && query.length <= 50)
+    .slice(0, 10); // Limit to 10 queries, caller can slice further (e.g., to 3)
 };
 
 // OPTIMIZED: Better Reddit search with multiple strategies - Reduced limits for faster processing
-const searchRedditAPI = async (query: string, subreddit?: string, options: { sort?: string; time?: string; limit?: number } = {}) => {
+const searchRedditAPI = async (query: string, subreddit?: string, options: { sort?: string; time?: string; limit?: number } = {}): Promise<RedditSearchResponse> => {
   const { sort = 'top', time = 'year', limit = 15 } = options; // OPTIMIZED: Default to 15 posts
   
   try {
@@ -136,7 +316,7 @@ const searchRedditAPI = async (query: string, subreddit?: string, options: { sor
       throw new Error(`Reddit API HTTP ${response.status}`);
     }
     
-    const data = await response.json();
+    const data = await response.json() as { data: { children: { data: RedditPost }[] } };
     
     if (!data?.data?.children || !Array.isArray(data.data.children)) {
       return { posts: [], isEmpty: true, error: 'Invalid data structure' };
@@ -148,13 +328,13 @@ const searchRedditAPI = async (query: string, subreddit?: string, options: { sor
     
     console.log(`✅ Found ${data.data.children.length} results`);
     return {
-      posts: data.data.children.map((child: any) => child.data),
+      posts: data.data.children.map((child: { data: RedditPost }) => child.data),
       isEmpty: false
     };
     
   } catch (error) {
     console.error(`❌ Reddit API error: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    return { posts: [], error: error instanceof Error ? error.message : 'Unknown error', failed: true };
+    return { posts: [], error: error instanceof Error ? error.message : 'Unknown error', failed: true, isEmpty: true };
   }
 };
 
@@ -163,7 +343,7 @@ const searchRedditAPI = async (query: string, subreddit?: string, options: { sor
 // ===============================================
 
 // ENHANCED: Much better data extraction with quality scoring
-const extractRedditDataEnhanced = (redditData: any, businessContext: string) => {
+const extractRedditDataEnhanced = (redditData: RedditSearchResponse, businessContext: string): ExtractedRedditPost[] => {
   if (!redditData?.posts || !Array.isArray(redditData.posts)) {
     return [];
   }
@@ -171,7 +351,7 @@ const extractRedditDataEnhanced = (redditData: any, businessContext: string) => 
   console.log(`📊 Processing ${redditData.posts.length} Reddit posts...`);
   
   const validPosts = redditData.posts
-    .filter((post: any) => {
+    .filter((post: RedditPost) => {
       // Basic validation
       const hasTitle = post.title && post.title.length > 10;
       const hasContent = (post.selftext && post.selftext.length > 20) || post.url;
@@ -180,7 +360,7 @@ const extractRedditDataEnhanced = (redditData: any, businessContext: string) => 
       
       return hasTitle && hasContent && notDeleted && hasEngagement;
     })
-    .map((post: any) => {
+    .map((post: RedditPost): ExtractedRedditPost => {
       const title = post.title.trim();
       const content = (post.selftext || '').trim();
       const fullText = `${title} ${content}`.toLowerCase();
@@ -210,8 +390,8 @@ const extractRedditDataEnhanced = (redditData: any, businessContext: string) => 
         hasComparison: /\b(best|better|vs|versus|compare|alternative)\b/.test(fullText)
       };
     })
-    .filter((item: any) => item.relevanceScore > 5) // OPTIMIZED: Higher threshold for peak accuracy
-    .sort((a: any, b: any) => {
+    .filter((item: ExtractedRedditPost) => item.relevanceScore > 5) // OPTIMIZED: Higher threshold for peak accuracy
+    .sort((a: ExtractedRedditPost, b: ExtractedRedditPost) => {
       // Sort by relevance score, then engagement
       if (b.relevanceScore !== a.relevanceScore) {
         return b.relevanceScore - a.relevanceScore;
@@ -225,7 +405,7 @@ const extractRedditDataEnhanced = (redditData: any, businessContext: string) => 
 };
 
 // ENHANCED: Advanced relevance scoring with multiple factors
-const calculateAdvancedRelevanceScore = (text: string, businessContext: string, metadata: any): number => {
+const calculateAdvancedRelevanceScore = (text: string, businessContext: string, metadata: RedditMetadata): number => {
   const lowerText = text.toLowerCase();
   const lowerContext = businessContext.toLowerCase();
   let score = 0;
@@ -297,63 +477,7 @@ const calculateAdvancedRelevanceScore = (text: string, businessContext: string, 
 // IMPROVED QUERY GENERATION
 // ===============================================
 
-// FIXED: Better strategic queries generation using concise semantic data
-const generateStrategicQueriesLegacy = (semanticData: any, businessContext: string, domain: string): string[] => {
-  // Use semantic data if available, otherwise fall back to business context
-  const searchTerms = semanticData?.searchTerms || [];
-  const keyProblems = semanticData?.keyProblems || [];
-  const primaryServices = semanticData?.primaryServices || [];
-  const location = semanticData?.location || '';
-  
-  // Create concise, targeted queries
-  const queries = [];
-  
-  // Use semantic search terms if available
-  if (searchTerms.length > 0) {
-    searchTerms.slice(0, 5).forEach((term: string) => {
-      queries.push(`${term} problems`);
-      queries.push(`best ${term}`);
-      queries.push(`how to ${term}`);
-    });
-  }
-  
-  // Use key problems for problem-focused queries
-  if (keyProblems.length > 0) {
-    keyProblems.slice(0, 3).forEach((problem: string) => {
-      queries.push(`${problem} solutions`);
-      queries.push(`fix ${problem}`);
-    });
-  }
-  
-  // Use primary services for service-focused queries
-  if (primaryServices.length > 0) {
-    primaryServices.slice(0, 3).forEach((service: string) => {
-      queries.push(`${service} help`);
-      queries.push(`${service} tips`);
-    });
-  }
-  
-  // Add location-specific queries if available
-  if (location && location !== 'Global') {
-    queries.push(`${businessContext} ${location}`);
-    queries.push(`${location} ${businessContext} services`);
-  }
-  
-  // Fallback queries if semantic data is insufficient
-  if (queries.length < 5) {
-    const cleanContext = businessContext.toLowerCase().replace(/[^\w\s]/g, ' ').trim();
-    queries.push(`${cleanContext} problems`);
-    queries.push(`best ${cleanContext}`);
-    queries.push(`how to ${cleanContext}`);
-    queries.push(`${cleanContext} help`);
-    queries.push(`${cleanContext} tips`);
-  }
-  
-  // Ensure queries are concise (max 50 characters)
-  return queries
-    .filter(query => query.length <= 50)
-    .slice(0, 15); // Limit to 15 queries
-};
+// Strategic query generation is now consolidated into generateStrategicQueries above.
 
 // ===============================================
 // ENHANCED RELEVANCE SCORING
@@ -414,7 +538,7 @@ const calculateEnhancedRelevanceScore = (text: string, businessContext: string):
 // ENHANCED COMMUNITY MINING FUNCTION
 // ===============================================
 
-const performOptimizedCommunityMining = async (businessContext: string, domain: any, semanticData?: any) => {
+const performOptimizedCommunityMining = async (businessContext: string, domain: Domain, semanticData?: SemanticData | null): Promise<MiningSummary> => {
   console.log(`🚀 Optimized community mining: ${businessContext}`);
   
   // OPTIMIZATION 1: Reduce queries from 6 to 3
@@ -425,7 +549,7 @@ const performOptimizedCommunityMining = async (businessContext: string, domain: 
   console.log(`📋 Using ${strategicQueries.length} optimized queries`);
   console.log(`🎯 Targeting ${targetSubreddits.length} high-value subreddits`);
   
-  const allRedditData: any[] = [];
+  const allRedditData: ExtractedRedditPost[] = [];
   let successfulQueries = 0;
   
   // OPTIMIZATION 3: Parallel processing instead of sequential
@@ -485,15 +609,15 @@ const performOptimizedCommunityMining = async (businessContext: string, domain: 
   
   // OPTIMIZATION 5: Reduce final data to top 10 posts
   const uniqueRedditData = allRedditData
-    .filter((item: any, index: number, arr: any[]) => {
-      const isDuplicate = arr.findIndex((other: any, otherIndex: number) => {
+    .filter((item: ExtractedRedditPost, index: number, arr: ExtractedRedditPost[]) => {
+      const isDuplicate = arr.findIndex((other: ExtractedRedditPost, otherIndex: number) => {
         if (otherIndex >= index) return false;
         return other.url === item.url || 
                (other.title === item.title && Math.abs(other.title.length - item.title.length) < 10);
       }) !== -1;
       return !isDuplicate;
     })
-    .sort((a: any, b: any) => {
+    .sort((a: ExtractedRedditPost, b: ExtractedRedditPost) => {
       if (b.relevanceScore !== a.relevanceScore) {
         return b.relevanceScore - a.relevanceScore;
       }
@@ -501,19 +625,19 @@ const performOptimizedCommunityMining = async (businessContext: string, domain: 
     })
     .slice(0, 10); // Reduced from 15 to 10
   
-  const dataQuality = {
+  const dataQuality: DataQuality = {
     totalQueries: strategicQueries.length,
     successfulQueries,
     failedQueries: strategicQueries.length - successfulQueries,
     redditResults: uniqueRedditData.length,
     totalResults: uniqueRedditData.length,
     averageRelevance: uniqueRedditData.length > 0 ? 
-      uniqueRedditData.reduce((sum: number, item: any) => sum + item.relevanceScore, 0) / uniqueRedditData.length : 0,
+      uniqueRedditData.reduce((sum: number, item: ExtractedRedditPost) => sum + item.relevanceScore, 0) / uniqueRedditData.length : 0,
     qualityRating: uniqueRedditData.length > 8 ? 'High' : 
                    uniqueRedditData.length > 4 ? 'Medium' : 'Low',
-    hasQuestions: uniqueRedditData.filter((item: any) => item.hasQuestion).length,
-    hasProblems: uniqueRedditData.filter((item: any) => item.hasProblem).length,
-    hasSolutions: uniqueRedditData.filter((item: any) => item.hasSolution).length
+    hasQuestions: uniqueRedditData.filter((item: ExtractedRedditPost) => item.hasQuestion).length,
+    hasProblems: uniqueRedditData.filter((item: ExtractedRedditPost) => item.hasProblem).length,
+    hasSolutions: uniqueRedditData.filter((item: ExtractedRedditPost) => item.hasSolution).length
   };
   
   console.log(`📈 Optimized Results: ${dataQuality.qualityRating} quality, ${dataQuality.redditResults} posts`);
@@ -530,17 +654,17 @@ const performOptimizedCommunityMining = async (businessContext: string, domain: 
 // ===============================================
 
 const createOptimizedRealDataPhrasePrompt = (
-  keyword: any,
-  domain: any,
-  realQuestions: any[],
-  realPhrases: any[],
-  userLanguagePatterns: any,
+  keyword: Keyword,
+  domain: Domain,
+  realQuestions: RealQuestion[],
+  realPhrases: RealPhrase[],
+  userLanguagePatterns: UserLanguagePatterns,
   semanticContext: string
 ) => `
 Generate 10 natural search phrases for: "${keyword.term}"
 
 REAL USER DATA:
-${realQuestions.slice(0, 8).map((q: any) => `• "${q.question}"`).join('\n')}
+${realQuestions.slice(0, 8).map((q: RealQuestion) => `• "${q.question}"`).join('\n')}
 
 USER LANGUAGE: ${userLanguagePatterns.solutionSeekers?.slice(0, 5).join(', ') || 'help, find, best'}
 
@@ -732,16 +856,16 @@ const extractEntities = (phrase: string, context: string) => {
 // ===============================================
 
 // 1. EXTRACT REAL QUESTIONS AND PHRASES FROM COMMUNITY DATA
-const extractRealUserQuestions = (communityData: any) => {
-  if (!communityData?.sources?.dataPoints) {
+const extractRealUserQuestions = (communityData: MiningSummary | null | undefined): { realQuestions: RealQuestion[]; realPhrases: RealPhrase[]; userLanguagePatterns: UserLanguagePatterns } => {
+  if (!communityData?.redditData) {
     return { realQuestions: [], realPhrases: [], userLanguagePatterns: {} };
   }
   
-  const dataPoints = communityData.sources.dataPoints;
-  const realQuestions: any[] = [];
-  const realPhrases: any[] = [];
+  const dataPoints = communityData.redditData;
+  const realQuestions: RealQuestion[] = [];
+  const realPhrases: RealPhrase[] = [];
   
-  dataPoints.forEach((item: any) => {
+  dataPoints.forEach((item: ExtractedRedditPost) => {
     const combinedText = `${item.title} ${item.content}`;
     
     // Extract high-value questions (with question marks)
@@ -778,7 +902,8 @@ const extractRealUserQuestions = (communityData: any) => {
             context: match[1]?.trim() || '',
             relevanceScore: item.relevanceScore,
             engagement: item.score + item.comments,
-            type: 'help_request'
+            type: 'help_request',
+            platform: 'reddit'
           });
         }
       });
@@ -799,7 +924,7 @@ const extractRealUserQuestions = (communityData: any) => {
   };
 };
 
-const extractAdvancedLanguagePatterns = (dataPoints: any[]) => {
+const extractAdvancedLanguagePatterns = (dataPoints: ExtractedRedditPost[]): UserLanguagePatterns => {
   const patterns = {
     questionStarters: new Set<string>(),
     problemDescriptors: new Set<string>(),
@@ -808,7 +933,7 @@ const extractAdvancedLanguagePatterns = (dataPoints: any[]) => {
     urgencyMarkers: new Set<string>()
   };
   
-  dataPoints.forEach((item: any) => {
+  dataPoints.forEach((item: ExtractedRedditPost) => {
     const text = `${item.title} ${item.content}`.toLowerCase();
     
     // Extract question starters
@@ -842,7 +967,7 @@ const extractAdvancedLanguagePatterns = (dataPoints: any[]) => {
 };
 
 // 2. EXTRACT AUTHENTIC USER LANGUAGE PATTERNS
-const extractLanguagePatterns = (dataPoints: any[]) => {
+const extractLanguagePatterns = (dataPoints: ExtractedRedditPost[]): UserLanguagePatterns => {
   const patterns = {
     problemDescriptors: new Set<string>(),
     solutionSeekers: new Set<string>(),
@@ -852,7 +977,7 @@ const extractLanguagePatterns = (dataPoints: any[]) => {
     emotionalTriggers: new Set<string>()
   };
   
-  dataPoints.forEach((item: any) => {
+  dataPoints.forEach((item: ExtractedRedditPost) => {
     const text = `${item.title} ${item.content}`.toLowerCase();
     
     // Problem descriptors
@@ -892,11 +1017,11 @@ const extractLanguagePatterns = (dataPoints: any[]) => {
 
 // 3. ENHANCED PHRASE GENERATION PROMPT WITH REAL DATA (LEGACY VERSION)
 const createLegacyRealDataPhrasePrompt = (
-  keyword: any,
-  domain: any,
-  realQuestions: any[],
-  realPhrases: any[],
-  userLanguagePatterns: any,
+  keyword: Keyword,
+  domain: Domain,
+  realQuestions: RealQuestion[],
+  realPhrases: RealPhrase[],
+  userLanguagePatterns: UserLanguagePatterns,
   semanticContext: string
 ) => `
 # AUTHENTIC USER LANGUAGE PHRASE GENERATOR v5.0
@@ -908,13 +1033,13 @@ const createLegacyRealDataPhrasePrompt = (
 • Context: ${domain.context}
 
 **REAL USER QUESTIONS FROM REDDIT:**
-${realQuestions.slice(0, 12).map((q: any) => 
+${realQuestions.slice(0, 12).map((q: RealQuestion) => 
   `• "${q.question}" [${q.platform.toUpperCase()}] (Engagement: ${q.engagement})`
 ).join('\n')}
 
 **REAL USER PHRASES AND PROBLEMS:**
-${realPhrases.slice(0, 18).map((p: any) => 
-  `• "${p.phrase}" [${p.platform.toUpperCase()}]`
+${realPhrases.slice(0, 18).map((p: RealPhrase) => 
+  `• "${p.phrase}" [${(p.platform || 'REDDIT').toUpperCase()}]`
 ).join('\n')}
 
 **AUTHENTIC USER LANGUAGE PATTERNS:**
@@ -998,12 +1123,12 @@ const validatePhraseNaturalness = (phrase: string) => {
 // ===============================================
 
 const generateEnhancedIntentPhrases = async (
-  keyword: any,
-  domain: any,
+  keyword: Keyword,
+  domain: Domain,
   semanticContext: string,
-  communityInsightData: any,
-  keywordSearchPatterns: any,
-  sendEvent: any
+  communityInsightData: MiningSummary | null | undefined,
+  keywordSearchPatterns: SearchPattern | null | undefined,
+  sendEvent: EventSender
 ) => {
   try {
     console.log(`🎯 Generating intent-based phrases for: ${keyword.term}`);
@@ -1013,7 +1138,7 @@ const generateEnhancedIntentPhrases = async (
     
     // Emit extracted Reddit posts for this keyword during phrase generation
     try {
-      const posts = communityInsightData?.sources?.dataPoints;
+      const posts = communityInsightData?.redditData || [];
       if (Array.isArray(posts) && posts.length > 0) {
         sendEvent('debug', {
           type: 'reddit',
@@ -1072,17 +1197,20 @@ const generateEnhancedIntentPhrases = async (
     }
     
     if (response && response.trim()) {
-      let phraseData = parseAIResponse(response, null);
+      let phraseDataRaw = parseAIResponse(response, null);
+      let phraseData: PhraseAnalysisResult[] = [];
       
       // Extract phrases array
-      if (phraseData?.phrases && Array.isArray(phraseData.phrases)) {
-        phraseData = phraseData.phrases;
+      if (phraseDataRaw?.phrases && Array.isArray(phraseDataRaw.phrases)) {
+        phraseData = phraseDataRaw.phrases;
+      } else if (Array.isArray(phraseDataRaw)) {
+        phraseData = phraseDataRaw;
       }
 
       if (Array.isArray(phraseData) && phraseData.length > 0) {
-        const validatedPhrases: any[] = [];
+        const validatedPhrases: PhraseAnalysisResult[] = [];
         
-        phraseData.forEach((phraseObj: any, index: number) => {
+        phraseData.forEach((phraseObj: PhraseAnalysisResult, index: number) => {
           console.log(`🔍 Validating phrase ${index + 1}: "${phraseObj.phrase}"`);
           
           // Validate phrase structure
@@ -1092,7 +1220,7 @@ const generateEnhancedIntentPhrases = async (
           }
 
           // Validate intent accuracy
-          const intentValidation = validateIntentAccuracy(phraseObj.phrase, phraseObj.intent);
+          const intentValidation: IntentValidation = validateIntentAccuracy(phraseObj.phrase, phraseObj.intent);
           
           if (!intentValidation.isValid) {
             console.warn(`❌ Intent validation failed for "${phraseObj.phrase}": ${intentValidation.issues.join(', ')}`);
@@ -1224,20 +1352,20 @@ const generateEnhancedIntentPhrases = async (
       }
     ];
 
-    const phrasesToInsert = intentBasedFallback.map(fallback => ({
+    const fallbackPhrasesToInsert = intentBasedFallback.map(fallback => ({
       domainId: domain.id,
       keywordId: keyword.id,
       phrase: fallback.phrase,
       intent: fallback.intent,
       intentConfidence: fallback.intentConfidence,
       relevanceScore: fallback.relevanceScore,
-      sources: ['Intent-Based Fallback'],
+      sources: ['AI Generated - Error Fallback'],
       trend: 'Rising',
       isSelected: false,
       tokenUsage: 0
     }));
 
-    return { phrasesToInsert, tokenUsage: 0 };
+    return { phrasesToInsert: fallbackPhrasesToInsert, tokenUsage: 0 };
   }
 };
 
@@ -1246,12 +1374,12 @@ const generateEnhancedIntentPhrases = async (
 // ===============================================
 
 const generateEnhancedPhrases = async (
-  keyword: any,
-  domain: any,
+  keyword: Keyword,
+  domain: Domain,
   semanticContext: string,
-  communityInsightData: any,
-  keywordSearchPatterns: any,
-  sendEvent: any
+  communityInsightData: MiningSummary | null | undefined,
+  keywordSearchPatterns: SearchPattern | null | undefined,
+  sendEvent: EventSender
 ) => {
   try {
     // Extract user data from community insights
@@ -1333,9 +1461,9 @@ const generateEnhancedPhrases = async (
       }
 
       if (Array.isArray(phraseData) && phraseData.length > 0) {
-        const phrasesToInsert: any[] = [];
+        const phrasesToInsert: PhraseAnalysisResult[] = [];
         
-        phraseData.forEach((phraseObj: any, phraseIndex: number) => {
+        phraseData.forEach((phraseObj: PhraseAnalysisResult, phraseIndex: number) => {
           console.log(`Processing phrase object ${phraseIndex}:`, phraseObj);
           
           // Handle different possible response formats
@@ -1499,7 +1627,7 @@ const generateEnhancedPhrases = async (
       }
     ];
 
-    const phrasesToInsert: any[] = [];
+    const phrasesToInsert: PhraseAnalysisResult[] = [];
     fallbackPhrases.forEach((fallbackPhrase, phraseIndex) => {
       const phraseData = {
         domainId: domain.id,
@@ -1601,7 +1729,7 @@ const retryOperation = async (operation: () => Promise<any>, maxRetries = 3, del
 };
 
 // Helper function to clean and parse JSON responses from AI
-const parseAIResponse = (response: string, fallbackData: any = null) => {
+const parseAIResponse = (response: string, fallbackData: any = null): any => {
   if (!response || response.trim() === '') {
     console.warn('Empty AI response received, using fallback data');
     return fallbackData;
@@ -1759,7 +1887,7 @@ router.get('/:domainId/step3', authenticateToken, async (req, res) => {
         context: domain.context,
         location: domain.location
       },
-      selectedKeywords: domain.keywords.map((kw: any) => ({
+      selectedKeywords: domain.keywords.map((kw: Keyword) => ({
         id: kw.id,
         keyword: kw.term,
         volume: kw.volume,
@@ -1777,13 +1905,13 @@ router.get('/:domainId/step3', authenticateToken, async (req, res) => {
         intentClassification: domain.intentClassifications[0] || null
       },
       existingPhrases: domain.keywords.flatMap((kw: any) => 
-        kw.generatedIntentPhrases.map((phrase: any) => ({
+        (kw.generatedIntentPhrases || []).map((phrase: any) => ({
           id: phrase.id.toString(),
           phrase: phrase.phrase,
           relevanceScore: phrase.relevanceScore || Math.floor(Math.random() * 30) + 70,
           intent: phrase.intent || 'Informational',
           intentConfidence: phrase.intentConfidence || 75,
-          sources: phrase.sources as string[] || ['AI Generated', 'Community'],
+          sources: (phrase.sources as string[]) || ['AI Generated', 'Community'],
           trend: phrase.trend || 'Rising',
           editable: true,
           selected: phrase.isSelected,
@@ -1795,7 +1923,7 @@ router.get('/:domainId/step3', authenticateToken, async (req, res) => {
         }))
       ),
       communityInsights: domain.keywords.flatMap((kw: any) => 
-        kw.communityInsights.map((insight: any) => ({
+        (kw.communityInsights || []).map((insight: any) => ({
           keywordId: kw.id,
           keyword: kw.term,
           sources: insight.sources,
@@ -1803,7 +1931,7 @@ router.get('/:domainId/step3', authenticateToken, async (req, res) => {
         }))
       ),
       searchPatterns: domain.keywords.flatMap((kw: any) => 
-        kw.searchPatterns.map((pattern: any) => ({
+        (kw.searchPatterns || []).map((pattern: any) => ({
           keywordId: kw.id,
           keyword: kw.term,
           patterns: pattern.patterns,
@@ -1833,7 +1961,7 @@ router.post('/:domainId/step3/generate', authenticateToken, async (req, res) => 
     'Access-Control-Allow-Headers': 'Cache-Control'
   });
 
-  const sendEvent = (event: string, data: any) => {
+  const sendEvent: EventSender = (event: string, data: any) => {
     res.write(`event: ${event}\n`);
     res.write(`data: ${JSON.stringify(data)}\n\n`);
   };
@@ -1885,6 +2013,7 @@ router.post('/:domainId/step3/generate', authenticateToken, async (req, res) => 
     const generatingSteps = [
       { name: 'Semantic Content Analysis', status: 'pending', progress: 0, description: 'Analyzing brand voice, theme, and target audience' },
       { name: 'Community Data Mining', status: 'pending', progress: 0, description: 'Extracting real insights from Reddit using Reddit API' },
+      { name: 'Competitor Analysis', status: 'pending', progress: 0, description: 'Analyzing competitor search positioning' },
       { name: 'Search Pattern Analysis', status: 'pending', progress: 0, description: 'Analyzing user search behaviors' },
       { name: 'Creating optimized intent phrases', status: 'pending', progress: 0, description: 'Generating optimized search phrases' },
       { name: 'Intent Classification', status: 'pending', progress: 0, description: 'Classifying generated phrases by intent' },
@@ -1896,10 +2025,11 @@ router.post('/:domainId/step3/generate', authenticateToken, async (req, res) => 
     let totalTokenUsage = 0;
 
     // Initialize data storage arrays
-    let communityInsightData: any = null;
-    const communityInsights: any[] = [];
-    const searchPatterns: any[] = [];
-    const newSearchPatterns: any[] = []; // Separate array for new patterns to insert
+    // Initialize data storage arrays
+    let communityInsightData: MiningSummary | null = null;
+    const communityInsights: MiningSummary[] = [];
+    const searchPatterns: SearchPattern[] = [];
+    const newSearchPatterns: SearchPattern[] = []; // Separate array for new patterns to insert
 
     // ========================================
     // STEP 1: SEMANTIC CONTENT ANALYSIS
@@ -2107,15 +2237,15 @@ Focus on terms people actually search for.
           summary: JSON.stringify({
             primaryQuestions: uniqueRedditData
               .slice(0, 10)
-              .map((item: any) => item.title),
+              .map((item: ExtractedRedditPost) => item.title),
             criticalPainPoints: uniqueRedditData
-              .filter((item: any) => item.content.toLowerCase().includes('problem') || item.content.toLowerCase().includes('issue'))
+              .filter((item: ExtractedRedditPost) => item.content.toLowerCase().includes('problem') || item.content.toLowerCase().includes('issue'))
               .slice(0, 5)
-              .map((item: any) => item.content.substring(0, 100) + '...'),
+              .map((item: ExtractedRedditPost) => item.content.substring(0, 100) + '...'),
             recommendedSolutions: uniqueRedditData
-              .filter((item: any) => item.title.toLowerCase().includes('how') || item.title.toLowerCase().includes('best'))
+              .filter((item: ExtractedRedditPost) => item.title.toLowerCase().includes('how') || item.title.toLowerCase().includes('best'))
               .slice(0, 5)
-              .map((item: any) => item.title),
+              .map((item: ExtractedRedditPost) => item.title),
             marketOpportunities: [
               `High-quality community engagement opportunities`,
               `Content gaps identified in competitor discussions`,
@@ -2123,7 +2253,7 @@ Focus on terms people actually search for.
               `Emerging trends in ${businessContext} discussions`
             ],
             languagePatterns: [...new Set([
-              ...uniqueRedditData.flatMap((item: any) => 
+              ...uniqueRedditData.flatMap((item: ExtractedRedditPost) => 
                 item.title.toLowerCase().match(/\b(?:how to|best|top|guide|tips|help|solution|problem|issue|fix|improve|optimize)\b/g) || []
               )
             ])].slice(0, 15)
@@ -2137,11 +2267,11 @@ Focus on terms people actually search for.
             const enhancedCommunityAnalysisPrompt = `
 Extract key insights from ${uniqueRedditData.length} Reddit posts about: ${businessContext}
 
-Top 3 posts:
-${uniqueRedditData.slice(0, 3).map((item: any, idx: number) => 
-  `${idx + 1}. "${item.title}"`
-).join('\n')}
-
+    top 3 posts:
+    ${uniqueRedditData.slice(0, 3).map((item: ExtractedRedditPost, idx: number) => 
+      `${idx + 1}. "${item.title}"`
+    ).join('\n')}
+    
 Return concise JSON:
 {
   "userIntelligence": {
@@ -2310,12 +2440,20 @@ Return concise JSON:
       sendEvent('step-update', { index: 1, status: 'completed', progress: 100 });
     }
 
-
+    // ========================================
+    // STEP 2.5: COMPETITOR ANALYSIS (SKIPPED/FAST-TRACK)
+    // ========================================
+    sendEvent('progress', { 
+      phase: 'competitor_analysis',
+      message: 'Competitor Analysis - Fast-tracking through existing data',
+      progress: 100
+    });
+    sendEvent('step-update', { index: 2, status: 'completed', progress: 100 });
 
     // ========================================
     // STEP 3: SEARCH PATTERN ANALYSIS (PER KEYWORD)
     // ========================================
-    sendEvent('step-update', { index: 2, status: 'running', progress: 0 });
+    sendEvent('step-update', { index: 3, status: 'running', progress: 0 });
     sendEvent('progress', { 
       phase: 'search_patterns',
       message: 'Search Pattern Analysis - Analyzing user search behaviors for keywords',
@@ -2491,12 +2629,12 @@ Return valid JSON only.`;
       message: 'Search Pattern Analysis completed',
       progress: 100
     });
-    sendEvent('step-update', { index: 2, status: 'completed', progress: 100 });
+    sendEvent('step-update', { index: 3, status: 'completed', progress: 100 });
 
     // ========================================
     // STEP 4: CREATING OPTIMIZED INTENT PHRASES
     // ========================================
-    sendEvent('step-update', { index: 3, status: 'running', progress: 0 });
+    sendEvent('step-update', { index: 4, status: 'running', progress: 0 });
     sendEvent('progress', { 
       phase: 'phrase_generation',
       message: 'Creating optimized intent phrases - Generating phrases using all context',
@@ -2504,7 +2642,7 @@ Return valid JSON only.`;
     });
 
     const allPhrases: any[] = [];
-    const phrasesToInsert: any[] = [];
+    const phrasesToInsert: PhraseAnalysisResult[] = [];
 
     // First, collect all existing phrases for all keywords
     const allExistingPhrases = await prisma.generatedIntentPhrase.findMany({
@@ -2601,7 +2739,7 @@ Return valid JSON only.`;
         // Add generated phrases to the main arrays
         phrasesToInsert.push(...newPhrases);
         
-        newPhrases.forEach((phrase: any, phraseIndex: number) => {
+        newPhrases.forEach((phrase: PhraseAnalysisResult, phraseIndex: number) => {
           allPhrases.push({
             ...phrase,
             id: `temp-${i}-${phraseIndex}`,
@@ -2751,12 +2889,12 @@ Return valid JSON only.`;
       message: `Phrase Generation completed - ${phrasesToInsert.length} phrases generated`,
       progress: 100
     });
-    sendEvent('step-update', { index: 3, status: 'completed', progress: 100 });
+    sendEvent('step-update', { index: 4, status: 'completed', progress: 100 });
 
     // ========================================
     // STEP 5: INTENT CLASSIFICATION (Integrated with phrase generation)
     // ========================================
-    sendEvent('step-update', { index: 4, status: 'running', progress: 0 });
+    sendEvent('step-update', { index: 5, status: 'running', progress: 0 });
     sendEvent('progress', { 
       phase: 'intent_classification',
       message: 'Intent Classification - Classifying generated phrases by intent',
@@ -2771,12 +2909,12 @@ Return valid JSON only.`;
       message: 'Intent Classification completed',
       progress: 100
     });
-    sendEvent('step-update', { index: 4, status: 'completed', progress: 100 });
+    sendEvent('step-update', { index: 5, status: 'completed', progress: 100 });
 
     // ========================================
     // STEP 6: RELEVANCE SCORE (Integrated with phrase generation)
     // ========================================
-    sendEvent('step-update', { index: 5, status: 'running', progress: 0 });
+    sendEvent('step-update', { index: 6, status: 'running', progress: 0 });
     sendEvent('progress', { 
       phase: 'relevance_scoring',
       message: 'Relevance Score - Computing semantic relevance scores',
@@ -2791,7 +2929,7 @@ Return valid JSON only.`;
       message: 'Relevance Score completed',
       progress: 100
     });
-    sendEvent('step-update', { index: 5, status: 'completed', progress: 100 });
+    sendEvent('step-update', { index: 6, status: 'completed', progress: 100 });
 
     // ========================================
     // COMPLETION
@@ -2848,12 +2986,16 @@ Return valid JSON only.`;
 // ENHANCED PHRASE GENERATION WITH REAL DATA
 // ===============================================
 
+// ===============================================
+// ENHANCED PHRASE GENERATION WITH REAL DATA
+// ===============================================
+
 const createDataDrivenPhrasePrompt = (
-  keyword: any,
-  domain: any,
-  realQuestions: any[],
-  realPhrases: any[],
-  userLanguagePatterns: any,
+  keyword: Keyword,
+  domain: Domain,
+  realQuestions: RealQuestion[],
+  realPhrases: RealPhrase[],
+  userLanguagePatterns: UserLanguagePatterns,
   semanticContext: string
 ) => `
 Generate 10 natural search phrases based on user data (any length is fine):
@@ -2861,7 +3003,7 @@ Generate 10 natural search phrases based on user data (any length is fine):
 TARGET: "${keyword.term}"
 
 USER QUESTIONS (most engaged):
-${realQuestions.slice(0, 10).map((q: any, i: number) => 
+${realQuestions.slice(0, 10).map((q: RealQuestion, i: number) => 
   `${i+1}. "${q.question}" (${q.engagement} engagement)`
 ).join('\n')}
 
@@ -2897,11 +3039,11 @@ JSON FORMAT:
 Make 10 diverse phrases based on the user data patterns above. Any length is fine.`;
 
 const generateDataDrivenPhrases = async (
-  keyword: any,
-  domain: any,
-  communityData: any,
-  sendEvent: any
-) => {
+  keyword: Keyword,
+  domain: Domain,
+  communityData: MiningSummary | null | undefined,
+  sendEvent: EventSender
+): Promise<{ phrasesToInsert: PhraseAnalysisResult[]; tokenUsage: number }> => {
   try {
     // Extract real user insights
     const { realQuestions, realPhrases, userLanguagePatterns } = extractRealUserQuestions(communityData);
@@ -2937,12 +3079,19 @@ const generateDataDrivenPhrases = async (
     const response = completion.choices[0]?.message?.content;
     
     if (response?.trim()) {
-      const phraseData = parseAIResponse(response, null);
+      const phraseDataRaw = parseAIResponse(response, null);
+      let phrases: PhraseAnalysisResult[] = [];
+
+      if (phraseDataRaw?.phrases && Array.isArray(phraseDataRaw.phrases)) {
+        phrases = phraseDataRaw.phrases;
+      } else if (Array.isArray(phraseDataRaw)) {
+        phrases = phraseDataRaw;
+      }
       
-      if (phraseData?.phrases && Array.isArray(phraseData.phrases)) {
-        const validatedPhrases = phraseData.phrases
-          .filter((p: any) => p.phrase && p.phrase.trim().split(/\s+/).length >= 6 && p.phrase.trim().split(/\s+/).length <= 12)
-          .map((phraseObj: any) => ({
+      if (phrases.length > 0) {
+        const validatedPhrases = phrases
+          .filter((p: PhraseAnalysisResult) => p.phrase && p.phrase.trim().split(/\s+/).length >= 6 && p.phrase.trim().split(/\s+/).length <= 12)
+          .map((phraseObj: PhraseAnalysisResult) => ({
             domainId: domain.id,
             keywordId: keyword.id,
             phrase: phraseObj.phrase,
@@ -2952,7 +3101,7 @@ const generateDataDrivenPhrases = async (
             sources: realQuestions.length > 0 ? ['User Data', 'Language Patterns'] : ['AI Generated'],
             trend: 'Rising',
             isSelected: false,
-            tokenUsage: Math.floor((completion.usage?.total_tokens || 0) / phraseData.phrases.length)
+            tokenUsage: Math.floor((completion.usage?.total_tokens || 0) / phrases.length)
           }));
         
         console.log(`✅ Generated ${validatedPhrases.length} data-driven phrases for "${keyword.term}"`);
@@ -3066,7 +3215,7 @@ router.post('/:domainId/:keywordId/generate-more', authenticateToken, async (req
     'Access-Control-Allow-Headers': 'Cache-Control'
   });
 
-  const sendEvent = (event: string, data: any) => {
+  const sendEvent: EventSender = (event: string, data: any) => {
     res.write(`event: ${event}\n`);
     res.write(`data: ${JSON.stringify(data)}\n\n`);
   };
