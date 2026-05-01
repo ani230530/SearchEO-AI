@@ -1080,6 +1080,85 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
     }
   }, [applyFeaturedImageState, extractEditedImage, featuredImageEditNote, publishResult, toast]);
 
+  /**
+   * Read-only metadata card shown in preview mode. Mirrors the editable
+   * fields from renderMetadataEditor (title, meta description, slug) plus
+   * the publish status, so users can see all of the draft's metadata at
+   * a glance without entering edit mode.
+   */
+  const renderMetadataReadout = () => {
+    if (!publishResult || isEditMode) return null;
+
+    const status = publishResult.status || 'draft';
+    const isPublished = status.toLowerCase() === 'published';
+
+    return (
+      <div className="rounded-2xl border border-gray-200 bg-white p-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <p className="text-xs uppercase tracking-[0.2em] text-gray-500">Metadata</p>
+          <span
+            className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${
+              isPublished
+                ? 'bg-emerald-50 text-emerald-700'
+                : 'bg-blue-50 text-blue-700'
+            }`}
+          >
+            {status}
+          </span>
+        </div>
+
+        <div className="space-y-1">
+          <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-gray-400">
+            Title
+          </p>
+          <p className="text-sm text-gray-900 break-words">
+            {publishResult.title || (
+              <span className="italic text-gray-400">No title</span>
+            )}
+          </p>
+        </div>
+
+        <div className="space-y-1">
+          <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-gray-400">
+            Meta Description
+          </p>
+          <p className="text-sm text-gray-700 break-words">
+            {publishResult.metaDescription || (
+              <span className="italic text-gray-400">No meta description</span>
+            )}
+          </p>
+        </div>
+
+        <div className="space-y-1">
+          <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-gray-400">
+            Slug
+          </p>
+          <p className="text-sm font-mono text-gray-700 break-all">
+            {publishResult.slug || (
+              <span className="italic font-sans text-gray-400">No slug set</span>
+            )}
+          </p>
+        </div>
+
+        {isPublished && publishResult.wordpressUrl && (
+          <div className="space-y-1">
+            <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-gray-400">
+              Live URL
+            </p>
+            <a
+              href={publishResult.wordpressUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="text-sm text-blue-600 hover:underline break-all"
+            >
+              {publishResult.wordpressUrl}
+            </a>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   const renderMetadataEditor = () => {
     if (!publishResult || !isEditMode) return null;
 
@@ -3103,6 +3182,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
                         </p>
                       </div>
 
+                      {renderMetadataReadout()}
                       {renderMetadataEditor()}
                       {renderFeaturedImageEditor()}
                       
