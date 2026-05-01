@@ -48,7 +48,7 @@ import {
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { CampaignStructure, GenerationPageStatus, KeywordTableItem } from '@/types';
+import { GenerationPageStatus, KeywordTableItem } from '@/types';
 import { WordpressIntegration } from '@/types/publish';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@radix-ui/react-accordion';
 import {AnimatePresence, motion} from 'framer-motion'
@@ -63,7 +63,6 @@ import CompetitorPage from '@/features/sidebar-dashboard/sections/CompetitorPage
 
 import type {
   CompanySubTabId,
-  DashboardCampaignViewMode,
   DashboardContentRouterProps,
   DashboardSidebarTab,
   DomainCheckResult,
@@ -223,9 +222,6 @@ const sseRef = useRef<EventSource | null>(null);
   }>>(new Map());
   // Track generation job statuses
   const [generationJobs, setGenerationJobs] = useState<Map<number, GenerationPageStatus>>(new Map());
-  // Lifted context from CampaignStructureView
-  const [campaignPageIdContext, setCampaignPageIdContext] = useState<number | null>(null);
-  const [currentGenerationTopicId, setCurrentGenerationTopicId] = useState<number | null>(null);
   const notifiedReadyPageIdsRef = useRef<Set<number>>(new Set());
 const [improvedContent, setImprovedContent] = useState("");
   const [gscEmail, setGscEmail] = useState<string>("");
@@ -332,29 +328,6 @@ const toggleSection = (idx: number) => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const isSidebarExpanded = sidebarOpen || isSidebarHovered;
-// Campaign States
-  const [campaignViewMode, setCampaignViewMode] = useState<DashboardCampaignViewMode>('split');
-
-const [selectedTopicId, setSelectedTopicId] = useState<number | null>(null);
-const [campaignStructure, setCampaignStructure] = useState<CampaignStructure>({
-  topics: []
-});
-
-  const getCampaignPageDisplayName = useCallback((pageId?: number, fallback?: string | null) => {
-    if (!pageId) return fallback || 'Your draft';
-
-    for (const topic of campaignStructure.topics) {
-      if (topic.pillarPage?.id === pageId) {
-        return topic.pillarPage.title || fallback || 'Your draft';
-      }
-      const subPage = topic.subPages.find((page) => page.id === pageId);
-      if (subPage) {
-        return subPage.title || fallback || 'Your draft';
-      }
-    }
-
-    return fallback || 'Your draft';
-  }, [campaignStructure.topics]);
 
 // For inline editing of campaigns
 const [showEditModal, setShowEditModal] = useState(false);
@@ -362,13 +335,6 @@ const [editingCampaignId, setEditingCampaignId] = useState<number | null>(null);
 const [editTitle, setEditTitle] = useState('');
 const [editDescription, setEditDescription] = useState('');
 
-
-  // Initialize selectedTopicId
-  useEffect(() => {
-    if (campaignStructure.topics.length > 0 && selectedTopicId === null) {
-      setSelectedTopicId(campaignStructure.topics[0].id);
-    }
-  }, [campaignStructure.topics, selectedTopicId]);
 
   useEffect(() => {
     if (sidebarOpen) {
@@ -900,7 +866,7 @@ useEffect(() => {
 
   // Fetch all campaign tab data in parallel when campaign tab is active
   const fetchCampaignTabData = useCallback(async () => {
-    if (activeTab !== 'projects' && activeTab !== 'create-project') return;
+    if (activeTab !== 'projects') return;
     
     setCampaignTabDataLoading(true);
     try {
@@ -958,7 +924,7 @@ useEffect(() => {
   }, [activeTab, awaitingNewDomain]);
 
   useEffect(() => {
-    if (activeTab === 'projects' || activeTab === 'create-project') {
+    if (activeTab === 'projects') {
       fetchCampaignTabData();
     }
   }, [activeTab, fetchCampaignTabData]);
@@ -1758,7 +1724,7 @@ useEffect(() => {
       fetchWordpressIntegration();
     
     // Also refresh campaign tab data if we're on campaign tab and WordPress integration might have changed
-    if ((activeTab === 'projects' || activeTab === 'create-project') && activeCompanySubTab === 'integration') {
+    if (activeTab === 'projects' && activeCompanySubTab === 'integration') {
       fetchCampaignTabData();
     }
   }, [activeTab, activeCompanySubTab, fetchGscStatus, fetchWordpressIntegration, fetchCampaignTabData]);
@@ -1801,7 +1767,7 @@ useEffect(() => {
   }, [toast]);
 
   useEffect(() => {
-    if (activeTab === 'projects' || activeTab === 'create-project' || activeTab === 'overview') {
+    if (activeTab === 'projects' || activeTab === 'overview') {
       // Fetch campaigns for both the Campaign tab and the Overview
       // so Overview can show recent campaigns/quick access.
       fetchCampaigns();
@@ -2474,7 +2440,7 @@ useEffect(() => {
       hasWordpressIntegration,
       isActive: activeTab === "publish",
       keywordsTableData,
-      pageId: campaignPageIdContext || undefined,
+      pageId: undefined,
       publishingPageIds,
       setDraftStatuses,
       setDraftToPageMap,
@@ -2903,10 +2869,6 @@ useEffect(() => {
           }
           setOpenWordpressConnectionView(false);
           setActiveTab(tabId);
-          if (tabId === "create-project") {
-            setSelectedCampaignId(null);
-            setShowCreateCampaign(false);
-          }
           if (tabId === "integration") {
             setActiveCompanySubTab("integration");
           }
@@ -2926,16 +2888,13 @@ useEffect(() => {
         {/* Content Header */}
         <DashboardHeader
           activeTab={activeTab}
-          campaignViewMode={campaignViewMode}
-          selectedCampaignId={selectedCampaignId}
           tabs={tabs}
           userEmail={user?.email}
-          onCampaignViewModeChange={setCampaignViewMode}
           onTabChange={setActiveTab}
         />
 
         {/* Content Body */}
-        <div className={(activeTab === 'projects' || activeTab === 'create-project') && selectedCampaignId ? "flex-1 min-h-[calc(100vh-80px)] bg-white" : "content-body"}>
+        <div className={activeTab === 'projects' && selectedCampaignId ? "flex-1 min-h-[calc(100vh-80px)] bg-white" : "content-body"}>
           {activeTab === "analytics" || activeTab === "integration" ? (
             <AnalyticsCompanySection
               companyDomainLoading={companyDomainLoading}
@@ -3009,38 +2968,12 @@ useEffect(() => {
               handleDomainChange={handleDomainChange}
               openWordpressConnectionView={openWordpressConnectionView}
             />
-          ) : activeTab === "projects" || activeTab === "create-project" ? (
+          ) : activeTab === "projects" ? (
             <ProjectsSection
               selectedCampaignId={selectedCampaignId}
               campaigns={campaigns}
               setSelectedCampaignId={setSelectedCampaignId}
-              companyDomain={companyDomain}
-              domainContext={domainContext}
               keywordsTableData={keywordsTableData}
-              hasWordpressIntegration={hasWordpressIntegration}
-              wpIntegration={wpIntegration}
-              handleConfigureWordpress={handleConfigureWordpress}
-              fetchWordpressIntegration={fetchWordpressIntegration}
-              activeTab={activeTab}
-              fetchCampaignTabData={fetchCampaignTabData}
-              campaignViewMode={campaignViewMode}
-              setCampaignViewMode={setCampaignViewMode}
-              sidebarOpen={sidebarOpen}
-              publishingPageIds={publishingPageIds}
-              setPublishingPageIds={setPublishingPageIds}
-              draftToPageMap={draftToPageMap}
-              setDraftToPageMap={setDraftToPageMap}
-              draftStatuses={draftStatuses}
-              setDraftStatuses={setDraftStatuses}
-              sharedPublishStatuses={sharedPublishStatuses}
-              handlePublishUpdate={handlePublishUpdate}
-              getCampaignPageDisplayName={getCampaignPageDisplayName}
-              generationJobs={generationJobs}
-              setGenerationJobs={setGenerationJobs}
-              campaignPageIdContext={campaignPageIdContext}
-              setCampaignPageIdContext={setCampaignPageIdContext}
-              currentGenerationTopicId={currentGenerationTopicId}
-              setCurrentGenerationTopicId={setCurrentGenerationTopicId}
               showCreateCampaign={showCreateCampaign}
               setShowCreateCampaign={setShowCreateCampaign}
               handleCreateCampaign={handleCreateCampaign}

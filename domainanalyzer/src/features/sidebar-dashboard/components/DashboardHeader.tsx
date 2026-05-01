@@ -1,27 +1,11 @@
-import { List, Network, Table, User } from "lucide-react";
+import { User } from "lucide-react";
 
-import type {
-  DashboardCampaignViewMode,
-  DashboardHeaderProps,
-} from "@/features/sidebar-dashboard/types";
-
-const VIEW_MODE_OPTIONS: Array<{
-  icon: typeof List;
-  label: string;
-  mode: DashboardCampaignViewMode;
-}> = [
-  { icon: List, label: "Topics", mode: "split" },
-  { icon: Network, label: "Map", mode: "graph" },
-  { icon: Table, label: "Table", mode: "table" },
-];
+import type { DashboardHeaderProps } from "@/features/sidebar-dashboard/types";
 
 export function DashboardHeader({
   activeTab,
-  campaignViewMode,
-  selectedCampaignId,
   tabs,
   userEmail,
-  onCampaignViewModeChange,
   onTabChange,
 }: DashboardHeaderProps) {
   const activeLabel = tabs.find((tab) => tab.id === activeTab)?.label || "Dashboard";
@@ -43,25 +27,6 @@ export function DashboardHeader({
           </h2>
         </div>
 
-        {(activeTab === "projects" || activeTab === "create-project") && selectedCampaignId && (
-          <div className="mr-4 flex items-center gap-2 rounded-lg border border-gray-200/50 bg-gray-100/80 p-1">
-            {VIEW_MODE_OPTIONS.map(({ icon: Icon, label, mode }) => (
-              <button
-                key={mode}
-                onClick={() => onCampaignViewModeChange(mode)}
-                className={`flex items-center gap-2 rounded-md p-1.5 text-xs font-medium transition-all ${
-                  campaignViewMode === mode
-                    ? "bg-white text-black shadow-sm"
-                    : "text-gray-500 hover:text-gray-700"
-                }`}
-                title={`${label} view`}
-              >
-                <Icon className="h-4 w-4" />
-                <span>{label}</span>
-              </button>
-            ))}
-          </div>
-        )}
         {userEmail && (
           <div className="flex items-center gap-3">
             <button

@@ -8,7 +8,6 @@ export type TabId =
   | "analytics"
   | "integration"
   | "domain-history"
-  | "create-project"
   | "projects"
   | "publish"
   | "settings"
@@ -36,8 +35,6 @@ export interface DashboardSidebarTab {
   icon: ReactNode;
 }
 
-export type DashboardCampaignViewMode = "split" | "graph" | "table";
-
 export interface DomainCheckResult {
   exists: boolean;
   domainId?: number;
@@ -55,11 +52,8 @@ export interface DashboardSearchState {
 
 export interface DashboardHeaderProps {
   activeTab: TabId;
-  campaignViewMode: DashboardCampaignViewMode;
-  selectedCampaignId: number | null;
   tabs: DashboardSidebarTab[];
   userEmail?: string | null;
-  onCampaignViewModeChange: (mode: DashboardCampaignViewMode) => void;
   onTabChange?: (tab: TabId) => void;
 }
 

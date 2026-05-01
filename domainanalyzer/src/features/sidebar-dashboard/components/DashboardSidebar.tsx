@@ -9,7 +9,6 @@ import {
   Link,
   LogOut,
   Menu,
-  Plus,
   Send,
   CopyCheck,
   Sparkles,
@@ -127,13 +126,6 @@ export function DashboardSidebar({
       {
         title: "Projects",
         items: [
-          {
-            key: "create-project",
-            label: "Create New Project",
-            icon: <Plus className="h-4 w-4" />,
-            isActive: activeTab === "create-project",
-            onClick: () => onSelectTab("create-project"),
-          },
           {
             key: "all-projects",
             label: "All Projects",
