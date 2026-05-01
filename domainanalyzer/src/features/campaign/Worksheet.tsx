@@ -27,12 +27,12 @@ import {
   createTopic,
   aiSuggestTopic,
   aiSuggestTopicTitle,
+  aiSuggestTopicKeywords,
   updateTopicTitle,
   deleteTopic,
   addTopicKeyword,
   selectPrimaryKeyword,
   selectLongtailKeyword,
-  deselectKeyword,
   deleteKeyword,
   deriveWorksheetStatus,
 } from './api';
@@ -42,8 +42,6 @@ type WorksheetColumnKey = 'topic' | 'keywords' | 'status' | 'action' | 'more';
 
 interface WorksheetProps {
   campaignId: number;
-  /** Optional pool of seed keywords used for AI suggestions. */
-  keywordsTableData?: Array<{ keyword?: string }>;
 }
 
 const STATUS_STYLES: Record<WorksheetStatus, { label: string; icon: React.ReactNode; className: string }> = {
@@ -79,11 +77,12 @@ const STATUS_STYLES: Record<WorksheetStatus, { label: string; icon: React.ReactN
   },
 };
 
-export default function Worksheet({ campaignId, keywordsTableData = [] }: WorksheetProps) {
+export default function Worksheet({ campaignId }: WorksheetProps) {
   const [topics, setTopics] = useState<WorksheetTopic[]>([]);
   const [loading, setLoading] = useState(true);
   const [busyTopicId, setBusyTopicId] = useState<number | null>(null);
   const [aiSuggestingTopicForRow, setAiSuggestingTopicForRow] = useState<number | null>(null);
+  const [aiSuggestingKeywordsForRow, setAiSuggestingKeywordsForRow] = useState<number | null>(null);
   const [aiSuggestingNewTopic, setAiSuggestingNewTopic] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -113,7 +112,8 @@ export default function Worksheet({ campaignId, keywordsTableData = [] }: Worksh
   const [keywordEditor, setKeywordEditor] = useState<{
     topicId: number;
     value: string;
-    keywordType: 'plain' | 'primary' | 'longtail';
+    /** Worksheet invariant: every keyword is either primary or longtail. */
+    keywordType: 'primary' | 'longtail';
   } | null>(null);
   const [deleteRowId, setDeleteRowId] = useState<number | null>(null);
   const [keywordPopover, setKeywordPopover] = useState<{ topicId: number; keywordId: number } | null>(null);
@@ -140,16 +140,6 @@ export default function Worksheet({ campaignId, keywordsTableData = [] }: Worksh
   }, [reload]);
 
   /* ---------- Filtering ---------- */
-
-  const keywordSeedPool = useMemo(() => {
-    return Array.from(
-      new Set(
-        (keywordsTableData || [])
-          .map((item) => String(item?.keyword || '').trim())
-          .filter(Boolean)
-      )
-    );
-  }, [keywordsTableData]);
 
   const filteredTopics = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -221,10 +211,7 @@ export default function Worksheet({ campaignId, keywordsTableData = [] }: Worksh
     try {
       let latest: WorksheetTopic[] = topics;
       for (const term of terms) {
-        latest = await addTopicKeyword(topicId, {
-          term,
-          keywordType: keywordType === 'plain' ? undefined : keywordType,
-        });
+        latest = await addTopicKeyword(topicId, { term, keywordType });
       }
       setTopics(latest);
     } catch (err) {
@@ -235,34 +222,11 @@ export default function Worksheet({ campaignId, keywordsTableData = [] }: Worksh
   };
 
   const handleAiSuggestKeywords = async (topic: WorksheetTopic) => {
-    const used = new Set(topic.keywords.map((k) => k.term.toLowerCase()));
-    const ctx = topic.title.toLowerCase().trim();
-    const candidates = keywordSeedPool
-      .filter((kw) => !used.has(kw.toLowerCase()))
-      .sort((a, b) => {
-        const as = ctx && a.toLowerCase().includes(ctx) ? 1 : 0;
-        const bs = ctx && b.toLowerCase().includes(ctx) ? 1 : 0;
-        return bs - as;
-      })
-      .slice(0, 3);
-
-    if (!candidates.length) {
-      setNotice('No suggestions available from your domain keyword list.');
-      return;
-    }
-
-    setBusyTopicId(topic.id);
-    setError(null);
+    setAiSuggestingKeywordsForRow(topic.id);
     try {
-      let latest: WorksheetTopic[] = topics;
-      for (const term of candidates) {
-        latest = await addTopicKeyword(topic.id, { term });
-      }
-      setTopics(latest);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'AI suggest failed');
+      await withBusy(topic.id, () => aiSuggestTopicKeywords(topic.id, { count: 5 }));
     } finally {
-      setBusyTopicId(null);
+      setAiSuggestingKeywordsForRow(null);
     }
   };
 
@@ -274,11 +238,6 @@ export default function Worksheet({ campaignId, keywordsTableData = [] }: Worksh
   const handleSetLongtail = async (keywordId: number, topicId: number) => {
     setKeywordPopover(null);
     await withBusy(topicId, () => selectLongtailKeyword(keywordId));
-  };
-
-  const handleDeselect = async (keywordId: number, topicId: number) => {
-    setKeywordPopover(null);
-    await withBusy(topicId, () => deselectKeyword(keywordId));
   };
 
   const handleRemoveKeyword = async (keywordId: number, topicId: number) => {
@@ -573,7 +532,15 @@ export default function Worksheet({ campaignId, keywordsTableData = [] }: Worksh
                             <div className="flex items-center gap-3 text-xs">
                               <button
                                 type="button"
-                                onClick={() => setKeywordEditor({ topicId: topic.id, value: '', keywordType: 'plain' })}
+                                onClick={() =>
+                                  setKeywordEditor({
+                                    topicId: topic.id,
+                                    value: '',
+                                    keywordType: topic.keywords.some((k) => k.isPrimary)
+                                      ? 'longtail'
+                                      : 'primary',
+                                  })
+                                }
                                 className="text-[#354b73] hover:text-[#1e2f4f] font-medium"
                               >
                                 + Add
@@ -581,9 +548,14 @@ export default function Worksheet({ campaignId, keywordsTableData = [] }: Worksh
                               <button
                                 type="button"
                                 onClick={() => handleAiSuggestKeywords(topic)}
-                                className="inline-flex items-center gap-1 text-[#4c6fae] hover:text-[#34558e] font-medium"
+                                disabled={aiSuggestingKeywordsForRow === topic.id}
+                                className="inline-flex items-center gap-1 text-[#4c6fae] hover:text-[#34558e] font-medium disabled:opacity-50"
                               >
-                                <Sparkles className="h-3 w-3" />
+                                {aiSuggestingKeywordsForRow === topic.id ? (
+                                  <Loader2 className="h-3 w-3 animate-spin" />
+                                ) : (
+                                  <Sparkles className="h-3 w-3" />
+                                )}
                                 AI Suggest
                               </button>
                             </div>
@@ -605,7 +577,6 @@ export default function Worksheet({ campaignId, keywordsTableData = [] }: Worksh
                                   }
                                   onSetPrimary={() => handleSetPrimary(kw.id, topic.id)}
                                   onSetLongtail={() => handleSetLongtail(kw.id, topic.id)}
-                                  onDeselect={() => handleDeselect(kw.id, topic.id)}
                                   onRemove={() => handleRemoveKeyword(kw.id, topic.id)}
                                 />
                               ))}
@@ -700,9 +671,7 @@ export default function Worksheet({ campaignId, keywordsTableData = [] }: Worksh
           title={
             keywordEditor.keywordType === 'primary'
               ? 'Add primary keyword'
-              : keywordEditor.keywordType === 'longtail'
-              ? 'Add longtail keywords'
-              : 'Add keywords'
+              : 'Add longtail keywords'
           }
           onClose={() => setKeywordEditor(null)}
         >
@@ -719,13 +688,6 @@ export default function Worksheet({ campaignId, keywordsTableData = [] }: Worksh
             autoFocus
           />
           <div className="flex items-center gap-3 mt-4 text-xs">
-            <KeywordTypeChip
-              active={keywordEditor.keywordType === 'plain'}
-              onClick={() =>
-                setKeywordEditor((prev) => (prev ? { ...prev, keywordType: 'plain' } : prev))
-              }
-              label="Plain"
-            />
             <KeywordTypeChip
               active={keywordEditor.keywordType === 'primary'}
               onClick={() =>
@@ -846,7 +808,6 @@ function KeywordChip({
   onTogglePopover,
   onSetPrimary,
   onSetLongtail,
-  onDeselect,
   onRemove,
 }: {
   keyword: WorksheetKeyword;
@@ -854,9 +815,11 @@ function KeywordChip({
   onTogglePopover: () => void;
   onSetPrimary: () => void;
   onSetLongtail: () => void;
-  onDeselect: () => void;
   onRemove: () => void;
 }) {
+  // Worksheet invariant: every keyword is Primary or Longtail. The neutral
+  // styling (last branch) only ever appears in the brief moment between a
+  // server response and the next render.
   const baseClasses = 'inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[11px] cursor-pointer';
   const variantClass = keyword.isPrimary
     ? 'border-[#e0a93f] bg-[#fff6e0] text-[#7a5a14]'
@@ -901,15 +864,6 @@ function KeywordChip({
               className="block w-full px-3 py-2 text-xs text-left hover:bg-gray-50"
             >
               Set as longtail
-            </button>
-          )}
-          {(keyword.isPrimary || keyword.isLongtail) && (
-            <button
-              type="button"
-              onClick={onDeselect}
-              className="block w-full px-3 py-2 text-xs text-left hover:bg-gray-50"
-            >
-              Clear tag
             </button>
           )}
           <button

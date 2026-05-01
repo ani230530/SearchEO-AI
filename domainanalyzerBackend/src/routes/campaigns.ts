@@ -850,6 +850,40 @@ const clearOtherPrimariesForTopic = async (
   );
 };
 
+/**
+ * Worksheet invariant: every keyword on a row is either Primary or Longtail.
+ * "Plain" untagged keywords are not permitted by the new model.
+ *
+ * Resolution rule when the caller does not specify a type:
+ *   - if the topic has no Primary yet, the new keyword becomes Primary;
+ *   - otherwise it becomes Longtail.
+ */
+const resolveKeywordType = async (
+  tx: Prisma.TransactionClient,
+  topicId: number,
+  requested: 'primary' | 'longtail' | undefined
+): Promise<'primary' | 'longtail'> => {
+  if (requested === 'primary' || requested === 'longtail') return requested;
+  const existingPrimary = await tx.campaignKeyword.findFirst({
+    where: {
+      topicId,
+      aiMetadata: { path: ['isPrimary'], equals: true },
+    },
+    select: { id: true },
+  });
+  return existingPrimary ? 'longtail' : 'primary';
+};
+
+const buildKeywordMetadata = (
+  type: 'primary' | 'longtail',
+  origin: 'manual' | 'ai'
+): Record<string, any> => ({
+  isPrimary: type === 'primary',
+  isLongtail: type === 'longtail',
+  origin,
+  generatedAt: new Date().toISOString(),
+});
+
 router.post(
   '/topics/:topicId/keywords',
   authenticateToken,
@@ -864,18 +898,20 @@ router.post(
     if (!term || !String(term).trim()) {
       return res.status(400).json({ success: false, error: 'Keyword term is required' });
     }
+    if (keywordType !== undefined && keywordType !== 'primary' && keywordType !== 'longtail') {
+      return res
+        .status(400)
+        .json({ success: false, error: 'keywordType must be "primary" or "longtail"' });
+    }
 
     const topic = await ensureTopicOwnership(topicId, userId);
     if (!topic) {
       return res.status(404).json({ success: false, error: 'Topic not found' });
     }
 
-    const aiMetadata: Record<string, any> = {};
-    if (keywordType === 'primary') aiMetadata.isPrimary = true;
-    if (keywordType === 'longtail') aiMetadata.isLongtail = true;
-
     await prisma.$transaction(async (tx) => {
-      if (keywordType === 'primary') {
+      const resolvedType = await resolveKeywordType(tx, topicId, keywordType);
+      if (resolvedType === 'primary') {
         await clearOtherPrimariesForTopic(tx, topicId);
       }
       await tx.campaignKeyword.create({
@@ -886,7 +922,7 @@ router.post(
           intent: intent || null,
           topicId,
           source: CampaignNodeSource.MANUAL,
-          aiMetadata: Object.keys(aiMetadata).length > 0 ? aiMetadata : undefined,
+          aiMetadata: buildKeywordMetadata(resolvedType, 'manual'),
         },
       });
     });
@@ -912,32 +948,75 @@ router.post(
       return res.status(404).json({ success: false, error: 'Topic not found' });
     }
 
+    // Pull existing keywords so the AI doesn't propose duplicates and so we
+    // know whether a Primary already exists.
+    const existingKeywords = await prisma.campaignKeyword.findMany({
+      where: { topicId },
+      select: { term: true, aiMetadata: true },
+    });
+    const existingTerms = existingKeywords.map((k) => k.term);
+    const hasExistingPrimary = existingKeywords.some(
+      (k) => (k.aiMetadata as any)?.isPrimary === true
+    );
+
+    // Pull semantic analysis for richer brand context (matches topic-gen path).
+    const semanticAnalysis = await prisma.semanticAnalysis.findFirst({
+      where: { domainId: topic.campaign.domain.id },
+      orderBy: { createdAt: 'desc' },
+      select: { contentSummary: true },
+    });
+    let brandVoice: any;
+    let targetAudience: any;
+    if (semanticAnalysis?.contentSummary) {
+      try {
+        const parsed = JSON.parse(semanticAnalysis.contentSummary);
+        brandVoice = parsed.brandVoice;
+        targetAudience = parsed.targetAudience;
+      } catch {
+        /* ignore */
+      }
+    }
+
     const domainKeywords = extractDomainKeywords(topic.campaign.domain).slice(0, 25);
     const suggestions = await generateKeywordsSuggestion({
       domainUrl: topic.campaign.domain.url,
       domainContext: topic.campaign.domain.context,
       keywords: domainKeywords,
       topicTitle: topic.title,
+      existingTerms,
+      campaignTitle: topic.campaign.title,
+      campaignDescription: topic.campaign.description || undefined,
       count,
+      location: (topic.campaign.domain as any).location,
+      locationContext: (topic.campaign.domain as any).locationContext,
+      brandVoice,
+      targetAudience,
     });
 
     if (!suggestions.length) {
       return respondWithStructure(res, topic.campaignId, userId);
     }
 
-    const aiMeta = { generatedAt: new Date().toISOString(), origin: 'topic_keywords_ai' };
-
-    await prisma.campaignKeyword.createMany({
-      data: suggestions.map((kw) => ({
-        term: kw.term,
-        volume: kw.volume ?? null,
-        difficulty: kw.difficulty || DEFAULT_KEYWORD_DIFFICULTY,
-        intent: kw.intent || null,
-        topicId,
-        source: CampaignNodeSource.AI,
-        aiMetadata: aiMeta,
-      })),
-      skipDuplicates: true,
+    await prisma.$transaction(async (tx) => {
+      // If no Primary exists yet, the first AI-suggested keyword takes that
+      // role and the rest are Longtails. If a Primary already exists, all
+      // AI suggestions are Longtails.
+      await tx.campaignKeyword.createMany({
+        data: suggestions.map((kw, idx) => {
+          const type: 'primary' | 'longtail' =
+            !hasExistingPrimary && idx === 0 ? 'primary' : 'longtail';
+          return {
+            term: kw.term,
+            volume: kw.volume ?? null,
+            difficulty: kw.difficulty || DEFAULT_KEYWORD_DIFFICULTY,
+            intent: kw.intent || null,
+            topicId,
+            source: CampaignNodeSource.AI,
+            aiMetadata: buildKeywordMetadata(type, 'ai'),
+          };
+        }),
+        skipDuplicates: true,
+      });
     });
 
     return respondWithStructure(res, topic.campaignId, userId, 201);

@@ -183,6 +183,11 @@ export async function deleteTopic(topicId: number): Promise<WorksheetTopic[]> {
 
 /* ---------- Keyword mutations ---------- */
 
+/**
+ * Worksheet keywords are always either Primary or Longtail. The caller can
+ * omit `keywordType` and the server resolves it (Primary if the topic has
+ * none yet, otherwise Longtail).
+ */
 export async function addTopicKeyword(
   topicId: number,
   payload: {
@@ -198,6 +203,28 @@ export async function addTopicKeyword(
     headers: authHeaders(),
     body: JSON.stringify(payload),
   });
+  const data = await handle<StructureResponse>(res);
+  return data.structure.topics.map(normalizeTopic);
+}
+
+/**
+ * AI keyword suggestion for an existing topic. Server pulls the topic's
+ * existing keywords, campaign context, and domain context to inform the
+ * prompt; resulting keywords are tagged Primary (first, if none exists yet)
+ * or Longtail.
+ */
+export async function aiSuggestTopicKeywords(
+  topicId: number,
+  options?: { count?: number }
+): Promise<WorksheetTopic[]> {
+  const res = await fetch(
+    `${API_BASE_URL}/api/campaigns/topics/${topicId}/keywords/ai`,
+    {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ count: options?.count ?? 5 }),
+    }
+  );
   const data = await handle<StructureResponse>(res);
   return data.structure.topics.map(normalizeTopic);
 }

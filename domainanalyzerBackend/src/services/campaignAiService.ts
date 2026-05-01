@@ -318,45 +318,92 @@ Only return JSON.`;
 }
 
 export async function generateKeywordsSuggestion(
-  context: BaseAiContext & { topicTitle?: string; count?: number }
+  context: BaseAiContext & {
+    topicTitle: string;
+    /** Keywords already on the row, so the AI doesn't propose duplicates. */
+    existingTerms?: string[];
+    campaignTitle?: string;
+    campaignDescription?: string;
+    count?: number;
+  }
 ): Promise<GeneratedKeyword[]> {
-  const { domainUrl, domainContext, keywords = [], topicTitle, count = 5 } = context;
-  const scope = topicTitle || domainUrl;
+  const {
+    domainUrl,
+    domainContext,
+    keywords: domainKeywords = [],
+    topicTitle,
+    existingTerms = [],
+    campaignTitle,
+    campaignDescription,
+    count = 5,
+    location,
+    locationContext,
+    brandVoice,
+    targetAudience,
+  } = context;
+
+  const geoContext = location
+    ? `\nTarget Location: ${location}${locationContext ? `\nLocation Context: ${locationContext}` : ''}`
+    : '';
+  const voiceContext = brandVoice
+    ? `\nBrand Voice: ${typeof brandVoice === 'object' ? JSON.stringify(brandVoice) : brandVoice}`
+    : '';
+  const audienceContext = targetAudience
+    ? `\nTarget Audience: ${typeof targetAudience === 'object' ? JSON.stringify(targetAudience) : targetAudience}`
+    : '';
+  const campaignContext = campaignTitle
+    ? `\nProject Name: ${campaignTitle}\nProject Goal: ${campaignDescription || 'Not provided'}`
+    : '';
+  const exclusion = existingTerms.length
+    ? `\nDO NOT suggest any of these (already on the row): ${existingTerms.slice(0, 16).join(', ')}.`
+    : '';
 
   const prompt = `
-Suggest ${count} SEO keywords for the worksheet topic "${scope}".
-Company context: ${domainContext || 'Not provided'}
-Existing priority keywords: ${keywords.slice(0, 8).join(', ') || 'none'}
+Suggest ${count} SEO keywords for the worksheet topic "${topicTitle}" on ${domainUrl}.
+Company context: ${domainContext || 'Not provided'}${geoContext}${voiceContext}${audienceContext}${campaignContext}
+Domain priority keywords (for tone/space alignment): ${domainKeywords.slice(0, 8).join(', ') || 'none'}.${exclusion}
+- The first keyword you return MUST be the strongest primary search term for this topic.
+- The rest should be supporting longtail variants (more specific, lower volume).
+- Each keyword must be a real search-intent phrase, not a category label.
+
 Random Seed: ${Date.now()}
 
 Return JSON:
-  {
-    "keywords": [
-      { "term": "string", "volume": 1200, "difficulty": "Medium", "intent": "informational" }
-    ]
-  }
+{
+  "keywords": [
+    { "term": "string", "volume": 1200, "difficulty": "Medium", "intent": "informational" }
+  ]
+}
 Only return JSON.`;
 
   const fallback = () => ({
     keywords: Array.from({ length: count }).map((_, index) =>
       buildKeyword(
         {
-          term: `${scope} keyword ${index + 1}`,
+          term: `${topicTitle} ${index === 0 ? 'guide' : `angle ${index}`}`,
           volume: Math.floor(800 + Math.random() * 1400),
           difficulty: difficultyBuckets[index % difficultyBuckets.length],
         },
-        `${scope} keyword ${index + 1}`
+        `${topicTitle} ${index}`
       )
     ),
   });
 
   const aiResponse = await callOpenAiJson<{ keywords: any[] }>(prompt, fallback);
-  const keywordList =
+  const list =
     Array.isArray(aiResponse?.keywords) && aiResponse.keywords.length > 0
       ? aiResponse.keywords
       : fallback().keywords;
 
-  return keywordList.map((kw: any, index: number) =>
-    buildKeyword(kw, `${scope} keyword ${index + 1}`)
-  );
+  // De-dupe against existing terms (case-insensitive).
+  const seen = new Set(existingTerms.map((t) => t.toLowerCase()));
+  const result: GeneratedKeyword[] = [];
+  for (const kw of list) {
+    const built = buildKeyword(kw, topicTitle);
+    const key = built.term.toLowerCase();
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    result.push(built);
+  }
+  return result.slice(0, count);
 }
