@@ -319,7 +319,7 @@ router.post('/', authenticateToken, asyncHandler(async (req: Request, res: Respo
     // Save crawl result
     sendEvent({ type: 'progress', phase: 'domain_extraction', step: 'Saving domain extraction results...', progress: 95 });
 
-      const crawlResult = await prisma.crawlResult.create({
+    const crawlResult = await prisma.crawlResult.create({
       data: {
         domainId: domain.id,
         pagesScanned: extraction.pagesScanned,

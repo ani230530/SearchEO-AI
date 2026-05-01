@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState, type Dispatch, type FormEvent, type ReactNode, type SetStateAction } from 'react';
+import React, { useEffect, useState, type Dispatch, type FormEvent, type ReactNode, type SetStateAction } from 'react';
 import {
   BarChart3,
   CheckCircle,
@@ -300,7 +300,7 @@ export function AnalyticsCompanySection({
                             const key = normalize(h);
                             return {
                               title: h,
-                              content: (contentMap[key] || []).join("\n").trim(),
+                              content: (contentMap[key] || []).join("\n").replace(/\\n/g, '\n').trim(),
                             };
                           });
                                                     const leftSections = sections.slice(0, 4);
