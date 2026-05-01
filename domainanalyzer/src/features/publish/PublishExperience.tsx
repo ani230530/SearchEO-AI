@@ -54,6 +54,11 @@ interface PublishExperienceProps {
   pageId?: number;
   disablePreviewOverlay?: boolean;
   onBack?: () => void;
+  /** When true, the component automatically fires handlePublishToWordpress
+   *  once a draft has finished loading. Used by the worksheet's row-level
+   *  "Publish" button so a single click both opens the preview and starts
+   *  the publish. Fires once per mount; the user can still cancel/close. */
+  autoPublishOnMount?: boolean;
   publishingPageIds?: Set<number>;
   setPublishingPageIds?: React.Dispatch<React.SetStateAction<Set<number>>>;
   draftToPageMap?: Map<number, number>;
@@ -171,6 +176,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
   pageId,
   onBack,
   disablePreviewOverlay = false,
+  autoPublishOnMount = false,
   publishingPageIds,
   setPublishingPageIds,
   draftToPageMap,
@@ -2244,6 +2250,30 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
       setIsPublishing(false);
     }
   };
+
+  /**
+   * Auto-publish trigger. When the worksheet's row-level "Publish" action
+   * mounts the overlay, it sets `autoPublishOnMount`. Once the draft has
+   * loaded (publishResult is populated) we fire handlePublishToWordpress
+   * exactly once. Subsequent renders are guarded by `firedRef`.
+   *
+   * This is intentionally a render-time effect rather than a callback on
+   * fetchDraftFromDb so it stays in sync with whatever path landed the
+   * publishResult — including initialDraft, refresh, or direct fetch.
+   */
+  const autoPublishFiredRef = useRef(false);
+  useEffect(() => {
+    if (!autoPublishOnMount) return;
+    if (!publishResult) return;
+    if (publishLoading || isPublishing) return;
+    if (autoPublishFiredRef.current) return;
+    autoPublishFiredRef.current = true;
+    void handlePublishToWordpress();
+    // handlePublishToWordpress is intentionally not a dep — we want exactly
+    // one fire keyed off (autoPublishOnMount, publishResult). Re-renders of
+    // the handler must not retrigger this effect.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoPublishOnMount, publishResult]);
 
   const handlePreviewMouseUp = useCallback((e?: MouseEvent) => {
     if (typeof window === 'undefined') return;

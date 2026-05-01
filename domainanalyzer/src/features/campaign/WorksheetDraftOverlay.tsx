@@ -25,6 +25,10 @@ export interface WorksheetDraftOverlayProps {
   /** Mirrors the dashboard's `isSidebarExpanded` state so the overlay's
    *  left offset matches `<main>`'s margin-left. */
   sidebarExpanded?: boolean;
+  /** When true, fire the publish action automatically once the draft
+   *  has loaded inside the embedded PublishExperience (one-click publish
+   *  from the worksheet row). The user can still cancel from the X. */
+  autoPublish?: boolean;
 
   // Pass-through props PublishExperience needs to render correctly. These
   // mirror what the Publish tab already supplies; we just forward them.
@@ -68,6 +72,7 @@ export default function WorksheetDraftOverlay({
   open,
   onClose,
   sidebarExpanded = true,
+  autoPublish = false,
   ...publishProps
 }: WorksheetDraftOverlayProps) {
   if (!open || draftId === null) return null;
@@ -101,6 +106,7 @@ export default function WorksheetDraftOverlay({
         initialDraftId={draftId}
         disablePreviewOverlay
         onBack={onClose}
+        autoPublishOnMount={autoPublish}
       />
     </div>
   );

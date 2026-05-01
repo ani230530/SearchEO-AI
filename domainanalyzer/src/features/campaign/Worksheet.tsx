@@ -46,10 +46,11 @@ type WorksheetColumnKey = 'topic' | 'keywords' | 'status' | 'action' | 'more';
 interface WorksheetProps {
   campaignId: number;
   /** Bubbled to the dashboard so the click on a row's "Draft Blog" /
-   *  "Publish" action switches to the Publish tab with the draft
-   *  preloaded into the existing PublishExperience. The dashboard
-   *  owns tab state, so the Worksheet can't do this itself. */
-  onOpenDraftInPublish?: (draftId: number) => void;
+   *  "Publish" action opens the dashboard-level draft overlay with the
+   *  draft preloaded. `intent: 'publish'` makes the overlay auto-fire
+   *  the publish action once the draft loads (one-click publish from
+   *  the worksheet); otherwise the overlay opens for review only. */
+  onOpenDraftInPublish?: (draftId: number, intent?: 'view' | 'publish') => void;
 }
 
 export default function Worksheet({ campaignId, onOpenDraftInPublish }: WorksheetProps) {
@@ -618,10 +619,16 @@ export default function Worksheet({ campaignId, onOpenDraftInPublish }: Workshee
                                   return;
                                 }
                                 setOpeningDraftRowId(topic.id);
-                                onOpenDraftInPublish(draftId);
-                                // Drop the per-row loading flag after the
-                                // dashboard finishes its tab switch so the
-                                // spinner is visible briefly.
+                                onOpenDraftInPublish(draftId, 'view');
+                                setTimeout(() => setOpeningDraftRowId(null), 350);
+                              },
+                              onPublishDirectly: (draftId) => {
+                                if (!onOpenDraftInPublish) {
+                                  setNotice('Publisher not wired up at this level.');
+                                  return;
+                                }
+                                setOpeningDraftRowId(topic.id);
+                                onOpenDraftInPublish(draftId, 'publish');
                                 setTimeout(() => setOpeningDraftRowId(null), 350);
                               },
                             }}

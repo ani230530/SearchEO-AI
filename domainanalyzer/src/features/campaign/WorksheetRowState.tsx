@@ -98,7 +98,12 @@ function ProgressLine({
 
 export interface RowActionHandlers {
   onGenerate: () => void;
+  /** View / edit the draft. Opens the preview overlay in default mode. */
   onOpenDraft: (draftId: number) => void;
+  /** One-click publish from the row. Opens the same overlay but with
+   *  intent: 'publish' so the publish action auto-fires once the draft
+   *  loads. The user can still cancel from inside the overlay. */
+  onPublishDirectly: (draftId: number) => void;
   onRetry: () => void;
 }
 
@@ -143,18 +148,27 @@ export function RowAction({
 
     case 'completed':
       return (
-        <ActionPill
-          label="Draft Blog"
-          onClick={() => handlers.onOpenDraft(state.draftId)}
-          disabled={draftSpinner}
-          icon={
-            draftSpinner ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <FileText className="h-4 w-4" />
-            )
-          }
-        />
+        <div className="inline-flex items-center gap-2">
+          <ActionPill
+            label="Draft Blog"
+            onClick={() => handlers.onOpenDraft(state.draftId)}
+            disabled={draftSpinner}
+            icon={
+              draftSpinner ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <FileText className="h-4 w-4" />
+              )
+            }
+          />
+          <ActionPill
+            label="Publish"
+            onClick={() => handlers.onPublishDirectly(state.draftId)}
+            disabled={draftSpinner}
+            variant="primary"
+            icon={<Send className="h-4 w-4" />}
+          />
+        </div>
       );
 
     case 'failed':
@@ -189,18 +203,24 @@ function ActionPill({
   onClick,
   disabled,
   icon,
+  variant = 'secondary',
 }: {
   label: string;
   onClick?: () => void;
   disabled?: boolean;
   icon?: React.ReactNode;
+  variant?: 'secondary' | 'primary';
 }) {
+  const styles =
+    variant === 'primary'
+      ? 'border-[#2D4059] bg-[#2D4059] text-white hover:bg-[#3a4f6f] disabled:hover:bg-[#2D4059]'
+      : 'border-[#9db5e0] bg-[#f4f8ff] text-[#3c5e99] hover:bg-[#eaf1ff] disabled:hover:bg-[#f4f8ff]';
   return (
     <button
       type="button"
       onClick={onClick}
       disabled={disabled || !onClick}
-      className={`inline-flex items-center gap-2 rounded-xl border border-[#9db5e0] bg-[#f4f8ff] px-5 py-2 text-sm font-medium text-[#3c5e99] transition hover:bg-[#eaf1ff] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-[#f4f8ff]`}
+      className={`inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50 ${styles}`}
     >
       {icon}
       <span>{label}</span>

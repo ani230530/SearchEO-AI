@@ -253,17 +253,23 @@ const [improvedContent, setImprovedContent] = useState("");
   );
   const [activeSection, setActiveSection] = useState<'all' | 'favourites' | 'published'>('all');
   /** Set when a worksheet row's "Draft Blog" / "Publish" action is clicked.
-   *  The dashboard renders a fullscreen overlay hosting PublishExperience in
-   *  its embedded (disablePreviewOverlay) mode. Switching tabs is avoided —
-   *  the user stays in the worksheet visually. */
-  const [draftOverlayId, setDraftOverlayId] = useState<number | null>(null);
+   *  The dashboard renders an overlay hosting PublishExperience in its
+   *  embedded (disablePreviewOverlay) mode. `intent: 'publish'` makes the
+   *  overlay auto-fire the publish action once the draft has loaded. */
+  const [draftOverlay, setDraftOverlay] = useState<{
+    draftId: number;
+    intent: 'view' | 'publish';
+  } | null>(null);
 
-  const handleOpenDraftInPublish = useCallback((draftId: number) => {
-    setDraftOverlayId(draftId);
-  }, []);
+  const handleOpenDraftInPublish = useCallback(
+    (draftId: number, intent: 'view' | 'publish' = 'view') => {
+      setDraftOverlay({ draftId, intent });
+    },
+    []
+  );
 
   const handleCloseDraftOverlay = useCallback(() => {
-    setDraftOverlayId(null);
+    setDraftOverlay(null);
   }, []);
   const [openSortMenu, setOpenSortMenu] = useState(false);
 const [sortBy, setSortBy] = useState<"date" | "name">("date");
@@ -3064,8 +3070,9 @@ useEffect(() => {
           viewport height, regardless of how tall the underlying worksheet
           page content is. */}
       <WorksheetDraftOverlay
-        draftId={draftOverlayId}
-        open={draftOverlayId !== null}
+        draftId={draftOverlay?.draftId ?? null}
+        open={draftOverlay !== null}
+        autoPublish={draftOverlay?.intent === 'publish'}
         onClose={handleCloseDraftOverlay}
         sidebarExpanded={isSidebarExpanded}
         companyDomain={companyDomain}
