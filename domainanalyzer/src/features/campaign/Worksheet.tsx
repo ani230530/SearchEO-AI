@@ -4,6 +4,7 @@ import {
   ArrowUpDown,
   CheckCircle2,
   ChevronDown,
+  ChevronLeft,
   Command,
   Download,
   Feather,
@@ -14,10 +15,8 @@ import {
   Radio,
   Search,
   Sparkles,
-  Star,
   Trash2,
   Upload,
-  X,
 } from 'lucide-react';
 import {
   WorksheetTopic,
@@ -817,31 +816,25 @@ function KeywordChip({
   onSetLongtail: () => void;
   onRemove: () => void;
 }) {
-  // Worksheet invariant: every keyword is Primary or Longtail. The neutral
-  // styling (last branch) only ever appears in the brief moment between a
-  // server response and the next render.
-  const baseClasses = 'inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[11px] cursor-pointer';
+  // Worksheet invariant: every keyword is Primary or Longtail.
+  // Primary uses a saturated lavender; Longtail uses a soft tint of the same
+  // hue. The chevron is the affordance for the actions popover.
   const variantClass = keyword.isPrimary
-    ? 'border-[#e0a93f] bg-[#fff6e0] text-[#7a5a14]'
-    : keyword.isLongtail
-    ? 'border-[#7da97c] bg-[#e7f4e6] text-[#2d6a2c]'
-    : 'border-[#9db5e0] bg-[#eaf1ff] text-[#3c5e99]';
+    ? 'bg-[#7281c4] border-[#7281c4] text-white hover:bg-[#6573ba]'
+    : 'bg-[#dde2f5] border-[#cdd5ed] text-[#4c5a8c] hover:bg-[#d3daf0]';
 
   return (
-    <span className="relative">
-      <span
-        role="button"
-        tabIndex={0}
+    <span className="relative inline-flex">
+      <button
+        type="button"
         onClick={onTogglePopover}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') onTogglePopover();
-        }}
-        className={`${baseClasses} ${variantClass}`}
+        className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[12px] font-medium transition-colors ${variantClass}`}
+        aria-haspopup="menu"
+        aria-expanded={isPopoverOpen}
       >
-        {keyword.isPrimary && <Star className="h-3 w-3" fill="currentColor" />}
-        {keyword.isLongtail && <span className="text-[9px] font-bold">L</span>}
-        {keyword.term}
-      </span>
+        <span className="whitespace-nowrap">{keyword.term}</span>
+        <ChevronLeft className="h-3 w-3 shrink-0" />
+      </button>
 
       {isPopoverOpen && (
         <span
