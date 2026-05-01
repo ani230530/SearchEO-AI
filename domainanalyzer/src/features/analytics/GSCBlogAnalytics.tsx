@@ -326,6 +326,9 @@ const GSCBlogAnalytics: React.FC = () => {
     id: blog.id
   }));
 
+  const ctrPercent = aggregateData.avgCTR * 100;
+  const avgPosition = aggregateData.avgPosition;
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -410,16 +413,16 @@ const GSCBlogAnalytics: React.FC = () => {
       </div>
 
       {/* Charts Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         {/* Line Chart - Performance Over Time */}
-        <div className="min-h-[380px] rounded-[24px] border border-gray-200 bg-white p-6 shadow-[0_8px_24px_rgba(15,23,42,0.03)]">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">Performance Trend</h3>
+        <div className="min-h-[300px] rounded-[24px] border border-gray-200 bg-white p-5 shadow-[0_8px_24px_rgba(15,23,42,0.03)]">
+          <h3 className="text-lg font-medium text-gray-900 mb-3">Performance Trend</h3>
           <div className="overflow-x-auto">
             <D3LineChart
               data={clicksData}
               secondaryData={impressionsData}
               width={500}
-              height={280}
+              height={230}
               primaryColor="#111111"
               secondaryColor="#4E76C7"
               primaryLabel="Clicks"
@@ -429,13 +432,13 @@ const GSCBlogAnalytics: React.FC = () => {
         </div>
 
         {/* Bar Chart - Top Blogs */}
-        <div className="min-h-[380px] rounded-[24px] border border-gray-200 bg-white p-6 shadow-[0_8px_24px_rgba(15,23,42,0.03)]">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">Top Performing Blogs</h3>
+        <div className="min-h-[330px] rounded-[24px] border border-gray-200 bg-white p-5 shadow-[0_8px_24px_rgba(15,23,42,0.03)]">
+          <h3 className="text-lg font-medium text-gray-900 mb-3">Top Performing Blogs</h3>
           <div className="overflow-x-auto">
             <D3BarChart
               data={blogBarData}
               width={500}
-              height={280}
+              height={230}
               horizontal
               gradientColors={['#111111', '#4b5563']}
               onBarClick={(item) => {
@@ -461,7 +464,7 @@ const GSCBlogAnalytics: React.FC = () => {
           </div>
           <div className="flex w-full justify-center">
             <D3GaugeChart
-              value={aggregateData.avgCTR * 100}
+              value={ctrPercent}
               maxValue={10}
               label="CTR Performance"
               unit="%"
@@ -473,6 +476,7 @@ const GSCBlogAnalytics: React.FC = () => {
               ]}
             />
           </div>
+          <p className="mt-1 text-center text-xs text-gray-500">Benchmarks: Low &lt;1%, Average 1-3%, Strong 3%+</p>
         </div>
 
         <div className="rounded-[24px] border border-gray-200 bg-white p-6 shadow-[0_8px_24px_rgba(15,23,42,0.03)]">
@@ -487,7 +491,7 @@ const GSCBlogAnalytics: React.FC = () => {
           </div>
           <div className="flex w-full justify-center">
             <D3GaugeChart
-              value={Math.min(aggregateData.avgPosition, 100)}
+              value={Math.min(avgPosition, 100)}
               maxValue={100}
               label="Lower is Better"
               unit=""
@@ -499,6 +503,7 @@ const GSCBlogAnalytics: React.FC = () => {
               ]}
             />
           </div>
+          <p className="mt-1 text-center text-xs text-gray-500">Benchmarks: Excellent 1-10, Good 11-30, Needs work 31+</p>
         </div>
       </div>
 

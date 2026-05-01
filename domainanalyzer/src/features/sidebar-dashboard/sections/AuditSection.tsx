@@ -223,20 +223,20 @@ export function AuditSection({
         {auditResult && best && worst && (
           <div ref={resultsRef} className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
             <div
-              className="flex justify-between bg-white/70 py-8 px-8 rounded-2xl border border-gray-200 shadow-sm"
+              className="bg-white/70 backdrop-blur-md py-8 px-8 rounded-2xl border border-gray-200 shadow-sm h-full"
               style={{ borderWidth: "0.5px", minHeight: "367px" }}
             >
-              <div className="flex-shrink-0 flex flex-col items-center justify-center pr-8">
-                <h3
-                  className="text-2xl font-light text-gray-900 p-6"
-                  style={{ letterSpacing: "-0.003em" }}
-                >
-                  Domain Audit
-                </h3>
-                <OverallScoreGauge score={overallScore} />
-              </div>
-
-              <div className="flex flex-col items-center justify-center gap-6 text-center">
+              <h3
+                className="text-2xl font-light text-gray-900 mb-4"
+                style={{ letterSpacing: "-0.003em" }}
+              >
+                Domain Audit
+              </h3>
+              <div className="h-[calc(100%-3rem)] flex items-center justify-center gap-8">
+                <div className="flex-shrink-0 flex items-center justify-center">
+                  <OverallScoreGauge score={overallScore} size={180} />
+                </div>
+                <div className="flex flex-col items-center justify-center gap-6 text-center">
                 <div>
                   <div
                     className="text-xs font-light uppercase tracking-wider text-green-700 mb-1"
@@ -278,12 +278,13 @@ export function AuditSection({
                     {worst.score}%
                   </div>
                 </div>
+                </div>
               </div>
             </div>
 
             <div
-              className="bg-white/70 backdrop-blur-md rounded-2xl border border-gray-200 p-12 shadow-sm"
-              style={{ borderWidth: "0.5px" }}
+              className="bg-white/70 backdrop-blur-md rounded-2xl border border-gray-200 p-8 shadow-sm h-full flex flex-col"
+              style={{ borderWidth: "0.5px", minHeight: "367px" }}
             >
               <div className="flex items-center justify-between mb-6">
                 <h3
@@ -330,7 +331,7 @@ export function AuditSection({
               {categories
                 .filter((category) => category.label === (selectedMetric || "Performance"))
                 .map(({ label, value }) => (
-                  <div key={label} className="flex items-center gap-8">
+                  <div key={label} className="h-[calc(100%-3rem)] flex items-center justify-center gap-8">
                     <div className="flex-shrink-0">
                       <AuditGaugeChart label={null} score={value} size={180} />
                     </div>
@@ -345,23 +346,23 @@ export function AuditSection({
 
             {auditResult?.screenshot && (
               <div
-                className="bg-white/70 backdrop-blur-md rounded-2xl border border-gray-200 p-6 shadow-sm overflow-hidden"
-                style={{ borderWidth: "0.5px" }}
+                className="bg-white/70 backdrop-blur-md rounded-2xl border border-gray-200 p-8 shadow-sm overflow-hidden h-full flex flex-col"
+                style={{ borderWidth: "0.5px", minHeight: "367px" }}
               >
                 <h3
-                  className="text-2xl font-light text-gray-900 mb-3 text-center"
+                  className="text-2xl font-light text-gray-900 mb-3 text-left"
                   style={{ letterSpacing: "-0.003em" }}
                 >
                   Website Preview
                 </h3>
                 <div
-                  className="rounded-xl overflow-hidden border border-gray-200"
+                  className="rounded-xl overflow-hidden border border-gray-200 flex-1"
                   style={{ borderWidth: "0.5px" }}
                 >
                   <img
                     src={auditResult.screenshot}
                     alt="Website Screenshot"
-                    className="w-full h-auto"
+                    className="w-full h-full object-cover"
                   />
                 </div>
               </div>

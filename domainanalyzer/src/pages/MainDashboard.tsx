@@ -49,6 +49,8 @@ interface ActiveOnboardingSession {
   lastActivity: string;
 }
 
+const DASHBOARD_CACHE_KEY = 'ai_visibility_domains_cache_v1';
+
 const ProfessionalDashboard = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [domains, setDomains] = useState<DashboardDomain[]>([]);
@@ -66,6 +68,21 @@ const ProfessionalDashboard = () => {
   const [statusFilter, setStatusFilter] = useState<'all' | 'completed' | 'in-progress' | 'not-started'>('all');
   const [sortBy, setSortBy] = useState<'recent' | 'visibility' | 'keywords' | 'phrases' | 'url'>('recent');
   const [sortDir, setSortDir] = useState<'desc' | 'asc'>('desc');
+
+  useEffect(() => {
+    try {
+      const cached = sessionStorage.getItem(DASHBOARD_CACHE_KEY);
+      if (!cached) return;
+
+      const parsed = JSON.parse(cached) as { domains?: DashboardDomain[] };
+      if (Array.isArray(parsed?.domains) && parsed.domains.length > 0) {
+        setDomains(parsed.domains);
+        setLoading(false);
+      }
+    } catch {
+      // ignore malformed cache and continue with network fetch
+    }
+  }, []);
 
   // Function to handle domain card clicks
   const handleDomainClick = (domain: DashboardDomain) => {
@@ -138,7 +155,10 @@ const ProfessionalDashboard = () => {
 
   useEffect(() => {
     const fetchData = async () => {
-      setLoading(true);
+      const hasCachedDomains = Boolean(sessionStorage.getItem(DASHBOARD_CACHE_KEY));
+      if (!hasCachedDomains) {
+        setLoading(true);
+      }
       setError(null);
       try {
         // Fetch completed domains
@@ -161,7 +181,16 @@ const ProfessionalDashboard = () => {
         }
         
         const domainsData = await domainsResponse.json();
-        setDomains(domainsData.domains || []);
+        const latestDomains = domainsData.domains || [];
+        setDomains(latestDomains);
+        try {
+          sessionStorage.setItem(
+            DASHBOARD_CACHE_KEY,
+            JSON.stringify({ domains: latestDomains, updatedAt: Date.now() })
+          );
+        } catch {
+          // best effort cache only
+        }
 
         // Onboarding sessions removed
         setActiveSessions([]);
@@ -174,8 +203,10 @@ const ProfessionalDashboard = () => {
     
     if (token) {
       fetchData();
+    } else if (!authLoading) {
+      setLoading(false);
     }
-  }, [token, navigate]);
+  }, [token, navigate, authLoading]);
 
   // Show loading while checking authentication
   if (authLoading) {

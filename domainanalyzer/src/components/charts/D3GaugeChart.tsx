@@ -64,14 +64,19 @@ const D3GaugeChart: React.FC<D3GaugeChartProps> = ({
         .attr('opacity', 0.2);
     });
 
-    // Determine current color based on value
-    const normalizedValue = (value / maxValue) * 100;
-    const currentColor = colorRanges.find(
-      range => normalizedValue >= range.min && normalizedValue <= range.max
-    )?.color || colorRanges[colorRanges.length - 1].color;
+    // Calculate clamped value once so angle and color logic stay consistent.
+    const clampedValue = Math.min(Math.max(value, 0), maxValue);
+    const normalizedValue = (clampedValue / maxValue) * 100;
+
+    // Prefer matching color ranges against the raw value scale.
+    // Fallback to normalized % matching for callers that pass 0-100 ranges.
+    const currentColor =
+      colorRanges.find((range) => clampedValue >= range.min && clampedValue <= range.max)?.color ||
+      colorRanges.find((range) => normalizedValue >= range.min && normalizedValue <= range.max)
+        ?.color ||
+      colorRanges[colorRanges.length - 1].color;
 
     // Calculate value angle
-    const clampedValue = Math.min(Math.max(value, 0), maxValue);
     const valueAngle = startAngle + (clampedValue / maxValue) * angleRange;
 
     // Draw value arc with animation
@@ -137,7 +142,7 @@ const D3GaugeChart: React.FC<D3GaugeChartProps> = ({
 if (showValue) {
   const valueText = g.append('text')
     .attr('text-anchor', 'middle')
-    .attr('dy', radius * 0.15)
+    .attr('dy', radius * 0.48)
     .style('font-size', `${size * 0.12}px`)
     .style('font-weight', 'bold')
     .attr('fill', '#1f2937');
@@ -162,7 +167,7 @@ if (showValue) {
     if (label) {
       g.append('text')
         .attr('text-anchor', 'middle')
-        .attr('dy', radius * 0.82)
+        .attr('dy', radius * 0.92)
         .text(label)
         .style('font-size', `${size * 0.044}px`)
         .attr('fill', '#6b7280');
@@ -188,7 +193,7 @@ if (showValue) {
   }, [value, maxValue, label, unit, size, colorRanges, animate]);
 
   return (
-    <svg ref={svgRef} className="mx-auto block overflow-visible" />
+    <svg ref={svgRef} className="mx-auto block overflow-hidden" />
   );
 };
 
