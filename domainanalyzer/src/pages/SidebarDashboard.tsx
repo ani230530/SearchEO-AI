@@ -2979,6 +2979,7 @@ useEffect(() => {
               handleCreateCampaign={handleCreateCampaign}
               newCampaignTitle={newCampaignTitle}
               setNewCampaignTitle={setNewCampaignTitle}
+              newCampaignDescription={newCampaignDescription}
               setNewCampaignDescription={setNewCampaignDescription}
               campaignLayout={campaignLayout}
               setCampaignLayout={setCampaignLayout}

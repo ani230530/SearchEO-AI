@@ -6,7 +6,7 @@ import Worksheet from '@/features/campaign/Worksheet';
 export function ProjectsSection(props: any) {
   const {
     selectedCampaignId, campaigns, setSelectedCampaignId, keywordsTableData,
-    showCreateCampaign, setShowCreateCampaign, handleCreateCampaign, newCampaignTitle, setNewCampaignTitle, setNewCampaignDescription,
+    showCreateCampaign, setShowCreateCampaign, handleCreateCampaign, newCampaignTitle, setNewCampaignTitle, newCampaignDescription, setNewCampaignDescription,
     campaignLayout, setCampaignLayout, openSortMenu, setOpenSortMenu, sortBy, setSortBy, activeSection, setActiveSection,
     campaignsLoading, campaignTabDataLoading, favouriteIds, editingCampaignId, toggleFavourite, openMenuId, setOpenMenuId,
     setEditingCampaignId, setEditTitle, setEditDescription, setShowEditModal, confirmDelete, handleDeleteCampaign,
@@ -62,7 +62,7 @@ export function ProjectsSection(props: any) {
             onClick={() => setShowCreateCampaign(false)}
           />
 
-          <div className="relative w-full max-w-6xl mx-4 my-8 max-h-[90vh] overflow-y-auto bg-white rounded-xl p-8 border border-gray-100 shadow-xl">
+          <div className="relative w-full max-w-xl mx-4 bg-white rounded-xl p-8 border border-gray-100 shadow-xl">
             <h3 className="text-xl font-light text-black tracking-tight mb-6">
               Create New Project
             </h3>
@@ -70,23 +70,30 @@ export function ProjectsSection(props: any) {
             <form onSubmit={handleCreateCampaign} className="space-y-6">
               <div>
                 <label className="block text-base font-light text-black mb-2">
-                  Title
+                  Name
                 </label>
                 <input
                   type="text"
                   value={newCampaignTitle}
                   onChange={(e) => setNewCampaignTitle(e.target.value)}
-                  placeholder="Enter project title"
+                  placeholder="Enter project name"
                   className="w-full px-4 py-3 rounded-2xl border border-gray-200 bg-gray-50 focus:ring-2 focus:ring-black focus:outline-none"
                   required
                 />
               </div>
 
-              <Worksheet
-                titleContext={newCampaignTitle}
-                keywordsTableData={keywordsTableData}
-                onDescriptionChange={setNewCampaignDescription}
-              />
+              <div>
+                <label className="block text-base font-light text-black mb-2">
+                  Description
+                </label>
+                <textarea
+                  value={newCampaignDescription}
+                  onChange={(e) => setNewCampaignDescription(e.target.value)}
+                  placeholder="Briefly describe this project (optional)"
+                  rows={4}
+                  className="w-full px-4 py-3 rounded-2xl border border-gray-200 bg-gray-50 focus:ring-2 focus:ring-black focus:outline-none resize-none"
+                />
+              </div>
 
               <div className="flex items-center justify-end gap-4">
                 <button
