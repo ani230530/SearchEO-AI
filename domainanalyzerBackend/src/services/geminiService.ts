@@ -1099,9 +1099,75 @@ async function fetchGoogleAutocomplete(seed: string): Promise<string[]> {
   }
 }
 
+export const GENERIC_ANALYSIS_KEYWORDS = [
+  'business analysis',
+  'market trends',
+  'seo strategy',
+  'competitive analysis',
+  'industry insights',
+  'customer profiling',
+  'brand positioning',
+  'content strategy',
+  'market dynamics',
+  'seo opportunities',
+  'local seo',
+  'market leaders',
+  'value proposition',
+  'competitive gaps',
+  'industry classification',
+  'customer journey',
+  'geographic scope',
+  'solution categories',
+  'local market',
+  'content themes',
+  'market size',
+  'decision factors',
+  'authority building',
+  'direct competitors',
+  'indirect competitors',
+  'competitive advantages',
+  'vulnerability areas',
+  'seasonal patterns',
+  'cultural considerations',
+  'local search behavior',
+  'content gaps',
+  'keyword opportunities',
+  'content opportunities',
+  'long-tail opportunities',
+  'local seo strategy',
+  'market positioning',
+  'key benefits',
+  'expertise areas',
+  'geographic considerations',
+];
+
+const GENERIC_ANALYSIS_KEYWORD_SET = new Set(GENERIC_ANALYSIS_KEYWORDS);
+
+export function isGenericAnalysisKeyword(term: string): boolean {
+  return GENERIC_ANALYSIS_KEYWORD_SET.has(term.trim().toLowerCase());
+}
+
+function hasWeakDomainContext(context: string): boolean {
+  const weakEvidenceMatches = context.match(/not clearly established from website evidence/gi) || [];
+  return weakEvidenceMatches.length >= 3;
+}
+
+function getHostnameLabel(domain: string): string {
+  try {
+    const withProtocol = /^https?:\/\//i.test(domain) ? domain : `https://${domain}`;
+    return new URL(withProtocol).hostname.replace(/^www\./, '').split('.')[0].replace(/[-_]/g, ' ');
+  } catch {
+    return domain.replace(/^https?:\/\//i, '').replace(/^www\./i, '').split('.')[0].replace(/[-_]/g, ' ');
+  }
+}
+
 export async function generateKeywordsForDomain(domain: string, context: string, location?: string): Promise<{ keywords: Array<{ term: string, volume: number, difficulty: string, cpc: number, intent: string }>, tokenUsage: number }> {
   try {
     const locationContext = location ? `\nLocation: ${location}` : '';
+    const weakContext = hasWeakDomainContext(context);
+    const businessContext = weakContext
+      ? `Domain: ${domain}\nBusiness or brand cue: ${getHostnameLabel(domain)}`
+      : context;
 
     // Get location context from database if available
     let locationDomainContext = '';
@@ -1120,12 +1186,13 @@ export async function generateKeywordsForDomain(domain: string, context: string,
     // AI-visibility-focused prompt: generate keywords that make good AI prompts
     const prompt = `Generate 40 SHORT-TAIL KEYWORDS (1-4 words max) for testing AI visibility of the following business. These keywords will be turned into prompts like "What is the best [keyword]?" or "Recommend a [keyword]" to test whether AI models mention this domain.
 
-Business: ${context}${locationContext}${locationDomainContext}
+Business: ${businessContext}${locationContext}${locationDomainContext}
 
 STRICT RULES:
 - Every keyword MUST be 1-4 words. NO phrases longer than 4 words.
 - Do NOT include the brand name "${domain}" or any brand variants
 - Do NOT include navigational terms
+- Do NOT include generic strategy/report headings such as "business analysis", "market trends", "seo strategy", "customer profiling", "brand positioning", or "competitive analysis"
 - Keywords should be generic industry/service/product terms that someone would ask an AI about
 - Focus on terms where this business COULD be recommended by an AI
 
@@ -1168,18 +1235,18 @@ Return JSON array only, no explanations:
       const jsonMatch = text.match(/\[[\s\S]*\]/);
       if (!jsonMatch) {
         console.error('No JSON found in keyword response');
-        return { keywords: generateDomainFallbackKeywords(domain, context), tokenUsage: completion.usage?.total_tokens || 0 };
+        return { keywords: generateDomainFallbackKeywords(domain, businessContext), tokenUsage: completion.usage?.total_tokens || 0 };
       }
       keywords = JSON.parse(jsonMatch[0]);
     }
 
     if (!Array.isArray(keywords)) {
-      return { keywords: generateDomainFallbackKeywords(domain, context), tokenUsage: completion.usage?.total_tokens || 0 };
+      return { keywords: generateDomainFallbackKeywords(domain, businessContext), tokenUsage: completion.usage?.total_tokens || 0 };
     }
 
     // ── Post-generation filtering ──────────────────────────────────────────
     const seen = new Set<string>();
-    const domainLower = domain.toLowerCase().replace(/\.(com|io|net|org|co)$/, '').replace(/^www\./, '');
+    const domainLower = getHostnameLabel(domain).toLowerCase();
 
     const validatedKeywords = keywords
       .map((kw: any) => {
@@ -1189,6 +1256,8 @@ Return JSON array only, no explanations:
         // HARD REJECT: more than 4 words
         const wordCount = term.split(/\s+/).length;
         if (wordCount > 4) return null;
+
+        if (isGenericAnalysisKeyword(term)) return null;
 
         // Reject brand terms
         if (term.includes(domainLower)) return null;
@@ -1228,7 +1297,7 @@ Return JSON array only, no explanations:
     for (const suggestions of autocompleteResults) {
       for (const s of suggestions) {
         const wordCount = s.split(/\s+/).length;
-        if (wordCount <= 4 && !seen.has(s) && !s.includes(domainLower)) {
+        if (wordCount <= 4 && !seen.has(s) && !s.includes(domainLower) && !isGenericAnalysisKeyword(s)) {
           autocompleteKeywords.add(s);
           seen.add(s);
         }
@@ -1254,7 +1323,10 @@ Return JSON array only, no explanations:
 
   } catch (error) {
     console.error('Keyword generation error:', error);
-    return { keywords: generateDomainFallbackKeywords(domain, context), tokenUsage: 0 };
+    const fallbackContext = hasWeakDomainContext(context)
+      ? `Domain: ${domain}\nBusiness or brand cue: ${getHostnameLabel(domain)}`
+      : context;
+    return { keywords: generateDomainFallbackKeywords(domain, fallbackContext), tokenUsage: 0 };
   }
 }
 
@@ -1310,6 +1382,7 @@ function generateDomainFallbackKeywords(domain: string, context: string): Array<
   return baseKeywords
     .filter(kw => {
       if (seen.has(kw.term)) return false;
+      if (isGenericAnalysisKeyword(kw.term)) return false;
       seen.add(kw.term);
       return kw.term.split(/\s+/).length <= 4;
     })
@@ -1513,109 +1586,6 @@ Be specific, accurate, and provide actionable insights based on real market dyna
   }
 }
 
-export async function suggestCompetitors(
-  domain: string,
-  context: string,
-  keywords: string[] = [],
-  location?: string
-): Promise<{
-  suggestedCompetitors: Array<{
-    name: string;
-    domain: string;
-    reason: string;
-    type: 'direct' | 'indirect';
-  }>;
-  dbStats: Record<string, unknown>;
-  tokenUsage: number;
-}> {
-  console.log(`Generating competitor suggestions for ${domain}`);
-  
-  try {
-    const keywordContext = keywords.length > 0 ? `\nKey Keywords: ${keywords.join(', ')}` : '';
-    const locationContext = location ? `\nTarget Market: ${location}` : '';
-    
-    const prompt = `You are a competitive intelligence expert. Based on the domain "${domain}" and its business context, suggest 6-8 potential competitors for analysis.
-
-DOMAIN CONTEXT: ${context}${keywordContext}${locationContext}
-
-Identify both direct and indirect competitors that would be valuable to analyze. Consider:
-- Companies targeting similar audiences
-- Businesses with overlapping product/service offerings
-- Players competing for the same keywords
-- Emerging threats in adjacent markets
-- Market leaders worth benchmarking against
-
-For each suggested competitor, provide:
-- Company/brand name
-- Domain/website
-- Reason for suggestion (be specific about why they're relevant)
-- Type: "direct" or "indirect" competitor
-
-Return ONLY a valid JSON object:
-{
-  "suggestedCompetitors": [
-    {
-      "name": "Company Name",
-      "domain": "competitor.com", 
-      "reason": "Specific reason why this is a relevant competitor",
-      "type": "direct|indirect"
-    }
-  ]
-}
-
-Focus on real, identifiable companies that would provide meaningful competitive insights.`;
-
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4o',
-      messages: [{ role: 'user', content: prompt }],
-      max_tokens: 1500,
-      temperature: 0.4
-    });
-
-    const content = response.choices[0]?.message?.content;
-    if (!content) {
-      throw new Error('No response from AI service');
-    }
-
-    // Extract JSON from response
-    const jsonMatch = content.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      throw new Error('No valid JSON found in AI response');
-    }
-
-    const suggestionData = JSON.parse(jsonMatch[0]);
-    const tokenUsage = response.usage?.total_tokens || 0;
-
-    console.log(`Competitor suggestions generated with ${tokenUsage} tokens`);
-    
-    return {
-      suggestedCompetitors: suggestionData.suggestedCompetitors || [],
-      dbStats: {
-        totalDomains: 15420,
-        industryMatches: 847,
-        keywordOverlaps: 156,
-        analysisGenerated: new Date().toISOString()
-      },
-      tokenUsage
-    };
-
-  } catch (error) {
-    console.error('Error generating competitor suggestions:', error);
-    
-    // Return fallback suggestions
-    return {
-      suggestedCompetitors: generateFallbackCompetitorSuggestions(domain, context),
-      dbStats: {
-        totalDomains: 15420,
-        industryMatches: 847,
-        keywordOverlaps: 156,
-        analysisGenerated: new Date().toISOString()
-      },
-      tokenUsage: 0
-    };
-  }
-}
-
 function generateFallbackCompetitorAnalysis(domain: string, context: string, selectedCompetitors: string[] = [], location?: string) {
   const baseDomain = domain.replace(/^https?:\/\//, '').replace(/\/$/, '');
   const domainName = baseDomain.split('.')[0];
@@ -1692,38 +1662,6 @@ function generateFallbackCompetitorAnalysis(domain: string, context: string, sel
       threatMitigation: ['Strengthen content strategy', 'Build brand authority', 'Improve technical performance']
     }
   };
-}
-
-function generateFallbackCompetitorSuggestions(domain: string, context: string) {
-  const baseDomain = domain.replace(/^https?:\/\//, '').replace(/\/$/, '');
-  const domainName = baseDomain.split('.')[0];
-  
-  return [
-    {
-      name: `${domainName}Pro`,
-      domain: `${domainName}pro.com`,
-      reason: 'Direct competitor with similar service offering and target audience',
-      type: 'direct' as const
-    },
-    {
-      name: 'IndustryLeader',
-      domain: 'industryleader.com',
-      reason: 'Market leader in the same industry vertical',
-      type: 'direct' as const
-    },
-    {
-      name: 'AlternativeSolution',
-      domain: 'alternativesolution.io',
-      reason: 'Alternative approach to solving similar customer problems',
-      type: 'indirect' as const
-    },
-    {
-      name: 'EmergingCompetitor',
-      domain: 'emergingcompetitor.ai',
-      reason: 'Fast-growing startup disrupting the traditional market',
-      type: 'indirect' as const
-    }
-  ];
 }
 
 // Export the service for backward compatibility

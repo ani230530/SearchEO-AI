@@ -15,6 +15,8 @@ import LandingPage from "./pages/LandingPage";
 import SidebarDashboard from "./pages/SidebarDashboard";
 import KnowledgeBase from "./pages/KnowledgeBase";
 import AIChecker from "./pages/AIChecker";
+import AIResultsReportPreview from "./pages/AIResultsReportPreview";
+
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -74,6 +76,9 @@ const App = () => (
               <ProtectedRoute>
                 <Navigate to="/dashboard?tab=integration&subtab=integration&wordpress=1" replace />
               </ProtectedRoute>
+            } />
+            <Route path="/ai-results-report-preview" element={
+               <AIResultsReportPreview />
             } />
             
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

@@ -1765,7 +1765,10 @@ router.get('/:domainId/step3', authenticateToken, async (req, res) => {
         volume: kw.volume,
         difficulty: kw.difficulty,
         cpc: kw.cpc,
-        isSelected: kw.isSelected
+        isSelected: kw.isSelected,
+        isCustom: kw.isCustom,
+        createdAt: kw.createdAt,
+        updatedAt: kw.updatedAt
       })),
       analysis: {
         semanticAnalysis: domain.semanticAnalyses[0] || null,
@@ -1785,7 +1788,10 @@ router.get('/:domainId/step3', authenticateToken, async (req, res) => {
           editable: true,
           selected: phrase.isSelected,
           parentKeyword: kw.term,
-          keywordId: kw.id
+          parentKeywordIsCustom: kw.isCustom,
+          keywordId: kw.id,
+          createdAt: phrase.createdAt,
+          updatedAt: phrase.updatedAt
         }))
       ),
       communityInsights: domain.keywords.flatMap((kw: any) => 
@@ -3345,6 +3351,53 @@ Respond with valid JSON only.
       console.log(`Created new keyword: ${newKeyword.term} (ID: ${keywordId})`);
     }
 
+    const existingPhrase = await prisma.generatedIntentPhrase.findFirst({
+      where: {
+        domainId: domain.id,
+        keywordId,
+        phrase: {
+          equals: phrase.trim(),
+          mode: 'insensitive'
+        }
+      }
+    });
+
+    if (existingPhrase) {
+      return res.json({
+        success: true,
+        phrase: {
+          id: existingPhrase.id,
+          phrase: existingPhrase.phrase,
+          relevanceScore: existingPhrase.relevanceScore,
+          intent: existingPhrase.intent,
+          intentConfidence: existingPhrase.intentConfidence,
+          sources: existingPhrase.sources,
+          trend: existingPhrase.trend,
+          editable: true,
+          selected: existingPhrase.isSelected,
+          parentKeyword: analysisResult.extractedKeyword,
+          parentKeywordIsCustom: targetKeyword ? targetKeyword.isCustom : true,
+          keywordId: existingPhrase.keywordId,
+          wordCount: existingPhrase.phrase.trim().split(/\s+/).length,
+          isAdditional: true,
+          createdAt: existingPhrase.createdAt,
+          updatedAt: existingPhrase.updatedAt
+        },
+        keyword: targetKeyword ? {
+          id: targetKeyword.id,
+          term: targetKeyword.term,
+          isExisting: true,
+          isCustom: targetKeyword.isCustom
+        } : {
+          id: keywordId,
+          term: analysisResult.extractedKeyword,
+          isExisting: true,
+          isCustom: true
+        },
+        analysis: analysisResult.analysis
+      });
+    }
+
     // Create the intent phrase
     const newPhrase = await prisma.generatedIntentPhrase.create({
       data: {
@@ -3375,18 +3428,23 @@ Respond with valid JSON only.
         editable: true,
         selected: newPhrase.isSelected,
         parentKeyword: analysisResult.extractedKeyword,
+        parentKeywordIsCustom: targetKeyword ? targetKeyword.isCustom : true,
         keywordId: newPhrase.keywordId,
         wordCount: analysisResult.wordCount,
-        isAdditional: true
+        isAdditional: true,
+        createdAt: newPhrase.createdAt,
+        updatedAt: newPhrase.updatedAt
       },
       keyword: targetKeyword ? {
         id: targetKeyword.id,
         term: targetKeyword.term,
-        isExisting: true
+        isExisting: true,
+        isCustom: targetKeyword.isCustom
       } : {
         id: keywordId,
         term: analysisResult.extractedKeyword,
-        isExisting: false
+        isExisting: false,
+        isCustom: true
       },
       analysis: analysisResult.analysis
     });

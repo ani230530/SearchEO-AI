@@ -1081,7 +1081,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
 
     return (
       <div className="rounded-2xl border border-gray-200 bg-white p-4 space-y-4">
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
           <div>
             <p className="text-xs text-gray-500 mb-1">Draft metadata</p>
             <p className="text-sm font-medium text-gray-900">Title, description, and slug</p>
@@ -1089,7 +1089,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
           <button
             type="button"
             onClick={syncSlugFromTitle}
-            className="rounded-full border border-gray-200 px-3 py-1 text-[11px] font-medium text-gray-600 hover:bg-gray-50"
+            className="w-full sm:w-auto rounded-xl border border-[#2D4059]/20  px-3 py-1.5 text-center text-[12px] font-semibold text-[#2D4059] hover:bg-[#2D4059]/10 transition-colors"
           >
             Use title for slug
           </button>
@@ -1192,25 +1192,25 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
             placeholder="https://example.com/featured-image.jpg"
             className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-900 outline-none transition focus:border-gray-900"
           />
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-2">
             <button
               type="button"
               onClick={handleApplyFeaturedImageUrl}
-              className="rounded-full bg-gray-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-gray-800"
+              className="inline-flex w-full items-center justify-center rounded-xl bg-[#2D4059] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#2D4059]/90"
             >
               Apply URL
             </button>
             <button
               type="button"
               onClick={handleEnableAutoFeaturedImage}
-              className="rounded-full border border-gray-200 px-4 py-2.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+              className="inline-flex w-full items-center justify-center rounded-xl border border-[#2D4059]/20  px-4 py-2.5 text-sm font-semibold text-[#2D4059] transition hover:bg-[#2D4059]/10"
             >
               Auto-generate
             </button>
             <button
               type="button"
               onClick={handleDisableFeaturedImage}
-              className="rounded-full border border-gray-200 px-4 py-2.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+              className="inline-flex w-full items-center justify-center rounded-xl border border-[#2D4059]/20  px-4 py-2.5 text-sm font-semibold text-[#2D4059] transition hover:bg-[#2D4059]/10"
             >
               Disable
             </button>
@@ -1257,7 +1257,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
               type="button"
               onClick={handleFeaturedImageEdit}
               disabled={!featuredImageEditNote.trim() || featuredImageEditing}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-gray-200 px-4 py-2.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-[#2D4059]/20 bg-[#2D4059]/5 px-4 py-2.5 text-sm font-semibold text-[#2D4059] transition hover:bg-[#2D4059]/10 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {featuredImageEditing ? (
                 <>
@@ -3131,7 +3131,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
                           <p className="text-xs text-gray-500">Manage images in your article</p>
                           <button
                             onClick={() => setShowAddImageModal(true)}
-                            className="inline-flex items-center gap-2 px-1 py-1 bg-black text-white rounded-full text-sm font-medium hover:bg-black/90  disabled:opacity-60 transition"
+                            className="inline-flex w-auto items-center justify-center rounded-xl border border-[#2D4059]/20  px-3 py-2.5 text-sm font-semibold text-white transition bg-[#2D4059] hover:bg-[#2D4059]/90"
                           >
                             <Plus className="h-3.5 w-3.5" />
                             Add
