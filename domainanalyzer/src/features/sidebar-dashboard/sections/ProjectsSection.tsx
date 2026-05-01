@@ -5,7 +5,7 @@ import Worksheet from '@/features/campaign/Worksheet';
 
 export function ProjectsSection(props: any) {
   const {
-    selectedCampaignId, campaigns, setSelectedCampaignId,
+    selectedCampaignId, campaigns, setSelectedCampaignId, onOpenDraftInPublish,
     showCreateCampaign, setShowCreateCampaign, handleCreateCampaign, newCampaignTitle, setNewCampaignTitle, newCampaignDescription, setNewCampaignDescription,
     campaignLayout, setCampaignLayout, openSortMenu, setOpenSortMenu, sortBy, setSortBy, activeSection, setActiveSection,
     campaignsLoading, campaignTabDataLoading, favouriteIds, editingCampaignId, toggleFavourite, openMenuId, setOpenMenuId,
@@ -45,7 +45,10 @@ export function ProjectsSection(props: any) {
           <h2 className="text-lg font-medium text-gray-800 truncate">{selectedCampaign.title}</h2>
           <div />
         </div>
-        <Worksheet campaignId={selectedCampaign.id} />
+        <Worksheet
+          campaignId={selectedCampaign.id}
+          onOpenDraftInPublish={onOpenDraftInPublish}
+        />
       </div>
     );
   }

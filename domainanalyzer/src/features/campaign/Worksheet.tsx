@@ -37,16 +37,20 @@ import {
   subscribeGenerationUpdates,
 } from './api';
 import WorksheetGenerateDrawer from './WorksheetGenerateDrawer';
-import WorksheetDraftDrawer from './WorksheetDraftDrawer';
 import { RowStatus, RowAction } from './WorksheetRowState';
 
 type WorksheetColumnKey = 'topic' | 'keywords' | 'status' | 'action' | 'more';
 
 interface WorksheetProps {
   campaignId: number;
+  /** Bubbled to the dashboard so the click on a row's "Draft Blog" /
+   *  "Publish" action switches to the Publish tab with the draft
+   *  preloaded into the existing PublishExperience. The dashboard
+   *  owns tab state, so the Worksheet can't do this itself. */
+  onOpenDraftInPublish?: (draftId: number) => void;
 }
 
-export default function Worksheet({ campaignId }: WorksheetProps) {
+export default function Worksheet({ campaignId, onOpenDraftInPublish }: WorksheetProps) {
   const [topics, setTopics] = useState<WorksheetTopic[]>([]);
   const [loading, setLoading] = useState(true);
   const [busyTopicId, setBusyTopicId] = useState<number | null>(null);
@@ -56,10 +60,9 @@ export default function Worksheet({ campaignId }: WorksheetProps) {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [topicForGenerate, setTopicForGenerate] = useState<WorksheetTopic | null>(null);
-  /** Draft drawer state. `openingDraftRowId` is set briefly between click and
-   *  drawer mount so the row's action button can show its own loading. */
+  /** Set briefly between an "Open draft" click and the dashboard switching
+   *  tabs, so the row's action button shows its own loading state. */
   const [openingDraftRowId, setOpeningDraftRowId] = useState<number | null>(null);
-  const [draftIdForViewer, setDraftIdForViewer] = useState<number | null>(null);
 
   const [search, setSearch] = useState('');
   const [openColumnMenu, setOpenColumnMenu] = useState<WorksheetColumnKey | null>(null);
@@ -606,12 +609,16 @@ export default function Worksheet({ campaignId }: WorksheetProps) {
                               onGenerate: () => setTopicForGenerate(topic),
                               onRetry: () => setTopicForGenerate(topic),
                               onOpenDraft: (draftId) => {
+                                if (!onOpenDraftInPublish) {
+                                  setNotice('Draft viewer not wired up at this level.');
+                                  return;
+                                }
                                 setOpeningDraftRowId(topic.id);
-                                setDraftIdForViewer(draftId);
-                                // Drop the per-row loading flag on the next
-                                // tick so the spinner is visible briefly even
-                                // when the drawer mounts instantly.
-                                setTimeout(() => setOpeningDraftRowId(null), 250);
+                                onOpenDraftInPublish(draftId);
+                                // Drop the per-row loading flag after the
+                                // dashboard finishes its tab switch so the
+                                // spinner is visible briefly.
+                                setTimeout(() => setOpeningDraftRowId(null), 350);
                               },
                             }}
                           />
@@ -786,12 +793,6 @@ export default function Worksheet({ campaignId }: WorksheetProps) {
         }}
       />
 
-      {/* Draft viewer */}
-      <WorksheetDraftDrawer
-        draftId={draftIdForViewer}
-        open={draftIdForViewer !== null}
-        onClose={() => setDraftIdForViewer(null)}
-      />
     </>
   );
 }

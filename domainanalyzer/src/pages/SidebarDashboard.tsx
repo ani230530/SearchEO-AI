@@ -251,6 +251,22 @@ const [improvedContent, setImprovedContent] = useState("");
     null
   );
   const [activeSection, setActiveSection] = useState<'all' | 'favourites' | 'published'>('all');
+  /** Set when a worksheet row routes the user into the Publish tab; the
+   *  PublishExperience picks this up via initialDraftId on mount. We clear
+   *  it once the user leaves the publish tab so a later tab switch doesn't
+   *  re-trigger the preload. */
+  const [pendingPublishDraftId, setPendingPublishDraftId] = useState<number | null>(null);
+
+  const handleOpenDraftInPublish = useCallback((draftId: number) => {
+    setPendingPublishDraftId(draftId);
+    setActiveTab('publish');
+  }, []);
+
+  useEffect(() => {
+    if (activeTab !== 'publish' && pendingPublishDraftId !== null) {
+      setPendingPublishDraftId(null);
+    }
+  }, [activeTab, pendingPublishDraftId]);
   const [openSortMenu, setOpenSortMenu] = useState(false);
 const [sortBy, setSortBy] = useState<"date" | "name">("date");
   const [favouriteIds, setFavouriteIds] = useState<Set<number>>(new Set());
@@ -2441,6 +2457,7 @@ useEffect(() => {
       isActive: activeTab === "publish",
       keywordsTableData,
       pageId: undefined,
+      initialDraftId: pendingPublishDraftId,
       publishingPageIds,
       setDraftStatuses,
       setDraftToPageMap,
@@ -2973,6 +2990,7 @@ useEffect(() => {
               selectedCampaignId={selectedCampaignId}
               campaigns={campaigns}
               setSelectedCampaignId={setSelectedCampaignId}
+              onOpenDraftInPublish={handleOpenDraftInPublish}
               keywordsTableData={keywordsTableData}
               showCreateCampaign={showCreateCampaign}
               setShowCreateCampaign={setShowCreateCampaign}

@@ -104,6 +104,9 @@ export interface PublishSectionProps {
   isActive: boolean;
   keywordsTableData: KeywordTableItem[];
   pageId?: number;
+  /** Draft id to preload on mount — e.g. when navigating from a worksheet
+   *  row's "Draft Blog" / "Publish" action into the Publish tab. */
+  initialDraftId?: number | null;
   publishingPageIds: Set<number>;
   setDraftStatuses: Dispatch<SetStateAction<Map<number, any>>>;
   setDraftToPageMap: Dispatch<SetStateAction<Map<number, number>>>;
