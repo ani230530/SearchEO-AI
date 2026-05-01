@@ -148,7 +148,7 @@ export function RowAction({
 
     case 'completed':
       return (
-        <div className="inline-flex items-center gap-2">
+        <div className="inline-flex flex-col items-stretch gap-2">
           <ActionPill
             label="Draft Blog"
             onClick={() => handlers.onOpenDraft(state.draftId)}
