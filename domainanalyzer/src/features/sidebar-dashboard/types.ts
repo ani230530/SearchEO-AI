@@ -186,4 +186,5 @@ export interface DashboardContentRouterProps {
   overview: OverviewSectionProps;
   publish: PublishSectionProps;
   settings: SettingsSectionProps;
+  onMenuItemClick?: (tabId: TabId, domainId?: string | number) => void;
 }

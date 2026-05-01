@@ -128,6 +128,17 @@ interface Props {
 }
 
 const CompetitorPage: React.FC<Props> = ({ domainId }) => {
+  if (!domainId) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-white">
+        <div className="text-center">
+          <p className="text-lg text-gray-600 mb-2">Select a domain to view competitors</p>
+          <p className="text-sm text-gray-400">Go to Domain History and select a domain first</p>
+        </div>
+      </div>
+    );
+  }
+
   const [data, setData] = useState<TableData[]>([]);
   const [competitors, setCompetitors] = useState<string[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
@@ -746,11 +757,11 @@ const CompetitorPage: React.FC<Props> = ({ domainId }) => {
         }));
 
     const term = searchTerm.trim().toLowerCase();
-    if (!term) return source.slice(0, 10); // Limit to 10 competitors
 
-    const filtered = source.filter((item) =>
-      item.brand.toLowerCase().includes(term)
-    );
+    const filtered = source.filter((item) => {
+      if (!term) return true;
+      return (item.brand || "").toLowerCase().includes(term);
+    });
 
     // Remove duplicates by brand name
     const uniqueFiltered = Array.from(new Map(filtered.map(item => [item.brand, item])).values());
@@ -765,6 +776,27 @@ const CompetitorPage: React.FC<Props> = ({ domainId }) => {
           competitorDomain={selectedCompetitor}
           onBack={() => setSelectedCompetitor(null)}
         />
+      ) : !domainId ? (
+        <div className="flex flex-col items-center justify-center min-h-[400px] p-6 text-center">
+          <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mb-4">
+            <Globe className="w-8 h-8 text-slate-400" />
+          </div>
+          <h3 className="text-xl font-semibold text-slate-900 mb-2">No Domain Selected</h3>
+          <p className="text-slate-500 max-w-sm mb-6">
+            Please analyze a new domain or select one from your history to see competitor intelligence.
+          </p>
+          <Button 
+            onClick={() => {
+              // Navigate back to history or overview if possible, 
+              // or just provide clear instructions
+              const historyTab = document.querySelector('[data-tab="domain-history"]') as HTMLElement;
+              if (historyTab) historyTab.click();
+            }}
+            variant="outline"
+          >
+            Go to Search History
+          </Button>
+        </div>
       ) : (
         <div className="mx-auto max-w-7xl p-6">
         <div className="flex flex-col gap-6 xl:flex-row xl:items-center xl:justify-between">

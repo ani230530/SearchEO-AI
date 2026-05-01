@@ -2,10 +2,22 @@ import { Router, Request, Response } from 'express';
 import { PrismaClient } from '../../generated/prisma';
 import { authenticateToken, AuthenticatedRequest } from '../middleware/auth';
 import IntentPhraseService, { IntentPhraseProgress } from '../services/intentPhraseService';
+import { analyzePhraseWithAI } from '../services/phraseAnalysisService';
 import { advanceDomainStep } from './domain';
 
 const router = Router();
 const prisma = new PrismaClient();
+
+// Shared constants for generation phases
+export const INTENT_PHRASE_PHASES = [
+  'semantic_analysis',
+  'community_mining',
+  'competitor_analysis',
+  'search_patterns', 
+  'phrase_generation',
+  'intent_classification',
+  'relevance_scoring'
+];
 
 // POST /api/intent-phrases/:domainId/stream - Stream AI-powered intent phrase generation with selected keywords
 router.post('/:domainId/stream', authenticateToken, async (req: Request, res: Response) => {
@@ -101,17 +113,7 @@ router.post('/:domainId/stream', authenticateToken, async (req: Request, res: Re
 
     // Initialize progress tracking
     let currentPhase = 'semantic_analysis';
-    let phaseProgress = 0;
-    const phases = [
-      'semantic_analysis',
-      'community_mining',
-      'competitor_analysis',
-      'search_patterns', 
-      'phrase_generation',
-      'intent_classification',
-      'relevance_scoring'
-    ];
-
+    
     const progressCallback = (progress: IntentPhraseProgress) => {
       // Update generation record
       prisma.intentPhraseGeneration.updateMany({
@@ -135,7 +137,6 @@ router.post('/:domainId/stream', authenticateToken, async (req: Request, res: Re
       // Update overall progress
       if (progress.phase !== currentPhase) {
         currentPhase = progress.phase;
-        phaseProgress = phases.indexOf(currentPhase);
       }
     };
 
@@ -167,7 +168,7 @@ router.post('/:domainId/stream', authenticateToken, async (req: Request, res: Re
       sendEvent('complete', {
         message: 'Intent phrase generation completed successfully',
         totalPhrases: phrases.length,
-        phases: phases.length
+        phases: INTENT_PHRASE_PHASES.length
       });
 
       // Update final status
@@ -316,52 +317,34 @@ router.post('/:domainId/select', authenticateToken, async (req: Request, res: Re
     });
     console.log('Unselected phrases count:', unselectResult.count);
 
-    // Then select the specified phrases
-    const updatePromises = selectedPhrases.map(async (phraseId: any) => {
-      const id = typeof phraseId === 'string' ? parseInt(phraseId) : phraseId;
-      
-      // Check if the parsed ID is valid
-      if (isNaN(id)) {
-        console.log(`Invalid phrase ID: ${phraseId} - cannot parse as number`);
-        return null; // Skip invalid IDs
-      }
-      
-      console.log('Selecting phrase with ID:', id);
-      
-      // First verify the phrase exists and belongs to this domain
-      const existingPhrase = await prisma.generatedIntentPhrase.findFirst({
-        where: { 
-          id: id,
-          domainId: domainId 
-        }
-      });
-      
-      if (!existingPhrase) {
-        console.log(`Phrase with ID ${id} not found or doesn't belong to domain ${domainId}`);
-        return null; // Skip this phrase
-      }
-      
-      return prisma.generatedIntentPhrase.update({
-        where: { id },
-        data: { isSelected: true }
-      });
+    // Then select the specified phrases in a single batch operation
+    const validIds = selectedPhrases
+      .map((phraseId: any) => typeof phraseId === 'string' ? parseInt(phraseId) : phraseId)
+      .filter((id: number) => !isNaN(id));
+
+    console.log('Selecting phrases in batch:', { domainId, validIds });
+
+    const updateResult = await prisma.generatedIntentPhrase.updateMany({
+      where: {
+        id: { in: validIds },
+        domainId: domainId
+      },
+      data: { isSelected: true }
     });
-
-    const updateResults = await Promise.all(updatePromises);
-    const successfulUpdates = updateResults.filter(result => result !== null);
     
-    console.log('Updated phrases count:', successfulUpdates.length);
+    const successfulUpdatesCount = updateResult.count;
+    console.log('Batch update complete. Count:', successfulUpdatesCount);
 
-    if (successfulUpdates.length > 0) {
+    if (successfulUpdatesCount > 0) {
       await advanceDomainStep(domainId, 3);
     }
 
     res.json({
       success: true,
-      message: `Successfully selected ${successfulUpdates.length} phrases`,
-      selectedCount: successfulUpdates.length,
+      message: `Successfully selected ${successfulUpdatesCount} phrases`,
+      selectedCount: successfulUpdatesCount,
       requestedCount: selectedPhrases.length,
-      skippedCount: selectedPhrases.length - successfulUpdates.length
+      skippedCount: selectedPhrases.length - successfulUpdatesCount
     });
 
   } catch (error) {
@@ -448,16 +431,7 @@ router.get('/:domainId/status', authenticateToken, async (req: Request, res: Res
       orderBy: { createdAt: 'desc' }
     });
 
-    const phases = [
-      'semantic_analysis',
-      'community_mining',
-      'search_patterns',
-      'intent_classification', 
-      'relevance_scoring',
-      'phrase_generation'
-    ];
-
-    const status = phases.map(phase => {
+    const status = INTENT_PHRASE_PHASES.map(phase => {
       const generation = generations.find(g => g.phase === phase);
       return {
         phase,
@@ -479,7 +453,7 @@ router.get('/:domainId/status', authenticateToken, async (req: Request, res: Res
       isRunning,
       isCompleted,
       hasError,
-      totalPhases: phases.length,
+      totalPhases: INTENT_PHRASE_PHASES.length,
       completedPhases: status.filter(s => s.status === 'completed').length
     });
 
@@ -501,17 +475,9 @@ router.post('/analyze', authenticateToken, async (req: Request, res: Response) =
   }
 
   try {
-    // First, analyze the phrase using AI directly instead of HTTP request
-    let analysisResult: any;
-    try {
-      // Import OpenAI dynamically to avoid circular dependencies
-      const { default: OpenAI } = await import('openai');
-      const apiKey = process.env.OPENAI_API_KEY;
-      if (!apiKey) throw new Error('OPENAI_API_KEY is not set');
-      const openai = new OpenAI({ apiKey });
-
-      // Get domain context if domainId is provided
-      let domainContext = '';
+    // Get domain context if domainId is provided
+    let domainContext = '';
+    if (domainId) {
       try {
         const domainRecord = await prisma.domain.findUnique({
           where: { id: domainId },
@@ -523,114 +489,9 @@ router.post('/analyze', authenticateToken, async (req: Request, res: Response) =
       } catch (error) {
         console.warn('Could not fetch domain context:', error);
       }
-
-      // Create comprehensive AI analysis prompt for phrases
-      const analysisPrompt = `
-You are an expert SEO analyst and search behavior specialist. Analyze the search phrase "${phrase}" for the domain ${domain.url}.
-
-Domain Context: ${domainContext || 'No specific context provided'}
-Location: Global
-
-Please provide a comprehensive analysis with the following data:
-
-1. **Primary Keyword**: Extract the main keyword from this phrase
-2. **Search Intent**: Informational, Commercial, Transactional, or Navigational
-3. **Relevance Score**: Score from 0-100 based on how relevant this phrase is to the domain
-4. **Search Volume**: Estimate monthly search volume (realistic numbers)
-5. **Competition Level**: Low, Medium, or High
-6. **Trend**: Rising, Stable, or Declining
-7. **Word Count**: Number of words in the phrase
-8. **Search Pattern**: Type of search pattern (question, comparison, local, etc.)
-9. **User Intent**: What the user is trying to accomplish
-10. **Content Type**: What type of content would best answer this search
-
-Consider the following factors:
-- Phrase length and specificity
-- User search behavior patterns
-- Commercial intent and monetization potential
-- Location-specific factors if applicable
-- Domain relevance and content alignment
-- Search engine optimization potential
-
-Return ONLY a JSON object with this exact structure:
-{
-  "phrase": "exact phrase as provided",
-  "primaryKeyword": "main keyword extracted",
-  "relevanceScore": 85,
-  "intent": "Informational",
-  "searchVolume": 1200,
-  "competition": "Medium",
-  "trend": "Stable",
-  "wordCount": 8,
-  "searchPattern": "question",
-  "userIntent": "User wants to learn about the topic",
-  "contentType": "how-to guide",
-  "analysis": "Brief analysis of phrase potential and strategy"
-}
-`;
-
-      const completion = await openai.chat.completions.create({
-        model: 'gpt-4o',
-        messages: [{ role: 'user', content: analysisPrompt }],
-        temperature: 0.3,
-        max_tokens: 1000
-      });
-
-      const response = completion.choices[0]?.message?.content;
-      if (!response) {
-        throw new Error('No response from AI analysis');
-      }
-
-      try {
-        // Clean the response to remove markdown formatting
-        let cleanResponse = response.trim();
-        if (cleanResponse.startsWith('```json')) {
-          cleanResponse = cleanResponse.replace(/^```json\s*/, '').replace(/\s*```$/, '');
-        } else if (cleanResponse.startsWith('```')) {
-          cleanResponse = cleanResponse.replace(/^```\s*/, '').replace(/\s*```$/, '');
-        }
-        
-        const parsedResult = JSON.parse(cleanResponse);
-        
-        // Validate and ensure all required fields are present
-        analysisResult = {
-          phrase: parsedResult.phrase || phrase,
-          primaryKeyword: parsedResult.primaryKeyword || phrase.split(' ')[0],
-          relevanceScore: parsedResult.relevanceScore || 75,
-          intent: parsedResult.intent || 'Informational',
-          searchVolume: parsedResult.searchVolume || 500,
-          competition: parsedResult.competition || 'Medium',
-          trend: parsedResult.trend || 'Stable',
-          wordCount: parsedResult.wordCount || phrase.trim().split(/\s+/).length,
-          searchPattern: parsedResult.searchPattern || 'general',
-          userIntent: parsedResult.userIntent || 'User is searching for information',
-          contentType: parsedResult.contentType || 'general content',
-          analysis: parsedResult.analysis || 'AI analysis completed successfully',
-          tokenUsage: completion.usage?.total_tokens || 0
-        };
-      } catch (parseError) {
-        console.error('Error parsing AI analysis response:', parseError);
-        throw new Error('Failed to parse AI analysis response');
-      }
-    } catch (aiError) {
-      console.error('AI analysis failed:', aiError);
-      // Fallback to basic analysis if AI fails
-      analysisResult = {
-        phrase: phrase,
-        primaryKeyword: phrase.split(' ')[0],
-        relevanceScore: 75,
-        intent: 'Informational',
-        searchVolume: 500,
-        competition: 'Medium',
-        trend: 'Stable',
-        wordCount: phrase.trim().split(/\s+/).length,
-        searchPattern: 'general',
-        userIntent: 'User is searching for information',
-        contentType: 'general content',
-        analysis: 'Basic analysis (AI analysis failed)',
-        tokenUsage: 0
-      };
     }
+
+    const analysisResult = await analyzePhraseWithAI(phrase, domain.url, domainContext);
 
     res.json({
       success: true,
@@ -639,7 +500,7 @@ Return ONLY a JSON object with this exact structure:
 
   } catch (error) {
     console.error('Phrase analysis error:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Failed to analyze phrase with AI',
       details: error instanceof Error ? error.message : 'Unknown error'
     });
@@ -660,143 +521,15 @@ router.post('/:domainId/custom', authenticateToken, async (req: Request, res: Re
     // Verify domain access
     const domain = await prisma.domain.findUnique({
       where: { id: domainId },
-      select: { id: true, userId: true, url: true }
+      select: { id: true, userId: true, url: true, context: true, locationContext: true }
     });
 
     if (!domain || domain.userId !== authReq.user.userId) {
       return res.status(403).json({ error: 'Access denied' });
     }
 
-    // First, analyze the phrase using AI directly instead of HTTP request
-    let analysisResult: any;
-    try {
-      // Import OpenAI dynamically to avoid circular dependencies
-      const { default: OpenAI } = await import('openai');
-      const apiKey = process.env.OPENAI_API_KEY;
-      if (!apiKey) throw new Error('OPENAI_API_KEY is not set');
-      const openai = new OpenAI({ apiKey });
-
-      // Get domain context if domainId is provided
-      let domainContext = '';
-      try {
-        const domainRecord = await prisma.domain.findUnique({
-          where: { id: domainId },
-          select: { context: true, locationContext: true }
-        });
-        if (domainRecord?.context) {
-          domainContext = domainRecord.context;
-        }
-      } catch (error) {
-        console.warn('Could not fetch domain context:', error);
-      }
-
-      // Create comprehensive AI analysis prompt for phrases
-      const analysisPrompt = `
-You are an expert SEO analyst and search behavior specialist. Analyze the search phrase "${phrase}" for the domain ${domain.url}.
-
-Domain Context: ${domainContext || 'No specific context provided'}
-Location: Global
-
-Please provide a comprehensive analysis with the following data:
-
-1. **Primary Keyword**: Extract the main keyword from this phrase
-2. **Search Intent**: Informational, Commercial, Transactional, or Navigational
-3. **Relevance Score**: Score from 0-100 based on how relevant this phrase is to the domain
-4. **Search Volume**: Estimate monthly search volume (realistic numbers)
-5. **Competition Level**: Low, Medium, or High
-6. **Trend**: Rising, Stable, or Declining
-7. **Word Count**: Number of words in the phrase
-8. **Search Pattern**: Type of search pattern (question, comparison, local, etc.)
-9. **User Intent**: What the user is trying to accomplish
-10. **Content Type**: What type of content would best answer this search
-
-Consider the following factors:
-- Phrase length and specificity
-- User search behavior patterns
-- Commercial intent and monetization potential
-- Location-specific factors if applicable
-- Domain relevance and content alignment
-- Search engine optimization potential
-
-Return ONLY a JSON object with this exact structure:
-{
-  "phrase": "exact phrase as provided",
-  "primaryKeyword": "main keyword extracted",
-  "relevanceScore": 85,
-  "intent": "Informational",
-  "searchVolume": 1200,
-  "competition": "Medium",
-  "trend": "Stable",
-  "wordCount": 8,
-  "searchPattern": "question",
-  "userIntent": "User wants to learn about the topic",
-  "contentType": "how-to guide",
-  "analysis": "Brief analysis of phrase potential and strategy"
-}
-`;
-
-      const completion = await openai.chat.completions.create({
-        model: 'gpt-4o',
-        messages: [{ role: 'user', content: analysisPrompt }],
-        temperature: 0.3,
-        max_tokens: 1000
-      });
-
-      const response = completion.choices[0]?.message?.content;
-      if (!response) {
-        throw new Error('No response from AI analysis');
-      }
-
-      try {
-        // Clean the response to remove markdown formatting
-        let cleanResponse = response.trim();
-        if (cleanResponse.startsWith('```json')) {
-          cleanResponse = cleanResponse.replace(/^```json\s*/, '').replace(/\s*```$/, '');
-        } else if (cleanResponse.startsWith('```')) {
-          cleanResponse = cleanResponse.replace(/^```\s*/, '').replace(/\s*```$/, '');
-        }
-        
-        const parsedResult = JSON.parse(cleanResponse);
-        
-        // Validate and ensure all required fields are present
-        analysisResult = {
-          phrase: parsedResult.phrase || phrase,
-          primaryKeyword: parsedResult.primaryKeyword || phrase.split(' ')[0],
-          relevanceScore: parsedResult.relevanceScore || 75,
-          intent: parsedResult.intent || 'Informational',
-          searchVolume: parsedResult.searchVolume || 500,
-          competition: parsedResult.competition || 'Medium',
-          trend: parsedResult.trend || 'Stable',
-          wordCount: parsedResult.wordCount || phrase.trim().split(/\s+/).length,
-          searchPattern: parsedResult.searchPattern || 'general',
-          userIntent: parsedResult.userIntent || 'User is searching for information',
-          contentType: parsedResult.contentType || 'general content',
-          analysis: parsedResult.analysis || 'AI analysis completed successfully',
-          tokenUsage: completion.usage?.total_tokens || 0
-        };
-      } catch (parseError) {
-        console.error('Error parsing AI analysis response:', parseError);
-        throw new Error('Failed to parse AI analysis response');
-      }
-    } catch (aiError) {
-      console.error('AI analysis failed:', aiError);
-      // Fallback to basic analysis if AI fails
-      analysisResult = {
-        phrase: phrase,
-        primaryKeyword: phrase.split(' ')[0],
-        relevanceScore: 75,
-        intent: 'Informational',
-        searchVolume: 500,
-        competition: 'Medium',
-        trend: 'Stable',
-        wordCount: phrase.trim().split(/\s+/).length,
-        searchPattern: 'general',
-        userIntent: 'User is searching for information',
-        contentType: 'general content',
-        analysis: 'Basic analysis (AI analysis failed)',
-        tokenUsage: 0
-      };
-    }
+    const domainContext = domain.context || domain.locationContext || '';
+    const analysisResult = await analyzePhraseWithAI(phrase, domain.url, domainContext);
 
     // Find the best matching keyword for this phrase
     let bestKeywordId = keywordId;
@@ -875,7 +608,7 @@ Return ONLY a JSON object with this exact structure:
   }
 });
 
-export default router; 
+
 // POST /api/intent-phrases/:domainId/analyze-custom - Analyze custom phrase and create keyword if needed
 router.post('/:domainId/analyze-custom', authenticateToken, async (req: Request, res: Response) => {
   const authReq = req as AuthenticatedRequest;
@@ -897,124 +630,8 @@ router.post('/:domainId/analyze-custom', authenticateToken, async (req: Request,
       return res.status(403).json({ error: 'Access denied' });
     }
 
-    // Analyze the phrase using AI to extract keyword and metrics
-    let analysisResult: any;
-    try {
-      // Import OpenAI dynamically to avoid circular dependencies
-      const { default: OpenAI } = await import('openai');
-      const apiKey = process.env.OPENAI_API_KEY;
-      if (!apiKey) throw new Error('OPENAI_API_KEY is not set');
-      const openai = new OpenAI({ apiKey });
-
-      const domainContext = domain.context || domain.locationContext || '';
-
-      // Create comprehensive AI analysis prompt for phrases
-      const analysisPrompt = `
-You are an expert SEO analyst and search behavior specialist. Analyze the search phrase "${phrase}" for the domain ${domain.url}.
-
-Domain Context: ${domainContext || 'No specific context provided'}
-Location: Global
-
-Please provide a comprehensive analysis with the following data:
-
-1. **Primary Keyword**: Extract the main keyword from this phrase
-2. **Search Intent**: Informational, Commercial, Transactional, or Navigational
-3. **Relevance Score**: Score from 0-100 based on how relevant this phrase is to the domain
-4. **Search Volume**: Estimate monthly search volume (realistic numbers)
-5. **Competition Level**: Low, Medium, or High
-6. **Trend**: Rising, Stable, or Declining
-7. **Word Count**: Number of words in the phrase
-8. **Search Pattern**: Type of search pattern (question, comparison, local, etc.)
-9. **User Intent**: What the user is trying to accomplish
-10. **Content Type**: What type of content would best answer this search
-
-Consider the following factors:
-- Phrase length and specificity
-- User search behavior patterns
-- Commercial intent and monetization potential
-- Location-specific factors if applicable
-- Domain relevance and content alignment
-- Search engine optimization potential
-
-Return ONLY a JSON object with this exact structure:
-{
-  "phrase": "exact phrase as provided",
-  "primaryKeyword": "main keyword extracted",
-  "relevanceScore": 85,
-  "intent": "Informational",
-  "searchVolume": 1200,
-  "competition": "Medium",
-  "trend": "Stable",
-  "wordCount": 8,
-  "searchPattern": "question",
-  "userIntent": "User wants to learn about the topic",
-  "contentType": "how-to guide",
-  "analysis": "Brief analysis of phrase potential and strategy"
-}
-`;
-
-      const completion = await openai.chat.completions.create({
-        model: 'gpt-4o',
-        messages: [{ role: 'user', content: analysisPrompt }],
-        temperature: 0.3,
-        max_tokens: 1000
-      });
-
-      const response = completion.choices[0]?.message?.content;
-      if (!response) {
-        throw new Error('No response from AI analysis');
-      }
-
-      try {
-        // Clean the response to remove markdown formatting
-        let cleanResponse = response.trim();
-        if (cleanResponse.startsWith('```json')) {
-          cleanResponse = cleanResponse.replace(/^```json\s*/, '').replace(/\s*```$/, '');
-        } else if (cleanResponse.startsWith('```')) {
-          cleanResponse = cleanResponse.replace(/^```\s*/, '').replace(/\s*```$/, '');
-        }
-        
-        const parsedResult = JSON.parse(cleanResponse);
-        
-        // Validate and ensure all required fields are present
-        analysisResult = {
-          phrase: parsedResult.phrase || phrase,
-          primaryKeyword: parsedResult.primaryKeyword || phrase.split(' ')[0],
-          relevanceScore: parsedResult.relevanceScore || 75,
-          intent: parsedResult.intent || 'Informational',
-          searchVolume: parsedResult.searchVolume || 500,
-          competition: parsedResult.competition || 'Medium',
-          trend: parsedResult.trend || 'Stable',
-          wordCount: parsedResult.wordCount || phrase.trim().split(/\s+/).length,
-          searchPattern: parsedResult.searchPattern || 'general',
-          userIntent: parsedResult.userIntent || 'User is searching for information',
-          contentType: parsedResult.contentType || 'general content',
-          analysis: parsedResult.analysis || 'AI analysis completed successfully',
-          tokenUsage: completion.usage?.total_tokens || 0
-        };
-      } catch (parseError) {
-        console.error('Error parsing AI analysis response:', parseError);
-        throw new Error('Failed to parse AI analysis response');
-      }
-    } catch (aiError) {
-      console.error('AI analysis failed:', aiError);
-      // Fallback to basic analysis if AI fails
-      analysisResult = {
-        phrase: phrase,
-        primaryKeyword: phrase.split(' ')[0],
-        relevanceScore: 75,
-        intent: 'Informational',
-        searchVolume: 500,
-        competition: 'Medium',
-        trend: 'Stable',
-        wordCount: phrase.trim().split(/\s+/).length,
-        searchPattern: 'general',
-        userIntent: 'User is searching for information',
-        contentType: 'general content',
-        analysis: 'Basic analysis (AI analysis failed)',
-        tokenUsage: 0
-      };
-    }
+    const domainContext = domain.context || domain.locationContext || '';
+    const analysisResult = await analyzePhraseWithAI(phrase, domain.url, domainContext);
 
     // Check if the primary keyword already exists for this domain
     let keywordRecord = await prisma.keyword.findFirst({
@@ -1024,6 +641,8 @@ Return ONLY a JSON object with this exact structure:
       }
     });
 
+    const keywordWasCreated = !keywordRecord;
+
     // If keyword doesn't exist, create it
     if (!keywordRecord) {
       keywordRecord = await prisma.keyword.create({
@@ -1031,7 +650,7 @@ Return ONLY a JSON object with this exact structure:
           term: analysisResult.primaryKeyword,
           volume: analysisResult.searchVolume,
           difficulty: analysisResult.competition,
-          cpc: 2.50, // Default CPC
+          cpc: 2.50,
           intent: analysisResult.intent,
           domainId: domainId,
           isSelected: false
@@ -1055,13 +674,7 @@ Return ONLY a JSON object with this exact structure:
       contentType: analysisResult.contentType,
       analysis: analysisResult.analysis,
       keywordId: keywordRecord.id,
-      keywordCreated: !await prisma.keyword.findFirst({
-        where: {
-          term: analysisResult.primaryKeyword,
-          domainId: domainId,
-          id: { lt: keywordRecord.id } // Check if this was a new keyword
-        }
-      })
+      keywordCreated: keywordWasCreated
     });
 
   } catch (error) {
@@ -1070,3 +683,4 @@ Return ONLY a JSON object with this exact structure:
   }
 });
 
+export default router;

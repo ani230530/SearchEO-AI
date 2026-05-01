@@ -21,6 +21,7 @@ export function DashboardContentRouter({
   publish,
   settings,
   competitorIntelligence,
+  onMenuItemClick,
 }: DashboardContentRouterProps) {
   switch (activeTab) {
     case "overview":
@@ -40,7 +41,7 @@ export function DashboardContentRouter({
     case "knowledge-base":
       return <KnowledgeBaseSection />;
     case "domain-history":
-      return <DomainHistorySection />;
+      return <DomainHistorySection onMenuItemClick={onMenuItemClick} />;
     case "profile":
       return <ProfileSection />;
     case "settings":

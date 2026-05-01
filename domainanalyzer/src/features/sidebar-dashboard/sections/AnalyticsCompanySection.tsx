@@ -275,6 +275,7 @@ export function AnalyticsCompanySection({
 };
                           const normalize = (s: string) =>
                             s
+                              .replace(/^#+\s*/, "")
                               .replace(/\*\*/g, "")
                               .replace(/^\s*\d+\.\s*/, "")
                               .replace(/[:]+$/, "")
@@ -287,7 +288,7 @@ export function AnalyticsCompanySection({
                           let current: string | null = null;
                           for (const line of lines) {
                             const n = normalize(line);
-                            const matched = target.find((t) => n.startsWith(t) || n.includes(t));
+                            const matched = target.find((t) => n === t);
                             if (matched) {
                               current = matched;
                               continue;
@@ -711,6 +712,7 @@ const allSections = [...leftSections, ...rightSections];
                                       onClick={() => handleSort("volume")}
                                     >
                                       <span>Volume</span>
+                                      <span className="text-[10px] text-gray-400 font-normal ml-1">(AI Est.)</span>
                                       {getSortIcon("volume")}
                                     </div>
 
@@ -727,6 +729,7 @@ const allSections = [...leftSections, ...rightSections];
                                       onClick={() => handleSort("organic")}
                                     >
                                       <span>Organic</span>
+                                      <span className="text-[10px] text-gray-400 font-normal ml-1">(AI Est.)</span>
                                       {getSortIcon("organic")}
                                     </div>
 

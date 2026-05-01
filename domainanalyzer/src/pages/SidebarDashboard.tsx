@@ -2529,6 +2529,12 @@ useEffect(() => {
         console.log("Run analysis for", competitorDomain);
       },
     },
+    onMenuItemClick: (tabId: TabId, domainId?: string | number) => {
+      setActiveTab(tabId);
+      if (domainId) {
+        setCreatedDomainId(Number(domainId));
+      }
+    },
   };
 
   return (
