@@ -58,6 +58,7 @@ import { DashboardHeader } from "@/features/sidebar-dashboard/components/Dashboa
 import { DashboardSidebar } from "@/features/sidebar-dashboard/components/DashboardSidebar";
 import { AnalyticsCompanySection } from "@/features/sidebar-dashboard/sections/AnalyticsCompanySection";
 import { ProjectsSection } from "@/features/sidebar-dashboard/sections/ProjectsSection";
+import WorksheetDraftOverlay from "@/features/campaign/WorksheetDraftOverlay";
 import { DASHBOARD_TABS } from "@/features/sidebar-dashboard/constants";
 import CompetitorPage from '@/features/sidebar-dashboard/sections/CompetitorPage';
 
@@ -251,22 +252,19 @@ const [improvedContent, setImprovedContent] = useState("");
     null
   );
   const [activeSection, setActiveSection] = useState<'all' | 'favourites' | 'published'>('all');
-  /** Set when a worksheet row routes the user into the Publish tab; the
-   *  PublishExperience picks this up via initialDraftId on mount. We clear
-   *  it once the user leaves the publish tab so a later tab switch doesn't
-   *  re-trigger the preload. */
-  const [pendingPublishDraftId, setPendingPublishDraftId] = useState<number | null>(null);
+  /** Set when a worksheet row's "Draft Blog" / "Publish" action is clicked.
+   *  The dashboard renders a fullscreen overlay hosting PublishExperience in
+   *  its embedded (disablePreviewOverlay) mode. Switching tabs is avoided —
+   *  the user stays in the worksheet visually. */
+  const [draftOverlayId, setDraftOverlayId] = useState<number | null>(null);
 
   const handleOpenDraftInPublish = useCallback((draftId: number) => {
-    setPendingPublishDraftId(draftId);
-    setActiveTab('publish');
+    setDraftOverlayId(draftId);
   }, []);
 
-  useEffect(() => {
-    if (activeTab !== 'publish' && pendingPublishDraftId !== null) {
-      setPendingPublishDraftId(null);
-    }
-  }, [activeTab, pendingPublishDraftId]);
+  const handleCloseDraftOverlay = useCallback(() => {
+    setDraftOverlayId(null);
+  }, []);
   const [openSortMenu, setOpenSortMenu] = useState(false);
 const [sortBy, setSortBy] = useState<"date" | "name">("date");
   const [favouriteIds, setFavouriteIds] = useState<Set<number>>(new Set());
@@ -2457,7 +2455,6 @@ useEffect(() => {
       isActive: activeTab === "publish",
       keywordsTableData,
       pageId: undefined,
-      initialDraftId: pendingPublishDraftId,
       publishingPageIds,
       setDraftStatuses,
       setDraftToPageMap,
@@ -3059,6 +3056,31 @@ useEffect(() => {
         )}
         </div>
       </main>
+
+      {/* Worksheet draft preview — fullscreen overlay hosting the legacy
+          PublishExperience in embedded mode. Sits at the dashboard level
+          so the publish-tracking state already wired for the Publish tab
+          can be reused without prop drilling through the worksheet. */}
+      <WorksheetDraftOverlay
+        draftId={draftOverlayId}
+        open={draftOverlayId !== null}
+        onClose={handleCloseDraftOverlay}
+        companyDomain={companyDomain}
+        domainContext={domainContext}
+        hasWordpressIntegration={hasWordpressIntegration}
+        wpIntegration={wpIntegration}
+        onConfigureWordpress={handleConfigureWordpress}
+        onRefreshWordpressIntegration={async () => {
+          await fetchWordpressIntegration();
+        }}
+        publishingPageIds={publishingPageIds}
+        setPublishingPageIds={setPublishingPageIds}
+        draftToPageMap={draftToPageMap}
+        setDraftToPageMap={setDraftToPageMap}
+        draftStatuses={draftStatuses}
+        setDraftStatuses={setDraftStatuses}
+        sharedPublishStatuses={sharedPublishStatuses}
+      />
     </div>
   );
 };

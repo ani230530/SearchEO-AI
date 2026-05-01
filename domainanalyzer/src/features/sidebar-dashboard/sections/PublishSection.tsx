@@ -12,7 +12,6 @@ export function PublishSection({
   isActive,
   keywordsTableData,
   pageId,
-  initialDraftId,
   publishingPageIds,
   setDraftStatuses,
   setDraftToPageMap,
@@ -38,7 +37,6 @@ export function PublishSection({
         onRefreshWordpressIntegration={onRefreshWordpressIntegration}
         isActive={isActive}
         pageId={pageId}
-        initialDraftId={initialDraftId ?? null}
         publishingPageIds={publishingPageIds}
         setPublishingPageIds={setPublishingPageIds}
         draftToPageMap={draftToPageMap}
