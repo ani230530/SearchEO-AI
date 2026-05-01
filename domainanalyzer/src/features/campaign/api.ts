@@ -28,7 +28,23 @@ export type WorksheetTopic = {
   publishStatus: string | null;
   liveUrl: string | null;
   draftId: number | null;
+  /** Latest GenerationJob snapshot for this topic, if any. */
+  job: GenerationJob | null;
 };
+
+export type GenerationJobStatus = 'pending' | 'generating' | 'completed' | 'failed';
+
+export interface GenerationJob {
+  jobId: string;
+  topicId: number;
+  status: GenerationJobStatus;
+  progress: number;
+  phase: string | null;
+  error: string | null;
+  draftId: number | null;
+  startedAt: string;
+  updatedAt: string;
+}
 
 type SerializedKeyword = {
   id: number;
@@ -50,6 +66,7 @@ type SerializedTopic = {
   publishStatus: string | null;
   liveUrl: string | null;
   draftId: number | null;
+  job: GenerationJob | null;
 };
 
 type StructureResponse = {
@@ -99,6 +116,7 @@ const normalizeTopic = (topic: SerializedTopic): WorksheetTopic => ({
   publishStatus: topic.publishStatus,
   liveUrl: topic.liveUrl,
   draftId: topic.draftId,
+  job: topic.job,
 });
 
 /* ---------- Reads ---------- */
@@ -292,67 +310,135 @@ export interface GenerateTopicPayload {
   template_fields?: Record<string, unknown>;
 }
 
-export interface GenerateTopicResult {
-  topics: WorksheetTopic[];
-  draftId: number;
-  content: {
-    title?: string;
-    htmlContent: string;
-    metaDescription?: string;
-    slug?: string;
-    primaryKeyword?: string;
-    longtailKeywords?: string;
-    featuredImageUrl?: string | null;
-    featuredImageEnabled?: boolean;
-    wordpressUrl?: string;
-    wordpressPostId?: number | null;
-    status?: string;
-  };
-}
-
+/**
+ * Kicks off a generation job. Returns immediately with the job snapshot
+ * (status: 'pending'). Subsequent updates arrive over the SSE channel
+ * `/api/campaigns/events` as `generation:update` events.
+ *
+ * 409 means a job is already in flight for this topic — the caller should
+ * surface a "wait for the current run to finish" message.
+ */
 export async function generateTopic(
   topicId: number,
   payload: GenerateTopicPayload
-): Promise<GenerateTopicResult> {
+): Promise<GenerationJob> {
   const res = await fetch(`${API_BASE_URL}/api/campaigns/topics/${topicId}/generate`, {
     method: 'POST',
     headers: authHeaders(),
     body: JSON.stringify(payload),
   });
-  const data = await handle<{
-    success: boolean;
-    structure: { topics: SerializedTopic[] };
-    draftId: number;
-    content: GenerateTopicResult['content'];
-  }>(res);
-  return {
-    topics: data.structure.topics.map(normalizeTopic),
-    draftId: data.draftId,
-    content: data.content,
+  const data = await handle<{ success: boolean; job: GenerationJob }>(res);
+  return data.job;
+}
+
+export async function getGenerationJob(topicId: number): Promise<GenerationJob | null> {
+  const res = await fetch(
+    `${API_BASE_URL}/api/campaigns/topics/${topicId}/generation-job`,
+    { headers: authHeaders() }
+  );
+  const data = await handle<{ success: boolean; job: GenerationJob | null }>(res);
+  return data.job;
+}
+
+/**
+ * Subscribe to generation status updates over SSE. The token is passed via
+ * query string because EventSource cannot set headers.
+ *
+ * Returns a teardown function that closes the connection.
+ */
+export type GenerationUpdateHandler = (job: GenerationJob) => void;
+
+export function subscribeGenerationUpdates(
+  onUpdate: GenerationUpdateHandler,
+  onError?: (err: unknown) => void
+): () => void {
+  const token = localStorage.getItem('authToken') ?? '';
+  if (!token) {
+    onError?.(new Error('Missing auth token'));
+    return () => undefined;
+  }
+
+  const url = `${API_BASE_URL}/api/campaigns/events?token=${encodeURIComponent(token)}`;
+  const es = new EventSource(url);
+
+  es.onmessage = (ev) => {
+    try {
+      const parsed = JSON.parse(ev.data);
+      if (parsed?.type !== 'generation:update') return;
+      const { type: _drop, ...job } = parsed as { type: string } & GenerationJob;
+      onUpdate(job);
+    } catch (err) {
+      onError?.(err);
+    }
+  };
+
+  es.onerror = (err) => {
+    onError?.(err);
+  };
+
+  return () => {
+    try {
+      es.close();
+    } catch {
+      /* noop */
+    }
   };
 }
 
-/* ---------- Status helper ---------- */
+/* ---------- Row state resolver ---------- */
+//
+// Single source of truth for what a worksheet row should render. The UI
+// switches on `kind`; no other branching is allowed in the row markup.
 
-export type WorksheetStatus =
-  | 'Not Started'
-  | 'In Progress'
-  | 'Ready'
-  | 'Generating'
-  | 'Published'
-  | 'Failed';
+export type RowState =
+  | { kind: 'not-started' }
+  | { kind: 'in-progress' }
+  | { kind: 'ready' }
+  | { kind: 'generating'; percent: number; phase: string | null }
+  | { kind: 'completed'; percent: 100; draftId: number }
+  | { kind: 'failed'; percent: number; error: string }
+  | { kind: 'published'; draftId: number; liveUrl: string | null };
 
-export function deriveWorksheetStatus(topic: WorksheetTopic): WorksheetStatus {
-  const ps = topic.publishStatus?.toLowerCase();
-  if (ps === 'generating' || ps === 'pending') return 'Generating';
-  if (ps === 'published') return 'Published';
-  if (ps === 'failed') return 'Failed';
+const isJobActive = (job: GenerationJob | null): boolean =>
+  !!job && (job.status === 'pending' || job.status === 'generating');
 
-  const hasTopic = Boolean(topic.title.trim());
+export function resolveRowState(topic: WorksheetTopic): RowState {
+  const job = topic.job;
+
+  // Live job wins — overrides any stale data inferred from the topic.
+  if (isJobActive(job)) {
+    return {
+      kind: 'generating',
+      percent: Math.max(5, Math.min(95, job!.progress)),
+      phase: job!.phase,
+    };
+  }
+
+  // Last attempt failed and there's no draft yet — surface the error.
+  if (job?.status === 'failed' && !topic.draftId) {
+    return {
+      kind: 'failed',
+      percent: Math.max(0, Math.min(95, job.progress)),
+      error: job.error || 'Generation failed.',
+    };
+  }
+
+  // Published trumps "completed" — content went live.
+  if (topic.publishStatus?.toLowerCase() === 'published' && topic.draftId) {
+    return { kind: 'published', draftId: topic.draftId, liveUrl: topic.liveUrl };
+  }
+
+  // Draft on disk — ready to review/publish.
+  if (topic.draftId) {
+    return { kind: 'completed', percent: 100, draftId: topic.draftId };
+  }
+
+  // Nothing generated yet — derive from data shape.
+  const hasTitle = Boolean(topic.title.trim());
   const hasKeywords = topic.keywords.length > 0;
   const hasPrimary = topic.keywords.some((k) => k.isPrimary);
 
-  if (hasTopic && hasPrimary) return 'Ready';
-  if (hasTopic || hasKeywords) return 'In Progress';
-  return 'Not Started';
+  if (hasTitle && hasPrimary) return { kind: 'ready' };
+  if (hasTitle || hasKeywords) return { kind: 'in-progress' };
+  return { kind: 'not-started' };
 }

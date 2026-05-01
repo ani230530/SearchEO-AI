@@ -462,15 +462,26 @@ model GenerationJob {
   topicId   Int
   userId    Int
   status    String   @default("pending") // pending | generating | completed | failed
+  /// 0..100. Honest server-driven progress. While n8n is sync, advanced by
+  /// a heartbeat timer; capped at 90 until the n8n response arrives.
+  progress  Int      @default(0)
+  /// Optional human-readable phase label (preparing / generating / persisting).
+  phase     String?
+  /// Failure reason. Only set when status = 'failed'.
+  error     String?
+  /// Resulting WordpressPublishLog id when status = 'completed'.
+  draftId   Int?
   startedAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   topic     CampaignTopic @relation(fields: [topicId], references: [id])
   user      User          @relation(fields: [userId], references: [id])
+  /// @deprecated Retained for legacy job rows; new jobs do not write here.
   pages     GenerationJobPage[]
 
   @@index([topicId])
   @@index([userId])
+  @@index([userId, status])
 }
 
 /// @deprecated Frozen archive — replaced by direct status fields on GenerationJob in the flat topic model.

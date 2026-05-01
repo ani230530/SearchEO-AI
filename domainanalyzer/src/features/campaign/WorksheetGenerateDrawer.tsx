@@ -4,7 +4,7 @@ import {
   WorksheetTopic,
   TemplateType,
   GenerateTopicPayload,
-  GenerateTopicResult,
+  GenerationJob,
   generateTopic,
 } from './api';
 
@@ -18,11 +18,14 @@ type FieldDef = {
   required?: boolean;
 };
 
+/**
+ * Worksheet's blog template uses the row's title as the n8n `topic` field —
+ * never asked from the user, never editable in the drawer. Backend also
+ * defensively re-injects topic.title if missing.
+ */
 const TEMPLATE_FIELDS: Record<TemplateType, { required: FieldDef[]; optional: FieldDef[] }> = {
   blog: {
-    required: [
-      { key: 'topic', label: 'Topic', type: 'text', required: true, placeholder: 'e.g. How AI is changing SEO in 2026' },
-    ],
+    required: [],
     optional: [
       { key: 'blog_angle', label: 'Blog angle', type: 'text', placeholder: 'How-to / Listicle / Opinion / ...' },
       { key: 'user_outline', label: 'Outline', type: 'textarea' },
@@ -211,7 +214,9 @@ export interface WorksheetGenerateDrawerProps {
   topic: WorksheetTopic | null;
   open: boolean;
   onClose: () => void;
-  onSuccess: (result: GenerateTopicResult) => void;
+  /** Fired with the initial job snapshot returned by the async route.
+   *  The caller is responsible for SSE follow-up. */
+  onSuccess: (job: GenerationJob) => void;
 }
 
 export default function WorksheetGenerateDrawer({
@@ -238,18 +243,6 @@ export default function WorksheetGenerateDrawer({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Pre-fill `topic` template field with the worksheet topic title for blog template,
-  // since that's what the spec requires and matches user expectation.
-  useEffect(() => {
-    if (!open || !topic) return;
-    setTemplateFields((prev) => {
-      if (templateType === 'blog' && !prev.topic) {
-        return { ...prev, topic: topic.title };
-      }
-      return prev;
-    });
-  }, [open, topic, templateType]);
-
   // Reset error when re-opened
   useEffect(() => {
     if (open) setError(null);
@@ -269,13 +262,9 @@ export default function WorksheetGenerateDrawer({
 
   const handleTemplateChange = (next: TemplateType) => {
     setTemplateType(next);
-    // Reset per-template fields but keep `topic` if switching back to blog
-    setTemplateFields((prev) => {
-      if (next === 'blog' && topic) {
-        return { topic: prev.topic || topic.title };
-      }
-      return {};
-    });
+    // Reset per-template fields when switching templates. Blog's `topic`
+    // field is server-injected from topic.title, so nothing to seed here.
+    setTemplateFields({});
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -394,17 +383,20 @@ export default function WorksheetGenerateDrawer({
             </div>
           </Section>
 
-          {/* Template-specific required fields */}
-          <Section title={`${TEMPLATE_LABELS[templateType]} details`}>
-            {fields.required.map((f) => (
-              <FieldInput
-                key={f.key}
-                def={f}
-                value={templateFields[f.key] || ''}
-                onChange={(v) => setTemplateField(f.key, v)}
-              />
-            ))}
-          </Section>
+          {/* Template-specific required fields. Blog has none in the worksheet
+              flow — its `topic` field is the row's title, server-injected. */}
+          {fields.required.length > 0 && (
+            <Section title={`${TEMPLATE_LABELS[templateType]} details`}>
+              {fields.required.map((f) => (
+                <FieldInput
+                  key={f.key}
+                  def={f}
+                  value={templateFields[f.key] || ''}
+                  onChange={(v) => setTemplateField(f.key, v)}
+                />
+              ))}
+            </Section>
+          )}
 
           {/* Project basics */}
           <Section title="Project basics">

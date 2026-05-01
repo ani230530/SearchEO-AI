@@ -12,7 +12,6 @@
  */
 
 import { Router, Request, Response } from 'express';
-import axios from 'axios';
 import { Prisma, PrismaClient, CampaignNodeSource } from '../../generated/prisma';
 import { authenticateToken, AuthenticatedRequest } from '../middleware/auth';
 import {
@@ -27,15 +26,14 @@ import {
   removeSSEClient,
   SSEClient,
 } from '../services/sseService';
+import { TemplateType } from '../services/universalGenerationService';
 import {
-  buildUniversalPayload,
-  isTemplateType,
-  TemplateType,
-  UniversalPayloadValidationError,
-} from '../services/universalGenerationService';
-import { normalizePublishGenerateResponse } from '../services/contentFlowService';
-import { decryptToken } from '../services/tokenEncryption';
-import { normalizeKeyword as normalizeKw } from '../utils/payloadNormalization';
+  startGenerationJob,
+  getJobForTopic,
+  GenerationJobConflictError,
+  GenerationJobValidationError,
+  SerializedGenerationJob,
+} from '../services/generationJobService';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -91,6 +89,9 @@ interface SerializedTopic {
   publishStatus: string | null;
   liveUrl: string | null;
   draftId: number | null;
+  /** Latest GenerationJob snapshot for this topic, if any. Hydrates the
+   *  worksheet row's progress UI on page load and after reconnects. */
+  job: SerializedGenerationJob | null;
 }
 
 const serializeKeyword = (kw: TopicWithRelations['keywords'][number]): SerializedKeyword => ({
@@ -102,7 +103,10 @@ const serializeKeyword = (kw: TopicWithRelations['keywords'][number]): Serialize
   aiMetadata: (kw.aiMetadata as Record<string, any>) ?? null,
 });
 
-const serializeTopic = (topic: TopicWithRelations): SerializedTopic => {
+const serializeTopic = (
+  topic: TopicWithRelations,
+  jobByTopic: Map<number, SerializedGenerationJob>
+): SerializedTopic => {
   const keywords = topic.keywords
     .slice()
     .sort((a, b) => a.id - b.id)
@@ -120,15 +124,34 @@ const serializeTopic = (topic: TopicWithRelations): SerializedTopic => {
     liveUrl:
       topic.latestDraft?.status === 'published' ? topic.latestDraft?.wordpressUrl || null : null,
     draftId: topic.latestDraft?.id ?? null,
+    job: jobByTopic.get(topic.id) ?? null,
   };
 };
 
-const serializeStructure = (campaign: CampaignWithStructure) => ({
+const serializeStructure = (
+  campaign: CampaignWithStructure,
+  jobByTopic: Map<number, SerializedGenerationJob>
+) => ({
   topics: campaign.topics
     .slice()
     .sort((a, b) => a.order - b.order)
-    .map(serializeTopic),
+    .map((t) => serializeTopic(t, jobByTopic)),
 });
+
+const loadJobsForCampaign = async (
+  campaign: CampaignWithStructure
+): Promise<Map<number, SerializedGenerationJob>> => {
+  const topicIds = campaign.topics.map((t) => t.id);
+  const map = new Map<number, SerializedGenerationJob>();
+  if (!topicIds.length) return map;
+  await Promise.all(
+    topicIds.map(async (topicId) => {
+      const job = await getJobForTopic(topicId);
+      if (job) map.set(topicId, job);
+    })
+  );
+  return map;
+};
 
 const fetchCampaignStructure = async (campaignId: number, userId: number) =>
   prisma.campaign.findFirst({
@@ -156,9 +179,10 @@ const respondWithStructure = async (
   if (!campaign) {
     return res.status(404).json({ success: false, error: 'Campaign not found' });
   }
+  const jobs = await loadJobsForCampaign(campaign);
   return res.status(status).json({
     success: true,
-    structure: serializeStructure(campaign),
+    structure: serializeStructure(campaign, jobs),
   });
 };
 
@@ -1160,56 +1184,14 @@ router.delete(
 );
 
 /* ----------------------------------------------------------------------------
- * Generate — universal n8n template flow.
+ * Generate — async universal n8n template flow.
  *
- * Sync mode: server posts to N8N_UNIVERSAL_WEBHOOK_URL, awaits the
- * response, persists a WordpressPublishLog draft, and links it to the
- * topic via latestDraftId / generationTopicId. Client gets the generated
- * content back in a single response.
+ * The route validates the request, creates a GenerationJob row, kicks off
+ * the runner in the background, and returns 202 immediately. Progress and
+ * the final result stream back over the SSE channel
+ * (/api/campaigns/events) as `generation:update` events. The job's latest
+ * snapshot is also retrievable via GET /topics/:topicId/generation-job.
  * --------------------------------------------------------------------------*/
-
-const N8N_UNIVERSAL_WEBHOOK_URL =
-  process.env.N8N_UNIVERSAL_WEBHOOK_URL ||
-  'https://n8n.srv891599.hstgr.cloud/webhook/universal%20workflow';
-const N8N_API_KEY = process.env.N8N_API_KEY || '1234';
-const N8N_API_KEY_HEADER = process.env.N8N_API_KEY_HEADER || 'key';
-const N8N_TIMEOUT_MS = Number(process.env.N8N_TIMEOUT_MS) || 300000;
-
-const summarizeContext = (input?: string | null, maxLines = 6, maxChars = 1000) => {
-  if (!input) return '';
-  const normalized = input.replace(/\r\n/g, '\n');
-  const lines = normalized
-    .split('\n')
-    .map((l) => l.trim())
-    .filter(Boolean);
-  const limited = lines.slice(0, maxLines).join('\n');
-  if (limited.length <= maxChars) return limited;
-  return `${limited.slice(0, maxChars)}…`;
-};
-
-const sanitizeDomainHost = (url: string) =>
-  url
-    .replace(/^https?:\/\//i, '')
-    .replace(/^www\./i, '')
-    .split('/')[0];
-
-const callUniversalWebhook = async (payload: Record<string, unknown>) => {
-  if (process.env.NODE_ENV !== 'production') {
-    const masked = { ...payload, Password: payload.Password ? '***' : undefined };
-    console.log('[n8n universal request]', { url: N8N_UNIVERSAL_WEBHOOK_URL, payload: masked });
-  }
-  const response = await axios.post(N8N_UNIVERSAL_WEBHOOK_URL, payload, {
-    headers: {
-      'Content-Type': 'application/json',
-      [N8N_API_KEY_HEADER]: N8N_API_KEY,
-    },
-    timeout: N8N_TIMEOUT_MS,
-  });
-  if (process.env.NODE_ENV !== 'production') {
-    console.log('[n8n universal response]', { status: response.status });
-  }
-  return response.data;
-};
 
 router.post(
   '/topics/:topicId/generate',
@@ -1222,161 +1204,70 @@ router.post(
       return res.status(400).json({ success: false, error: 'Invalid topic ID' });
     }
 
-    const body = (req.body || {}) as Record<string, unknown>;
-    const templateType = body.template_type as TemplateType;
-    if (!isTemplateType(templateType)) {
-      return res.status(400).json({
-        success: false,
-        error: 'template_type is required and must be one of blog, faq, case_study, press_release, landing_page, report, custom',
-      });
-    }
-
-    // Topic + ownership + keywords + campaign + domain in one query.
+    // Cheap ownership + readiness preflight before we let the runner do the
+    // heavy work. Saves a job row + an n8n round-trip on bad input.
     const topic = await prisma.campaignTopic.findFirst({
       where: {
         id: topicId,
         campaign: { domain: { userId, isCompanyDomain: true } },
       },
-      include: {
-        keywords: true,
-        campaign: { include: { domain: true } },
-      },
+      include: { keywords: true },
     });
+    if (!topic) {
+      return res.status(404).json({ success: false, error: 'Topic not found' });
+    }
+    const hasPrimary = topic.keywords.some((k) => (k.aiMetadata as any)?.isPrimary === true);
+    if (!hasPrimary) {
+      return res.status(400).json({
+        success: false,
+        error:
+          'Topic must have a primary keyword before it can be generated. Pick one from the worksheet.',
+      });
+    }
 
+    const body = (req.body || {}) as Record<string, unknown>;
+    try {
+      const job = await startGenerationJob({
+        topicId,
+        userId,
+        templateType: body.template_type as TemplateType,
+        body,
+      });
+      return res.status(202).json({ success: true, job });
+    } catch (err) {
+      if (err instanceof GenerationJobConflictError) {
+        return res.status(409).json({ success: false, error: err.message });
+      }
+      if (err instanceof GenerationJobValidationError) {
+        return res.status(400).json({
+          success: false,
+          error: err.message,
+          details: err.details,
+        });
+      }
+      throw err;
+    }
+  })
+);
+
+router.get(
+  '/topics/:topicId/generation-job',
+  authenticateToken,
+  asyncHandler(async (req: Request, res: Response) => {
+    const userId = (req as AuthenticatedRequest).user.userId;
+    const topicId = parseInt(req.params.topicId, 10);
+
+    if (isNaN(topicId)) {
+      return res.status(400).json({ success: false, error: 'Invalid topic ID' });
+    }
+
+    const topic = await ensureTopicOwnership(topicId, userId);
     if (!topic) {
       return res.status(404).json({ success: false, error: 'Topic not found' });
     }
 
-    const primary = topic.keywords.find(
-      (k) => (k.aiMetadata as any)?.isPrimary === true
-    );
-    if (!primary) {
-      return res.status(400).json({
-        success: false,
-        error: 'Topic must have a primary keyword before it can be generated. Pick one from the worksheet.',
-      });
-    }
-
-    const longtails = topic.keywords
-      .filter((k) => (k.aiMetadata as any)?.isLongtail === true)
-      .map((k) => k.term);
-
-    const integration = await prisma.wordpressIntegration.findUnique({
-      where: { userId },
-    });
-    if (!integration) {
-      return res.status(400).json({
-        success: false,
-        error: 'WordPress integration not configured. Connect WordPress to generate content.',
-      });
-    }
-
-    let decryptedPassword: string;
-    try {
-      decryptedPassword = decryptToken(integration.password);
-    } catch (err) {
-      console.error('Failed to decrypt WordPress password', err);
-      return res.status(400).json({
-        success: false,
-        error: 'WordPress integration password cannot be decrypted. Reconfigure WordPress in settings.',
-      });
-    }
-
-    const brandName = sanitizeDomainHost(topic.campaign.domain.url) || 'Brand';
-    const brandDescription = summarizeContext(topic.campaign.domain.context);
-
-    let payload: Record<string, unknown>;
-    try {
-      payload = buildUniversalPayload({
-        templateType,
-        projectName: topic.campaign.title,
-        projectGoal: String(body.project_goal ?? ''),
-        primaryKeyword: primary.term,
-        longtailKeywords: longtails,
-        brandName,
-        brandDescription,
-        targetAudience: String(body.target_audience ?? ''),
-        customAudienceText: body.custom_audience_text as string | undefined,
-        tone: String(body.tone ?? ''),
-        customToneText: body.custom_tone_text as string | undefined,
-        wordCount: Number(body.word_count ?? 800),
-        language: body.language as string | undefined,
-        cta: body.cta as string | undefined,
-        images: body.images !== undefined ? Number(body.images) : undefined,
-        featuredImage:
-          body.featured_image === undefined
-            ? undefined
-            : body.featured_image === true ||
-              body.featured_image === 'yes' ||
-              body.featured_image === 1,
-        wordpress: {
-          username: integration.username,
-          password: decryptedPassword,
-          url: integration.siteUrl,
-        },
-        templateFields: (body.template_fields as Record<string, unknown>) || {},
-      });
-    } catch (err) {
-      if (err instanceof UniversalPayloadValidationError) {
-        return res.status(400).json({ success: false, error: err.message, details: err.details });
-      }
-      throw err;
-    }
-
-    let webhookResponse: unknown;
-    try {
-      webhookResponse = await callUniversalWebhook(payload);
-    } catch (err: any) {
-      console.error('Universal webhook error', err?.response?.data || err);
-      return res.status(502).json({
-        success: false,
-        error: 'Generation service unavailable',
-        details: err?.response?.data,
-      });
-    }
-
-    const content = normalizePublishGenerateResponse(webhookResponse, integration);
-
-    if (!content.htmlContent) {
-      return res.status(502).json({
-        success: false,
-        error: 'Generation service did not return HTML content',
-      });
-    }
-
-    // Persist as a WordpressPublishLog row, link to topic.
-    const draft = await prisma.$transaction(async (tx) => {
-      const created = await tx.wordpressPublishLog.create({
-        data: {
-          userId,
-          wordpressUrl: content.wordpressUrl || integration.siteUrl,
-          primaryKeyword: content.primaryKeyword || primary.term,
-          normalizedPrimaryKeyword: normalizeKw(content.primaryKeyword || primary.term),
-          title: content.title || topic.title,
-          slug: content.slug || null,
-          status: content.status || 'draft',
-          response: webhookResponse as any,
-          generationTopicId: topicId,
-          integrationId: integration.id,
-          wordpressPostId: content.wordpressPostId ?? null,
-        },
-      });
-
-      await tx.campaignTopic.update({
-        where: { id: topicId },
-        data: { latestDraftId: created.id },
-      });
-
-      return created;
-    });
-
-    const fresh = await fetchCampaignStructure(topic.campaignId, userId);
-    return res.status(201).json({
-      success: true,
-      structure: fresh ? serializeStructure(fresh) : { topics: [] },
-      draftId: draft.id,
-      content,
-    });
+    const job = await getJobForTopic(topicId);
+    return res.json({ success: true, job });
   })
 );
 

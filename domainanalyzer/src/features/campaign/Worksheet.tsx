@@ -20,8 +20,8 @@ import {
 } from 'lucide-react';
 import {
   WorksheetTopic,
-  WorksheetStatus,
   WorksheetKeyword,
+  GenerationJob,
   fetchCampaignTopics,
   createTopic,
   aiSuggestTopic,
@@ -33,48 +33,17 @@ import {
   selectPrimaryKeyword,
   selectLongtailKeyword,
   deleteKeyword,
-  deriveWorksheetStatus,
+  resolveRowState,
+  subscribeGenerationUpdates,
 } from './api';
 import WorksheetGenerateDrawer from './WorksheetGenerateDrawer';
+import { RowStatus, RowAction } from './WorksheetRowState';
 
 type WorksheetColumnKey = 'topic' | 'keywords' | 'status' | 'action' | 'more';
 
 interface WorksheetProps {
   campaignId: number;
 }
-
-const STATUS_STYLES: Record<WorksheetStatus, { label: string; icon: React.ReactNode; className: string }> = {
-  'Not Started': {
-    label: 'Not Started',
-    icon: <AlertCircle className="h-4 w-4" />,
-    className: 'text-[#636f83]',
-  },
-  'In Progress': {
-    label: 'In Progress',
-    icon: <Loader2 className="h-4 w-4" />,
-    className: 'text-[#a87b21]',
-  },
-  Ready: {
-    label: 'Ready',
-    icon: <CheckCircle2 className="h-4 w-4" />,
-    className: 'text-[#2a7c4d]',
-  },
-  Generating: {
-    label: 'Generating',
-    icon: <Loader2 className="h-4 w-4 animate-spin" />,
-    className: 'text-[#3c5e99]',
-  },
-  Published: {
-    label: 'Published',
-    icon: <CheckCircle2 className="h-4 w-4" />,
-    className: 'text-[#2a7c4d]',
-  },
-  Failed: {
-    label: 'Failed',
-    icon: <AlertCircle className="h-4 w-4" />,
-    className: 'text-[#c14545]',
-  },
-};
 
 export default function Worksheet({ campaignId }: WorksheetProps) {
   const [topics, setTopics] = useState<WorksheetTopic[]>([]);
@@ -136,6 +105,41 @@ export default function Worksheet({ campaignId }: WorksheetProps) {
 
   useEffect(() => {
     reload();
+  }, [reload]);
+
+  /* ---------- SSE: live job updates ---------- */
+
+  // Merge an incoming job update into the right topic. We refetch the full
+  // structure once on completion to pick up the new draftId and refreshed
+  // publishStatus that aren't part of the SSE event payload.
+  useEffect(() => {
+    let alive = true;
+
+    const applyJob = (job: GenerationJob) => {
+      if (!alive) return;
+      setTopics((prev) =>
+        prev.map((t) => (t.id === job.topicId ? { ...t, job } : t))
+      );
+      // Terminal states need a structure refetch so the row reflects the
+      // newly persisted draft (latestDraft / publishStatus / draftId).
+      if (job.status === 'completed' || job.status === 'failed') {
+        reload();
+      }
+    };
+
+    const teardown = subscribeGenerationUpdates(
+      applyJob,
+      (err) => {
+        if (process.env.NODE_ENV !== 'production') {
+          console.warn('[worksheet] SSE error', err);
+        }
+      }
+    );
+
+    return () => {
+      alive = false;
+      teardown();
+    };
   }, [reload]);
 
   /* ---------- Filtering ---------- */
@@ -317,7 +321,7 @@ export default function Worksheet({ campaignId }: WorksheetProps) {
       keywords: t.keywords.map((k) => k.term),
       primary: t.keywords.find((k) => k.isPrimary)?.term ?? null,
       longtails: t.keywords.filter((k) => k.isLongtail).map((k) => k.term),
-      status: deriveWorksheetStatus(t),
+      status: resolveRowState(t).kind,
     }));
 
     const blob = new Blob([JSON.stringify({ rows: payload }, null, 2)], {
@@ -482,10 +486,8 @@ export default function Worksheet({ campaignId }: WorksheetProps) {
                   </tr>
                 )}
                 {filteredTopics.map((topic, idx) => {
-                  const status = deriveWorksheetStatus(topic);
-                  const statusConfig = STATUS_STYLES[status];
+                  const rowState = resolveRowState(topic);
                   const isBusy = busyTopicId === topic.id;
-                  const canGenerate = status === 'Ready';
 
                   return (
                     <tr
@@ -585,29 +587,23 @@ export default function Worksheet({ campaignId }: WorksheetProps) {
                       )}
 
                       {columnVisibility.status && (
-                        <td className="border-r border-[#c8cfdb] px-4 align-middle text-center">
-                          <div className={`inline-flex items-center gap-2 text-xs ${statusConfig.className}`}>
-                            {statusConfig.icon}
-                            {statusConfig.label}
-                          </div>
+                        <td className="border-r border-[#c8cfdb] px-4 py-3 align-middle">
+                          <RowStatus state={rowState} />
                         </td>
                       )}
 
                       {columnVisibility.action && (
                         <td className="border-r border-[#c8cfdb] px-4 align-middle text-center">
-                          <button
-                            type="button"
-                            disabled={!canGenerate}
-                            onClick={() => setTopicForGenerate(topic)}
-                            className="h-9 px-5 inline-flex items-center gap-2 rounded-xl border border-[#4E76C7] text-sm font-medium bg-[#f4f8ff] hover:bg-[#eaf1ff] disabled:opacity-50 disabled:cursor-not-allowed"
-                            title={
-                              !canGenerate
-                                ? 'Add a topic and mark a primary keyword to enable generate'
-                                : 'Generate content for this topic'
-                            }
-                          >
-                            <span className="text-blue-800 font-medium">Generate</span>
-                          </button>
+                          <RowAction
+                            state={rowState}
+                            handlers={{
+                              onGenerate: () => setTopicForGenerate(topic),
+                              onRetry: () => setTopicForGenerate(topic),
+                              onOpenDraft: () => {
+                                setNotice('Draft viewer wiring is on the way.');
+                              },
+                            }}
+                          />
                         </td>
                       )}
 
@@ -768,9 +764,13 @@ export default function Worksheet({ campaignId }: WorksheetProps) {
         topic={topicForGenerate}
         open={topicForGenerate !== null}
         onClose={() => setTopicForGenerate(null)}
-        onSuccess={(result) => {
-          setTopics(result.topics);
-          setNotice(`Draft ready: ${result.content.title || 'Untitled'}.`);
+        onSuccess={(job) => {
+          // The job is now in flight on the server. Optimistically merge the
+          // initial snapshot into the topic; SSE updates take over from here.
+          setTopics((prev) =>
+            prev.map((t) => (t.id === job.topicId ? { ...t, job } : t))
+          );
+          setNotice('Generation started. Status updates will appear inline.');
           setTopicForGenerate(null);
         }}
       />
