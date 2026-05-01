@@ -5,14 +5,16 @@ import type { WordpressIntegration } from '@/types/publish';
 import type { KeywordTableItem } from '@/types';
 
 /**
- * Fullscreen overlay that hosts the legacy PublishExperience in its
+ * Content-area overlay that hosts the legacy PublishExperience in its
  * `disablePreviewOverlay` (embedded) mode. Rendering it as an overlay —
  * rather than navigating to the Publish tab — keeps the user in the
  * worksheet context and preserves every preview/edit/publish feature
  * that already exists on the page.
  *
- * The overlay sits at the dashboard level (where the publish-tracking
- * state already lives) so PublishExperience gets its full prop surface.
+ * Positioning is `absolute inset-0`, so it covers the *content area* it
+ * is mounted inside. The dashboard's sidebar stays visible because the
+ * overlay sits inside `<main>` (which is offset by the sidebar width).
+ * The parent must be `position: relative` for this to work.
  */
 export interface WorksheetDraftOverlayProps {
   draftId: number | null;
@@ -65,7 +67,7 @@ export default function WorksheetDraftOverlay({
   if (!open || draftId === null) return null;
 
   return (
-    <div className="fixed inset-0 z-[60] bg-white">
+    <div className="absolute inset-0 z-40 overflow-y-auto bg-white">
       {/* Floating close button — PublishExperience's embedded header has its
           own back chevron, but we mount this here too so the overlay always
           has a visible close affordance regardless of inner state. */}
@@ -73,7 +75,7 @@ export default function WorksheetDraftOverlay({
         type="button"
         onClick={onClose}
         aria-label="Close draft preview"
-        className="absolute top-4 right-4 z-[61] inline-flex h-9 w-9 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-500 shadow-sm hover:bg-gray-50 hover:text-gray-700"
+        className="absolute top-4 right-4 z-[1] inline-flex h-9 w-9 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-500 shadow-sm hover:bg-gray-50 hover:text-gray-700"
       >
         <X className="h-5 w-5" />
       </button>
