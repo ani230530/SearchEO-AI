@@ -11,15 +11,20 @@ import type { KeywordTableItem } from '@/types';
  * worksheet context and preserves every preview/edit/publish feature
  * that already exists on the page.
  *
- * Positioning is `absolute inset-0`, so it covers the *content area* it
- * is mounted inside. The dashboard's sidebar stays visible because the
- * overlay sits inside `<main>` (which is offset by the sidebar width).
- * The parent must be `position: relative` for this to work.
+ * Positioning is `position: fixed` with a sidebar-width left offset so
+ * the overlay always covers exactly the working area at viewport size,
+ * regardless of how tall the underlying page content (worksheet rows)
+ * is. The sidebar offset mirrors `.main-content`'s margin-left, so the
+ * overlay edges align with `<main>` and the same 0.3s ease transition
+ * runs when the sidebar collapses.
  */
 export interface WorksheetDraftOverlayProps {
   draftId: number | null;
   open: boolean;
   onClose: () => void;
+  /** Mirrors the dashboard's `isSidebarExpanded` state so the overlay's
+   *  left offset matches `<main>`'s margin-left. */
+  sidebarExpanded?: boolean;
 
   // Pass-through props PublishExperience needs to render correctly. These
   // mirror what the Publish tab already supplies; we just forward them.
@@ -62,12 +67,20 @@ export default function WorksheetDraftOverlay({
   draftId,
   open,
   onClose,
+  sidebarExpanded = true,
   ...publishProps
 }: WorksheetDraftOverlayProps) {
   if (!open || draftId === null) return null;
 
+  // Match `.main-content`'s margin-left rule: 280px when the sidebar is
+  // expanded, 78px when collapsed. Same 0.3s ease transition.
+  const leftOffset = sidebarExpanded ? 280 : 78;
+
   return (
-    <div className="absolute inset-0 z-40 overflow-y-auto bg-white">
+    <div
+      className="fixed top-0 right-0 bottom-0 z-40 bg-white"
+      style={{ left: `${leftOffset}px`, transition: 'left 0.3s ease' }}
+    >
       {/* Floating close button — PublishExperience's embedded header has its
           own back chevron, but we mount this here too so the overlay always
           has a visible close affordance regardless of inner state. */}

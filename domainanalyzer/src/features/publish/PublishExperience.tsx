@@ -2986,9 +2986,11 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
       {showPreviewStage && (
         disablePreviewOverlay ? (
           // Render preview content directly without overlay wrapper (for embedded use)
-          // Parent overlay already provides fixed inset-0, so we just fill it
-          <div className="absolute inset-0 overflow-y-auto bg-white">
-          <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-xl border-b border-gray-100 shadow-sm">
+          // Parent overlay provides absolute inset-0 — we just fill it with a
+          // flex column. Heights are flex-driven so the embedded preview
+          // adapts to any container size (viewport, modal, content area).
+          <div className="absolute inset-0 flex flex-col bg-white">
+          <div className="z-20 bg-white/95 backdrop-blur-xl border-b border-gray-100 shadow-sm shrink-0">
             <div className="min-w-7xl mx-2 px-6 py-4">
               <div className="flex items-center justify-between gap-4">
                 <div className="flex items-center gap-3 min-w-0">
@@ -3103,7 +3105,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
             </div>
           </div>
 
-          <div className="flex overflow-hidden" style={{ height: 'calc(100vh - 80px)' }}>
+          <div className="flex flex-1 min-h-0 overflow-hidden">
             {/* Left Sidebar - Article Stats */}
             {publishResult && (
               <div className="w-80 border-r border-gray-200 bg-gray-50/50 overflow-y-auto">

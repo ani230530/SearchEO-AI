@@ -3056,35 +3056,35 @@ useEffect(() => {
           </div>
         )}
         </div>
-
-        {/* Worksheet draft preview — content-area overlay hosting the legacy
-            PublishExperience in embedded mode. Mounts inside <main> (which
-            is `position: relative`) so it covers the working area only, not
-            the sidebar. The dashboard owns the state because the publish-
-            tracking deps already wired here can be reused without prop-
-            drilling through the worksheet. */}
-        <WorksheetDraftOverlay
-          draftId={draftOverlayId}
-          open={draftOverlayId !== null}
-          onClose={handleCloseDraftOverlay}
-          companyDomain={companyDomain}
-          domainContext={domainContext}
-          keywordsTableData={keywordsTableData}
-          hasWordpressIntegration={hasWordpressIntegration}
-          wpIntegration={wpIntegration}
-          onConfigureWordpress={handleConfigureWordpress}
-          onRefreshWordpressIntegration={async () => {
-            await fetchWordpressIntegration();
-          }}
-          publishingPageIds={publishingPageIds}
-          setPublishingPageIds={setPublishingPageIds}
-          draftToPageMap={draftToPageMap}
-          setDraftToPageMap={setDraftToPageMap}
-          draftStatuses={draftStatuses}
-          setDraftStatuses={setDraftStatuses}
-          sharedPublishStatuses={sharedPublishStatuses}
-        />
       </main>
+
+      {/* Worksheet draft preview — viewport-pinned overlay hosting the legacy
+          PublishExperience in embedded mode. Uses `position: fixed` with a
+          sidebar-width left offset so it covers the working area at exactly
+          viewport height, regardless of how tall the underlying worksheet
+          page content is. */}
+      <WorksheetDraftOverlay
+        draftId={draftOverlayId}
+        open={draftOverlayId !== null}
+        onClose={handleCloseDraftOverlay}
+        sidebarExpanded={isSidebarExpanded}
+        companyDomain={companyDomain}
+        domainContext={domainContext}
+        keywordsTableData={keywordsTableData}
+        hasWordpressIntegration={hasWordpressIntegration}
+        wpIntegration={wpIntegration}
+        onConfigureWordpress={handleConfigureWordpress}
+        onRefreshWordpressIntegration={async () => {
+          await fetchWordpressIntegration();
+        }}
+        publishingPageIds={publishingPageIds}
+        setPublishingPageIds={setPublishingPageIds}
+        draftToPageMap={draftToPageMap}
+        setDraftToPageMap={setDraftToPageMap}
+        draftStatuses={draftStatuses}
+        setDraftStatuses={setDraftStatuses}
+        sharedPublishStatuses={sharedPublishStatuses}
+      />
     </div>
   );
 };
