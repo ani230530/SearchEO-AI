@@ -536,10 +536,14 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
   }, [publishResult?.featuredImageUrl]);
 
   const filteredPublishKeywords = useMemo(() => {
+    // Defensive: keywordsTableData is an optional prop. Not every caller
+    // (e.g. an embedded preview overlay) wires it through. Always return
+    // an array so downstream useMemo spreads stay safe.
+    const source = Array.isArray(keywordsTableData) ? keywordsTableData : [];
     if (!publishKeywordQuery) {
-      return keywordsTableData;
+      return source;
     }
-    return keywordsTableData.filter((keyword) =>
+    return source.filter((keyword) =>
       keyword.keyword.toLowerCase().includes(publishKeywordQuery.toLowerCase())
     );
   }, [keywordsTableData, publishKeywordQuery]);

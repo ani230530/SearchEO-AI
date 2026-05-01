@@ -3067,6 +3067,7 @@ useEffect(() => {
         onClose={handleCloseDraftOverlay}
         companyDomain={companyDomain}
         domainContext={domainContext}
+        keywordsTableData={keywordsTableData}
         hasWordpressIntegration={hasWordpressIntegration}
         wpIntegration={wpIntegration}
         onConfigureWordpress={handleConfigureWordpress}

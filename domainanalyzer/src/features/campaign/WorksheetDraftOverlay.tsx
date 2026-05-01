@@ -2,6 +2,7 @@ import React from 'react';
 import { X } from 'lucide-react';
 import PublishExperience from '@/features/publish/PublishExperience';
 import type { WordpressIntegration } from '@/types/publish';
+import type { KeywordTableItem } from '@/types';
 
 /**
  * Fullscreen overlay that hosts the legacy PublishExperience in its
@@ -22,6 +23,7 @@ export interface WorksheetDraftOverlayProps {
   // mirror what the Publish tab already supplies; we just forward them.
   companyDomain?: string;
   domainContext?: string;
+  keywordsTableData?: KeywordTableItem[];
   hasWordpressIntegration?: boolean;
   wpIntegration?: WordpressIntegration | null;
   onConfigureWordpress?: () => void;
