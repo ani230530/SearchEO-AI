@@ -1185,6 +1185,10 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
 
     const cfg = configByState[state];
 
+    // When the draft is already live, "Re-publish" is more accurate than
+    // "Publish" — and we want a slightly stronger CTA to match the design.
+    const label = state === 'idle-republish' ? 'Re-publish to WordPress' : cfg.label;
+
     return (
       <button
         type="button"
@@ -1194,8 +1198,43 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
         className={`${base} ${cfg.tone} disabled:opacity-60 disabled:cursor-not-allowed`}
       >
         {cfg.icon}
-        <span>{cfg.label}</span>
+        <span>{label}</span>
       </button>
+    );
+  };
+
+  /**
+   * Renders the publish-button + (when live) a sibling "View Live" link.
+   * Used everywhere the publish action surface lives — embedded preview
+   * header and publish-tab footer — so both layouts stay in sync.
+   */
+  const renderPublishActions = (variant: 'compact' | 'full' = 'compact') => {
+    const button = renderPublishButton(variant);
+    if (!button) return null;
+    const liveUrl = publishResult?.wordpressUrl?.startsWith('http')
+      ? publishResult.wordpressUrl
+      : null;
+    if (!liveUrl) return button;
+
+    const liveBase =
+      variant === 'full'
+        ? 'inline-flex items-center gap-2 px-6 py-2.5 rounded-full border border-emerald-700 bg-emerald-700 text-white text-sm font-medium shadow-lg hover:bg-emerald-800 transition-colors'
+        : 'inline-flex items-center gap-2 px-4 py-2.5 rounded-md border border-emerald-700 bg-emerald-700 text-white text-sm font-medium shadow-lg hover:bg-emerald-800 transition-colors';
+
+    return (
+      <>
+        <a
+          href={liveUrl}
+          target="_blank"
+          rel="noreferrer"
+          className={liveBase}
+          title="Open the live post in a new tab"
+        >
+          <Eye className="h-4 w-4" />
+          <span>View Live</span>
+        </a>
+        {button}
+      </>
     );
   };
 
@@ -3236,7 +3275,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
                       onChange={handleDeviceImageSelect}
                       className="hidden"
                     />
-                  {renderPublishButton('compact')}
+                  {renderPublishActions('compact')}
                 </div>
               </div>
             </div>
@@ -3823,25 +3862,15 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
                       {publishLoading ? 'Generating…' : publishResult ? 'Regenerate' : 'Generate'}
                     </button>
                     
-                    {currentDraftStatus === 'published' && publishResult?.wordpressUrl ? (
-                      <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3">
+                      {currentDraftStatus === 'published' && publishResult?.wordpressUrl && (
                         <div className="flex items-center gap-1.5 px-3 py-1.5 bg-green-50 text-green-700 rounded-full border border-green-200 shadow-sm animate-in fade-in slide-in-from-right-4 duration-500">
                           <CheckCircle className="h-4 w-4" />
                           <span className="text-xs font-semibold tracking-wide uppercase">Live</span>
                         </div>
-                        <a
-                          href={publishResult.wordpressUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="px-6 py-2.5 rounded-full bg-black text-white text-sm font-medium shadow-lg hover:bg-gray-800 transition-all flex items-center gap-2"
-                        >
-                          <Eye className="h-4 w-4" />
-                          Live URL
-                        </a>
-                      </div>
-                    ) : (
-                      renderPublishButton('full')
-                    )}
+                      )}
+                      {renderPublishActions('full')}
+                    </div>
                   </div>
                 </div>
               </div>

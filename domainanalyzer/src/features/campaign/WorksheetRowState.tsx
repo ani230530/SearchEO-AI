@@ -1,5 +1,5 @@
 import React from 'react';
-import { FileText, Loader2, Send } from 'lucide-react';
+import { Eye, FileText, Loader2, Send } from 'lucide-react';
 import { RowState } from './api';
 
 /* ----------------------------------------------------------------------------
@@ -182,18 +182,38 @@ export function RowAction({
 
     case 'published':
       return (
-        <ActionPill
-          label="Publish"
-          onClick={() => handlers.onOpenDraft(state.draftId)}
-          disabled={draftSpinner}
-          icon={
-            draftSpinner ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Send className="h-4 w-4" />
-            )
-          }
-        />
+        <div className="inline-flex flex-col items-stretch gap-2">
+          <ActionPill
+            label="Draft Blog"
+            onClick={() => handlers.onOpenDraft(state.draftId)}
+            disabled={draftSpinner}
+            icon={
+              draftSpinner ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <FileText className="h-4 w-4" />
+              )
+            }
+          />
+          {state.liveUrl ? (
+            <a
+              href={state.liveUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center justify-center gap-2 rounded-xl border border-emerald-700 bg-emerald-700 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-800"
+            >
+              <Eye className="h-4 w-4" />
+              <span>View Live</span>
+            </a>
+          ) : (
+            <ActionPill
+              label="View Live"
+              disabled
+              variant="primary"
+              icon={<Eye className="h-4 w-4" />}
+            />
+          )}
+        </div>
       );
   }
 }
