@@ -145,6 +145,58 @@ async function sweepStaleJobs(topicId: number): Promise<void> {
   });
 }
 
+/**
+ * Process-wide sweeper that catches jobs the in-process runner can't reach —
+ * specifically jobs left in pending/generating after a server restart, where
+ * the in-memory heartbeat + handler are gone. Marks them failed and pushes
+ * an SSE update so any open frontend tab flips out of the stuck "Generating"
+ * row state without requiring a refresh.
+ *
+ * Started once during server boot from index.ts. The interval is short
+ * relative to the staleness threshold; a job is only swept if its updatedAt
+ * is genuinely older than STALE_JOB_THRESHOLD_MS.
+ */
+const SWEEP_INTERVAL_MS = 60 * 1000; // 1 minute
+let sweeperTimer: NodeJS.Timeout | null = null;
+
+export function startStaleJobSweeper(): () => void {
+  if (sweeperTimer) return () => undefined;
+  const tick = async () => {
+    try {
+      const cutoff = new Date(Date.now() - STALE_JOB_THRESHOLD_MS);
+      const stale = await prisma.generationJob.findMany({
+        where: {
+          status: { in: ['pending', 'generating'] },
+          updatedAt: { lt: cutoff },
+        },
+        select: { jobId: true, userId: true, progress: true, phase: true },
+      });
+      if (stale.length === 0) return;
+      const reason = 'Job timed out (server lost track of progress).';
+      for (const job of stale) {
+        const updated = await updateJob(job.jobId, {
+          status: 'failed',
+          error: reason,
+        });
+        if (updated) broadcast(job.userId, updated);
+      }
+      console.log(`[gen-sweeper] swept ${stale.length} stale job(s)`);
+    } catch (err) {
+      console.warn('[gen-sweeper] tick failed', err);
+    }
+  };
+  // Fire once on start to clean up anything left from a prior crash, then
+  // every minute thereafter.
+  void tick();
+  sweeperTimer = setInterval(tick, SWEEP_INTERVAL_MS);
+  return () => {
+    if (sweeperTimer) {
+      clearInterval(sweeperTimer);
+      sweeperTimer = null;
+    }
+  };
+}
+
 /** Returns true if there is a pending/generating (non-stale) job for this topic. */
 async function hasActiveJob(topicId: number): Promise<boolean> {
   await sweepStaleJobs(topicId);
@@ -354,13 +406,35 @@ async function runGenerationJob(jobId: string, input: RunGenerationInput): Promi
   });
   if (generating) broadcast(userId, generating);
 
+  // Heartbeat lifecycle. `terminated` is the master gate — once set, no
+  // further heartbeat tick may broadcast or write progress, so a tick that
+  // was mid-await when the n8n response arrived can't downgrade the
+  // terminal state we're about to write.
   let lastProgress = 10;
-  const heartbeat = setInterval(async () => {
+  let terminated = false;
+  let heartbeat: NodeJS.Timeout | null = null;
+  const stopHeartbeat = () => {
+    terminated = true;
+    if (heartbeat) {
+      clearInterval(heartbeat);
+      heartbeat = null;
+    }
+  };
+  heartbeat = setInterval(async () => {
+    if (terminated) return;
     const next = Math.min(HEARTBEAT_CEILING, lastProgress + HEARTBEAT_INCREMENT);
     if (next === lastProgress) return;
-    lastProgress = next;
-    const updated = await updateJob(jobId, { progress: next });
-    if (updated) broadcast(userId, updated);
+    try {
+      const updated = await updateJob(jobId, { progress: next });
+      if (terminated) return; // racing with a terminal transition — drop.
+      lastProgress = next;
+      if (updated) broadcast(userId, updated);
+    } catch (err) {
+      // A transient DB hiccup shouldn't tear down the runner. The
+      // heartbeat is best-effort; the next tick will retry. Worst case
+      // sweepStaleJobs catches a wedged job after STALE_JOB_THRESHOLD_MS.
+      console.warn('[gen] heartbeat tick failed', { jobId, err });
+    }
   }, HEARTBEAT_INTERVAL_MS);
 
   let webhookResponse: unknown;
@@ -377,7 +451,7 @@ async function runGenerationJob(jobId: string, input: RunGenerationInput): Promi
     });
     webhookResponse = response.data;
   } catch (err: any) {
-    clearInterval(heartbeat);
+    stopHeartbeat();
     const detail =
       err?.response?.data?.message ||
       err?.response?.statusText ||
@@ -389,7 +463,7 @@ async function runGenerationJob(jobId: string, input: RunGenerationInput): Promi
     return;
   }
 
-  clearInterval(heartbeat);
+  stopHeartbeat();
 
   // Persist + finalize.
   const content = normalizePublishGenerateResponse(webhookResponse, integration);

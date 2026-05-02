@@ -357,36 +357,57 @@ export async function getGenerationJob(topicId: number): Promise<GenerationJob |
  * Subscribe to generation status updates over SSE. The token is passed via
  * query string because EventSource cannot set headers.
  *
- * Returns a teardown function that closes the connection.
+ * Robustness contract:
+ *   - The browser auto-reconnects on transient drops. We detect reconnects
+ *     by counting `onopen` calls and fire `onReconnect` so the consumer
+ *     can refetch state — necessary because events that fired during the
+ *     disconnect window are lost forever.
+ *   - `onError` fires on every transient blip too; the connection itself
+ *     is still healing in the background, so don't tear anything down.
+ *   - Returns a teardown function that closes the connection cleanly.
  */
 export type GenerationUpdateHandler = (job: GenerationJob) => void;
 
-export function subscribeGenerationUpdates(
-  onUpdate: GenerationUpdateHandler,
-  onError?: (err: unknown) => void
-): () => void {
+export interface SubscribeOptions {
+  onUpdate: GenerationUpdateHandler;
+  /** Fired the second (and subsequent) time `onopen` fires — i.e. after a
+   *  reconnect. Use it to refetch the structure so any events lost during
+   *  the disconnect get reconciled. */
+  onReconnect?: () => void;
+  onError?: (err: unknown) => void;
+}
+
+export function subscribeGenerationUpdates(opts: SubscribeOptions): () => void {
   const token = localStorage.getItem('authToken') ?? '';
   if (!token) {
-    onError?.(new Error('Missing auth token'));
+    opts.onError?.(new Error('Missing auth token'));
     return () => undefined;
   }
 
   const url = `${API_BASE_URL}/api/campaigns/events?token=${encodeURIComponent(token)}`;
   const es = new EventSource(url);
+  let openCount = 0;
+
+  es.onopen = () => {
+    openCount += 1;
+    if (openCount > 1) {
+      opts.onReconnect?.();
+    }
+  };
 
   es.onmessage = (ev) => {
     try {
       const parsed = JSON.parse(ev.data);
       if (parsed?.type !== 'generation:update') return;
       const { type: _drop, ...job } = parsed as { type: string } & GenerationJob;
-      onUpdate(job);
+      opts.onUpdate(job);
     } catch (err) {
-      onError?.(err);
+      opts.onError?.(err);
     }
   };
 
   es.onerror = (err) => {
-    onError?.(err);
+    opts.onError?.(err);
   };
 
   return () => {

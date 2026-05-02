@@ -146,17 +146,58 @@ export default function Worksheet({
 
   /* ---------- SSE: live job updates ---------- */
 
-  // Merge an incoming job update into the right topic. We refetch the full
-  // structure once on completion to pick up the new draftId and refreshed
-  // publishStatus that aren't part of the SSE event payload.
+  // Merge an incoming job update into the right topic with three robustness
+  // guards:
+  //   1. Status-downgrade guard: never replace a terminal local state
+  //      (completed | failed) with a non-terminal incoming update. Heartbeat
+  //      ticks can race past terminal broadcasts; this drops them.
+  //   2. Monotonicity guard: ignore updates with an older `updatedAt` than
+  //      what we already have. Defensive against any reordering.
+  //   3. Failure toast: when a job transitions into `failed` while the user
+  //      has the worksheet open, surface it visibly — don't rely on the
+  //      user noticing a row turn red.
+  // Reconnect handling: if the EventSource silently drops + auto-reconnects,
+  // events fired during the gap are lost. On reconnect we refetch the
+  // structure (which carries the latest `job` snapshot per topic) so state
+  // converges back to truth.
   useEffect(() => {
     let alive = true;
+    const failureToastedJobs = new Set<string>();
 
     const applyJob = (job: GenerationJob) => {
       if (!alive) return;
       setTopics((prev) =>
-        prev.map((t) => (t.id === job.topicId ? { ...t, job } : t))
+        prev.map((t) => {
+          if (t.id !== job.topicId) return t;
+
+          const existing = t.job;
+          const localTerminal =
+            existing?.status === 'completed' || existing?.status === 'failed';
+          const incomingTerminal =
+            job.status === 'completed' || job.status === 'failed';
+
+          // (1) downgrade guard
+          if (localTerminal && !incomingTerminal) return t;
+
+          // (2) monotonicity guard — only relevant when comparing same job.
+          if (
+            existing &&
+            existing.jobId === job.jobId &&
+            existing.updatedAt > job.updatedAt
+          ) {
+            return t;
+          }
+
+          return { ...t, job };
+        })
       );
+
+      // (3) toast on a freshly observed failure for this jobId.
+      if (job.status === 'failed' && !failureToastedJobs.has(job.jobId)) {
+        failureToastedJobs.add(job.jobId);
+        setError(job.error || 'Generation failed.');
+      }
+
       // Terminal states need a structure refetch so the row reflects the
       // newly persisted draft (latestDraft / publishStatus / draftId).
       if (job.status === 'completed' || job.status === 'failed') {
@@ -164,14 +205,22 @@ export default function Worksheet({
       }
     };
 
-    const teardown = subscribeGenerationUpdates(
-      applyJob,
-      (err) => {
+    const teardown = subscribeGenerationUpdates({
+      onUpdate: applyJob,
+      onReconnect: () => {
+        if (!alive) return;
+        // Events during the disconnect window are unrecoverable from SSE;
+        // refetch the structure so per-topic `job` snapshots converge.
+        reload();
+      },
+      onError: (err) => {
         if (process.env.NODE_ENV !== 'production') {
           console.warn('[worksheet] SSE error', err);
         }
-      }
-    );
+        // Don't tear down — the browser auto-reconnects. onReconnect will
+        // refetch when the connection comes back up.
+      },
+    });
 
     return () => {
       alive = false;
