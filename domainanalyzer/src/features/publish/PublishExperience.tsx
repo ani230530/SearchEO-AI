@@ -1204,16 +1204,25 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
   };
 
   /**
-   * Renders the publish-button + (when live) a sibling "View Live" link.
-   * Used everywhere the publish action surface lives — embedded preview
-   * header and publish-tab footer — so both layouts stay in sync.
+   * Renders the publish-button + (when actually live) a sibling "View Live"
+   * link. Used everywhere the publish action surface lives — embedded
+   * preview header and publish-tab footer — so both layouts stay in sync.
+   *
+   * View-Live gating: the WordpressPublishLog row's `wordpressUrl` is
+   * always populated (defaulting to the integration's base URL during
+   * generation). It only points to the actual live post once the publish
+   * completes, so we additionally require `currentDraftStatus === 'published'`
+   * — the state machine's terminal — before rendering the link. This
+   * prevents View Live from showing while the draft is still pre-publish.
    */
   const renderPublishActions = (variant: 'compact' | 'full' = 'compact') => {
     const button = renderPublishButton(variant);
     if (!button) return null;
-    const liveUrl = publishResult?.wordpressUrl?.startsWith('http')
-      ? publishResult.wordpressUrl
-      : null;
+    const isPublished = currentDraftStatus === 'published';
+    const liveUrl =
+      isPublished && publishResult?.wordpressUrl?.startsWith('http')
+        ? publishResult.wordpressUrl
+        : null;
     if (!liveUrl) return button;
 
     const liveBase =

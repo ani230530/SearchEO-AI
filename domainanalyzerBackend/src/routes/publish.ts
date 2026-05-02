@@ -553,22 +553,15 @@ router.post(
     const userId = authReq.user.userId;
     const {
       draftId,
-      primaryKeyword,
-      htmlContent,
-      featuredImageEnabled = true,
-      featuredImageUrl,
-      title,
-      metaDescription,
-      slug,
-      pageId // Extract pageId for campaign synchronization
+      primaryKeyword: bodyPrimaryKeyword,
+      htmlContent: bodyHtmlContent,
+      featuredImageEnabled: bodyFeaturedImageEnabled,
+      featuredImageUrl: bodyFeaturedImageUrl,
+      title: bodyTitle,
+      metaDescription: bodyMetaDescription,
+      slug: bodySlug,
+      pageId, // Extract pageId for campaign synchronization
     } = req.body;
-
-    if (!primaryKeyword || !htmlContent) {
-      return res.status(400).json({
-        success: false,
-        error: 'Primary keyword and HTML content are required',
-      });
-    }
 
     let integration;
     try {
@@ -580,8 +573,12 @@ router.post(
       });
     }
 
-    // If draftId is provided, check if draft exists
+    // If draftId is provided, check if draft exists. The persisted draft
+    // also acts as a fallback for missing body fields — that's the path
+    // the worksheet uses (a one-shot { draftId } publish where the server
+    // pulls all metadata from the saved draft).
     let existingDraft: any = null;
+    let storedContent: ReturnType<typeof serializeDraftContent> | null = null;
     if (draftId) {
       existingDraft = await prisma.wordpressPublishLog.findFirst({
         where: { id: Number(draftId), userId },
@@ -592,6 +589,28 @@ router.post(
           error: 'Draft not found',
         });
       }
+      storedContent = serializeDraftContent(existingDraft);
+    }
+
+    // Resolve effective fields: explicit body values win (overlay path with
+    // unsaved edits), otherwise fall back to the stored draft content.
+    const primaryKeyword = bodyPrimaryKeyword || storedContent?.primaryKeyword;
+    const htmlContent = bodyHtmlContent || storedContent?.htmlContent;
+    const title = bodyTitle ?? storedContent?.title;
+    const metaDescription = bodyMetaDescription ?? storedContent?.metaDescription;
+    const slug = bodySlug ?? storedContent?.slug;
+    const featuredImageUrl =
+      bodyFeaturedImageUrl ?? storedContent?.featuredImageUrl ?? undefined;
+    const featuredImageEnabled =
+      bodyFeaturedImageEnabled !== undefined
+        ? bodyFeaturedImageEnabled
+        : storedContent?.featuredImageEnabled ?? true;
+
+    if (!primaryKeyword || !htmlContent) {
+      return res.status(400).json({
+        success: false,
+        error: 'Primary keyword and HTML content are required',
+      });
     }
 
     let decryptedPassword: string;

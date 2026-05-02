@@ -34,6 +34,7 @@ import {
   selectLongtailKeyword,
   deleteKeyword,
   updateKeywordTerm,
+  publishDraft,
   resolveRowState,
   subscribeGenerationUpdates,
 } from './api';
@@ -726,12 +727,7 @@ export default function Worksheet({
                                 onOpenDraftInPublish(draftId, 'view');
                                 setTimeout(() => setOpeningDraftRowId(null), 350);
                               },
-                              onPublishDirectly: (draftId) => {
-                                if (!onOpenDraftInPublish) {
-                                  setNotice('Publisher not wired up at this level.');
-                                  return;
-                                }
-                                setOpeningDraftRowId(topic.id);
+                              onPublishDirectly: async (draftId) => {
                                 // Optimistic: flip the row into `publishing`
                                 // immediately. The reconciliation effect
                                 // clears it on SSE / structure terminal.
@@ -741,8 +737,35 @@ export default function Worksheet({
                                   next.add(topic.id);
                                   return next;
                                 });
-                                onOpenDraftInPublish(draftId, 'publish');
-                                setTimeout(() => setOpeningDraftRowId(null), 350);
+                                // Direct fire — no overlay, all state lives
+                                // on the row. The publish endpoint accepts
+                                // just { draftId } and pulls metadata from
+                                // the persisted draft. Status converges
+                                // back via SSE to sharedPublishStatuses.
+                                try {
+                                  const result = await publishDraft(draftId);
+                                  if (result.status === 'failed') {
+                                    setOptimisticPublishingTopicIds((prev) => {
+                                      if (!prev.has(topic.id)) return prev;
+                                      const next = new Set(prev);
+                                      next.delete(topic.id);
+                                      return next;
+                                    });
+                                    setError(result.error || 'Publish failed.');
+                                  }
+                                } catch (err) {
+                                  setOptimisticPublishingTopicIds((prev) => {
+                                    if (!prev.has(topic.id)) return prev;
+                                    const next = new Set(prev);
+                                    next.delete(topic.id);
+                                    return next;
+                                  });
+                                  setError(
+                                    err instanceof Error
+                                      ? err.message
+                                      : 'Publish failed.'
+                                  );
+                                }
                               },
                             }}
                           />

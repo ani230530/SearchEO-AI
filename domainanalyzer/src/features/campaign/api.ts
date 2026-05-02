@@ -296,6 +296,40 @@ export async function deleteKeyword(keywordId: number): Promise<WorksheetTopic[]
   return data.structure.topics.map(normalizeTopic);
 }
 
+/* ---------- Direct publish from worksheet ---------- */
+
+/**
+ * Publish a previously-generated draft straight to WordPress without
+ * routing through the editor overlay.
+ *
+ * The backend's POST /api/publish/publish accepts a body of just
+ * `{ draftId }` — it pulls primaryKeyword / htmlContent / title /
+ * metaDescription / slug / featuredImage* from the persisted
+ * WordpressPublishLog row when those fields are missing. The same
+ * endpoint serves the overlay (which sends explicit overrides for
+ * unsaved edits) and the worksheet (which sends only draftId).
+ *
+ * Response is the standard publish-flow shape:
+ *   { status: 'published' | 'generating' | ..., draftId, publishedUrl?, ... }
+ */
+export interface PublishDraftResult {
+  success: boolean;
+  status?: 'published' | 'generating' | 'failed';
+  draftId?: number;
+  publishedUrl?: string;
+  wordpressPostId?: number | null;
+  error?: string;
+}
+
+export async function publishDraft(draftId: number): Promise<PublishDraftResult> {
+  const res = await fetch(`${API_BASE_URL}/api/publish/publish`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({ draftId }),
+  });
+  return handle<PublishDraftResult>(res);
+}
+
 /* ---------- Generate (universal n8n template) ---------- */
 
 export type TemplateType =
