@@ -409,14 +409,34 @@ export type RowState =
   | { kind: 'ready' }
   | { kind: 'generating'; percent: number; phase: string | null }
   | { kind: 'completed'; percent: 100; draftId: number }
+  /** Publish action is in flight (server-side n8n is still working).
+   *  Distinct from `generating` — that's content generation, this is the
+   *  WordPress publish step. */
+  | { kind: 'publishing'; draftId: number }
   | { kind: 'failed'; percent: number; error: string }
   | { kind: 'published'; draftId: number; liveUrl: string | null };
 
 const isJobActive = (job: GenerationJob | null): boolean =>
   !!job && (job.status === 'pending' || job.status === 'generating');
 
-export function resolveRowState(topic: WorksheetTopic): RowState {
+export interface ResolveRowOptions {
+  /** True when a publish action is in flight for this topic — set
+   *  optimistically by the worksheet on Publish click and confirmed by
+   *  SSE while the WordPress publish is processing in the background. */
+  isPublishing?: boolean;
+}
+
+export function resolveRowState(
+  topic: WorksheetTopic,
+  options: ResolveRowOptions = {}
+): RowState {
   const job = topic.job;
+
+  // Publishing wins over everything once we have a draft — it's a foreground
+  // user action that the row needs to acknowledge immediately.
+  if (topic.draftId && options.isPublishing) {
+    return { kind: 'publishing', draftId: topic.draftId };
+  }
 
   // Live job wins — overrides any stale data inferred from the topic.
   if (isJobActive(job)) {

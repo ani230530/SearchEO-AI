@@ -51,9 +51,26 @@ interface WorksheetProps {
    *  the publish action once the draft loads (one-click publish from
    *  the worksheet); otherwise the overlay opens for review only. */
   onOpenDraftInPublish?: (draftId: number, intent?: 'view' | 'publish') => void;
+  /** SSE-driven map of draftId → publish status. The dashboard already
+   *  tracks this for the embedded PublishExperience; we forward it so
+   *  the worksheet row can flip into a `publishing` state in lockstep
+   *  with the actual server-side publish. */
+  sharedPublishStatuses?: Map<
+    number,
+    {
+      status: 'generating' | 'published' | 'failed';
+      publishedUrl?: string;
+      error?: string;
+      updatedAt?: string;
+    }
+  >;
 }
 
-export default function Worksheet({ campaignId, onOpenDraftInPublish }: WorksheetProps) {
+export default function Worksheet({
+  campaignId,
+  onOpenDraftInPublish,
+  sharedPublishStatuses,
+}: WorksheetProps) {
   const [topics, setTopics] = useState<WorksheetTopic[]>([]);
   const [loading, setLoading] = useState(true);
   const [busyTopicId, setBusyTopicId] = useState<number | null>(null);
@@ -66,6 +83,15 @@ export default function Worksheet({ campaignId, onOpenDraftInPublish }: Workshee
   /** Set briefly between an "Open draft" click and the dashboard switching
    *  tabs, so the row's action button shows its own loading state. */
   const [openingDraftRowId, setOpeningDraftRowId] = useState<number | null>(null);
+  /** Topics whose Publish button has been clicked. The row stays in the
+   *  `publishing` row-state until either:
+   *    - the SSE layer confirms a terminal status for that draft
+   *      (sharedPublishStatuses → 'published' | 'failed'), or
+   *    - a structure refetch surfaces topic.publishStatus = 'published'.
+   *  Optimistic for instant feedback; SSE for accuracy. */
+  const [optimisticPublishingTopicIds, setOptimisticPublishingTopicIds] = useState<
+    Set<number>
+  >(new Set());
 
   const [search, setSearch] = useState('');
   const [openColumnMenu, setOpenColumnMenu] = useState<WorksheetColumnKey | null>(null);
@@ -152,6 +178,29 @@ export default function Worksheet({ campaignId, onOpenDraftInPublish }: Workshee
       teardown();
     };
   }, [reload]);
+
+  /* ---------- Publishing state reconciliation ---------- */
+  // When SSE pushes a terminal publish status (or a structure refetch already
+  // shows the topic as published), drop the optimistic flag so the row exits
+  // the `publishing` state cleanly.
+  useEffect(() => {
+    setOptimisticPublishingTopicIds((prev) => {
+      if (prev.size === 0) return prev;
+      let next = prev;
+      for (const topic of topics) {
+        if (!prev.has(topic.id)) continue;
+        const draftId = topic.draftId;
+        const live = draftId ? sharedPublishStatuses?.get(draftId) : undefined;
+        const ssePublished = live?.status === 'published' || live?.status === 'failed';
+        const dataPublished = topic.publishStatus?.toLowerCase() === 'published';
+        if (ssePublished || dataPublished) {
+          if (next === prev) next = new Set(prev);
+          next.delete(topic.id);
+        }
+      }
+      return next === prev ? prev : next;
+    });
+  }, [topics, sharedPublishStatuses]);
 
   /* ---------- Filtering ---------- */
 
@@ -488,7 +537,13 @@ export default function Worksheet({ campaignId, onOpenDraftInPublish }: Workshee
                   </tr>
                 )}
                 {filteredTopics.map((topic, idx) => {
-                  const rowState = resolveRowState(topic);
+                  const liveStatus = topic.draftId
+                    ? sharedPublishStatuses?.get(topic.draftId)?.status
+                    : undefined;
+                  const isPublishing =
+                    optimisticPublishingTopicIds.has(topic.id) ||
+                    liveStatus === 'generating';
+                  const rowState = resolveRowState(topic, { isPublishing });
                   const isBusy = busyTopicId === topic.id;
 
                   return (
@@ -628,6 +683,15 @@ export default function Worksheet({ campaignId, onOpenDraftInPublish }: Workshee
                                   return;
                                 }
                                 setOpeningDraftRowId(topic.id);
+                                // Optimistic: flip the row into `publishing`
+                                // immediately. The reconciliation effect
+                                // clears it on SSE / structure terminal.
+                                setOptimisticPublishingTopicIds((prev) => {
+                                  if (prev.has(topic.id)) return prev;
+                                  const next = new Set(prev);
+                                  next.add(topic.id);
+                                  return next;
+                                });
                                 onOpenDraftInPublish(draftId, 'publish');
                                 setTimeout(() => setOpeningDraftRowId(null), 350);
                               },

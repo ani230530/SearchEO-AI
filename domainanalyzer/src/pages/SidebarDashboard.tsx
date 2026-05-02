@@ -2995,6 +2995,7 @@ useEffect(() => {
               campaigns={campaigns}
               setSelectedCampaignId={setSelectedCampaignId}
               onOpenDraftInPublish={handleOpenDraftInPublish}
+              sharedPublishStatuses={sharedPublishStatuses}
               keywordsTableData={keywordsTableData}
               showCreateCampaign={showCreateCampaign}
               setShowCreateCampaign={setShowCreateCampaign}

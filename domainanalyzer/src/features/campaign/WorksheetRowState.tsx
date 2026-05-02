@@ -32,6 +32,9 @@ export function RowStatus({ state }: { state: RowState }) {
     case 'completed':
       return <ProgressLine percent={100} label="Completed" color="bg-emerald-600" />;
 
+    case 'publishing':
+      return <ProgressLine percent={100} label="Publishing…" color="bg-amber-500" />;
+
     case 'failed':
       return (
         <ProgressLine
@@ -167,6 +170,23 @@ export function RowAction({
             disabled={draftSpinner}
             variant="primary"
             icon={<Send className="h-4 w-4" />}
+          />
+        </div>
+      );
+
+    case 'publishing':
+      return (
+        <div className="inline-flex flex-col items-stretch gap-2">
+          <ActionPill
+            label="Draft Blog"
+            disabled
+            icon={<FileText className="h-4 w-4" />}
+          />
+          <ActionPill
+            label="Publishing…"
+            disabled
+            variant="primary"
+            icon={<Loader2 className="h-4 w-4 animate-spin" />}
           />
         </div>
       );
