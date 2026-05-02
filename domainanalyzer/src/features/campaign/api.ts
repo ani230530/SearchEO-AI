@@ -479,6 +479,13 @@ export interface ResolveRowOptions {
    *  optimistically by the worksheet on Publish click and confirmed by
    *  SSE while the WordPress publish is processing in the background. */
   isPublishing?: boolean;
+  /** Latest publish-channel SSE status for this topic's draft, when one
+   *  has arrived. Treated as authoritative over `topic.publishStatus`
+   *  (which is only refreshed by structure refetches and so lags the
+   *  live event). Lets the row flip to `published` the instant the
+   *  webhook fires, instead of waiting for a reload. */
+  livePublishStatus?: 'published' | 'failed' | 'generating';
+  livePublishedUrl?: string | null;
 }
 
 export function resolveRowState(
@@ -491,6 +498,17 @@ export function resolveRowState(
   // user action that the row needs to acknowledge immediately.
   if (topic.draftId && options.isPublishing) {
     return { kind: 'publishing', draftId: topic.draftId };
+  }
+
+  // Live SSE publish update wins over stale topic.publishStatus. SSE arrives
+  // before the next structure refetch, so without this check the row flickers
+  // back to `completed` after the optimistic flag clears.
+  if (topic.draftId && options.livePublishStatus === 'published') {
+    return {
+      kind: 'published',
+      draftId: topic.draftId,
+      liveUrl: options.livePublishedUrl ?? topic.liveUrl,
+    };
   }
 
   // Live job wins — overrides any stale data inferred from the topic.

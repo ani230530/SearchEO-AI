@@ -231,25 +231,39 @@ export default function Worksheet({
   /* ---------- Publishing state reconciliation ---------- */
   // When SSE pushes a terminal publish status (or a structure refetch already
   // shows the topic as published), drop the optimistic flag so the row exits
-  // the `publishing` state cleanly.
+  // the `publishing` state cleanly. Also call reload() once a terminal SSE
+  // arrives so topic.publishStatus / liveUrl catch up from the DB — the live
+  // SSE snapshot in `sharedPublishStatuses` covers the gap until then.
+  const reloadedDraftsRef = useRef<Set<number>>(new Set());
   useEffect(() => {
+    let needsReload = false;
     setOptimisticPublishingTopicIds((prev) => {
-      if (prev.size === 0) return prev;
       let next = prev;
       for (const topic of topics) {
-        if (!prev.has(topic.id)) continue;
         const draftId = topic.draftId;
         const live = draftId ? sharedPublishStatuses?.get(draftId) : undefined;
-        const ssePublished = live?.status === 'published' || live?.status === 'failed';
+        const sseTerminal = live?.status === 'published' || live?.status === 'failed';
         const dataPublished = topic.publishStatus?.toLowerCase() === 'published';
-        if (ssePublished || dataPublished) {
+
+        if (prev.has(topic.id) && (sseTerminal || dataPublished)) {
           if (next === prev) next = new Set(prev);
           next.delete(topic.id);
+        }
+
+        // Only trigger reload once per draft per terminal event so the worksheet
+        // doesn't refetch in a tight loop while the SSE snapshot stays around.
+        if (sseTerminal && draftId && !reloadedDraftsRef.current.has(draftId)) {
+          reloadedDraftsRef.current.add(draftId);
+          needsReload = true;
         }
       }
       return next === prev ? prev : next;
     });
-  }, [topics, sharedPublishStatuses]);
+
+    if (needsReload) {
+      reload();
+    }
+  }, [topics, sharedPublishStatuses, reload]);
 
   /* ---------- Filtering ---------- */
 
@@ -586,13 +600,18 @@ export default function Worksheet({
                   </tr>
                 )}
                 {filteredTopics.map((topic, idx) => {
-                  const liveStatus = topic.draftId
-                    ? sharedPublishStatuses?.get(topic.draftId)?.status
+                  const liveSnapshot = topic.draftId
+                    ? sharedPublishStatuses?.get(topic.draftId)
                     : undefined;
+                  const liveStatus = liveSnapshot?.status;
                   const isPublishing =
                     optimisticPublishingTopicIds.has(topic.id) ||
                     liveStatus === 'generating';
-                  const rowState = resolveRowState(topic, { isPublishing });
+                  const rowState = resolveRowState(topic, {
+                    isPublishing,
+                    livePublishStatus: liveStatus,
+                    livePublishedUrl: liveSnapshot?.publishedUrl,
+                  });
                   const isBusy = busyTopicId === topic.id;
 
                   return (

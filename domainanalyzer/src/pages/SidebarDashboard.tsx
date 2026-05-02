@@ -48,6 +48,7 @@ import {
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import { usePublishStatus } from '@/hooks/usePublishStatus';
 import { GenerationPageStatus, KeywordTableItem } from '@/types';
 import { WordpressIntegration } from '@/types/publish';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@radix-ui/react-accordion';
@@ -497,6 +498,24 @@ const [editDescription, setEditDescription] = useState('');
       });
     }
   }, [draftToPageMap, toast]);
+
+  // Subscribe to backend publish_update SSE events. Without this hook nobody
+  // would consume the events broadcast by /api/publish/publish-webhook —
+  // generation SSE explicitly drops anything other than `generation:update`,
+  // so the worksheet's optimistic "Publishing…" flag would never clear and
+  // sharedPublishStatuses would stay empty until a full page reload.
+  usePublishStatus({
+    onUpdate: (data) => {
+      handlePublishUpdate({
+        draftId: data.draftId,
+        pageId: data.pageId,
+        status: data.status === 'draft' ? 'generating' : data.status,
+        publishedUrl: data.publishedUrl,
+        wordpressPostId: data.wordpressPostId,
+        error: data.error,
+      });
+    },
+  });
 
   const tabs: DashboardSidebarTab[] = DASHBOARD_TABS.map((tab) => ({
     ...tab,
