@@ -5,18 +5,10 @@ import type { WordpressIntegration } from '@/types/publish';
 import type { KeywordTableItem } from '@/types';
 
 /**
- * Content-area overlay that hosts the legacy PublishExperience in its
- * `disablePreviewOverlay` (embedded) mode. Rendering it as an overlay —
- * rather than navigating to the Publish tab — keeps the user in the
- * worksheet context and preserves every preview/edit/publish feature
- * that already exists on the page.
- *
- * Positioning is `position: fixed` with a sidebar-width left offset so
- * the overlay always covers exactly the working area at viewport size,
- * regardless of how tall the underlying page content (worksheet rows)
- * is. The sidebar offset mirrors `.main-content`'s margin-left, so the
- * overlay edges align with `<main>` and the same 0.3s ease transition
- * runs when the sidebar collapses.
+ * Content-area overlay that hosts PublishExperience as the draft preview.
+ * Positioning is `position: fixed` with a sidebar-width left offset so the
+ * overlay covers the working area only — the sidebar stays visible and the
+ * 0.3s ease transition matches `.main-content`'s margin-left rule.
  */
 export interface WorksheetDraftOverlayProps {
   draftId: number | null;
@@ -26,14 +18,12 @@ export interface WorksheetDraftOverlayProps {
    *  left offset matches `<main>`'s margin-left. */
   sidebarExpanded?: boolean;
 
-  // Pass-through props PublishExperience needs to render correctly. These
-  // mirror what the Publish tab already supplies; we just forward them.
+  // Pass-through props PublishExperience needs to render correctly.
   companyDomain?: string;
   domainContext?: string;
   keywordsTableData?: KeywordTableItem[];
   hasWordpressIntegration?: boolean;
   wpIntegration?: WordpressIntegration | null;
-  onConfigureWordpress?: () => void;
   onRefreshWordpressIntegration?: () => Promise<void>;
   publishingPageIds?: Set<number>;
   setPublishingPageIds?: React.Dispatch<React.SetStateAction<Set<number>>>;
@@ -95,11 +85,7 @@ export default function WorksheetDraftOverlay({
 
       <PublishExperience
         {...publishProps}
-        // Always treat the overlay as the active surface so the embedded
-        // preview renders even though the Publish tab is not selected.
-        isActive
         initialDraftId={draftId}
-        disablePreviewOverlay
         onBack={onClose}
       />
     </div>

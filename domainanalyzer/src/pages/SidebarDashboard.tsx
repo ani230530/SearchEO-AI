@@ -950,8 +950,7 @@ useEffect(() => {
       // But we shouldn't re-fetch on *every* tab switch if we already have data, to prevent flickering.
       const shouldFetch =
         activeTab === 'overview' ||
-        activeTab === 'analytics' ||
-        activeTab === 'publish';
+        activeTab === 'analytics';
 
       if (shouldFetch) {
           fetchCompanyDomain();
@@ -1617,14 +1616,6 @@ useEffect(() => {
       }
     } catch (error) {
       console.error('Error fetching WordPress integration:', error);
-      // Only show toast if we're on publish tab, not for background loading in campaign tab
-      if (activeTab === 'publish') {
-      toast({
-        title: "WordPress",
-        description: "Unable to load WordPress integration details",
-        variant: "destructive"
-      });
-      }
     } finally {
       setWpIntegrationLoading(false);
     }
@@ -1743,12 +1734,6 @@ useEffect(() => {
       fetchCampaignTabData();
     }
   }, [activeTab, activeCompanySubTab, fetchGscStatus, fetchWordpressIntegration, fetchCampaignTabData]);
-
-  useEffect(() => {
-    if (activeTab === 'publish') {
-      fetchWordpressIntegration();
-    }
-  }, [activeTab, fetchWordpressIntegration]);
 
   const fetchCampaigns = useCallback(async () => {
     setCampaignsLoading(true);
@@ -2446,27 +2431,6 @@ useEffect(() => {
       setupContent: null,
       showResults,
     },
-    publish: {
-      companyDomain,
-      companyDomainLoading,
-      domainContext,
-      draftStatuses,
-      draftToPageMap,
-      hasWordpressIntegration,
-      isActive: activeTab === "publish",
-      keywordsTableData,
-      pageId: undefined,
-      publishingPageIds,
-      setDraftStatuses,
-      setDraftToPageMap,
-      setPublishingPageIds,
-      sharedPublishStatuses,
-      wpIntegration,
-      onConfigureWordpress: handleConfigureWordpress,
-      onRefreshWordpressIntegration: async () => {
-        await fetchWordpressIntegration();
-      },
-    },
     audit: {
       activeChartTab,
       auditLoading,
@@ -3075,7 +3039,6 @@ useEffect(() => {
         keywordsTableData={keywordsTableData}
         hasWordpressIntegration={hasWordpressIntegration}
         wpIntegration={wpIntegration}
-        onConfigureWordpress={handleConfigureWordpress}
         onRefreshWordpressIntegration={async () => {
           await fetchWordpressIntegration();
         }}
