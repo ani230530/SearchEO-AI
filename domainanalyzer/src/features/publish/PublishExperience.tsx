@@ -54,11 +54,6 @@ interface PublishExperienceProps {
   pageId?: number;
   disablePreviewOverlay?: boolean;
   onBack?: () => void;
-  /** When true, the component automatically fires handlePublishToWordpress
-   *  once a draft has finished loading. Used by the worksheet's row-level
-   *  "Publish" button so a single click both opens the preview and starts
-   *  the publish. Fires once per mount; the user can still cancel/close. */
-  autoPublishOnMount?: boolean;
   publishingPageIds?: Set<number>;
   setPublishingPageIds?: React.Dispatch<React.SetStateAction<Set<number>>>;
   draftToPageMap?: Map<number, number>;
@@ -176,7 +171,6 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
   pageId,
   onBack,
   disablePreviewOverlay = false,
-  autoPublishOnMount = false,
   publishingPageIds,
   setPublishingPageIds,
   draftToPageMap,
@@ -2299,30 +2293,6 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
     }
   };
 
-  /**
-   * Auto-publish trigger. When the worksheet's row-level "Publish" action
-   * mounts the overlay, it sets `autoPublishOnMount`. Once the draft has
-   * loaded (publishResult is populated) we fire handlePublishToWordpress
-   * exactly once. Subsequent renders are guarded by `firedRef`.
-   *
-   * This is intentionally a render-time effect rather than a callback on
-   * fetchDraftFromDb so it stays in sync with whatever path landed the
-   * publishResult — including initialDraft, refresh, or direct fetch.
-   */
-  const autoPublishFiredRef = useRef(false);
-  useEffect(() => {
-    if (!autoPublishOnMount) return;
-    if (!publishResult) return;
-    if (publishLoading || isPublishing) return;
-    if (autoPublishFiredRef.current) return;
-    autoPublishFiredRef.current = true;
-    void handlePublishToWordpress();
-    // handlePublishToWordpress is intentionally not a dep — we want exactly
-    // one fire keyed off (autoPublishOnMount, publishResult). Re-renders of
-    // the handler must not retrigger this effect.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoPublishOnMount, publishResult]);
-
   const handlePreviewMouseUp = useCallback((e?: MouseEvent) => {
     if (typeof window === 'undefined') return;
     if (!previewRef.current) return;
@@ -3255,20 +3225,13 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
                     <Save className='h-5 w-5' />
                     {/* {saving ? 'Saving…' : hasUnsavedChanges ? 'Save Draft • Unsaved' : 'Save Draft'} */}
                   </button>
-                  {/* <button
-                    onClick={handleResetDraft}
-                    title='Reset'
-                    className="px-4 py-2.5 rounded-md border border-gray-200 bg-white text-sm font-medium text-gray-900 hover:bg-gray-50 disabled:opacity-60 transition-colors"
-                  >
-                   Reset
-                  </button> */}
-                  <button
-                    onClick={handleGenerateContent}
-                    title='Regenerate'
-                    disabled={publishLoading}
-                    className="flex items-center gap-2 px-4 py-2.5 rounded-md border border-gray-200 bg-white text-sm font-medium text-gray-900 hover:bg-gray-50 disabled:opacity-60 transition-colors"
-                  ><RotateCcw className='h-4 w-4'/>
-                  </button>
+                  {/* Regenerate intentionally hidden in embedded mode.
+                      The worksheet's Generate flow uses a different (universal)
+                      n8n webhook tied to topic + keywords; calling
+                      handleGenerateContent here would route to the legacy
+                      single-keyword review webhook and clobber the topic's
+                      draft with mismatched content. Regenerate from the
+                      worksheet row instead. */}
                     <button
                       type="button"
                       onClick={() => addImageInputRef.current?.click()}

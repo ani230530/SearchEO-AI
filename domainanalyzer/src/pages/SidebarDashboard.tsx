@@ -252,24 +252,19 @@ const [improvedContent, setImprovedContent] = useState("");
     null
   );
   const [activeSection, setActiveSection] = useState<'all' | 'favourites' | 'published'>('all');
-  /** Set when a worksheet row's "Draft Blog" / "Publish" action is clicked.
-   *  The dashboard renders an overlay hosting PublishExperience in its
-   *  embedded (disablePreviewOverlay) mode. `intent: 'publish'` makes the
-   *  overlay auto-fire the publish action once the draft has loaded. */
-  const [draftOverlay, setDraftOverlay] = useState<{
-    draftId: number;
-    intent: 'view' | 'publish';
-  } | null>(null);
+  /** Set when a worksheet row's "Draft Blog" action is clicked. The
+   *  dashboard renders an overlay hosting PublishExperience in its embedded
+   *  (disablePreviewOverlay) mode. The Publish action on the worksheet row
+   *  doesn't go through here — it fires direct via /api/publish/publish.
+   *  This overlay is only for viewing/editing the draft. */
+  const [draftOverlayId, setDraftOverlayId] = useState<number | null>(null);
 
-  const handleOpenDraftInPublish = useCallback(
-    (draftId: number, intent: 'view' | 'publish' = 'view') => {
-      setDraftOverlay({ draftId, intent });
-    },
-    []
-  );
+  const handleOpenDraftInPublish = useCallback((draftId: number) => {
+    setDraftOverlayId(draftId);
+  }, []);
 
   const handleCloseDraftOverlay = useCallback(() => {
-    setDraftOverlay(null);
+    setDraftOverlayId(null);
   }, []);
   const [openSortMenu, setOpenSortMenu] = useState(false);
 const [sortBy, setSortBy] = useState<"date" | "name">("date");
@@ -3071,9 +3066,8 @@ useEffect(() => {
           viewport height, regardless of how tall the underlying worksheet
           page content is. */}
       <WorksheetDraftOverlay
-        draftId={draftOverlay?.draftId ?? null}
-        open={draftOverlay !== null}
-        autoPublish={draftOverlay?.intent === 'publish'}
+        draftId={draftOverlayId}
+        open={draftOverlayId !== null}
         onClose={handleCloseDraftOverlay}
         sidebarExpanded={isSidebarExpanded}
         companyDomain={companyDomain}

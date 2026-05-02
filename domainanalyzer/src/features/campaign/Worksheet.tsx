@@ -46,12 +46,11 @@ type WorksheetColumnKey = 'topic' | 'keywords' | 'status' | 'action' | 'more';
 
 interface WorksheetProps {
   campaignId: number;
-  /** Bubbled to the dashboard so the click on a row's "Draft Blog" /
-   *  "Publish" action opens the dashboard-level draft overlay with the
-   *  draft preloaded. `intent: 'publish'` makes the overlay auto-fire
-   *  the publish action once the draft loads (one-click publish from
-   *  the worksheet); otherwise the overlay opens for review only. */
-  onOpenDraftInPublish?: (draftId: number, intent?: 'view' | 'publish') => void;
+  /** Bubbled to the dashboard so the click on a row's "Draft Blog" action
+   *  opens the dashboard-level draft overlay with the draft preloaded. The
+   *  worksheet "Publish" button doesn't route through here — it fires the
+   *  publish action directly without the overlay. */
+  onOpenDraftInPublish?: (draftId: number) => void;
   /** SSE-driven map of draftId → publish status. The dashboard already
    *  tracks this for the embedded PublishExperience; we forward it so
    *  the worksheet row can flip into a `publishing` state in lockstep
@@ -724,7 +723,7 @@ export default function Worksheet({
                                   return;
                                 }
                                 setOpeningDraftRowId(topic.id);
-                                onOpenDraftInPublish(draftId, 'view');
+                                onOpenDraftInPublish(draftId);
                                 setTimeout(() => setOpeningDraftRowId(null), 350);
                               },
                               onPublishDirectly: async (draftId) => {
