@@ -5,52 +5,13 @@ export interface Keyword {
     difficulty: string;
     intent?: string | null;
     cpc?: number;
-    aiMetadata?: any; // For storing isPrimary/isLongtail flags
-}
-
-export interface SubPage {
-    id: number;
-    title: string;
-    description?: string | null;
-    summary?: string | null;
-    keywords: Keyword[];
-    publishStatus?: string;
-    liveUrl?: string;
-    draftId?: number;
-}
-
-export interface PillarPage {
-    id: number;
-    title: string;
-    description?: string | null;
-    summary?: string | null;
-    keywords: Keyword[];
-    publishStatus?: string;
-    liveUrl?: string;
-    draftId?: number;
-}
-
-export interface Topic {
-    id: number;
-    title: string;
-    description?: string | null;
-    status?: string;
-    source?: string;
-    keywords?: Keyword[];
-    pillarPage: PillarPage | null;
-    subPages: SubPage[];
-    referenceUrl?: string; // Add referenceUrl which was seemingly missing in the interface but used in code
-}
-
-export interface CampaignStructure {
-    topics: Topic[];
+    aiMetadata?: any;
 }
 
 export type GenerationPageStatus = {
     jobId: string;
     topicId?: number | null;
     pageId: number;
-    pageType: 'pillar' | 'subpage';
     status: 'pending' | 'generating' | 'completed' | 'failed' | 'published';
     draftId?: number;
     progress?: number;
@@ -79,7 +40,6 @@ export type DraftPreview = {
 
 export type DraftStatusRecord = {
     pageId: number;
-    pageType: string;
     status: string;
     draftId?: number;
     progress?: number;
@@ -95,7 +55,6 @@ export type GenerationStreamingEvent = {
     jobId: string;
     topicId?: number | null;
     pageId?: number | null;
-    pageType?: 'pillar' | 'subpage' | null;
     status?: 'pending' | 'generating' | 'completed' | 'failed' | 'published';
     phase?: string | null;
     progress?: number | null;

@@ -48,7 +48,8 @@ import {
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { CampaignStructure, GenerationPageStatus, KeywordTableItem } from '@/types';
+import { usePublishStatus } from '@/hooks/usePublishStatus';
+import { GenerationPageStatus, KeywordTableItem } from '@/types';
 import { WordpressIntegration } from '@/types/publish';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@radix-ui/react-accordion';
 import {AnimatePresence, motion} from 'framer-motion'
@@ -58,12 +59,12 @@ import { DashboardHeader } from "@/features/sidebar-dashboard/components/Dashboa
 import { DashboardSidebar } from "@/features/sidebar-dashboard/components/DashboardSidebar";
 import { AnalyticsCompanySection } from "@/features/sidebar-dashboard/sections/AnalyticsCompanySection";
 import { ProjectsSection } from "@/features/sidebar-dashboard/sections/ProjectsSection";
+import WorksheetDraftOverlay from "@/features/campaign/WorksheetDraftOverlay";
 import { DASHBOARD_TABS } from "@/features/sidebar-dashboard/constants";
 import CompetitorPage from '@/features/sidebar-dashboard/sections/CompetitorPage';
 
 import type {
   CompanySubTabId,
-  DashboardCampaignViewMode,
   DashboardContentRouterProps,
   DashboardSidebarTab,
   DomainCheckResult,
@@ -223,9 +224,6 @@ const sseRef = useRef<EventSource | null>(null);
   }>>(new Map());
   // Track generation job statuses
   const [generationJobs, setGenerationJobs] = useState<Map<number, GenerationPageStatus>>(new Map());
-  // Lifted context from CampaignStructureView
-  const [campaignPageIdContext, setCampaignPageIdContext] = useState<number | null>(null);
-  const [currentGenerationTopicId, setCurrentGenerationTopicId] = useState<number | null>(null);
   const notifiedReadyPageIdsRef = useRef<Set<number>>(new Set());
 const [improvedContent, setImprovedContent] = useState("");
   const [gscEmail, setGscEmail] = useState<string>("");
@@ -255,6 +253,20 @@ const [improvedContent, setImprovedContent] = useState("");
     null
   );
   const [activeSection, setActiveSection] = useState<'all' | 'favourites' | 'published'>('all');
+  /** Set when a worksheet row's "Draft Blog" action is clicked. The
+   *  dashboard renders an overlay hosting PublishExperience in its embedded
+   *  (disablePreviewOverlay) mode. The Publish action on the worksheet row
+   *  doesn't go through here — it fires direct via /api/publish/publish.
+   *  This overlay is only for viewing/editing the draft. */
+  const [draftOverlayId, setDraftOverlayId] = useState<number | null>(null);
+
+  const handleOpenDraftInPublish = useCallback((draftId: number) => {
+    setDraftOverlayId(draftId);
+  }, []);
+
+  const handleCloseDraftOverlay = useCallback(() => {
+    setDraftOverlayId(null);
+  }, []);
   const [openSortMenu, setOpenSortMenu] = useState(false);
 const [sortBy, setSortBy] = useState<"date" | "name">("date");
   const [favouriteIds, setFavouriteIds] = useState<Set<number>>(new Set());
@@ -332,29 +344,6 @@ const toggleSection = (idx: number) => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const isSidebarExpanded = sidebarOpen || isSidebarHovered;
-// Campaign States
-  const [campaignViewMode, setCampaignViewMode] = useState<DashboardCampaignViewMode>('split');
-
-const [selectedTopicId, setSelectedTopicId] = useState<number | null>(null);
-const [campaignStructure, setCampaignStructure] = useState<CampaignStructure>({
-  topics: []
-});
-
-  const getCampaignPageDisplayName = useCallback((pageId?: number, fallback?: string | null) => {
-    if (!pageId) return fallback || 'Your draft';
-
-    for (const topic of campaignStructure.topics) {
-      if (topic.pillarPage?.id === pageId) {
-        return topic.pillarPage.title || fallback || 'Your draft';
-      }
-      const subPage = topic.subPages.find((page) => page.id === pageId);
-      if (subPage) {
-        return subPage.title || fallback || 'Your draft';
-      }
-    }
-
-    return fallback || 'Your draft';
-  }, [campaignStructure.topics]);
 
 // For inline editing of campaigns
 const [showEditModal, setShowEditModal] = useState(false);
@@ -362,13 +351,6 @@ const [editingCampaignId, setEditingCampaignId] = useState<number | null>(null);
 const [editTitle, setEditTitle] = useState('');
 const [editDescription, setEditDescription] = useState('');
 
-
-  // Initialize selectedTopicId
-  useEffect(() => {
-    if (campaignStructure.topics.length > 0 && selectedTopicId === null) {
-      setSelectedTopicId(campaignStructure.topics[0].id);
-    }
-  }, [campaignStructure.topics, selectedTopicId]);
 
   useEffect(() => {
     if (sidebarOpen) {
@@ -516,6 +498,24 @@ const [editDescription, setEditDescription] = useState('');
       });
     }
   }, [draftToPageMap, toast]);
+
+  // Subscribe to backend publish_update SSE events. Without this hook nobody
+  // would consume the events broadcast by /api/publish/publish-webhook —
+  // generation SSE explicitly drops anything other than `generation:update`,
+  // so the worksheet's optimistic "Publishing…" flag would never clear and
+  // sharedPublishStatuses would stay empty until a full page reload.
+  usePublishStatus({
+    onUpdate: (data) => {
+      handlePublishUpdate({
+        draftId: data.draftId,
+        pageId: data.pageId,
+        status: data.status === 'draft' ? 'generating' : data.status,
+        publishedUrl: data.publishedUrl,
+        wordpressPostId: data.wordpressPostId,
+        error: data.error,
+      });
+    },
+  });
 
   const tabs: DashboardSidebarTab[] = DASHBOARD_TABS.map((tab) => ({
     ...tab,
@@ -900,7 +900,7 @@ useEffect(() => {
 
   // Fetch all campaign tab data in parallel when campaign tab is active
   const fetchCampaignTabData = useCallback(async () => {
-    if (activeTab !== 'projects' && activeTab !== 'create-project') return;
+    if (activeTab !== 'projects') return;
     
     setCampaignTabDataLoading(true);
     try {
@@ -958,7 +958,7 @@ useEffect(() => {
   }, [activeTab, awaitingNewDomain]);
 
   useEffect(() => {
-    if (activeTab === 'projects' || activeTab === 'create-project') {
+    if (activeTab === 'projects') {
       fetchCampaignTabData();
     }
   }, [activeTab, fetchCampaignTabData]);
@@ -969,8 +969,7 @@ useEffect(() => {
       // But we shouldn't re-fetch on *every* tab switch if we already have data, to prevent flickering.
       const shouldFetch =
         activeTab === 'overview' ||
-        activeTab === 'analytics' ||
-        activeTab === 'publish';
+        activeTab === 'analytics';
 
       if (shouldFetch) {
           fetchCompanyDomain();
@@ -1636,14 +1635,6 @@ useEffect(() => {
       }
     } catch (error) {
       console.error('Error fetching WordPress integration:', error);
-      // Only show toast if we're on publish tab, not for background loading in campaign tab
-      if (activeTab === 'publish') {
-      toast({
-        title: "WordPress",
-        description: "Unable to load WordPress integration details",
-        variant: "destructive"
-      });
-      }
     } finally {
       setWpIntegrationLoading(false);
     }
@@ -1758,16 +1749,10 @@ useEffect(() => {
       fetchWordpressIntegration();
     
     // Also refresh campaign tab data if we're on campaign tab and WordPress integration might have changed
-    if ((activeTab === 'projects' || activeTab === 'create-project') && activeCompanySubTab === 'integration') {
+    if (activeTab === 'projects' && activeCompanySubTab === 'integration') {
       fetchCampaignTabData();
     }
   }, [activeTab, activeCompanySubTab, fetchGscStatus, fetchWordpressIntegration, fetchCampaignTabData]);
-
-  useEffect(() => {
-    if (activeTab === 'publish') {
-      fetchWordpressIntegration();
-    }
-  }, [activeTab, fetchWordpressIntegration]);
 
   const fetchCampaigns = useCallback(async () => {
     setCampaignsLoading(true);
@@ -1801,7 +1786,7 @@ useEffect(() => {
   }, [toast]);
 
   useEffect(() => {
-    if (activeTab === 'projects' || activeTab === 'create-project' || activeTab === 'overview') {
+    if (activeTab === 'projects' || activeTab === 'overview') {
       // Fetch campaigns for both the Campaign tab and the Overview
       // so Overview can show recent campaigns/quick access.
       fetchCampaigns();
@@ -2465,27 +2450,6 @@ useEffect(() => {
       setupContent: null,
       showResults,
     },
-    publish: {
-      companyDomain,
-      companyDomainLoading,
-      domainContext,
-      draftStatuses,
-      draftToPageMap,
-      hasWordpressIntegration,
-      isActive: activeTab === "publish",
-      keywordsTableData,
-      pageId: campaignPageIdContext || undefined,
-      publishingPageIds,
-      setDraftStatuses,
-      setDraftToPageMap,
-      setPublishingPageIds,
-      sharedPublishStatuses,
-      wpIntegration,
-      onConfigureWordpress: handleConfigureWordpress,
-      onRefreshWordpressIntegration: async () => {
-        await fetchWordpressIntegration();
-      },
-    },
     audit: {
       activeChartTab,
       auditLoading,
@@ -2528,6 +2492,12 @@ useEffect(() => {
         // TODO: implement
         console.log("Run analysis for", competitorDomain);
       },
+    },
+    onMenuItemClick: (tabId: TabId, domainId?: string | number) => {
+      setActiveTab(tabId);
+      if (domainId) {
+        setCreatedDomainId(Number(domainId));
+      }
     },
   };
 
@@ -2753,6 +2723,7 @@ useEffect(() => {
         }
 
         .main-content {
+          position: relative;
           margin-left: 280px;
           transition: margin-left 0.3s ease;
           min-height: 100vh;
@@ -2897,10 +2868,6 @@ useEffect(() => {
           }
           setOpenWordpressConnectionView(false);
           setActiveTab(tabId);
-          if (tabId === "create-project") {
-            setSelectedCampaignId(null);
-            setShowCreateCampaign(false);
-          }
           if (tabId === "integration") {
             setActiveCompanySubTab("integration");
           }
@@ -2920,16 +2887,13 @@ useEffect(() => {
         {/* Content Header */}
         <DashboardHeader
           activeTab={activeTab}
-          campaignViewMode={campaignViewMode}
-          selectedCampaignId={selectedCampaignId}
           tabs={tabs}
           userEmail={user?.email}
-          onCampaignViewModeChange={setCampaignViewMode}
           onTabChange={setActiveTab}
         />
 
         {/* Content Body */}
-        <div className={(activeTab === 'projects' || activeTab === 'create-project') && selectedCampaignId ? "flex-1 min-h-[calc(100vh-80px)] bg-white" : "content-body"}>
+        <div className={activeTab === 'projects' && selectedCampaignId ? "flex-1 min-h-[calc(100vh-80px)] bg-white" : "content-body"}>
           {activeTab === "analytics" || activeTab === "integration" ? (
             <AnalyticsCompanySection
               companyDomainLoading={companyDomainLoading}
@@ -3003,43 +2967,20 @@ useEffect(() => {
               handleDomainChange={handleDomainChange}
               openWordpressConnectionView={openWordpressConnectionView}
             />
-          ) : activeTab === "projects" || activeTab === "create-project" ? (
+          ) : activeTab === "projects" ? (
             <ProjectsSection
               selectedCampaignId={selectedCampaignId}
               campaigns={campaigns}
               setSelectedCampaignId={setSelectedCampaignId}
-              companyDomain={companyDomain}
-              domainContext={domainContext}
-              keywordsTableData={keywordsTableData}
-              hasWordpressIntegration={hasWordpressIntegration}
-              wpIntegration={wpIntegration}
-              handleConfigureWordpress={handleConfigureWordpress}
-              fetchWordpressIntegration={fetchWordpressIntegration}
-              activeTab={activeTab}
-              fetchCampaignTabData={fetchCampaignTabData}
-              campaignViewMode={campaignViewMode}
-              setCampaignViewMode={setCampaignViewMode}
-              sidebarOpen={sidebarOpen}
-              publishingPageIds={publishingPageIds}
-              setPublishingPageIds={setPublishingPageIds}
-              draftToPageMap={draftToPageMap}
-              setDraftToPageMap={setDraftToPageMap}
-              draftStatuses={draftStatuses}
-              setDraftStatuses={setDraftStatuses}
+              onOpenDraftInPublish={handleOpenDraftInPublish}
               sharedPublishStatuses={sharedPublishStatuses}
-              handlePublishUpdate={handlePublishUpdate}
-              getCampaignPageDisplayName={getCampaignPageDisplayName}
-              generationJobs={generationJobs}
-              setGenerationJobs={setGenerationJobs}
-              campaignPageIdContext={campaignPageIdContext}
-              setCampaignPageIdContext={setCampaignPageIdContext}
-              currentGenerationTopicId={currentGenerationTopicId}
-              setCurrentGenerationTopicId={setCurrentGenerationTopicId}
+              keywordsTableData={keywordsTableData}
               showCreateCampaign={showCreateCampaign}
               setShowCreateCampaign={setShowCreateCampaign}
               handleCreateCampaign={handleCreateCampaign}
               newCampaignTitle={newCampaignTitle}
               setNewCampaignTitle={setNewCampaignTitle}
+              newCampaignDescription={newCampaignDescription}
               setNewCampaignDescription={setNewCampaignDescription}
               campaignLayout={campaignLayout}
               setCampaignLayout={setCampaignLayout}
@@ -3101,6 +3042,33 @@ useEffect(() => {
         )}
         </div>
       </main>
+
+      {/* Worksheet draft preview — viewport-pinned overlay hosting the legacy
+          PublishExperience in embedded mode. Uses `position: fixed` with a
+          sidebar-width left offset so it covers the working area at exactly
+          viewport height, regardless of how tall the underlying worksheet
+          page content is. */}
+      <WorksheetDraftOverlay
+        draftId={draftOverlayId}
+        open={draftOverlayId !== null}
+        onClose={handleCloseDraftOverlay}
+        sidebarExpanded={isSidebarExpanded}
+        companyDomain={companyDomain}
+        domainContext={domainContext}
+        keywordsTableData={keywordsTableData}
+        hasWordpressIntegration={hasWordpressIntegration}
+        wpIntegration={wpIntegration}
+        onRefreshWordpressIntegration={async () => {
+          await fetchWordpressIntegration();
+        }}
+        publishingPageIds={publishingPageIds}
+        setPublishingPageIds={setPublishingPageIds}
+        draftToPageMap={draftToPageMap}
+        setDraftToPageMap={setDraftToPageMap}
+        draftStatuses={draftStatuses}
+        setDraftStatuses={setDraftStatuses}
+        sharedPublishStatuses={sharedPublishStatuses}
+      />
     </div>
   );
 };

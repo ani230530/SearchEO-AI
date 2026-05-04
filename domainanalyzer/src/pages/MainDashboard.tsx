@@ -49,6 +49,8 @@ interface ActiveOnboardingSession {
   lastActivity: string;
 }
 
+const DASHBOARD_CACHE_KEY = 'ai_visibility_domains_cache_v1';
+
 const ProfessionalDashboard = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [domains, setDomains] = useState<DashboardDomain[]>([]);
@@ -67,6 +69,21 @@ const ProfessionalDashboard = () => {
   const [sortBy, setSortBy] = useState<'recent' | 'visibility' | 'keywords' | 'phrases' | 'url'>('recent');
   const [sortDir, setSortDir] = useState<'desc' | 'asc'>('desc');
 
+  useEffect(() => {
+    try {
+      const cached = sessionStorage.getItem(DASHBOARD_CACHE_KEY);
+      if (!cached) return;
+
+      const parsed = JSON.parse(cached) as { domains?: DashboardDomain[] };
+      if (Array.isArray(parsed?.domains) && parsed.domains.length > 0) {
+        setDomains(parsed.domains);
+        setLoading(false);
+      }
+    } catch {
+      // ignore malformed cache and continue with network fetch
+    }
+  }, []);
+
   // Function to handle domain card clicks
   const handleDomainClick = (domain: DashboardDomain) => {
     const currentStep = domain.currentStep ?? 0;
@@ -77,7 +94,7 @@ const ProfessionalDashboard = () => {
       navigate(`/dashboard/${maskedId}`);
     } else {
       // Otherwise, go to the analysis flow at the current step
-      navigate(`/analyze?domainId=${domain.id}`);
+      navigate(`/ai-checker-page?domainId=${domain.id}`);
     }
   };
 
@@ -138,7 +155,10 @@ const ProfessionalDashboard = () => {
 
   useEffect(() => {
     const fetchData = async () => {
-      setLoading(true);
+      const hasCachedDomains = Boolean(sessionStorage.getItem(DASHBOARD_CACHE_KEY));
+      if (!hasCachedDomains) {
+        setLoading(true);
+      }
       setError(null);
       try {
         // Fetch completed domains
@@ -161,7 +181,16 @@ const ProfessionalDashboard = () => {
         }
         
         const domainsData = await domainsResponse.json();
-        setDomains(domainsData.domains || []);
+        const latestDomains = domainsData.domains || [];
+        setDomains(latestDomains);
+        try {
+          sessionStorage.setItem(
+            DASHBOARD_CACHE_KEY,
+            JSON.stringify({ domains: latestDomains, updatedAt: Date.now() })
+          );
+        } catch {
+          // best effort cache only
+        }
 
         // Onboarding sessions removed
         setActiveSessions([]);
@@ -174,8 +203,10 @@ const ProfessionalDashboard = () => {
     
     if (token) {
       fetchData();
+    } else if (!authLoading) {
+      setLoading(false);
     }
-  }, [token, navigate]);
+  }, [token, navigate, authLoading]);
 
   // Show loading while checking authentication
   if (authLoading) {
@@ -1303,7 +1334,7 @@ const ProfessionalDashboard = () => {
                   </span>
                   <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button
-                      onClick={(e) => { e.stopPropagation(); navigate(`/analyze?domainId=${domain.id}&reanalyze=1`); }}
+                      onClick={(e) => { e.stopPropagation(); navigate(`/ai-checker-page?domainId=${domain.id}&reanalyze=1`); }}
                       className="px-3 py-1.5 text-xs rounded-full border border-gray-200 text-gray-700 hover:bg-gray-50"
                     >
                       Re-analyze
@@ -1359,7 +1390,7 @@ const ProfessionalDashboard = () => {
               </p>
               <button 
                 className="apple-button"
-                onClick={() => navigate('/analyze')}
+                onClick={() => navigate('/ai-checker-page')}
               >
                 <Plus className="h-4 w-4 mr-2" />
                 Add Domain

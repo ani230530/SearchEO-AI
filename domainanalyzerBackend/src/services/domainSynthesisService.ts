@@ -247,10 +247,10 @@ export async function synthesizeDomainContext(params: {
           role: 'system',
           content: [
             'You are an expert business intelligence analyst and SEO strategist.',
-            'Use only website evidence provided.',
+            'Analyze the provided website evidence and formulate a comprehensive domain context.',
             'Return only JSON.',
-            'Do not invent unsupported facts.',
-            'If evidence is weak, explicitly say "not clearly established from website evidence".',
+            'Extract the best possible insights from the provided text. Make reasonable analytical inferences even if evidence is partial.',
+            'NEVER say "not clearly established" if you can deduce reasonable details from the company summary or offerings.',
             'Each structured claim must cite evidence page URLs from the provided pages.',
             'For the narrative section fields, use markdown bullet lists with exact bold labels matching the requested field names.',
           ].join(' '),
@@ -346,7 +346,7 @@ export async function synthesizeDomainContext(params: {
                 'Use the exact field labels shown in the schema examples.',
                 'Each section must be a markdown bullet list.',
                 'Each bullet must start with "- **Label**: "',
-                'Be detailed like the previous long-form output, but keep every claim conservative and evidence-based.',
+                'Be detailed, highly analytical, and make reasonable inferences. Populate every single field based on the context available.',
               ],
             },
             null,
@@ -418,6 +418,7 @@ export async function synthesizeDomainContext(params: {
       tokenUsage: response.usage?.total_tokens || 0,
     };
   } catch (error) {
+    console.error('Synthesis failed:', error);
     const fallback = buildFallbackContext({ pages: curatedPages.length > 0 ? pages : [], domain, location });
     return {
       contextJson: fallback,

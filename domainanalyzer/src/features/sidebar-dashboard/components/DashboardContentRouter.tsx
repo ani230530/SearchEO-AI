@@ -5,7 +5,6 @@ import { GscAnalyticsSection } from "@/features/sidebar-dashboard/sections/GscAn
 import KnowledgeBaseSection from "@/features/sidebar-dashboard/sections/KnowledgeBaseSection";
 import { DomainHistorySection } from "@/features/sidebar-dashboard/sections/DomainHistorySection";
 import { ProfileSection } from "@/features/sidebar-dashboard/sections/ProfileSection";
-import { PublishSection } from "@/features/sidebar-dashboard/sections/PublishSection";
 import { OverviewSection } from "@/features/sidebar-dashboard/sections/OverviewSection";
 import { SettingsSection } from "@/features/sidebar-dashboard/sections/SettingsSection";
 import type { DashboardContentRouterProps } from "@/features/sidebar-dashboard/types";
@@ -18,17 +17,15 @@ export function DashboardContentRouter({
   analyticsReport,
   gscAnalytics,
   overview,
-  publish,
   settings,
   competitorIntelligence,
+  onMenuItemClick,
 }: DashboardContentRouterProps) {
   switch (activeTab) {
     case "overview":
       return <OverviewSection {...overview} />;
     case "analytics":
       return <CompanySection {...company} />;
-    case "publish":
-      return <PublishSection {...publish} />;
     case "audit":
       return <AuditSection {...audit} />;
     case "analytics-report":
@@ -40,7 +37,7 @@ export function DashboardContentRouter({
     case "knowledge-base":
       return <KnowledgeBaseSection />;
     case "domain-history":
-      return <DomainHistorySection />;
+      return <DomainHistorySection onMenuItemClick={onMenuItemClick} />;
     case "profile":
       return <ProfileSection />;
     case "settings":

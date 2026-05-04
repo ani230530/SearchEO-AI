@@ -46,13 +46,10 @@ interface PublishExperienceProps {
   keywordsTableData?: KeywordTableItem[];
   hasWordpressIntegration?: boolean;
   wpIntegration?: WordpressIntegration | null;
-  onConfigureWordpress?: () => void;
   onRefreshWordpressIntegration?: () => void;
-  isActive?: boolean;
   initialDraft?: GeneratedArticleContent | null;
   initialDraftId?: number | null;
   pageId?: number;
-  disablePreviewOverlay?: boolean;
   onBack?: () => void;
   publishingPageIds?: Set<number>;
   setPublishingPageIds?: React.Dispatch<React.SetStateAction<Set<number>>>;
@@ -163,14 +160,11 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
   keywordsTableData,
   hasWordpressIntegration,
   wpIntegration,
-  onConfigureWordpress,
   onRefreshWordpressIntegration,
-  isActive,
   initialDraft,
   initialDraftId,
   pageId,
   onBack,
-  disablePreviewOverlay = false,
   publishingPageIds,
   setPublishingPageIds,
   draftToPageMap,
@@ -191,7 +185,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
   });
   const [publishLoading, setPublishLoading] = useState(false);
   const [publishResult, setPublishResult] = useState<GeneratedArticleContent | null>(null);
-  const [publishStage, setPublishStage] = useState<'compose' | 'preview'>('compose');
+  const [publishStage, setPublishStage] = useState<'compose' | 'preview'>('preview');
   const [publishHistory, setPublishHistory] = useState<PublishHistoryEntry[]>([]);
   const [publishDrawerOpen, setPublishDrawerOpen] = useState(false);
   const [drawerStep, setDrawerStep] = useState(1);
@@ -199,6 +193,13 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
   // savingDraft removed - using 'saving' state instead
   const [currentDraftId, setCurrentDraftId] = useState<number | null>(initialDraftId || null);
   const [currentDraftStatus, setCurrentDraftStatus] = useState<string | null>(null);
+  /**
+   * Specific to the WordPress publish action so its loading state can be
+   * distinguished from `publishLoading` (which is also true during content
+   * generation, regenerate, edits, etc.). Set in handlePublishToWordpress;
+   * cleared by applyTerminalPublishState on the resulting SSE event.
+   */
+  const [isPublishing, setIsPublishing] = useState(false);
   const [selectedText, setSelectedText] = useState('');
   const [textEditNote, setTextEditNote] = useState('');
   const [textEditing, setTextEditing] = useState(false);
@@ -247,25 +248,10 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
     createDraftSnapshot(initialDraft ?? null, initialDraft?.htmlContent ?? '')
   );
 
-  const fetchPublishHistory = useCallback(async () => {
-    try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/publish/history`, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem('authToken')}`,
-          'Content-Type': 'application/json',
-        },
-      });
-      if (!response.ok) {
-        throw new Error('Failed to fetch publish history');
-      }
-      const data = await response.json();
-      if (data.success) {
-        setPublishHistory(data.logs || []);
-      }
-    } catch (error) {
-      console.error('Error fetching publish history:', error);
-    }
-  }, []);
+  // Publish history list lives only on the (now-removed) Publish tab. Embedded
+  // overlay never renders the history; keep the symbol as a no-op so legacy
+  // call sites in save/publish handlers stay valid until they are pruned.
+  const fetchPublishHistory = useCallback(async () => {}, []);
 
   const applyTerminalPublishState = useCallback((params: {
     status: 'published' | 'failed';
@@ -278,6 +264,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
     const { status, draftId, publishedUrl, wordpressPostId, error, notify = false } = params;
 
     setPublishLoading(false);
+    setIsPublishing(false);
 
     if (status === 'published') {
       setPublishError('');
@@ -536,10 +523,14 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
   }, [publishResult?.featuredImageUrl]);
 
   const filteredPublishKeywords = useMemo(() => {
+    // Defensive: keywordsTableData is an optional prop. Not every caller
+    // (e.g. an embedded preview overlay) wires it through. Always return
+    // an array so downstream useMemo spreads stay safe.
+    const source = Array.isArray(keywordsTableData) ? keywordsTableData : [];
     if (!publishKeywordQuery) {
-      return keywordsTableData;
+      return source;
     }
-    return keywordsTableData.filter((keyword) =>
+    return source.filter((keyword) =>
       keyword.keyword.toLowerCase().includes(publishKeywordQuery.toLowerCase())
     );
   }, [keywordsTableData, publishKeywordQuery]);
@@ -562,30 +553,6 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
   ];
 
  
-  useEffect(() => {
-    // Only fetch history when actually in publish tab (not when viewing from campaign overlay)
-    // If initialDraft is provided, we're in campaign preview mode, so don't fetch history
-    if (isActive && !initialDraft) {
-      fetchPublishHistory();
-    }
-  }, [isActive, initialDraft, fetchPublishHistory]);
-
-  useEffect(() => {
-    if (!publishResult && !publishLoading && publishStage !== 'compose') {
-      setPublishStage('compose');
-    }
-  }, [publishResult, publishLoading, publishStage]);
-
-  useEffect(() => {
-    if (publishStage === 'compose') {
-      textTooltipInstanceRef.current?.hide();
-      imageTooltipInstanceRef.current?.hide();
-      if (tooltipAnchorRef.current) {
-        tooltipAnchorRef.current.style.display = 'none';
-      }
-    }
-  }, [publishStage]);
-
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const handleAutoHide = () => {
@@ -1076,24 +1043,207 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
     }
   }, [applyFeaturedImageState, extractEditedImage, featuredImageEditNote, publishResult, toast]);
 
+  /**
+   * Publish button state machine.
+   *
+   * Single source of truth for what the Publish button should render.
+   * Distinguishes between background-queued publishes (n8n still running
+   * server-side, page can be navigated away from) and the in-flight
+   * client-side request that fires it. Cleared on terminal SSE updates
+   * via applyTerminalPublishState.
+   */
+  type PublishButtonState =
+    | 'hidden'
+    | 'idle-fresh'
+    | 'idle-republish'
+    | 'publishing'
+    | 'queued'
+    | 'failed';
+
+  const computePublishButtonState = (): PublishButtonState => {
+    if (!publishResult) return 'hidden';
+    if (currentDraftStatus === 'generating' && isPublishing) return 'queued';
+    if (isPublishing) return 'publishing';
+    if (currentDraftStatus === 'failed') return 'failed';
+    if (publishResult.wordpressUrl?.startsWith('http')) return 'idle-republish';
+    return 'idle-fresh';
+  };
+
+  const renderPublishButton = (variant: 'compact' | 'full' = 'compact') => {
+    const state = computePublishButtonState();
+    if (state === 'hidden') return null;
+
+    const baseCompact =
+      'px-4 py-2.5 rounded-md text-white text-sm font-medium shadow-lg transition-colors flex items-center gap-2';
+    const baseFull =
+      'px-6 py-2.5 rounded-full text-white text-sm font-medium shadow-lg transition-all flex items-center gap-2';
+    const base = variant === 'full' ? baseFull : baseCompact;
+
+    type ButtonConfig = {
+      label: string;
+      icon: React.ReactNode;
+      tone: string;
+      disabled: boolean;
+      title?: string;
+    };
+
+    const configByState: Record<Exclude<PublishButtonState, 'hidden'>, ButtonConfig> = {
+      'idle-fresh': {
+        label: 'Publish',
+        icon: <Send className="h-4 w-4" />,
+        tone:
+          variant === 'full'
+            ? 'bg-black hover:bg-gray-800'
+            : 'bg-[#2D4059] hover:bg-[#2D4059]/90',
+        disabled: false,
+      },
+      'idle-republish': {
+        label: 'Re-publish',
+        icon: <Send className="h-4 w-4" />,
+        tone:
+          variant === 'full'
+            ? 'bg-black hover:bg-gray-800'
+            : 'bg-[#2D4059] hover:bg-[#2D4059]/90',
+        disabled: false,
+        title: 'Republish to WordPress (overwrites the live post)',
+      },
+      publishing: {
+        label: 'Publishing…',
+        icon: <ButtonSpinner />,
+        tone:
+          variant === 'full'
+            ? 'bg-black hover:bg-gray-800'
+            : 'bg-[#2D4059] hover:bg-[#2D4059]/90',
+        disabled: true,
+      },
+      queued: {
+        label: 'Publishing in background…',
+        icon: <ButtonSpinner />,
+        tone: 'bg-[#5f6dab] hover:bg-[#5f6dab]',
+        disabled: true,
+        title: 'WordPress is processing this publish in the background',
+      },
+      failed: {
+        label: 'Retry publish',
+        icon: <Send className="h-4 w-4" />,
+        tone: 'bg-red-600 hover:bg-red-700',
+        disabled: false,
+        title: 'The last publish failed. Click to try again.',
+      },
+    };
+
+    const cfg = configByState[state];
+
+    // When the draft is already live, "Re-publish" is more accurate than
+    // "Publish" — and we want a slightly stronger CTA to match the design.
+    const label = state === 'idle-republish' ? 'Re-publish to WordPress' : cfg.label;
+
+    return (
+      <button
+        type="button"
+        onClick={handlePublishToWordpress}
+        disabled={cfg.disabled || !publishResult}
+        title={cfg.title}
+        className={`${base} ${cfg.tone} disabled:opacity-60 disabled:cursor-not-allowed`}
+      >
+        {cfg.icon}
+        <span>{label}</span>
+      </button>
+    );
+  };
+
+  /**
+   * Renders the publish-button + (when actually live) a sibling "View Live"
+   * link. Used everywhere the publish action surface lives — embedded
+   * preview header and publish-tab footer — so both layouts stay in sync.
+   *
+   * View-Live gating: the WordpressPublishLog row's `wordpressUrl` is
+   * always populated (defaulting to the integration's base URL during
+   * generation). It only points to the actual live post once the publish
+   * completes, so we additionally require `currentDraftStatus === 'published'`
+   * — the state machine's terminal — before rendering the link. This
+   * prevents View Live from showing while the draft is still pre-publish.
+   */
+  const renderPublishActions = (variant: 'compact' | 'full' = 'compact') => {
+    const button = renderPublishButton(variant);
+    if (!button) return null;
+    const isPublished = currentDraftStatus === 'published';
+    const liveUrl =
+      isPublished && publishResult?.wordpressUrl?.startsWith('http')
+        ? publishResult.wordpressUrl
+        : null;
+    if (!liveUrl) return button;
+
+    const liveBase =
+      variant === 'full'
+        ? 'inline-flex items-center gap-2 px-6 py-2.5 rounded-full border border-emerald-700 bg-emerald-700 text-white text-sm font-medium shadow-lg hover:bg-emerald-800 transition-colors'
+        : 'inline-flex items-center gap-2 px-4 py-2.5 rounded-md border border-emerald-700 bg-emerald-700 text-white text-sm font-medium shadow-lg hover:bg-emerald-800 transition-colors';
+
+    return (
+      <>
+        <a
+          href={liveUrl}
+          target="_blank"
+          rel="noreferrer"
+          className={liveBase}
+          title="Open the live post in a new tab"
+        >
+          <Eye className="h-4 w-4" />
+          <span>View Live</span>
+        </a>
+        {button}
+      </>
+    );
+  };
+
+  /**
+   * Always-on metadata editor. Title, meta description, and slug are
+   * editable in any mode (preview or content-edit). Status pill and the
+   * live URL are folded in here so users see everything in one card and
+   * don't need to flip into edit mode just to see/edit metadata.
+   */
   const renderMetadataEditor = () => {
-    if (!publishResult || !isEditMode) return null;
+    if (!publishResult) return null;
+
+    const status = publishResult.status || 'draft';
+    const isPublished = status.toLowerCase() === 'published';
 
     return (
       <div className="rounded-2xl border border-gray-200 bg-white p-4 space-y-4">
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
           <div>
             <p className="text-xs text-gray-500 mb-1">Draft metadata</p>
             <p className="text-sm font-medium text-gray-900">Title, description, and slug</p>
           </div>
-          <button
-            type="button"
-            onClick={syncSlugFromTitle}
-            className="rounded-full border border-gray-200 px-3 py-1 text-[11px] font-medium text-gray-600 hover:bg-gray-50"
+          <span
+            className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${
+              isPublished
+                ? 'bg-emerald-50 text-emerald-700'
+                : 'bg-blue-50 text-blue-700'
+            }`}
           >
-            Use title for slug
-          </button>
+            {status}
+          </span>
         </div>
+
+        {isPublished && publishResult.wordpressUrl && (
+          <a
+            href={publishResult.wordpressUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="block text-xs text-blue-600 hover:underline break-all"
+          >
+            {publishResult.wordpressUrl}
+          </a>
+        )}
+
+        <button
+          type="button"
+          onClick={syncSlugFromTitle}
+          className="w-full rounded-xl border border-[#2D4059]/20 px-3 py-1.5 text-center text-[12px] font-semibold text-[#2D4059] hover:bg-[#2D4059]/10 transition-colors"
+        >
+          Use title for slug
+        </button>
 
         <div className="space-y-2">
           <label className="text-xs font-medium uppercase tracking-[0.2em] text-gray-500">Title</label>
@@ -1192,25 +1342,25 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
             placeholder="https://example.com/featured-image.jpg"
             className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-900 outline-none transition focus:border-gray-900"
           />
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-2">
             <button
               type="button"
               onClick={handleApplyFeaturedImageUrl}
-              className="rounded-full bg-gray-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-gray-800"
+              className="inline-flex w-full items-center justify-center rounded-xl bg-[#2D4059] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#2D4059]/90"
             >
               Apply URL
             </button>
             <button
               type="button"
               onClick={handleEnableAutoFeaturedImage}
-              className="rounded-full border border-gray-200 px-4 py-2.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+              className="inline-flex w-full items-center justify-center rounded-xl border border-[#2D4059]/20  px-4 py-2.5 text-sm font-semibold text-[#2D4059] transition hover:bg-[#2D4059]/10"
             >
               Auto-generate
             </button>
             <button
               type="button"
               onClick={handleDisableFeaturedImage}
-              className="rounded-full border border-gray-200 px-4 py-2.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+              className="inline-flex w-full items-center justify-center rounded-xl border border-[#2D4059]/20  px-4 py-2.5 text-sm font-semibold text-[#2D4059] transition hover:bg-[#2D4059]/10"
             >
               Disable
             </button>
@@ -1257,7 +1407,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
               type="button"
               onClick={handleFeaturedImageEdit}
               disabled={!featuredImageEditNote.trim() || featuredImageEditing}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-gray-200 px-4 py-2.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-[#2D4059]/20 bg-[#2D4059]/5 px-4 py-2.5 text-sm font-semibold text-[#2D4059] transition hover:bg-[#2D4059]/10 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {featuredImageEditing ? (
                 <>
@@ -1989,6 +2139,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
     }
 
     setPublishLoading(true);
+    setIsPublishing(true);
     try {
       // SIMPLE: Just use currentHtmlContent - user should save manually before publishing
       const latestHtmlContent = currentHtmlContent;
@@ -2065,7 +2216,8 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
         fetchPublishHistory();
         onRefreshWordpressIntegration();
         setPublishLoading(false); // Stop loading on success
-      } 
+        setIsPublishing(false);
+      }
       // Handle Queued/Generating Status
       else if (data.status === 'generating') {
         console.log('[Publish:Debug] Job queued, setting currentDraftId:', data.draftId);
@@ -2092,6 +2244,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
         variant: 'destructive',
       });
       setPublishLoading(false); // Stop loading on error
+      setIsPublishing(false);
     }
   };
 
@@ -2193,17 +2346,6 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
     }
   }, [isEditMode, publishResult, currentHtmlContent]);
 
-  // Prevent background scroll when preview overlay is open (only if not in embedded overlay mode)
-  useEffect(() => {
-    if (typeof document === 'undefined') return;
-    const originalOverflow = document.body.style.overflow;
-    if (showPreviewStage && !disablePreviewOverlay) {
-      document.body.style.overflow = 'hidden';
-    }
-    return () => {
-      document.body.style.overflow = originalOverflow;
-    };
-  }, [showPreviewStage, disablePreviewOverlay]);
 
   const handleRemoveImage = useCallback((imageSrc: string) => {
     if (!publishResult) return;
@@ -2418,543 +2560,16 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
     handleImageEdit,
   ]);
 
-  // In embedded mode (disablePreviewOverlay), never show compose UI (even during initial load)
-  // This prevents the compose UI from flashing briefly before the preview loads
-  const shouldShowComposeUI = !disablePreviewOverlay && isActive;
-
   return (
     <>
-      {/* When in embedded mode, skip compose UI entirely */}
-      {/* Only render compose UI when NOT in embedded mode AND when active (for publish tab) */}
-      {shouldShowComposeUI && (
-    <div className="space-y-8">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h2 className="text-3xl font-thin text-black tracking-tight mb-2">Publish History</h2>
-          <p className="text-base font-light text-gray-600">
-            Generate, refine, and push articles directly to WordPress
-          </p>
-        </div>
-        {hasWordpressIntegration ? (
-          <div className="px-4 py-2 rounded-full bg-green-50 text-green-700 text-sm font-medium">
-            Connected to {wpIntegration?.siteUrl?.replace(/^https?:\/\//, '') || 'WordPress'}
-          </div>
-        ) : (
-          <button
-            onClick={onConfigureWordpress}
-            className="px-5 py-2.5 border border-gray-200 rounded-full text-sm font-medium hover:bg-gray-50"
-          >
-            Configure WordPress
-          </button>
-        )}
-      </div>
-
-      <PublishOverviewCard
-        hasWordpressIntegration={hasWordpressIntegration}
-        wpIntegration={wpIntegration}
-        publishHistoryCount={publishHistory.length}
-        publishWordCount={publishForm.wordCount}
-        publishImageCount={publishForm.images}
-        publishStage={publishStage}
-        onOpenComposeDrawer={handleOpenComposeDrawer}
-        onExitPreview={handleExitPreview}
-      />
-
-      {publishError && (
-        <div className="rounded-2xl border border-red-100 bg-red-50/80 px-4 py-3 text-sm text-red-700">
-          {publishError}
-        </div>
-      )}
-
-      <Sheet
-        open={publishDrawerOpen && (publishStage === 'compose' || (publishStage === 'preview' && publishLoading && !publishResult))}
-        onOpenChange={(open) => {
-          setPublishDrawerOpen(open);
-          if (open && !publishLoading) {
-            setPublishStage('compose');
-          }
-        }}
-      >
-        <SheetContent
-          side="right"
-          className="w-full sm:max-w-3xl border-l border-[#e2e4ea] bg-[#f5f6fa] px-10 py-12 overflow-y-auto font-light"
-        >
-          <div className="space-y-10">
-            <div className="rounded-[32px] border border-white/80 bg-white/90 px-6 py-6 shadow-[0_30px_80px_rgba(15,23,42,0.10)] backdrop-blur">
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                <div className="space-y-3">
-                  <div className="inline-flex items-center gap-2 rounded-full border border-black/10 px-4 py-1 text-[10px] tracking-[0.35em] uppercase text-gray-500">
-                    Launch prep
-                  </div>
-                  <div>
-                    <h3 className="text-[28px] font-light text-gray-900 tracking-tight">
-                      {publishLoading && !publishResult ? (
-                        <span className="flex items-center gap-2">
-                          Generating content...
-                          <svg className="h-5 w-5 animate-spin text-gray-400" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4l3-3-3-3v4A8 8 0 104 12z" />
-                          </svg>
-                        </span>
-                      ) : (
-                        `Step ${drawerStep} of ${totalDrawerSteps}`
-                      )}
-                    </h3>
-                    {publishLoading && !publishResult && (
-                      <p className="text-sm text-gray-500 mt-1">Your content is being created. You can continue editing or check back shortly.</p>
-                    )}
-                  </div>
-                </div>
-                <div className="flex flex-col items-end gap-2">
-                  <div className="flex items-center gap-1">
-                    {drawerSteps.map((step) => (
-                      <span
-                        key={`progress-${step.id}`}
-                        className={`h-1.5 w-12 rounded-full transition-all ${
-                          step.id <= drawerStep ? 'bg-black/80' : 'bg-black/10'
-                        }`}
-                      />
-                    ))}
-                  </div>
-                  <p className="text-xs uppercase tracking-[0.3em] text-gray-400">
-                    Compose flow
-                  </p>
-                </div>
-              </div>
-              <div className="mt-6 grid gap-3 sm:grid-cols-4">
-                
-              </div>
-            </div>
-
-            {drawerStep === 1 && (
-              <section className="rounded-[36px] border border-white/70 bg-white p-8 shadow-[0_30px_80px_rgba(15,23,42,0.08)] space-y-8">
-                <div className="space-y-2">
-                  <span className="text-[11px] uppercase tracking-[0.35em] text-gray-400">Word cadence</span>
-                  <h4 className="text-2xl font-light text-gray-900">Dial in the depth and pace.</h4>
-                  <p className="text-sm text-gray-500 max-w-2xl">
-                    Glide between quick reads and flagship editorials. Every notch subtly changes paragraph
-                    length, transitions, and how immersive the narration should feel.
-                  </p>
-                </div>
-                <div className="rounded-[28px] border border-gray-100 bg-gray-50/70 p-5 space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-semibold text-gray-800">Projected read time</p>
-                      <p className="text-xs text-gray-500">A calm slider tuned for editorial pacing.</p>
-                    </div>
-                    <div className="inline-flex items-baseline gap-2 rounded-full bg-white px-5 py-1.5 shadow-inner">
-                      <span className="text-2xl font-light">{publishForm.wordCount}</span>
-                      <span className="text-xs uppercase tracking-[0.25em] text-gray-500">words</span>
-                    </div>
-                  </div>
-                  <div>
-                    <div className="flex justify-between text-[10px] uppercase tracking-[0.3em] text-gray-400 mb-2">
-                      <span>Brief</span>
-                      <span>Feature</span>
-                      <span>Chronicle</span>
-                    </div>
-                    <input
-                      type="range"
-                      min={500}
-                      max={2000}
-                      step={50}
-                      value={publishForm.wordCount}
-                      onChange={(e) =>
-                        setPublishForm((prev) => ({ ...prev, wordCount: Number(e.target.value) }))
-                      }
-                      className="w-full h-2 rounded-full bg-gradient-to-r from-gray-200 via-gray-300 to-gray-400 accent-black"
-                    />
-                    <div className="mt-2 flex justify-between text-xs text-gray-500">
-                      <span>Snackable insight</span>
-                      <span>Premium editorial</span>
-                      <span>Marquee deep dive</span>
-                    </div>
-                  </div>
-                </div>
-                <div className="flex flex-wrap gap-2 text-xs text-gray-600">
-                  {['Product deep dive', 'Interview format', 'Thought leadership', 'Point-of-view essay'].map(
-                    (chip) => (
-                      <span
-                        key={chip}
-                        className="inline-flex items-center rounded-full border border-gray-200 bg-gray-50 px-3 py-1"
-                      >
-                        {chip}
-                      </span>
-                    )
-                  )}
-                </div>
-              </section>
-            )}
-
-            {drawerStep === 2 && (
-              <section className="rounded-[36px] border border-white/70 bg-white p-8 shadow-[0_30px_80px_rgba(15,23,42,0.08)] space-y-8">
-                <div className="space-y-2">
-                  <span className="text-[11px] uppercase tracking-[0.35em] text-gray-400">Imagery</span>
-                  <h4 className="text-2xl font-light text-gray-900">Compose a modern visual cadence.</h4>
-                  <p className="text-sm text-gray-500 max-w-2xl">
-                    Control how often imagery appears and whether a cinematic banner crowns the experience.
-                  </p>
-                </div>
-                <div className="grid gap-6 md:grid-cols-2">
-                  <div className="rounded-3xl border border-gray-100 bg-gray-50/80 p-5">
-                    <div className="flex items-center justify-between mb-4">
-                      <div>
-                        <p className="text-sm font-semibold text-gray-800">Inline images</p>
-                        <p className="text-xs text-gray-500">Slide to fine-tune the visual tempo.</p>
-                      </div>
-                      <span className="text-lg font-semibold text-gray-900">{publishForm.images}</span>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <button
-                        onClick={() =>
-                          setPublishForm((prev) => ({ ...prev, images: Math.max(0, prev.images - 1) }))
-                        }
-                        className="w-12 h-12 rounded-full border border-gray-200 text-2xl leading-none flex items-center justify-center hover:border-gray-300"
-                      >
-                        −
-                      </button>
-                      <div className="flex-1 h-2 rounded-full bg-gray-100">
-                        <div
-                          className="h-full rounded-full bg-gray-900 transition-all"
-                          style={{ width: `${(publishForm.images / 4) * 100}%` }}
-                        />
-                      </div>
-                      <button
-                        onClick={() =>
-                          setPublishForm((prev) => ({ ...prev, images: Math.min(4, prev.images + 1) }))
-                        }
-                        className="w-12 h-12 rounded-full border border-gray-200 text-2xl leading-none flex items-center justify-center hover:border-gray-300"
-                      >
-                        +
-                      </button>
-                    </div>
-                  </div>
-                  <div className="rounded-3xl border border-gray-100 bg-gray-50/80 p-5 space-y-3">
-                    <p className="text-sm font-semibold text-gray-800">Hero banner</p>
-                    <p className="text-xs text-gray-500">
-                      Perfect for featured cards, WordPress previews, and shareable link thumbnails.
-                    </p>
-                    <button
-                      onClick={() =>
-                        setPublishForm((prev) => ({ ...prev, featuredImageEnabled: !prev.featuredImageEnabled }))
-                      }
-                      className={`w-full px-4 py-3 rounded-[30px] border text-sm font-medium transition-all ${
-                        publishForm.featuredImageEnabled
-                          ? 'bg-black text-white border-black shadow-lg'
-                          : 'border-gray-200 text-gray-700 hover:bg-gray-100'
-                      }`}
-                    >
-                      {publishForm.featuredImageEnabled 
-  ? 'Skip banner imagery' 
-  : 'Use banner imagery'}
-                    </button>
-                  </div>
-                </div>
-              </section>
-            )}
-
-            {drawerStep === 3 && (
-              <section className="rounded-[36px] bg-white border border-white/70 shadow-[0_30px_80px_rgba(15,23,42,0.08)] p-8 space-y-6">
-                <div>
-                  <p className="text-xs uppercase tracking-[0.35em] text-gray-500">Primary keyword</p>
-                  <p className="text-sm text-gray-500">Select the hero query or type your own</p>
-                </div>
-                <input
-                  type="text"
-                  value={primaryKeywordInput}
-                  onChange={(e) => handlePrimaryInputChange(e.target.value)}
-                  placeholder="Finance expert witness"
-                  className="w-full px-5 py-4 rounded-[28px] border border-gray-200 bg-gradient-to-br from-white via-white to-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent text-base shadow-inner"
-                />
-                <div className="rounded-[28px] border border-gray-200 bg-gray-50/60 p-4 space-y-3">
-                  <div className="relative">
-                    <Search className="h-4 w-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                    <input
-                      type="text"
-                      value={publishKeywordQuery}
-                      onChange={(e) => setPublishKeywordQuery(e.target.value)}
-                      placeholder="Search domain keywords..."
-                      className="w-full pl-9 pr-3 py-2.5 rounded-2xl border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-gray-900"
-                    />
-                  </div>
-                  <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-                    {sortedKeywords.length === 0 ? (
-                      <p className="p-4 text-sm text-gray-500">No keywords available for this search.</p>
-                    ) : (
-                      <>
-                        <div className="bg-gray-50/50 border-b border-gray-200">
-                          <div className="grid grid-cols-[auto,1fr,100px,90px] gap-6 px-5 py-3.5">
-                            <div className="w-8" />
-                            <div 
-                              className="flex items-center space-x-1.5 cursor-pointer hover:text-gray-900 transition-colors text-xs font-semibold text-gray-600 uppercase tracking-wider"
-                              onClick={() => handleSort('keyword')}
-                            >
-                              <span>Keyword</span>
-                              {getSortIcon('keyword')}
-                            </div>
-                            <div 
-                              className="flex items-center space-x-1.5 cursor-pointer hover:text-gray-900 transition-colors justify-end text-xs font-semibold text-gray-600 uppercase tracking-wider"
-                              onClick={() => handleSort('volume')}
-                            >
-                              <span>Volume</span>
-                              {getSortIcon('volume')}
-                            </div>
-                            <div 
-                              className="flex items-center space-x-1.5 cursor-pointer hover:text-gray-900 transition-colors justify-center text-xs font-semibold text-gray-600 uppercase tracking-wider"
-                              onClick={() => handleSort('intent')}
-                            >
-                              <span>Intent</span>
-                              {getSortIcon('intent')}
-                            </div>
-                          </div>
-                        </div>
-                        <div className="divide-y divide-gray-100/80 max-h-72 overflow-y-auto">
-                          {sortedKeywords.slice(0, 25).map((keyword) => {
-                            const isActive = publishForm.primaryKeyword === keyword.keyword;
-                            return (
-                              <button
-                                key={keyword.id}
-                                onClick={() => handlePrimaryKeywordSelect(keyword.keyword)}
-                                className={`w-full grid grid-cols-[auto,1fr,100px,90px] items-center gap-6 px-5 py-3.5 hover:bg-gray-50/50 transition-all duration-150 cursor-pointer ${
-                                  isActive ? 'bg-blue-50/30' : ''
-                                }`}
-                              >
-                                <div className="flex items-center justify-center w-8">
-                                  <div className={`w-5 h-5 rounded-full border-2 transition-all duration-150 flex items-center justify-center ${
-                                    isActive 
-                                      ? 'bg-gray-900 border-gray-900' 
-                                      : 'border-gray-300 hover:border-gray-400'
-                                  }`}>
-                                    {isActive && (
-                                      <CheckCircle className="w-4 h-4 text-white -ml-0.5 -mt-0.5" fill="currentColor" />
-                                    )}
-                                  </div>
-                                </div>
-                                <div className="text-left min-w-0">
-                                  <span className="font-medium text-gray-900 text-sm block truncate">
-                                    {keyword.keyword}
-                                  </span>
-                                </div>
-                                <div className="text-right">
-                                  <span className="font-medium text-gray-700 text-sm">
-                                    {keyword.volume >= 1000 ? `${(keyword.volume/1000).toFixed(1)}K` : keyword.volume.toLocaleString()}
-                                  </span>
-                                </div>
-                                <div className="flex items-center justify-center">
-                                  <span className={`px-2.5 py-1 rounded-md text-[10px] font-medium ${
-                                    keyword.intent === 'Commercial' ? 'bg-blue-50 text-blue-700' :
-                                    keyword.intent === 'Transactional' ? 'bg-green-50 text-green-700' :
-                                    'bg-gray-50 text-gray-700'
-                                  }`}>
-                                    {keyword.intent}
-                                  </span>
-                                </div>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </>
-                    )}
-                  </div>
-                </div>
-              </section>
-            )}
-
-            {drawerStep === 4 && (
-              <section className="rounded-[36px] bg-white border border-white/70 shadow-[0_30px_80px_rgba(15,23,42,0.08)] p-8 space-y-6">
-                <div>
-                  <p className="text-xs uppercase tracking-[0.35em] text-gray-500">Long-tail notes</p>
-                  <p className="text-sm text-gray-500">
-                    Select supporting angles or add your own prompts.
-                  </p>
-                </div>
-                <div className="rounded-[28px] border border-gray-200 bg-gray-50/60 p-4 space-y-3">
-                  <div className="relative">
-                    <Search className="h-4 w-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                    <input
-                      type="text"
-                      value={publishKeywordQuery}
-                      onChange={(e) => setPublishKeywordQuery(e.target.value)}
-                      placeholder="Search support keywords..."
-                      className="w-full pl-9 pr-3 py-2.5 rounded-2xl border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-gray-900"
-                    />
-                  </div>
-                  <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-                    {sortedKeywords.length === 0 ? (
-                      <p className="p-4 text-sm text-gray-500">No keywords available for this search.</p>
-                    ) : (
-                      <>
-                        <div className="bg-gray-50/50 border-b border-gray-200">
-                          <div className="grid grid-cols-[auto,1fr,100px,90px] gap-6 px-5 py-3.5">
-                            <div className="w-8" />
-                            <div 
-                              className="flex items-center space-x-1.5 cursor-pointer hover:text-gray-900 transition-colors text-xs font-semibold text-gray-600 uppercase tracking-wider"
-                              onClick={() => handleSort('keyword')}
-                            >
-                              <span>Keyword</span>
-                              {getSortIcon('keyword')}
-                            </div>
-                            <div 
-                              className="flex items-center space-x-1.5 cursor-pointer hover:text-gray-900 transition-colors justify-end text-xs font-semibold text-gray-600 uppercase tracking-wider"
-                              onClick={() => handleSort('volume')}
-                            >
-                              <span>Volume</span>
-                              {getSortIcon('volume')}
-                            </div>
-                            <div 
-                              className="flex items-center space-x-1.5 cursor-pointer hover:text-gray-900 transition-colors justify-center text-xs font-semibold text-gray-600 uppercase tracking-wider"
-                              onClick={() => handleSort('intent')}
-                            >
-                              <span>Intent</span>
-                              {getSortIcon('intent')}
-                            </div>
-                          </div>
-                        </div>
-                        <div className="divide-y divide-gray-100/80 max-h-60 overflow-y-auto">
-                          {sortedKeywords.slice(0, 25).map((keyword) => {
-                            const isSelected = selectedLongtailKeywords.includes(keyword.keyword);
-                            return (
-                              <button
-                                key={`${keyword.id}-longtail`}
-                                type="button"
-                                onClick={() => toggleLongtailKeyword(keyword.keyword)}
-                                className={`w-full grid grid-cols-[auto,1fr,100px,90px] items-center gap-6 px-5 py-3.5 hover:bg-gray-50/50 transition-all duration-150 cursor-pointer ${
-                                  isSelected ? 'bg-blue-50/30' : ''
-                                }`}
-                              >
-                                <div className="flex items-center justify-center w-8">
-                                  <div className={`w-5 h-5 rounded-full border-2 transition-all duration-150 flex items-center justify-center ${
-                                    isSelected 
-                                      ? 'bg-gray-900 border-gray-900' 
-                                      : 'border-gray-300 hover:border-gray-400'
-                                  }`}>
-                                    {isSelected && (
-                                      <CheckCircle className="w-4 h-4 text-white -ml-0.5 -mt-0.5" fill="currentColor" />
-                                    )}
-                                  </div>
-                                </div>
-                                <div className="text-left min-w-0">
-                                  <span className="font-medium text-gray-900 text-sm block truncate">
-                                    {keyword.keyword}
-                                  </span>
-                                </div>
-                                <div className="text-right">
-                                  <span className="font-medium text-gray-700 text-sm">
-                                    {keyword.volume >= 1000 ? `${(keyword.volume/1000).toFixed(1)}K` : keyword.volume.toLocaleString()}
-                                  </span>
-                                </div>
-                                <div className="flex items-center justify-center">
-                                  <span className={`px-2.5 py-1 rounded-md text-[10px] font-medium ${
-                                    keyword.intent === 'Commercial' ? 'bg-blue-50 text-blue-700' :
-                                    keyword.intent === 'Transactional' ? 'bg-green-50 text-green-700' :
-                                    'bg-gray-50 text-gray-700'
-                                  }`}>
-                                    {keyword.intent}
-                                  </span>
-                                </div>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </>
-                    )}
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-xs uppercase tracking-[0.35em] text-gray-500">
-                    Add custom direction
-                  </label>
-                  <div className="flex flex-col sm:flex-row gap-3">
-                    <input
-                      type="text"
-                      value={longtailInput}
-                      onChange={(e) => setLongtailInput(e.target.value)}
-                      placeholder="Add tone, CTA, or example..."
-                      className="flex-1 px-4 py-3 text-sm rounded-2xl border border-gray-200 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-900"
-                    />
-                    <button
-                      onClick={handleAddLongtailInput}
-                      className="px-5 py-3 rounded-2xl bg-black text-white text-sm font-medium hover:bg-black/90 transition-colors"
-                    >
-                      Add
-                    </button>
-                  </div>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {selectedLongtailKeywords.length === 0 ? (
-                    <p className="text-xs text-gray-400">
-                      Selected notes will appear here. Use them to guide tone, voice, or structure.
-                    </p>
-                  ) : (
-                    selectedLongtailKeywords.map((keyword) => (
-                      <span
-                        key={`chip-${keyword}`}
-                        className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-gray-900 text-white text-xs font-medium"
-                      >
-                        {keyword}
-                        <button
-                          onClick={() => handleRemoveLongtailKeyword(keyword)}
-                          className="hover:text-gray-200"
-                          aria-label={`Remove ${keyword}`}
-                        >
-                          <X className="h-3 w-3" />
-                        </button>
-                      </span>
-                    ))
-                  )}
-                </div>
-              </section>
-            )}
-
-            {/* <div className="flex items-center justify-between pt-4 border-t border-gray-200">
-              <button
-                onClick={handleDrawerBack}
-                disabled={drawerStep === 1}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-40"
-              >
-                <ChevronLeft className="h-4 w-4" />
-                Back
-              </button>
-              <div className="flex items-center gap-3">
-                {drawerStep < totalDrawerSteps && (
-                  <button
-                    onClick={handleDrawerNext}
-                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-gray-900 text-white text-sm font-semibold hover:bg-black/90"
-                  >
-                    Next
-                    <ChevronRight className="h-4 w-4" />
-                  </button>
-                )}
-                {drawerStep === totalDrawerSteps && (
-                  <button
-                    onClick={handleGenerateContent}
-                    disabled={publishLoading || !publishForm.primaryKeyword.trim()}
-                    className="px-6 py-2.5 rounded-full bg-black text-white text-sm font-semibold shadow-lg hover:bg-black/90 disabled:opacity-60 transition-colors"
-                  >
-                    {publishLoading ? 'Generating…' : 'Generate & Preview'}
-                  </button>
-                )}
-              </div>
-            </div> */}
-          </div>
-        </SheetContent>
-      </Sheet>
-
-          <PublishHistoryTable
-            entries={publishHistory}
-            onRefresh={fetchPublishHistory}
-            onNewDraft={handleOpenComposeDrawer}
-            onResumeDraft={handleResumeDraft}
-          />
-        </div>
-      )}
 
       {showPreviewStage && (
-        disablePreviewOverlay ? (
           // Render preview content directly without overlay wrapper (for embedded use)
-          // Parent overlay already provides fixed inset-0, so we just fill it
-          <div className="absolute inset-0 overflow-y-auto bg-white">
-          <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-xl border-b border-gray-100 shadow-sm">
+          // Parent overlay provides absolute inset-0 — we just fill it with a
+          // flex column. Heights are flex-driven so the embedded preview
+          // adapts to any container size (viewport, modal, content area).
+          <div className="absolute inset-0 flex flex-col bg-white">
+          <div className="z-20 bg-white/95 backdrop-blur-xl border-b border-gray-100 shadow-sm shrink-0">
             <div className="min-w-7xl mx-2 px-6 py-4">
               <div className="flex items-center justify-between gap-4">
                 <div className="flex items-center gap-3 min-w-0">
@@ -3025,20 +2640,13 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
                     <Save className='h-5 w-5' />
                     {/* {saving ? 'Saving…' : hasUnsavedChanges ? 'Save Draft • Unsaved' : 'Save Draft'} */}
                   </button>
-                  {/* <button
-                    onClick={handleResetDraft}
-                    title='Reset'
-                    className="px-4 py-2.5 rounded-md border border-gray-200 bg-white text-sm font-medium text-gray-900 hover:bg-gray-50 disabled:opacity-60 transition-colors"
-                  >
-                   Reset
-                  </button> */}
-                  <button
-                    onClick={handleGenerateContent}
-                    title='Regenerate'
-                    disabled={publishLoading}
-                    className="flex items-center gap-2 px-4 py-2.5 rounded-md border border-gray-200 bg-white text-sm font-medium text-gray-900 hover:bg-gray-50 disabled:opacity-60 transition-colors"
-                  ><RotateCcw className='h-4 w-4'/>
-                  </button>
+                  {/* Regenerate intentionally hidden in embedded mode.
+                      The worksheet's Generate flow uses a different (universal)
+                      n8n webhook tied to topic + keywords; calling
+                      handleGenerateContent here would route to the legacy
+                      single-keyword review webhook and clobber the topic's
+                      draft with mismatched content. Regenerate from the
+                      worksheet row instead. */}
                     <button
                       type="button"
                       onClick={() => addImageInputRef.current?.click()}
@@ -3054,22 +2662,13 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
                       onChange={handleDeviceImageSelect}
                       className="hidden"
                     />
-                  <button
-  onClick={handlePublishToWordpress}
-  disabled={publishLoading || !publishResult}
-  className="px-4 py-2.5 rounded-md bg-[#2D4059] text-white text-sm font-medium shadow-lg hover:bg-[#2D4059]/90 disabled:opacity-60 transition-colors flex items-center gap-2"
->
-  <Send className="h-4 w-4" />
-  {publishLoading
-    ? 'Working…'
-    : (publishResult?.wordpressUrl?.startsWith('http') ? 'Re-publish' : 'Publish')}
-</button>
+                  {renderPublishActions('compact')}
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="flex overflow-hidden" style={{ height: 'calc(100vh - 80px)' }}>
+          <div className="flex flex-1 min-h-0 overflow-hidden">
             {/* Left Sidebar - Article Stats */}
             {publishResult && (
               <div className="w-80 border-r border-gray-200 bg-gray-50/50 overflow-y-auto">
@@ -3131,7 +2730,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
                           <p className="text-xs text-gray-500">Manage images in your article</p>
                           <button
                             onClick={() => setShowAddImageModal(true)}
-                            className="inline-flex items-center gap-2 px-1 py-1 bg-black text-white rounded-full text-sm font-medium hover:bg-black/90  disabled:opacity-60 transition"
+                            className="inline-flex w-auto items-center justify-center rounded-xl border border-[#2D4059]/20  px-3 py-2.5 text-sm font-semibold text-white transition bg-[#2D4059] hover:bg-[#2D4059]/90"
                           >
                             <Plus className="h-3.5 w-3.5" />
                             Add
@@ -3557,628 +3156,6 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
             </div>
           )}
           </div>
-        ) : (
-          // Render with full-screen overlay wrapper (for standalone use in publish tab)
-          // Only render if active (to prevent showing when viewing from campaign)
-          isActive ? (
-            <div className="fixed inset-0 z-50 bg-white">
-            <div className="sticky top-0 z-0 bg-white/95 backdrop-blur-xl border-b border-gray-100 shadow-sm">
-              <div className="min-w-7xl mx-auto px-6 py-4">
-                <div className="flex items-center justify-between gap-4">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <button
-                      onClick={handleOpenComposeDrawer}
-                      className="inline-flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors"
-                    >
-                      <ArrowLeft className="h-4 w-4" />
-                    </button>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <p className="text-xs uppercase tracking-[0.3em] text-gray-500">
-                          {isEditMode ? 'Edit Mode' : 'Draft Preview'}
-                        </p>
-                        {publishLoading && !publishResult && (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-blue-50 border border-blue-200 text-[10px] font-medium text-blue-700 uppercase tracking-[0.2em]">
-                            <svg className="h-3 w-3 animate-spin" fill="none" viewBox="0 0 24 24">
-                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4l3-3-3-3v4A8 8 0 104 12z" />
-                            </svg>
-                            Generating
-                          </span>
-                        )}
-                      </div>
-                      <h3 className="text-2xl font-light text-gray-900 tracking-tight truncate">
-                        {publishResult?.title || publishForm.primaryKeyword || 'Untitled article'}
-                      </h3>
-                      {publishResult?.metaDescription && (
-                        <p className="text-sm text-gray-600 mt-1 truncate">{publishResult.metaDescription}</p>
-                      )}
-                      {publishLoading && !publishResult && (
-                        <p className="text-sm text-gray-500 mt-1">Creating your content...</p>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-3 justify-end flex-shrink-0">
-                    {publishResult && (
-                      <button
-                      title={isEditMode ? "Exit edit mode" : "Edit content"}
-                        onClick={handleToggleEditMode}
-                        className={`px-1 py-2 rounded-full text-sm font-medium text-gray-500 hover:text-gray-900 transition-colors ${
-                          isEditMode
-                            ? 'border-gray-900 text-gray-900 hover:text-gray-500'
-                            : 'border-gray-200 text-gray-500 hover:text-gray-900'
-                        }`}
-                      >
-                        {isEditMode ? (
-                          <span className="flex items-center ">
-                            <Edit className='h-5 w-5' />
-                         
-                          </span>
-                        ) : (
-                          <span className="flex items-center ">
-                            <Edit className='h-5 w-5' />
-                           
-                          </span>
-                        )}
-                      </button>
-                    )}
-                    <button
-                    title='Save Draft'
-                      onClick={handleSaveDraft}
-                      disabled={saving || !publishResult || !hasUnsavedChanges}
-                      className={`px-1 py-2 rounded-full text-sm font-medium text-gray-500 hover:text-gray-900 transition-colors${
-                        hasUnsavedChanges 
-                          ? 'border-gray-900 text-gray-900 hover:text-gray-500' 
-                          : 'border-gray-200 text-gray-500 hover:text-gray-900'
-                      } disabled:opacity-50 disabled:cursor-not-allowed`}
-                    >
-                      <Save className='h-5 w-5'/>
-                      {/* {saving ? 'Saving…' : hasUnsavedChanges ? 'Save Draft • Unsaved' : 'Save Draft'} */}
-                    </button>
-                    {/* <button
-                    title='Reset'
-                      onClick={handleResetDraft}
-                      className="px-1 py-2 rounded-full text-sm font-medium text-gray-500 hover:text-gray-900 transition-colors"
-                    >
-                     <RotateCcw className='h-5 w-5'/>
-                    </button> */}
-                    <button
-                      onClick={handleGenerateContent}
-                      disabled={publishLoading}
-                      className="px-5 py-2.5 rounded-full border border-gray-200 bg-white text-sm font-medium text-gray-900 hover:bg-gray-50 hover:border-gray-900 disabled:opacity-60 transition-colors"
-                    >
-                      {publishLoading ? 'Generating…' : publishResult ? 'Regenerate' : 'Generate'}
-                    </button>
-                    
-                    {currentDraftStatus === 'published' && publishResult?.wordpressUrl ? (
-                      <div className="flex items-center gap-3">
-                        <div className="flex items-center gap-1.5 px-3 py-1.5 bg-green-50 text-green-700 rounded-full border border-green-200 shadow-sm animate-in fade-in slide-in-from-right-4 duration-500">
-                          <CheckCircle className="h-4 w-4" />
-                          <span className="text-xs font-semibold tracking-wide uppercase">Live</span>
-                        </div>
-                        <a
-                          href={publishResult.wordpressUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="px-6 py-2.5 rounded-full bg-black text-white text-sm font-medium shadow-lg hover:bg-gray-800 transition-all flex items-center gap-2"
-                        >
-                          <Eye className="h-4 w-4" />
-                          Live URL
-                        </a>
-                      </div>
-                    ) : (
-                      <button
-                        onClick={handlePublishToWordpress}
-                        disabled={publishLoading || !publishResult}
-                        className="px-6 py-2.5 rounded-full bg-black text-white text-sm font-medium shadow-lg hover:bg-gray-800 disabled:opacity-60 transition-all flex items-center gap-2"
-                      >
-                        {publishLoading ? (
-                          <>
-                            <ButtonSpinner />
-                            <span>Publishing…</span>
-                          </>
-                        ) : (
-                          <>
-                            <Send className="h-4 w-4" />
-                            <span>Publish to WordPress</span>
-                          </>
-                        )}
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="h-[calc(100vh-80px)] flex overflow-hidden">
-              {/* Left Sidebar - Article Stats */}
-              {/* {publishResult && (
-                <div className="w-80 border-r border-gray-200 bg-gray-50/50 overflow-y-auto">
-                  <div className="p-6 space-y-6">
-                    <div>
-                      <h4 className="text-xs uppercase tracking-[0.3em] text-gray-500 mb-3">Article Stats</h4>
-                      <div className="space-y-4">
-                        <div className="rounded-2xl border border-gray-200 bg-white p-4">
-                          <div className="flex items-center justify-between mb-1">
-                            <p className="text-xs text-gray-500">Total Words</p>
-                            {hasUnsavedChanges && (
-                              <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-medium">
-                                Unsaved
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-2xl font-light text-gray-900">{wordCount.toLocaleString()}</p>
-                          {isEditMode && (
-                            <p className="text-[10px] text-gray-400 mt-1">Updates as you type</p>
-                          )}
-                        </div>
-                        
-                        <div className="rounded-2xl border border-gray-200 bg-white p-4">
-                          <p className="text-xs text-gray-500 mb-2">Primary Keyword</p>
-                          <p className="text-sm font-medium text-gray-900">
-                            {publishResult.primaryKeyword || publishForm.primaryKeyword || 'Not set'}
-                          </p>
-                        </div>
-
-                        {renderMetadataEditor()}
-                        {renderFeaturedImageEditor()}
-                        
-                        <div className="rounded-2xl border border-gray-200 bg-white p-4">
-                          <p className="text-xs text-gray-500 mb-2">Secondary Keywords</p>
-                          {secondaryKeywords.length > 0 ? (
-                            <div className="flex flex-wrap gap-2">
-                              {secondaryKeywords.map((keyword, index) => (
-                                <span
-                                  key={index}
-                                  className="inline-flex items-center px-2.5 py-1 rounded-full bg-gray-100 text-gray-700 text-xs font-medium"
-                                >
-                                  {keyword}
-                                </span>
-                              ))}
-                            </div>
-                          ) : (
-                            <p className="text-xs text-gray-400 italic">No secondary keywords set</p>
-                          )}
-                        </div>
-                      </div>
-                    </div> */}
-
-                    {/* Image Management Panel - Below Article Stats */}
-                  {/* {isEditMode && (
-                    <div>
-                      <h4 className="text-xs uppercase tracking-[0.3em] text-gray-500 mb-3">Image Management</h4>
-                      <div className="rounded-2xl border border-gray-200 bg-white overflow-hidden flex flex-col max-h-[calc(100vh-400px)]">
-                        <div className="border-b border-gray-200 bg-gray-50 px-4 py-3 flex items-center justify-between flex-shrink-0">
-                          <p className="text-xs text-gray-500">Manage images in your article</p>
-                          <button
-                            onClick={() => setShowAddImageModal(true)}
-                            className="inline-flex items-center gap-2 px-2 py-1 text-black rounded-full text-sm font-medium hover:bg-gray-200  disabled:opacity-60 transition"
-                          >
-                            <Plus className="h-2.5 w-2.5" />
-                            Add
-                          </button>
-                        </div>
-                        <div className="p-4 overflow-y-auto flex-1">
-                          {publishImages.length === 0 ? (
-                            <div className="text-center py-8 text-sm text-gray-500">
-                              <ImageIcon className="h-8 w-8 mx-auto mb-2 text-gray-400" />
-                              <p>No images in this article</p>
-                            </div>
-                          ) : (
-                            <div className="grid grid-cols-1 gap-4">
-                              {publishImages.map((image, index) => (
-                                <div key={index} className="relative group rounded-xl border border-gray-200 overflow-hidden bg-gray-50">
-                                  <img
-                                    src={image.src}
-                                    alt={image.alt}
-                                    className="w-full h-32 object-cover"
-                                  />
-                                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100">
-                                    <button
-                                      onClick={() => handleImageSelect(image.src)}
-                                      className="px-3 py-1.5 rounded-full bg-white text-gray-900 text-xs font-medium hover:bg-gray-100"
-                                    >
-                                      <Edit className="h-3 w-3 inline mr-1" />
-                                      Edit
-                                    </button>
-                                    <button
-                                      onClick={() => handleRemoveImage(image.src)}
-                                      className="px-3 py-1.5 rounded-full bg-red-600 text-white text-xs font-medium hover:bg-red-700"
-                                    >
-                                      <Trash2 className="h-3 w-3 inline mr-1" />
-                                      Remove
-                                    </button>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )} */}
-              
-              {/* Main Content Area */}
-              <div className="flex-1 overflow-y-auto">
-                <div className="max-w-7xl mx-auto px-6 py-8">
-                {publishLoading && !publishResult ? (
-                  <div className="space-y-8">
-                    {/* Hero section skeleton */}
-                    <div className="space-y-4">
-                      <div className="h-12 bg-gradient-to-r from-gray-100 via-gray-50 to-gray-100 rounded-2xl w-3/4 animate-pulse" />
-                      <div className="space-y-2">
-                        <div className="h-4 bg-gray-100 rounded-full w-full animate-pulse" />
-                        <div className="h-4 bg-gray-100 rounded-full w-11/12 animate-pulse" />
-                        <div className="h-4 bg-gray-100 rounded-full w-5/6 animate-pulse" />
-                      </div>
-                    </div>
-                    
-                    {/* Image skeleton */}
-                    <div className="h-64 bg-gradient-to-br from-gray-100 to-gray-50 rounded-2xl animate-pulse" />
-                    
-                    {/* Content skeleton */}
-                    <div className="space-y-6">
-                      {[1, 2, 3, 4].map((i) => (
-                        <div key={i} className="space-y-3">
-                          <div className="h-8 bg-gray-100 rounded-xl w-1/2 animate-pulse" />
-                          <div className="space-y-2">
-                            <div className="h-4 bg-gray-50 rounded-full w-full animate-pulse" />
-                            <div className="h-4 bg-gray-50 rounded-full w-11/12 animate-pulse" />
-                            <div className="h-4 bg-gray-50 rounded-full w-10/12 animate-pulse" />
-                            <div className="h-4 bg-gray-50 rounded-full w-full animate-pulse" />
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                    
-                    {/* Loading indicator */}
-                    <div className="flex items-center justify-center py-8">
-                      <div className="flex flex-col items-center gap-3">
-                        <svg className="h-8 w-8 animate-spin text-gray-400" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4l3-3-3-3v4A8 8 0 104 12z" />
-                        </svg>
-                        <p className="text-sm font-light text-gray-500">Crafting your content...</p>
-                      </div>
-                    </div>
-                  </div>
-                ) : publishResult ? (
-                  <>
-                    {isEditMode ? (
-                      <div className="rounded-2xl border border-gray-200 bg-white">
-                        <div className="bg-white">
-                          <style>{`
-                            /* ReactQuill wrapper styles */
-                            .ql-snow {
-                              border: none;
-                            }
-                            .ql-container {
-                              font-family: SF Pro Display;
-                              font-size: 16px;
-                              min-height: calc(100vh - 450px);
-                              height: auto;
-                              border: none;
-                            }
-                            .ql-editor {
-                              min-height: calc(100vh - 450px);
-                              padding: 24px;
-                            }
-                            .ql-editor.ql-blank::before {
-                              font-style: normal;
-                              color: #9ca3af;
-                            }
-                            /* Make toolbar sticky at the very top */
-                            .ql-toolbar,
-                            .ql-toolbar.ql-snow,
-                            .ql-snow .ql-toolbar,
-                            div.ql-toolbar,
-                            [class*="ql-toolbar"] {
-                              position: sticky !important;
-                              top: 0 !important;
-                              z-index: 30 !important;
-                              background: white !important;
-                              backdrop-filter: blur(10px);
-                              -webkit-backdrop-filter: blur(10px);
-                              border-top: none !important;
-                              border-left: none !important;
-                              border-right: none !important;
-                              border-bottom: 1px solid #e5e7eb !important;
-                              padding: 12px !important;
-                              box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08) !important;
-                              margin: 0 !important;
-                            }
-                            .ql-editor.has-edits {
-                              position: relative;
-                            }
-                            .ql-editor.has-edits::before {
-                              content: '';
-                              position: absolute;
-                              top: 0;
-                              left: 0;
-                              right: 0;
-                              bottom: 0;
-                              background: linear-gradient(90deg, 
-                                transparent 0%, 
-                                rgba(59, 130, 246, 0.03) 50%, 
-                                transparent 100%);
-                              pointer-events: none;
-                              z-index: 0;
-                            }
-                            .ql-editor.has-edits {
-                              background-color: rgba(59, 130, 246, 0.02);
-                            }
-                            .ql-editor.has-edits p,
-                            .ql-editor.has-edits h1,
-                            .ql-editor.has-edits h2,
-                            .ql-editor.has-edits h3,
-                            .ql-editor.has-edits h4,
-                            .ql-editor.has-edits h5,
-                            .ql-editor.has-edits h6 {
-                              position: relative;
-                              z-index: 1;
-                            }
-                          `}</style>
-                          <ReactQuill
-                            ref={quillRef}
-                            theme="snow"
-                            value={editedHtmlContent}
-                            onChange={(content) => {
-                              handleHtmlEditorChange(content);
-                            }}
-                            modules={{
-                              toolbar: [
-                                [{ 'header': [1, 2, 3, 4, 5, 6, false] }],
-                                ['bold', 'italic', 'underline', 'strike'],
-                                [{ 'list': 'ordered'}, { 'list': 'bullet' }],
-                                [{ 'script': 'sub'}, { 'script': 'super' }],
-                                [{ 'indent': '-1'}, { 'indent': '+1' }],
-                                [{ 'direction': 'rtl' }],
-                                [{ 'size': ['small', false, 'large', 'huge'] }],
-                                [{ 'color': [] }, { 'background': [] }],
-                                [{ 'font': [] }],
-                                [{ 'align': [] }],
-                                ['clean'],
-                                ['link', 'image', 'video'],
-                                ['code-block']
-                              ],
-                            }}
-                            formats={[
-                              'header', 'font', 'size',
-                              'bold', 'italic', 'underline', 'strike',
-                              'list', 'bullet', 'indent',
-                              'script', 'direction',
-                              'color', 'background',
-                              'align', 'link', 'image', 'video', 'code-block'
-                            ]}
-                          />
-                      </div>
-                    </div>
-                  ) : (
-                    <>
-                      <style>{`
-                        ::selection {
-                          background-color: rgba(59, 130, 246, 0.4) !important;
-                          color: inherit;
-                        }
-                        .prose ::selection {
-                          background-color: rgba(59, 130, 246, 0.45) !important;
-                        }
-                        .prose *::selection {
-                          background-color: rgba(59, 130, 246, 0.45) !important;
-                        }
-                        [data-selection-active="true"] ::selection {
-                          background-color: rgba(59, 130, 246, 0.5) !important;
-                        }
-                        .selection-highlight {
-                          background-color: rgba(59, 130, 246, 0.2) !important;
-                          border-radius: 2px;
-                          padding: 0 2px;
-                          position: relative;
-                        }
-                        .selection-highlight::before {
-                          content: '';
-                          position: absolute;
-                          inset: -2px;
-                          border: 2px solid rgba(59, 130, 246, 0.4);
-                          border-radius: 4px;
-                          pointer-events: none;
-                        }
-                        /* Quill size classes so preview matches editor */
-                        .ql-size-small { font-size: 0.75em; }
-                        .ql-size-large { font-size: 1.5em; }
-                        .ql-size-huge { font-size: 2.5em; }
-                      `}</style>
-                      <div
-                        ref={previewRef}
-                        data-selection-active={selectedText ? 'true' : 'false'}
-                        onMouseUp={(e) => {
-                          handlePreviewMouseUp(e.nativeEvent);
-                        }}
-                        onDoubleClick={(e) => {
-                          const target = e.target as HTMLElement;
-                          if (target.tagName === 'P' || target.closest('p')) {
-                            const paragraph = target.tagName === 'P' ? target : target.closest('p');
-                            if (paragraph) {
-                              const range = document.createRange();
-                              range.selectNodeContents(paragraph);
-                              const selection = window.getSelection();
-                              if (selection) {
-                                selection.removeAllRanges();
-                                selection.addRange(range);
-                                setSelectedRange(range.cloneRange());
-                                setSelectedText(selection.toString().trim());
-                                setTimeout(() => {
-                                  handlePreviewMouseUp(e.nativeEvent);
-                                }, 10);
-                              }
-                            }
-                          }
-                        }}
-                        onMouseDown={(e) => {
-                          const target = e.target as HTMLElement;
-                          if (target.closest('.tippy-box') || target.closest('[data-tippy-root]')) {
-                            e.preventDefault();
-                            return;
-                          }
-                          if (previewRef.current?.contains(target)) {
-                            return;
-                          }
-                        }}
-                        className="prose prose-lg prose-gray max-w-none prose-headings:font-semibold prose-img:rounded-2xl prose-img:shadow-sm selection:bg-blue-100 selection:text-gray-900"
-                        style={{
-                          userSelect: 'text',
-                          WebkitUserSelect: 'text',
-                        }}
-                      >
-                        {parse(currentHtmlContent || '')}
-                      </div>
-                      <p className="text-xs text-gray-500 text-center mt-8 pt-6 border-t border-gray-100">
-                        Highlight text or tap any image to open the inline AI palette.
-                      </p>
-                    </>
-                  )}
-                </>
-              ) : (
-                <div className="py-16 text-center text-sm text-gray-500">
-                  <p>Generate a draft to see the immersive preview.</p>
-                </div>
-              )}
-              </div>
-            </div>
-          </div>
-
-          {!isEditMode && publishResult && publishImages.length > 0 && (
-            <div className="fixed bottom-6 right-6 z-40">
-              <div className="bg-white/95 backdrop-blur-xl rounded-2xl border border-gray-200 shadow-2xl p-4 max-w-xs">
-                <h4 className="text-sm font-medium text-gray-900 mb-3">Images</h4>
-                <div className="grid grid-cols-2 gap-2">
-                  {publishImages.map((image) => (
-                    <Tippy
-                      key={image.src}
-                      onCreate={(instance) => {
-                        if (selectedImage === image.src) {
-                          imageTooltipInstanceRef.current = instance;
-                        }
-                      }}
-                      content={
-                        selectedImage === image.src ? (
-                            <div className="w-[360px] rounded-[14px] border border-gray-200/70 bg-white p-5 shadow-2xl backdrop-blur-2xl space-y-3">
-                            <div className="flex items-center justify-between">
-                              <div>
-                                <p className="text-md uppercase text-gray-800 font-medium">
-                                  AI Assistance
-                                </p>
-                                
-                              </div>
-                              <button
-                                onClick={closeImageTooltip}
-                                className="text-xs text-gray-400 hover:text-gray-900 transition-colors p-1 rounded-full hover:bg-gray-100"
-                                aria-label="Close tooltip"
-                              >
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                </svg>
-                              </button>
-                            </div>
-                            <div className="relative rounded-xl overflow-hidden border border-gray-200/50">
-                              <img src={selectedImage} alt="Selected for editing" className="w-full h-24 object-cover" />
-                              <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
-                            </div>
-                            <div className="space-y-2">
-                              <label className="text-xs uppercase tracking-[0.2em] text-gray-500 font-medium">
-                                Alt text
-                              </label>
-                              <input
-                                type="text"
-                                value={selectedImageAlt}
-                                onChange={(e) => setSelectedImageAlt(e.target.value)}
-                                placeholder="Describe this image"
-                                className="w-full px-3 py-2.5 text-sm rounded-2xl border border-gray-200/80 bg-white focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent transition-all"
-                              />
-                              <button
-                                onClick={updateImageAltText}
-                                disabled={!selectedImage || selectedImageAlt === (selectedImageDetails?.alt || '')}
-                                className="w-full px-4 py-2.5 rounded-full border border-gray-200 bg-white text-sm font-semibold hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-                              >
-                                Save Alt Text
-                              </button>
-                            </div>
-                            <textarea
-                              ref={imageEditTextareaRef}
-                              value={imageEditNote}
-                              onChange={(e) => setImageEditNote(e.target.value)}
-                              onKeyDown={(e) => {
-                                if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
-                                  e.preventDefault();
-                                  if (selectedImage && imageEditNote.trim() && !imageEditing) {
-                                    handleImageEdit();
-                                  }
-                                }
-                              }}
-                              placeholder="Describe how this image should feel, what mood, style, or elements to include..."
-                              rows={3}
-                              className="w-full px-3 py-2.5 text-sm rounded-2xl border border-gray-200/80 bg-white focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent transition-all resize-none"
-                            />
-                            <button
-                              onClick={handleImageEdit}
-                              disabled={!selectedImage || !imageEditNote.trim() || imageEditing}
-                              className="w-full px-4 py-2.5 rounded-full border-2 border-gray-200 bg-white text-sm font-semibold hover:bg-gray-50 hover:border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm hover:shadow-md"
-                            >
-                              {imageEditing ? (
-                                <span className="flex items-center justify-center gap-2">
-                                  <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
-                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
-                                  </svg>
-                                  Regenerating…
-                                </span>
-                              ) : (
-                                'Regenerate Image'
-                              )}
-                            </button>
-                          </div>
-                        ) : null
-                      }
-                      visible={selectedImage === image.src}
-                      interactive
-                      placement="left"
-                      theme="light"
-                      className="publish-tippy"
-                      arrow={false}
-                      maxWidth="none"
-                      animation="fade"
-                      duration={200}
-                      offset={[0, 12]}
-                      hideOnClick={false}
-                      trigger="manual"
-                      appendTo={() => document.body}
-                    >
-                      <button
-                        type="button"
-                        onClick={() => handleImageSelect(image.src)}
-                        className={`relative rounded-xl border-2 overflow-hidden transition-all aspect-square ${
-                          selectedImage === image.src
-                            ? 'border-black shadow-lg ring-2 ring-black/20'
-                            : 'border-gray-200 hover:border-gray-300'
-                        }`}
-                      >
-                        <img src={image.src} alt={image.alt} className="w-full h-full object-cover" />
-                        {selectedImage === image.src && (
-                          <div className="absolute inset-0 bg-black/10 border-2 border-white rounded-xl" />
-                        )}
-                      </button>
-                    </Tippy>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-          ) : null
-        )
       )}
 
       {/* Add Image Modal - rendered outside preview overlay */}

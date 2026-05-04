@@ -99,18 +99,13 @@ router.get('/all', authenticateToken, asyncHandler(async (req: AuthenticatedRequ
       }
     });
 
-    const domainsWithSteps = await Promise.all(domains.map(async domain => {
-      const syncedStep = await syncDomainCurrentStep(domain.id);
-      return { domain, syncedStep };
-    }));
-
     res.json({
-      domains: domainsWithSteps.map(({ domain, syncedStep }) => ({
+      domains: domains.map((domain) => ({
         id: domain.id,
         url: domain.url,
         context: domain.context,
         location: domain.location,
-        currentStep: syncedStep,
+        currentStep: domain.currentStep,
         createdAt: domain.createdAt,
         updatedAt: domain.updatedAt,
         lastAnalyzed: domain.dashboardAnalyses[0]?.updatedAt || domain.updatedAt,

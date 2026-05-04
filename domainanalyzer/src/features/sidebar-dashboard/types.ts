@@ -8,9 +8,7 @@ export type TabId =
   | "analytics"
   | "integration"
   | "domain-history"
-  | "create-project"
   | "projects"
-  | "publish"
   | "settings"
   | "profile"
   | "ai-checker"
@@ -36,8 +34,6 @@ export interface DashboardSidebarTab {
   icon: ReactNode;
 }
 
-export type DashboardCampaignViewMode = "split" | "graph" | "table";
-
 export interface DomainCheckResult {
   exists: boolean;
   domainId?: number;
@@ -55,11 +51,8 @@ export interface DashboardSearchState {
 
 export interface DashboardHeaderProps {
   activeTab: TabId;
-  campaignViewMode: DashboardCampaignViewMode;
-  selectedCampaignId: number | null;
   tabs: DashboardSidebarTab[];
   userEmail?: string | null;
-  onCampaignViewModeChange: (mode: DashboardCampaignViewMode) => void;
   onTabChange?: (tab: TabId) => void;
 }
 
@@ -98,26 +91,6 @@ export interface CompanySectionProps {
 
 export interface GscAnalyticsSectionProps {
   activeGscSubTab: GscSubTabId;
-}
-
-export interface PublishSectionProps {
-  companyDomain: string;
-  companyDomainLoading: boolean;
-  domainContext: string;
-  draftStatuses: Map<number, any>;
-  draftToPageMap: Map<number, number>;
-  hasWordpressIntegration: boolean;
-  isActive: boolean;
-  keywordsTableData: KeywordTableItem[];
-  pageId?: number;
-  publishingPageIds: Set<number>;
-  setDraftStatuses: Dispatch<SetStateAction<Map<number, any>>>;
-  setDraftToPageMap: Dispatch<SetStateAction<Map<number, number>>>;
-  setPublishingPageIds: Dispatch<SetStateAction<Set<number>>>;
-  sharedPublishStatuses: Map<number, any>;
-  wpIntegration: WordpressIntegration | null;
-  onConfigureWordpress: () => void;
-  onRefreshWordpressIntegration: () => Promise<void>;
 }
 
 export interface AuditSectionProps {
@@ -184,6 +157,6 @@ export interface DashboardContentRouterProps {
   gscAnalytics: GscAnalyticsSectionProps;
   competitorIntelligence: CompetitorIntelligenceProps;
   overview: OverviewSectionProps;
-  publish: PublishSectionProps;
   settings: SettingsSectionProps;
+  onMenuItemClick?: (tabId: TabId, domainId?: string | number) => void;
 }

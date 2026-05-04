@@ -13,6 +13,7 @@ import {
   ShieldAlert,
 } from "lucide-react";
 import { useMemo, useState } from "react";
+import { TabId } from "../types";
 
 const getLogoUrl = (domainUrl: string) => {
   const domain = domainUrl.replace(/^https?:\/\//, "").replace(/^www\./, "");
@@ -103,7 +104,11 @@ const domains: DomainItem[] = [
   },
 ];
 
-export function DomainHistorySection() {
+interface DomainHistorySectionProps {
+  onMenuItemClick?: (tabId: TabId, domainId?: string | number) => void;
+}
+
+export function DomainHistorySection({ onMenuItemClick }: DomainHistorySectionProps) {
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -272,6 +277,18 @@ export function DomainHistorySection() {
                           <button
                             key={item}
                             type="button"
+                            onClick={() => {
+                              if (item === "Competitors") {
+                                onMenuItemClick?.("competitor-intelligence", domain.id);
+                              } else if (item === "View AI Dashboard") {
+                                onMenuItemClick?.("analytics", domain.id);
+                              } else if (item === "Top Keywords") {
+                                onMenuItemClick?.("analytics", domain.id);
+                              } else if (item === "Top Prompts") {
+                                onMenuItemClick?.("analytics", domain.id);
+                              }
+                              setOpenMenuId(null);
+                            }}
                             className="block w-full px-3 py-2 text-left text-xs text-[#374252] hover:bg-[#f4f6fa]"
                           >
                             {item}
