@@ -91,6 +91,7 @@ import { validateDomainInput } from "@/lib/domainValidation";
 
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3002";
+const WORKSHEET_TARGET_KEY = 'ai-results/pending-worksheet-target';
 
 
 
@@ -1792,6 +1793,24 @@ useEffect(() => {
       fetchCampaigns();
     }
   }, [activeTab, fetchCampaigns]);
+
+  useEffect(() => {
+    if (activeTab !== 'projects') return;
+    if (!campaigns.length) return;
+    if (selectedCampaignId !== null) return;
+
+    const pendingTarget = sessionStorage.getItem(WORKSHEET_TARGET_KEY);
+    if (!pendingTarget) return;
+
+    const parsedTargetId = Number(pendingTarget);
+    if (!Number.isFinite(parsedTargetId)) return;
+
+    const matchedCampaign = campaigns.find((campaign) => campaign.id === parsedTargetId);
+    if (!matchedCampaign) return;
+
+    setSelectedCampaignId(matchedCampaign.id);
+    sessionStorage.removeItem(WORKSHEET_TARGET_KEY);
+  }, [activeTab, campaigns, selectedCampaignId]);
 
   const handleCreateCampaign = async (e: React.FormEvent) => {
     e.preventDefault();

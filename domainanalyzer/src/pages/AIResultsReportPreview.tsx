@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   Area,
   AreaChart,
@@ -39,6 +39,13 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import {
   Table,
@@ -48,6 +55,11 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { useNavigate } from 'react-router-dom';
+
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3002';
+const WORKSHEET_IMPORT_KEY = 'ai-results/pending-worksheet-import';
+const WORKSHEET_TARGET_KEY = 'ai-results/pending-worksheet-target';
 
 const sidebarItems = [
   { label: 'AI Results', icon: Sparkles, active: true },
@@ -81,9 +93,23 @@ const scoreCards = [
   { label: 'AI Share of Voice', value: '34%', tone: 'text-blue-600', note: 'Across all AI Models' },
 ];
 
-const promptRows = [
+type PromptRow = {
+  id: string;
+  prompt: string;
+  text: string;
+  type: string;
+  profile: string;
+  ranking: string;
+  position: string;
+  sov: string;
+  competitors: string[];
+};
+
+const promptRows: PromptRow[] = [
   {
+    id: 'ph-101',
     prompt: 'Compare Semrush, Ahrefs, Advanced AI Results',
+    text: 'Compare Semrush, Ahrefs, Advanced AI Results',
     type: 'Prompt',
     profile: 'Positive',
     ranking: '2/5',
@@ -92,7 +118,9 @@ const promptRows = [
     competitors: ['Semrush', 'Ahrefs', '+1'],
   },
   {
+    id: 'ph-102',
     prompt: 'Keyword research software',
+    text: 'Keyword research software',
     type: 'Prompt',
     profile: 'Positive',
     ranking: '2/5',
@@ -101,7 +129,9 @@ const promptRows = [
     competitors: ['Semrush', 'Ahrefs', '+1'],
   },
   {
+    id: 'ph-103',
     prompt: 'SEO tools platform',
+    text: 'SEO tools platform',
     type: 'Prompt',
     profile: 'Positive',
     ranking: '2/5',
@@ -110,7 +140,9 @@ const promptRows = [
     competitors: ['Semrush', 'Ahrefs', '+1'],
   },
   {
+    id: 'ph-104',
     prompt: 'Best local SEO app and plan',
+    text: 'Best local SEO app and plan',
     type: 'Prompt',
     profile: 'Positive',
     ranking: '2/5',
@@ -119,7 +151,31 @@ const promptRows = [
     competitors: ['Semrush', 'Ahrefs', '+1'],
   },
   {
+    id: 'ph-105',
     prompt: 'Digital marketing analytics',
+    text: 'Digital marketing analytics',
+    type: 'Prompt',
+    profile: 'Positive',
+    ranking: '2/5',
+    position: '1st',
+    sov: '42%',
+    competitors: ['Semrush', 'Ahrefs', '+1'],
+  },
+  {
+    id: 'ph-106',
+    prompt: 'Enterprise SEO reporting',
+    text: 'Enterprise SEO reporting',
+    type: 'Prompt',
+    profile: 'Positive',
+    ranking: '2/5',
+    position: '1st',
+    sov: '42%',
+    competitors: ['Semrush', 'Ahrefs', '+1'],
+  },
+  {
+    id: 'ph-107',
+    prompt: 'AI visibility analysis',
+    text: 'AI visibility analysis',
     type: 'Prompt',
     profile: 'Positive',
     ranking: '2/5',
@@ -128,8 +184,6 @@ const promptRows = [
     competitors: ['Semrush', 'Ahrefs', '+1'],
   },
 ];
-
-type PromptRow = (typeof promptRows)[number];
 
 const privateVisibilityItems = [
   { title: 'Best SaaS analytics tools', count: 'Position #2 • 2 competitors', status: 'positive' },
@@ -618,14 +672,166 @@ const PromptRowActions = () => (
   </div>
 );
 
-const PromptTableEntry = ({ row }: { row: PromptRow }) => {
+type WorksheetOption = {
+  id: string;
+  name: string;
+  description: string | null;
+};
+
+const getFinalSelection = (selectedIds: Set<string>, rawData: PromptRow[]) =>
+  Array.from(selectedIds).filter((id) => rawData.some((item) => item.id === id));
+
+type WorksheetPickerModalProps = {
+  open: boolean;
+  selectedCount: number;
+  activeWorksheetId: string | null;
+  worksheets: WorksheetOption[];
+  loading?: boolean;
+  onOpenChange: (open: boolean) => void;
+  onWorksheetSelect: (id: string) => void;
+  onAddToWorksheet: () => void;
+  onCreateNewWorksheet: () => void;
+};
+
+const WorksheetPickerModal = ({
+  open,
+  selectedCount,
+  activeWorksheetId,
+  worksheets,
+  loading = false,
+  onOpenChange,
+  onWorksheetSelect,
+  onAddToWorksheet,
+  onCreateNewWorksheet,
+}: WorksheetPickerModalProps) => {
+  const addDisabled = !activeWorksheetId;
+  const hasWorksheets = worksheets.length > 0;
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="w-[min(920px,calc(100vw-1.5rem))] max-w-none overflow-hidden rounded-[28px] border border-[#E5E7EB] bg-white p-0 shadow-[0_20px_80px_rgba(15,23,42,0.22)]">
+        <div className="flex max-h-[calc(100vh-2rem)] flex-col">
+          <DialogHeader className="shrink-0 border-b border-[#E5E7EB] px-6 py-5 text-left">
+            <DialogTitle className="text-[26px] font-semibold leading-[1.15] tracking-[-0.02em] text-[#1F2937]">
+              Select worksheet
+            </DialogTitle>
+            <DialogDescription className="mt-2 text-sm leading-[150%] text-[#6B7280]">
+              You are adding {selectedCount} item{selectedCount === 1 ? '' : 's'} to your worksheet.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-y-auto px-6 py-5">
+            <div className="mb-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[#2D4059]">
+                Select a worksheet
+              </p>
+            </div>
+
+            {hasWorksheets ? (
+              <div className="flex flex-col gap-3">
+                {worksheets.map((worksheet) => {
+                  const isSelected = activeWorksheetId === worksheet.id;
+
+                  return (
+                    <button
+                      key={worksheet.id}
+                      type="button"
+                      onClick={() => onWorksheetSelect(worksheet.id)}
+                      className={cn(
+                        'flex w-full items-center justify-between rounded-2xl border px-4 py-4 text-left transition-all focus:outline-none focus:ring-2 focus:ring-[#2D4059] focus:ring-offset-2',
+                        isSelected
+                          ? 'border-[#A8C4F6] bg-[#EEF4FF] shadow-[0_0_0_1px_rgba(94,129,230,0.18)]'
+                          : 'border-[#E5E7EB] bg-[#FAFAFA] hover:border-[#CBD5E1] hover:bg-white'
+                      )}
+                      aria-pressed={isSelected}
+                      >
+                        <div className="min-w-0">
+                          <p className="truncate text-base font-semibold leading-[150%] text-[#1F2937]">
+                            {worksheet.name}
+                          </p>
+                          {worksheet.description ? (
+                            <p className="mt-1 text-xs leading-[150%] text-[#6B7280]">
+                              {worksheet.description}
+                            </p>
+                          ) : null}
+                        </div>
+                        <span
+                          className={cn(
+                            'ml-4 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full border text-[10px] leading-none',
+                          isSelected
+                            ? 'border-[#2D4059] bg-[#2D4059] text-white'
+                            : 'border-[#CBD5E1] bg-white text-transparent'
+                        )}
+                        aria-hidden="true"
+                      >
+                        •
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            ) : loading ? (
+              <div className="rounded-2xl border border-dashed border-[#CBD5E1] bg-[#FAFAFA] p-6 text-sm text-[#6B7280]">
+                Loading worksheets...
+              </div>
+            ) : (
+              <div className="rounded-2xl border border-dashed border-[#CBD5E1] bg-[#FAFAFA] p-6 text-sm text-[#6B7280]">
+                No worksheets are available yet.
+              </div>
+            )}
+          </div>
+
+          <div className="shrink-0 border-t border-[#E5E7EB] bg-white px-6 py-4">
+            <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={onCreateNewWorksheet}
+                className="h-11 w-full rounded-xl border border-[#D5D7DA] bg-white px-5 text-sm font-medium text-[#344054] shadow-none hover:bg-[#F9FAFB] sm:w-[190px]"
+              >
+                Create New Worksheet
+              </Button>
+              <Button
+                type="button"
+                disabled={addDisabled}
+                onClick={onAddToWorksheet}
+                className={cn(
+                  'h-11 w-full rounded-xl px-5 text-sm font-semibold shadow-none sm:w-[190px]',
+                  addDisabled
+                    ? 'cursor-not-allowed border border-[#9CA0A7] bg-[#9CA0A7] text-white/80 hover:bg-[#9CA0A7]'
+                    : 'border border-[#2D4059] bg-[#2D4059] text-white hover:bg-[#24364d]'
+                )}
+              >
+                Add to Worksheet
+              </Button>
+            </div>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+type PromptRowItemProps = {
+  row: PromptRow;
+  isSelected: boolean;
+  onToggle: (id: string) => void;
+};
+
+const PromptRowItem = memo(({ row, isSelected, onToggle }: PromptRowItemProps) => {
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
 
   return (
     <TableRow className="h-[72px]">
       <TableCell className="h-[72px] border-b border-[#E5E7EB] p-0 lg:w-[72px]">
         <div className="relative flex h-full w-fit items-center gap-2 pl-2 lg:pl-7">
-          <input type="checkbox" className="h-3.5 w-3.5 rounded border-gray-300" />
+          <input
+            type="checkbox"
+            checked={isSelected}
+            onChange={() => onToggle(row.id)}
+            aria-label={`Select ${row.prompt}`}
+            className="h-3.5 w-3.5 rounded border-gray-300"
+          />
           <button
             type="button"
             aria-label="Show prompt details"
@@ -676,7 +882,9 @@ const PromptTableEntry = ({ row }: { row: PromptRow }) => {
       </TableCell>
     </TableRow>
   );
-};
+});
+
+PromptRowItem.displayName = 'PromptRowItem';
 
 const PromptResultCard = ({ row }: { row: PromptRow }) => {
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
@@ -753,9 +961,174 @@ const PromptResultCard = ({ row }: { row: PromptRow }) => {
   );
 };
 
-const PromptTable = () => (
-  <Card className="mx-auto flex w-full max-w-[1530px] flex-col gap-[22px] rounded-xl border-0 shadow-none">
-    <CardHeader className="flex h-auto w-full flex-col px-0 py-0">
+const PromptTable = () => {
+  const navigate = useNavigate();
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const headerCheckboxRef = useRef<HTMLInputElement | null>(null);
+  const worksheetTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const [isWorksheetModalOpen, setIsWorksheetModalOpen] = useState(false);
+  const [activeWorksheetId, setActiveWorksheetId] = useState<string | null>(null);
+  const [worksheetOptions, setWorksheetOptions] = useState<WorksheetOption[]>([]);
+  const [worksheetOptionsLoading, setWorksheetOptionsLoading] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+
+    const fetchWorksheets = async () => {
+      setWorksheetOptionsLoading(true);
+      try {
+        const token = localStorage.getItem('authToken');
+        const response = await fetch(`${API_BASE_URL}/api/campaigns`, {
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error(`Failed to fetch worksheets (${response.status})`);
+        }
+
+        const data = await response.json();
+        const campaigns = Array.isArray(data?.campaigns) ? data.campaigns : [];
+
+        if (!alive) return;
+
+        setWorksheetOptions(
+          campaigns.map((campaign: { id: number; title: string; description?: string | null }) => ({
+            id: String(campaign.id),
+            name: campaign.title,
+            description: campaign.description?.trim() ? campaign.description.trim() : null,
+          }))
+        );
+      } catch (error) {
+        if (!alive) return;
+        if (import.meta.env.DEV) {
+          console.warn('[worksheet] failed to load campaigns', error);
+        }
+        setWorksheetOptions([]);
+      } finally {
+        if (alive) setWorksheetOptionsLoading(false);
+      }
+    };
+
+    fetchWorksheets();
+
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const filteredItems = useMemo(() => {
+    const normalizedSearch = searchTerm.trim().toLowerCase();
+    if (!normalizedSearch) return promptRows;
+    return promptRows.filter((item) => item.text.toLowerCase().includes(normalizedSearch));
+  }, [searchTerm]);
+
+  const visibleItems = useMemo(
+    () => (isExpanded ? filteredItems : filteredItems.slice(0, 5)),
+    [filteredItems, isExpanded]
+  );
+
+  const selectedVisibleItems = useMemo(
+    () => visibleItems.filter((item) => selectedIds.has(item.id)),
+    [selectedIds, visibleItems]
+  );
+
+  const isAllVisibleSelected = visibleItems.length > 0 && selectedVisibleItems.length === visibleItems.length;
+  const isIndeterminate = selectedVisibleItems.length > 0 && !isAllVisibleSelected;
+  const hiddenSelectedCount = selectedIds.size - selectedVisibleItems.length;
+  const finalSelection = useMemo(() => getFinalSelection(selectedIds, promptRows), [selectedIds]);
+  const selectedCount = selectedIds.size;
+
+  useEffect(() => {
+    if (headerCheckboxRef.current) {
+      headerCheckboxRef.current.indeterminate = isIndeterminate;
+    }
+  }, [isIndeterminate]);
+
+  const handleToggleRow = useCallback((id: string) => {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  }, []);
+
+  const handleToggleVisible = useCallback(() => {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+
+      if (isAllVisibleSelected) {
+        visibleItems.forEach((item) => {
+          next.delete(item.id);
+        });
+      } else {
+        visibleItems.forEach((item) => {
+          next.add(item.id);
+        });
+      }
+
+      return next;
+    });
+  }, [isAllVisibleSelected, visibleItems]);
+
+  const handleOpenWorksheetModal = useCallback(() => {
+    if (selectedCount === 0) return;
+    setActiveWorksheetId(null);
+    setIsWorksheetModalOpen(true);
+  }, [selectedCount]);
+
+  const handleWorksheetModalOpenChange = useCallback((open: boolean) => {
+    setIsWorksheetModalOpen(open);
+    if (!open) {
+      setActiveWorksheetId(null);
+      window.requestAnimationFrame(() => {
+        worksheetTriggerRef.current?.focus();
+      });
+    }
+  }, []);
+
+  const handleAddToWorksheet = useCallback(() => {
+    if (!activeWorksheetId) return;
+
+    const payload = {
+      activeWorksheetId,
+      selectedItemIds: finalSelection,
+      selectedRows: promptRows.filter((row) => selectedIds.has(row.id)).map((row) => ({
+        id: row.id,
+        prompt: row.prompt,
+      })),
+    };
+
+    sessionStorage.setItem(WORKSHEET_TARGET_KEY, activeWorksheetId);
+    sessionStorage.setItem(WORKSHEET_IMPORT_KEY, JSON.stringify(payload));
+    localStorage.setItem('activeTab', 'projects');
+    console.debug('[worksheet] add-to-worksheet payload', payload);
+    handleWorksheetModalOpenChange(false);
+    navigate('/dashboard');
+  }, [activeWorksheetId, finalSelection, handleWorksheetModalOpenChange, navigate, selectedIds]);
+
+  const handleCreateNewWorksheet = useCallback(() => {
+    const payload = {
+      activeWorksheetId,
+      selectedItemIds: finalSelection,
+      mode: 'create_new',
+    };
+
+    console.debug('[worksheet] create-new-worksheet payload', payload);
+    handleWorksheetModalOpenChange(false);
+  }, [activeWorksheetId, finalSelection, handleWorksheetModalOpenChange]);
+
+  return (
+    <Card className="mx-auto flex w-full max-w-[1530px] flex-col gap-[22px] rounded-xl border-0 shadow-none">
+      <CardHeader className="flex h-auto w-full flex-col px-0 py-0">
       <div className="flex h-auto w-full min-w-0 flex-col justify-start">
         <CardTitle className="w-fit text-xl font-semibold leading-[135%] tracking-normal text-[#222831]">
           Top searched Prompts
@@ -771,6 +1144,8 @@ const PromptTable = () => (
             <Search className="h-4 w-4 text-gray-400" />
             <input
               type="search"
+              value={searchTerm}
+              onChange={(event) => setSearchTerm(event.target.value)}
               placeholder="Enter your custom phrase/keyword to analyze"
               className="w-full bg-transparent text-xs outline-none placeholder:text-gray-400"
             />
@@ -786,59 +1161,127 @@ const PromptTable = () => (
           <ToolbarIconButton label="Download" src="/report-icons/download-button.svg" />
           <ReportActionButton label="Sort" icon={ListFilter} className="w-[110px]" />
           <ReportActionButton label="Filters" icon={Filter} className="w-[118px]" />
-          <Button variant="outline" className="h-[41px] w-[178px] gap-1 rounded-lg border-2 border-[#9CA0A7] bg-[#9CA0A7] px-3.5 py-2.5 text-xs text-white shadow-[0_1px_2px_0_#1018280D] hover:bg-[#9CA0A7] hover:text-white">
-            <img src="/report-icons/worksheet.svg" alt="" className="h-5 w-5 shrink-0" />
-            Add to Worksheet
-          </Button>
+          <div className="flex flex-col items-start gap-1">
+            <Button
+              ref={worksheetTriggerRef}
+              type="button"
+              variant="outline"
+              disabled={selectedCount === 0}
+              onClick={handleOpenWorksheetModal}
+              className={cn(
+                "h-[41px] min-w-[178px] gap-1 rounded-lg border-2 px-3.5 py-2.5 text-xs shadow-[0_1px_2px_0_#1018280D] transition-colors",
+                selectedCount > 0
+                  ? "border-[#2D4059] bg-[#2D4059] text-white hover:bg-[#24364d] hover:text-white"
+                  : "border-[#9CA0A7] bg-[#9CA0A7] text-white/80 hover:bg-[#9CA0A7] hover:text-white"
+              )}
+            >
+              <img src="/report-icons/worksheet.svg" alt="" className="h-5 w-5 shrink-0" />
+              Add to Worksheet ({selectedCount})
+            </Button>
+            {hiddenSelectedCount > 0 ? (
+              <p className="max-w-[260px] text-[11px] leading-[150%] text-[#717680]">
+                Note: {hiddenSelectedCount} selected items currently hidden by filters will also be added.
+              </p>
+            ) : null}
+          </div>
         </div>
-      </div>
-    </CardHeader>
 
-    <CardContent className="flex h-auto w-full min-w-0 flex-col gap-1 px-0 pb-3 lg:h-[488px]">
-      <div className="w-full max-w-full overflow-x-hidden">
-        <div className="w-full min-w-0">
-          <div className="px-3">
-            <Table className="table-fixed">
-              <PromptTableColumns />
-              <TableHeader>
-                <TableRow className="bg-gray-50 hover:bg-gray-50">
-                  <TableHead className="px-0 pl-2 lg:pl-7">
-                    <input type="checkbox" className="h-3.5 w-3.5 rounded border-gray-300" />
-                  </TableHead>
-                  <TableHead className="pl-6 pr-[13px]"><PromptTableHeaderLabel label="Prompts & Keywords" /></TableHead>
-                  <TableHead className="pl-6"><PromptTableHeaderLabel label="Sentiment" /></TableHead>
-                  <TableHead><PromptTableHeaderLabel label="Ranking" /></TableHead>
-                  <TableHead><PromptTableHeaderLabel label="Positions" /></TableHead>
-                  <TableHead><PromptTableHeaderLabel label="SOV" /></TableHead>
-                  <TableHead><PromptTableHeaderLabel label="Competitors" /></TableHead>
-                  <TableHead className="text-left"><PromptTableHeaderLabel label="Action" /></TableHead>
-                </TableRow>
-              </TableHeader>
-            </Table>
-          </div>
-          <div className="px-3">
-            <Table className="table-fixed">
-              <PromptTableColumns />
-              <TableBody>
-                {promptRows.map((row) => (
-                  <PromptTableEntry key={row.prompt} row={row} />
-                ))}
-              </TableBody>
-            </Table>
+        <WorksheetPickerModal
+          open={isWorksheetModalOpen}
+          selectedCount={selectedCount}
+          activeWorksheetId={activeWorksheetId}
+          worksheets={worksheetOptions}
+          loading={worksheetOptionsLoading}
+          onOpenChange={handleWorksheetModalOpenChange}
+          onWorksheetSelect={setActiveWorksheetId}
+          onAddToWorksheet={handleAddToWorksheet}
+          onCreateNewWorksheet={handleCreateNewWorksheet}
+        />
+      </div>
+      </CardHeader>
+
+      <CardContent className="flex h-auto w-full min-w-0 flex-col gap-1 px-0 pb-3 lg:h-[488px]">
+        <div className="w-full max-w-full overflow-x-hidden">
+          <div className="w-full min-w-0">
+            <div className="px-3">
+              <Table className="table-fixed">
+                <PromptTableColumns />
+                <TableHeader>
+                  <TableRow className="bg-gray-50 hover:bg-gray-50">
+                    <TableHead className="px-0 pl-2 lg:pl-7">
+                      <input
+                        ref={headerCheckboxRef}
+                        type="checkbox"
+                        checked={isAllVisibleSelected}
+                        disabled={visibleItems.length === 0}
+                        aria-checked={isIndeterminate ? 'mixed' : isAllVisibleSelected}
+                        onChange={handleToggleVisible}
+                        className="h-3.5 w-3.5 rounded border-gray-300"
+                      />
+                    </TableHead>
+                    <TableHead className="pl-6 pr-[13px]"><PromptTableHeaderLabel label="Prompts & Keywords" /></TableHead>
+                    <TableHead className="pl-6"><PromptTableHeaderLabel label="Sentiment" /></TableHead>
+                    <TableHead><PromptTableHeaderLabel label="Ranking" /></TableHead>
+                    <TableHead><PromptTableHeaderLabel label="Positions" /></TableHead>
+                    <TableHead><PromptTableHeaderLabel label="SOV" /></TableHead>
+                    <TableHead><PromptTableHeaderLabel label="Competitors" /></TableHead>
+                    <TableHead className="text-left"><PromptTableHeaderLabel label="Action" /></TableHead>
+                  </TableRow>
+                </TableHeader>
+              </Table>
+            </div>
+            <div className="px-3">
+              <Table className="table-fixed">
+                <PromptTableColumns />
+                <TableBody>
+                  {visibleItems.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={8} className="py-12 text-center text-sm text-[#717680]">
+                        No prompts match your search.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    visibleItems.map((row) => (
+                      <PromptRowItem
+                        key={row.id}
+                        row={row}
+                        isSelected={selectedIds.has(row.id)}
+                        onToggle={handleToggleRow}
+                      />
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
           </div>
         </div>
-      </div>
-      <div className="flex h-auto w-full max-w-[1506px] flex-wrap items-center gap-4 rounded-b-lg border-b border-[#E9EAEB] bg-white py-3 pl-[23px] pr-4 lg:h-[60px]">
-        <div className="flex h-8 w-[169px] items-center gap-2.5 border-r border-[#D5D7DA] p-2">
-          <span className="text-sm font-medium leading-4 tracking-normal text-[#535862]">Showing 5 of 7 queries</span>
+        <div className="flex h-auto w-full max-w-[1506px] flex-wrap items-center gap-4 rounded-b-lg border-b border-[#E9EAEB] bg-white py-3 pl-[23px] pr-4 lg:h-[60px]">
+          <div className="flex h-8 min-w-[169px] items-center gap-2.5 border-r border-[#D5D7DA] p-2">
+            <span className="text-sm font-medium leading-4 tracking-normal text-[#535862]">
+              Showing {visibleItems.length} of {filteredItems.length} queries
+            </span>
+          </div>
+          {filteredItems.length > 5 ? (
+            <button
+              type="button"
+              onClick={() => setIsExpanded((current) => !current)}
+              className="flex h-[37px] w-[88px] items-center justify-center gap-3 rounded-lg bg-[#F9F9F9] px-3 py-2"
+            >
+              <span className="h-[21px] w-[64px] text-center text-sm font-semibold leading-[150%] tracking-normal text-[#3393F2]">
+                {isExpanded ? 'Show less' : 'View all'}
+              </span>
+            </button>
+          ) : null}
+          {finalSelection.length > 0 ? (
+            <span className="ml-auto text-xs font-medium text-[#717680]">
+              {finalSelection.length} selected item{finalSelection.length === 1 ? '' : 's'} ready to add.
+            </span>
+          ) : null}
         </div>
-        <button type="button" className="flex h-[37px] w-[77px] items-center justify-center gap-3 rounded-lg bg-[#F9F9F9] px-3 py-2">
-          <span className="h-[21px] w-[53px] text-center text-sm font-semibold leading-[150%] tracking-normal text-[#3393F2]">View all</span>
-        </button>
-      </div>
-    </CardContent>
-  </Card>
-);
+      </CardContent>
+    </Card>
+  );
+};
 
 const OpportunityCard = ({
   title,
