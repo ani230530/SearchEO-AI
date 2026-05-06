@@ -42,6 +42,8 @@ import WorksheetGenerateDrawer from './WorksheetGenerateDrawer';
 import InlineEditable from './InlineEditable';
 import { RowStatus, RowAction } from './WorksheetRowState';
 
+const PENDING_WORKSHEET_IMPORT_KEY = 'ai-results/pending-worksheet-import';
+
 type WorksheetColumnKey = 'topic' | 'keywords' | 'status' | 'action' | 'more';
 
 interface WorksheetProps {
@@ -96,7 +98,7 @@ export default function Worksheet({
   const [search, setSearch] = useState('');
   const [openColumnMenu, setOpenColumnMenu] = useState<WorksheetColumnKey | null>(null);
   const [columnLabels, setColumnLabels] = useState<Record<WorksheetColumnKey, string>>({
-    topic: 'Topic',
+    topic: 'Prompt',
     keywords: 'Keywords',
     status: 'Status',
     action: 'Action',
@@ -122,6 +124,7 @@ export default function Worksheet({
   } | null>(null);
   const [deleteRowId, setDeleteRowId] = useState<number | null>(null);
   const [keywordPopover, setKeywordPopover] = useState<{ topicId: number; keywordId: number } | null>(null);
+  const importSignatureRef = useRef<string | null>(null);
 
   const importInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -143,6 +146,72 @@ export default function Worksheet({
   useEffect(() => {
     reload();
   }, [reload]);
+
+  useEffect(() => {
+    if (loading) return;
+
+    const raw = sessionStorage.getItem(PENDING_WORKSHEET_IMPORT_KEY);
+    if (!raw) return;
+
+    type PendingWorksheetImport = {
+      activeWorksheetId: string;
+      selectedItemIds: string[];
+      selectedRows: Array<{ id: string; prompt: string }>;
+    };
+
+    let payload: PendingWorksheetImport | null = null;
+    try {
+      payload = JSON.parse(raw) as PendingWorksheetImport;
+    } catch {
+      sessionStorage.removeItem(PENDING_WORKSHEET_IMPORT_KEY);
+      return;
+    }
+
+    if (!payload || payload.activeWorksheetId !== String(campaignId)) {
+      return;
+    }
+
+    const signature = `${payload.activeWorksheetId}:${payload.selectedRows
+      .map((row) => row.id)
+      .join(',')}`;
+    if (importSignatureRef.current === signature) {
+      return;
+    }
+    importSignatureRef.current = signature;
+
+    const importedIds = new Set(topics.map((topic) => topic.id));
+
+    const runImport = async () => {
+      let latestTopics = topics;
+
+      for (const row of [...payload!.selectedRows].reverse()) {
+        latestTopics = await createTopic(campaignId, {
+          title: row.prompt?.trim() || 'Untitled prompt',
+        });
+
+        const createdTopic =
+          latestTopics.find((topic) => !importedIds.has(topic.id)) ??
+          latestTopics[latestTopics.length - 1];
+
+        if (createdTopic) {
+          importedIds.add(createdTopic.id);
+          setTopics((current) => [
+            createdTopic,
+            ...current.filter((topic) => topic.id !== createdTopic.id),
+          ]);
+        }
+      }
+
+      sessionStorage.removeItem(PENDING_WORKSHEET_IMPORT_KEY);
+      setNotice(`${payload!.selectedRows.length} row${payload!.selectedRows.length === 1 ? '' : 's'} added to the worksheet.`);
+    };
+
+    void runImport().catch((err) => {
+      console.error('[worksheet] import failed', err);
+      setError(err instanceof Error ? err.message : 'Failed to import worksheet rows');
+      sessionStorage.removeItem(PENDING_WORKSHEET_IMPORT_KEY);
+    });
+  }, [campaignId, loading, topics]);
 
   /* ---------- SSE: live job updates ---------- */
 
@@ -292,7 +361,7 @@ export default function Worksheet({
   };
 
   const handleAddBlankRow = async () => {
-    await withBusy(null, () => createTopic(campaignId, { title: 'Untitled topic' }));
+    await withBusy(null, () => createTopic(campaignId, { title: 'Untitled prompt' }));
   };
 
   const handleAiSuggestNewTopic = async () => {
@@ -519,7 +588,7 @@ export default function Worksheet({
                 className="h-9 px-3 rounded-md border border-[#909bb0] text-[#495668] text-xs font-medium inline-flex items-center gap-1.5 disabled:opacity-50"
               >
                 {aiSuggestingNewTopic ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
-                AI Suggest Topic
+                AI Suggest Prompt
               </button>
               <button
                 type="button"
@@ -595,7 +664,7 @@ export default function Worksheet({
                 {!loading && filteredTopics.length === 0 && (
                   <tr>
                     <td colSpan={6} className="p-10 text-center text-sm text-gray-500">
-                      No topics yet. Click <span className="font-medium">+ Add Row</span> below or <span className="font-medium">AI Suggest Topic</span> above to get started.
+                      No prompts yet. Click <span className="font-medium">+ Add Row</span> below or <span className="font-medium">AI Suggest Prompt</span> above to get started.
                     </td>
                   </tr>
                 )}
@@ -628,7 +697,7 @@ export default function Worksheet({
                           <div className="flex flex-col gap-2">
                             <InlineEditable
                               value={topic.title}
-                              placeholder="+ Add topic name"
+                              placeholder="+ Add prompt name"
                               onCommit={(next) =>
                                 withBusy(topic.id, () => updateTopicTitle(topic.id, next))
                               }
@@ -898,9 +967,9 @@ export default function Worksheet({
 
       {/* Delete row confirm modal */}
       {deleteRowId !== null && (
-        <Modal title="Delete topic" onClose={() => setDeleteRowId(null)}>
+        <Modal title="Delete prompt" onClose={() => setDeleteRowId(null)}>
           <p className="text-sm text-gray-600 -mt-4 mb-4">
-            This will remove the topic and its keywords. This action cannot be undone.
+            This will remove the prompt and its keywords. This action cannot be undone.
           </p>
           <div className="flex items-center justify-end gap-4 mt-2">
             <button
