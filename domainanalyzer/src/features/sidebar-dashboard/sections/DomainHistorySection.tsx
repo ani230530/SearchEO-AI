@@ -16,6 +16,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { apiGet } from "../../../services/apiClient";
 import { maskDomainId } from "../../../lib/domainUtils";
+import { AddDomainModal } from "../components/AddDomainModal";
 import { TabId } from "../types";
 
 type DashboardDomain = {
@@ -79,6 +80,7 @@ export function DomainHistorySection({ onMenuItemClick }: DomainHistorySectionPr
   const [openMenuId, setOpenMenuId] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [state, setState] = useState<FetchState>({ status: "loading" });
+  const [addDomainOpen, setAddDomainOpen] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -264,9 +266,9 @@ export function DomainHistorySection({ onMenuItemClick }: DomainHistorySectionPr
               Uncover how your content appears in AI search, which keywords you're visible for, and
               where you're missing opportunities.
             </p>
-            {/* TODO: wire to Add Domain modal in next PR */}
             <button
               type="button"
+              onClick={() => setAddDomainOpen(true)}
               className="mt-5 inline-flex h-10 items-center gap-2 rounded-md px-5 text-sm font-medium text-white"
               style={{ background: "linear-gradient(90deg, #2D4059 0%, #4E76C7 100%)" }}
             >
@@ -420,6 +422,8 @@ export function DomainHistorySection({ onMenuItemClick }: DomainHistorySectionPr
           )}
         </div>
       </div>
+
+      <AddDomainModal open={addDomainOpen} onOpenChange={setAddDomainOpen} />
     </div>
   );
 }
