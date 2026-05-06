@@ -136,6 +136,8 @@ const AIChecker = () => {
   const [competitors, setCompetitors] = useState<CompetitorOption[]>([]);
   const [newCompetitor, setNewCompetitor] = useState('');
   const [stepItems, setStepItems] = useState<AnalysisItem[]>([]);
+  const [totalBackendKeywords, setTotalBackendKeywords] = useState(0);
+  const [totalBackendPrompts, setTotalBackendPrompts] = useState(0);
   const [workspace, setWorkspace] = useState<DomainWorkspace | null>(null);
   const [status, setStatus] = useState('');
   const [progress, setProgress] = useState(0);
@@ -179,6 +181,10 @@ const AIChecker = () => {
             
             if (reanalyze) {
               setStep(1);
+            } else if (data.currentStep >= 4) {
+              // Domain is already fully processed. Redirect to results.
+              navigate(`/ai-results/${maskDomainId(nextWorkspace.domainId)}`);
+              return;
             } else if (data.currentStep >= 3) {
               setStep(3);
               await loadKeywordsAndPhrases(nextWorkspace);
@@ -393,6 +399,9 @@ const AIChecker = () => {
 
     let createdDomainId: number | null = null;
     await parseStream(createResponse, ({ data }) => {
+      if (data?.type === 'error' && data?.phase === 'keyword_generation') {
+        throw new Error(data.details || 'Keyword generation failed. Try again.');
+      }
       if (data?.type === 'progress') {
         const backendProgress = typeof data.progress === 'number' ? data.progress : 0;
         setAnalysisState(data.step || 'Analyzing domain...', 20 + Math.round(backendProgress * 0.25));
@@ -453,7 +462,6 @@ const AIChecker = () => {
 
       const keywordsData = await keywordsResponse.json();
       const allKeywordItems: AnalysisItem[] = (keywordsData.keywords || [])
-        .filter((keyword: any) => keyword.term && !isGenericAnalysisKeyword(keyword.term))
         .map((keyword: any) => ({
           id: `keyword-${keyword.id}`,
           type: 'keyword',
@@ -514,6 +522,8 @@ const AIChecker = () => {
         .map((item) => item.id);
       setStepItems(combined);
       setSelectedStepItems([...customSelectionIds, ...defaultSelectionIds]);
+      setTotalBackendKeywords(keywordCount);
+      setTotalBackendPrompts(promptCount);
       setAnalysisState(combined.length ? 'Backend keywords and prompts loaded.' : 'No backend keywords or prompts found yet.', 75);
       return { keywordCount, promptCount, itemCount: combined.length };
     } finally {
@@ -693,7 +703,7 @@ const AIChecker = () => {
   };
 
   const selectPhrases = async (phraseIds: number[]) => {
-    if (!workspace) return;
+    if (!workspace || phraseIds.length === 0) return;
     const response = await fetch(`${API_BASE_URL}/api/intent-phrases/${workspace.domainId}/select`, {
       method: 'POST',
       headers: getAuthHeaders(),
@@ -864,7 +874,7 @@ const AIChecker = () => {
       await selectPhrases(phraseIds);
       await runFullAnalysis();
       setAnalysisState('Opening report...', 100);
-      navigate(`/dashboard/${maskDomainId(workspace.domainId)}`);
+      navigate(`/ai-results/${maskDomainId(workspace.domainId)}`);
     } catch (reportError) {
       const message = reportError instanceof Error ? reportError.message : 'Unable to generate report.';
       setError(message);
@@ -1085,7 +1095,7 @@ const AIChecker = () => {
                 <div className="flex items-center gap-4">
                   {['all', 'prompt', 'keyword'].map((tab) => (
                     <button key={tab} type="button" onClick={() => setSelectedTab(tab as 'all' | 'prompt' | 'keyword')} className={`px-5 py-2 text-base font-semibold rounded-full transition ${selectedTab === tab ? 'bg-[#c7d6f2] text-[#2d4059]' : 'text-gray-500 hover:text-gray-700'}`}>
-                      {tab === 'all' ? 'All' : tab === 'prompt' ? 'Prompts' : 'Keywords'}
+                      {tab === 'all' ? `All (${totalBackendKeywords + totalBackendPrompts})` : tab === 'prompt' ? `Prompts (${totalBackendPrompts})` : `Keywords (${totalBackendKeywords})`}
                     </button>
                   ))}
                 </div>

@@ -154,6 +154,7 @@ router.post('/reanalyze-phrases', authenticateToken, async (req: Request, res: R
               accuracy: scoringResult.accuracy,
               sentiment: scoringResult.sentiment,
               overall: scoringResult.overall,
+              domainRank: scoringResult.domainRank, // Fix: Save domain rank
               // Add competitor fields
               competitorNames: scoringResult.competitors?.names,
               competitorMentions: scoringResult.competitors?.mentions,
@@ -279,6 +280,7 @@ router.post('/reanalyze-phrase', authenticateToken, async (req: Request, res: Re
         accuracy: scoringResult.accuracy,
         sentiment: scoringResult.sentiment,
         overall: scoringResult.overall,
+        domainRank: scoringResult.domainRank, // Fix: Save domain rank
         competitorNames: scoringResult.competitors?.names,
         competitorMentions: scoringResult.competitors?.mentions,
         competitorCount: scoringResult.competitors?.totalMentions,
@@ -305,6 +307,7 @@ router.post('/reanalyze-phrase', authenticateToken, async (req: Request, res: Re
           accuracy: scoringResult.accuracy,
           sentiment: scoringResult.sentiment,
           overall: scoringResult.overall,
+          domainRank: scoringResult.domainRank,
           // Add competitor fields
           competitorNames: scoringResult.competitors?.names,
           competitorMentions: scoringResult.competitors?.mentions,
@@ -956,17 +959,37 @@ async function processQueryBatch(
       }
       
       // Find the phrase record first to check completion
-      const keywordRecord = await prisma.keyword.findFirst({
-        where: { 
-          term: query.keyword, 
-          domainId: query.domainId
+      let keywordRecord = null;
+      if (query.keyword && query.keyword !== 'Unknown') {
+        keywordRecord = await prisma.keyword.findFirst({
+          where: { 
+            term: query.keyword, 
+            domainId: query.domainId
+          },
+        });
+      }
+      
+      let phraseRecord = await prisma.generatedIntentPhrase.findFirst({
+        where: {
+          phrase: query.phrase,
+          domainId: query.domainId,
         },
       });
-      
-      let phraseRecord = null;
-      if (keywordRecord) {
-        phraseRecord = await prisma.generatedIntentPhrase.findFirst({
-          where: { phrase: query.phrase, keywordId: keywordRecord.id, domainId: query.domainId },
+
+      // Fallback: If no phrase record found, create one
+      if (!phraseRecord) {
+        phraseRecord = await prisma.generatedIntentPhrase.create({
+          data: {
+            phrase: query.phrase,
+            keywordId: keywordRecord ? keywordRecord.id : null,
+            domainId: query.domainId,
+            isSelected: true,
+            intent: 'Commercial', // Default for synthetic
+            intentConfidence: 85,
+            relevanceScore: 85,
+            sources: ['Synthetic Fallback'],
+            trend: 'Stable'
+          }
         });
       }
       
@@ -2307,6 +2330,20 @@ router.post('/:domainId', authenticateToken, async (req, res) => {
         return;
     }
 
+    // Get domain information for context and verify ownership
+    const domainObj = await prisma.domain.findUnique({
+        where: { id: domainId },
+        select: { url: true, context: true, location: true, userId: true }
+    });
+
+    if (!domainObj || domainObj.userId !== (req as any).user?.userId) {
+        res.status(403).json({ error: 'Access denied or domain not found' });
+        return;
+    }
+    const domain = domainObj.url || undefined;
+    const context = domainObj.context || undefined;
+    const location = domainObj.location || undefined;
+
     // Check rate limiting
     const currentRequests = activeRequests.get(domainId) || 0;
     if (currentRequests >= MAX_CONCURRENT_REQUESTS) {
@@ -2438,21 +2475,6 @@ router.post('/:domainId', authenticateToken, async (req, res) => {
             return;
         }
 
-        // Get domain information for context
-        const domainObj = await prisma.domain.findUnique({
-            where: { id: domainId },
-            select: { url: true, context: true, location: true }
-        });
-
-        if (!domainObj) {
-            res.write(`event: error\ndata: ${JSON.stringify({ error: 'Domain not found' })}\n\n`);
-            res.end();
-            return;
-        }
-        const domain = domainObj.url || undefined;
-        const context = domainObj.context || undefined;
-        const location = domainObj.location || undefined;
-
         const allQueries = phrases.flatMap((item: any) =>
             item.phrases.map((phrase: string) => ({
                 keyword: item.keyword,
@@ -2517,6 +2539,10 @@ router.post('/:domainId', authenticateToken, async (req, res) => {
                     }
                   ];
 
+                  // Get current keyword and phrase counts to include in snapshot
+                  const keywordCount = await prisma.keyword.count({ where: { domainId } });
+                  const phraseCount = await prisma.generatedIntentPhrase.count({ where: { domainId } });
+
                   await prisma.dashboardAnalysis.create({
                     data: {
                       domainId,
@@ -2528,6 +2554,8 @@ router.post('/:domainId', authenticateToken, async (req, res) => {
                         avgSentiment: Number(avgSentiment05),
                         avgOverall: Number(avgOverall05),
                         totalQueries,
+                        keywordCount,
+                        phraseCount,
                         modelPerformance,
                         performanceData
                       },

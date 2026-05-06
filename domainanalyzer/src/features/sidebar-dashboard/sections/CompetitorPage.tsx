@@ -12,7 +12,9 @@ import {
   BarChart3,
   Target,
   Users,
+  Globe,
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import CompetitorDetailPage from "./CompetitorDetailPage";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "";
@@ -101,6 +103,7 @@ interface StandaloneCompetitor {
   aiVisibility?: number;
   dataSource?: string;
   confidence?: string;
+  estimatedTraffic?: number | string;
 }
 
 interface AICompetitorsResponse {

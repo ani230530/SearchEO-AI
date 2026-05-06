@@ -112,21 +112,25 @@ interface MiningSummary {
   redditData: ExtractedRedditPost[];
   dataQuality: DataQuality;
   allData: ExtractedRedditPost[];
+  summary?: string;
+  domainId?: number | null;
+  keywordId?: number | null;
+  sources?: any;
 }
 
 interface Keyword {
   id: number;
   term: string;
-  domainId: number;
+  domainId: number | null;
   [key: string]: any; // Allow for other prisma properties
 }
 
 interface Domain {
   id: number;
   url: string;
-  userId: number;
-  location?: string;
-  context?: string;
+  userId: number | null;
+  location?: string | null;
+  context?: string | null;
   [key: string]: any; // Allow for other prisma properties
 }
 
@@ -179,19 +183,14 @@ interface RealPhrase {
 }
 
 interface SearchPattern {
-  domainId: number;
-  keywordId: number;
-  patterns: string[];
+  domainId: number | null;
+  keywordId: number | null;
+  patterns: any;
   summary: string;
   tokenUsage: number;
 }
 
-interface AuthenticatedRequest extends Request {
-  user: {
-    userId: number;
-    email: string;
-  };
-}
+
 
 type EventSender = (event: string, data: any) => void;
 
@@ -1126,8 +1125,8 @@ const generateEnhancedIntentPhrases = async (
   keyword: Keyword,
   domain: Domain,
   semanticContext: string,
-  communityInsightData: MiningSummary | null | undefined,
-  keywordSearchPatterns: SearchPattern | null | undefined,
+  communityInsightData: any,
+  keywordSearchPatterns: any,
   sendEvent: EventSender
 ) => {
   try {
@@ -1461,7 +1460,7 @@ const generateEnhancedPhrases = async (
       }
 
       if (Array.isArray(phraseData) && phraseData.length > 0) {
-        const phrasesToInsert: PhraseAnalysisResult[] = [];
+        const phrasesToInsert: any[] = [];
         
         phraseData.forEach((phraseObj: PhraseAnalysisResult, phraseIndex: number) => {
           console.log(`Processing phrase object ${phraseIndex}:`, phraseObj);
@@ -1627,7 +1626,7 @@ const generateEnhancedPhrases = async (
       }
     ];
 
-    const phrasesToInsert: PhraseAnalysisResult[] = [];
+    const phrasesToInsert: any[] = [];
     fallbackPhrases.forEach((fallbackPhrase, phraseIndex) => {
       const phraseData = {
         domainId: domain.id,
@@ -1887,7 +1886,7 @@ router.get('/:domainId/step3', authenticateToken, async (req, res) => {
         context: domain.context,
         location: domain.location
       },
-      selectedKeywords: domain.keywords.map((kw: Keyword) => ({
+      selectedKeywords: domain.keywords.map((kw: any) => ({
         id: kw.id,
         keyword: kw.term,
         volume: kw.volume,
@@ -2026,9 +2025,9 @@ router.post('/:domainId/step3/generate', authenticateToken, async (req, res) => 
 
     // Initialize data storage arrays
     // Initialize data storage arrays
-    let communityInsightData: MiningSummary | null = null;
+    let communityInsightData: any = null;
     const communityInsights: MiningSummary[] = [];
-    const searchPatterns: SearchPattern[] = [];
+    const searchPatterns: any[] = [];
     const newSearchPatterns: SearchPattern[] = []; // Separate array for new patterns to insert
 
     // ========================================
@@ -2642,7 +2641,7 @@ Return valid JSON only.`;
     });
 
     const allPhrases: any[] = [];
-    const phrasesToInsert: PhraseAnalysisResult[] = [];
+    const phrasesToInsert: any[] = [];
 
     // First, collect all existing phrases for all keywords
     const allExistingPhrases = await prisma.generatedIntentPhrase.findMany({
@@ -2850,7 +2849,7 @@ Return valid JSON only.`;
             const insertedPhrases: any[] = [];
             for (const phraseData of phrasesToInsert) {
               const insertedPhrase = await prisma.generatedIntentPhrase.create({
-                data: phraseData
+                data: phraseData as any
               });
               insertedPhrases.push(insertedPhrase);
             }
@@ -3286,7 +3285,7 @@ router.post('/:domainId/:keywordId/generate-more', authenticateToken, async (req
     const insertedPhrases = [];
     for (const phraseData of limitedPhrases) {
       const insertedPhrase = await prisma.generatedIntentPhrase.create({
-        data: phraseData
+        data: phraseData as any
       });
       insertedPhrases.push(insertedPhrase);
     }

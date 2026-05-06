@@ -91,7 +91,7 @@ const ProfessionalDashboard = () => {
     // If analysis is completed (currentStep === 4), go to dashboard
     if (currentStep === 4) {
       const maskedId = maskDomainId(domain.id);
-      navigate(`/dashboard/${maskedId}`);
+      navigate(`/ai-results/${maskedId}`);
     } else {
       // Otherwise, go to the analysis flow at the current step
       navigate(`/ai-checker-page?domainId=${domain.id}`);
@@ -1100,8 +1100,8 @@ const ProfessionalDashboard = () => {
             const currentStep = domain.currentStep ?? 0;
             const status = currentStep === 4 ? 'completed' : currentStep > 0 ? 'in-progress' : 'not-started';
             const visibilityScore = domain.metrics?.visibilityScore ?? 0;
-            const keywordCount = domain.metrics?.keywordCount ?? 0;
-            const phraseCount = domain.metrics?.phraseCount ?? 0;
+            const keywordCount = domain.metrics?.keywordCount ?? domain.keywordCount ?? 0;
+            const phraseCount = domain.metrics?.phraseCount ?? domain.phraseCount ?? 0;
             const industry = domain.industry ?? 'General';
 
             return (
