@@ -1405,28 +1405,58 @@ const AIResultsReportPreview = () => {
 
   useEffect(() => {
     const fetchData = async () => {
-      if (!maskedDomainId) return;
-
-      const realId = unmaskDomainId(maskedDomainId);
-      if (!realId) {
-        setLoading(false);
+      if (!maskedDomainId) {
+        console.warn('[AIResults] No maskedDomainId found in URL params');
         return;
       }
 
+      console.log('[AIResults] Starting data fetch for:', maskedDomainId);
       setLoading(true);
+
       try {
-        // Parallel fetch for report data and domain list
+        let realId = unmaskDomainId(maskedDomainId);
+        
+        // Fallback: If mapping is missing (e.g. fresh page reload on deep link),
+        // fetch all domains and find which one matches this mask.
+        if (!realId) {
+          console.log('[AIResults] realId mapping missing, fetching domains to resolve...');
+          const domainsResp = await apiGet<any>('/dashboard/all');
+          const domains = domainsResp?.domains || [];
+          setAllDomains(domains);
+          
+          const found = domains.find((d: any) => maskDomainId(d.id) === maskedDomainId);
+          if (found) {
+            realId = found.id;
+            console.log('[AIResults] Resolved realId from fallback:', realId);
+          } else {
+            console.error('[AIResults] Could not resolve maskedDomainId even after fetching all domains');
+            setLoading(false);
+            return;
+          }
+        }
+
+        console.log('[AIResults] Fetching data for realId:', realId);
+        // Parallel fetch for report data and domain list (if not already fetched)
         const [data, domainsResponse] = await Promise.all([
           apiGet<any>(`/dashboard/${realId}`),
-          apiGet<any>('/dashboard/all')
+          allDomains.length === 0 ? apiGet<any>('/dashboard/all') : Promise.resolve({ domains: allDomains })
         ]);
 
-        if (data) setReportData(data);
-        if (domainsResponse?.domains) setAllDomains(domainsResponse.domains);
+        if (data) {
+          console.log('[AIResults] Report data received:', data.id);
+          setReportData(data);
+        } else {
+          console.warn('[AIResults] No data returned for realId:', realId);
+        }
+
+        if (domainsResponse?.domains) {
+          setAllDomains(domainsResponse.domains);
+        }
       } catch (err) {
-        console.error('Failed to fetch dashboard data:', err);
+        console.error('[AIResults] Failed to fetch dashboard data:', err);
       } finally {
         setLoading(false);
+        console.log('[AIResults] Loading finished');
       }
     };
 
