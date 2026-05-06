@@ -81,6 +81,7 @@ export function DomainHistorySection({ onMenuItemClick }: DomainHistorySectionPr
   const [searchQuery, setSearchQuery] = useState("");
   const [state, setState] = useState<FetchState>({ status: "loading" });
   const [addDomainOpen, setAddDomainOpen] = useState(false);
+  const [retryUrl, setRetryUrl] = useState<string | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -382,12 +383,13 @@ export function DomainHistorySection({ onMenuItemClick }: DomainHistorySectionPr
                 {domain.status === "retry" ? (
                   <div className="flex h-[145px] flex-col items-center justify-center">
                     <p className="text-[20px] font-semibold text-[#414651]">Retry analysis</p>
-                    {/* TODO: wire to Retry SSE flow in next PR */}
                     <button
                       type="button"
-                      className="mt-4 inline-flex h-11 w-11 items-center justify-center rounded-md bg-[#f0f3f8] text-[#4d5d78]"
+                      onClick={() => setRetryUrl(domain.url)}
+                      aria-label={`Retry analysis for ${domain.name}`}
+                      className="mt-4 inline-flex h-11 w-11 items-center justify-center rounded-md bg-[#f0f3f8] text-[#4d5d78] hover:bg-[#e6ebf3]"
                     >
-                      <Plus className="h-4 w-4" />
+                      <RefreshCw className="h-4 w-4" />
                     </button>
                   </div>
                 ) : (
@@ -424,6 +426,17 @@ export function DomainHistorySection({ onMenuItemClick }: DomainHistorySectionPr
       </div>
 
       <AddDomainModal open={addDomainOpen} onOpenChange={setAddDomainOpen} />
+      <AddDomainModal
+        open={retryUrl !== null}
+        onOpenChange={(open) => {
+          if (!open) setRetryUrl(null);
+        }}
+        initialUrl={retryUrl ?? ""}
+        lockUrl
+        title="Retry audit"
+        description="Re-runs domain extraction and keyword generation for this URL."
+        ctaLabel="Retry audit"
+      />
     </div>
   );
 }
