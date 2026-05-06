@@ -692,7 +692,20 @@ const CitationSidebar = ({ activeResult }: { activeResult: any }) => {
   );
 };
 
-const PromptTable = ({ data }: { data: any[] }) => {
+type PromptTableProps = {
+  data: any[];
+  selectedRowIds: Set<string>;
+  onToggleRow: (id: string) => void;
+  onOpenWorksheetModal: (singleRowId?: string) => void;
+};
+
+const PromptTable = ({
+  data,
+  selectedRowIds,
+  onToggleRow,
+  onOpenWorksheetModal,
+}: PromptTableProps) => {
+  const selectedCount = selectedRowIds.size;
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [tableFilter, setTableFilter] = useState<'all' | 'prompt' | 'keyword'>('all');
   const [tableMetric, setTableMetric] = useState<string | null>(null);
@@ -804,7 +817,7 @@ const PromptTable = ({ data }: { data: any[] }) => {
             <Button
               type="button"
               disabled={selectedCount === 0}
-              onClick={() => handleOpenWorksheetModal()}
+              onClick={() => onOpenWorksheetModal()}
               className={cn(
                 'h-9 gap-2 text-white border-none rounded-lg px-4 transition-all ml-1',
                 selectedCount === 0
@@ -853,7 +866,7 @@ const PromptTable = ({ data }: { data: any[] }) => {
                           type="checkbox"
                           checked={selectedRowIds.has(String(row.id))}
                           onClick={(e) => e.stopPropagation()}
-                          onChange={() => handleToggleRow(String(row.id))}
+                          onChange={() => onToggleRow(String(row.id))}
                           aria-label={`Select ${row.phrase ?? row.prompt ?? 'row'}`}
                           className="h-3.5 w-3.5 rounded border-gray-300 accent-blue-600"
                         />
@@ -931,7 +944,7 @@ const PromptTable = ({ data }: { data: any[] }) => {
                           variant="outline"
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleOpenWorksheetModal(String(row.id));
+                            onOpenWorksheetModal(String(row.id));
                           }}
                           className="h-7 rounded-lg px-3 text-[10px] font-bold border-slate-300 text-slate-600 hover:bg-gray-50 shadow-none"
                         >
@@ -1632,7 +1645,12 @@ const AIResultsReportPreview = () => {
             {loading ? (
               <div className="h-[400px] w-full animate-pulse rounded-xl bg-gray-50 border border-slate-200" />
             ) : (
-              <PromptTable data={filteredPrompts} />
+              <PromptTable
+                data={filteredPrompts}
+                selectedRowIds={selectedRowIds}
+                onToggleRow={handleToggleRow}
+                onOpenWorksheetModal={handleOpenWorksheetModal}
+              />
             )}
           </div>
         </section>
