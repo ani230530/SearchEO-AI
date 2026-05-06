@@ -12,6 +12,7 @@ import LandingPage from "./pages/LandingPage";
 import SidebarDashboard from "./pages/SidebarDashboard";
 import KnowledgeBase from "./pages/KnowledgeBase";
 import AIVisibilityRedirect from "./pages/AIVisibilityRedirect";
+import AIChecker from "./pages/AIChecker";
 import AIResultsReportPreview from "./pages/AIResultsReportPreview";
 
 const queryClient = new QueryClient();
@@ -37,6 +38,11 @@ const App = () => (
             <Route path="/ai-visibility" element={
               <ProtectedRoute>
                 <AIVisibilityRedirect />
+              </ProtectedRoute>
+            } />
+            <Route path="/ai-checker-page" element={
+              <ProtectedRoute>
+                <AIChecker />
               </ProtectedRoute>
             } />
             <Route path="/ai-results/:domain" element={

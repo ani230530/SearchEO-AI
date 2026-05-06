@@ -80,7 +80,6 @@ export function DomainHistorySection({ onMenuItemClick }: DomainHistorySectionPr
   const [openMenuId, setOpenMenuId] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [state, setState] = useState<FetchState>({ status: "loading" });
-  const [addDomainOpen, setAddDomainOpen] = useState(false);
   const [retryUrl, setRetryUrl] = useState<string | null>(null);
 
   useEffect(() => {
@@ -269,7 +268,7 @@ export function DomainHistorySection({ onMenuItemClick }: DomainHistorySectionPr
             </p>
             <button
               type="button"
-              onClick={() => setAddDomainOpen(true)}
+              onClick={() => navigate("/ai-checker-page")}
               className="mt-5 inline-flex h-10 items-center gap-2 rounded-md px-5 text-sm font-medium text-white"
               style={{ background: "linear-gradient(90deg, #2D4059 0%, #4E76C7 100%)" }}
             >
@@ -425,7 +424,6 @@ export function DomainHistorySection({ onMenuItemClick }: DomainHistorySectionPr
         </div>
       </div>
 
-      <AddDomainModal open={addDomainOpen} onOpenChange={setAddDomainOpen} />
       <AddDomainModal
         open={retryUrl !== null}
         onOpenChange={(open) => {
@@ -434,7 +432,7 @@ export function DomainHistorySection({ onMenuItemClick }: DomainHistorySectionPr
         initialUrl={retryUrl ?? ""}
         lockUrl
         title="Retry audit"
-        description="Re-runs domain extraction and keyword generation for this URL."
+        description="Re-runs the full audit pipeline for this URL."
         ctaLabel="Retry audit"
       />
     </div>
