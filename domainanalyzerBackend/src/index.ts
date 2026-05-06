@@ -222,4 +222,8 @@ app.listen(PORT, () => {
   // Start publish timeout checker
   const { startPublishTimeoutChecker } = require('./services/publishJobTimeout');
   startPublishTimeoutChecker();
+
+  // Worksheet generation: sweep + broadcast jobs left stuck after restart.
+  const { startStaleJobSweeper } = require('./services/generationJobService');
+  startStaleJobSweeper();
 }); 

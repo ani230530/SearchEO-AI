@@ -381,7 +381,12 @@ export const normalizeGenerationCallbackPayload = (body: unknown): { jobId: stri
 };
 
 export const serializeDraftContent = (draft: WordpressPublishLog): CanonicalDraftContent => {
-  const response = ((draft.response as UnknownRecord | null) || {}) as UnknownRecord;
+  // n8n returns a single-element array for some workflows. New code unwraps
+  // before persisting, but legacy rows may still hold the array form — be
+  // tolerant of both shapes here so historical drafts render correctly.
+  const rawResponse = draft.response as unknown;
+  const responseObj = Array.isArray(rawResponse) ? rawResponse[0] : rawResponse;
+  const response = ((responseObj as UnknownRecord | null) || {}) as UnknownRecord;
   const featuredImageUrl =
     normalizeFeaturedImageUrl(
       response.featuredImageUrl ??

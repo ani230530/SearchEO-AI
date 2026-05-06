@@ -1,3 +1,14 @@
+/**
+ * AI generation for the worksheet flat-topic model.
+ *
+ * Two surface APIs:
+ *   - generateCampaignTopics: returns N flat topics, each with a title,
+ *     summary, description, and a small set of keywords.
+ *   - generateKeywordsSuggestion: returns N keyword suggestions for a topic.
+ *
+ * No pillar/subpage concept anywhere — each topic is a single content unit.
+ */
+
 import OpenAI from 'openai';
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
@@ -11,18 +22,11 @@ export type GeneratedKeyword = {
   intent?: string;
 };
 
-export type GeneratedPage = {
-  title: string;
-  summary?: string;
-  keywords?: GeneratedKeyword[];
-};
-
 export type GeneratedTopic = {
   title: string;
   description?: string;
-  pillarPage?: GeneratedPage | null;
-  subPages?: GeneratedPage[];
-  keywords?: GeneratedKeyword[];
+  summary?: string;
+  keywords: GeneratedKeyword[];
 };
 
 type BaseAiContext = {
@@ -36,7 +40,6 @@ type BaseAiContext = {
 };
 
 const DEFAULT_DIFFICULTY = 'Medium';
-
 const difficultyBuckets = ['Low', 'Medium', 'High'];
 
 const sanitizeNumber = (value: unknown, fallback = 0): number => {
@@ -61,20 +64,15 @@ const sanitizeDifficulty = (value: unknown): string => {
 const extractJsonFromResponse = (response: string): any => {
   const trimmed = response.trim();
   if (!trimmed) return null;
-
   const fenceMatch = trimmed.match(/```(?:json)?([\s\S]*?)```/);
   const jsonText = fenceMatch ? fenceMatch[1] : trimmed;
-
   const jsonMatch = jsonText.match(/\{[\s\S]*\}/);
   const candidate = jsonMatch ? jsonMatch[0] : jsonText;
-
   return JSON.parse(candidate);
 };
 
 const callOpenAiJson = async <T>(prompt: string, fallback: () => T): Promise<T> => {
-  if (!openai) {
-    return fallback();
-  }
+  if (!openai) return fallback();
   try {
     const completion = await openai.chat.completions.create({
       model: CAMPAIGN_AI_MODEL,
@@ -82,27 +80,20 @@ const callOpenAiJson = async <T>(prompt: string, fallback: () => T): Promise<T> 
       messages: [
         {
           role: 'system',
-          content: 'You are an expert content marketing strategist. Generate creative, diverse, and unique ideas. Always return valid JSON that matches the requested schema.'
+          content:
+            'You are an expert content marketing strategist. Generate creative, diverse, and unique ideas. Always return valid JSON that matches the requested schema.',
         },
-        {
-          role: 'user',
-          content: prompt
-        }
-      ]
+        { role: 'user', content: prompt },
+      ],
     });
 
     const content = completion.choices[0].message?.content || '';
-    if (!content) {
-      return fallback();
-    }
+    if (!content) return fallback();
     const parsed = extractJsonFromResponse(content);
-    if (!parsed) {
-      return fallback();
-    }
+    if (!parsed) return fallback();
     return parsed as T;
   } catch (error) {
     console.warn('Campaign AI generation failed, using fallback output.', error);
-    console.warn('Prompt context:', prompt);
     return fallback();
   }
 };
@@ -112,7 +103,7 @@ const buildKeyword = (keyword?: any, seed?: string): GeneratedKeyword => {
     return {
       term: seed,
       volume: Math.floor(500 + Math.random() * 2500),
-      difficulty: DEFAULT_DIFFICULTY
+      difficulty: DEFAULT_DIFFICULTY,
     };
   }
 
@@ -120,45 +111,26 @@ const buildKeyword = (keyword?: any, seed?: string): GeneratedKeyword => {
 
   return {
     term,
-    volume: sanitizeNumber(keyword?.volume ?? keyword?.searchVolume ?? keyword?.estimatedSearches, Math.floor(800 + Math.random() * 1200)),
+    volume: sanitizeNumber(
+      keyword?.volume ?? keyword?.searchVolume ?? keyword?.estimatedSearches,
+      Math.floor(800 + Math.random() * 1200)
+    ),
     difficulty: sanitizeDifficulty(keyword?.difficulty),
-    intent: keyword?.intent
-  };
-};
-
-const buildPage = (page?: any, seed?: string): GeneratedPage => {
-  if (!page) {
-    return {
-      title: seed || 'New Page Idea',
-      summary: seed ? `Blueprint for ${seed}` : undefined,
-      keywords: seed ? [buildKeyword(undefined, `${seed} strategy`)] : []
-    };
-  }
-
-  return {
-    title: page.title || seed || 'New Page Idea',
-    summary: page.summary || page.description,
-    keywords: Array.isArray(page.keywords)
-      ? page.keywords.map((kw: any) => buildKeyword(kw))
-      : seed
-        ? [buildKeyword(undefined, `${seed} outline`)]
-        : []
+    intent: keyword?.intent,
   };
 };
 
 const buildTopic = (topic: any, fallbackSeed: string): GeneratedTopic => {
-  const seed = topic?.title || fallbackSeed;
-  return {
-    title: seed,
-    description: topic?.description || `Campaign theme for ${seed}`,
-    pillarPage: topic?.pillarPage ? buildPage(topic.pillarPage, `${seed} pillar`) : null,
-    subPages: Array.isArray(topic?.subPages)
-      ? topic.subPages.map((page: any, index: number) => buildPage(page, `${seed} sub ${index + 1}`))
-      : [],
-    keywords: Array.isArray(topic?.keywords)
-      ? topic.keywords.map((kw: any) => buildKeyword(kw))
-      : []
-  };
+  const title = (topic?.title && String(topic.title).trim()) || fallbackSeed;
+  const summary = topic?.summary || topic?.description || undefined;
+  const description = topic?.description || undefined;
+
+  const rawKeywords: any[] = Array.isArray(topic?.keywords) ? topic.keywords : [];
+  const keywords = rawKeywords.length
+    ? rawKeywords.map((kw) => buildKeyword(kw))
+    : [buildKeyword(undefined, `${title} strategy`)];
+
+  return { title, description, summary, keywords };
 };
 
 export async function generateCampaignTopics(
@@ -182,10 +154,10 @@ export async function generateCampaignTopics(
     location,
     locationContext,
     brandVoice,
-    targetAudience
+    targetAudience,
   } = context;
 
-  const exclusionPrompt = excludeTopics.length > 0
+  const exclusionPrompt = excludeTopics.length
     ? `\nCRITICAL: DO NOT generate topics that overlap with these existing ones (avoid these themes entirely): ${excludeTopics.join(', ')}`
     : '';
 
@@ -206,15 +178,16 @@ export async function generateCampaignTopics(
     : '';
 
   const prompt = `
-Create ${count} UNIQUE and NEW campaign topics for ${domainUrl}. These topics will be used to generate high-quality BLOG POSTS and ARTICLES.
+Create ${count} UNIQUE and NEW worksheet topics for ${domainUrl}. Each topic is a single content unit (not a hierarchy) — it will become one row in the worksheet and one piece of generated content.
 Context: ${domainContext || 'Not provided'}. Use this to align topics with the brand's voice and expertise.${geoContext}${voiceContext}${audienceContext}${campaignContext}
-Important keywords: ${keywords.join(', ') || 'none'}. Ensure topics are relevant to these keywords.
+Important keywords: ${keywords.join(', ') || 'none'}. Keep each topic relevant to these.
 Focus: ${focus || 'balanced mix of awareness and consideration'}${exclusionPrompt}
 
 GUIDELINES for VARIETY:
 - Explore different content angles: Technical/Deep-Dive, Strategic/Management, Trend/Future-focused, Beginners Guide, or Contrarian/Opinion.
-- DON'T just stick to "How to" guides. Mix in "Why X is the future", "The state of Y", or "Strategic approach to Z".
-- Ensure each topic has a distinct "hook".
+- Don't only do "How to" guides. Mix in "Why X is the future", "The state of Y", or "Strategic approach to Z".
+- Each topic must have a distinct angle — no overlapping themes.
+- For every topic, return 4–6 keywords. The first keyword should be the primary search term; the rest are longtails.
 
 Random Seed: ${Date.now()}
 
@@ -223,257 +196,214 @@ Return JSON matching:
   "topics": [
     {
       "title": "string",
+      "summary": "string",
       "description": "string",
-      "pillarPage": {
-        "title": "string",
-        "summary": "string",
-        "keywords": [
-          { "term": "string", "volume": 1800, "difficulty": "Medium" }
-        ]
-      },
-      "subPages": [
-        {
-          "title": "string",
-          "summary": "string",
-          "keywords": [
-            { "term": "string", "volume": 900, "difficulty": "Low" }
-          ]
-        }
+      "keywords": [
+        { "term": "string", "volume": 1500, "difficulty": "Medium", "intent": "informational" }
       ]
     }
   ]
 }
-Only return JSON.Ensure titles are distinct from the excluded list.`;
+Only return JSON. Ensure titles are distinct from the excluded list.`;
 
   const fallback = () => ({
-    topics: Array.from({ length: count }).map((_, index) =>
-      buildTopic(
+    topics: Array.from({ length: count }).map((_, index) => {
+      const seed = focus
+        ? `${focus} angle ${index + 1}`
+        : keywords[index] || `Worksheet topic ${index + 1}`;
+      return buildTopic(
         {
-          title: focus
-            ? `${focus} Topic ${index + 1} (v${Date.now()})`
-            : keywords[index] || `Campaign Topic ${index + 1} (v${Date.now()})`,
-          description: `Content angle inspired by ${keywords[index] || 'brand narrative'}.`,
-          pillarPage: {
-            title: `Ultimate Guide to ${keywords[index] || 'Brand Strategy'}`,
-            summary: `Deep dive resource covering ${keywords[index] || 'core capabilities'}.`
-          },
-          subPages: [
-            {
-              title: `${keywords[index] || 'Brand'} playbook`,
-              summary: 'Tactical execution guide.'
-            }
-          ]
+          title: seed,
+          summary: `Content angle inspired by ${keywords[index] || 'brand narrative'}.`,
+          description: '',
+          keywords: keywords.slice(index, index + 4).map((term) => ({ term })),
         },
-        `Topic ${index + 1}`
-      )
-    )
+        seed
+      );
+    }),
   });
 
   const aiResponse = await callOpenAiJson<{ topics: any[] }>(prompt, fallback);
-  const topics = Array.isArray(aiResponse?.topics) && aiResponse.topics.length > 0
-    ? aiResponse.topics
-    : fallback().topics;
+  const topics =
+    Array.isArray(aiResponse?.topics) && aiResponse.topics.length > 0
+      ? aiResponse.topics
+      : fallback().topics;
 
   return topics.map((topic: any, index: number) =>
-    buildTopic(topic, `Topic ${index + 1}`)
+    buildTopic(topic, `Worksheet topic ${index + 1}`)
   );
 }
 
-export async function generatePillarPageSuggestion(
+/**
+ * Suggests a title (and short summary) for an existing worksheet row, using
+ * the row's keywords + campaign/domain context. Used by the row-level
+ * "AI Suggest" button — does NOT create a new topic, only proposes content
+ * for an existing one.
+ */
+export async function generateTopicTitleSuggestion(
   context: BaseAiContext & {
-    topicTitle: string;
+    /** Keywords already on the topic — primary first if present. */
+    keywordTerms: string[];
     campaignTitle?: string;
     campaignDescription?: string;
+    /** Existing title, if the user wants the AI to "rewrite" rather than fill in. */
+    currentTitle?: string;
   }
-): Promise<GeneratedPage> {
+): Promise<{ title: string; summary: string }> {
   const {
     domainUrl,
     domainContext,
-    keywords = [],
-    topicTitle,
+    keywordTerms,
     campaignTitle,
     campaignDescription,
+    currentTitle,
     location,
     locationContext,
     brandVoice,
-    targetAudience
+    targetAudience,
   } = context;
 
   const geoContext = location
     ? `\nTarget Location: ${location}${locationContext ? `\nLocation Context: ${locationContext}` : ''}`
     : '';
-
   const voiceContext = brandVoice
     ? `\nBrand Voice: ${typeof brandVoice === 'object' ? JSON.stringify(brandVoice) : brandVoice}`
     : '';
-
   const audienceContext = targetAudience
     ? `\nTarget Audience: ${typeof targetAudience === 'object' ? JSON.stringify(targetAudience) : targetAudience}`
     : '';
-
   const campaignContext = campaignTitle
     ? `\nCampaign Name: ${campaignTitle}\nCampaign Goal: ${campaignDescription || 'Not provided'}`
     : '';
 
+  const seedKeywords = keywordTerms.filter(Boolean).slice(0, 8);
+  const currentTitleHint =
+    currentTitle && currentTitle.trim()
+      ? `\nThe row currently has the working title "${currentTitle.trim()}". You may improve it or replace it.`
+      : '';
+
   const prompt = `
-Create a single pillar page idea for the topic "${topicTitle}" for ${domainUrl}.
-Context: ${domainContext || 'Not provided'}${geoContext}${voiceContext}${audienceContext}${campaignContext}
-Important keywords: ${keywords.slice(0, 8).join(', ') || 'none'}
+Propose a single, distinct content title and a one-sentence summary for a worksheet row on ${domainUrl}.
+The row will become one piece of generated content, so the title must be specific and indexable, not a category name.
+Context: ${domainContext || 'Not provided'}${geoContext}${voiceContext}${audienceContext}${campaignContext}${currentTitleHint}
+Keywords already attached to this row: ${seedKeywords.length ? seedKeywords.join(', ') : 'none yet'}.
+- If keywords are present, the title MUST be relevant to them. The first keyword is the primary search term and should drive the angle.
+- If no keywords, lean on the campaign + brand context.
+- Avoid generic phrasings like "Ultimate Guide to X" — be specific and action-oriented.
+
 Random Seed: ${Date.now()}
 
 Return JSON:
 {
   "title": "string",
-  "summary": "string",
-  "keywords": [
-    { "term": "string", "volume": 2000, "difficulty": "Medium" }
-  ]
+  "summary": "string"
 }
 Only return JSON.`;
 
-  const fallback = () =>
-    buildPage(
-      {
-        title: `${topicTitle} Master Guide`,
-        summary: `Comprehensive resource for ${topicTitle.toLowerCase()}.`,
-        keywords: keywords.slice(0, 3).map(term => ({
-          term,
-          volume: Math.floor(1500 + Math.random() * 1000),
-          difficulty: DEFAULT_DIFFICULTY
-        }))
-      },
-      topicTitle
-    );
+  const fallback = () => {
+    const seed = seedKeywords[0] || campaignTitle || domainUrl;
+    return {
+      title: `How ${seed} drives measurable outcomes`,
+      summary: `A focused take on ${seed} for ${campaignTitle || 'this campaign'}.`,
+    };
+  };
 
-  const aiResponse = await callOpenAiJson<GeneratedPage>(prompt, fallback);
-  return buildPage(aiResponse, topicTitle);
+  const aiResponse = await callOpenAiJson<{ title?: string; summary?: string }>(
+    prompt,
+    fallback
+  );
+  const title = (aiResponse?.title || '').trim() || fallback().title;
+  const summary = (aiResponse?.summary || '').trim() || '';
+  return { title, summary };
 }
 
-export async function generateSubPagesSuggestion(
+export async function generateKeywordsSuggestion(
   context: BaseAiContext & {
     topicTitle: string;
-    count?: number;
-    excludeTitles?: string[];
+    /** Keywords already on the row, so the AI doesn't propose duplicates. */
+    existingTerms?: string[];
     campaignTitle?: string;
     campaignDescription?: string;
+    count?: number;
   }
-): Promise<GeneratedPage[]> {
+): Promise<GeneratedKeyword[]> {
   const {
     domainUrl,
     domainContext,
-    keywords = [],
+    keywords: domainKeywords = [],
     topicTitle,
-    count = 2,
-    excludeTitles = [],
+    existingTerms = [],
     campaignTitle,
     campaignDescription,
+    count = 5,
     location,
     locationContext,
     brandVoice,
-    targetAudience
+    targetAudience,
   } = context;
 
   const geoContext = location
     ? `\nTarget Location: ${location}${locationContext ? `\nLocation Context: ${locationContext}` : ''}`
     : '';
-
   const voiceContext = brandVoice
     ? `\nBrand Voice: ${typeof brandVoice === 'object' ? JSON.stringify(brandVoice) : brandVoice}`
     : '';
-
   const audienceContext = targetAudience
     ? `\nTarget Audience: ${typeof targetAudience === 'object' ? JSON.stringify(targetAudience) : targetAudience}`
     : '';
-
-  const exclusionPrompt = excludeTitles.length > 0
-    ? `\nDO NOT generate these sub-page titles (they already exist): ${excludeTitles.join(', ')}`
-    : '';
-
   const campaignContext = campaignTitle
-    ? `\nCampaign Name: ${campaignTitle}\nCampaign Goal: ${campaignDescription || 'Not provided'}`
+    ? `\nProject Name: ${campaignTitle}\nProject Goal: ${campaignDescription || 'Not provided'}`
+    : '';
+  const exclusion = existingTerms.length
+    ? `\nDO NOT suggest any of these (already on the row): ${existingTerms.slice(0, 16).join(', ')}.`
     : '';
 
   const prompt = `
-Suggest ${count} UNIQUE and NEW supporting sub-pages for the topic "${topicTitle}".
-Company: ${domainUrl}
-Context: ${domainContext || 'Not provided'}${geoContext}${voiceContext}${audienceContext}${campaignContext}
-Important keywords: ${keywords.slice(0, 8).join(', ') || 'none'}${exclusionPrompt}
+Suggest ${count} SEO keywords for the worksheet topic "${topicTitle}" on ${domainUrl}.
+Company context: ${domainContext || 'Not provided'}${geoContext}${voiceContext}${audienceContext}${campaignContext}
+Domain priority keywords (for tone/space alignment): ${domainKeywords.slice(0, 8).join(', ') || 'none'}.${exclusion}
+- The first keyword you return MUST be the strongest primary search term for this topic.
+- The rest should be supporting longtail variants (more specific, lower volume).
+- Each keyword must be a real search-intent phrase, not a category label.
+
 Random Seed: ${Date.now()}
 
 Return JSON:
 {
-  "subPages": [
-    {
-      "title": "string",
-      "summary": "string",
-      "keywords": [
-        { "term": "string", "volume": 900, "difficulty": "Low" }
-      ]
-    }
+  "keywords": [
+    { "term": "string", "volume": 1200, "difficulty": "Medium", "intent": "informational" }
   ]
 }
-Only return JSON.`;
-
-  const fallback = () => ({
-    subPages: Array.from({ length: count }).map((_, index) =>
-      buildPage(
-        {
-          title: `${topicTitle} Sub Topic ${index + 1} `,
-          summary: `Supporting article for ${topicTitle}.`
-        },
-        `${topicTitle} sub ${index + 1} `
-      )
-    )
-  });
-
-  const aiResponse = await callOpenAiJson<{ subPages: any[] }>(prompt, fallback);
-  const subPages = Array.isArray(aiResponse?.subPages) && aiResponse.subPages.length > 0
-    ? aiResponse.subPages
-    : fallback().subPages;
-
-  return subPages.map((page: any, index: number) =>
-    buildPage(page, `${topicTitle} sub ${index + 1} `)
-  );
-}
-
-export async function generateKeywordsSuggestion(
-  context: BaseAiContext & { topicTitle?: string; pageTitle?: string; count?: number }
-): Promise<GeneratedKeyword[]> {
-  const { domainUrl, domainContext, keywords = [], topicTitle, pageTitle, count = 5 } = context;
-  const scope = pageTitle || topicTitle || domainUrl;
-  const prompt = `
-Suggest ${count} SEO keywords for "${scope}".
-Company context: ${domainContext || 'Not provided'}
-Existing priority keywords: ${keywords.slice(0, 8).join(', ') || 'none'}
-Random Seed: ${Date.now()}
-
-Return JSON:
-  {
-    "keywords": [
-      { "term": "string", "volume": 1200, "difficulty": "Medium", "intent": "informational" }
-    ]
-  }
 Only return JSON.`;
 
   const fallback = () => ({
     keywords: Array.from({ length: count }).map((_, index) =>
       buildKeyword(
         {
-          term: `${scope} keyword ${index + 1} `,
+          term: `${topicTitle} ${index === 0 ? 'guide' : `angle ${index}`}`,
           volume: Math.floor(800 + Math.random() * 1400),
-          difficulty: difficultyBuckets[index % difficultyBuckets.length]
+          difficulty: difficultyBuckets[index % difficultyBuckets.length],
         },
-        `${scope} keyword ${index + 1} `
+        `${topicTitle} ${index}`
       )
-    )
+    ),
   });
 
   const aiResponse = await callOpenAiJson<{ keywords: any[] }>(prompt, fallback);
-  const keywordList = Array.isArray(aiResponse?.keywords) && aiResponse.keywords.length > 0
-    ? aiResponse.keywords
-    : fallback().keywords;
+  const list =
+    Array.isArray(aiResponse?.keywords) && aiResponse.keywords.length > 0
+      ? aiResponse.keywords
+      : fallback().keywords;
 
-  return keywordList.map((kw: any, index: number) =>
-    buildKeyword(kw, `${scope} keyword ${index + 1} `)
-  );
+  // De-dupe against existing terms (case-insensitive).
+  const seen = new Set(existingTerms.map((t) => t.toLowerCase()));
+  const result: GeneratedKeyword[] = [];
+  for (const kw of list) {
+    const built = buildKeyword(kw, topicTitle);
+    const key = built.term.toLowerCase();
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    result.push(built);
+  }
+  return result.slice(0, count);
 }

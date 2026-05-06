@@ -9,7 +9,6 @@ export type TabId =
   | "integration"
   | "domain-history"
   | "projects"
-  | "publish"
   | "settings"
   | "profile"
   | "ai-checker"
@@ -94,26 +93,6 @@ export interface GscAnalyticsSectionProps {
   activeGscSubTab: GscSubTabId;
 }
 
-export interface PublishSectionProps {
-  companyDomain: string;
-  companyDomainLoading: boolean;
-  domainContext: string;
-  draftStatuses: Map<number, any>;
-  draftToPageMap: Map<number, number>;
-  hasWordpressIntegration: boolean;
-  isActive: boolean;
-  keywordsTableData: KeywordTableItem[];
-  pageId?: number;
-  publishingPageIds: Set<number>;
-  setDraftStatuses: Dispatch<SetStateAction<Map<number, any>>>;
-  setDraftToPageMap: Dispatch<SetStateAction<Map<number, number>>>;
-  setPublishingPageIds: Dispatch<SetStateAction<Set<number>>>;
-  sharedPublishStatuses: Map<number, any>;
-  wpIntegration: WordpressIntegration | null;
-  onConfigureWordpress: () => void;
-  onRefreshWordpressIntegration: () => Promise<void>;
-}
-
 export interface AuditSectionProps {
   activeChartTab: "overview" | "comparison" | "distribution";
   auditLoading: boolean;
@@ -178,7 +157,6 @@ export interface DashboardContentRouterProps {
   gscAnalytics: GscAnalyticsSectionProps;
   competitorIntelligence: CompetitorIntelligenceProps;
   overview: OverviewSectionProps;
-  publish: PublishSectionProps;
   settings: SettingsSectionProps;
   onMenuItemClick?: (tabId: TabId, domainId?: string | number) => void;
 }

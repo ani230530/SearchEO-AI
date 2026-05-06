@@ -48,6 +48,7 @@ import {
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import { usePublishStatus } from '@/hooks/usePublishStatus';
 import { GenerationPageStatus, KeywordTableItem } from '@/types';
 import { WordpressIntegration } from '@/types/publish';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@radix-ui/react-accordion';
@@ -58,6 +59,7 @@ import { DashboardHeader } from "@/features/sidebar-dashboard/components/Dashboa
 import { DashboardSidebar } from "@/features/sidebar-dashboard/components/DashboardSidebar";
 import { AnalyticsCompanySection } from "@/features/sidebar-dashboard/sections/AnalyticsCompanySection";
 import { ProjectsSection } from "@/features/sidebar-dashboard/sections/ProjectsSection";
+import WorksheetDraftOverlay from "@/features/campaign/WorksheetDraftOverlay";
 import { DASHBOARD_TABS } from "@/features/sidebar-dashboard/constants";
 import CompetitorPage from '@/features/sidebar-dashboard/sections/CompetitorPage';
 
@@ -89,6 +91,7 @@ import { validateDomainInput } from "@/lib/domainValidation";
 
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3002";
+const WORKSHEET_TARGET_KEY = 'ai-results/pending-worksheet-target';
 
 
 
@@ -251,6 +254,20 @@ const [improvedContent, setImprovedContent] = useState("");
     null
   );
   const [activeSection, setActiveSection] = useState<'all' | 'favourites' | 'published'>('all');
+  /** Set when a worksheet row's "Draft Blog" action is clicked. The
+   *  dashboard renders an overlay hosting PublishExperience in its embedded
+   *  (disablePreviewOverlay) mode. The Publish action on the worksheet row
+   *  doesn't go through here — it fires direct via /api/publish/publish.
+   *  This overlay is only for viewing/editing the draft. */
+  const [draftOverlayId, setDraftOverlayId] = useState<number | null>(null);
+
+  const handleOpenDraftInPublish = useCallback((draftId: number) => {
+    setDraftOverlayId(draftId);
+  }, []);
+
+  const handleCloseDraftOverlay = useCallback(() => {
+    setDraftOverlayId(null);
+  }, []);
   const [openSortMenu, setOpenSortMenu] = useState(false);
 const [sortBy, setSortBy] = useState<"date" | "name">("date");
   const [favouriteIds, setFavouriteIds] = useState<Set<number>>(new Set());
@@ -482,6 +499,24 @@ const [editDescription, setEditDescription] = useState('');
       });
     }
   }, [draftToPageMap, toast]);
+
+  // Subscribe to backend publish_update SSE events. Without this hook nobody
+  // would consume the events broadcast by /api/publish/publish-webhook —
+  // generation SSE explicitly drops anything other than `generation:update`,
+  // so the worksheet's optimistic "Publishing…" flag would never clear and
+  // sharedPublishStatuses would stay empty until a full page reload.
+  usePublishStatus({
+    onUpdate: (data) => {
+      handlePublishUpdate({
+        draftId: data.draftId,
+        pageId: data.pageId,
+        status: data.status === 'draft' ? 'generating' : data.status,
+        publishedUrl: data.publishedUrl,
+        wordpressPostId: data.wordpressPostId,
+        error: data.error,
+      });
+    },
+  });
 
   const tabs: DashboardSidebarTab[] = DASHBOARD_TABS.map((tab) => ({
     ...tab,
@@ -935,8 +970,7 @@ useEffect(() => {
       // But we shouldn't re-fetch on *every* tab switch if we already have data, to prevent flickering.
       const shouldFetch =
         activeTab === 'overview' ||
-        activeTab === 'analytics' ||
-        activeTab === 'publish';
+        activeTab === 'analytics';
 
       if (shouldFetch) {
           fetchCompanyDomain();
@@ -1602,14 +1636,6 @@ useEffect(() => {
       }
     } catch (error) {
       console.error('Error fetching WordPress integration:', error);
-      // Only show toast if we're on publish tab, not for background loading in campaign tab
-      if (activeTab === 'publish') {
-      toast({
-        title: "WordPress",
-        description: "Unable to load WordPress integration details",
-        variant: "destructive"
-      });
-      }
     } finally {
       setWpIntegrationLoading(false);
     }
@@ -1729,12 +1755,6 @@ useEffect(() => {
     }
   }, [activeTab, activeCompanySubTab, fetchGscStatus, fetchWordpressIntegration, fetchCampaignTabData]);
 
-  useEffect(() => {
-    if (activeTab === 'publish') {
-      fetchWordpressIntegration();
-    }
-  }, [activeTab, fetchWordpressIntegration]);
-
   const fetchCampaigns = useCallback(async () => {
     setCampaignsLoading(true);
     try {
@@ -1773,6 +1793,24 @@ useEffect(() => {
       fetchCampaigns();
     }
   }, [activeTab, fetchCampaigns]);
+
+  useEffect(() => {
+    if (activeTab !== 'projects') return;
+    if (!campaigns.length) return;
+    if (selectedCampaignId !== null) return;
+
+    const pendingTarget = sessionStorage.getItem(WORKSHEET_TARGET_KEY);
+    if (!pendingTarget) return;
+
+    const parsedTargetId = Number(pendingTarget);
+    if (!Number.isFinite(parsedTargetId)) return;
+
+    const matchedCampaign = campaigns.find((campaign) => campaign.id === parsedTargetId);
+    if (!matchedCampaign) return;
+
+    setSelectedCampaignId(matchedCampaign.id);
+    sessionStorage.removeItem(WORKSHEET_TARGET_KEY);
+  }, [activeTab, campaigns, selectedCampaignId]);
 
   const handleCreateCampaign = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -2431,27 +2469,6 @@ useEffect(() => {
       setupContent: null,
       showResults,
     },
-    publish: {
-      companyDomain,
-      companyDomainLoading,
-      domainContext,
-      draftStatuses,
-      draftToPageMap,
-      hasWordpressIntegration,
-      isActive: activeTab === "publish",
-      keywordsTableData,
-      pageId: undefined,
-      publishingPageIds,
-      setDraftStatuses,
-      setDraftToPageMap,
-      setPublishingPageIds,
-      sharedPublishStatuses,
-      wpIntegration,
-      onConfigureWordpress: handleConfigureWordpress,
-      onRefreshWordpressIntegration: async () => {
-        await fetchWordpressIntegration();
-      },
-    },
     audit: {
       activeChartTab,
       auditLoading,
@@ -2725,6 +2742,7 @@ useEffect(() => {
         }
 
         .main-content {
+          position: relative;
           margin-left: 280px;
           transition: margin-left 0.3s ease;
           min-height: 100vh;
@@ -2973,6 +2991,8 @@ useEffect(() => {
               selectedCampaignId={selectedCampaignId}
               campaigns={campaigns}
               setSelectedCampaignId={setSelectedCampaignId}
+              onOpenDraftInPublish={handleOpenDraftInPublish}
+              sharedPublishStatuses={sharedPublishStatuses}
               keywordsTableData={keywordsTableData}
               showCreateCampaign={showCreateCampaign}
               setShowCreateCampaign={setShowCreateCampaign}
@@ -3041,6 +3061,33 @@ useEffect(() => {
         )}
         </div>
       </main>
+
+      {/* Worksheet draft preview — viewport-pinned overlay hosting the legacy
+          PublishExperience in embedded mode. Uses `position: fixed` with a
+          sidebar-width left offset so it covers the working area at exactly
+          viewport height, regardless of how tall the underlying worksheet
+          page content is. */}
+      <WorksheetDraftOverlay
+        draftId={draftOverlayId}
+        open={draftOverlayId !== null}
+        onClose={handleCloseDraftOverlay}
+        sidebarExpanded={isSidebarExpanded}
+        companyDomain={companyDomain}
+        domainContext={domainContext}
+        keywordsTableData={keywordsTableData}
+        hasWordpressIntegration={hasWordpressIntegration}
+        wpIntegration={wpIntegration}
+        onRefreshWordpressIntegration={async () => {
+          await fetchWordpressIntegration();
+        }}
+        publishingPageIds={publishingPageIds}
+        setPublishingPageIds={setPublishingPageIds}
+        draftToPageMap={draftToPageMap}
+        setDraftToPageMap={setDraftToPageMap}
+        draftStatuses={draftStatuses}
+        setDraftStatuses={setDraftStatuses}
+        sharedPublishStatuses={sharedPublishStatuses}
+      />
     </div>
   );
 };
