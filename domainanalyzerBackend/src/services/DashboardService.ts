@@ -30,8 +30,12 @@ export class DashboardService {
       };
     }
 
-    const aiQueryResults = domain.generatedIntentPhrases 
-      ? domain.generatedIntentPhrases.flatMap((p: any) => p.aiQueryResults || [])
+    // Empty array is truthy in JS — guard with .length so the keyword-nested
+    // fallback runs when the flat phrases relation comes back empty
+    // (e.g. legacy data where phrases were only attached via keyword).
+    const flatPhrases = (domain.generatedIntentPhrases ?? []) as any[];
+    const aiQueryResults = flatPhrases.length > 0
+      ? flatPhrases.flatMap((p: any) => p.aiQueryResults || [])
       : this.flattenAIQueryResults(domain.keywords || []);
 
     // Handle crawl data properly
@@ -378,10 +382,22 @@ export class DashboardService {
    */
   static getUnifiedAnalysisList(domain: any) {
     const unifiedList: any[] = [];
-    
+
     // 1. Process Phrases (Individual Prompts) FIRST as requested
-    if (domain.generatedIntentPhrases) {
-      domain.generatedIntentPhrases.forEach((phrase: any) => {
+    // Empty array is truthy, so fall back to keyword-nested phrases when
+    // the flat relation comes back empty (legacy data shape).
+    const flatPhrases = (domain.generatedIntentPhrases ?? []) as any[];
+    const phraseSource = flatPhrases.length > 0
+      ? flatPhrases
+      : (domain.keywords ?? []).flatMap((kw: any) =>
+          (kw?.generatedIntentPhrases ?? []).map((p: any) => ({
+            ...p,
+            keyword: p.keyword ?? { term: kw.term },
+          }))
+        );
+
+    if (phraseSource.length > 0) {
+      phraseSource.forEach((phrase: any) => {
         const results = phrase.aiQueryResults || [];
         
         const avgOverall = results.length > 0 
@@ -581,9 +597,11 @@ export class DashboardService {
             difficulty: true,
             generatedIntentPhrases: {
               select: {
+                id: true,
                 phrase: true,
                 aiQueryResults: {
                   select: {
+                    id: true,
                     presence: true,
                     relevance: true,
                     accuracy: true,
@@ -591,6 +609,8 @@ export class DashboardService {
                     overall: true,
                     model: true,
                     competitorNames: true,
+                    competitorUrls: true,
+                    domainRank: true,
                     response: true,
                     sources: true,
                     citations: true
