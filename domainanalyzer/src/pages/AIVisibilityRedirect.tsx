@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { maskDomainId } from "@/lib/domainUtils";
+import { apiGet } from "../services/apiClient";
 
 export const AI_VISIBILITY_LAST_DOMAIN_SLUG = "ai-visibility:lastDomainSlug";
 
@@ -19,51 +20,57 @@ const AIVisibilityRedirect = () => {
   useEffect(() => {
     if (authLoading) return;
 
-    const stored = localStorage.getItem(AI_VISIBILITY_LAST_DOMAIN_SLUG);
-    if (stored) {
-      setState({ status: "redirect", slug: stored });
-      return;
-    }
-
-    if (!token) {
-      setState({ status: "empty" });
-      return;
-    }
-
     let cancelled = false;
-    (async () => {
+
+    const resolveDomain = async () => {
       try {
-        const resp = await fetch(`${import.meta.env.VITE_API_URL}/api/dashboard/all`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-        });
-        if (!resp.ok) throw new Error("Failed to load domains");
-        const data = (await resp.json()) as {
-          domains?: Array<{ id: number; lastAnalyzed?: string; metrics?: unknown }>;
-        };
+        // We always fetch the domains list to ensure we have fresh data and 
+        // to populate the sessionStorage mapping via maskDomainId.
+        const data = await apiGet<any>('/dashboard/all');
         const domains = data.domains ?? [];
+        
         if (cancelled) return;
+
         if (domains.length === 0) {
           setState({ status: "empty" });
           return;
         }
-        const mostRecent = [...domains].sort((a, b) => {
-          const aTime = a.lastAnalyzed ? new Date(a.lastAnalyzed).getTime() : 0;
-          const bTime = b.lastAnalyzed ? new Date(b.lastAnalyzed).getTime() : 0;
-          return bTime - aTime;
-        })[0];
-        const slug = maskDomainId(mostRecent.id);
-        setState({ status: "redirect", slug });
+
+        // Find the most recent domain or use the one from localStorage if it still exists
+        const storedSlug = localStorage.getItem(AI_VISIBILITY_LAST_DOMAIN_SLUG);
+        let targetDomain = null;
+
+        if (storedSlug) {
+          // Try to find the domain that matches the stored slug
+          targetDomain = domains.find(d => maskDomainId(d.id) === storedSlug);
+        }
+
+        if (!targetDomain) {
+          // Fallback to the most recently analyzed domain
+          targetDomain = [...domains].sort((a, b) => {
+            const aTime = a.lastAnalyzed ? new Date(a.lastAnalyzed).getTime() : 0;
+            const bTime = b.lastAnalyzed ? new Date(b.lastAnalyzed).getTime() : 0;
+            return bTime - aTime;
+          })[0];
+        }
+
+        if (targetDomain) {
+          const slug = maskDomainId(targetDomain.id);
+          setState({ status: "redirect", slug });
+        } else {
+          setState({ status: "empty" });
+        }
       } catch (err) {
         if (cancelled) return;
+        console.error("AIVisibilityRedirect error:", err);
         setState({
           status: "error",
           message: err instanceof Error ? err.message : "Failed to load domains",
         });
       }
-    })();
+    };
+
+    resolveDomain();
 
     return () => {
       cancelled = true;
