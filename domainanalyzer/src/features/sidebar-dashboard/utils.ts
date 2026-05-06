@@ -12,7 +12,7 @@ const VALID_TABS: readonly TabId[] = [
   "projects",
   "settings",
   "profile",
-  "ai-checker",
+  "ai-visibility",
   "gsc-analytics",
   "audit",
   "analytics-report",
@@ -64,12 +64,12 @@ export function parseDashboardSearchState(search: string): DashboardSearchState 
   const subtabParam = params.get("subtab");
   const wordpressParam = params.get("wordpress");
 
-  if (tabParam === "ai-checker") {
-    return { redirectToAiChecker: true };
+  if (tabParam === "ai-visibility" || tabParam === "ai-checker") {
+    return { redirectToAiVisibility: true };
   }
 
   return {
-    redirectToAiChecker: false,
+    redirectToAiVisibility: false,
     activeTab:
       tabParam && VALID_QUERY_TABS.includes(tabParam as TabId)
         ? (tabParam as TabId)

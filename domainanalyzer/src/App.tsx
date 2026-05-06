@@ -5,8 +5,6 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
-import Index from "./pages/Index";
-import MainDashboard from "./pages/MainDashboard";
 import DomainDashboard from "./pages/DomainDashboard";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
@@ -14,7 +12,7 @@ import Profile from "./pages/Profile";
 import LandingPage from "./pages/LandingPage";
 import SidebarDashboard from "./pages/SidebarDashboard";
 import KnowledgeBase from "./pages/KnowledgeBase";
-import AIChecker from "./pages/AIChecker";
+import AIVisibilityRedirect from "./pages/AIVisibilityRedirect";
 import AIResultsReportPreview from "./pages/AIResultsReportPreview";
 
 const queryClient = new QueryClient();
@@ -37,19 +35,9 @@ const App = () => (
                 <SidebarDashboard />
               </ProtectedRoute>
             } />
-            <Route path="/ai-checker" element={
+            <Route path="/ai-visibility" element={
               <ProtectedRoute>
-                <MainDashboard />
-              </ProtectedRoute>
-            } />
-            {/* <Route path="/analyze" element={
-              <ProtectedRoute>
-                <Index />
-              </ProtectedRoute>
-            } /> */}
-             <Route path="/ai-checker-page" element={
-              <ProtectedRoute>
-                <AIChecker/>
+                <AIVisibilityRedirect />
               </ProtectedRoute>
             } />
             <Route path="/ai-results/:domain" element={

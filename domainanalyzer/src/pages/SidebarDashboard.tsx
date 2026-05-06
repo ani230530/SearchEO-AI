@@ -794,8 +794,8 @@ useEffect(() => {
   useEffect(() => {
     const searchState = parseDashboardSearchState(window.location.search);
 
-    if (searchState.redirectToAiChecker) {
-      navigate('/ai-checker');
+    if (searchState.redirectToAiVisibility) {
+      navigate('/ai-visibility');
     } else if (searchState.activeTab) {
       setActiveTab(searchState.activeTab);
     }
@@ -2881,8 +2881,8 @@ useEffect(() => {
         onLogout={logout}
         onSelectCompanySubTab={setActiveCompanySubTab}
         onSelectTab={(tabId) => {
-          if (tabId === "ai-checker") {
-            navigate("/ai-checker");
+          if (tabId === "ai-visibility") {
+            navigate("/ai-visibility");
             return;
           }
           setOpenWordpressConnectionView(false);
