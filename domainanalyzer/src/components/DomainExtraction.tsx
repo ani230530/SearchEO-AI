@@ -1538,7 +1538,7 @@ const DomainExtraction: React.FC<DomainExtractionProps> = ({
               className="col-span-1 flex items-center space-x-2 cursor-pointer hover:text-gray-900 transition-colors justify-center"
               onClick={() => handleSort('competition')}
             >
-              <span>Competition</span>
+              <span>KD</span>
               {getSortIcon('competition')}
             </div>
             

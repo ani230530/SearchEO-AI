@@ -14,7 +14,7 @@ import {
 interface KeywordData {
   id: string;
   keyword: string;
-  rank: number;
+  rank: string;
   myRank: string;
   volume: string;
   landingPage: string;
@@ -125,11 +125,13 @@ const CompetitorDetailPage: React.FC<CompetitorDetailPageProps> = ({
         let aValue: any = a[sortConfig.key as keyof KeywordData];
         let bValue: any = b[sortConfig.key as keyof KeywordData];
 
-        if (typeof aValue === "string" && !isNaN(Number(aValue))) {
-          aValue = Number(aValue);
+        if (typeof aValue === "string") {
+          const stripped = aValue.replace(/^#/, "");
+          if (!isNaN(Number(stripped))) aValue = Number(stripped);
         }
-        if (typeof bValue === "string" && !isNaN(Number(bValue))) {
-          bValue = Number(bValue);
+        if (typeof bValue === "string") {
+          const stripped = bValue.replace(/^#/, "");
+          if (!isNaN(Number(stripped))) bValue = Number(stripped);
         }
 
         if (aValue < bValue) return sortConfig.direction === "asc" ? -1 : 1;

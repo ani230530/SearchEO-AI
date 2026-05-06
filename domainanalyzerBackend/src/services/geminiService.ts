@@ -80,7 +80,7 @@ async function delay(ms: number): Promise<void> {
 
 function normalizeUrlOrDomain(input: string): { isUrl: boolean; baseUrl: string; domain: string } {
   const trimmed = input.trim();
-  
+
   // Check if it's already a full URL
   if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
     const url = new URL(trimmed);
@@ -90,7 +90,7 @@ function normalizeUrlOrDomain(input: string): { isUrl: boolean; baseUrl: string;
       domain: url.hostname.replace(/^www\./, '')
     };
   }
-  
+
   // It's a domain, construct the URL
   const cleanDomain = trimmed.replace(/^www\./, '');
   return {
@@ -106,21 +106,21 @@ async function crawlWebsiteWithProgress(
   onProgress?: ProgressCallback,
   relevantPaths?: string[],
   priorityUrls?: string[]
-): Promise<{contentBlocks: string[], urls: string[]}> {
+): Promise<{ contentBlocks: string[], urls: string[] }> {
   const visited = new Set<string>();
   const queue: string[] = [];
-  
+
   // Check if we have specific URLs/paths to crawl
   const hasSpecificUrls = priorityUrls && priorityUrls.length > 0;
   const hasSpecificPaths = relevantPaths && relevantPaths.length > 0;
   const hasSpecificTargets = hasSpecificUrls || hasSpecificPaths;
-  
+
   // Determine if input is a full URL or just a domain
   const isFullUrl = urlOrDomain.startsWith('http://') || urlOrDomain.startsWith('https://');
-  
+
   let domain: string;
   let baseUrl: string;
-  
+
   if (isFullUrl) {
     // It's a full URL - crawl only this single page
     const url = new URL(urlOrDomain);
@@ -132,7 +132,7 @@ async function crawlWebsiteWithProgress(
     // It's a domain
     domain = urlOrDomain.replace(/^www\./, '');
     baseUrl = `https://${domain}`;
-    
+
     if (hasSpecificTargets) {
       // If URLs/paths are provided, crawl only those (no discovery)
       if (hasSpecificUrls) {
@@ -180,9 +180,9 @@ async function crawlWebsiteWithProgress(
   // Phase 1: Domain Discovery
   onProgress?.({
     phase: 'discovery',
-    step: isFullUrl ? 'Validating URL accessibility...' : 
-          hasSpecificUrls ? `Validating domain and ${priorityUrls?.length} specific URLs...` :
-          hasSpecificPaths ? `Validating domain and ${relevantPaths?.length} specific paths...` : 
+    step: isFullUrl ? 'Validating URL accessibility...' :
+      hasSpecificUrls ? `Validating domain and ${priorityUrls?.length} specific URLs...` :
+        hasSpecificPaths ? `Validating domain and ${relevantPaths?.length} specific paths...` :
           'Validating domain accessibility...',
     progress: 5,
     stats
@@ -199,9 +199,9 @@ async function crawlWebsiteWithProgress(
 
   onProgress?.({
     phase: 'discovery',
-    step: hasSpecificUrls ? `Analyzing ${queue.length} specified pages...` : 
-          hasSpecificPaths ? `Analyzing ${queue.length} specified paths...` :
-          isFullUrl ? 'Analyzing single page...' : 
+    step: hasSpecificUrls ? `Analyzing ${queue.length} specified pages...` :
+      hasSpecificPaths ? `Analyzing ${queue.length} specified paths...` :
+        isFullUrl ? 'Analyzing single page...' :
           'Scanning site architecture...',
     progress: 10,
     stats
@@ -217,7 +217,7 @@ async function crawlWebsiteWithProgress(
 
   let progressIncrement = 50 / Math.max(1, queue.length);
 
-    // Helper function to crawl a single page
+  // Helper function to crawl a single page
   async function crawlSinglePage(url: string) {
     if (!url || visited.has(url)) return;
     try {
@@ -232,7 +232,7 @@ async function crawlWebsiteWithProgress(
       discoveredUrls.push(url);
       stats.pagesScanned = visited.size;
       const $ = cheerio.load(response.data);
-      
+
       const contentSelectors = [
         'p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
         'article', 'section', '.content', '.main',
@@ -301,7 +301,7 @@ async function crawlWebsiteWithProgress(
         progress: 20 + (visited.size / maxPages) * 30,
         stats
       });
-      
+
       // --- Link Discovery ---
       // Only discover links if we haven't hit maxPages and we're not using specific targets
       if (visited.size < maxPages && !hasSpecificTargets) {
@@ -310,15 +310,15 @@ async function crawlWebsiteWithProgress(
             return new URL(url).hostname.replace(/^www\./, '');
           } catch { return null; }
         })();
-        
+
         // Find relevant internal links
         const relevantLinks = new Set<string>();
         const allLinks: string[] = [];
-        
+
         $('a[href]').each((_, el) => {
           const href = $(el).attr('href');
           if (!href) return;
-          
+
           let fullUrl = '';
           if (href.startsWith('http')) {
             try {
@@ -328,22 +328,22 @@ async function crawlWebsiteWithProgress(
           } else if (href.startsWith('/')) {
             fullUrl = `https://${pageDomain}${href}`;
           }
-          
+
           if (fullUrl) {
             allLinks.push(fullUrl);
-            
+
             // Filter for relevant pages (avoid admin, login, etc.)
             if (!visited.has(fullUrl) && !queue.includes(fullUrl)) {
               const path = fullUrl.toLowerCase();
               // Skip unwanted paths
               const skipPaths = [
-                '/admin', '/login', '/register', '/cart', '/checkout', 
+                '/admin', '/login', '/register', '/cart', '/checkout',
                 '/wp-admin', '/wp-login', '?', '#', '/search', '/tag/',
                 '/category/', '/author/', '/date/', '/page/', '/feed',
                 '.pdf', '.jpg', '.jpeg', '.png', '.gif', '.css', '.js',
                 '.xml', '.txt', '.zip', '.doc', '.docx', '.xls', '.xlsx'
               ];
-              
+
               const shouldSkip = skipPaths.some(skip => path.includes(skip));
               if (!shouldSkip) {
                 relevantLinks.add(fullUrl);
@@ -351,12 +351,12 @@ async function crawlWebsiteWithProgress(
             }
           }
         });
-        
+
         // Add relevant links to queue (up to remaining slots)
         const remainingSlots = maxPages - visited.size;
         const linksToAdd = Array.from(relevantLinks).slice(0, remainingSlots);
         queue.push(...linksToAdd);
-        
+
         console.log(`Page ${url}:`);
         console.log(`  - Found ${allLinks.length} total links`);
         console.log(`  - ${relevantLinks.size} relevant links after filtering`);
@@ -376,7 +376,7 @@ async function crawlWebsiteWithProgress(
   // Parallel crawling with concurrency limit
   const CONCURRENCY = 3;
   console.log(`Starting crawl loop. Initial queue: ${queue.length} URLs, maxPages: ${maxPages}`);
-  
+
   while (queue.length > 0 && visited.size < maxPages) {
     const batch: string[] = [];
     while (batch.length < CONCURRENCY && queue.length > 0 && visited.size + batch.length < maxPages) {
@@ -389,11 +389,11 @@ async function crawlWebsiteWithProgress(
       console.log(`Breaking crawl loop: batch is empty. Queue: ${queue.length}, Visited: ${visited.size}`);
       break;
     }
-    
+
     console.log(`Processing batch of ${batch.length} URLs. Visited: ${visited.size}/${maxPages}, Queue remaining: ${queue.length}`);
     await Promise.all(batch.map(url => crawlSinglePage(url)));
   }
-  
+
   console.log(`Crawl complete. Visited ${visited.size} pages, found ${discoveredUrls.length} URLs`);
 
   return { contentBlocks, urls: discoveredUrls };
@@ -614,14 +614,14 @@ export async function crawlAndExtractWithGpt4o(
         throw new Error(`API rate limit reached. Please wait before retrying.`);
       }
     }
-    
+
     throw new Error(`Crawling failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
 
 // Helper functions for optimization
 function prioritizeAndFilterContent(
-  crawlResults: Array<{contentBlocks: string[], urls: string[]}>,
+  crawlResults: Array<{ contentBlocks: string[], urls: string[] }>,
   options: {
     maxPages: number;
     maxTokens: number;
@@ -629,7 +629,7 @@ function prioritizeAndFilterContent(
     priorityUrls: string[];
   }
 ) {
-  let allContent: Array<{content: string, url: string, priority: number}> = [];
+  let allContent: Array<{ content: string, url: string, priority: number }> = [];
   let allUrls: string[] = [];
 
   // Combine and score content
@@ -637,7 +637,7 @@ function prioritizeAndFilterContent(
     result.contentBlocks.forEach((content, index) => {
       const url = result.urls[index] || '';
       const priority = calculateContentPriority(content, url, options.priorityUrls);
-      
+
       if (content.length >= options.contentQualityThreshold) {
         allContent.push({ content, url, priority });
       }
@@ -659,32 +659,32 @@ function prioritizeAndFilterContent(
 }
 
 function calculateContentPriority(
-  content: string, 
-  url: string, 
+  content: string,
+  url: string,
   priorityUrls: string[]
 ): number {
   let score = 0;
-  
+
   // Priority URL bonus
   if (priorityUrls.some(pUrl => url.includes(pUrl))) {
     score += 100;
   }
-  
+
   // Content quality factors
   score += Math.min(content.length / 100, 50); // Length score (max 50)
   score += (content.match(/\b(about|service|product|solution)\b/gi) || []).length * 5;
   score += url.includes('/about') ? 20 : 0;
   score += url === '/' || url.endsWith('/') ? 15 : 0; // Homepage bonus
-  
+
   // Penalize thin content
   if (content.length < 200) score -= 20;
-  
+
   return score;
 }
 
 function deduplicateContent(
-  contentArray: Array<{content: string, url: string, priority: number}>
-): Array<{content: string, url: string, priority: number}> {
+  contentArray: Array<{ content: string, url: string, priority: number }>
+): Array<{ content: string, url: string, priority: number }> {
   const seen = new Set<string>();
   return contentArray.filter(item => {
     // Simple similarity check - could be enhanced with fuzzy matching
@@ -698,14 +698,14 @@ function deduplicateContent(
 }
 
 function buildLocationContext(
-  domainContextMap: Map<string, string | null>, 
+  domainContextMap: Map<string, string | null>,
   domainList: string[]
 ): string {
   const contexts = domainList
     .map(domain => domainContextMap.get(domain))
     .filter(Boolean) as string[];
-  
-  return contexts.length > 0 
+
+  return contexts.length > 0
     ? `\n\n**LOCATION-DOMAIN CONTEXT:**\n${contexts.join('\n\n')}`
     : '';
 }
@@ -719,7 +719,7 @@ function buildAnalysisPrompt(params: {
   analyzedUrls: string[];
 }): string {
   const { primaryDomain, location, contentBlocks, locationDomainContext, totalPages, analyzedUrls } = params;
-  
+
   return `You are an expert business intelligence analyst and SEO strategist. Conduct a comprehensive domain analysis that will serve as the foundation for all subsequent AI-powered analysis phases.
 
 **ANALYSIS CONTEXT:**
@@ -819,7 +819,7 @@ function estimateTokenCount(text: string): number {
 function truncateToTokenLimit(contentBlocks: string[], maxTokens: number): string[] {
   let currentTokens = 0;
   const result: string[] = [];
-  
+
   for (const block of contentBlocks) {
     const blockTokens = estimateTokenCount(block);
     if (currentTokens + blockTokens > maxTokens) {
@@ -828,16 +828,16 @@ function truncateToTokenLimit(contentBlocks: string[], maxTokens: number): strin
     result.push(block);
     currentTokens += blockTokens;
   }
-  
+
   return result;
 }
 
 function calculateContentQualityScore(contentBlocks: string[]): number {
   if (contentBlocks.length === 0) return 0;
-  
+
   const avgLength = contentBlocks.reduce((sum, block) => sum + block.length, 0) / contentBlocks.length;
   const uniquenessScore = contentBlocks.length / new Set(contentBlocks).size;
-  
+
   return Math.min(100, (avgLength / 10) + (uniquenessScore * 20));
 }
 
@@ -847,7 +847,7 @@ export async function generatePhrases(keyword: string, domain?: string, context?
     const businessContext = context ? `\nBusiness Context: ${context}` : '';
     const hasLocation = location && location.trim();
     const locationContext = hasLocation ? `\nLocation: ${location.trim()}` : '';
-    
+
     const prompt = `Generate 5 highly realistic, intent-based search phrases for the keyword "${keyword}". These should be EXACTLY what real users would type into Google when searching for this type of business or service.
 
 BUSINESS CONTEXT:
@@ -923,16 +923,16 @@ LOCATION HANDLING GUIDELINES:
 - ❌ "how to [keyword] in [location]" (forced location)
 - ❌ "[keyword] guide [location]" (unnecessary location)
 
-${hasLocation ? 
-  `LOCATION CONTEXT: ${location}
+${hasLocation ?
+        `LOCATION CONTEXT: ${location}
    - Include 1-2 location-specific phrases ONLY if location is naturally relevant
    - Include 3-4 general phrases without location for broader reach
    - Use realistic location formats: "downtown ${location}", "${location} area"`
-  : 
-  `- Create general phrases without location
+        :
+        `- Create general phrases without location
    - Focus on brand discovery and comparison searches
    - Include phrases that work nationally/globally`
-}
+      }
 
 BUSINESS CONTEXT INTEGRATION:
 - Consider the actual business type and industry
@@ -969,7 +969,8 @@ IMPORTANT: Return ONLY a JSON array of 5 strings, no other text or formatting:
     const completion = await openai.chat.completions.create({
       model: 'gpt-4o',
       messages: [
-        { role: 'system', content: `You are an expert SEO specialist and search behavior analyst. Your task is to generate highly realistic search phrases that real users would actually type into search engines.
+        {
+          role: 'system', content: `You are an expert SEO specialist and search behavior analyst. Your task is to generate highly realistic search phrases that real users would actually type into search engines.
 
 CRITICAL REQUIREMENTS:
 - Generate 5 DIFFERENT types of search intents (local, comparison, solution, review, brand discovery)
@@ -991,10 +992,10 @@ Your goal is to create phrases that would help users discover and compare real b
     });
     const text = completion.choices[0].message?.content;
     if (!text) throw new Error('Empty response from GPT-4o-mini API');
-    
+
     // Try multiple approaches to extract JSON
     let phrases: string[] = [];
-    
+
     // First, try to find JSON array in the response
     const jsonMatch = text.match(/\[[\s\S]*\]/);
     if (jsonMatch) {
@@ -1004,7 +1005,7 @@ Your goal is to create phrases that would help users discover and compare real b
         console.log('Failed to parse JSON match:', jsonMatch[0]);
       }
     }
-    
+
     // If that fails, try to parse the entire response as JSON
     if (!Array.isArray(phrases) || phrases.length === 0) {
       try {
@@ -1013,7 +1014,7 @@ Your goal is to create phrases that would help users discover and compare real b
         console.log('Failed to parse entire response as JSON:', text);
       }
     }
-    
+
     // If still no success, try to extract phrases manually
     if (!Array.isArray(phrases) || phrases.length === 0) {
       // Look for numbered items or quoted strings
@@ -1022,13 +1023,13 @@ Your goal is to create phrases that would help users discover and compare real b
         phrases = phraseMatches.map(match => match.replace(/['"]/g, ''));
       }
     }
-    
+
     // If still no success, generate fallback phrases
     if (!Array.isArray(phrases) || phrases.length === 0) {
       console.log('Generating fallback phrases for keyword:', keyword);
       phrases = generateFallbackPhrases(keyword, hasLocation ? location : undefined);
     }
-    
+
     // Ensure we have exactly 5 phrases
     if (phrases.length > 5) {
       phrases = phrases.slice(0, 5);
@@ -1041,7 +1042,7 @@ Your goal is to create phrases that would help users discover and compare real b
         }
       }
     }
-    
+
     return {
       phrases: phrases.filter((phrase: any) => typeof phrase === 'string' && phrase.length > 0),
       tokenUsage: completion.usage?.total_tokens || 0
@@ -1065,7 +1066,7 @@ function generateFallbackPhrases(keyword: string, location?: string): string[] {
     `affordable ${keyword} solutions`,
     `${keyword} near me`
   ];
-  
+
   if (location) {
     return [
       `best ${keyword} companies in ${location}`,
@@ -1075,7 +1076,7 @@ function generateFallbackPhrases(keyword: string, location?: string): string[] {
       `top rated ${keyword} companies in ${location}`
     ];
   }
-  
+
   return basePhrases;
 }
 
@@ -1102,15 +1103,12 @@ async function fetchGoogleAutocomplete(seed: string): Promise<string[]> {
 export const GENERIC_ANALYSIS_KEYWORDS = [
   'business analysis',
   'market trends',
-  'seo strategy',
   'competitive analysis',
   'industry insights',
   'customer profiling',
   'brand positioning',
   'content strategy',
   'market dynamics',
-  'seo opportunities',
-  'local seo',
   'market leaders',
   'value proposition',
   'competitive gaps',
@@ -1131,10 +1129,8 @@ export const GENERIC_ANALYSIS_KEYWORDS = [
   'cultural considerations',
   'local search behavior',
   'content gaps',
-  'keyword opportunities',
   'content opportunities',
   'long-tail opportunities',
-  'local seo strategy',
   'market positioning',
   'key benefits',
   'expertise areas',
@@ -1147,6 +1143,13 @@ export function isGenericAnalysisKeyword(term: string): boolean {
   return GENERIC_ANALYSIS_KEYWORD_SET.has(term.trim().toLowerCase());
 }
 
+const BLACKLISTED_CONTEXT_NOUNS = new Set([
+  'domain', 'analysis', 'business', 'model', 'audience', 'market', 'strategy', 
+  'content', 'seo', 'comprehensive', 'report', 'results', 'finding', 'insight',
+  'opportunity', 'vulnerability', 'advantage', 'dynamic', 'consideration',
+  'behavior', 'leadership', 'profiling', 'positioning', 'proposition', 'intelligence'
+]);
+
 function hasWeakDomainContext(context: string): boolean {
   const weakEvidenceMatches = context.match(/not clearly established from website evidence/gi) || [];
   return weakEvidenceMatches.length >= 3;
@@ -1155,7 +1158,10 @@ function hasWeakDomainContext(context: string): boolean {
 function getHostnameLabel(domain: string): string {
   try {
     const withProtocol = /^https?:\/\//i.test(domain) ? domain : `https://${domain}`;
-    return new URL(withProtocol).hostname.replace(/^www\./, '').split('.')[0].replace(/[-_]/g, ' ');
+    const hostname = new URL(withProtocol).hostname.replace(/^www\./, '');
+    const parts = hostname.split('.');
+    // Use the main domain part (e.g. 'figma' from 'figma.com')
+    return parts[0].replace(/[-_]/g, ' ');
   } catch {
     return domain.replace(/^https?:\/\//i, '').replace(/^www\./i, '').split('.')[0].replace(/[-_]/g, ' ');
   }
@@ -1165,8 +1171,12 @@ export async function generateKeywordsForDomain(domain: string, context: string,
   try {
     const locationContext = location ? `\nLocation: ${location}` : '';
     const weakContext = hasWeakDomainContext(context);
+    
+    // Log the context source for tracing
+    console.log(`[KeywordGen] Domain: ${domain} | WeakContext: ${weakContext} | ContextLength: ${context.length}`);
+    
     const businessContext = weakContext
-      ? `Domain: ${domain}\nBusiness or brand cue: ${getHostnameLabel(domain)}`
+      ? `Brand/Business Name: ${getHostnameLabel(domain)}`
       : context;
 
     // Get location context from database if available
@@ -1278,43 +1288,30 @@ Return JSON array only, no explanations:
           ? kw.intent
           : determineIntent(term);
 
-        // Estimate realistic volume based on difficulty
-        let baseVolume = 0;
-        if (difficulty === 'High') {
-          baseVolume = Math.floor(Math.random() * 8000) + 12000; // 12000 - 20000
-        } else if (difficulty === 'Medium') {
-          baseVolume = Math.floor(Math.random() * 7000) + 3000;  // 3000 - 10000
-        } else {
-          baseVolume = Math.floor(Math.random() * 2500) + 500;   // 500 - 3000
-        }
-        
-        // Adjust based on word count
-        if (wordCount === 1) baseVolume = Math.floor(baseVolume * 1.5);
-        else if (wordCount === 2) baseVolume = Math.floor(baseVolume * 1.2);
-        else if (wordCount >= 4) baseVolume = Math.floor(baseVolume * 0.6);
-        
-        const volume = Math.max(10, Math.round(baseVolume / 10) * 10);
-
-        // Estimate realistic CPC based on intent
-        let baseCpc = Math.random() * 2.0 + 0.5; // 0.50 to 2.50
-        if (intent === 'Transactional' || intent === 'Commercial') {
-          baseCpc += Math.random() * 3.0 + 1.5; // add 1.50 to 4.50
-        }
-        const cpc = Math.round(baseCpc * 100) / 100;
+        const metrics = estimateKeywordMetrics(term, difficulty, intent);
 
         return {
           term,
-          volume,
-          difficulty,
-          cpc,
-          intent
+          volume: metrics.volume,
+          difficulty: metrics.difficulty as string,
+          cpc: metrics.cpc,
+          intent: metrics.intent as string
         };
       })
       .filter(Boolean) as Array<{ term: string, volume: number, difficulty: string, cpc: number, intent: string }>;
 
+    console.log(`[KeywordGen] AI generated ${validatedKeywords.length} valid keywords after filtering.`);
+
+    // Domain-fit validation gate
+    const isFit = validateDomainFit(validatedKeywords.map(k => k.term), businessContext);
+    if (!isFit) {
+      console.warn(`[KeywordGen] Domain-fit validation failed. Keywords drifted from extracted context. Falling back.`);
+      return { keywords: generateDomainFallbackKeywords(domain, businessContext), tokenUsage: completion.usage?.total_tokens || 0 };
+    }
+
     // ── Google Autocomplete expansion ──────────────────────────────────────
-    // Pick top 8 seed keywords and expand via autocomplete to find real searches
-    const seeds = validatedKeywords.slice(0, 8).map(k => k.term);
+    // Pick top 12 seed keywords and expand via autocomplete to find real searches
+    const seeds = validatedKeywords.slice(0, 12).map(k => k.term);
     const autocompleteResults = await Promise.all(seeds.map(s => fetchGoogleAutocomplete(s)));
     const autocompleteKeywords = new Set<string>();
 
@@ -1329,65 +1326,105 @@ Return JSON array only, no explanations:
     }
 
     // Add autocomplete-validated keywords (mark as Medium difficulty, Commercial intent by default)
+    let addedAutocomplete = 0;
     for (const term of autocompleteKeywords) {
-      if (validatedKeywords.length >= 40) break;
+      if (validatedKeywords.length >= 45) break;
+      const metrics = estimateKeywordMetrics(term, 'Medium', determineIntent(term));
       validatedKeywords.push({
         term,
-        volume: 0,
-        difficulty: 'Medium',
-        cpc: 0,
-        intent: determineIntent(term),
+        volume: metrics.volume,
+        difficulty: metrics.difficulty as string,
+        cpc: metrics.cpc,
+        intent: metrics.intent as string,
       });
+      addedAutocomplete++;
+    }
+    if (addedAutocomplete > 0) {
+      console.log(`[KeywordGen] Added ${addedAutocomplete} keywords from Google Autocomplete.`);
     }
 
+    // If AI generation produced too few keywords, generate seed-based fallback
+    if (validatedKeywords.length < 15) {
+      console.log(`[KeywordGen] Triggering noun-based fallback. Current count: ${validatedKeywords.length}`);
+      const contextNouns = extractTopNouns(businessContext, 6); 
+      const modifiers = ['best', 'top', 'how to', 'affordable'];
+
+      for (const noun of contextNouns) {
+        for (const mod of modifiers) {
+          const candidate = `${mod} ${noun}`.trim();
+          if (!seen.has(candidate) && !isGenericAnalysisKeyword(candidate)) {
+            const metrics = estimateKeywordMetrics(candidate, 'Medium', determineIntent(candidate));
+            validatedKeywords.push({
+              term: candidate,
+              volume: metrics.volume,
+              difficulty: metrics.difficulty as string,
+              intent: metrics.intent as string,
+              cpc: metrics.cpc
+            });
+            seen.add(candidate);
+            if (validatedKeywords.length >= 25) break;
+          }
+        }
+        if (validatedKeywords.length >= 25) break;
+      }
+    }
+
+    console.log(`[KeywordGen] Final keyword set size: ${validatedKeywords.length}`);
     return {
-      keywords: validatedKeywords.slice(0, 40),
+      keywords: validatedKeywords.slice(0, 50),
       tokenUsage: completion.usage?.total_tokens || 0
     };
 
   } catch (error) {
-    console.error('Keyword generation error:', error);
-    const fallbackContext = hasWeakDomainContext(context)
-      ? `Domain: ${domain}\nBusiness or brand cue: ${getHostnameLabel(domain)}`
-      : context;
-    return { keywords: generateDomainFallbackKeywords(domain, fallbackContext), tokenUsage: 0 };
+    console.error('Keyword generation error in geminiService:', error);
+    // Rethrow to let domain.ts catch it and trigger the frontend error state
+    throw error;
   }
+}
+
+function extractTopNouns(text: string, limit: number): string[] {
+  // Filter out markdown headers and common generic words
+  const cleanText = text.replace(/#+ /g, '').replace(/[\*\-]/g, ' ');
+  
+  return cleanText
+    .toLowerCase()
+    .split(/\s+/)
+    .filter((w) => {
+      if (w.length < 3 || w.length > 12) return false;
+      if (!/^[a-z]+$/i.test(w)) return false; // letters only
+      if (BLACKLISTED_CONTEXT_NOUNS.has(w)) return false;
+      return true;
+    })
+    .filter((w, i, arr) => arr.indexOf(w) === i) // dedupe
+    .slice(0, limit);
 }
 
 // Helper function for intent determination
 function determineIntent(term: string): string {
   const termLower = term.toLowerCase();
-  
+
   // Informational patterns
   if (termLower.match(/(how to|what is|guide|tutorial|learn|tips|why|when|where)/)) {
     return 'Informational';
   }
-  
+
   // Transactional patterns
   if (termLower.match(/(buy|price|cost|hire|contact|near me|book|order|get quote)/)) {
     return 'Transactional';
   }
-  
+
   // Commercial patterns
   if (termLower.match(/(best|review|compare|vs|top|alternative|rating)/)) {
     return 'Commercial';
   }
-  
+
   // Default to Commercial for middle-funnel terms
   return 'Commercial';
 }
 
 function generateDomainFallbackKeywords(domain: string, context: string): Array<{ term: string, volume: number, difficulty: string, cpc: number, intent: string }> {
   // Extract meaningful words from context for fallback keyword seeds
-  const contextWords = context
-    .toLowerCase()
-    .replace(/[^a-z\s]/g, '')
-    .split(/\s+/)
-    .filter(w => w.length > 3)
-    .filter(w => !['the', 'and', 'for', 'with', 'that', 'this', 'from', 'have', 'been', 'they', 'their', 'about', 'which', 'when', 'make', 'more', 'also', 'into', 'some', 'than', 'them'].includes(w));
-
-  // Pick up to 5 unique context words as seeds
-  const seeds = [...new Set(contextWords)].slice(0, 5);
+  const seeds = extractTopNouns(context, 5);
 
   const baseKeywords: Array<{ term: string, difficulty: string, intent: string }> = [];
 
@@ -1411,18 +1448,84 @@ function generateDomainFallbackKeywords(domain: string, context: string): Array<
       return kw.term.split(/\s+/).length <= 4;
     })
     .slice(0, 25)
-    .map(kw => ({
-      term: kw.term,
-      volume: 0,
-      difficulty: kw.difficulty,
-      cpc: 0,
-      intent: kw.intent,
-    }));
+    .map(kw => {
+      const metrics = estimateKeywordMetrics(kw.term, kw.difficulty, kw.intent);
+      return {
+        term: kw.term,
+        volume: metrics.volume,
+        difficulty: metrics.difficulty as string,
+        cpc: metrics.cpc,
+        intent: metrics.intent as string,
+      };
+    });
+}
+
+function estimateKeywordMetrics(term: string, baseDifficulty?: string, baseIntent?: string) {
+  const wordCount = term.trim().split(/\s+/).length;
+  
+  let difficulty = baseDifficulty;
+  if (!['Low', 'Medium', 'High'].includes(difficulty as string)) {
+    if (wordCount >= 3) difficulty = 'Low';
+    else if (wordCount >= 2) difficulty = 'Medium';
+    else difficulty = 'High';
+  }
+
+  const intent = ['Informational', 'Commercial', 'Transactional'].includes(baseIntent as string)
+    ? baseIntent
+    : determineIntent(term);
+
+  // Estimate realistic volume based on difficulty
+  let baseVolume = 0;
+  if (difficulty === 'High') {
+    baseVolume = Math.floor(Math.random() * 8000) + 12000;
+  } else if (difficulty === 'Medium') {
+    baseVolume = Math.floor(Math.random() * 7000) + 3000;
+  } else {
+    baseVolume = Math.floor(Math.random() * 2500) + 500;
+  }
+
+  // Adjust based on word count
+  if (wordCount === 1) baseVolume = Math.floor(baseVolume * 1.5);
+  else if (wordCount === 2) baseVolume = Math.floor(baseVolume * 1.2);
+  else if (wordCount >= 4) baseVolume = Math.floor(baseVolume * 0.6);
+
+  const volume = Math.max(10, Math.round(baseVolume / 10) * 10);
+
+  // Estimate realistic CPC based on intent
+  let baseCpc = Math.random() * 2.0 + 0.5;
+  if (intent === 'Transactional' || intent === 'Commercial') {
+    baseCpc += Math.random() * 3.0 + 1.5;
+  }
+  const cpc = Math.round(baseCpc * 100) / 100;
+
+  return { volume, cpc, difficulty, intent };
+}
+
+function validateDomainFit(keywords: string[], businessContext: string): boolean {
+  if (hasWeakDomainContext(businessContext) || businessContext.length < 50) return true;
+  if (keywords.length === 0) return false;
+  
+  const contextNouns = new Set(extractTopNouns(businessContext, 30));
+  if (contextNouns.size === 0) return true; // Can't validate
+  
+  let matchCount = 0;
+  for (const kw of keywords) {
+    const kwWords = kw.toLowerCase().split(/\s+/);
+    for (const w of kwWords) {
+      if (contextNouns.has(w)) {
+        matchCount++;
+        break;
+      }
+    }
+  }
+  
+  // Need at least 15% overlap
+  return (matchCount / keywords.length) >= 0.15;
 }
 
 export async function analyzeCompetitors(
-  domain: string, 
-  context: string, 
+  domain: string,
+  context: string,
   selectedCompetitors: string[] = [],
   location?: string
 ): Promise<{
@@ -1469,23 +1572,23 @@ export async function analyzeCompetitors(
   tokenUsage: number;
 }> {
   console.log(`Starting competitor analysis for ${domain} with context: ${context}, selected competitors: ${selectedCompetitors.join(', ')}`);
-  
+
   try {
     const locationContext = location ? `\nTarget Market: ${location}` : '';
-    const competitorContext = selectedCompetitors.length > 0 
+    const competitorContext = selectedCompetitors.length > 0
       ? `\nSelected Competitors to Analyze: ${selectedCompetitors.join(', ')}`
       : '';
-    
+
     const prompt = `You are an expert market research analyst specializing in competitive intelligence and market positioning. Analyze the competitive landscape for the domain "${domain}" based on the following context:
 
 DOMAIN CONTEXT: ${context}${locationContext}${competitorContext}
 
 Perform a comprehensive competitive analysis and provide:
 
-1. COMPETITOR ANALYSIS: ${selectedCompetitors.length > 0 
-  ? `Analyze ONLY the following selected competitors: ${selectedCompetitors.join(', ')}. Do not identify additional competitors - focus exclusively on these selected ones.`
-  : 'Identify 5-8 direct and indirect competitors based on the domain\'s business model, target audience, and market positioning. Include both established players and emerging threats.'
-}
+1. COMPETITOR ANALYSIS: ${selectedCompetitors.length > 0
+        ? `Analyze ONLY the following selected competitors: ${selectedCompetitors.join(', ')}. Do not identify additional competitors - focus exclusively on these selected ones.`
+        : 'Identify 5-8 direct and indirect competitors based on the domain\'s business model, target audience, and market positioning. Include both established players and emerging threats.'
+      }
 
 2. DETAILED COMPETITOR PROFILES: For each competitor, provide:
    - Company name and domain
@@ -1519,6 +1622,12 @@ Perform a comprehensive competitive analysis and provide:
    - Competitive gaps to exploit
    - Market opportunities to pursue
    - Threat mitigation strategies
+
+### OUTPUT INSTRUCTIONS:
+- Return ONLY a valid JSON object. No preamble, no markdown formatting (unless specifically in strings), no post-script.
+- Ensure all numeric values are either numbers or strings as defined in the schema.
+- If a value is unknown, use "—" for strings or null for objects, but do not omit keys.
+- Be specific, accurate, and provide actionable insights based on real market dynamics and competitive positioning.
 
 Return ONLY a valid JSON object with this exact structure:
 {
@@ -1568,7 +1677,10 @@ Return ONLY a valid JSON object with this exact structure:
   }
 }
 
-Be specific, accurate, and provide actionable insights based on real market dynamics and competitive positioning.`;
+Be specific, accurate, and provide actionable insights based on real market dynamics and competitive positioning.
+Ensure the JSON is perfectly valid and follows the schema strictly.
+DO NOT include any text outside the JSON object.
+JSON:`;
 
     const response = await openai.chat.completions.create({
       model: 'gpt-4o',
@@ -1592,7 +1704,7 @@ Be specific, accurate, and provide actionable insights based on real market dyna
     const tokenUsage = response.usage?.total_tokens || 0;
 
     console.log(`Competitor analysis completed with ${tokenUsage} tokens`);
-    
+
     return {
       ...analysisData,
       tokenUsage
@@ -1600,7 +1712,7 @@ Be specific, accurate, and provide actionable insights based on real market dyna
 
   } catch (error) {
     console.error('Error in competitor analysis:', error);
-    
+
     // Return fallback analysis based on domain and context
     const fallbackAnalysis = generateFallbackCompetitorAnalysis(domain, context, selectedCompetitors, location);
     return {
@@ -1613,42 +1725,42 @@ Be specific, accurate, and provide actionable insights based on real market dyna
 function generateFallbackCompetitorAnalysis(domain: string, context: string, selectedCompetitors: string[] = [], location?: string) {
   const baseDomain = domain.replace(/^https?:\/\//, '').replace(/\/$/, '');
   const domainName = baseDomain.split('.')[0];
-  
+
   // If specific competitors are selected, use them; otherwise create fallback competitors
-  const competitors = selectedCompetitors.length > 0 
+  const competitors = selectedCompetitors.length > 0
     ? selectedCompetitors.map((comp, index) => ({
-        name: comp,
-        domain: comp,
-        strength: ['Strong', 'Moderate', 'Weak'][index % 3],
-        marketShare: `${Math.floor(Math.random() * 30 + 5)}%`,
-        keyStrengths: ['Established market presence', 'Strong brand recognition', 'Good user base'],
-        weaknesses: ['Limited innovation', 'Technical debt', 'Slow adaptation'],
-        threatLevel: ['High', 'Medium', 'Low'][index % 3],
-        recommendations: ['Monitor their strategy', 'Track their updates'],
-        comparisonToDomain: {
-          keywordOverlap: `${Math.floor(Math.random() * 40 + 10)}%`,
-          marketPosition: ['Leading', 'Competing', 'Following'][index % 3],
-          competitiveAdvantage: 'Better implementation approach',
-          vulnerabilityAreas: ['User experience', 'Technology stack']
-        }
-      }))
+      name: comp,
+      domain: comp,
+      strength: ['Strong', 'Moderate', 'Weak'][index % 3],
+      marketShare: `${Math.floor(Math.random() * 30 + 5)}%`,
+      keyStrengths: ['Established market presence', 'Strong brand recognition', 'Good user base'],
+      weaknesses: ['Limited innovation', 'Technical debt', 'Slow adaptation'],
+      threatLevel: ['High', 'Medium', 'Low'][index % 3],
+      recommendations: ['Monitor their strategy', 'Track their updates'],
+      comparisonToDomain: {
+        keywordOverlap: `${Math.floor(Math.random() * 40 + 10)}%`,
+        marketPosition: ['Leading', 'Competing', 'Following'][index % 3],
+        competitiveAdvantage: 'Better implementation approach',
+        vulnerabilityAreas: ['User experience', 'Technology stack']
+      }
+    }))
     : [{
-        name: `${domainName}Alternative`,
-        domain: `${domainName}alternative.com`,
-        strength: 'Moderate',
-        marketShare: '15%',
-        keyStrengths: ['Established brand presence', 'Strong SEO performance', 'Active user community'],
-        weaknesses: ['Limited mobile optimization', 'Older technology stack'],
-        threatLevel: 'Medium',
-        recommendations: ['Monitor their content strategy', 'Track their keyword rankings'],
-        comparisonToDomain: {
-          keywordOverlap: '25%',
-          marketPosition: 'Competing',
-          competitiveAdvantage: 'Better technical implementation',
-          vulnerabilityAreas: ['Content freshness', 'User experience']
-        }
-      }];
-  
+      name: `${domainName}Alternative`,
+      domain: `${domainName}alternative.com`,
+      strength: 'Moderate',
+      marketShare: '15%',
+      keyStrengths: ['Established brand presence', 'Strong SEO performance', 'Active user community'],
+      weaknesses: ['Limited mobile optimization', 'Older technology stack'],
+      threatLevel: 'Medium',
+      recommendations: ['Monitor their content strategy', 'Track their keyword rankings'],
+      comparisonToDomain: {
+        keywordOverlap: '25%',
+        marketPosition: 'Competing',
+        competitiveAdvantage: 'Better technical implementation',
+        vulnerabilityAreas: ['Content freshness', 'User experience']
+      }
+    }];
+
   return {
     competitors,
     marketInsights: {

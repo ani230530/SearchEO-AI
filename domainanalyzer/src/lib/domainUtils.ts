@@ -65,7 +65,13 @@ export const maskDomainId = (id: number): string => {
 
 export const unmaskDomainId = (masked: string): number | null => {
   const mapping = getDomainIdMapping();
-  return mapping[masked] || null;
+  const idFromMapping = mapping[masked];
+  if (idFromMapping) return idFromMapping;
+
+  // If not in mapping, try to see if it's a direct ID or fallback encoded
+  if (/^\d+$/.test(masked)) return parseInt(masked, 10);
+  
+  return fallbackUnmaskDomainId(masked);
 };
 
 // Fallback to simple encoding if mapping fails

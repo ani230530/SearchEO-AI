@@ -364,7 +364,8 @@ router.post('/', authenticateToken, asyncHandler(async (req: Request, res: Respo
       // Use enhanced AI keyword generation with location context
       let keywords = [];
       try {
-        const aiKeywordResult = await generateKeywordsForDomain(domain.url, extraction.extractedContext, location);
+        const contextString = extraction.summaryContext || extraction.extractedContext || '';
+        const aiKeywordResult = await generateKeywordsForDomain(domain.url, contextString, location);
         keywords = aiKeywordResult.keywords.map((kw: any) => ({
           term: kw.term,
           volume: kw.volume,
@@ -403,8 +404,10 @@ router.post('/', authenticateToken, asyncHandler(async (req: Request, res: Respo
           data: keywordData,
           skipDuplicates: true,
         });
+      } else if (!isNewDomain) {
+        console.warn(`No new keywords for re-analyzed domain ${domain.id}`);
       } else {
-        console.warn(`No valid domain keywords to save for domain ${domain.id}; skipped generic keyword insert.`);
+        throw new Error(`Keyword generation returned 0 valid keywords for domain ${domain.id}. Domain context may be too generic.`);
       }
 
       const keywordAnalysis = await prisma.keywordAnalysis.create({
@@ -424,7 +427,14 @@ router.post('/', authenticateToken, asyncHandler(async (req: Request, res: Respo
     } catch (keywordError) {
       console.error('Keyword generation error:', keywordError);
       await updateAnalysisPhase(domain.id, 'keyword_generation', 'failed', 0, null, keywordError instanceof Error ? keywordError.message : 'Unknown keyword generation error');
-      sendEvent({ type: 'progress', phase: 'keyword_generation', step: 'Keyword generation failed, finalizing analysis...', progress: 0 });
+      sendEvent({ 
+        type: 'error',
+        phase: 'keyword_generation',
+        error: 'Keyword generation failed',
+        details: keywordError instanceof Error ? keywordError.message : 'Unknown error'
+      });
+      res.end();
+      return;
     }
 
     // Final completion

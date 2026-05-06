@@ -1088,184 +1088,9 @@ const CompetitorRankingTable: React.FC<{
         </CardContent>
       </Card>
 
-      {/* Market Overview */}
-      {oldMarketInsights && (
-        <Card className="shadow-sm border border-slate-200">
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <BarChart3 className="h-5 w-5" />
-              <span>Market Overview</span>
-              <Badge variant="secondary" className="ml-2">AI Analysis</Badge>
-            </CardTitle>
-            <CardDescription>
-              Comprehensive market insights and competitive landscape analysis
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <div className="space-y-2">
-                <h4 className="font-semibold text-slate-900">Market Size</h4>
-                <p className="text-2xl font-bold text-blue-600">{oldMarketInsights.marketSize || '—'}</p>
-              </div>
-              <div className="space-y-2">
-                <h4 className="font-semibold text-slate-900">Growth Rate</h4>
-                <p className="text-2xl font-bold text-green-600">{oldMarketInsights.growthRate || '—'}</p>
-              </div>
-              <div className="space-y-2">
-                <h4 className="font-semibold text-slate-900">Market Leader</h4>
-                <p className="text-lg font-medium text-slate-700">{oldMarketInsights.marketLeader || '—'}</p>
-              </div>
-              <div className="space-y-2">
-                <h4 className="font-semibold text-slate-900">Total Competitors</h4>
-                <p className="text-2xl font-bold text-orange-600">{oldMarketInsights.totalCompetitors || '—'}</p>
-              </div>
-            </div>
-            
-            {oldMarketInsights.opportunities && oldMarketInsights.opportunities.length > 0 && (
-              <div className="mt-6">
-                <h4 className="font-semibold text-slate-900 mb-3">Market Opportunities</h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {oldMarketInsights.opportunities.map((opportunity, idx) => (
-                    <div key={idx} className="bg-green-50 p-3 rounded-lg border border-green-200">
-                      <p className="text-sm text-green-800">{opportunity}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-            
-            {oldMarketInsights.marketTrends && oldMarketInsights.marketTrends.length > 0 && (
-              <div className="mt-6">
-                <h4 className="font-semibold text-slate-900 mb-3">Market Trends</h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {oldMarketInsights.marketTrends.map((trend, idx) => (
-                    <div key={idx} className="bg-blue-50 p-3 rounded-lg border border-blue-200">
-                      <p className="text-sm text-blue-800">{trend}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
+      {/* Strategic Recommendations and other analysis sections moved to main dashboard body for cleaner layout */}
+      {/* AI-Based Analysis Results moved to main dashboard body */}
 
-      {/* Strategic Recommendations */}
-      {oldStrategicRecommendations && oldStrategicRecommendations.length > 0 && (
-        <Card className="shadow-sm border border-slate-200">
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <Lightbulb className="h-5 w-5" />
-              <span>Strategic Recommendations</span>
-              <Badge variant="secondary" className="ml-2">AI Generated</Badge>
-            </CardTitle>
-            <CardDescription>
-              Actionable strategies for your domain based on competitive analysis
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {oldStrategicRecommendations.map((rec, idx) => (
-                <div key={idx} className="border border-slate-200 rounded-lg p-4">
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex items-center space-x-3">
-                      <Badge className={`${
-                        rec.priority === 'High' ? 'bg-red-100 text-red-800' :
-                        rec.priority === 'Medium' ? 'bg-yellow-100 text-yellow-800' :
-                        'bg-green-100 text-green-800'
-                      }`}>
-                        {rec.priority || 'Medium'}
-                      </Badge>
-                      <Badge variant="outline">{rec.category || 'General'}</Badge>
-                    </div>
-                    <Badge variant="secondary" className="text-xs">
-                      {rec.timeline || 'TBD'}
-                    </Badge>
-                  </div>
-                  
-                  <h4 className="font-semibold text-slate-900 mb-2">{rec.action || 'Strategic Action'}</h4>
-                  <p className="text-sm text-slate-700 mb-3">{rec.expectedImpact || 'Expected impact not specified'}</p>
-                  
-                  <div className="flex items-center justify-between text-xs text-slate-500">
-                    <span>Resource: {rec.resourceRequirement || 'Medium'}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Old Analysis Results */}
-      {oldCompetitors && oldCompetitors.length > 0 && (
-        <Card className="shadow-sm border border-slate-200 mt-6">
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <BarChart3 className="h-5 w-5" />
-              <span>AI-Based Analysis Results</span>
-              <Badge variant="secondary" className="ml-2">Legacy Method</Badge>
-              {cached && <Badge variant="outline" className="ml-2">Cached</Badge>}
-            </CardTitle>
-            <CardDescription>
-              Results from the traditional AI-based competitor analysis method
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {oldCompetitors.map((competitor, idx) => (
-                <div key={idx} className="border border-slate-200 rounded-lg p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <h4 className="font-semibold text-slate-900">{competitor.name || competitor.competitor}</h4>
-                    <div className="flex space-x-4 text-sm">
-                      {competitor.threatLevel && (
-                        <span className={`px-2 py-1 rounded text-xs font-medium ${getThreatLevelColor(competitor.threatLevel || 'Unknown')}`}>
-                          {competitor.threatLevel}
-                        </span>
-                      )}
-                      {competitor.marketShare && (
-                        <span className="text-slate-600">Market Share: {competitor.marketShare}</span>
-                      )}
-                    </div>
-                  </div>
-                  
-                  {competitor.keyStrengths && competitor.keyStrengths.length > 0 && (
-                    <div className="mb-3">
-                      <h5 className="font-medium text-green-700 mb-2">Key Strengths</h5>
-                      <ul className="list-disc list-inside text-sm text-slate-700 space-y-1">
-                        {competitor.keyStrengths.map((strength: string, i: number) => (
-                          <li key={i}>{strength}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                  
-                  {competitor.weaknesses && competitor.weaknesses.length > 0 && (
-                    <div className="mb-3">
-                      <h5 className="font-medium text-red-700 mb-2">Weaknesses</h5>
-                      <ul className="list-disc list-inside text-sm text-slate-700 space-y-1">
-                        {competitor.weaknesses.map((weakness: string, i: number) => (
-                          <li key={i}>{weakness}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                  
-                  {competitor.recommendations && competitor.recommendations.length > 0 && (
-                    <div>
-                      <h5 className="font-medium text-blue-700 mb-2">Recommendations</h5>
-                      <ul className="list-disc list-inside text-sm text-slate-700 space-y-1">
-                        {competitor.recommendations.map((rec: string, i: number) => (
-                          <li key={i}>{rec}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
     </div>
     );
   };
@@ -2844,7 +2669,41 @@ const DomainDashboard = () => {
       if (data.competitorData) {
         setCompetitorData(data.competitorData);
       }
-      
+
+      // Load existing deep analysis data on page load
+      try {
+        const deepAnalysisResponse = await fetch(`${import.meta.env.VITE_API_URL}/api/dashboard/${domainId}/competitors/deep-analysis`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+          }
+        });
+
+        if (deepAnalysisResponse.ok) {
+          const deepAnalysisData = await deepAnalysisResponse.json();
+
+          // Populate competitors from competitorListArr if it exists
+          if (deepAnalysisData.competitorListArr && deepAnalysisData.competitorListArr.length > 0) {
+            setCompetitors(deepAnalysisData.competitorListArr);
+          }
+
+          // Populate competitor data with deep analysis results
+          if (deepAnalysisData.oldCompetitors && deepAnalysisData.oldCompetitors.length > 0) {
+            setCompetitorData((prev: any) => ({
+              ...prev,
+              competitors: deepAnalysisData.competitors || prev?.competitors || [],
+              oldCompetitors: deepAnalysisData.oldCompetitors,
+              oldMarketInsights: deepAnalysisData.oldMarketInsights,
+              oldStrategicRecommendations: deepAnalysisData.oldStrategicRecommendations,
+              oldCompetitiveAnalysis: deepAnalysisData.oldCompetitiveAnalysis,
+              cached: deepAnalysisData.cached
+            }));
+          }
+        }
+      } catch (err) {
+        console.error('Error loading deep competitor analysis:', err);
+        // Don't block page load if deep analysis fetch fails
+      }
+
       // Transform the data to match the expected structure
       // The backend already provides flattened AI query results
       // but we need to ensure the phrases array is properly populated
@@ -2949,34 +2808,64 @@ const DomainDashboard = () => {
   };
 
 
-  // Analyze competitors using existing AI responses
-  const analyzeCompetitorsFromResponses = async () => {
+  // Analyze competitors using existing AI responses + deep analysis
+  const analyzeCompetitorsFromResponses = async (force = false) => {
     try {
       setCompetitorLoading(true);
       setError(null);
-      
+
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/dashboard/${domainId}/competitors/analyze-responses`, {
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
         },
-        body: JSON.stringify({ competitors })
+        body: JSON.stringify({ competitors, force })
       });
-      
+
       if (!response.ok) {
         const errorText = await response.text();
         throw new Error(errorText || 'Failed to analyze competitors from responses');
       }
-      
+
       const data = await response.json();
-      setCompetitorData(data);
-      
+      let mergedData = { ...data };
+
+      // Also trigger deep analysis endpoint to populate rich view sections
+      try {
+        const deepAnalysisResponse = await fetch(`${import.meta.env.VITE_API_URL}/api/dashboard/${domainId}/competitors/deep-analysis`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+          },
+          body: JSON.stringify({ competitors })
+        });
+
+        if (deepAnalysisResponse.ok) {
+          const deepAnalysisData = await deepAnalysisResponse.json();
+          // Merge deep analysis data with ranking table data
+          mergedData = {
+            ...mergedData,
+            competitors: deepAnalysisData.competitors || mergedData.competitors || [],
+            oldCompetitors: deepAnalysisData.oldCompetitors,
+            oldMarketInsights: deepAnalysisData.oldMarketInsights,
+            oldStrategicRecommendations: deepAnalysisData.oldStrategicRecommendations,
+            oldCompetitiveAnalysis: deepAnalysisData.oldCompetitiveAnalysis
+          };
+        }
+      } catch (deepErr) {
+        console.error('Error in deep analysis:', deepErr);
+        // Continue with response-based analysis even if deep analysis fails
+      }
+
+      setCompetitorData(mergedData);
+
       // Update competitors state from the analysis's competitorListArr
       if (Array.isArray(data.competitorListArr)) {
         setCompetitors(data.competitorListArr);
       }
-      
+
       // Refresh the main dashboard data to get updated competitor data
       await fetchDomainData(domainId);
     } catch (err) {
@@ -3237,6 +3126,42 @@ const DomainDashboard = () => {
       // Refresh dashboard to show new results
       await fetchDomainData(domainId);
 
+      // Auto-trigger deep analysis if competitors exist
+      if (competitors.length > 0) {
+        try {
+          await fetch(`${import.meta.env.VITE_API_URL}/api/dashboard/${domainId}/competitors/deep-analysis`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+            },
+            body: JSON.stringify({ competitors })
+          });
+
+          // Refresh competitor data after deep analysis completes
+          const deepAnalysisResponse = await fetch(`${import.meta.env.VITE_API_URL}/api/dashboard/${domainId}/competitors/deep-analysis`, {
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+            }
+          });
+
+          if (deepAnalysisResponse.ok) {
+            const deepAnalysisData = await deepAnalysisResponse.json();
+            setCompetitorData((prev: any) => ({
+              ...prev,
+              oldCompetitors: deepAnalysisData.oldCompetitors,
+              oldMarketInsights: deepAnalysisData.oldMarketInsights,
+              oldStrategicRecommendations: deepAnalysisData.oldStrategicRecommendations,
+              oldCompetitiveAnalysis: deepAnalysisData.oldCompetitiveAnalysis,
+              cached: deepAnalysisData.cached
+            }));
+          }
+        } catch (err) {
+          console.error('Error triggering deep analysis:', err);
+          // Don't block user if deep analysis fails
+        }
+      }
+
       // Clear analyzed phrases that were analyzed
       setAnalyzedCustomPhrases(prev => prev.filter(p => !p.selected));
       setIsAddingCustomPhrase(false);
@@ -3323,6 +3248,42 @@ const DomainDashboard = () => {
       // Refresh data and clear selection
       await fetchDomainData(domainId);
       setSelectedPhraseIdsForPerfTable(new Set());
+
+      // Auto-trigger deep analysis if competitors exist
+      if (competitors.length > 0) {
+        try {
+          await fetch(`${import.meta.env.VITE_API_URL}/api/dashboard/${domainId}/competitors/deep-analysis`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+            },
+            body: JSON.stringify({ competitors })
+          });
+
+          // Refresh competitor data after deep analysis completes
+          const deepAnalysisResponse = await fetch(`${import.meta.env.VITE_API_URL}/api/dashboard/${domainId}/competitors/deep-analysis`, {
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+            }
+          });
+
+          if (deepAnalysisResponse.ok) {
+            const deepAnalysisData = await deepAnalysisResponse.json();
+            setCompetitorData((prev: any) => ({
+              ...prev,
+              oldCompetitors: deepAnalysisData.oldCompetitors,
+              oldMarketInsights: deepAnalysisData.oldMarketInsights,
+              oldStrategicRecommendations: deepAnalysisData.oldStrategicRecommendations,
+              oldCompetitiveAnalysis: deepAnalysisData.oldCompetitiveAnalysis,
+              cached: deepAnalysisData.cached
+            }));
+          }
+        } catch (err) {
+          console.error('Error triggering deep analysis:', err);
+          // Don't block user if deep analysis fails
+        }
+      }
 
     } catch (e) {
       console.error('Analyze selected phrases (perf table) error:', e);
@@ -5445,8 +5406,8 @@ const DomainDashboard = () => {
           <div>
             {/* Competitor Management */}
             <Card className="bg-white/70 backdrop-blur-sm border-slate-200/60 shadow-sm">
-              <CardHeader>
-                <CardTitle className="text-slate-800">Competitor Analysis</CardTitle>
+            <CardHeader>
+                <CardTitle className="text-slate-800">Competitor Management</CardTitle>
                 <CardDescription className="text-slate-600">Manage and analyze your competitors</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
@@ -5484,7 +5445,7 @@ const DomainDashboard = () => {
                     </div>
                       <div className="flex space-x-3">
                         <Button 
-                          onClick={analyzeCompetitorsFromResponses}
+                          onClick={() => analyzeCompetitorsFromResponses(false)}
                           disabled={competitorLoading}
                           className="bg-blue-600 hover:bg-blue-700 text-white"
                         >
@@ -5499,6 +5460,15 @@ const DomainDashboard = () => {
                               Analyze Competitors
                             </>
                           )}
+                        </Button>
+                        <Button 
+                          onClick={() => analyzeCompetitorsFromResponses(true)}
+                          disabled={competitorLoading}
+                          variant="outline"
+                          title="Force deep re-analysis"
+                          className="border-blue-200 text-blue-600 hover:bg-blue-50"
+                        >
+                          <RefreshCw className={`h-4 w-4 ${competitorLoading ? 'animate-spin' : ''}`} />
                         </Button>
                       </div>
                   </div>
@@ -5538,8 +5508,7 @@ const DomainDashboard = () => {
             </Card>
 
             {/* Competitor Ranking Table - Only show for response-based analysis */}
-            {competitorData && competitorData.competitors && Array.isArray(competitorData.competitors) && competitorData.competitors.length > 0 &&
-             competitorData.competitors[0] && typeof competitorData.competitors[0] === 'object' && 'competitor' in competitorData.competitors[0] && (
+            {competitorData && Array.isArray(competitorData.competitors) && competitorData.competitors.length > 0 && (
               <div className="space-y-8">
                  <CompetitorRankingTable 
                    competitors={competitorData.competitors as unknown as Array<{
@@ -5641,12 +5610,12 @@ const DomainDashboard = () => {
                 {/* Competitor Comparison */}
                 <Card className="bg-white/70 backdrop-blur-sm border-slate-200/60 shadow-sm">
                   <CardHeader>
-                    <CardTitle className="text-slate-800">Competitor Analysis</CardTitle>
-                    <CardDescription className="text-slate-600">Detailed competitor breakdown</CardDescription>
+                    <CardTitle className="text-slate-800">Competitor Analysis Results</CardTitle>
+                    <CardDescription className="text-slate-600">Detailed strategic breakdown</CardDescription>
                   </CardHeader>
                   <CardContent>
                       <div className="space-y-6">
-                        {competitorData.oldCompetitors?.map((competitor, index) => (
+                        {competitorData.oldCompetitors?.filter(c => (c.name || c.competitor) && c.keyStrengths && c.keyStrengths.length > 0).map((competitor, index) => (
                         <div key={index} className="border border-slate-200 rounded-lg p-6 space-y-4">
                           <div className="flex items-center justify-between">
                             <div>

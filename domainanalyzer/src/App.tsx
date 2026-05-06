@@ -52,9 +52,9 @@ const App = () => (
                 <AIChecker/>
               </ProtectedRoute>
             } />
-            <Route path="/dashboard/:domain" element={
+            <Route path="/ai-results/:domain" element={
               <ProtectedRoute>
-                <DomainDashboard />
+                <AIResultsReportPreview />
               </ProtectedRoute>
             } />
             <Route path="/profile" element={

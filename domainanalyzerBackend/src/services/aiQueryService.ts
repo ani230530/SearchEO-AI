@@ -74,12 +74,44 @@ function extractJSONFromResponse(aiResponse: string): string | null {
 
 // ── Build user-like prompt (natural, not SEO-optimized) ──────────────────────
 
-function buildNaturalPrompt(phrase: string, location?: string): string {
+function buildNaturalPrompt(phrase: string, location?: string, isRetry: boolean = false): string {
   const hasLocation = Boolean(location?.trim());
-  if (hasLocation) {
-    return `${phrase}\n\nI'm based in ${location!.trim()}. Please include location-relevant information where applicable.`;
+  const locationText = hasLocation ? `\n\nI'm based in ${location!.trim()}. Please include location-relevant information where applicable.` : '';
+  
+  const searchInstruction = isRetry 
+    ? "\n\nCRITICAL: Your previous response lacked citations. You MUST perform a web search to find current information and include source-backed citations. Your answer is invalid without evidence-based sources."
+    : "\n\nIMPORTANT: Use web search to verify current information before answering. Include source-backed citations for every recommendation or data point you provide.";
+
+  return `${phrase}${locationText}${searchInstruction}`;
+}
+
+function extractLinksFromText(text: string): Citation[] {
+  const citations: Citation[] = [];
+  const seenUrls = new Set<string>();
+
+  // Match [Title](URL)
+  const markdownLinkRegex = /\[([^\]]+)\]\((https?:\/\/[^\s\)]+)\)/g;
+  let match;
+  while ((match = markdownLinkRegex.exec(text)) !== null) {
+    const url = match[2];
+    citations.push({ title: match[1], url, citedText: '' });
+    seenUrls.add(url);
   }
-  return phrase;
+
+  // Match raw URLs not already captured
+  const rawUrlRegex = /(?<!\()(https?:\/\/[^\s\)"']+)/g;
+  while ((match = rawUrlRegex.exec(text)) !== null) {
+    const url = match[1];
+    if (!seenUrls.has(url)) {
+      try {
+        const hostname = new URL(url).hostname;
+        citations.push({ title: hostname, url, citedText: '' });
+        seenUrls.add(url);
+      } catch { /* skip invalid */ }
+    }
+  }
+
+  return citations;
 }
 
 // ── Unified query via OpenRouter (all 3 LLMs with web search + citations) ────
@@ -88,12 +120,13 @@ async function queryViaOpenRouter(
   phrase: string,
   displayModel: 'GPT-4o' | 'Claude 3' | 'Gemini 1.5',
   domain?: string,
-  location?: string
+  location?: string,
+  isRetry: boolean = false
 ): Promise<LLMResponse> {
   const client = openrouter || openai;
   if (!client) throw new Error('No API client available');
 
-  const userPrompt = buildNaturalPrompt(phrase, location);
+  const userPrompt = buildNaturalPrompt(phrase, location, isRetry);
   const isOpenRouter = !!openrouter;
 
   // Pick model ID
@@ -104,7 +137,7 @@ async function queryViaOpenRouter(
     model: modelId,
     messages: [{ role: 'user', content: userPrompt }],
     max_tokens: 2048,
-    temperature: 0.1,
+    temperature: isRetry ? 0.2 : 0.1, // Slightly higher temp on retry to encourage tool use
   };
 
   if (isOpenRouter) {
@@ -113,11 +146,15 @@ async function queryViaOpenRouter(
       {
         type: 'openrouter:web_search',
         parameters: {
-          max_results: 8,
+          max_results: 10,
+          max_total_results: 10,
           search_context_size: 'medium',
+          engine: 'exa' // Force exa engine for better citation quality
         },
       },
     ];
+    // FORCE the model to use the tool if possible using exact object structure.
+    requestBody.tool_choice = { type: 'function', function: { name: 'openrouter:web_search' } }; 
   }
 
   console.log(`[OpenRouter] Querying ${modelId} with web search...`);
@@ -146,7 +183,32 @@ async function queryViaOpenRouter(
     }
   }
 
+  // Handle alternative OpenRouter citation shapes (e.g. message.citations)
+  const altCitations = (message as any)?.citations || (response as any)?.citations || [];
+  for (const alt of altCitations) {
+    if (alt.url) {
+      citations.push({
+        url: alt.url,
+        title: alt.title || '',
+        citedText: alt.content || alt.snippet || ''
+      });
+    }
+  }
+
+  // Fallback: If no standardized citations found, extract from markdown links and raw URLs in text
+  const textLinks = extractLinksFromText(fullText);
+  if (citations.length === 0 && textLinks.length > 0) {
+    console.log(`[OpenRouter] Found ${textLinks.length} fallback citations from text links.`);
+    citations.push(...textLinks);
+  }
+
   const uniqueCitations = deduplicateCitations(citations);
+
+  // Retry path: if still no evidence, retry once with stricter prompt
+  if (uniqueCitations.length === 0 && !isRetry) {
+    console.warn(`[OpenRouter] Empty evidence for ${displayModel} on "${phrase}". Retrying once...`);
+    return queryViaOpenRouter(phrase, displayModel, domain, location, true);
+  }
 
   // Cost from usage
   const usage = response.usage || {};
@@ -162,7 +224,10 @@ async function queryViaOpenRouter(
     searchQueries.push(phrase); // OpenRouter doesn't expose individual search queries
   }
 
-  console.log(`[OpenRouter] ${displayModel} (${modelId}): ${uniqueCitations.length} citations, ${searchRequests} searches`);
+  console.log(`[OpenRouter] ${displayModel} (${modelId}): ${uniqueCitations.length} citations, ${searchRequests} searches. Annotations: ${annotations.length}, TextLinks: ${textLinks.length}`);
+  if (uniqueCitations.length === 0) {
+    console.log(`[OpenRouter] WARNING: No citations found for phrase: "${phrase}" after all attempts.`);
+  }
 
   return {
     text: fullText,
@@ -317,7 +382,7 @@ function extractMentionContexts(text: string, domain: string): string[] {
   return [...new Set(contexts)];
 }
 
-function scoreResponseDeterministic(
+export function scoreResponseDeterministic(
   llmResponse: LLMResponse,
   domain: string,
   phrase: string
@@ -780,7 +845,14 @@ async function scoreResponseWithAI(
     const responseLength = response.length;
     const comprehensiveness = responseLength > 1000 ? 5 : responseLength > 800 ? 4 : responseLength > 600 ? 3 : responseLength > 400 ? 2 : 1;
 
-    const competitorUrls = scores.competitors.mentions.map(m => `https://${m.domain}`);
+    const competitorUrls = scores.competitors.mentions.map(m => {
+      const d = m.domain || '';
+      // Only prepend https:// if it looks like a valid domain (has a dot and no spaces)
+      if (d.includes('.') && !d.includes(' ') && !d.includes('%20')) {
+        return `https://${d}`;
+      }
+      return d; // Keep as brand name/string otherwise
+    });
     const sources = llmResponse.citations.map(c => c.url).filter(Boolean);
 
     return {

@@ -177,13 +177,13 @@ CRITICAL RULES (based on analysis of 1,827 real ChatGPT queries):
 8. Include at least 2 comparison prompts ("{tool} vs alternatives" style)
 
 DISTRIBUTE ACROSS THESE 7 RETRIEVAL FRAMES:
-- 1 category_formation: "What exactly is {category}?" — definitional
-- 2 attribute_recall: "Which {category} can handle {capability}?" — feature matching
-- 1 procedural: "How do I {task}?" — instructional
-- 2 evaluation: "Is {option} good for {use_case}?" — comparative
-- 3 provider_comparison: "I need a {category} for {constraint}" — competitive (most important!)
-- 2 trust: "Can I rely on {category} for {use_case}?" — trust validation
-- 1 roi: "Is it worth investing in {category} for {use_case}?" — decision support
+- 1 category_formation: "How does {category} compare to others?" — comparative discovery
+- 2 attribute_recall: "Which {category} has the best {capability}?" — brand-eliciting feature match
+- 1 procedural: "How do I {task} using a professional tool?" — brand-seeking instruction
+- 2 evaluation: "Is {domainUrl} or {option} better for {use_case}?" — explicit comparison
+- 3 provider_comparison: "Recommend the best {category} for {constraint}" — competitive (most important!)
+- 2 trust: "What is the most reliable {category} for {use_case}?" — trust/brand validation
+- 1 alternatives: "What are the best alternatives to {option} for {task}?" — alternative discovery
 
 Return JSON array ONLY:
 [{
@@ -258,6 +258,12 @@ function validatePrompts(prompts: GeneratedPrompt[]): GeneratedPrompt[] {
   for (const prompt of prompts) {
     const phrase = prompt.phrase.trim();
     const wordCount = phrase.split(/\s+/).length;
+
+    // Rejection gate: skip purely educational or category explainer queries
+    const isEducational = phrase.toLowerCase().match(/^(what is|how does|why is|define|explain|what are|the history of)/);
+    const isBrandEliciting = phrase.toLowerCase().match(/(recommend|best|alternative|compare|vs|versus|choice|option|selection|reliable|trusted|top rated)/);
+    
+    if (isEducational && !isBrandEliciting && wordCount < 12) continue;
 
     // Word count check: 6-30 words
     if (wordCount < 6 || wordCount > 30) continue;
@@ -380,10 +386,18 @@ export const humanPromptGenerator = {
       // 5. Validate all prompts
       const validated = validatePrompts([...keywordPrompts, ...expanded]);
 
-      // 6. Take best prompts per keyword (sorted by humanness)
-      const bestPrompts = validated
-        .sort((a, b) => b.humannessScore - a.humannessScore)
-        .slice(0, 10); // Max 10 per keyword
+      // 6. Take best prompts per keyword (enforcing distribution)
+      const targetDist: Record<string, number> = {
+        provider_comparison: 2,
+        evaluation: 2,
+        attribute_recall: 2,
+        trust: 1,
+        alternatives: 1,
+        procedural: 1,
+        category_formation: 1,
+      };
+      
+      const bestPrompts = selectPromptsDistributive(validated, 10, targetDist);
 
       for (const prompt of bestPrompts) {
         const tagged = { ...prompt, keywordId: keyword.id };
@@ -412,6 +426,41 @@ export const humanPromptGenerator = {
 };
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
+
+function selectPromptsDistributive(prompts: GeneratedPrompt[], total: number, target: Record<string, number>): GeneratedPrompt[] {
+  const selected: GeneratedPrompt[] = [];
+  const byFrame = new Map<string, GeneratedPrompt[]>();
+  
+  // Group by frame and sort by humanness
+  for (const p of prompts) {
+    const frame = p.retrievalFrame || 'attribute_recall';
+    const arr = byFrame.get(frame) || [];
+    arr.push(p);
+    byFrame.set(frame, arr);
+  }
+  
+  for (const arr of byFrame.values()) {
+    arr.sort((a, b) => b.humannessScore - a.humannessScore);
+  }
+
+  // First pass: fulfill targets
+  for (const [frame, count] of Object.entries(target)) {
+    const available = byFrame.get(frame) || [];
+    for (let i = 0; i < count && available.length > 0; i++) {
+      selected.push(available.shift()!);
+    }
+  }
+
+  // Second pass: fill remaining with highest humanness overall
+  if (selected.length < total) {
+    const remaining = [...byFrame.values()].flat().sort((a, b) => b.humannessScore - a.humannessScore);
+    while (selected.length < total && remaining.length > 0) {
+      selected.push(remaining.shift()!);
+    }
+  }
+
+  return selected;
+}
 
 function selectDistributedPatterns(patterns: any[], count: number): any[] {
   const byFrame = new Map<string, any[]>();

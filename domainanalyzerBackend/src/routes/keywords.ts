@@ -148,6 +148,14 @@ router.post('/:domainId/select', authenticateToken, async (req: Request, res: Re
     // Convert keywordIds to integers and update keyword selection status
     const numericKeywordIds = keywordIds.map((id: any) => Number(id));
     
+    // Reset all keywords for domain to false first if we are selecting new ones
+    if (selected) {
+      await prisma.keyword.updateMany({
+        where: { domainId },
+        data: { isSelected: false }
+      });
+    }
+
     const updateResult = await prisma.keyword.updateMany({
       where: {
         id: { in: numericKeywordIds },

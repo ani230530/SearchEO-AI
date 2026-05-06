@@ -1079,7 +1079,7 @@ const allSections = [...leftSections, ...rightSections];
                         <button
                           onClick={() => {
                             const maskedId = maskDomainId(createdDomainId);
-                            navigate(`/dashboard/${maskedId}`);
+                            navigate(`/ai-results/${maskedId}`);
                           }}
                           className="inline-flex items-center gap-2 px-6 py-3 bg-black text-white rounded-full text-sm font-medium hover:bg-gray-600  disabled:opacity-60 transition"
                         >
