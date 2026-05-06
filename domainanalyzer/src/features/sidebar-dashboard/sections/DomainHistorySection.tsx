@@ -12,63 +12,29 @@ import {
   Search,
   ShieldAlert,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { apiGet } from "../../../services/apiClient";
+import { maskDomainId } from "../../../lib/domainUtils";
 import { TabId } from "../types";
 
-const getLogoUrl = (domainUrl: string) => {
-  const domain = domainUrl.replace(/^https?:\/\//, "").replace(/^www\./, "");
-  return `https://img.logo.dev/${domain}?token=pk_DTdFFG1JT9WOCjATvZEzIA&size=64`;
+type DashboardDomain = {
+  id: number;
+  url: string;
+  context?: string;
+  lastAnalyzed?: string;
+  currentStep?: number;
+  metrics?: {
+    visibilityScore?: number;
+    keywordCount?: number;
+    phraseCount?: number;
+    totalQueries?: number;
+  };
+  industry?: string;
 };
 
-const stats = [
-  {
-    id: "total",
-    title: "Total Queries",
-    value: "0",
-    percent: "0%",
-    subtext: "this month",
-    percentClass: "text-[#4e9f2d]",
-    iconBg: "bg-[#eaf7e9]",
-    iconColor: "text-[#4e9f2d]",
-    icon: Globe,
-  },
-  {
-    id: "completed",
-    title: "Analysis Completed",
-    value: "0",
-    percent: "0%",
-    subtext: "Completed",
-    percentClass: "text-[#4e9f2d]",
-    iconBg: "bg-[#eef3ff]",
-    iconColor: "text-[#4f628a]",
-    icon: Eye,
-  },
-  {
-    id: "progress",
-    title: "Analysis In Progress",
-    value: "0",
-    percent: "0%",
-    subtext: "Below average",
-    percentClass: "text-[#d59a00]",
-    iconBg: "bg-[#fff7e5]",
-    iconColor: "text-[#d59a00]",
-    icon: CircleAlert,
-  },
-  {
-    id: "error",
-    title: "Error occured",
-    value: "0",
-    percent: "0%",
-    subtext: "Retry",
-    percentClass: "text-[#cf3d3d]",
-    iconBg: "bg-[#ffeef0]",
-    iconColor: "text-[#cf3d3d]",
-    icon: AlertTriangle,
-  },
-];
-
 type DomainItem = {
-  id: string;
+  id: number;
   name: string;
   url: string;
   status: "success" | "retry";
@@ -77,42 +43,141 @@ type DomainItem = {
   topPrompts?: number;
 };
 
-const domains: DomainItem[] = [
-  {
-    id: "girl-power-talk",
-    name: "Girl Power Talk",
-    url: "https://girlpowertalk.com",
-    status: "success",
-    visibility: 52,
-    topKeywords: 118,
-    topPrompts: 118,
-  },
-  {
-    id: "blue-ocean",
-    name: "Blue Ocean Global Technology",
-    url: "https://blueoceanglobaltech.com",
-    status: "success",
-    visibility: 78,
-    topKeywords: 16,
-    topPrompts: 38,
-  },
-  {
-    id: "semrush",
-    name: "Semrush",
-    url: "https://semrush.com",
-    status: "retry",
-  },
-];
+type FetchState =
+  | { status: "loading" }
+  | { status: "ready"; domains: DashboardDomain[] }
+  | { status: "error"; message: string };
+
+const getLogoUrl = (domainUrl: string) => {
+  const host = domainUrl.replace(/^https?:\/\//, "").replace(/^www\./, "");
+  return `https://img.logo.dev/${host}?token=pk_DTdFFG1JT9WOCjATvZEzIA&size=64`;
+};
+
+const getDisplayName = (domain: DashboardDomain) => {
+  return domain.url.replace(/^https?:\/\//, "").replace(/^www\./, "");
+};
+
+const toItem = (d: DashboardDomain): DomainItem => {
+  const isComplete = d.currentStep === 4 && Boolean(d.metrics);
+  return {
+    id: d.id,
+    name: getDisplayName(d),
+    url: d.url,
+    status: isComplete ? "success" : "retry",
+    visibility: d.metrics?.visibilityScore,
+    topKeywords: d.metrics?.keywordCount,
+    topPrompts: d.metrics?.phraseCount,
+  };
+};
 
 interface DomainHistorySectionProps {
   onMenuItemClick?: (tabId: TabId, domainId?: string | number) => void;
 }
 
 export function DomainHistorySection({ onMenuItemClick }: DomainHistorySectionProps) {
-  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const navigate = useNavigate();
+  const [openMenuId, setOpenMenuId] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [state, setState] = useState<FetchState>({ status: "loading" });
 
-  const hasDomains = domains.length > 0;
+  useEffect(() => {
+    let alive = true;
+    apiGet<{ domains: DashboardDomain[] }>("/dashboard/all")
+      .then((data) => {
+        if (!alive) return;
+        setState({ status: "ready", domains: data?.domains ?? [] });
+      })
+      .catch((err) => {
+        if (!alive) return;
+        setState({
+          status: "error",
+          message: err instanceof Error ? err.message : "Failed to load domains",
+        });
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const allDomains = state.status === "ready" ? state.domains : [];
+
+  const stats = useMemo(() => {
+    const total = allDomains.length;
+    const completed = allDomains.filter((d) => d.currentStep === 4).length;
+    const inProgress = allDomains.filter(
+      (d) => (d.currentStep ?? 0) > 0 && (d.currentStep ?? 0) < 4
+    ).length;
+    const totalQueries = allDomains.reduce(
+      (sum, d) => sum + (d.metrics?.totalQueries ?? 0),
+      0
+    );
+    const completedPct = total > 0 ? Math.round((completed / total) * 100) : 0;
+    const inProgressPct = total > 0 ? Math.round((inProgress / total) * 100) : 0;
+
+    return [
+      {
+        id: "total",
+        title: "Total Queries",
+        value: totalQueries.toLocaleString(),
+        percent: total > 0 ? `${total}` : "0",
+        subtext: "domains tracked",
+        percentClass: "text-[#4e9f2d]",
+        iconBg: "bg-[#eaf7e9]",
+        iconColor: "text-[#4e9f2d]",
+        icon: Globe,
+      },
+      {
+        id: "completed",
+        title: "Analysis Completed",
+        value: completed.toString(),
+        percent: `${completedPct}%`,
+        subtext: "of domains",
+        percentClass: "text-[#4e9f2d]",
+        iconBg: "bg-[#eef3ff]",
+        iconColor: "text-[#4f628a]",
+        icon: Eye,
+      },
+      {
+        id: "progress",
+        title: "Analysis In Progress",
+        value: inProgress.toString(),
+        percent: `${inProgressPct}%`,
+        subtext: "of domains",
+        percentClass: "text-[#d59a00]",
+        iconBg: "bg-[#fff7e5]",
+        iconColor: "text-[#d59a00]",
+        icon: CircleAlert,
+      },
+      {
+        id: "error",
+        title: "Error occured",
+        value: "0",
+        percent: "0%",
+        subtext: "Retry",
+        percentClass: "text-[#cf3d3d]",
+        iconBg: "bg-[#ffeef0]",
+        iconColor: "text-[#cf3d3d]",
+        icon: AlertTriangle,
+      },
+    ];
+  }, [allDomains]);
+
+  const items = useMemo<DomainItem[]>(() => allDomains.map(toItem), [allDomains]);
+
+  const filteredDomains = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return items;
+    return items.filter(
+      (d) => d.name.toLowerCase().includes(q) || d.url.toLowerCase().includes(q)
+    );
+  }, [items, searchQuery]);
+
+  const hasDomains = items.length > 0;
+
+  const handleViewReport = (domain: DomainItem) => {
+    navigate(`/ai-results/${maskDomainId(domain.id)}`);
+  };
+
   const domainMenuItems = [
     "View AI Dashboard",
     "View Report",
@@ -121,14 +186,6 @@ export function DomainHistorySection({ onMenuItemClick }: DomainHistorySectionPr
     "Competitors",
     "Inspect",
   ];
-
-  const filteredDomains = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
-    if (!q) return domains;
-    return domains.filter(
-      (domain) => domain.name.toLowerCase().includes(q) || domain.url.toLowerCase().includes(q)
-    );
-  }, [searchQuery]);
 
   return (
     <div className="w-full">
@@ -207,6 +264,7 @@ export function DomainHistorySection({ onMenuItemClick }: DomainHistorySectionPr
               Uncover how your content appears in AI search, which keywords you're visible for, and
               where you're missing opportunities.
             </p>
+            {/* TODO: wire to Add Domain modal in next PR */}
             <button
               type="button"
               className="mt-5 inline-flex h-10 items-center gap-2 rounded-md px-5 text-sm font-medium text-white"
@@ -244,9 +302,20 @@ export function DomainHistorySection({ onMenuItemClick }: DomainHistorySectionPr
         </div>
 
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
-          {filteredDomains.length === 0 ? (
+          {state.status === "loading" ? (
+            Array.from({ length: 3 }).map((_, i) => (
+              <div
+                key={i}
+                className="h-[230px] animate-pulse rounded-xl border border-[#e2e6ee] bg-white"
+              />
+            ))
+          ) : state.status === "error" ? (
+            <div className="col-span-full rounded-xl border border-[#fad4d4] bg-[#fff5f5] p-8 text-center text-sm text-[#cf3d3d]">
+              {state.message}
+            </div>
+          ) : filteredDomains.length === 0 ? (
             <div className="col-span-full rounded-xl border border-[#e2e6ee] bg-white p-8 text-center text-sm text-[#7f8795]">
-              No matching domains found.
+              {searchQuery ? "No matching domains found." : "No domains analyzed yet."}
             </div>
           ) : (
             filteredDomains.map((domain) => (
@@ -280,12 +349,13 @@ export function DomainHistorySection({ onMenuItemClick }: DomainHistorySectionPr
                             onClick={() => {
                               if (item === "Competitors") {
                                 onMenuItemClick?.("competitor-intelligence", domain.id);
-                              } else if (item === "View AI Dashboard") {
-                                onMenuItemClick?.("analytics", domain.id);
-                              } else if (item === "Top Keywords") {
-                                onMenuItemClick?.("analytics", domain.id);
-                              } else if (item === "Top Prompts") {
-                                onMenuItemClick?.("analytics", domain.id);
+                              } else if (
+                                item === "View AI Dashboard" ||
+                                item === "View Report" ||
+                                item === "Top Prompts" ||
+                                item === "Top Keywords"
+                              ) {
+                                handleViewReport(domain);
                               }
                               setOpenMenuId(null);
                             }}
@@ -310,6 +380,7 @@ export function DomainHistorySection({ onMenuItemClick }: DomainHistorySectionPr
                 {domain.status === "retry" ? (
                   <div className="flex h-[145px] flex-col items-center justify-center">
                     <p className="text-[20px] font-semibold text-[#414651]">Retry analysis</p>
+                    {/* TODO: wire to Retry SSE flow in next PR */}
                     <button
                       type="button"
                       className="mt-4 inline-flex h-11 w-11 items-center justify-center rounded-md bg-[#f0f3f8] text-[#4d5d78]"
@@ -318,27 +389,31 @@ export function DomainHistorySection({ onMenuItemClick }: DomainHistorySectionPr
                     </button>
                   </div>
                 ) : (
-                  <>
+                  <button
+                    type="button"
+                    onClick={() => handleViewReport(domain)}
+                    className="block w-full text-left"
+                  >
                     <div className="mb-2 border-t border-[#edf1f7] pt-3">
                       <p className="mb-2 text-[19px] font-semibold text-[#414651]">Visibility Score</p>
                       <div className="flex items-center gap-3">
                         <div className="h-2 flex-1 rounded-full bg-[#d6dbe5]">
-                          <div className="h-2 rounded-full bg-[#6f8fc9]" style={{ width: `${domain.visibility}%` }} />
+                          <div className="h-2 rounded-full bg-[#6f8fc9]" style={{ width: `${domain.visibility ?? 0}%` }} />
                         </div>
-                        <span className="text-4xl font-semibold leading-none text-[#6f8fc9]">{domain.visibility}%</span>
+                        <span className="text-4xl font-semibold leading-none text-[#6f8fc9]">{domain.visibility ?? 0}%</span>
                       </div>
                     </div>
                     <div className="mt-3 grid grid-cols-2 gap-3">
                       <div>
                         <p className="text-[18px] font-semibold text-[#5f6878] pb-2">Top Keywords</p>
-                        <p className="text-[30px] font-medium leading-none text-[#3d83df]">{domain.topKeywords}</p>
+                        <p className="text-[30px] font-medium leading-none text-[#3d83df]">{domain.topKeywords ?? 0}</p>
                       </div>
                       <div>
                         <p className="text-[18px] font-semibold text-[#5f6878] pb-2">Top Prompts</p>
-                        <p className="text-[30px] font-medium leading-none text-[#3d83df]">{domain.topPrompts}</p>
+                        <p className="text-[30px] font-medium leading-none text-[#3d83df]">{domain.topPrompts ?? 0}</p>
                       </div>
                     </div>
-                  </>
+                  </button>
                 )}
               </div>
             ))
