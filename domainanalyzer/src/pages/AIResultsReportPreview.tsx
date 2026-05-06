@@ -1510,7 +1510,10 @@ const AIResultsReportPreview = () => {
                   <ChevronDown className="h-3.5 w-3.5 text-gray-400" />
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent className="w-[260px] p-1" align="start">
+              <DropdownMenuContent
+                className="max-h-[60vh] w-[260px] overflow-y-auto p-1"
+                align="start"
+              >
                 {allDomains.length > 0 ? (
                   allDomains.map((domain) => {
                     const isActive = domain.id === reportData?.domainInfo?.id;
