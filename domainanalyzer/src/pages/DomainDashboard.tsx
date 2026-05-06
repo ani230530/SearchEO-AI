@@ -2504,6 +2504,12 @@ const DomainDashboard = () => {
 
   const domainId = getDomainId();
 
+  useEffect(() => {
+    if (domain) {
+      localStorage.setItem("ai-visibility:lastDomainSlug", domain);
+    }
+  }, [domain]);
+
   // Keep sidebar always collapsed on small screens for smart responsiveness
   useEffect(() => {
     const syncSidebarToViewport = () => {

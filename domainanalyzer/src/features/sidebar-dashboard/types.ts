@@ -11,7 +11,7 @@ export type TabId =
   | "projects"
   | "settings"
   | "profile"
-  | "ai-checker"
+  | "ai-visibility"
   | "gsc-analytics"
   | "audit"
   | "analytics-report"
@@ -43,7 +43,7 @@ export interface DomainCheckResult {
 }
 
 export interface DashboardSearchState {
-  redirectToAiChecker: boolean;
+  redirectToAiVisibility: boolean;
   activeTab?: TabId;
   activeCompanySubTab?: CompanySubTabId;
   openWordpressConnection?: boolean;

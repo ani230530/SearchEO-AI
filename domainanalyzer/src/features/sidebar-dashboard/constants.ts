@@ -21,7 +21,7 @@ import type { DashboardTabConfig, TabId } from "@/features/sidebar-dashboard/typ
 export const DASHBOARD_DEFAULT_TAB: TabId = "overview";
 
 export const DASHBOARD_TABS: DashboardTabConfig[] = [
-  { id: "ai-checker", label: "AI Visibility", icon: Sparkles },
+  { id: "ai-visibility", label: "AI Visibility", icon: Sparkles },
   { id: "overview", label: "Dashboard", icon: LayoutDashboard },
   { id: "analytics", label: "Company", icon: Building },
   { id: "integration", label: "Integration", icon: Link },
