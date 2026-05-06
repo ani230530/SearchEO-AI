@@ -1262,7 +1262,7 @@ const AIResultsReportPreview = () => {
         <header className="w-full bg-white px-6 py-6">
           <div className="flex min-h-[3.75rem] w-full items-center justify-between gap-2.5 py-2.5 pr-2.5">
             <button
-              onClick={() => navigate('/ai-checker')}
+              onClick={() => navigate('/ai-visibility')}
               className="inline-flex items-center gap-2.5 text-left text-2xl font-semibold leading-[1.35] tracking-normal text-gray-950"
             >
               <BackArrowIcon />
