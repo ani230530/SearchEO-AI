@@ -1044,6 +1044,13 @@ const AreaChartCard = ({
 const AIResultsReportPreview = () => {
   const navigate = useNavigate();
   const { domain: maskedDomainId } = useParams();
+
+  useEffect(() => {
+    if (maskedDomainId) {
+      localStorage.setItem("ai-visibility:lastDomainSlug", maskedDomainId);
+    }
+  }, [maskedDomainId]);
+
   const [loading, setLoading] = useState(true);
   const [reportData, setReportData] = useState<any>(null);
   const [allDomains, setAllDomains] = useState<any[]>([]);

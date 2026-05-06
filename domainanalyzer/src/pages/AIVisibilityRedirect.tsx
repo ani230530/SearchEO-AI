@@ -71,7 +71,7 @@ const AIVisibilityRedirect = () => {
   }, [authLoading, token]);
 
   if (state.status === "redirect") {
-    return <Navigate to={`/dashboard/${state.slug}`} replace />;
+    return <Navigate to={`/ai-results/${state.slug}`} replace />;
   }
 
   if (state.status === "empty") {
