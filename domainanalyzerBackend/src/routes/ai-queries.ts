@@ -2361,8 +2361,10 @@ router.post('/:domainId', authenticateToken, async (req, res) => {
     res.flushHeaders();
 
     try {
-        // Fetch selected phrases from the database
-        const selectedPhrases = await prisma.generatedIntentPhrase.findMany({
+        // Fetch selected phrases from the database. If none are explicitly
+        // selected (e.g. an auto-audit kicked off without manual selection),
+        // fall back to all phrases for the domain so the run isn't blocked.
+        const explicitlySelectedPhrases = await prisma.generatedIntentPhrase.findMany({
             where: {
                 domainId: domainId,
                 isSelected: true
@@ -2375,6 +2377,13 @@ router.post('/:domainId', authenticateToken, async (req, res) => {
                 }
             }
         });
+
+        const selectedPhrases = explicitlySelectedPhrases.length > 0
+            ? explicitlySelectedPhrases
+            : await prisma.generatedIntentPhrase.findMany({
+                where: { domainId },
+                include: { keyword: { select: { term: true } } },
+            });
 
         // Also check total phrases for comparison
         const totalPhrasesCount = await prisma.generatedIntentPhrase.count({
