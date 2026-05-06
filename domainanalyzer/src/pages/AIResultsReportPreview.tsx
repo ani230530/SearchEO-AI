@@ -1,7 +1,8 @@
-import { useState, useEffect, useMemo, Fragment } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { useNavigate, useParams } from 'react-router-dom';
 import { apiGet } from '../services/apiClient';
+import { cn } from '@/lib/utils';
 import {
   Area,
   AreaChart,
@@ -44,6 +45,13 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -793,9 +801,21 @@ const PromptTable = ({ data }: { data: any[] }) => {
               </DropdownMenuContent>
             </DropdownMenu>
 
-            <Button className="h-9 gap-2 bg-[#94a3b8] hover:bg-[#64748b] text-white border-none rounded-lg px-4 transition-all ml-1">
+            <Button
+              type="button"
+              disabled={selectedCount === 0}
+              onClick={() => handleOpenWorksheetModal()}
+              className={cn(
+                'h-9 gap-2 text-white border-none rounded-lg px-4 transition-all ml-1',
+                selectedCount === 0
+                  ? 'bg-[#94a3b8] hover:bg-[#94a3b8] cursor-not-allowed'
+                  : 'bg-[#2D4059] hover:bg-[#24364d]'
+              )}
+            >
               <LayoutGrid className="h-4 w-4" />
-              <span className="text-sm font-medium">Add to Worksheet</span>
+              <span className="text-sm font-medium">
+                Add to Worksheet{selectedCount > 0 ? ` (${selectedCount})` : ''}
+              </span>
             </Button>
           </div>
         </div>
@@ -829,7 +849,14 @@ const PromptTable = ({ data }: { data: any[] }) => {
                   >
                     <TableCell className="px-4 py-3">
                       <div className="flex items-center gap-1">
-                        <input type="checkbox" className="h-3.5 w-3.5 rounded border-gray-300 accent-blue-600" />
+                        <input
+                          type="checkbox"
+                          checked={selectedRowIds.has(String(row.id))}
+                          onClick={(e) => e.stopPropagation()}
+                          onChange={() => handleToggleRow(String(row.id))}
+                          aria-label={`Select ${row.phrase ?? row.prompt ?? 'row'}`}
+                          className="h-3.5 w-3.5 rounded border-gray-300 accent-blue-600"
+                        />
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
@@ -900,7 +927,14 @@ const PromptTable = ({ data }: { data: any[] }) => {
                         >
                           {expandedId === row.id ? 'Close' : 'AI Response'}
                         </Button>
-                        <Button variant="outline" className="h-7 rounded-lg px-3 text-[10px] font-bold border-slate-300 text-slate-600 hover:bg-gray-50 shadow-none">
+                        <Button
+                          variant="outline"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenWorksheetModal(String(row.id));
+                          }}
+                          className="h-7 rounded-lg px-3 text-[10px] font-bold border-slate-300 text-slate-600 hover:bg-gray-50 shadow-none"
+                        >
                           Draft Blog
                         </Button>
                       </div>
@@ -1041,6 +1075,146 @@ const AreaChartCard = ({
 );
 
 
+const WORKSHEET_IMPORT_KEY = 'ai-results/pending-worksheet-import';
+const WORKSHEET_TARGET_KEY = 'ai-results/pending-worksheet-target';
+
+type WorksheetOption = {
+  id: string;
+  name: string;
+  description: string | null;
+};
+
+type WorksheetPickerModalProps = {
+  open: boolean;
+  selectedCount: number;
+  activeWorksheetId: string | null;
+  worksheets: WorksheetOption[];
+  loading?: boolean;
+  onOpenChange: (open: boolean) => void;
+  onWorksheetSelect: (id: string) => void;
+  onAddToWorksheet: () => void;
+  onCreateNewWorksheet: () => void;
+};
+
+const WorksheetPickerModal = ({
+  open,
+  selectedCount,
+  activeWorksheetId,
+  worksheets,
+  loading = false,
+  onOpenChange,
+  onWorksheetSelect,
+  onAddToWorksheet,
+  onCreateNewWorksheet,
+}: WorksheetPickerModalProps) => {
+  const addDisabled = !activeWorksheetId;
+  const hasWorksheets = worksheets.length > 0;
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="w-[min(920px,calc(100vw-1.5rem))] max-w-none overflow-hidden rounded-[28px] border border-[#E5E7EB] bg-white p-0 shadow-[0_20px_80px_rgba(15,23,42,0.22)]">
+        <div className="flex max-h-[calc(100vh-2rem)] flex-col">
+          <DialogHeader className="shrink-0 border-b border-[#E5E7EB] px-6 py-5 text-left">
+            <DialogTitle className="text-[26px] font-semibold leading-[1.15] tracking-[-0.02em] text-[#1F2937]">
+              Select worksheet
+            </DialogTitle>
+            <DialogDescription className="mt-2 text-sm leading-[150%] text-[#6B7280]">
+              You are adding {selectedCount} item{selectedCount === 1 ? '' : 's'} to your worksheet.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-y-auto px-6 py-5">
+            <div className="mb-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[#2D4059]">
+                Select a worksheet
+              </p>
+            </div>
+
+            {hasWorksheets ? (
+              <div className="flex flex-col gap-3">
+                {worksheets.map((worksheet) => {
+                  const isSelected = activeWorksheetId === worksheet.id;
+                  return (
+                    <button
+                      key={worksheet.id}
+                      type="button"
+                      onClick={() => onWorksheetSelect(worksheet.id)}
+                      className={cn(
+                        'flex w-full items-center justify-between rounded-2xl border px-4 py-4 text-left transition-all focus:outline-none focus:ring-2 focus:ring-[#2D4059] focus:ring-offset-2',
+                        isSelected
+                          ? 'border-[#A8C4F6] bg-[#EEF4FF] shadow-[0_0_0_1px_rgba(94,129,230,0.18)]'
+                          : 'border-[#E5E7EB] bg-[#FAFAFA] hover:border-[#CBD5E1] hover:bg-white'
+                      )}
+                      aria-pressed={isSelected}
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate text-base font-semibold leading-[150%] text-[#1F2937]">
+                          {worksheet.name}
+                        </p>
+                        {worksheet.description ? (
+                          <p className="mt-1 text-xs leading-[150%] text-[#6B7280]">
+                            {worksheet.description}
+                          </p>
+                        ) : null}
+                      </div>
+                      <span
+                        className={cn(
+                          'ml-4 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full border text-[10px] leading-none',
+                          isSelected
+                            ? 'border-[#2D4059] bg-[#2D4059] text-white'
+                            : 'border-[#CBD5E1] bg-white text-transparent'
+                        )}
+                        aria-hidden="true"
+                      >
+                        •
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            ) : loading ? (
+              <div className="rounded-2xl border border-dashed border-[#CBD5E1] bg-[#FAFAFA] p-6 text-sm text-[#6B7280]">
+                Loading worksheets...
+              </div>
+            ) : (
+              <div className="rounded-2xl border border-dashed border-[#CBD5E1] bg-[#FAFAFA] p-6 text-sm text-[#6B7280]">
+                No worksheets are available yet.
+              </div>
+            )}
+          </div>
+
+          <div className="shrink-0 border-t border-[#E5E7EB] bg-white px-6 py-4">
+            <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={onCreateNewWorksheet}
+                className="h-11 w-full rounded-xl border border-[#D5D7DA] bg-white px-5 text-sm font-medium text-[#344054] shadow-none hover:bg-[#F9FAFB] sm:w-[190px]"
+              >
+                Create New Worksheet
+              </Button>
+              <Button
+                type="button"
+                disabled={addDisabled}
+                onClick={onAddToWorksheet}
+                className={cn(
+                  'h-11 w-full rounded-xl px-5 text-sm font-semibold shadow-none sm:w-[190px]',
+                  addDisabled
+                    ? 'cursor-not-allowed border border-[#9CA0A7] bg-[#9CA0A7] text-white/80 hover:bg-[#9CA0A7]'
+                    : 'border border-[#2D4059] bg-[#2D4059] text-white hover:bg-[#24364d]'
+                )}
+              >
+                Add to Worksheet
+              </Button>
+            </div>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+
 const AIResultsReportPreview = () => {
   const navigate = useNavigate();
   const { domain: maskedDomainId } = useParams();
@@ -1055,6 +1229,93 @@ const AIResultsReportPreview = () => {
   const [reportData, setReportData] = useState<any>(null);
   const [allDomains, setAllDomains] = useState<any[]>([]);
   const [filterType, setFilterType] = useState<'all' | 'prompt' | 'keyword'>('all');
+
+  const [selectedRowIds, setSelectedRowIds] = useState<Set<string>>(new Set());
+  const [worksheetOptions, setWorksheetOptions] = useState<WorksheetOption[]>([]);
+  const [worksheetOptionsLoading, setWorksheetOptionsLoading] = useState(false);
+  const [activeWorksheetId, setActiveWorksheetId] = useState<string | null>(null);
+  const [isWorksheetModalOpen, setIsWorksheetModalOpen] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    setWorksheetOptionsLoading(true);
+    apiGet<{ campaigns: Array<{ id: number; title: string; description?: string | null }> }>(
+      '/campaigns'
+    )
+      .then((data) => {
+        if (!alive) return;
+        const campaigns = Array.isArray(data?.campaigns) ? data.campaigns : [];
+        setWorksheetOptions(
+          campaigns.map((c) => ({
+            id: String(c.id),
+            name: c.title,
+            description: c.description?.trim() ? c.description.trim() : null,
+          }))
+        );
+      })
+      .catch(() => {
+        if (!alive) return;
+        setWorksheetOptions([]);
+      })
+      .finally(() => {
+        if (alive) setWorksheetOptionsLoading(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const selectedCount = selectedRowIds.size;
+
+  const handleToggleRow = useCallback((id: string) => {
+    setSelectedRowIds((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const handleOpenWorksheetModal = useCallback(
+    (singleRowId?: string) => {
+      if (singleRowId) {
+        setSelectedRowIds(new Set([singleRowId]));
+      } else if (selectedRowIds.size === 0) {
+        return;
+      }
+      setActiveWorksheetId(null);
+      setIsWorksheetModalOpen(true);
+    },
+    [selectedRowIds]
+  );
+
+  const handleWorksheetModalOpenChange = useCallback((open: boolean) => {
+    setIsWorksheetModalOpen(open);
+    if (!open) setActiveWorksheetId(null);
+  }, []);
+
+  const handleAddToWorksheet = useCallback(() => {
+    if (!activeWorksheetId) return;
+    const rowsById = new Map<string, any>(
+      (reportData?.topPrompts || []).map((p: any) => [String(p.id), p])
+    );
+    const selectedItemIds = Array.from(selectedRowIds);
+    const selectedRows = selectedItemIds
+      .map((id) => rowsById.get(id))
+      .filter(Boolean)
+      .map((row: any) => ({ id: String(row.id), prompt: row.phrase ?? row.prompt ?? '' }));
+
+    const payload = { activeWorksheetId, selectedItemIds, selectedRows };
+    sessionStorage.setItem(WORKSHEET_TARGET_KEY, activeWorksheetId);
+    sessionStorage.setItem(WORKSHEET_IMPORT_KEY, JSON.stringify(payload));
+    localStorage.setItem('activeTab', 'projects');
+    setIsWorksheetModalOpen(false);
+    navigate('/dashboard');
+  }, [activeWorksheetId, navigate, reportData, selectedRowIds]);
+
+  const handleCreateNewWorksheet = useCallback(() => {
+    setIsWorksheetModalOpen(false);
+  }, []);
 
   // Derived metrics for dynamic cards
   const metricCards = useMemo(() => {
@@ -1482,6 +1743,18 @@ const AIResultsReportPreview = () => {
           </Button>
         </section>
       </main>
+
+      <WorksheetPickerModal
+        open={isWorksheetModalOpen}
+        selectedCount={selectedCount}
+        activeWorksheetId={activeWorksheetId}
+        worksheets={worksheetOptions}
+        loading={worksheetOptionsLoading}
+        onOpenChange={handleWorksheetModalOpenChange}
+        onWorksheetSelect={setActiveWorksheetId}
+        onAddToWorksheet={handleAddToWorksheet}
+        onCreateNewWorksheet={handleCreateNewWorksheet}
+      />
     </div>
   );
 };
