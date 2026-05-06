@@ -69,6 +69,17 @@ import {
 } from '@/components/ui/table';
 import { maskDomainId, unmaskDomainId } from '../lib/domainUtils';
 
+const getDomainHost = (rawUrl: string | undefined): string => {
+  if (!rawUrl) return '';
+  return rawUrl.replace(/^https?:\/\//i, '').replace(/^www\./i, '').split('/')[0];
+};
+
+const getDomainLogo = (rawUrl: string | undefined): string | null => {
+  const host = getDomainHost(rawUrl);
+  if (!host) return null;
+  return `https://img.logo.dev/${host}?token=pk_DTdFFG1JT9WOCjATvZEzIA&size=64`;
+};
+
 const sidebarItems = [
   { id: 'ai-results', label: 'AI Results', icon: Sparkles },
   { id: 'competitors', label: 'Competitors', icon: Users },
@@ -1464,8 +1475,8 @@ const AIResultsReportPreview = () => {
   }, [maskedDomainId]);
 
   return (
-    <div className="flex min-h-screen w-full flex-col bg-[#f5f5f7] text-slate-900 lg:flex-row">
-      <aside className="min-h-[220px] w-full shrink-0 basis-auto border-b border-slate-300 bg-white p-4 lg:min-h-screen lg:basis-[18%] lg:min-w-[260px] lg:max-w-[342px] lg:border-b-0 lg:border-r">
+    <div className="flex min-h-screen w-full flex-col bg-[#f5f5f7] text-slate-900 lg:flex-row lg:items-start">
+      <aside className="min-h-[220px] w-full shrink-0 basis-auto border-b border-slate-300 bg-white p-4 lg:sticky lg:top-0 lg:h-screen lg:basis-[18%] lg:min-w-[260px] lg:max-w-[342px] lg:overflow-y-auto lg:border-b-0 lg:border-r">
         <div className="flex h-full flex-col">
           <div className="flex items-center justify-between">
             <span className="text-xs font-medium text-gray-500">logo</span>
@@ -1477,12 +1488,23 @@ const AIResultsReportPreview = () => {
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button className="flex w-full items-center justify-between rounded-lg border border-slate-300 bg-white px-3 py-2 text-left text-xs shadow-sm transition hover:bg-gray-50">
-                  <span className="flex items-center gap-2">
-                    <span className="grid h-6 w-6 place-items-center rounded-md bg-rose-50 text-rose-600">
-                      <Globe2 className="h-3.5 w-3.5" />
+                  <span className="flex min-w-0 items-center gap-2">
+                    <span className="grid h-6 w-6 flex-shrink-0 place-items-center overflow-hidden rounded-md bg-gray-50">
+                      {getDomainLogo(reportData?.domainInfo?.url) ? (
+                        <img
+                          src={getDomainLogo(reportData?.domainInfo?.url)!}
+                          alt=""
+                          className="h-5 w-5 object-contain"
+                          onError={(e) => {
+                            (e.currentTarget as HTMLImageElement).style.display = 'none';
+                          }}
+                        />
+                      ) : (
+                        <Globe2 className="h-3.5 w-3.5 text-gray-500" />
+                      )}
                     </span>
-                    <span className="truncate max-w-[140px]">
-                      {reportData?.domainInfo?.url || 'Loading...'}
+                    <span className="truncate text-xs font-medium text-gray-900">
+                      {getDomainHost(reportData?.domainInfo?.url) || 'Loading…'}
                     </span>
                   </span>
                   <ChevronDown className="h-3.5 w-3.5 text-gray-400" />
@@ -1490,26 +1512,47 @@ const AIResultsReportPreview = () => {
               </DropdownMenuTrigger>
               <DropdownMenuContent className="w-[260px] p-1" align="start">
                 {allDomains.length > 0 ? (
-                  allDomains.map((domain) => (
-                    <DropdownMenuItem
-                      key={domain.id}
-                      onClick={() => navigate(`/ai-results/${maskDomainId(domain.id)}`)}
-                      className={`flex flex-col items-start gap-0.5 px-3 py-2 cursor-pointer ${domain.id === reportData?.domainInfo?.id ? 'bg-gray-50' : ''
-                        }`}
-                    >
-                      <div className="flex w-full items-center justify-between">
-                        <span className="text-xs font-semibold text-gray-900 truncate">
-                          {domain.url}
+                  allDomains.map((domain) => {
+                    const isActive = domain.id === reportData?.domainInfo?.id;
+                    const logo = getDomainLogo(domain.url);
+                    return (
+                      <DropdownMenuItem
+                        key={domain.id}
+                        onClick={() => navigate(`/ai-results/${maskDomainId(domain.id)}`)}
+                        className={`flex items-start gap-2 px-3 py-2 cursor-pointer ${isActive ? 'bg-gray-50' : ''}`}
+                      >
+                        <span className="grid h-7 w-7 flex-shrink-0 place-items-center overflow-hidden rounded-md bg-gray-50">
+                          {logo ? (
+                            <img
+                              src={logo}
+                              alt=""
+                              className="h-6 w-6 object-contain"
+                              onError={(e) => {
+                                (e.currentTarget as HTMLImageElement).style.display = 'none';
+                              }}
+                            />
+                          ) : (
+                            <Globe2 className="h-3.5 w-3.5 text-gray-500" />
+                          )}
                         </span>
-                        {domain.id === reportData?.domainInfo?.id && (
-                          <CheckCircle2 className="h-3 w-3 text-emerald-600" />
-                        )}
-                      </div>
-                      <span className="text-[10px] text-gray-500">
-                        Last analyzed: {new Date(domain.createdAt).toLocaleDateString()}
-                      </span>
-                    </DropdownMenuItem>
-                  ))
+                        <div className="min-w-0 flex-1">
+                          <div className="flex w-full items-center justify-between gap-2">
+                            <span className="truncate text-xs font-semibold text-gray-900">
+                              {getDomainHost(domain.url)}
+                            </span>
+                            {isActive && (
+                              <CheckCircle2 className="h-3 w-3 flex-shrink-0 text-emerald-600" />
+                            )}
+                          </div>
+                          {domain.createdAt && (
+                            <span className="text-[10px] text-gray-500">
+                              Last analyzed: {new Date(domain.createdAt).toLocaleDateString()}
+                            </span>
+                          )}
+                        </div>
+                      </DropdownMenuItem>
+                    );
+                  })
                 ) : (
                   <div className="p-3 text-center text-xs text-gray-500">
                     No other domains found
