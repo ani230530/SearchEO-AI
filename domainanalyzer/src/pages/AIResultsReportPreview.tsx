@@ -1408,6 +1408,10 @@ const AIResultsReportPreview = () => {
   const filteredPrompts = useMemo(() => {
     if (!reportData?.topPrompts) return [];
     let items = [...reportData.topPrompts];
+    // Hide rows that were never queried — empty `results` array means no
+    // AI calls ran for this prompt/keyword, so the metrics row is all zeros
+    // and adds no signal. Only show items the user actually selected and ran.
+    items = items.filter((p: any) => Array.isArray(p?.results) && p.results.length > 0);
     if (filterType !== 'all') {
       items = items.filter(p => p.type?.toLowerCase() === filterType);
     }
