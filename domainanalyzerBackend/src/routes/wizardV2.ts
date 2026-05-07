@@ -8,9 +8,14 @@
  */
 
 import { Router, Request, Response } from 'express';
+import OpenAI from 'openai';
 import { PrismaClient } from '../../generated/prisma';
 import { authenticateToken, AuthenticatedRequest } from '../middleware/auth';
 import { analyzeStandalonePeerCompetitors } from '../services/standaloneCompetitorAnalysisService';
+
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+const openai = OPENAI_API_KEY ? new OpenAI({ apiKey: OPENAI_API_KEY }) : null;
+const TOPICS_MODEL = 'gpt-4o-mini';
 
 const LOGO_DEV_TOKEN = 'pk_DTdFFG1JT9WOCjATvZEzIA';
 const buildLogoUrl = (host: string) =>
@@ -416,6 +421,306 @@ router.post('/domain/:id/competitors/select', authenticateToken, async (req: Req
   });
 
   return res.json({ domainId, selectedCompetitors: cleaned });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Topics phase — generates keywords + prompts together in a single LLM call,
+// flattened into a tagged list the UI renders directly.
+// ─────────────────────────────────────────────────────────────────────────────
+
+type Intent = 'Informational' | 'Transactional' | 'Commercial' | 'Navigational';
+
+interface GeneratedTopic {
+  keyword: string;
+  intent: Intent;
+  prompts: string[];
+}
+
+const VALID_INTENTS: Intent[] = ['Informational', 'Transactional', 'Commercial', 'Navigational'];
+const sanitizeIntent = (raw: unknown): Intent =>
+  typeof raw === 'string' && (VALID_INTENTS as string[]).includes(raw) ? (raw as Intent) : 'Commercial';
+
+function buildTopicsPrompt(args: {
+  url: string;
+  context: string;
+  industry: string | null;
+  companySize: string | null;
+  country: string | null;
+  state: string | null;
+  competitors: string[];
+  customKeywords: string[];
+  customPrompts: string[];
+}): string {
+  const profile = [
+    `Domain: ${args.url}`,
+    args.industry ? `Industry: ${args.industry}` : null,
+    args.companySize ? `Company size: ${args.companySize}` : null,
+    [args.country, args.state].filter(Boolean).join(', ') ? `Location: ${[args.country, args.state].filter(Boolean).join(', ')}` : null,
+    args.competitors.length ? `Known competitors: ${args.competitors.join(', ')}` : null,
+  ].filter(Boolean).join('\n');
+
+  const seeds = [
+    args.customKeywords.length ? `User-supplied keyword seeds (must be included verbatim as keywords): ${args.customKeywords.join(', ')}` : null,
+    args.customPrompts.length ? `User-supplied prompt seeds (must be included verbatim as prompts under the most relevant keyword): ${args.customPrompts.join(', ')}` : null,
+  ].filter(Boolean).join('\n');
+
+  return [
+    'Generate 6–10 topics for testing this brand\'s AI search visibility.',
+    'Each topic = one short keyword phrase plus 2–3 natural-language prompts a real person might ask ChatGPT/Claude/Gemini.',
+    'Prompts MUST be full questions or task descriptions, not bare phrases.',
+    'Spread intents across Informational / Commercial / Transactional. Keep prompts diverse — different angles, not paraphrases.',
+    'Avoid generic prompts that don\'t reference the domain\'s actual niche.',
+    '',
+    profile,
+    '',
+    seeds,
+    '',
+    'Return JSON: { "topics": [ { "keyword": string, "intent": "Informational"|"Commercial"|"Transactional"|"Navigational", "prompts": string[] } ] }',
+  ].filter(Boolean).join('\n');
+}
+
+async function generateTopicsViaLLM(args: Parameters<typeof buildTopicsPrompt>[0]): Promise<GeneratedTopic[]> {
+  if (!openai) throw new Error('OPENAI_API_KEY not configured');
+  const response = await openai.chat.completions.create({
+    model: TOPICS_MODEL,
+    messages: [
+      { role: 'system', content: 'You output strict JSON for AI search visibility audits. Quality over quantity. No filler.' },
+      { role: 'user', content: buildTopicsPrompt(args) },
+    ],
+    response_format: { type: 'json_object' },
+    temperature: 0.3,
+    max_tokens: 2200,
+  });
+  const text = response.choices[0]?.message?.content ?? '';
+  let parsed: any;
+  try { parsed = JSON.parse(text); } catch { throw new Error('LLM did not return valid JSON'); }
+  const arr = Array.isArray(parsed?.topics) ? parsed.topics : [];
+  return arr
+    .map((t: any): GeneratedTopic | null => {
+      const keyword = typeof t?.keyword === 'string' ? t.keyword.trim() : '';
+      if (!keyword) return null;
+      const prompts = Array.isArray(t?.prompts)
+        ? t.prompts.filter((p: unknown): p is string => typeof p === 'string' && p.trim().length > 0).map((p: string) => p.trim())
+        : [];
+      return { keyword, intent: sanitizeIntent(t?.intent), prompts };
+    })
+    .filter((t: GeneratedTopic | null): t is GeneratedTopic => t !== null);
+}
+
+interface FlatItem {
+  id: number;
+  type: 'keyword' | 'prompt';
+  text: string;
+  intent: string | null;
+  source: 'ai' | 'custom';
+  parentKeywordId?: number;
+}
+
+/**
+ * POST /api/wizard/domain/:id/topics
+ * One LLM call → keyword+prompt tree → persisted Keyword + GeneratedIntentPhrase
+ * rows → returned as a flat tagged list the wizard renders directly.
+ *
+ * Idempotent re-run: deletes existing AI-generated rows (Keyword.isCustom=false
+ * and their child phrases) and recreates. Custom-source rows survive.
+ */
+router.post('/domain/:id/topics', authenticateToken, async (req: Request, res: Response) => {
+  const authReq = req as AuthenticatedRequest;
+  const domainId = Number(req.params.id);
+  if (!domainId || Number.isNaN(domainId)) {
+    return res.status(400).json({ error: 'Invalid domainId' });
+  }
+
+  const domain = await prisma.domain.findUnique({
+    where: { id: domainId },
+    select: {
+      id: true, userId: true, url: true, context: true,
+      country: true, state: true, industry: true, companySize: true,
+      customSeeds: true, selectedCompetitors: true,
+    },
+  });
+  if (!domain || domain.userId !== authReq.user.userId) {
+    return res.status(404).json({ error: 'Domain not found' });
+  }
+
+  await recordPhase(domainId, 'topics', 'running', 5);
+
+  const seeds = (domain.customSeeds as { keywords?: string[]; prompts?: string[] } | null) ?? {};
+  const competitorList = Array.isArray(domain.selectedCompetitors)
+    ? (domain.selectedCompetitors as string[]).filter((c) => typeof c === 'string')
+    : [];
+
+  try {
+    const topics = await generateTopicsViaLLM({
+      url: domain.url,
+      context: domain.context ?? '',
+      industry: domain.industry,
+      companySize: domain.companySize,
+      country: domain.country,
+      state: domain.state,
+      competitors: competitorList,
+      customKeywords: Array.isArray(seeds.keywords) ? seeds.keywords : [],
+      customPrompts: Array.isArray(seeds.prompts) ? seeds.prompts : [],
+    });
+
+    if (topics.length === 0) throw new Error('LLM returned no topics');
+
+    // Reset AI-generated rows for this domain. Keep isCustom=true rows.
+    const existingAiKeywords = await prisma.keyword.findMany({
+      where: { domainId, isCustom: false },
+      select: { id: true },
+    });
+    const existingAiKeywordIds = existingAiKeywords.map((k) => k.id);
+    if (existingAiKeywordIds.length > 0) {
+      await prisma.generatedIntentPhrase.deleteMany({
+        where: { domainId, keywordId: { in: existingAiKeywordIds } },
+      });
+      await prisma.keyword.deleteMany({ where: { id: { in: existingAiKeywordIds } } });
+    }
+
+    // Insert fresh AI-generated keywords + their prompts.
+    const aiCustomSeedKeywords = new Set(
+      (Array.isArray(seeds.keywords) ? seeds.keywords : []).map((k) => k.toLowerCase().trim())
+    );
+
+    const flatItems: FlatItem[] = [];
+    for (const topic of topics) {
+      const isCustom = aiCustomSeedKeywords.has(topic.keyword.toLowerCase().trim());
+      const keyword = await prisma.keyword.upsert({
+        where: { term_domainId: { term: topic.keyword, domainId } },
+        update: { intent: topic.intent, isCustom },
+        create: {
+          term: topic.keyword,
+          domainId,
+          intent: topic.intent,
+          isCustom,
+          isSelected: false,
+          volume: 0,
+          difficulty: 'Medium',
+          cpc: 0,
+        },
+      });
+      flatItems.push({
+        id: keyword.id,
+        type: 'keyword',
+        text: keyword.term,
+        intent: keyword.intent,
+        source: isCustom ? 'custom' : 'ai',
+      });
+
+      for (const promptText of topic.prompts) {
+        const phrase = await prisma.generatedIntentPhrase.create({
+          data: {
+            domainId,
+            keywordId: keyword.id,
+            phrase: promptText,
+            intent: topic.intent,
+            isSelected: false,
+            sources: ['ai'] as any,
+          },
+        });
+        flatItems.push({
+          id: phrase.id,
+          type: 'prompt',
+          text: phrase.phrase,
+          intent: phrase.intent,
+          source: 'ai',
+          parentKeywordId: keyword.id,
+        });
+      }
+    }
+
+    // Layer in user-supplied custom prompts that the LLM didn't already cover.
+    const customPromptTexts = Array.isArray(seeds.prompts) ? seeds.prompts : [];
+    for (const promptText of customPromptTexts) {
+      const trimmed = promptText.trim();
+      if (!trimmed) continue;
+      const exists = flatItems.some((i) => i.type === 'prompt' && i.text.toLowerCase() === trimmed.toLowerCase());
+      if (exists) continue;
+      const phrase = await prisma.generatedIntentPhrase.create({
+        data: {
+          domainId,
+          phrase: trimmed,
+          intent: 'Commercial',
+          isSelected: false,
+          sources: ['user-custom'] as any,
+        },
+      });
+      flatItems.push({
+        id: phrase.id,
+        type: 'prompt',
+        text: phrase.phrase,
+        intent: 'Commercial',
+        source: 'custom',
+      });
+    }
+
+    await recordPhase(domainId, 'topics', 'completed', 100, undefined, { count: flatItems.length });
+    return res.json({ domainId, items: flatItems });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Topic generation failed';
+    await recordPhase(domainId, 'topics', 'failed', 0, message);
+    return res.status(500).json({ error: message });
+  }
+});
+
+/**
+ * POST /api/wizard/domain/:id/select
+ * Body: { keywordIds: number[], promptIds: number[] }
+ * Sets isSelected for the given ids, clears it for everything else on the domain.
+ * This is the action behind "Generate Report" — turns the user's checkbox state
+ * into the selection that the AI-queries phase will run.
+ */
+router.post('/domain/:id/select', authenticateToken, async (req: Request, res: Response) => {
+  const authReq = req as AuthenticatedRequest;
+  const domainId = Number(req.params.id);
+  if (!domainId || Number.isNaN(domainId)) {
+    return res.status(400).json({ error: 'Invalid domainId' });
+  }
+  const { keywordIds, promptIds } = (req.body ?? {}) as { keywordIds?: number[]; promptIds?: number[] };
+  const domain = await prisma.domain.findUnique({ where: { id: domainId }, select: { id: true, userId: true } });
+  if (!domain || domain.userId !== authReq.user.userId) {
+    return res.status(404).json({ error: 'Domain not found' });
+  }
+
+  const kwIds = Array.isArray(keywordIds) ? keywordIds.filter((n): n is number => Number.isFinite(n)) : [];
+  const phIds = Array.isArray(promptIds) ? promptIds.filter((n): n is number => Number.isFinite(n)) : [];
+
+  await prisma.$transaction([
+    prisma.keyword.updateMany({ where: { domainId }, data: { isSelected: false } }),
+    prisma.generatedIntentPhrase.updateMany({ where: { domainId }, data: { isSelected: false } }),
+    ...(kwIds.length > 0 ? [prisma.keyword.updateMany({ where: { id: { in: kwIds }, domainId }, data: { isSelected: true } })] : []),
+    ...(phIds.length > 0 ? [prisma.generatedIntentPhrase.updateMany({ where: { id: { in: phIds }, domainId }, data: { isSelected: true } })] : []),
+  ]);
+
+  await recordPhase(domainId, 'select', 'completed', 100);
+  return res.json({ domainId, selectedKeywords: kwIds.length, selectedPrompts: phIds.length });
+});
+
+/**
+ * PATCH /api/wizard/domain/:id/selection-draft
+ * Body: { keywordIds: number[], promptIds: number[] }
+ * Debounced auto-save of the user's checkbox state on Step 4 so closing the
+ * tab restores selections on next mount. Does NOT set isSelected on the rows.
+ */
+router.patch('/domain/:id/selection-draft', authenticateToken, async (req: Request, res: Response) => {
+  const authReq = req as AuthenticatedRequest;
+  const domainId = Number(req.params.id);
+  if (!domainId || Number.isNaN(domainId)) {
+    return res.status(400).json({ error: 'Invalid domainId' });
+  }
+  const { keywordIds, promptIds } = (req.body ?? {}) as { keywordIds?: number[]; promptIds?: number[] };
+  const domain = await prisma.domain.findUnique({ where: { id: domainId }, select: { id: true, userId: true } });
+  if (!domain || domain.userId !== authReq.user.userId) {
+    return res.status(404).json({ error: 'Domain not found' });
+  }
+
+  const draft = {
+    keywordIds: Array.isArray(keywordIds) ? keywordIds.filter((n): n is number => Number.isFinite(n)) : [],
+    promptIds: Array.isArray(promptIds) ? promptIds.filter((n): n is number => Number.isFinite(n)) : [],
+  };
+  await prisma.domain.update({ where: { id: domainId }, data: { selectionDraft: draft as any } });
+  return res.json({ domainId, selectionDraft: draft });
 });
 
 export default router;
