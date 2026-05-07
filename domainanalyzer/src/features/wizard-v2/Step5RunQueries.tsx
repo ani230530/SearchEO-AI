@@ -101,18 +101,18 @@ export function Step5RunQueries({ domainId, onError }: Step5Props) {
   }, [domainId, navigate, onError]);
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex items-center gap-3 text-[#414651]">
-        <Loader2 className="h-5 w-5 animate-spin" />
-        <p className="text-[16px] font-medium">{status}</p>
+    <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+      <div className="flex items-center gap-3 mb-4 text-slate-700">
+        <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
+        <p className="text-sm font-medium">{status}</p>
       </div>
-      <div className="h-1.5 w-full overflow-hidden rounded-full bg-[#d6dbe5]">
+      <div className="h-2 overflow-hidden rounded-full bg-slate-100">
         <div
-          className="h-full rounded-full bg-gradient-to-r from-[#2D4059] to-[#4C74C2] transition-[width] duration-300"
+          className="h-full rounded-full bg-blue-600 transition-all"
           style={{ width: `${Math.min(100, Math.max(0, progress))}%` }}
         />
       </div>
-      <div className="flex items-center justify-between text-[12px] text-[#717680]">
+      <div className="mt-3 flex items-center justify-between text-xs text-slate-500">
         <span>
           {totalExpected > 0
             ? `${resultsCount} of ${totalExpected} queries scored`
@@ -120,9 +120,9 @@ export function Step5RunQueries({ domainId, onError }: Step5Props) {
         </span>
         <span>{progress}%</span>
       </div>
-      <p className="text-[12px] text-[#717680]">
-        AI queries can take 1–3 minutes depending on selection size. You can leave this tab — your
-        report will be ready when it completes.
+      <p className="mt-3 text-xs text-slate-500">
+        AI queries take 1–3 minutes. You can leave this tab — your report will be ready when it
+        completes.
       </p>
     </div>
   );
