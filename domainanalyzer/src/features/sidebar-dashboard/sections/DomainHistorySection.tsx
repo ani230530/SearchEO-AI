@@ -268,7 +268,7 @@ export function DomainHistorySection({ onMenuItemClick }: DomainHistorySectionPr
             </p>
             <button
               type="button"
-              onClick={() => navigate("/ai-checker-page")}
+              onClick={() => navigate("/ai-checker-v2")}
               className="mt-5 inline-flex h-10 items-center gap-2 rounded-md px-5 text-sm font-medium text-white"
               style={{ background: "linear-gradient(90deg, #2D4059 0%, #4E76C7 100%)" }}
             >
