@@ -12,7 +12,6 @@ import LandingPage from "./pages/LandingPage";
 import SidebarDashboard from "./pages/SidebarDashboard";
 import KnowledgeBase from "./pages/KnowledgeBase";
 import AIVisibilityRedirect from "./pages/AIVisibilityRedirect";
-import AIChecker from "./pages/AIChecker";
 import AICheckerV2 from "./pages/AIChecker.v2";
 import AIResultsReportPreview from "./pages/AIResultsReportPreview";
 
@@ -41,16 +40,13 @@ const App = () => (
                 <AIVisibilityRedirect />
               </ProtectedRoute>
             } />
-            <Route path="/ai-checker-page" element={
-              <ProtectedRoute>
-                <AIChecker />
-              </ProtectedRoute>
-            } />
             <Route path="/ai-checker-v2" element={
               <ProtectedRoute>
                 <AICheckerV2 />
               </ProtectedRoute>
             } />
+            {/* Legacy /ai-checker-page → redirect to the new wizard for any old bookmarks */}
+            <Route path="/ai-checker-page" element={<Navigate to="/ai-checker-v2" replace />} />
             <Route path="/ai-results/:domain" element={
               <ProtectedRoute>
                 <AIResultsReportPreview />
