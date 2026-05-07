@@ -13,6 +13,7 @@ import SidebarDashboard from "./pages/SidebarDashboard";
 import KnowledgeBase from "./pages/KnowledgeBase";
 import AIVisibilityRedirect from "./pages/AIVisibilityRedirect";
 import AIChecker from "./pages/AIChecker";
+import AICheckerV2 from "./pages/AIChecker.v2";
 import AIResultsReportPreview from "./pages/AIResultsReportPreview";
 
 const queryClient = new QueryClient();
@@ -43,6 +44,11 @@ const App = () => (
             <Route path="/ai-checker-page" element={
               <ProtectedRoute>
                 <AIChecker />
+              </ProtectedRoute>
+            } />
+            <Route path="/ai-checker-v2" element={
+              <ProtectedRoute>
+                <AICheckerV2 />
               </ProtectedRoute>
             } />
             <Route path="/ai-results/:domain" element={
