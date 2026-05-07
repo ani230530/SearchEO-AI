@@ -36,15 +36,6 @@ const MODEL_MAP: Record<string, string> = {
   'Gemini 1.5': 'google/gemini-2.0-flash-001',
 };
 
-// Fallback chain: when a model fails, try a *different* model rather than
-// retrying the same one (which is what was happening — the GPT-4o fallback
-// was a no-op when GPT-4o itself was the failure).
-const FALLBACK_CHAIN: Record<'GPT-4o' | 'Claude 3' | 'Gemini 1.5', 'GPT-4o' | 'Claude 3' | 'Gemini 1.5'> = {
-  'GPT-4o': 'Claude 3',
-  'Claude 3': 'GPT-4o',
-  'Gemini 1.5': 'GPT-4o',
-};
-
 // ── Shared types ─────────────────────────────────────────────────────────────
 
 export interface Citation {
@@ -988,49 +979,9 @@ export const aiQueryService = {
   ): Promise<{ response: string; cost: number; sources?: string[]; enhancedData?: any; llmResponse?: LLMResponse }> => {
     console.log(`[aiQueryService] Processing query with REAL ${model} via OpenRouter`);
 
-    let llmResponse: LLMResponse;
-
-    const isTransient5xx = (err: any): boolean => {
-      const status = err?.status;
-      return status === 500 || status === 502 || status === 503 || status === 504;
-    };
-
-    const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-
-    try {
-      llmResponse = await queryViaOpenRouter(phrase, model, domain, location);
-    } catch (error) {
-      // One retry on transient 5xx before falling back to a different model.
-      if (isTransient5xx(error)) {
-        console.warn(`[aiQueryService] ${model} hit ${(error as any).status}, retrying once after 1.5s`);
-        await sleep(1500);
-        try {
-          llmResponse = await queryViaOpenRouter(phrase, model, domain, location, true);
-        } catch (retryError) {
-          // Retry failed too — go to a different model from the fallback chain.
-          const fallbackModel = FALLBACK_CHAIN[model];
-          console.error(`[aiQueryService] ${model} retry failed, falling back to ${fallbackModel}:`, retryError);
-          try {
-            llmResponse = await queryViaOpenRouter(phrase, fallbackModel, domain, location);
-            llmResponse.model = model; // keep original display name
-          } catch (fallbackError) {
-            console.error(`[aiQueryService] ${fallbackModel} fallback also failed:`, fallbackError);
-            throw fallbackError;
-          }
-        }
-      } else {
-        // Non-transient (e.g. 400 invalid model) — go straight to the chain fallback.
-        const fallbackModel = FALLBACK_CHAIN[model];
-        console.error(`[aiQueryService] ${model} failed (${(error as any)?.status ?? 'unknown'}), falling back to ${fallbackModel}:`, error);
-        try {
-          llmResponse = await queryViaOpenRouter(phrase, fallbackModel, domain, location);
-          llmResponse.model = model;
-        } catch (fallbackError) {
-          console.error(`[aiQueryService] ${fallbackModel} fallback also failed:`, fallbackError);
-          throw fallbackError;
-        }
-      }
-    }
+    // No fallback / no retry — call the requested model directly and let errors
+    // propagate so the caller decides what to do.
+    const llmResponse: LLMResponse = await queryViaOpenRouter(phrase, model, domain, location);
 
     console.log(`[aiQueryService] ${model} returned ${llmResponse.citations.length} citations, ${llmResponse.searchQueries.length} searches`);
 
