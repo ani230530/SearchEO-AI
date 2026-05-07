@@ -262,12 +262,12 @@ useEffect(() => {
         </div>
       </div>
     ) : (
-    <div className="min-w-7xl mx-auto px-4 sm:px-6 py-4 space-y-6">
+    <div className="w-full min-w-7xl mx-auto px-4 sm:px-6 py-4 space-y-6">
       <div className="relative overflow-hidden rounded-xl border border-gray-200 ">
         <div className="absolute -top-24 -left-24 w-96 h-96 rounded-full blur-3xl" />
         <p className="pl-4 pt-4 text-base text-[#717680]">Free website audit</p>
         <div className="relative p-4 sm:p-4 gap-10 justify-between">
-          <div className="min-w-4xl">
+          <div className="w-full min-w-0">
             <h1 className="text-3xl sm:text-3xl font-bold text-gray-900 leading-tight">
               Analyze Your Site&apos;s SEO, Performance, and Visibility in Seconds
             </h1>
@@ -284,7 +284,7 @@ useEffect(() => {
           <div className="items-start gap-6">
             <div className="mt-6 flex flex-wrap items-center gap-3">
               {companyDomain && (
-                <div className="flex items-center gap-3 border border-gray-200 text-blue-700 px-5 py-3 rounded-xl flex-1 min-w-[300px]">
+                <div className="flex items-center gap-3 border border-gray-200 text-blue-700 px-4 sm:px-5 py-3 rounded-xl w-full min-w-0">
                   <img
                     src={`https://img.logo.dev/${normalizedDomain}?token=pk_DTdFFG1JT9WOCjATvZEzIA&size=128`}
                     alt="Company logo"
@@ -293,7 +293,7 @@ useEffect(() => {
                     className="w-8 h-8 rounded-md"
                     loading="lazy"
                   />
-                  <span className="font-medium text-lg tracking-tight">
+                  <span className="font-medium text-base sm:text-lg tracking-tight break-all">
                     <a
                       href={companyDomain.startsWith("http") ? companyDomain : `https://${companyDomain}`}
                       target="_blank"
@@ -312,10 +312,10 @@ useEffect(() => {
         </div>
       </div>
 
-      <div className="w-full flex items-center justify-between px-4">
+      <div className="w-full flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between px-4">
         <div className="text-xl font-bold text-gray-900">Overview</div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <button
             onClick={onVisitSite}
             className="inline-flex items-center gap-1 px-2 py-2 text-sm font-medium text-[#4E76C7] rounded-lg hover:underline transition"
@@ -353,7 +353,7 @@ useEffect(() => {
 {/* ===================== SNAPSHOT ===================== */}
   <div className="grid grid-cols-1 lg:grid-cols-1 gap-6">
 
-  <div className="grid grid-cols-4 gap-4">
+  <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
   {[
     ["Ranking Keywords", keywordsTableData.length, "https://res.cloudinary.com/dgfzjdi68/image/upload/v1775648922/Frame_1321316715_sku1sv.png"],
     ["Projects", campaignsCount, "https://res.cloudinary.com/dgfzjdi68/image/upload/v1776261732/Frame_1321316715_1_xpevty.png"],
@@ -366,7 +366,7 @@ useEffect(() => {
     return (
       <div
         key={label}
-        className="group rounded-2xl border border-gray-200 bg-white p-4 flex items-center gap-3 hover:shadow-sm transition"
+        className="group rounded-2xl border border-gray-200 bg-white p-4 flex items-center gap-3 hover:shadow-sm transition min-w-0"
       >
         {/* Left Image */}
         <img
@@ -376,7 +376,7 @@ useEffect(() => {
         />
 
         {/* Content */}
-        <div className="flex-1">
+        <div className="flex-1 min-w-0">
           <div className="text-xs uppercase tracking-wide text-gray-500">
             {label}
           </div>
@@ -384,7 +384,7 @@ useEffect(() => {
           <div className="mt-1 flex items-center justify-between">
             <div
               className={cn(
-                "text-2xl font-medium",
+                "text-xl sm:text-2xl font-medium break-words",
                 isConnected
                   ? "text-green-600"
                   : "text-gray-900"
@@ -476,11 +476,11 @@ useEffect(() => {
         </div>
         )}
               {/* Audit Summary */}
-           <div className="lg:col-span-1 rounded-xl bg-white border border-gray-200 p-6 shadow-sm  transition-shadow duration-300">
+           <div className="lg:col-span-1 rounded-xl bg-white border border-gray-200 p-4 sm:p-6 shadow-sm transition-shadow duration-300 overflow-hidden">
           {/* Header */}
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h3 className="text-3xl font-medium text-gray-900">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
+            <div className="min-w-0">
+              <h3 className="text-2xl sm:text-3xl font-medium text-gray-900 break-words">
                 Audit Summary
               </h3>
               <p className="text-xs text-gray-400">
@@ -504,14 +504,14 @@ useEffect(() => {
         </button>
           </div>
         
-         {!auditResult ? (
+          {!auditResult ? (
           <p className="text-sm text-gray-500">
             Run an audit to view performance metrics.
           </p>
         ) : (
-        <div className="flex gap-6">
+        <div className="flex flex-col 2xl:flex-row gap-4 sm:gap-6">
           {/* LEFT: 4 metric cards */}
-          <div className="grid grid-cols-2 gap-4 flex-1">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 flex-1 min-w-0">
             {[
               ["Performance", auditResult.performance],
               ["SEO", auditResult.seo],
@@ -523,18 +523,18 @@ useEffect(() => {
               return (
                 <div
           key={label}
-          className="rounded-xl p-4 bg-white shadow-md flex items-center gap-6"
+          className="rounded-xl p-3 sm:p-4 bg-white shadow-md flex items-center gap-3 sm:gap-4 min-w-0 w-full"
         >
           {/* Left Icon */}
-          <ChartNoAxesCombined className="w-8 h-8 text-gray-500" />
+          <ChartNoAxesCombined className="w-6 h-6 sm:w-8 sm:h-8 text-gray-500 shrink-0" />
         
           {/* Right Content */}
-          <div className="flex flex-col">
-            <span className="text-sm text-gray-600">
+          <div className="flex flex-col min-w-0">
+            <span className="text-sm text-gray-600 break-words">
               {label}
             </span>
         
-            <span className="text-2xl font-semibold text-gray-900">
+            <span className="text-xl sm:text-2xl font-semibold text-gray-900">
               {pct}%
             </span>
           </div>
@@ -544,9 +544,9 @@ useEffect(() => {
           </div>
         
           {/* RIGHT: Overall Score */}
-          <div className="w-48 rounded-xl  p-6 flex flex-col items-center justify-center">
+          <div className="w-full 2xl:w-auto rounded-xl p-2 sm:p-4 flex flex-col items-center justify-center">
             <OverallScoreGauge
-              size={200}
+              size={160}
               score={
                 (
                   auditResult.performance +
