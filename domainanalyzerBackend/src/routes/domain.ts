@@ -157,9 +157,33 @@ router.get('/check/:url', authenticateToken, asyncHandler(async (req: Request, r
 }));
 
 // POST /domain - create/find domain, run multi-phase analysis, and stream progress
+// Heuristic company-size classifier based on extracted crawl text.
+// Cheap and deterministic — no LLM call. Wizard v2 only.
+function inferCompanySize(extractedText: string | undefined | null): string {
+  if (!extractedText) return 'smb';
+  const text = extractedText.toLowerCase();
+  if (/\b(enterprise|fortune\s*(500|100)|publicly\s+traded|nyse|nasdaq|global\s+leader|10000\+\s*employees)\b/.test(text)) return 'enterprise';
+  if (/\b(mid[- ]market|series\s+[bc]|\d{3,4}\s*employees|growing\s+team\s+of\s+\d+)\b/.test(text)) return 'mid';
+  if (/\b(freelancer|self[- ]employed|sole\s+proprietor|consultant\s+working\s+alone)\b/.test(text)) return 'solo';
+  if (/\b(startup|early\s+stage|small\s+business|smb|series\s+(a|seed)|bootstrap)\b/.test(text)) return 'smb';
+  return 'smb';
+}
+
 router.post('/', authenticateToken, asyncHandler(async (req: Request, res: Response) => {
   const authReq = req as AuthenticatedRequest;
-  const { url, subdomains, customPaths, priorityUrls, location } = req.body;
+  const {
+    url, subdomains, customPaths, priorityUrls, location,
+    // Wizard v2 — opt-in flag. When true:
+    //   - persist user-supplied country/state/industry/customSeeds
+    //   - infer companySize from crawl
+    //   - SKIP keyword_generation phase (PR 5 introduces a separate topics phase)
+    //   - mark phases as 'crawl' (not 'domain_extraction') and 'profile' for the new state machine
+    wizardV2,
+    country,
+    state,
+    industry,
+    customSeeds,
+  } = req.body;
 
   // Validate input before setting SSE headers
   if (!url) {
@@ -235,10 +259,27 @@ router.post('/', authenticateToken, asyncHandler(async (req: Request, res: Respo
           userId: authReq.user.userId,
           location: location || null,
           currentStep: 0,
-          isCompanyDomain: false
+          isCompanyDomain: false,
+          ...(wizardV2 ? {
+            country: country || null,
+            state: state || null,
+            industry: industry || null,
+            customSeeds: customSeeds ?? undefined,
+          } : {}),
         }
       });
       isNewDomain = true;
+    } else if (wizardV2) {
+      // Existing domain re-entered through Wizard v2 — refresh user-supplied fields.
+      domain = await prisma.domain.update({
+        where: { id: domain.id },
+        data: {
+          country: country ?? domain.country,
+          state: state ?? domain.state,
+          industry: industry ?? domain.industry,
+          customSeeds: customSeeds ?? (domain.customSeeds as any) ?? undefined,
+        },
+      });
     }
 
     sendEvent({ type: 'domain_created', domainId: domain.id, isNewDomain });
@@ -343,16 +384,45 @@ router.post('/', authenticateToken, asyncHandler(async (req: Request, res: Respo
     await advanceDomainStep(domain.id, 1);
 
     await updateAnalysisPhase(domain.id, 'domain_extraction', 'completed', 100, crawlResult, undefined);
+    if (wizardV2) {
+      // Wizard v2 mirrors the same milestone under the new phase name so the
+      // /api/wizard/domain/:id/state endpoint sees `crawl: completed`.
+      await updateAnalysisPhase(domain.id, 'crawl', 'completed', 100, crawlResult, undefined);
+    }
     sendEvent({ type: 'progress', phase: 'domain_extraction', step: 'Domain extraction completed successfully!', progress: 100 });
 
-    // Update domain context
+    // Update domain context (and infer company size for Wizard v2)
+    const inferredSize = wizardV2 ? inferCompanySize(extraction.summaryContext || extraction.extractedContext) : null;
     await prisma.domain.update({
       where: { id: domain.id },
       data: {
         context: extraction.extractedContext,
         contextJson: extraction.contextJson as any,
+        ...(wizardV2 && inferredSize ? { companySize: inferredSize } : {}),
       },
     });
+
+    if (wizardV2) {
+      await updateAnalysisPhase(domain.id, 'profile', 'completed', 100, { companySize: inferredSize }, undefined);
+      sendEvent({ type: 'profile_ready', companySize: inferredSize });
+
+      // Skip keyword generation entirely — Wizard v2 produces keywords + prompts
+      // together in the topics phase (PR 5). Send completion now.
+      await syncDomainCurrentStep(domain.id);
+      sendEvent({
+        type: 'complete',
+        result: {
+          domain,
+          extraction: crawlResult,
+          isNewDomain,
+          tokenUsage: totalTokenUsage,
+          companySize: inferredSize,
+          phases: { domain_extraction: 'completed', crawl: 'completed', profile: 'completed' },
+        },
+      });
+      res.end();
+      return;
+    }
 
     // PHASE 2: Enhanced AI Keyword Generation
     sendEvent({ type: 'progress', phase: 'keyword_generation', step: 'Starting enhanced AI keyword generation...', progress: 10 });
