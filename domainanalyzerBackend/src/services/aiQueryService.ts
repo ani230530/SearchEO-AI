@@ -131,33 +131,21 @@ async function queryViaOpenRouter(
   const userPrompt = buildNaturalPrompt(phrase, location, isRetry);
   const isOpenRouter = !!openrouter;
 
-  // Pick model ID
-  const modelId = isOpenRouter ? MODEL_MAP[displayModel] : 'gpt-4o';
+  // Pick model ID. On OpenRouter, append `:online` so OpenRouter runs web
+  // search server-side and returns standardized citations as `annotations`.
+  // This replaces the non-documented `tools: [{ type: 'openrouter:web_search' }]`
+  // form that wasn't actually triggering search for Claude / Gemini.
+  // Docs: https://openrouter.ai/docs/features/web-search
+  const baseModelId = isOpenRouter ? MODEL_MAP[displayModel] : 'gpt-4o';
+  const modelId = isOpenRouter ? `${baseModelId}:online` : baseModelId;
 
   // Build request body
   const requestBody: any = {
     model: modelId,
     messages: [{ role: 'user', content: userPrompt }],
     max_tokens: 2048,
-    temperature: isRetry ? 0.2 : 0.1, // Slightly higher temp on retry to encourage tool use
+    temperature: isRetry ? 0.2 : 0.1,
   };
-
-  if (isOpenRouter) {
-    // OpenRouter: use web_search server tool – works with ANY model, returns standardized citations
-    requestBody.tools = [
-      {
-        type: 'openrouter:web_search',
-        parameters: {
-          max_results: 10,
-          max_total_results: 10,
-          search_context_size: 'medium',
-          engine: 'exa' // Force exa engine for better citation quality
-        },
-      },
-    ];
-    // FORCE the model to use the tool if possible using exact object structure.
-    requestBody.tool_choice = { type: 'function', function: { name: 'openrouter:web_search' } }; 
-  }
 
   console.log(`[OpenRouter] Querying ${modelId} with web search...`);
 
