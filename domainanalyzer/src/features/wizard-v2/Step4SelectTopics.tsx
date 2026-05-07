@@ -150,8 +150,17 @@ export function Step4SelectTopics({ domainId, initialDraft, onContinue }: Step4P
 
       <div className="space-y-6">
         {loading && (
-          <div className="rounded-lg border border-slate-200 bg-white px-4 py-5 text-sm text-slate-600">
-            Loading backend keywords and prompts...
+          <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="flex items-center gap-3 mb-4 text-slate-700">
+              <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
+              <p className="text-sm font-medium">Generating keywords and prompts for your niche…</p>
+            </div>
+            <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+              <div className="h-full rounded-full bg-blue-600 transition-all w-1/2 animate-pulse" />
+            </div>
+            <p className="mt-3 text-xs text-slate-500">
+              One LLM call produces both keywords and their child prompts — usually ~20 seconds.
+            </p>
           </div>
         )}
 

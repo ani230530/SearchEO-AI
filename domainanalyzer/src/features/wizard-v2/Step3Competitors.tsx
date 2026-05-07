@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Check, Loader2, Plus } from "lucide-react";
+
 import { apiPost } from "@/services/apiClient";
 import type { WizardCompetitor } from "./types";
 
@@ -100,8 +101,17 @@ export function Step3Competitors({ domainId, initialSelected = [], onContinue }:
         <div className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
           <div className="space-y-4">
             {loading && (
-              <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-5 text-sm text-slate-600">
-                Loading suggested competitors from backend...
+              <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+                <div className="flex items-center gap-3 mb-4 text-slate-700">
+                  <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
+                  <p className="text-sm font-medium">Finding peer competitors…</p>
+                </div>
+                <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+                  <div className="h-full rounded-full bg-blue-600 transition-all w-1/2 animate-pulse" />
+                </div>
+                <p className="mt-3 text-xs text-slate-500">
+                  Same-tier match by industry, location and company size — usually ~30 seconds.
+                </p>
               </div>
             )}
             {!loading && competitors.length === 0 && (
