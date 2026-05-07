@@ -16,6 +16,7 @@ import googleSearchConsoleRouter, { handleOAuthCallback } from './routes/googleS
 import publishRouter from './routes/publish';
 import blogAnalyticsRouter from './routes/blogAnalytics';
 import campaignsRouter from './routes/campaigns';
+import wizardV2Router from './routes/wizardV2';
 import { PrismaClient } from '../generated/prisma';
 import { authenticateToken, AuthenticatedRequest } from './middleware/auth';
 import auditRoutes from './routes/auditRoutes';
@@ -116,6 +117,7 @@ app.use('/api/user', userRouter);
 app.use('/api/domain', domainRouter);
 app.use('/api/gsc', googleSearchConsoleRouter);
 app.use('/api/campaigns', campaignsRouter);
+app.use('/api/wizard', wizardV2Router);
 app.use('/api/publish', publishRouter);
 app.use('/api/webhooks/n8n', n8nErrorRouter);
 app.use('/api/audit/n8n', auditN8nRouter);
