@@ -2436,8 +2436,10 @@ useEffect(() => {
       auditComplete,
       auditLoading,
       auditResult,
+      campaigns,
       campaignsCount: campaigns.length,
       companyDomain,
+      domainId: createdDomainId,
       hasWordpressIntegration,
       keywordsTableData,
       normalizedDomain,
@@ -2450,6 +2452,7 @@ useEffect(() => {
         setActiveTab("audit");
         setTimeout(() => setShowAuditModal(true), 120);
       },
+      onOpenCompetitor: () => setActiveTab("competitor-intelligence"),
       onRunAudit: () => handleRunAudit(companyDomain),
       onViewReport: handleViewReport,
       onVisitSite: () => {
@@ -2909,6 +2912,7 @@ useEffect(() => {
           tabs={tabs}
           userEmail={user?.email}
           onTabChange={setActiveTab}
+          lastSync={gscLastSynced}
         />
 
         {/* Content Body */}
