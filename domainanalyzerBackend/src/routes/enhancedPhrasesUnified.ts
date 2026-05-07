@@ -1368,7 +1368,7 @@ const generateEnhancedIntentPhrases = async (
       tokenUsage: 0
     }));
 
-    return { phrasesToInsert: fallbackPhrasesToInsert, tokenUsage: 0, usedFallback: true };
+    return { phrasesToInsert: fallbackPhrasesToInsert, tokenUsage: 0 };
   }
 };
 
@@ -1648,7 +1648,7 @@ const generateEnhancedPhrases = async (
       phrasesToInsert.push(phraseData);
     });
 
-    return { phrasesToInsert, tokenUsage: 0, usedFallback: true };
+    return { phrasesToInsert, tokenUsage: 0 };
   }
 };
 
@@ -2730,11 +2730,7 @@ Return valid JSON only.`;
         const keywordSearchPatterns = searchPatterns.find(pattern => pattern.keywordId === keyword.id);
 
         // Use the enhanced intent-based phrase generation function
-        const {
-          phrasesToInsert: newPhrases,
-          tokenUsage: phraseTokenUsage,
-          usedFallback,
-        } = await generateEnhancedIntentPhrases(
+        const { phrasesToInsert: newPhrases, tokenUsage: phraseTokenUsage } = await generateEnhancedIntentPhrases(
           keyword,
           domain,
           semanticContext,
@@ -2742,16 +2738,6 @@ Return valid JSON only.`;
           keywordSearchPatterns,
           sendEvent
         );
-
-        if (usedFallback) {
-          console.warn(`[phrases] LLM fallback used for keyword "${keyword.term}" (id ${keyword.id})`);
-          sendEvent('phrase-fallback-used', {
-            keywordId: keyword.id,
-            keyword: keyword.term,
-            count: newPhrases.length,
-            reason: 'LLM phrase generation failed; templated fallback was used.',
-          });
-        }
 
         // Add generated phrases to the main arrays
         phrasesToInsert.push(...newPhrases);
@@ -3209,8 +3195,8 @@ const generateDataDrivenPhrases = async (
       isSelected: false,
       tokenUsage: 0
     }));
-
-    return { phrasesToInsert, tokenUsage: 0, usedFallback: true };
+    
+    return { phrasesToInsert, tokenUsage: 0 };
   }
 };
 
