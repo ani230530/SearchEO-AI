@@ -1,10 +1,6 @@
 import { useEffect, useState } from "react";
-import { ChevronRight, Globe2, Loader2, Plus, RefreshCw } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Input } from "@/components/ui/input";
+import { Check, Loader2, Plus } from "lucide-react";
 import { apiPost } from "@/services/apiClient";
-import { cn } from "@/lib/utils";
 import type { WizardCompetitor } from "./types";
 
 interface Step3Props {
@@ -18,12 +14,15 @@ interface CompetitorsResponse {
   competitors: WizardCompetitor[];
 }
 
+interface CompetitorRow extends WizardCompetitor {
+  selected: boolean;
+}
+
 export function Step3Competitors({ domainId, initialSelected = [], onContinue }: Step3Props) {
-  const [competitors, setCompetitors] = useState<WizardCompetitor[]>([]);
-  const [selected, setSelected] = useState<Set<string>>(new Set(initialSelected));
+  const [competitors, setCompetitors] = useState<CompetitorRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [customInput, setCustomInput] = useState("");
+  const [newCompetitor, setNewCompetitor] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   const loadCompetitors = async () => {
@@ -31,11 +30,14 @@ export function Step3Competitors({ domainId, initialSelected = [], onContinue }:
     setError(null);
     try {
       const res = await apiPost<CompetitorsResponse>(`/wizard/domain/${domainId}/competitors`);
-      setCompetitors(res.competitors);
-      // Default-select all on first load
-      if (selected.size === 0) {
-        setSelected(new Set(res.competitors.map((c) => c.url)));
-      }
+      const initialSet = new Set(initialSelected);
+      const seedSelectAll = initialSet.size === 0;
+      setCompetitors(
+        res.competitors.map((c) => ({
+          ...c,
+          selected: seedSelectAll ? true : initialSet.has(c.url),
+        }))
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not load competitors");
     } finally {
@@ -49,32 +51,32 @@ export function Step3Competitors({ domainId, initialSelected = [], onContinue }:
   }, [domainId]);
 
   const toggle = (url: string) => {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(url)) next.delete(url);
-      else next.add(url);
-      return next;
-    });
+    setCompetitors((prev) =>
+      prev.map((c) => (c.url === url ? { ...c, selected: !c.selected } : c))
+    );
   };
 
-  const addCustom = () => {
-    const trimmed = customInput.trim();
+  const handleAddCompetitor = () => {
+    const trimmed = newCompetitor.trim();
     if (!trimmed) return;
     const url = trimmed.startsWith("http") ? trimmed : `https://${trimmed}`;
     const host = trimmed.replace(/^https?:\/\//, "").replace(/^www\./, "").split("/")[0];
-    if (competitors.some((c) => c.url === url)) {
-      setSelected((prev) => new Set(prev).add(url));
-    } else {
-      const fresh: WizardCompetitor = {
-        name: host,
-        domain: host,
-        url,
-        logoUrl: `https://img.logo.dev/${host}?token=pk_DTdFFG1JT9WOCjATvZEzIA&size=64`,
-      };
-      setCompetitors((prev) => [...prev, fresh]);
-      setSelected((prev) => new Set(prev).add(url));
-    }
-    setCustomInput("");
+    setCompetitors((prev) => {
+      if (prev.some((c) => c.url === url)) {
+        return prev.map((c) => (c.url === url ? { ...c, selected: true } : c));
+      }
+      return [
+        ...prev,
+        {
+          name: host,
+          domain: host,
+          url,
+          logoUrl: `https://img.logo.dev/${host}?token=pk_DTdFFG1JT9WOCjATvZEzIA&size=64`,
+          selected: true,
+        },
+      ];
+    });
+    setNewCompetitor("");
   };
 
   const handleContinue = async () => {
@@ -82,7 +84,7 @@ export function Step3Competitors({ domainId, initialSelected = [], onContinue }:
     setError(null);
     try {
       await apiPost(`/wizard/domain/${domainId}/competitors/select`, {
-        urls: Array.from(selected),
+        urls: competitors.filter((c) => c.selected).map((c) => c.url),
       });
       onContinue();
     } catch (err) {
@@ -92,109 +94,113 @@ export function Step3Competitors({ domainId, initialSelected = [], onContinue }:
     }
   };
 
-  const canContinue = selected.size > 0 && !submitting && !loading;
-
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-end">
-        <button
-          type="button"
-          onClick={loadCompetitors}
-          disabled={loading}
-          className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-[#d5d7da] bg-white text-[#717680] hover:bg-[#f9f9f9]"
-          aria-label="Regenerate competitors"
-        >
-          <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
-        </button>
-      </div>
+    <>
+      <div className="space-y-6">
+        <div className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="space-y-4">
+            {loading && (
+              <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-5 text-sm text-slate-600">
+                Loading suggested competitors from backend...
+              </div>
+            )}
+            {!loading && competitors.length === 0 && (
+              <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-5 text-sm text-slate-600">
+                No backend competitors found yet. Add competitor domains manually to continue.
+              </div>
+            )}
+            {!loading &&
+              competitors.map((competitor) => (
+                <button
+                  key={competitor.url}
+                  type="button"
+                  onClick={() => toggle(competitor.url)}
+                  className={`w-full flex items-center justify-between gap-4 rounded-3xl border px-4 py-4 text-left transition ${
+                    competitor.selected
+                      ? "border-blue-500 bg-blue-50"
+                      : "border-slate-200 bg-white hover:bg-slate-50"
+                  }`}
+                >
+                  <div className="flex items-center gap-4">
+                    <span
+                      className={`flex h-5 w-5 items-center justify-center rounded-sm border ${
+                        competitor.selected
+                          ? "border-blue-500 bg-blue-500 text-white"
+                          : "border-slate-300 bg-white text-transparent"
+                      }`}
+                    >
+                      <Check className="h-3.5 w-3.5" />
+                    </span>
+                    <span className="grid h-7 w-7 flex-shrink-0 place-items-center overflow-hidden rounded-md bg-slate-50">
+                      <img
+                        src={competitor.logoUrl}
+                        alt=""
+                        className="h-6 w-6 object-contain"
+                        onError={(e) => ((e.currentTarget as HTMLImageElement).style.display = "none")}
+                      />
+                    </span>
+                    <div className="min-w-0">
+                      <p className="font-semibold text-slate-900">{competitor.name}</p>
+                      <p className="truncate text-sm text-slate-500">{competitor.url}</p>
+                    </div>
+                  </div>
+                  <a
+                    href={competitor.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    className="text-sm font-medium text-blue-600 truncate"
+                  >
+                    {competitor.url}
+                  </a>
+                </button>
+              ))}
+          </div>
 
-      {loading ? (
-        <div className="flex items-center gap-3 rounded-lg border border-[#d5d7da] bg-white px-4 py-6 text-[#717680]">
-          <Loader2 className="h-5 w-5 animate-spin" />
-          <span className="text-sm">Finding peer competitors…</span>
-        </div>
-      ) : (
-        <div className="flex flex-col gap-2">
-          {competitors.map((c) => {
-            const isOn = selected.has(c.url);
-            return (
+          <div className="mt-5 rounded-[10px] border border-dashed border-slate-300 bg-slate-50 p-4">
+            <div className="flex items-center justify-between gap-3">
+              <input
+                type="text"
+                value={newCompetitor}
+                onChange={(e) => setNewCompetitor(e.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    handleAddCompetitor();
+                  }
+                }}
+                placeholder="Add Competitor"
+                className="flex-1 bg-transparent text-sm text-slate-700 placeholder:text-slate-400 focus:outline-none"
+              />
               <button
-                key={c.url}
                 type="button"
-                onClick={() => toggle(c.url)}
-                className={cn(
-                  "flex items-center gap-3 rounded-lg border p-4 text-left transition",
-                  isOn
-                    ? "border-[#2D4059] bg-[#EEF4FF]/40"
-                    : "border-[#d5d7da] bg-white hover:border-[#cbd5e1]"
-                )}
+                onClick={handleAddCompetitor}
+                className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-slate-100 text-slate-500 transition hover:bg-slate-200"
               >
-                <Checkbox checked={isOn} onCheckedChange={() => toggle(c.url)} className="data-[state=checked]:border-[#2D4059] data-[state=checked]:bg-[#2D4059]" />
-                <span className="grid h-6 w-6 flex-shrink-0 place-items-center overflow-hidden rounded-md bg-gray-50">
-                  <img
-                    src={c.logoUrl}
-                    alt=""
-                    className="h-5 w-5 object-contain"
-                    onError={(e) => ((e.currentTarget as HTMLImageElement).style.display = "none")}
-                  />
-                </span>
-                <div className="flex-1 min-w-0">
-                  <p className="text-[18px] font-medium text-[#414651]">{c.name}</p>
-                  {c.reasoning ? (
-                    <p className="truncate text-[11px] text-[#717680]">{c.reasoning}</p>
-                  ) : null}
-                </div>
-                <p className="hidden text-[14px] text-[#4ca6ff] sm:block">{c.url}</p>
+                <Plus className="h-5 w-5" />
               </button>
-            );
-          })}
+            </div>
+          </div>
         </div>
-      )}
-
-      <div className="flex items-center gap-2">
-        <div className="relative flex-1">
-          <Globe2 className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#717680]" />
-          <Input
-            value={customInput}
-            onChange={(e) => setCustomInput(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && addCustom()}
-            placeholder="Add Competitor"
-            className="h-[44px] rounded-lg border-dashed border-[#717680] bg-[#f9f9f9] pl-10"
-          />
-        </div>
-        <Button
-          type="button"
-          variant="outline"
-          onClick={addCustom}
-          disabled={!customInput.trim()}
-          className="h-[44px] rounded-lg"
-        >
-          <Plus className="h-4 w-4" />
-        </Button>
       </div>
 
       {error && (
-        <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+        <div className="mt-6 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
           {error}
         </div>
       )}
 
-      <Button
-        type="button"
-        onClick={handleContinue}
-        disabled={!canContinue}
-        className={cn(
-          "h-[44px] w-full rounded-lg text-white",
-          canContinue
-            ? "bg-gradient-to-r from-[#2D4059] to-[#4C74C2] hover:opacity-95"
-            : "cursor-not-allowed bg-[#b8bbc0]"
-        )}
-      >
-        {submitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-        Continue
-        {!submitting && <ChevronRight className="ml-1 h-4 w-4" />}
-      </Button>
-      <p className="text-center text-[12px] text-[#717680]">{selected.size} selected</p>
-    </div>
+      <div className="mt-6 flex flex-col gap-3">
+        <button
+          onClick={handleContinue}
+          disabled={submitting || loading}
+          className="w-full rounded-[10px] bg-slate-400 px-4 py-4 text-sm font-semibold text-white hover:bg-slate-500 transition-colors flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-70"
+        >
+          {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+          {submitting ? "Loading backend data..." : "Continue"}
+          <span>→</span>
+        </button>
+      </div>
+    </>
   );
 }

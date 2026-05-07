@@ -17,22 +17,22 @@ const HEADINGS: Record<WizardStep, { eyebrow: string; heading: string; descripti
   },
   2: {
     eyebrow: "Get to know us",
-    heading: "Crawling your site",
-    description: "Sit tight — we're reading your domain and pulling structured context.",
+    heading: "Add your domain",
+    description: "Hang tight — we're reading your site and extracting structured context.",
   },
   3: {
     eyebrow: "Get to know us",
     heading: "Track Your Competitors in AI Search",
-    description: "List at least 3–5 competitors relevant to your space for more accurate comparison.",
+    description: "Add competitor domains that matter most to your industry.",
   },
   4: {
     eyebrow: "Select for precise results",
     heading: "Select prompts & keywords in your niche",
-    description: "Choose the most relevant queries to help AI understand what you want to track and optimize.",
+    description: "Choose backend-generated keywords and prompts for the full AI visibility analysis.",
   },
   5: {
     eyebrow: "Almost there",
-    heading: "Running your AI visibility audit",
+    heading: "Generating your report",
     description: "Querying ChatGPT, Gemini, and Claude with the prompts you selected.",
   },
 };

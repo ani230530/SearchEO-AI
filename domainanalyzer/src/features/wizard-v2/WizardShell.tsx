@@ -11,9 +11,11 @@ interface WizardShellProps {
 }
 
 /**
- * Lean layout — slate gradient background, full-width form column.
- * No top progress bar (per user direction). Each step's own
- * SSE-driven progress UI lives inside the step component itself.
+ * Two-column layout matching the previous wizard exactly:
+ *   - slate gradient background
+ *   - left half: form column (passed in via children)
+ *   - right half: /ai-checker.png hero image
+ *   - no top progress bar (each step's SSE loader lives inline)
  */
 export function WizardShell({
   eyebrow = "Get to know us",
@@ -24,7 +26,7 @@ export function WizardShell({
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
       <div className="flex gap-12 px-6 py-12 max-w-7xl mx-auto">
-        <div className="w-full max-w-2xl">
+        <div className="w-1/2 max-w-none">
           <div className="mb-8">
             <p className="text-sm font-medium text-blue-600 mb-2">{eyebrow}</p>
             <h1 className="text-4xl font-bold text-slate-900 mb-3">{heading}</h1>
@@ -33,7 +35,17 @@ export function WizardShell({
             ) : null}
           </div>
 
-          <div className="flex flex-col gap-6">{children}</div>
+          {children}
+        </div>
+
+        <div className="w-1/2 space-y-6">
+          <div className="mb-6">
+            <img
+              src="/ai-checker.png"
+              alt="AI Checker"
+              className="w-full h-auto rounded-lg shadow-sm"
+            />
+          </div>
         </div>
       </div>
     </div>
