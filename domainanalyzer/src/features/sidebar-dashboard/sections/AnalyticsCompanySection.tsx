@@ -1,17 +1,11 @@
 import React, { useEffect, useState, type Dispatch, type FormEvent, type ReactNode, type SetStateAction } from 'react';
 import {
   BarChart3,
-  CheckCircle,
   ChevronDown,
-  ChevronLeft,
   ChevronRight,
-  Database,
-  Globe,
-  ArrowRight,
   Grid3X3,
   List,
   Loader2,
-  Plug,
   Plus,
   Search,
   Table,
@@ -20,7 +14,7 @@ import {
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { cn } from '@/lib/utils';
-import { IntegrationSkeleton } from '@/features/sidebar-dashboard/components/IntegrationSkeleton';
+import { AnalyticsIntegrationSection } from '@/features/sidebar-dashboard/sections/AnalyticsIntegrationSection';
 import { CompanySection } from '@/features/sidebar-dashboard/sections/CompanySection';
 import type { CompanySubTabId } from '@/features/sidebar-dashboard/types';
 import { getCompetitionBadgeClassName } from '@/features/sidebar-dashboard/utils';
@@ -313,7 +307,7 @@ const allSections = [...leftSections, ...rightSections];
       {/* Master Panel */}
       <div>
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-6 border-gray-600/50">
+        <div className="flex flex-col gap-4 px-4 py-6 border-gray-600/50 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <h1 className="text-3xl font-light tracking-tight text-gray-900">
               Domain Info
@@ -323,8 +317,8 @@ const allSections = [...leftSections, ...rightSections];
             </p>
           </div>
 
-          <div className="flex items-center gap-3">
-            <div className="inline-flex items-center gap-5 bg-blue-50 border border-blue-200 text-blue-700 px-5 py-3 rounded-xl shadow-sm">
+          <div className="flex w-full items-center gap-3 lg:w-auto">
+            <div className="inline-flex w-full items-center justify-center gap-3 bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded-xl shadow-sm sm:justify-start sm:gap-5 sm:px-5 lg:w-auto">
                    <img
   src={`https://img.logo.dev/${normalizedDomain}?token=pk_DTdFFG1JT9WOCjATvZEzIA&size=128`}
   alt="Company logo"
@@ -334,7 +328,7 @@ const allSections = [...leftSections, ...rightSections];
   loading="lazy"
 />
 
-                    <span className="font-medium text-lg tracking-tight">
+                    <span className="font-medium text-base tracking-tight sm:text-lg">
                       {" "}
                       <a
                         href={
@@ -344,7 +338,7 @@ const allSections = [...leftSections, ...rightSections];
                         }
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-blue-600 hover:underline text-lg"
+                        className="text-blue-600 hover:underline text-base break-all sm:text-lg"
                       >
                         {companyDomain
                           .replace(/^https?:\/\//, "")
@@ -357,10 +351,9 @@ const allSections = [...leftSections, ...rightSections];
 
         {/* Body */}
  {/* Top Row */}
-<div className="flex flex-wrap gap-6 py-8">
+<div className="grid grid-cols-1 gap-4 py-6 sm:grid-cols-2 sm:gap-6 sm:py-8 xl:grid-cols-4">
   {allSections.slice(0, 4).map((sec, idx) => {
     const isOpen = openIndex === idx;
-    const isOtherOpen = openIndex !== null && openIndex !== idx && idx < 4;
 
     return (
       <div
@@ -368,19 +361,15 @@ const allSections = [...leftSections, ...rightSections];
         className={`rounded-3xl border overflow-hidden pb-6${
           isOpen ? " bg-blue-50" : " bg-white"
         }`}
-        style={{
-          flex: isOpen ? "2 1 0%" : isOtherOpen ? "0.9 1 0%" : "1 1 0%",
-          minWidth: 0,
-        }}
       >
         {/* Header */}
         <button
           onClick={() => toggleSection(idx)}
-          className="flex w-full items-center justify-between px-6 py-6 text-left"
+          className="flex w-full items-start justify-between gap-3 px-4 py-5 text-left sm:items-center sm:px-6 sm:py-6"
         >
-          <div className="flex items-center gap-3">
+          <div className="flex flex-col items-start gap-3">
             <div className="text-blue-600">{iconMap[sec.title]}</div>
-            <h3 className="text-xl font-light text-gray-900">{sec.title}</h3>
+            <h3 className="text-lg font-light text-gray-900 sm:text-xl">{sec.title}</h3>
           </div>
           <div style={{ transform: isOpen ? "rotate(180deg)" : "rotate(0deg)" }}>
             <ChevronDown size={22} />
@@ -388,7 +377,7 @@ const allSections = [...leftSections, ...rightSections];
         </button>
 <div className="mt-2 mb-4 mx-4 border-t border-gray-200 w-[calc(100%-2rem)]" />
         {/* Content */}
-        <div className={`px-6 mb-2 text-gray-600 break-words relative ${!isOpen ? "line-clamp-4" : ""}`}>
+        <div className={`px-4 mb-2 text-gray-600 break-words relative sm:px-6 ${!isOpen ? "line-clamp-4" : ""}`}>
           <ReactMarkdown remarkPlugins={[remarkGfm]}>
             {sec.content}
           </ReactMarkdown>
@@ -399,11 +388,10 @@ const allSections = [...leftSections, ...rightSections];
 </div>
 
 {/* Bottom Row */}
-<div className="flex flex-wrap gap-6 py-8">
+<div className="grid grid-cols-1 gap-4 py-6 sm:grid-cols-2 sm:gap-6 sm:py-8 xl:grid-cols-4">
   {allSections.slice(4, 8).map((sec, idx) => {
     const realIdx = idx + 4;
     const isOpen = openIndex === realIdx;
-    const isOtherOpen = openIndex !== null && openIndex !== realIdx;
 
     return (
       <div
@@ -411,19 +399,15 @@ const allSections = [...leftSections, ...rightSections];
         className={`rounded-3xl border overflow-hidden pb-6${
           isOpen ? " bg-blue-50" : " bg-white"
         }`}
-        style={{
-          flex: isOpen ? "2 1 0%" : isOtherOpen ? "0.9 1 0%" : "1 1 0%",
-          minWidth: 0,
-        }}
       >
         {/* Header */}
         <button
           onClick={() => toggleSection(realIdx)}
-          className="flex w-full items-center justify-between px-6 py-6 text-left"
+          className="flex w-full items-start justify-between gap-3 px-4 py-5 text-left sm:items-center sm:px-6 sm:py-6"
         >
-          <div className="flex items-center gap-3">
+          <div className="flex flex-col items-start gap-3">
             <div className="text-blue-600">{iconMap[sec.title]}</div>
-            <h3 className="text-xl font-light text-gray-900">{sec.title}</h3>
+            <h3 className="text-lg font-light text-gray-900 sm:text-xl">{sec.title}</h3>
           </div>
           <div style={{ transform: isOpen ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.2s ease" }}>
             <ChevronDown size={22} />
@@ -431,7 +415,7 @@ const allSections = [...leftSections, ...rightSections];
         </button>
 <div className="mt-2 mb-4 mx-4 border-t border-gray-200 w-[calc(100%-2rem)]" />
         {/* Content */}
-        <div className={`px-6 mb-2 text-gray-600 break-words relative ${!isOpen ? "line-clamp-4" : ""}`}>
+        <div className={`px-4 mb-2 text-gray-600 break-words relative sm:px-6 ${!isOpen ? "line-clamp-4" : ""}`}>
           <ReactMarkdown remarkPlugins={[remarkGfm]}>
             {sec.content}
           </ReactMarkdown>
@@ -480,7 +464,7 @@ const allSections = [...leftSections, ...rightSections];
                       <div className="mt-16">
                         <div className="bg-white rounded-3xl border border-gray-100  overflow-hidden backdrop-blur-sm">
                           <div className="p-4 sm:p-6 border-b border-gray-100 bg-gradient-to-b from-gray-50/50 to-white">
-                            <div className="flex items-center justify-between mb-4">
+                            <div className="flex flex-col gap-2 mb-4 sm:flex-row sm:items-center sm:justify-between">
                               <h2 className="text-2xl font-light text-gray-900 tracking-tight">
                                 Keywords
                               </h2>
@@ -508,7 +492,7 @@ const allSections = [...leftSections, ...rightSections];
 
                               {showAddKeyword && (
                                 <div className="space-y-3">
-                                  <div className="flex items-center space-x-3">
+                                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:space-x-3">
                                     <input
                                       type="text"
                                       value={newKeyword}
@@ -551,8 +535,8 @@ const allSections = [...leftSections, ...rightSections];
 
                             {/* Search and Filters */}
                             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6">
-                              <div className="flex items-center space-x-4">
-                                <div className="relative">
+                              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:space-x-4">
+                                <div className="relative w-full lg:w-auto">
                                   <Search className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
                                   <input
                                     type="text"
@@ -561,7 +545,7 @@ const allSections = [...leftSections, ...rightSections];
                                     onChange={(e) =>
                                       setSearchTerm(e.target.value)
                                     }
-                                    className="pl-10 pr-3 py-2.5 border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent text-sm bg-gray-50/50 transition-all duration-200 w-72"
+                                    className="w-full pl-10 pr-3 py-2.5 border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent text-sm bg-gray-50/50 transition-all duration-200 lg:w-72"
                                   />
                                 </div>
 
@@ -573,7 +557,7 @@ const allSections = [...leftSections, ...rightSections];
                                       competition: e.target.value,
                                     }))
                                   }
-                                  className="px-3 py-2.5 border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent text-sm bg-gray-50/50 transition-all duration-200 appearance-none cursor-pointer"
+                                  className="w-full px-3 py-2.5 border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent text-sm bg-gray-50/50 transition-all duration-200 appearance-none cursor-pointer sm:w-auto"
                                 >
                                   <option value="">All Competition</option>
                                   <option value="Low">Low</option>
@@ -589,7 +573,7 @@ const allSections = [...leftSections, ...rightSections];
                                       intent: e.target.value,
                                     }))
                                   }
-                                  className="px-3 py-2.5 border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent text-sm bg-gray-50/50 transition-all duration-200 appearance-none cursor-pointer"
+                                  className="w-full px-3 py-2.5 border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent text-sm bg-gray-50/50 transition-all duration-200 appearance-none cursor-pointer sm:w-auto"
                                 >
                                   <option value="">All Intent</option>
                                   <option value="Informational">
@@ -603,7 +587,7 @@ const allSections = [...leftSections, ...rightSections];
                               </div>
 
                               {/* View Mode Toggle + Rows per page */}
-                              <div className="flex items-center gap-3">
+                              <div className="flex flex-wrap items-center gap-3">
                                 <div className="flex items-center rounded-2xl p-1">
                                   {/* <button
                                     onClick={() => setViewMode("cards")}
@@ -697,7 +681,8 @@ const allSections = [...leftSections, ...rightSections];
                             {viewMode === "table" ? (
                               <div className="bg-white rounded-3xl border border-gray-200 overflow-hidden shadow-sm">
                                 {/* Table Header */}
-                                <div className="bg-gray-50/80 border-b border-gray-200">
+                                <div className="overflow-x-auto">
+                                <div className="hidden md:block bg-gray-50/80 border-b border-gray-200 min-w-[920px]">
                                   <div className="grid grid-cols-9 gap-4 px-6 py-4 text-sm font-semibold text-gray-700">
                                     <div
                                       className="col-span-3 flex items-center space-x-2 cursor-pointer hover:text-gray-900 transition-colors"
@@ -752,7 +737,7 @@ const allSections = [...leftSections, ...rightSections];
                                 </div>
 
                                 {/* Table Body */}
-                                <div className="divide-y divide-gray-100">
+                                <div className="hidden md:block divide-y divide-gray-100 min-w-[920px]">
                                   {currentKeywords.map((keyword) => (
                                     <div
                                       key={keyword.id}
@@ -831,10 +816,75 @@ const allSections = [...leftSections, ...rightSections];
                                   ))}
                                 </div>
 
+                                <div className="divide-y divide-gray-100 md:hidden">
+                                  {currentKeywords.map((keyword) => (
+                                    <div
+                                      key={keyword.id}
+                                      className="px-4 py-4 hover:bg-gray-50/80 transition-all duration-200"
+                                    >
+                                      <div className="flex items-start justify-between gap-3 mb-3">
+                                        <div className="font-medium text-gray-900 text-sm break-words">
+                                          {keyword.keyword.charAt(0).toUpperCase() + keyword.keyword.slice(1)}
+                                        </div>
+                                        {keyword.isCustom && (
+                                          <span className="bg-purple-100 text-purple-800 px-2 py-0.5 rounded-full text-xs font-semibold shrink-0">
+                                            Custom
+                                          </span>
+                                        )}
+                                      </div>
+
+                                      <div className="grid grid-cols-2 gap-2 text-sm">
+                                        <div className="rounded-xl border border-gray-100 bg-gray-50 px-3 py-2">
+                                          <p className="text-xs text-gray-500">Volume (AI Est.)</p>
+                                          <p className="font-medium text-gray-900">
+                                            {keyword.volume >= 1000
+                                              ? `${(keyword.volume / 1000).toFixed(1)}K`
+                                              : keyword.volume.toLocaleString()}
+                                          </p>
+                                        </div>
+                                        <div className="rounded-xl border border-gray-100 bg-gray-50 px-3 py-2">
+                                          <p className="text-xs text-gray-500">Organic (AI Est.)</p>
+                                          <p className="font-medium text-gray-900">
+                                            {keyword.organic.toLocaleString()}
+                                          </p>
+                                        </div>
+                                        <div className="rounded-xl border border-gray-100 bg-gray-50 px-3 py-2">
+                                          <p className="text-xs text-gray-500">Competition</p>
+                                          <div className="pt-1">
+                                            <span className={getCompetitionBadgeClassName(keyword.competition)}>
+                                              {keyword.competition}
+                                            </span>
+                                          </div>
+                                        </div>
+                                        <div className="rounded-xl border border-gray-100 bg-gray-50 px-3 py-2">
+                                          <p className="text-xs text-gray-500">Intent</p>
+                                          <p className="font-medium text-gray-900">{keyword.intent}</p>
+                                        </div>
+                                      </div>
+
+                                      <div className="mt-2 rounded-xl border border-gray-100 bg-gray-50 px-3 py-2">
+                                        <p className="text-xs text-gray-500 mb-1">Trend</p>
+                                        <div className="flex items-center gap-1">
+                                          <TrendingUp
+                                            className={`w-4 h-4 ${
+                                              keyword.trend === "Rising"
+                                                ? "text-green-500"
+                                                : keyword.trend === "Falling"
+                                                ? "text-red-500"
+                                                : "text-gray-500"
+                                            }`}
+                                          />
+                                          <span className="text-sm text-gray-700">{keyword.trend}</span>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+
                                 {/* Pagination */}
                                 {totalPages > 1 && (
                                   <div className="bg-gray-50/50 border-t border-gray-200 px-6 py-4">
-                                    <div className="flex items-center justify-between">
+                                    <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                                       {/* Results info */}
                                       <div className="text-sm text-gray-600">
                                         Showing {startIndex + 1} to{" "}
@@ -846,7 +896,7 @@ const allSections = [...leftSections, ...rightSections];
                                       </div>
 
                                       {/* Pagination controls */}
-                                      <div className="flex items-center space-x-2">
+                                      <div className="flex flex-wrap items-center gap-2">
                                         {/* Previous button */}
                                         <button
                                           onClick={() =>
@@ -864,7 +914,7 @@ const allSections = [...leftSections, ...rightSections];
                                         </button>
 
                                         {/* Page numbers */}
-                                        <div className="flex items-center space-x-1">
+                                        <div className="flex flex-wrap items-center gap-1">
                                           {getPageNumbers().map(
                                             (page, index) => (
                                               <React.Fragment key={index}>
@@ -921,6 +971,7 @@ const allSections = [...leftSections, ...rightSections];
                                     </p>
                                   </div>
                                 )}
+                              </div>
                               </div>
                             ) : (
                               (() => {
@@ -1092,411 +1143,34 @@ const allSections = [...leftSections, ...rightSections];
 
                 {/* Integration Tab Content */}
                 {activeCompanySubTab === 'integration' && (
-                  <div className="min-w-6xl mx-auto space-y-6">
-                    {showWordpressConnectionView ? (
-                      <div className="space-y-4">
-                        <div className="flex items-center gap-2 text-sm text-gray-500">
-                          <button
-                            onClick={() => setShowWordpressConnectionView(false)}
-                            className="inline-flex items-center gap-1.5 text-gray-600 hover:text-gray-900 transition-colors"
-                          >
-                            <ChevronLeft className="h-4 w-4" />
-                            Integration
-                          </button>
-                          <span>/</span>
-                          <span className="text-gray-900 font-medium">Connect your WordPress site</span>
-                        </div>
-
-                        <div className="bg-white rounded-2xl border border-gray-200 p-6">
-                          <div className="mb-6">
-                            <div className="flex items-center gap-2 mb-2">
-                              <img src="/skill-icons_wordpress.png" alt="" />
-                              <h2 className="text-2xl font-medium text-gray-900">Connect Your WordPress Site!</h2>
-                            </div>
-                            <p className="text-sm text-gray-500 font-light">
-                              To upload it directly to your website, please connect your WordPress account. Once connected, we&apos;ll be able to publish your content with the correct formatting and SEO settings. You remain in full control of what goes live.
-                            </p>
-                          </div>
-
-                          <div
-                            className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-medium border uppercase tracking-wider mb-6 ${
-                              hasWordpressIntegration
-                                ? 'bg-green-100 text-green-700 border-green-100'
-                                : 'bg-red-100 text-red-700 border-red-100'
-                            }`}
-                          >
-                            {hasWordpressIntegration ? 'Connected' : 'Not Connected'}
-                          </div>
-
-                          {wpIntegrationLoading ? (
-                            <div className="animate-pulse space-y-3">
-                              <div className="h-4 bg-gray-100 rounded"></div>
-                              <div className="h-4 bg-gray-100 rounded"></div>
-                              <div className="h-4 bg-gray-100 rounded w-1/2"></div>
-                            </div>
-                          ) : (
-                            <div className="space-y-4">
-                              <div>
-                                <label className="text-sm font-medium text-gray-900 mb-2 block">
-                                  WordPress URL <span className="text-red-700">*</span>
-                                </label>
-                                <input
-                                  type="text"
-                                  value={wpForm.siteUrl}
-                                  onChange={(e) => setWpForm((prev) => ({ ...prev, siteUrl: e.target.value }))}
-                                  placeholder="https://example.org"
-                                  className="w-full px-4 py-3 text-sm rounded-md border border-gray-300 bg-white focus:outline-none focus:ring-2 focus:ring-gray-900 font-light"
-                                />
-                              </div>
-
-                              <div>
-                                <label className="text-sm font-medium text-gray-900 mb-2 block">
-                                  WordPress Username <span className="text-red-700">*</span>
-                                </label>
-                                <input
-                                  type="text"
-                                  value={wpForm.username}
-                                  onChange={(e) => setWpForm((prev) => ({ ...prev, username: e.target.value }))}
-                                  placeholder="admin"
-                                  className="w-full px-4 py-3 text-sm rounded-md border border-gray-300 bg-white focus:outline-none focus:ring-2 focus:ring-gray-900 font-light"
-                                />
-                              </div>
-
-                              <div>
-                                <label className="text-sm font-medium text-gray-900 mb-2 block">
-                                  Application Password <span className="text-red-700">*</span>
-                                </label>
-                                <input
-                                  type="password"
-                                  value={wpForm.password}
-                                  onChange={(e) => setWpForm((prev) => ({ ...prev, password: e.target.value }))}
-                                  placeholder={hasWordpressIntegration ? 'Enter password to update' : '••••••••'}
-                                  className="w-full px-4 py-3 text-sm rounded-md border border-gray-300 bg-white focus:outline-none focus:ring-2 focus:ring-gray-900 font-light"
-                                />
-                                <p className="text-xs font-light text-gray-500 mt-2">
-                                  For security, use a WordPress application password instead of your main login password.
-                                </p>
-                              </div>
-
-                              <div className="flex flex-wrap gap-3 pt-2">
-                                <button
-                                  onClick={handleSaveWordpressIntegration}
-                                  disabled={wpIntegrationSaving}
-                                  className="h-11 px-6 inline-flex items-center justify-center gap-2 rounded-md bg-[#2D4059] text-sm font-medium text-white transition disabled:opacity-50 disabled:cursor-not-allowed"
-                                >
-                                  {wpIntegrationSaving ? 'Saving...' : hasWordpressIntegration ? 'Update Connection' : 'Connect WordPress'}
-                                  <ArrowRight className="h-4 w-4" />
-                                </button>
-
-                                {hasWordpressIntegration && (
-                                  <button
-                                    onClick={handleDisconnectWordpress}
-                                    disabled={wpIntegrationDeleting}
-                                    className="h-11 px-6 rounded-md border border-gray-300 text-gray-700 bg-white text-sm font-medium hover:bg-gray-100 transition disabled:opacity-50 disabled:cursor-not-allowed"
-                                  >
-                                    {wpIntegrationDeleting ? 'Removing...' : 'Disconnect'}
-                                  </button>
-                                )}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    ) : gscStatusLoading ? (
-                      <IntegrationSkeleton />
-                    ) : !gscConnected ? (
-                      <div className="bg-white rounded-3xl p-12 border border-gray-100 shadow-sm text-center">
-                        <div className="w-16 h-16 mx-auto mb-6 bg-gray-100 rounded-full flex items-center justify-center ">
-                          <Plug className="h-8 w-8 text-gray-400" />
-                        </div>
-                        <h2 className="text-2xl font-light text-black tracking-tight mb-3 ">
-                          Google Search Console
-                        </h2>
-                        <p className="text-base font-light text-gray-600 mb-8">
-                          Connect your Google Search Console account to view
-                          search performance data
-                        </p>
-                        <button
-                          onClick={handleConnectGsc}
-                          className="px-8 py-3 inline-flex items-center gap-2 px-6 py-3 bg-black text-white rounded-full text-sm font-medium hover:bg-gray-600  disabled:opacity-60 transitions"
-                        >
-                          Connect Google Search Console
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="bg-white rounded-3xl p-8 border border-gray-100 ">
-                          <div className="flex items-center justify-between mb-6">
-                            <div className="flex items-center gap-3">
-                              <div className="w-12 h-12 rounded-xl bg-green-50 flex items-center justify-center">
-                                <CheckCircle className="h-6 w-6 text-green-600" />
-                              </div>
-                              <div>
-                                <h3 className="text-xl font-light text-black tracking-tight">
-                                  Connected
-                                </h3>
-                                <p className="text-sm font-light text-gray-600">
-                                  {gscEmail}
-                                </p>
-                              </div>
-                            </div>
-                            <button
-                              onClick={handleDisconnectGsc}
-                              className="px-4 py-2 text-sm font-light text-red-600 hover:text-red-700 transition-colors"
-                            >
-                              Disconnect
-                            </button>
-                          </div>
-                          <p className="text-sm text-neutral-400 font-light max-w-xl mb-4">
-                             Connect Google Search Console to analyze your content and SEO automatically.
-                            </p>
-                          <div className="relative w-full aspect-video rounded-2xl overflow-hidden border border-gray-100 mb-4">
-    <iframe
-      className="w-full h-full"
-      src="https://www.youtube.com/embed/JnX6_YAflt8?si=EvfXp_9hEyyCSI0m"
-      title="Google Search Console Tutorial"
-      frameBorder="0"
-      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-      allowFullScreen
-    ></iframe>
-  </div>
-                          {gscLastSynced && (
-                            <p className="text-xs font-light text-gray-500 ">
-                              Last synced:{" "}
-                              {new Date(gscLastSynced).toLocaleString()}
-                            </p>
-                          )}
-                        </div>
-
-                        {!gscSelectedProperty ? (
-                          <div className="bg-white rounded-3xl p-8 border border-gray-100 shadow-sm">
-                            <h3 className="text-xl font-light text-black tracking-tight mb-4">
-                              Select Property
-                            </h3>
-                            <p className="text-sm font-light text-gray-600 mb-6">
-                              Choose which Search Console property to use
-                            </p>
-                            {gscLoading ? (
-                              <div className="text-center py-8">
-                                <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-                                <p className="text-sm font-light text-gray-600 mt-4">
-                                  Loading properties...
-                                </p>
-                              </div>
-                            ) : gscProperties.length > 0 ? (
-                              <div className="space-y-3">
-                                {gscProperties.map((property) => (
-                                  <button
-                                    key={property.siteUrl}
-                                    onClick={() =>
-                                      handleSelectProperty(property.siteUrl)
-                                    }
-                                    className="w-full text-left p-4 rounded-2xl border border-gray-100 hover:border-gray-200 hover:bg-gray-50 transition-all duration-200"
-                                  >
-                                    <div className="flex items-center justify-between ">
-                                      <div>
-                                        <p className="text-base font-light text-black">
-                                          {property.siteUrl}
-                                        </p>
-                                        <p className="text-xs font-light text-gray-500 mt-1">
-                                          {property.permissionLevel}
-                                        </p>
-                                      </div>
-                                      <Globe className="h-5 w-5 text-gray-400" />
-                                    </div>
-                                  </button>
-                                ))}
-                              </div>
-                            ) : (
-                              <div className="text-center py-8">
-                                <p className="text-sm font-light text-gray-600">
-                                  No properties found. Make sure your site is
-                                  verified in Google Search Console.
-                                </p>
-                                <button
-                                  onClick={fetchGscProperties}
-                                  className="mt-4 px-4 py-2 text-sm font-light text-blue-600 hover:text-blue-700"
-                                >
-                                  Refresh Properties
-                                </button>
-                              </div>
-                            )}
-                          </div>
-                        ) : (
-                          <div className="bg-white rounded-3xl p-8 border border-gray-100 ">
-                            <div className="flex items-center justify-between mb-6">
-                              <div>
-                              <div className="flex items-center gap-3">
-                                <img src="/gsc-icon.png" alt="" srcSet="" />
-                                <h3 className="text-xl font-light text-black tracking-tight mb-1">
-                                  Selected Property
-                                </h3>
-                                </div>
-                                <p className="text-sm font-light text-gray-600">
-                                  {gscSelectedProperty}
-                                </p>
-                              </div>
-                              <button
-                                onClick={() => {
-                                  setGscSelectedProperty("");
-                                  fetchGscProperties();
-                                }}
-                                className="px-4 py-2 text-sm font-light text-gray-600 hover:text-gray-900"
-                              >
-                                Change
-                              </button>
-                            </div>
-                            <p className="text-sm text-neutral-400 font-light mb-4">
-                              Search Console data will be available for this
-                              property, and the same Google connection now
-                              includes Analytics read access for reporting.
-                            </p>
-                              <div className="relative w-full aspect-video rounded-2xl overflow-hidden border border-gray-100 mb-4">
-    <iframe
-      className="w-full h-full"
-      src="https://www.youtube.com/embed/JnX6_YAflt8?si=EvfXp_9hEyyCSI0m"
-      title="Google Search Console Tutorial"
-      frameBorder="0"
-      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-      allowFullScreen
-    ></iframe>
-  </div>
-                          </div>
-                        )}
-
-                        {/* Google Analytics Section */}
-                        <div className="bg-white rounded-3xl p-8 border border-gray-100 ">
-
-  {/* Header */}
-  <div>
-    <div className="flex items-center justify-between">
-      <div className="flex items-center gap-3">
-      <img src="icons8-google-analytics-24.png" alt="" srcSet="" />
-      <h3 className="text-2xl font-light text-black tracking-tight">
-        Google Analytics
-      </h3>
-      </div>
-      {googleAnalyticsId && (
-        <div className="flex items-center gap-1.5 bg-green-50 text-green-700 px-3 py-1 rounded-full text-[10px] font-medium border border-green-100 uppercase tracking-wider">
-          Connected
-        </div>
-      )}
-    </div>
-
-    <p className="text-sm text-neutral-400 font-light max-w-xl mb-4 mt-2">
-      Connect Google for Search Console, then add your GA4 ID for reporting.
-    </p>
-  </div>
-
-  {/* ? Bigger Video */}
-  <div className="w-full aspect-video rounded-2xl overflow-hidden border border-gray-100">
-    <iframe
-      className="w-full h-full"
-      src="https://www.youtube.com/embed/pJxNPfwQfHs"
-      title="Google Search Console Tutorial"
-      frameBorder="0"
-      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-      allowFullScreen
-    ></iframe>
-  </div>
-
-  {/* ? Input + Button Row */}
-  <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center py-3">
-
-    {/* Input */}
-    <div className="relative flex-1 group">
-      <div className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-400 group-focus-within:text-black transition">
-        <Database className="h-4 w-4" />
-      </div>
-
-      <input
-        type="text"
-        value={googleAnalyticsId}
-        onChange={(e) => setGoogleAnalyticsId(e.target.value)}
-        placeholder="GA4 Property ID (e.g. 123456789)"
-        className="w-full h-12 pl-11 pr-4 text-sm rounded-md border border-neutral-200 bg-neutral-50 focus:bg-white focus:border-black/20 focus:ring-4 focus:ring-black/5 outline-none transition-all placeholder:text-neutral-400 font-light"
-      />
-    </div>
-
-    {/* Button */}
-    <button
-      onClick={handleSaveGoogleAnalyticsId}
-      disabled={gaSaving || !googleAnalyticsId}
-      className={cn(
-        "h-12 px-6 whitespace-nowrap inline-flex items-center justify-center gap-2 rounded-md bg-[#2D4059] text-md font-medium transition",
-        googleAnalyticsId && !gaSaving
-          ? "text-white shadow-md hover:shadow-lg active:scale-95"
-          : "bg-neutral-100 text-neutral-400 cursor-not-allowed"
-      )}
-    >
-      {gaSaving ? (
-        <>
-          <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-          Syncing
-        </>
-      ) : (
-        "Update Analytics ID"
-      )}
-      <ArrowRight />
-    </button>
-
-  </div>
-</div>
-                         <div className="bg-white rounded-3xl p-8 border border-gray-100 ">
-                      <div className="flex flex-wrap items-center justify-between gap-4 ">
-                        <div>
-                          <div className="flex items-center gap-3">
-                          <img src="/skill-icons_wordpress.png" alt="" srcSet="" />
-                          <h3 className="text-2xl font-light text-black tracking-tight">
-                            WordPress Publishing
-                          </h3></div>
-                          <p className="text-sm text-neutral-400 font-light max-w-xl mb-4 mt-2">
-                            Securely store credentials to auto-publish generated content
-                          </p>
-                        </div>
-                        <div
-                          className={`flex items-center gap-1.5 bg-green-50 text-green-700 px-3 py-1 rounded-full text-[10px] font-medium border border-green-100 uppercase tracking-wider ${
-                            hasWordpressIntegration ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-                          }`}
-                        >
-                          {hasWordpressIntegration ? 'Connected' : 'Not Connected'}
-                        </div>
-                      </div>
-
-                      {wpIntegrationLoading ? (
-                        <div className="animate-pulse space-y-3">
-                          <div className="h-4 bg-gray-100 rounded"></div>
-                          <div className="h-4 bg-gray-100 rounded"></div>
-                          <div className="h-4 bg-gray-100 rounded w-1/2"></div>
-                        </div>
-                      ) : (
-                        
-  <div>
-                           <div className="relative w-full aspect-video rounded-2xl overflow-hidden border border-gray-100 mb-4">
-    <iframe
-      className="w-full h-full"
-      src="https://www.youtube.com/embed/pJxNPfwQfHs?si=DmLV-gdgqw9TJUdZ"
-      title="Google Search Console Tutorial"
-      frameBorder="0"
-      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-      allowFullScreen
-    ></iframe>
-  </div>
-  <button
-    onClick={() => setShowWordpressConnectionView(true)}
-    className={cn(
-      "h-12 px-6 whitespace-nowrap inline-flex items-center justify-center gap-2 rounded-md bg-[#2D4059] text-md font-medium transition text-white shadow-md hover:shadow-lg active:scale-95",
-      
-    )}
-  >Wordpress
-  <ArrowRight />
-  </button>
-  </div>
-                      )}
-                    </div>
-                      </div>
-                    )}
-                  </div>
+                  <AnalyticsIntegrationSection
+                    showWordpressConnectionView={showWordpressConnectionView}
+                    setShowWordpressConnectionView={setShowWordpressConnectionView}
+                    gscStatusLoading={gscStatusLoading}
+                    gscConnected={gscConnected}
+                    handleConnectGsc={handleConnectGsc}
+                    gscEmail={gscEmail}
+                    handleDisconnectGsc={handleDisconnectGsc}
+                    gscLastSynced={gscLastSynced}
+                    gscSelectedProperty={gscSelectedProperty}
+                    setGscSelectedProperty={setGscSelectedProperty}
+                    fetchGscProperties={fetchGscProperties}
+                    gscLoading={gscLoading}
+                    gscProperties={gscProperties}
+                    handleSelectProperty={handleSelectProperty}
+                    googleAnalyticsId={googleAnalyticsId}
+                    setGoogleAnalyticsId={setGoogleAnalyticsId}
+                    gaSaving={gaSaving}
+                    handleSaveGoogleAnalyticsId={handleSaveGoogleAnalyticsId}
+                    hasWordpressIntegration={hasWordpressIntegration}
+                    wpIntegrationLoading={wpIntegrationLoading}
+                    wpForm={wpForm}
+                    setWpForm={setWpForm}
+                    handleSaveWordpressIntegration={handleSaveWordpressIntegration}
+                    wpIntegrationSaving={wpIntegrationSaving}
+                    handleDisconnectWordpress={handleDisconnectWordpress}
+                    wpIntegrationDeleting={wpIntegrationDeleting}
+                  />
                 )}
               </div>
             

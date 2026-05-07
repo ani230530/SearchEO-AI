@@ -75,7 +75,7 @@ export function AuditSection({
         <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-gray-100 rounded-full blur-3xl opacity-20" />
       </div>
 
-      <div className="relative z-10 min-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-4">
+      <div className="relative z-10 w-full min-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-4">
         <div className="text-left mb-2">
           <h1 className="text-4xl font-thin text-black tracking-tight mb-4">Audit Your Domain</h1>
           <p className="text-gray-600 mb-3">
@@ -83,9 +83,9 @@ export function AuditSection({
             performance data.
           </p>
 
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-8">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
             <div
-              className="flex-1 min-w-md bg-white/70 backdrop-blur-md border border-gray-200 px-6 py-3 flex items-center justify-between shadow-sm rounded-md"
+              className="w-full sm:flex-1 bg-white/70 backdrop-blur-md border border-gray-200 px-4 sm:px-6 py-3 flex items-center justify-between shadow-sm rounded-md"
               style={{ borderWidth: "0.5px" }}
             >
               <span
@@ -96,12 +96,12 @@ export function AuditSection({
               </span>
             </div>
 
-            <div className="flex gap-3 ">
+            <div className="flex w-full sm:w-auto gap-3">
               <button
                 onClick={onRunAudit}
                 disabled={auditLoading || !companyDomain}
                 className={cn(
-                  "inline-flex items-center gap-2 px-6 py-3 text-white rounded-xl text-sm font-medium hover:opacity-90 disabled:opacity-60 transition",
+                  "inline-flex w-full sm:w-auto justify-center items-center gap-2 px-6 py-3 text-white rounded-xl text-sm font-medium hover:opacity-90 disabled:opacity-60 transition",
                   auditLoading && "cursor-not-allowed"
                 )}
                 style={{
@@ -113,7 +113,7 @@ export function AuditSection({
               <PDFDownloadLink
                 document={<AuditPDF data={auditResult} domain={companyDomain} />}
                 fileName={`audit-${companyDomain}-${new Date().toISOString().split("T")[0]}.pdf`}
-                className="px-4 py-2 rounded-xl border border-gray-200 text-sm font-light bg-white hover:bg-gray-50 flex items-center justify-center"
+                className="w-full sm:w-auto px-4 py-2 rounded-xl border border-gray-200 text-sm font-light bg-white hover:bg-gray-50 flex items-center justify-center"
               >
                 {({ loading }) => (loading ? "Preparing..." : "Export PDF")}
               </PDFDownloadLink>
@@ -154,7 +154,7 @@ export function AuditSection({
               className="mt-6 p-6 bg-white/70 backdrop-blur-md rounded-2xl border border-gray-200 shadow-sm"
               style={{ borderWidth: "0.5px" }}
             >
-              <div className="flex items-center justify-between mb-4">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-4">
                 <h3
                   className="text-lg font-light text-gray-900"
                   style={{ letterSpacing: "-0.003em" }}
@@ -221,10 +221,10 @@ export function AuditSection({
         </div>
 
         {auditResult && best && worst && (
-          <div ref={resultsRef} className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+          <div ref={resultsRef} className="grid grid-cols-1 lg:grid-cols-2 min-[1630px]:grid-cols-3 gap-8 items-start">
             <div
-              className="bg-white/70 backdrop-blur-md py-8 px-8 rounded-2xl border border-gray-200 shadow-sm h-full"
-              style={{ borderWidth: "0.5px", minHeight: "367px" }}
+              className="bg-white/70 backdrop-blur-md py-6 px-4 sm:px-6 lg:px-8 rounded-2xl border border-gray-200 shadow-sm h-full flex flex-col overflow-hidden"
+              style={{ borderWidth: "0.5px" }}
             >
               <h3
                 className="text-2xl font-light text-gray-900 mb-4"
@@ -232,12 +232,12 @@ export function AuditSection({
               >
                 Domain Audit
               </h3>
-              <div className="h-[calc(100%-3rem)] flex items-center justify-center gap-8">
-                <div className="flex-shrink-0 flex items-center justify-center">
+              <div className="w-full flex-1 flex flex-col items-center justify-center gap-6">
+                <div className="w-full max-w-[220px] sm:max-w-[250px] flex-shrink-0 flex items-center justify-center">
                   <OverallScoreGauge score={overallScore} size={180} />
                 </div>
-                <div className="flex flex-col items-center justify-center gap-6 text-center">
-                <div>
+                <div className="w-full grid grid-cols-1 sm:grid-cols-2 gap-5 sm:gap-6 text-center">
+                <div className="min-w-0">
                   <div
                     className="text-xs font-light uppercase tracking-wider text-green-700 mb-1"
                     style={{ letterSpacing: "0.083em" }}
@@ -245,7 +245,7 @@ export function AuditSection({
                     Strongest
                   </div>
                   <div
-                    className="text-2xl font-light text-gray-900"
+                    className="text-lg sm:text-xl lg:text-xl font-light text-gray-900 break-words"
                     style={{ letterSpacing: "-0.003em" }}
                   >
                     {best.label}
@@ -258,7 +258,7 @@ export function AuditSection({
                   </div>
                 </div>
 
-                <div>
+                <div className="min-w-0">
                   <div
                     className="text-xs font-light uppercase tracking-wider text-orange-700 mb-1"
                     style={{ letterSpacing: "0.083em" }}
@@ -266,7 +266,7 @@ export function AuditSection({
                     Needs Work
                   </div>
                   <div
-                    className="text-2xl font-light text-gray-900"
+                    className="text-lg sm:text-xl lg:text-xl font-light text-gray-900 break-words"
                     style={{ letterSpacing: "-0.003em" }}
                   >
                     {worst.label}
@@ -283,10 +283,10 @@ export function AuditSection({
             </div>
 
             <div
-              className="bg-white/70 backdrop-blur-md rounded-2xl border border-gray-200 p-8 shadow-sm h-full flex flex-col"
-              style={{ borderWidth: "0.5px", minHeight: "367px" }}
+              className="bg-white/70 backdrop-blur-md rounded-2xl border border-gray-200 p-6 sm:p-8 shadow-sm h-full flex flex-col overflow-hidden"
+              style={{ borderWidth: "0.5px" }}
             >
-              <div className="flex items-center justify-between mb-6">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
                 <h3
                   className="text-2xl font-light text-gray-900"
                   style={{ letterSpacing: "-0.003em" }}
@@ -294,7 +294,7 @@ export function AuditSection({
                   Individual Metric
                 </h3>
 
-                <div className="relative w-[180px] pl-6">
+                <div className="relative w-full sm:w-[180px]">
                   <label htmlFor="metric-select" className="sr-only">
                     Select Metric
                   </label>
@@ -331,12 +331,12 @@ export function AuditSection({
               {categories
                 .filter((category) => category.label === (selectedMetric || "Performance"))
                 .map(({ label, value }) => (
-                  <div key={label} className="h-[calc(100%-3rem)] flex items-center justify-center gap-8">
-                    <div className="flex-shrink-0">
+                  <div key={label} className="w-full flex-1 flex flex-col items-center justify-center gap-5 sm:gap-6">
+                    <div className="w-full max-w-[220px] sm:max-w-[250px] flex-shrink-0">
                       <AuditGaugeChart label={null} score={value} size={180} />
                     </div>
                     {CATEGORY_DESCRIPTIONS[label] && (
-                      <div className="flex-1 text-sm text-gray-500 flex items-center">
+                      <div className="w-full text-sm text-gray-500 text-center break-words max-w-prose">
                         {CATEGORY_DESCRIPTIONS[label]}
                       </div>
                     )}
@@ -368,12 +368,12 @@ export function AuditSection({
               </div>
             )}
 
-            <div className="col-span-1 lg:col-span-2 bg-white/70">
+            <div className="col-span-1 min-[1630px]:col-span-2 bg-white/70">
               <div
                 className="bg-white/70 backdrop-blur-md rounded-2xl border border-gray-200 p-8 shadow-sm animate-in fade-in duration-300"
                 style={{ borderWidth: "0.5px", minHeight: "520px" }}
               >
-                <div className="flex justify-between items-center mb-2">
+                <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center mb-2">
                   <h3
                     className="text-2xl font-light text-gray-900"
                     style={{ letterSpacing: "-0.003em" }}
@@ -383,7 +383,7 @@ export function AuditSection({
                     {activeChartTab === "distribution" && "Score Distribution"}
                   </h3>
 
-                  <div className="relative w-[190px]">
+                  <div className="relative w-full sm:w-[190px]">
                     <select
                       value={activeChartTab}
                       onChange={(e) =>
@@ -429,7 +429,7 @@ export function AuditSection({
 
             {auditResult.audits && (
               <div
-                className="col-span-1 bg-white/70 backdrop-blur-md rounded-2xl border border-gray-200 p-8 shadow-sm overflow-hidden "
+                className="col-span-1 lg:col-span-1 bg-white/70 backdrop-blur-md rounded-2xl border border-gray-200 p-6 sm:p-8 shadow-sm overflow-hidden "
                 style={{ borderWidth: "0.5px" }}
               >
                 <h3
@@ -451,7 +451,7 @@ export function AuditSection({
                     return (
                       <div
                         key={key}
-                        className="flex justify-between items-center px-4 py-3 rounded-xl bg-gray-50 border border-gray-200 hover:bg-gray-50 transition-all"
+                        className="flex flex-col gap-2 sm:flex-row sm:justify-between sm:items-center px-4 py-3 rounded-xl bg-gray-50 border border-gray-200 hover:bg-gray-50 transition-all"
                         style={{ borderWidth: "0.5px" }}
                       >
                         <span

@@ -157,15 +157,14 @@ export const AuditGaugeChart: React.FC<{ label: string; score: number; size?: nu
 }) => {
   const percent = Math.round(score * 100);
   const color = getScoreColor(score);
-  const colorLight = getScoreColorLight(score);
   const radius = size / 2 - 10;
   const circumference = 2 * Math.PI * radius;
   const offset = circumference - (percent / 100) * circumference;
 
   return (
     <div className="flex flex-col items-center">
-      <div className="relative" style={{ width: size, height: size }}>
-        <svg width={size} height={size} className="transform -rotate-90">
+      <div className="relative w-full max-w-full aspect-square" style={{ maxWidth: size }}>
+        <svg viewBox={`0 0 ${size} ${size}`} className="w-full h-full transform -rotate-90">
           {/* Background circle */}
           <circle
             cx={size / 2}
@@ -194,8 +193,8 @@ export const AuditGaugeChart: React.FC<{ label: string; score: number; size?: nu
         <div className="absolute inset-0 flex items-center justify-center">
           <div className="flex items-center gap-1">
   <div
-    className="text-2xl font-bold"
-    style={{ color: '#1d1d1f', letterSpacing: '-0.003em' }}
+    className="font-bold"
+    style={{ color: '#1d1d1f', letterSpacing: '-0.03em', fontSize: 'clamp(1rem, 4.5vw, 1.5rem)' }}
   >
     {percent} %
   </div>
@@ -330,9 +329,9 @@ export const OverallScoreGauge: React.FC<{ score: number; size?: number }> = ({ 
   const offset = circumference - (percent / 100) * circumference;
 
   return (
-    <div className="justify-center px-6">
-      <div className="relative" style={{ width: size, height: size }}>
-        <svg width={size} height={size} className="transform -rotate-90">
+    <div className="justify-center w-full px-2 sm:px-6">
+      <div className="relative w-full max-w-full aspect-square mx-auto" style={{ maxWidth: size }}>
+        <svg viewBox={`0 0 ${size} ${size}`} className="w-full h-full transform -rotate-90">
           <circle
             cx={size / 2}
             cy={size / 2}
@@ -359,23 +358,23 @@ export const OverallScoreGauge: React.FC<{ score: number; size?: number }> = ({ 
         <div className="absolute inset-0 flex items-center justify-center">
           <div className="text-center">
             <div
-              className="text-6xl font-light"
+              className="font-light"
               style={{ 
                 color: '#1d1d1f', 
                 letterSpacing: '-0.003em', 
                 lineHeight: 1.05,
-                fontSize: `${size * 0.3}px` // Scale font size relative to chart size
+                fontSize: 'clamp(2rem, 8vw, 1.75rem)',
               }}
             >
               {percent}
             </div>
             <div
-              className="text-lg mt-1"
+              className="mt-1"
               style={{ 
                 color: '#86868b', 
                 letterSpacing: '0.011em', 
                 fontWeight: 300,
-                fontSize: `${size * 0.09}px` // Scale label size
+                fontSize: 'clamp(0.75rem, 2.5vw, 0.75rem)',
               }}
             >
               Overall Score
