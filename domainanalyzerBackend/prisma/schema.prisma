@@ -43,6 +43,18 @@ model Domain {
   locationContext             String?
   currentStep                 Int                          @default(0)
   isCompanyDomain             Boolean                      @default(false)
+  // Wizard v2 — user-supplied profile (Step 1 form)
+  country                     String?
+  state                       String?
+  industry                    String?
+  // Wizard v2 — inferred from crawl, not user-input
+  companySize                 String?
+  // Wizard v2 — comma-separated seeds the user adds in Step 1 advanced options
+  customSeeds                 Json?
+  // Wizard v2 — list of competitor URLs the user kept in Step 3
+  selectedCompetitors         Json?
+  // Wizard v2 — auto-saved selection draft for Step 4 so closing the tab restores checkboxes
+  selectionDraft              Json?
   analysisPhases              AnalysisPhase[]
   analysisReports             AnalysisReport[]
   communityInsights           CommunityInsight[]
