@@ -54,6 +54,7 @@ export interface DashboardHeaderProps {
   tabs: DashboardSidebarTab[];
   userEmail?: string | null;
   onTabChange?: (tab: TabId) => void;
+  lastSync?: Date | string | null;
 }
 
 export interface AnalyticsReportSectionProps {
@@ -73,11 +74,14 @@ export interface OverviewSectionProps {
   onAuditModalOpenChange: (open: boolean) => void;
   onOpenAnalytics: () => void;
   onOpenAuditDetails: () => void;
+  onOpenCompetitor?: () => void;
   onRunAudit: () => void;
   onViewReport: () => void;
   onVisitSite: () => void;
   overallScore: number;
   showAuditModal: boolean;
+  domainId?: string | number | null;
+  campaigns?: Array<{ id: number; title: string; description: string | null; createdAt: string; updatedAt: string }>;
 }
 
 export interface CompanySectionProps {
