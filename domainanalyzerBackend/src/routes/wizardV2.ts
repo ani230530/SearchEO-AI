@@ -10,6 +10,11 @@
 import { Router, Request, Response } from 'express';
 import { PrismaClient } from '../../generated/prisma';
 import { authenticateToken, AuthenticatedRequest } from '../middleware/auth';
+import { analyzeStandalonePeerCompetitors } from '../services/standaloneCompetitorAnalysisService';
+
+const LOGO_DEV_TOKEN = 'pk_DTdFFG1JT9WOCjATvZEzIA';
+const buildLogoUrl = (host: string) =>
+  `https://img.logo.dev/${host.replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0]}?token=${LOGO_DEV_TOKEN}&size=64`;
 
 const prisma = new PrismaClient();
 const router = Router();
@@ -256,6 +261,161 @@ router.get('/domain/:id/state', authenticateToken, async (req: Request, res: Res
     phases: domain.analysisPhases,
     canResumeAt,
   });
+});
+
+async function recordPhase(domainId: number, phase: string, status: string, progress: number, error?: string, result?: unknown) {
+  await prisma.analysisPhase.upsert({
+    where: { domainId_phase: { domainId, phase } },
+    update: {
+      status,
+      progress,
+      error: error ?? null,
+      result: result ? (JSON.stringify(result) as any) : undefined,
+      endTime: status === 'completed' || status === 'failed' ? new Date() : undefined,
+    },
+    create: {
+      domainId,
+      phase,
+      status,
+      progress,
+      startTime: new Date(),
+      error: error ?? null,
+      result: result ? (JSON.stringify(result) as any) : undefined,
+    },
+  });
+}
+
+/**
+ * POST /api/wizard/domain/:id/competitors
+ * Generates 5–10 same-tier peer competitors based on the domain profile
+ * (country/state/industry/companySize) — keywords are NOT required at this
+ * stage, which is the structural change vs the old wizard.
+ *
+ * Idempotent: replaces the previous CompetitorAnalysis row for the domain
+ * (each domain has at most one persisted suggestion set).
+ */
+router.post('/domain/:id/competitors', authenticateToken, async (req: Request, res: Response) => {
+  const authReq = req as AuthenticatedRequest;
+  const domainId = Number(req.params.id);
+  if (!domainId || Number.isNaN(domainId)) {
+    return res.status(400).json({ error: 'Invalid domainId' });
+  }
+
+  const domain = await prisma.domain.findUnique({
+    where: { id: domainId },
+    select: {
+      id: true,
+      userId: true,
+      url: true,
+      context: true,
+      country: true,
+      state: true,
+      industry: true,
+      companySize: true,
+      location: true,
+    },
+  });
+  if (!domain || domain.userId !== authReq.user.userId) {
+    return res.status(404).json({ error: 'Domain not found' });
+  }
+
+  await recordPhase(domainId, 'competitors', 'running', 5);
+
+  // Build a profile-enriched context. analyzeStandalonePeerCompetitors reads
+  // location separately; the rest go in the context string.
+  const profileLines = [
+    domain.country ? `Country: ${domain.country}` : null,
+    domain.state ? `State: ${domain.state}` : null,
+    domain.industry ? `Industry: ${domain.industry}` : null,
+    domain.companySize ? `Company size: ${domain.companySize}` : null,
+  ].filter(Boolean).join('\n');
+  const enrichedContext = [profileLines, domain.context ?? ''].filter(Boolean).join('\n\n');
+  const locationLabel = [domain.country, domain.state].filter(Boolean).join(', ') || domain.location || null;
+
+  try {
+    const result = await analyzeStandalonePeerCompetitors({
+      domain: domain.url,
+      context: enrichedContext,
+      location: locationLabel,
+    });
+
+    const competitorsWithLogos = result.competitors.map((c) => ({
+      name: c.name,
+      domain: c.domain,
+      url: c.domain.startsWith('http') ? c.domain : `https://${c.domain}`,
+      logoUrl: buildLogoUrl(c.domain),
+      reasoning: c.peerFitReason,
+      threatLevel: c.threatLevel,
+      confidence: c.confidence,
+      marketTier: c.marketTier,
+      operatesInTargetLocation: c.operatesInTargetLocation,
+    }));
+
+    // Replace previous suggestion set for this domain (idempotent re-run).
+    await prisma.competitorAnalysis.deleteMany({ where: { domainId } });
+    const saved = await prisma.competitorAnalysis.create({
+      data: {
+        domainId,
+        competitors: competitorsWithLogos as any,
+        marketInsights: result.marketInsights as any,
+        strategicRecommendations: result.strategicRecommendations as any,
+        competitiveAnalysis: result.competitiveAnalysis as any,
+        competitorList: result.competitorList,
+      },
+    });
+
+    await recordPhase(domainId, 'competitors', 'completed', 100, undefined, { count: competitorsWithLogos.length });
+
+    return res.json({
+      domainId,
+      competitors: competitorsWithLogos,
+      marketInsights: result.marketInsights,
+      analysisId: saved.id,
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Competitor generation failed';
+    await recordPhase(domainId, 'competitors', 'failed', 0, message);
+    return res.status(500).json({ error: message });
+  }
+});
+
+/**
+ * POST /api/wizard/domain/:id/competitors/select
+ * Body: { urls: string[] }
+ * Persists the user-chosen subset onto Domain.selectedCompetitors so future
+ * topics/AI-query phases know which competitors the user actually cares about.
+ */
+router.post('/domain/:id/competitors/select', authenticateToken, async (req: Request, res: Response) => {
+  const authReq = req as AuthenticatedRequest;
+  const domainId = Number(req.params.id);
+  const { urls } = (req.body ?? {}) as { urls?: string[] };
+  if (!domainId || Number.isNaN(domainId)) {
+    return res.status(400).json({ error: 'Invalid domainId' });
+  }
+  if (!Array.isArray(urls)) {
+    return res.status(400).json({ error: 'urls must be an array' });
+  }
+
+  const domain = await prisma.domain.findUnique({
+    where: { id: domainId },
+    select: { id: true, userId: true },
+  });
+  if (!domain || domain.userId !== authReq.user.userId) {
+    return res.status(404).json({ error: 'Domain not found' });
+  }
+
+  const cleaned = Array.from(new Set(
+    urls
+      .filter((u): u is string => typeof u === 'string' && u.trim().length > 0)
+      .map((u) => u.trim())
+  ));
+
+  await prisma.domain.update({
+    where: { id: domainId },
+    data: { selectedCompetitors: cleaned as any },
+  });
+
+  return res.json({ domainId, selectedCompetitors: cleaned });
 });
 
 export default router;
