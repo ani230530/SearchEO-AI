@@ -34,7 +34,7 @@ const sidebarItems: Array<{
   { id: "ai-results", label: "AI Results", icon: Sparkles },
   { id: "competitors", label: "Competitors", icon: Users },
   { id: "track-prompts", label: "Track Prompts", icon: Star },
-  { id: "top-keywords", label: "Top Keywords", icon: Star },
+  { id: "top-keywords", label: "Track Keyword", icon: Star },
   { id: "analytics", label: "Analytics", icon: LayoutDashboard },
 ];
 
@@ -64,8 +64,13 @@ export function AIResultsLayout({
   const navigateToItem = (itemId: AIResultsNavItemId, nextMaskedId = maskedDomainId) => {
     if (!nextMaskedId) return;
 
-    if (itemId === "ai-results" || itemId === "top-keywords") {
+    if (itemId === "ai-results") {
       navigate(`/ai-results/${nextMaskedId}`);
+      return;
+    }
+
+    if (itemId === "top-keywords") {
+      navigate(`/ai-results/${nextMaskedId}/track-keywords`);
       return;
     }
 

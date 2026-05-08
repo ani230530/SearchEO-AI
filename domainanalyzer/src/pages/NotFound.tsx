@@ -3,6 +3,7 @@ import { useEffect } from "react";
 
 const NotFound = () => {
   const location = useLocation();
+  console.log("NotFound Rendering for path:", location.pathname);
 
   useEffect(() => {
     console.error(

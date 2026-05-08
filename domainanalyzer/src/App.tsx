@@ -15,6 +15,7 @@ import AIVisibilityRedirect from "./pages/AIVisibilityRedirect";
 import AICheckerV2 from "./pages/AIChecker.v2";
 import AIResultsReportPreview from "./pages/AIResultsReportPreview";
 import TrackPromptsPage from "./pages/TrackPromptsPage";
+import TrackKeywordsPage from "./pages/TrackKeywordsPage";
 
 const queryClient = new QueryClient();
 
@@ -26,6 +27,7 @@ const App = () => (
         <Sonner />
         <BrowserRouter>
           <Routes>
+            {console.log("App Rendering Routes")}
             {/* Public routes */}
             <Route path="/" element={<LandingPage />} />
             <Route path="/auth" element={<Auth />} />
@@ -48,14 +50,19 @@ const App = () => (
             } />
             {/* Legacy /ai-checker-page → redirect to the new wizard for any old bookmarks */}
             <Route path="/ai-checker-page" element={<Navigate to="/ai-checker-v2" replace />} />
-            <Route path="/ai-results/:domain" element={
-              <ProtectedRoute>
-                <AIResultsReportPreview />
-              </ProtectedRoute>
-            } />
             <Route path="/ai-results/:domain/track-prompts" element={
               <ProtectedRoute>
                 <TrackPromptsPage />
+              </ProtectedRoute>
+            } />
+            <Route path="/ai-results/:domain/track-keywords" element={
+              <ProtectedRoute>
+                <TrackKeywordsPage />
+              </ProtectedRoute>
+            } />
+            <Route path="/ai-results/:domain" element={
+              <ProtectedRoute>
+                <AIResultsReportPreview />
               </ProtectedRoute>
             } />
             <Route path="/profile" element={

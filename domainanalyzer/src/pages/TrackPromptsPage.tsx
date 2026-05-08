@@ -284,6 +284,7 @@ const PromptVisibilityTrendsChart = () => (
 );
 
 const TrackPromptsPage = () => {
+  console.log("TrackPromptsPage Rendering");
   const { domain: maskedDomainId } = useParams();
   const [allDomains, setAllDomains] = useState<DashboardDomain[]>([]);
   const [domainInfo, setDomainInfo] = useState<DashboardDomain | null>(null);
