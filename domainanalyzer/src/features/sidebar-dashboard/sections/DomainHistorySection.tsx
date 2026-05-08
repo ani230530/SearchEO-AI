@@ -116,7 +116,7 @@ export function DomainHistorySection({ onMenuItemClick }: DomainHistorySectionPr
   const domainMenuItems = [
     "View AI Dashboard",
     "View Report",
-    "Top Prompts",
+    "Track Prompts",
     "Top Keywords",
     "Competitors",
     "Inspect",
@@ -284,7 +284,7 @@ export function DomainHistorySection({ onMenuItemClick }: DomainHistorySectionPr
                                 onMenuItemClick?.("analytics", domain.id);
                               } else if (item === "Top Keywords") {
                                 onMenuItemClick?.("analytics", domain.id);
-                              } else if (item === "Top Prompts") {
+                              } else if (item === "Track Prompts") {
                                 onMenuItemClick?.("analytics", domain.id);
                               }
                               setOpenMenuId(null);
@@ -334,7 +334,7 @@ export function DomainHistorySection({ onMenuItemClick }: DomainHistorySectionPr
                         <p className="text-[30px] font-medium leading-none text-[#3d83df]">{domain.topKeywords}</p>
                       </div>
                       <div>
-                        <p className="text-[18px] font-semibold text-[#5f6878] pb-2">Top Prompts</p>
+                        <p className="text-[18px] font-semibold text-[#5f6878] pb-2">Track Prompts</p>
                         <p className="text-[30px] font-medium leading-none text-[#3d83df]">{domain.topPrompts}</p>
                       </div>
                     </div>

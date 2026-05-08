@@ -13,6 +13,7 @@ import SidebarDashboard from "./pages/SidebarDashboard";
 import KnowledgeBase from "./pages/KnowledgeBase";
 import AIVisibilityRedirect from "./pages/AIVisibilityRedirect";
 import AIResultsReportPreview from "./pages/AIResultsReportPreview";
+import TrackPromptsPage from "./pages/TrackPromptsPage";
 
 const queryClient = new QueryClient();
 
@@ -42,6 +43,11 @@ const App = () => (
             <Route path="/ai-results/:domain" element={
               <ProtectedRoute>
                 <AIResultsReportPreview />
+              </ProtectedRoute>
+            } />
+            <Route path="/ai-results/:domain/track-prompts" element={
+              <ProtectedRoute>
+                <TrackPromptsPage />
               </ProtectedRoute>
             } />
             <Route path="/profile" element={
