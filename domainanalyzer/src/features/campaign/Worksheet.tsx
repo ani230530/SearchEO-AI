@@ -603,7 +603,7 @@ export default function Worksheet({
                 onClick={handleExportData}
                 className="h-9 px-3 rounded-md border border-[#909bb0] text-[#495668] text-xs font-medium inline-flex items-center gap-1.5"
               >
-                <Download className="h-4 w-4" />
+                <img src="https://res.cloudinary.com/dgfzjdi68/image/upload/v1772183203/vscode-icons_file-type-excel_t2sqbh.svg" alt="Export" />
                 Export
                 <ChevronDown className="h-3.5 w-3.5" />
               </button>
@@ -624,7 +624,7 @@ export default function Worksheet({
         <div className="p-3 sm:p-4">
           <div className="overflow-auto border border-[#c8cfdb]">
             <table className="min-w-[980px] w-full">
-              <thead className="bg-[#e6e8eb] border-b border-[#c8cfdb]">
+              <thead className="bg-[#EDEDED] border-b border-[#c8cfdb]">
                 <tr className="h-10">
                   <th className="w-10 border-r border-[#c8cfdb] px-3 text-left">
                     <input type="checkbox" className="h-3.5 w-3.5 rounded border-[#8e99ad]" />
@@ -686,7 +686,7 @@ export default function Worksheet({
                   return (
                     <tr
                       key={topic.id}
-                      className={`min-h-[86px] border-b border-[#c8cfdb] ${idx % 2 ? 'bg-[#dde3ef]' : 'bg-[#f5f6f8]'} ${isBusy ? 'opacity-70' : ''}`}
+                      className={`min-h-[86px] border-b border-[#c8cfdb] ${idx % 2 ? 'bg-[#F2F6FF]' : 'bg-white'} ${isBusy ? 'opacity-70' : ''}`}
                     >
                       <td className="border-r border-[#c8cfdb] px-3 align-middle">
                         <input type="checkbox" className="h-3.5 w-3.5 rounded border-[#8e99ad]" />
@@ -1056,12 +1056,12 @@ function KeywordChip({
   // hue. The chevron is the affordance for the actions popover; the term
   // itself is click-to-edit via <InlineEditable>.
   const variantClass = keyword.isPrimary
-    ? 'bg-[#7281c4] border-[#7281c4] text-white hover:bg-[#6573ba]'
-    : 'bg-[#dde2f5] border-[#cdd5ed] text-[#4c5a8c] hover:bg-[#d3daf0]';
+    ? 'bg-[#7E9BD7] border-[#7281c4] text-white hover:bg-[#6573ba]'
+    : 'bg-[#F2F6FF] border-[#cdd5ed] text-[#4c5a8c] hover:bg-[#d3daf0]';
 
   return (
     <span
-      className={`relative inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[12px] font-medium transition-colors ${variantClass}`}
+      className={`relative inline-flex items-center gap-2 rounded-md border px-3 py-1 text-[12px] font-medium transition-colors ${variantClass}`}
     >
       <InlineEditable
         value={keyword.term}
@@ -1101,7 +1101,7 @@ function KeywordChip({
             <button
               type="button"
               onClick={onSetLongtail}
-              className="block w-full px-3 py-2 text-xs text-left hover:bg-gray-50"
+              className="block w-full text-gray-600 px-3 py-2 text-xs text-left hover:bg-gray-50"
             >
               Set as longtail
             </button>

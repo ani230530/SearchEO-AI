@@ -723,6 +723,7 @@ export const PromptTable = ({
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [tableFilter, setTableFilter] = useState<'all' | 'prompt' | 'keyword'>('all');
   const [tableMetric, setTableMetric] = useState<string | null>(null);
+  const [showAllQueries, setShowAllQueries] = useState(false);
 
   const displayData = useMemo(() => {
     let items = [...data];
@@ -744,14 +745,14 @@ export const PromptTable = ({
     }
 
     // Default mixed view slicing if no metric is chosen
-    if (!tableMetric && tableFilter === 'all') {
+    if (!showAllQueries && !tableMetric && tableFilter === 'all') {
       const prompts = items.filter(item => item.type?.toLowerCase() === 'prompt').slice(0, 3);
       const keywords = items.filter(item => item.type?.toLowerCase() === 'keyword').slice(0, 2);
       return [...prompts, ...keywords];
     }
 
-    return items.slice(0, 5);
-  }, [data, tableFilter, tableMetric]);
+    return showAllQueries ? items : items.slice(0, 5);
+  }, [data, showAllQueries, tableFilter, tableMetric]);
 
   return (
     <Card className="rounded-xl border-slate-300 shadow-sm overflow-hidden">
@@ -986,6 +987,12 @@ export const PromptTable = ({
           <div className="h-3 w-[1px] bg-gray-300" />
           <button
             type="button"
+            onClick={() => {
+              setTableFilter('all');
+              setTableMetric(null);
+              setShowAllQueries(true);
+            }}
+            disabled={showAllQueries || displayData.length >= data.length}
             className="px-2.5 py-1 text-[11px] font-bold text-[#3B82F6] bg-gray-50/80 hover:bg-gray-100 rounded-lg transition-all"
           >
             View all
@@ -1528,7 +1535,10 @@ const AIResultsReportPreview = () => {
                   Filters
                   <ChevronDown className="ml-1.5 h-3.5 w-3.5" />
                 </Button>
-                <Button className="h-[41px] rounded-lg bg-[#2f4462] px-4 text-xs text-white hover:bg-[#263852]">
+                <Button
+                  onClick={() => navigate("/ai-checker-v2")}
+                  className="h-[41px] rounded-lg bg-[#2f4462] px-4 text-xs text-white hover:bg-[#263852]"
+                >
                   <Plus className="mr-1.5 h-3.5 w-3.5" />
                   Start New Audit
                 </Button>

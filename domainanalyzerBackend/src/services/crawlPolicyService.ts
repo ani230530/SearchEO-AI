@@ -43,6 +43,14 @@ export function canonicalizeUrl(rawUrl: string, baseUrl?: string): string {
   return resolved.toString();
 }
 
+export function canonicalizeUrlOrNull(rawUrl: string, baseUrl?: string): string | null {
+  try {
+    return canonicalizeUrl(rawUrl, baseUrl);
+  } catch {
+    return null;
+  }
+}
+
 function parseRobotsRules(body: string): CrawlPolicyRule[] {
   const lines = body.split(/\r?\n/);
   const rules: CrawlPolicyRule[] = [];

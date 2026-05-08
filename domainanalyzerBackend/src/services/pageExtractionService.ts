@@ -1,6 +1,6 @@
 import crypto from 'crypto';
 import * as cheerio from 'cheerio';
-import { canonicalizeUrl } from './crawlPolicyService';
+import { canonicalizeUrl, canonicalizeUrlOrNull } from './crawlPolicyService';
 import { scoreUrl } from './urlDiscoveryService';
 import type { CrawlPolicy, PageFetchMode, PageSnapshot } from './domainContextTypes';
 
@@ -215,14 +215,17 @@ export function extractPageSnapshot(params: {
     .filter(Boolean)
     .slice(0, 12);
   const canonicalHref = $('link[rel="canonical"]').attr('href');
-  const canonicalUrl = canonicalHref ? canonicalizeUrl(canonicalHref, finalUrl) : canonicalizeUrl(finalUrl, policy.baseUrl);
+  const canonicalUrl =
+    (canonicalHref ? canonicalizeUrlOrNull(canonicalHref, finalUrl) : null) ??
+    canonicalizeUrl(finalUrl, policy.baseUrl);
   const language = $('html').attr('lang') || headers['content-language'] || null;
   const mainText = extractMainText($);
   const internalLinks = $('a[href]')
     .map((_, element) => $(element).attr('href'))
     .get()
     .filter((href): href is string => !!href && !href.startsWith('mailto:') && !href.startsWith('tel:') && !href.startsWith('#'))
-    .map((href) => canonicalizeUrl(href, finalUrl))
+    .map((href) => canonicalizeUrlOrNull(href, finalUrl))
+    .filter((href): href is string => !!href)
     .filter((href) => {
       try {
         return new URL(href).hostname.replace(/^www\./, '').toLowerCase() === policy.normalizedDomain;
