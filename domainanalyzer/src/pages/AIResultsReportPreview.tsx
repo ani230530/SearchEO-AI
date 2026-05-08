@@ -40,6 +40,8 @@ import {
   Upload,
   UserRound,
   Users,
+  TrendingUp,
+  X,
   Zap,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -163,34 +165,88 @@ const opportunityItems = [
 ];
 
 const shareOfVoiceData = [
-  { date: '10 Apr', brand: 8, gemini: 4, chatgpt: 2 },
-  { date: '12 Apr', brand: 12, gemini: 5, chatgpt: 3 },
-  { date: '14 Apr', brand: 9, gemini: 7, chatgpt: 4 },
-  { date: '16 Apr', brand: 18, gemini: 9, chatgpt: 7 },
-  { date: '18 Apr', brand: 25, gemini: 14, chatgpt: 12 },
-  { date: '20 Apr', brand: 21, gemini: 32, chatgpt: 18 },
-  { date: '22 Apr', brand: 16, gemini: 48, chatgpt: 29 },
+  { date: '10 April', semrush: 620, ahref: 220, athenaHq: 120, scrunch: 80 },
+  { date: '11 April', semrush: 960, ahref: 300, athenaHq: 180, scrunch: 120 },
+  { date: '12 April', semrush: 1800, ahref: 520, athenaHq: 340, scrunch: 220 },
+  { date: '13 April', semrush: 2300, ahref: 780, athenaHq: 460, scrunch: 320 },
+  { date: '14 April', semrush: 1850, ahref: 820, athenaHq: 520, scrunch: 400 },
+  { date: '15 April', semrush: 1700, ahref: 1120, athenaHq: 700, scrunch: 560 },
+  { date: '16 April', semrush: 5200, ahref: 1750, athenaHq: 980, scrunch: 820 },
+  { date: '17 April', semrush: 5800, ahref: 2050, athenaHq: 1300, scrunch: 1100 },
+  { date: '18 April', semrush: 3400, ahref: 1120, athenaHq: 900, scrunch: 720 },
+  { date: '19 April', semrush: 900, ahref: 3800, athenaHq: 1700, scrunch: 1400 },
+  { date: '20 April', semrush: 1200, ahref: 5200, athenaHq: 2400, scrunch: 1900 },
 ];
 
 const citationsData = [
-  { date: 'Apr 25', brand: 320, gemini: 140, chatgpt: 90 },
-  { date: 'Jun 25', brand: 680, gemini: 220, chatgpt: 140 },
-  { date: 'Aug 25', brand: 420, gemini: 180, chatgpt: 130 },
-  { date: 'Oct 25', brand: 540, gemini: 260, chatgpt: 160 },
-  { date: 'Dec 25', brand: 2100, gemini: 900, chatgpt: 440 },
-  { date: 'Feb 26', brand: 1700, gemini: 840, chatgpt: 520 },
-  { date: 'May 26', brand: 850, gemini: 1600, chatgpt: 1100 },
+  { date: 'April 25', chatgpt: 920, gemini: 220, claude: 110 },
+  { date: 'May 25', chatgpt: 940, gemini: 260, claude: 140 },
+  { date: 'June 25', chatgpt: 2100, gemini: 440, claude: 220 },
+  { date: 'July 25', chatgpt: 2600, gemini: 620, claude: 320 },
+  { date: 'Aug 25', chatgpt: 1550, gemini: 420, claude: 230 },
+  { date: 'Sept 25', chatgpt: 1450, gemini: 380, claude: 180 },
+  { date: 'Oct 25', chatgpt: 1750, gemini: 460, claude: 240 },
+  { date: 'Nov 25', chatgpt: 2450, gemini: 680, claude: 300 },
+  { date: 'Dec 25', chatgpt: 5200, gemini: 1350, claude: 760 },
+  { date: 'Jan 26', chatgpt: 6900, gemini: 1750, claude: 980 },
+  { date: 'Feb 26', chatgpt: 4400, gemini: 1600, claude: 1180 },
+  { date: 'Mar 26', chatgpt: 3200, gemini: 1180, claude: 860 },
+  { date: 'April 26', chatgpt: 860, gemini: 1100, claude: 760 },
+  { date: 'May 26', chatgpt: 1200, gemini: 3600, claude: 2200 },
 ];
 
 const mentionsData = [
-  { date: 'Apr 25', brand: 80, competitors: 24 },
-  { date: 'Jun 25', brand: 120, competitors: 30 },
-  { date: 'Aug 25', brand: 70, competitors: 22 },
-  { date: 'Oct 25', brand: 110, competitors: 40 },
-  { date: 'Dec 25', brand: 460, competitors: 180 },
-  { date: 'Feb 26', brand: 390, competitors: 150 },
-  { date: 'May 26', brand: 760, competitors: 320 },
+  { date: 'April 25', brand: 120, competitors: 260 },
+  { date: 'May 25', brand: 180, competitors: 320 },
+  { date: 'June 25', brand: 260, competitors: 420 },
+  { date: 'July 25', brand: 220, competitors: 380 },
+  { date: 'Aug 25', brand: 80, competitors: 120 },
+  { date: 'Sept 25', brand: 90, competitors: 140 },
+  { date: 'Oct 25', brand: 160, competitors: 220 },
+  { date: 'Nov 25', brand: 320, competitors: 620 },
+  { date: 'Dec 25', brand: 1000, competitors: 2600 },
+  { date: 'Jan 26', brand: 1150, competitors: 2700 },
+  { date: 'Feb 26', brand: 1050, competitors: 1800 },
+  { date: 'Mar 26', brand: 820, competitors: 1500 },
+  { date: 'April 26', brand: 650, competitors: 1300 },
+  { date: 'May 26', brand: 2100, competitors: 3200 },
 ];
+
+const shareOfVoiceSeries = [
+  { key: 'semrush', label: 'Semrush', stroke: '#E9897E' },
+  { key: 'ahref', label: 'Ahref', stroke: '#8DD9E8' },
+  { key: 'athenaHq', label: 'Athena HQ', stroke: '#79A7F2' },
+  { key: 'scrunch', label: 'Scrunch', stroke: '#9D8CF4' },
+] as const;
+
+const citationsSeries = [
+  { key: 'chatgpt', label: 'ChatGPT', stroke: '#E9897E' },
+  { key: 'gemini', label: 'Gemini', stroke: '#8DD9E8' },
+  { key: 'claude', label: 'Claude', stroke: '#79A7F2' },
+] as const;
+
+const mentionsSeries = [
+  { key: 'brand', label: 'Brand mentions', stroke: '#6EA8FF' },
+  { key: 'competitors', label: 'Competitors Mentions', stroke: '#7BD8EB' },
+] as const;
+
+const formatChartTick = (value: string | number) => {
+  const numericValue = Number(value);
+  if (!Number.isFinite(numericValue)) return `${value}`;
+  if (numericValue === 0) return '0';
+  return numericValue >= 1000 ? `${Math.round(numericValue / 1000)}k` : `${numericValue}`;
+};
+
+const formatDateTick = (value: string | number) =>
+  `${value}`
+    .replace('April', 'Apr')
+    .replace('June', 'Jun')
+    .replace('July', 'Jul')
+    .replace('August', 'Aug')
+    .replace('September', 'Sept')
+    .replace('October', 'Oct')
+    .replace('November', 'Nov')
+    .replace('December', 'Dec');
 
 type IconButtonProps = {
   label: string;
@@ -219,6 +275,18 @@ const HelperIcon = () => (
 const BellIcon = () => (
   <svg width="17" height="19" viewBox="0 0 17 19" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
     <path d="M5.82767 16.5833C6.41528 17.102 7.18716 17.4167 8.03253 17.4167C8.8779 17.4167 9.64977 17.102 10.2374 16.5833M13.0325 5.75C13.0325 4.42392 12.5057 3.15215 11.5681 2.21447C10.6304 1.27678 9.35861 0.75 8.03253 0.75C6.70645 0.75 5.43468 1.27678 4.49699 2.21447C3.55931 3.15215 3.03253 4.42392 3.03253 5.75C3.03253 8.32515 2.38292 10.0883 1.65725 11.2545C1.04513 12.2382 0.739075 12.7301 0.750298 12.8673C0.762724 13.0192 0.79491 13.0772 0.91734 13.168C1.02791 13.25 1.52635 13.25 2.52324 13.25H13.5418C14.5387 13.25 15.0371 13.25 15.1477 13.168C15.2701 13.0772 15.3023 13.0192 15.3148 12.8673C15.326 12.7301 15.0199 12.2382 14.4078 11.2545C13.6821 10.0883 13.0325 8.32515 13.0325 5.75Z" stroke="#8D9199" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
+const IntegrateSiteIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <path
+      d="M10.5883 15.3034L9.40982 16.4819C7.78264 18.1091 5.14445 18.1091 3.51726 16.4819C1.89008 14.8547 1.89008 12.2165 3.51726 10.5893L4.69577 9.4108M15.3024 10.5893L16.4809 9.4108C18.1081 7.78361 18.1081 5.14542 16.4809 3.51824C14.8537 1.89106 12.2155 1.89106 10.5883 3.51824L9.40982 4.69675M7.08241 12.9167L12.9157 7.08337"
+      stroke="white"
+      strokeWidth="1.66667"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
   </svg>
 );
 
@@ -252,41 +320,89 @@ const HeaderProfileButton = () => (
   </button>
 );
 
+const ReportDownloadIcon = () => (
+  <img src="/report-icons/download-button.svg" alt="" className="h-10 w-10 shrink-0" />
+);
+
+const ReportSortIcon = () => (
+  <svg width="17" height="12" viewBox="0 0 17 12" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <path
+      d="M3.25 5.75H13.25M0.75 0.75H15.75M5.75 10.75H10.75"
+      stroke="#717680"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
+
+type MetricCardDetail = {
+  label: string;
+  value: string;
+  subLabel?: string;
+  subValue?: string;
+  iconSrc?: string;
+};
+
 interface MetricCardData {
   title: string;
-  primaryLabel: string;
-  primaryValue: string;
-  secondaryLabel: string;
-  secondaryValue: string;
-  footer?: { label: string; value: string; }[];
+  kind: 'citations' | 'summary';
+  details: MetricCardDetail[];
 }
 
+const MetricInfoIcon = () => (
+  <span
+    aria-hidden="true"
+    className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-[#717680] text-[9px] font-semibold leading-none text-[#717680]"
+  >
+    i
+  </span>
+);
+
 const MetricCard = ({ card }: { card: MetricCardData }) => (
-  <Card className="rounded-xl border-slate-300 shadow-sm">
-    <CardHeader className="px-4 pb-2 pt-4">
-      <CardTitle className="text-xs font-semibold text-gray-800">{card.title}</CardTitle>
-    </CardHeader>
-    <CardContent className="px-4 pb-4">
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <p className="text-[11px] text-gray-500">{card.primaryLabel}</p>
-          <p className="mt-1 text-lg font-semibold text-blue-600">{card.primaryValue}</p>
-        </div>
-        <div>
-          <p className="text-[11px] text-gray-500">{card.secondaryLabel}</p>
-          <p className="mt-1 text-lg font-semibold text-blue-600">{card.secondaryValue}</p>
-        </div>
+  <Card className="h-full rounded-xl border border-[#D5D7DA] bg-white shadow-[0_1px_2px_0_#1018280D]">
+    <CardContent className={cn('flex h-full flex-col p-5 sm:p-6', card.kind === 'citations' ? 'min-h-[228px] gap-5' : 'min-h-[120px] gap-4')}>
+      <div className="flex items-center gap-1.5">
+        <CardTitle className="text-base font-semibold leading-[135%] tracking-normal text-[#535862]">
+          {card.title}
+        </CardTitle>
+        <MetricInfoIcon />
       </div>
-      {card.footer ? (
-        <div className="mt-4 grid grid-cols-3 gap-2 border-t border-slate-200 pt-3">
-          {card.footer.map((item) => (
-            <div key={item.label}>
-              <p className="text-[10px] text-gray-500">{item.label}</p>
-              <p className="text-xs font-semibold text-blue-600">{item.value}</p>
+
+      {card.kind === 'citations' ? (
+        <div className="grid flex-1 grid-cols-1 gap-x-6 gap-y-6 sm:grid-cols-2">
+          {card.details.map((item) => (
+            <div key={item.label} className="min-w-0">
+              <p className="text-sm font-semibold leading-[150%] tracking-normal text-[#535862]">{item.label}</p>
+              <div className="mt-2 flex items-start gap-3">
+                {item.iconSrc ? <img src={item.iconSrc} alt="" className="h-6 w-6 shrink-0 object-contain" /> : null}
+                <span className="text-[27px] font-semibold leading-[1] tracking-normal text-[#3393F2]">
+                  {item.value}
+                </span>
+              </div>
+              <p className="mt-1 text-[10px] font-normal leading-[150%] tracking-normal text-[#717680]">
+                Pages <span className="text-[#3393F2]">{item.subValue ?? '1'}</span>
+              </p>
             </div>
           ))}
         </div>
-      ) : null}
+      ) : (
+        <div className="grid flex-1 grid-cols-2 gap-6">
+          {card.details.map((item) => (
+            <div key={item.label} className="min-w-0">
+              <p className="text-sm font-semibold leading-[150%] tracking-normal text-[#535862]">{item.label}</p>
+              <p className="mt-2 text-[27px] font-semibold leading-[1] tracking-normal text-[#3393F2]">
+                {item.value}
+              </p>
+              {item.subLabel ? (
+                <p className="mt-2 text-[10px] font-normal leading-[150%] tracking-normal text-[#717680]">
+                  {item.subLabel} <span className="text-[#3393F2]">{item.subValue ?? ''}</span>
+                </p>
+              ) : null}
+            </div>
+          ))}
+        </div>
+      )}
     </CardContent>
   </Card>
 );
@@ -1003,7 +1119,31 @@ export const PromptTable = ({
   );
 };
 
-const OpportunityCard = ({
+const FilterPill = ({
+  label,
+  icon,
+  removable = false,
+}: {
+  label: string;
+  icon?: 'sort' | 'filter';
+  removable?: boolean;
+}) => (
+  <Button
+    variant="outline"
+    className="h-8 rounded-lg border border-[#D5D7DA] bg-white px-2.5 text-[11px] font-normal text-[#717680] shadow-[0_1px_2px_0_#1018280D] hover:bg-white"
+  >
+    {icon === 'sort' ? (
+      <img src="/report-icons/ascending-arrow.svg" alt="" className="mr-1.5 h-3.5 w-3.5 shrink-0" />
+    ) : icon === 'filter' ? (
+      <Filter className="mr-1.5 h-3.5 w-3.5 shrink-0 text-[#717680]" strokeWidth={1.8} />
+    ) : null}
+    {label}
+    {icon ? <ChevronDown className="ml-1.5 h-3.5 w-3.5 shrink-0 text-[#717680]" strokeWidth={1.8} /> : null}
+    {removable ? <X className="ml-1.5 h-3.5 w-3.5 shrink-0 text-[#717680]" strokeWidth={1.8} /> : null}
+  </Button>
+);
+
+const VisibilityRow = ({
   title,
   meta,
   status,
@@ -1015,25 +1155,38 @@ const OpportunityCard = ({
   actionLabel?: string;
 }) => (
   <div
-    className={`rounded-lg border p-3 ${status === 'positive'
-      ? 'border-emerald-100 bg-emerald-50'
-      : 'border-rose-100 bg-rose-50'
-      }`}
+    className={cn(
+      'rounded-lg px-3 py-3',
+      status === 'positive'
+        ? 'border border-[#B9F8CF] bg-[#E5FFE6]'
+        : 'border border-[#D5D7DA] border-t-[0.8px] border-t-[#D5D7DA] bg-white shadow-[0_1px_2px_0_#1018280D]'
+    )}
   >
-    <div className="flex items-start justify-between gap-3">
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       <div className="min-w-0">
         <div className="flex items-center gap-2">
           {status === 'positive' ? (
-            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+            <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-[#0A6D0E]" strokeWidth={2} />
           ) : (
-            <Target className="h-3.5 w-3.5 text-rose-600" />
+            <Target className="h-3.5 w-3.5 shrink-0 text-[#B42318]" strokeWidth={2} />
           )}
-          <p className="truncate text-xs font-semibold text-gray-900">{title}</p>
+          <p
+            className={cn(
+              'truncate text-[12px] italic leading-[150%]',
+              status === 'positive' ? 'text-[#2D4059]' : 'text-[#B23131]'
+            )}
+          >
+            {title}
+          </p>
         </div>
-        <p className="mt-1 text-[11px] text-gray-500">{meta}</p>
+        <p className="mt-1 text-[11px] leading-[150%] text-[#717680]">{meta}</p>
       </div>
       {actionLabel ? (
-        <Button variant="outline" className="h-7 shrink-0 rounded-lg bg-white px-2 text-[10px]">
+        <Button
+          variant="outline"
+          className="h-[37px] shrink-0 rounded-lg border border-[#D5D7DA] bg-[#F9F9F9] px-[10px] text-[12px] font-medium text-[#2D4059] shadow-[0_1px_2px_0_#1018280D] hover:bg-[#F9F9F9]"
+        >
+          <Sparkles className="mr-1.5 h-3.5 w-3.5 text-[#2D4059]" strokeWidth={1.8} />
           {actionLabel}
         </Button>
       ) : null}
@@ -1041,72 +1194,182 @@ const OpportunityCard = ({
   </div>
 );
 
+const OpportunityRow = ({
+  title,
+  severity,
+  priority,
+}: {
+  title: string;
+  severity: string;
+  priority: string;
+}) => (
+  <div className="rounded-lg border-l-[3px] border-l-[#7E9BD7] bg-white px-3 py-3 shadow-[0_1px_4px_0_#0000000D]">
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="min-w-0">
+        <p className="max-w-[240px] text-[12px] italic leading-[150%] text-[#2D4059]">{title}</p>
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <span className="inline-flex items-center rounded-full border border-[#FDA29B] bg-[#FEF3F2] px-2.5 py-0.5 text-[11px] text-[#B42318]">
+            {severity}
+          </span>
+          <span className="inline-flex items-center gap-1 text-[12px] font-medium text-[#0A6D0E]">
+            <TrendingUp className="h-3.5 w-3.5" strokeWidth={2} />
+            {priority}
+          </span>
+        </div>
+      </div>
+      <Button
+        variant="outline"
+        className="h-[37px] shrink-0 rounded-lg border border-[#D5D7DA] bg-[#F9F9F9] px-[10px] text-[12px] font-medium text-[#2D4059] shadow-[0_1px_2px_0_#1018280D] hover:bg-[#F9F9F9]"
+      >
+        <Sparkles className="mr-1.5 h-3.5 w-3.5 text-[#2D4059]" strokeWidth={1.8} />
+        Generate Content
+      </Button>
+    </div>
+  </div>
+);
+
+type ChartSeries = {
+  key: string;
+  label: string;
+  stroke: string;
+};
+
+const ChartLegendItem = ({ series }: { series: ChartSeries }) => (
+  <span className="inline-flex items-center gap-1.5 text-[10px] leading-none text-[#2D4059]">
+    <span className="inline-flex h-3 w-3 items-center justify-center rounded-[2px] border bg-white" style={{ borderColor: series.stroke }}>
+      <span className="h-1.5 w-1.5 rounded-[1px]" style={{ backgroundColor: series.stroke }} />
+    </span>
+    {series.label}
+  </span>
+);
+
+const ChartTooltip = ({
+  active,
+  payload,
+  title,
+  series,
+}: {
+  active?: boolean;
+  payload?: Array<{ dataKey?: string; value?: number | string }>;
+  title: string;
+  series: readonly ChartSeries[];
+}) => {
+  if (!active || !payload?.length) return null;
+
+  return (
+    <div className="rounded-xl border border-[#D5D7DA] bg-white px-3 py-2.5 shadow-[0_12px_30px_rgba(15,23,42,0.12)]">
+      <p className="text-xs font-semibold leading-[150%] text-[#2D4059]">{title}</p>
+      <div className="mt-2 space-y-1">
+        {series.map((item) => {
+          const value = payload.find((entry) => entry.dataKey === item.key)?.value ?? 0;
+          return (
+            <div key={item.key} className="flex items-center justify-between gap-6 text-[10px] leading-[150%] text-[#535862]">
+              <span>{item.label}</span>
+              <span className="font-medium text-[#2D4059]">{formatChartTick(value)}</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
 export const AreaChartCard = ({
   title,
   subtitle,
   data,
-  secondKey = 'gemini',
-  thirdKey = 'chatgpt',
+  series,
+  tooltipTitle,
+  yMax = 8000,
 }: {
   title: string;
   subtitle: string;
   data: Array<Record<string, string | number>>;
-  secondKey?: string;
-  thirdKey?: string;
-}) => (
-  <div className="rounded-xl border border-slate-300 bg-white p-4">
-    <div className="mb-3 flex items-start justify-between gap-3">
-      <div>
-        <h3 className="text-sm font-semibold text-gray-900">{title}</h3>
-        <p className="mt-1 text-xs text-gray-500">{subtitle}</p>
+  series: readonly ChartSeries[];
+  tooltipTitle?: string;
+  yMax?: number;
+}) => {
+  const chartId = title.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+  const ticks = [0, yMax * 0.25, yMax * 0.5, yMax * 0.75, yMax];
+
+  return (
+    <div className="w-full min-w-0">
+      <div className="px-0.5">
+        <div className="flex items-center gap-1.5">
+          <h3 className="text-[20px] font-semibold leading-[135%] text-[#414651]">{title}</h3>
+          <MetricInfoIcon />
+        </div>
+        <p className="mt-2 text-sm leading-[150%] text-[#535862]">{subtitle}</p>
+        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
+          {series.map((item) => (
+            <ChartLegendItem key={item.key} series={item} />
+          ))}
+          <span className="text-[12px] font-semibold leading-none text-[#2D4059]">+</span>
+        </div>
       </div>
-      <div className="flex gap-2">
-        <Button variant="outline" className="h-8 rounded-lg px-2 text-[11px]">
-          <ChevronDown className="mr-1 h-3 w-3" />
-          Tags
-        </Button>
-        <Button variant="outline" className="h-8 rounded-lg px-2 text-[11px]">
-          <ChevronDown className="mr-1 h-3 w-3" />
-          Sort
-        </Button>
+
+      <div className="mt-2 h-[170px] w-full overflow-x-auto">
+        <div className="h-full min-w-[520px] sm:min-w-0">
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={data} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
+              <defs>
+                {series.map((item) => (
+                  <linearGradient key={item.key} id={`${chartId}-${item.key}`} x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor={item.stroke} stopOpacity={0.42} />
+                    <stop offset="95%" stopColor={item.stroke} stopOpacity={0.18} />
+                  </linearGradient>
+                ))}
+              </defs>
+              <CartesianGrid stroke="#D5D7DA" strokeDasharray="2 3" vertical={false} />
+              <XAxis
+                dataKey="date"
+                tickLine={false}
+                axisLine={false}
+                interval="preserveStartEnd"
+                minTickGap={16}
+                tick={{ fontSize: 11, fill: '#717680' }}
+                tickFormatter={formatDateTick}
+              />
+              <YAxis
+                orientation="right"
+                domain={[0, yMax]}
+                ticks={ticks}
+                tickLine={false}
+                axisLine={false}
+                width={34}
+                tick={{ fontSize: 11, fill: '#D5D7DA' }}
+                tickFormatter={formatChartTick}
+              />
+              <Tooltip
+                cursor={{ stroke: '#A8C4F6', strokeWidth: 1 }}
+                content={({ active, payload }) => (
+                  <ChartTooltip
+                    active={active}
+                    payload={payload as Array<{ dataKey?: string; value?: number | string }> | undefined}
+                    title={tooltipTitle ?? title}
+                    series={series}
+                  />
+                )}
+              />
+              {series.map((item) => (
+                <Area
+                  key={item.key}
+                  type="monotone"
+                  dataKey={item.key}
+                  stackId="coverage"
+                  stroke={item.stroke}
+                  fill={`url(#${chartId}-${item.key})`}
+                  strokeWidth={0}
+                  activeDot={{ r: 4, fill: item.stroke, stroke: '#fff', strokeWidth: 2 }}
+                />
+              ))}
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
       </div>
     </div>
-    <div className="h-52">
-      <ResponsiveContainer width="100%" height="100%">
-        <AreaChart data={data} margin={{ top: 8, right: 8, left: -24, bottom: 0 }}>
-          <defs>
-            <linearGradient id={`${title}-brand`} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="#efb0a8" stopOpacity={0.8} />
-              <stop offset="95%" stopColor="#efb0a8" stopOpacity={0.12} />
-            </linearGradient>
-            <linearGradient id={`${title}-second`} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="#7dd3fc" stopOpacity={0.8} />
-              <stop offset="95%" stopColor="#7dd3fc" stopOpacity={0.12} />
-            </linearGradient>
-            <linearGradient id={`${title}-third`} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="#93c5fd" stopOpacity={0.7} />
-              <stop offset="95%" stopColor="#93c5fd" stopOpacity={0.1} />
-            </linearGradient>
-          </defs>
-          <CartesianGrid stroke="#eef2f7" strokeDasharray="3 3" vertical={false} />
-          <XAxis dataKey="date" tickLine={false} axisLine={false} tick={{ fontSize: 10, fill: '#9ca3af' }} />
-          <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 10, fill: '#9ca3af' }} />
-          <Tooltip
-            contentStyle={{
-              borderRadius: 12,
-              border: '1px solid #e5e7eb',
-              boxShadow: '0 12px 30px rgba(15, 23, 42, 0.12)',
-              fontSize: 12,
-            }}
-          />
-          <Area type="monotone" dataKey="brand" stroke="#e9897e" fill={`url(#${title}-brand)`} strokeWidth={2} />
-          <Area type="monotone" dataKey={secondKey} stroke="#38bdf8" fill={`url(#${title}-second)`} strokeWidth={2} />
-          <Area type="monotone" dataKey={thirdKey} stroke="#60a5fa" fill={`url(#${title}-third)`} strokeWidth={2} />
-        </AreaChart>
-      </ResponsiveContainer>
-    </div>
-  </div>
-);
+  );
+};
 
 
 const WORKSHEET_IMPORT_KEY = 'ai-results/pending-worksheet-import';
@@ -1352,51 +1615,57 @@ const AIResultsReportPreview = () => {
   }, []);
 
   // Derived metrics for dynamic cards
-  const metricCards = useMemo(() => {
+  const metricCards = useMemo<MetricCardData[]>(() => {
     if (!reportData) return [];
 
     const keywords = reportData.topPrompts?.filter((p: any) => p.type === 'keyword') || [];
     const prompts = reportData.topPrompts?.filter((p: any) => p.type === 'prompt') || [];
+    const trackedKeywords = keywords.filter((k: any) => Array.isArray(k.results) ? k.results.length > 0 : true).length || keywords.length;
+    const trackedPrompts = prompts.filter((p: any) => Array.isArray(p.results) ? p.results.length > 0 : true).length || prompts.length;
 
     const modelStats = reportData.metrics?.modelPerformance || [];
     const gptMentions = modelStats.find((m: any) => m.model?.toLowerCase().includes('gpt'))?.mentions || 0;
     const geminiMentions = modelStats.find((m: any) => m.model?.toLowerCase().includes('gemini'))?.mentions || 0;
     const claudeMentions = modelStats.find((m: any) => m.model?.toLowerCase().includes('claude'))?.mentions || 0;
     const totalMentions = modelStats.reduce((sum: number, m: any) => sum + m.mentions, 0);
+    const keywordVisibility = keywords.length > 0 ? `${Math.round(keywords.reduce((acc: number, k: any) => acc + Number.parseFloat(k.sov || '0'), 0) / keywords.length)}%` : '0%';
+    const promptVisibility = prompts.length > 0 ? `${Math.round(prompts.reduce((acc: number, p: any) => acc + Number.parseFloat(p.sov || '0'), 0) / prompts.length)}%` : '0%';
+    const mentionRate = Math.round(reportData.metrics?.mentionRate || 0);
 
     return [
       {
-        title: 'Brand Mentions',
-        primaryLabel: 'Total Mentions',
-        primaryValue: totalMentions.toString(),
-        secondaryLabel: 'ChatGPT',
-        secondaryValue: gptMentions.toString(),
-        footer: [
-          { label: 'Gemini', value: geminiMentions.toString() },
-          { label: 'Claude', value: claudeMentions.toString() },
-          { label: 'Perplexity', value: '0' },
+        title: 'AI Citations',
+        kind: 'citations',
+        details: [
+          { label: 'AI Overview', value: totalMentions.toString(), iconSrc: '/report-icons/google.svg', subValue: '1' },
+          { label: 'ChatGPT', value: gptMentions.toString(), iconSrc: '/report-icons/chat-gpt.svg', subValue: '1' },
+          { label: 'Gemini', value: geminiMentions.toString(), iconSrc: '/report-icons/gemini.svg', subValue: '3' },
+          { label: 'Claude', value: claudeMentions.toString(), iconSrc: '/report-icons/claude.svg', subValue: '1' },
         ],
       },
       {
         title: 'Top Keywords',
-        primaryLabel: 'Total',
-        primaryValue: keywords.length.toString(),
-        secondaryLabel: 'Visibility',
-        secondaryValue: keywords.length > 0 ? `${Math.round(keywords.reduce((acc: number, k: any) => acc + parseInt(k.sov), 0) / keywords.length)}%` : '0%'
+        kind: 'summary',
+        details: [
+          { label: 'Total', value: keywords.length.toString(), subLabel: 'Visibility', subValue: keywordVisibility },
+          { label: 'Tracked', value: trackedKeywords.toString(), subLabel: 'Visibility', subValue: keywordVisibility },
+        ],
       },
       {
         title: 'Top Prompts',
-        primaryLabel: 'Total',
-        primaryValue: prompts.length.toString(),
-        secondaryLabel: 'Visibility',
-        secondaryValue: prompts.length > 0 ? `${Math.round(prompts.reduce((acc: number, p: any) => acc + parseInt(p.sov), 0) / prompts.length)}%` : '0%'
+        kind: 'summary',
+        details: [
+          { label: 'Total', value: prompts.length.toString(), subLabel: 'Visibility', subValue: promptVisibility },
+          { label: 'Tracked', value: trackedPrompts.toString(), subLabel: 'Visibility', subValue: promptVisibility },
+        ],
       },
       {
         title: 'Mentions',
-        primaryLabel: 'Brand',
-        primaryValue: `${Math.round(reportData.metrics?.mentionRate || 0)}%`,
-        secondaryLabel: 'Gap',
-        secondaryValue: `${100 - Math.round(reportData.metrics?.mentionRate || 0)}%`
+        kind: 'summary',
+        details: [
+          { label: 'Brand', value: `${mentionRate}%`, subLabel: 'No. of Pages', subValue: String(reportData.metrics?.brandPages ?? 45) },
+          { label: 'Competitors', value: `${100 - mentionRate}%`, subLabel: 'No. of Pages', subValue: String(reportData.metrics?.competitorPages ?? 354) },
+        ],
       },
     ];
   }, [reportData]);
@@ -1410,8 +1679,8 @@ const AIResultsReportPreview = () => {
 
     return [
       { label: 'Overall Sentiment', value: sentimentLabel, tone: sentimentColor },
-      { label: 'Brand Accuracy Score', value: `${Math.round(reportData.metrics?.avgAccuracy || 0)}%`, tone: 'text-blue-600' },
-      { label: 'AI Share of Voice', value: `${Math.round(reportData.metrics?.visibilityScore || 0)}%`, tone: 'text-blue-600', note: 'Across all AI Models' },
+      { label: 'Brand Accuracy Score', value: `${Math.round(reportData.metrics?.avgAccuracy || 0)}%`, tone: 'text-[#3393F2]' },
+      { label: 'AI Share of Voice', value: `${Math.round(reportData.metrics?.visibilityScore || 0)}%`, tone: 'text-[#3393F2]', note: 'Across all AI Models' },
     ];
   }, [reportData]);
 
@@ -1497,105 +1766,148 @@ const AIResultsReportPreview = () => {
       maskedDomainId={maskedDomainId}
       title="AI Results"
     >
-          <section className="flex w-full flex-col gap-5 bg-white px-6 py-3">
-            <div className="flex w-full flex-col gap-6 lg:flex-row lg:flex-nowrap lg:items-center lg:justify-between">
-              <div className="flex min-h-[59px] w-full min-w-0 flex-col gap-2 lg:max-w-[882px] lg:flex-1">
-                <h1 className="text-xl font-semibold text-gray-950">Your AI Visibility Report</h1>
-                <p className=" font-normal text-base leading-normal tracking-normal text-slate-600">
-                  See how your domain appears across AI platforms and where you can improve visibility,
-                  relevance, and performance.
-                </p>
-              </div>
+      <section className="flex w-full flex-col bg-white px-4 py-3 sm:px-6">
+        <div className="flex w-full flex-col gap-4 rounded-xl bg-[#F1F6FF] px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+          <div className="min-w-0">
+            <h2 className="text-lg font-semibold leading-[1.35] tracking-normal text-[#7BA0E8] sm:text-xl">
+              Connect your site
+            </h2>
+            <p className="mt-1 text-sm font-normal leading-normal text-[#535862] sm:text-base">
+              Connect your site integration for unlock access direct blog implementation.
+            </p>
+          </div>
+          <Button className="h-[37px] w-full shrink-0 rounded-lg bg-[#2D4059] px-4 text-sm font-semibold text-white shadow-[0_1px_2px_0_#1018280D] hover:bg-[#24364d] sm:w-auto">
+            <IntegrateSiteIcon />
+            <span className="ml-2">Integrate Site</span>
+          </Button>
+        </div>
 
-              <div className="ml-auto flex h-auto w-full max-w-[591px] flex-wrap items-center justify-start gap-[9px] opacity-100 lg:h-[41px] lg:w-[591px] lg:flex-nowrap lg:justify-end lg:shrink-0">
-                <Button variant="outline" size="icon" aria-label="Download" className="h-[41px] w-[41px] shrink-0 rounded-lg">
-                  <Download className="h-4 w-4" />
-                </Button>
-                <Button variant="outline" className="h-[41px] rounded-lg px-3 text-xs">
-                  <Calendar className="mr-1.5 h-3.5 w-3.5" />
-                  7 days
-                  <ChevronDown className="ml-1.5 h-3.5 w-3.5" />
-                </Button>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline" className="h-[41px] rounded-lg px-3 text-xs capitalize">
-                      <LineChart className="mr-1.5 h-3.5 w-3.5" />
-                      {filterType === 'all' ? 'Sort' : filterType}
-                      <ChevronDown className="ml-1.5 h-3.5 w-3.5" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-[150px]">
-                    <DropdownMenuItem onClick={() => setFilterType('all')}>All Queries</DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => setFilterType('prompt')}>Prompts Only</DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => setFilterType('keyword')}>Keywords Only</DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-                <Button variant="outline" className="h-[41px] rounded-lg px-3 text-xs">
-                  <Filter className="mr-1.5 h-3.5 w-3.5" />
-                  Filters
-                  <ChevronDown className="ml-1.5 h-3.5 w-3.5" />
-                </Button>
-                <Button
-                  onClick={() => navigate("/ai-checker-v2")}
-                  className="h-[41px] rounded-lg bg-[#2f4462] px-4 text-xs text-white hover:bg-[#263852]"
-                >
-                  <Plus className="mr-1.5 h-3.5 w-3.5" />
-                  Start New Audit
-                </Button>
-              </div>
+        <div className="flex w-full flex-col gap-6 px-0 py-6">
+          <div className="flex w-full flex-col gap-4 lg:flex-row lg:flex-nowrap lg:items-start lg:justify-between">
+            <div className="min-w-0 flex-1">
+              <h1 className="text-xl font-semibold text-gray-950 sm:text-2xl">Your AI Visibility Report</h1>
+              <p className="mt-2 max-w-3xl text-base font-normal leading-normal tracking-normal text-slate-600">
+                See how your domain appears across AI platforms and where you can improve visibility,
+                relevance, and performance.
+              </p>
             </div>
 
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              {loading ? (
-                Array(4).fill(0).map((_, i) => (
-                  <div key={i} className="h-[120px] w-full animate-pulse rounded-xl bg-gray-50 border border-slate-200" />
+            <div className="flex w-full flex-wrap items-center gap-[9px] lg:ml-auto lg:w-auto lg:justify-end">
+              <Button
+                variant="outline"
+                size="icon"
+                aria-label="Download"
+                className="h-[41px] w-[41px] shrink-0 rounded-lg border-2 border-[#F9F9F9] bg-[#F9F9F9] p-0 shadow-[0_1px_2px_0_#1018280D]"
+              >
+                <ReportDownloadIcon />
+              </Button>
+              <Button
+                variant="outline"
+                className="h-[41px] rounded-lg border border-[#D5D7DA] bg-[#FFFFFF] px-3 text-xs text-[#717680] shadow-[0_1px_2px_0_#1018280D]"
+              >
+                <Calendar className="mr-1.5 h-3.5 w-3.5 text-[#717680]" strokeWidth={1.8} />
+                7 days
+                <ChevronDown className="ml-1.5 h-3.5 w-3.5 text-[#717680]" strokeWidth={1.8} />
+              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="h-[41px] rounded-lg border border-[#D5D7DA] bg-[#FFFFFF] px-3 text-xs capitalize text-[#717680] shadow-[0_1px_2px_0_#1018280D]"
+                  >
+                    <ReportSortIcon />
+                    {filterType === 'all' ? 'Sort' : filterType}
+                    <ChevronDown className="ml-1.5 h-3.5 w-3.5 text-[#717680]" strokeWidth={1.8} />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-[150px]">
+                  <DropdownMenuItem onClick={() => setFilterType('all')}>All Queries</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setFilterType('prompt')}>Prompts Only</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setFilterType('keyword')}>Keywords Only</DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <Button
+                variant="outline"
+                className="h-[41px] rounded-lg border border-[#D5D7DA] bg-[#FFFFFF] px-3 text-xs text-[#717680] shadow-[0_1px_2px_0_#1018280D]"
+              >
+                <Filter className="mr-1.5 h-3.5 w-3.5 text-[#717680]" strokeWidth={1.8} />
+                Filters
+                <ChevronDown className="ml-1.5 h-3.5 w-3.5 text-[#717680]" strokeWidth={1.8} />
+              </Button>
+              <Button
+                onClick={() => navigate('/ai-checker-v2')}
+                className="h-[41px] rounded-lg bg-gradient-to-r from-[#2D4059] to-[#4C74C2] px-4 text-xs text-white shadow-[0_1px_2px_0_#1018280D] hover:opacity-95"
+              >
+                <Plus className="mr-1.5 h-3.5 w-3.5" />
+                Start New Audit
+              </Button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,0.96fr)_minmax(0,2.04fr)]">
+            {loading || metricCards.length === 0 ? (
+              <div className="h-[230px] w-full animate-pulse rounded-xl border border-slate-200 bg-gray-50" />
+            ) : (
+              <MetricCard card={metricCards[0]} />
+            )}
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              {loading || metricCards.length === 0 ? (
+                Array(6).fill(0).map((_, i) => (
+                  <div key={i} className="h-[120px] w-full animate-pulse rounded-xl border border-slate-200 bg-gray-50" />
                 ))
               ) : (
-                metricCards.map((card) => (
-                  <MetricCard key={card.title} card={card} />
-                ))
+                [...metricCards.slice(1), ...scoreCards].map((card) =>
+                  'details' in card ? (
+                    <MetricCard key={card.title} card={card as MetricCardData} />
+                  ) : (
+                    <Card key={card.label} className="h-full rounded-xl border border-[#D5D7DA] bg-white shadow-[0_1px_2px_0_#1018280D]">
+                      <CardContent className="flex h-full flex-col gap-4 p-5 sm:p-6">
+                        <div className="flex items-center gap-1.5">
+                          <CardTitle className="text-base font-semibold leading-[135%] tracking-normal text-[#535862]">
+                            {card.label}
+                          </CardTitle>
+                          <MetricInfoIcon />
+                        </div>
+                        {card.note ? <p className="text-sm font-medium text-[#535862]">{card.note}</p> : null}
+                        <p className={cn('text-[27px] font-semibold leading-[1] tracking-normal', card.tone)}>
+                          {card.value}
+                        </p>
+                      </CardContent>
+                    </Card>
+                  )
+                )
               )}
             </div>
+          </div>
 
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-              {loading ? (
-                Array(3).fill(0).map((_, i) => (
-                  <div key={i} className="h-[100px] w-full animate-pulse rounded-xl bg-gray-50 border border-slate-200" />
-                ))
-              ) : (
-                scoreCards.map((card) => (
-                  <Card key={card.label} className="rounded-xl border-slate-300 shadow-sm">
-                    <CardContent className="p-4">
-                      <p className="text-xs font-semibold text-gray-800">{card.label}</p>
-                      {card.note ? <p className="mt-3 text-[11px] text-gray-500">{card.note}</p> : null}
-                      <p className={`mt-2 text-2xl font-semibold ${card.tone}`}>{card.value}</p>
-                    </CardContent>
-                  </Card>
-                ))
-              )}
-            </div>
+          <div>
+            {loading ? (
+              <div className="h-[400px] w-full animate-pulse rounded-xl border border-slate-200 bg-gray-50" />
+            ) : (
+              <PromptTable
+                data={filteredPrompts}
+                selectedRowIds={selectedRowIds}
+                onToggleRow={handleToggleRow}
+                onOpenWorksheetModal={handleOpenWorksheetModal}
+              />
+            )}
+          </div>
+        </div>
+      </section>
 
-  <div>
-    {loading ? (
-      <div className="h-[400px] w-full animate-pulse rounded-xl bg-gray-50 border border-slate-200" />
-    ) : (
-      <PromptTable
-        data={filteredPrompts}
-        selectedRowIds={selectedRowIds}
-        onToggleRow={handleToggleRow}
-        onOpenWorksheetModal={handleOpenWorksheetModal}
-      />
-    )}
-  </div>
-        </section >
-
-        <section className="grid w-full grid-cols-1 gap-6 bg-white px-4 py-4 sm:px-6 xl:grid-cols-[0.72fr_1.28fr]">
+        <section className="grid w-full grid-cols-1 gap-6 bg-white px-4 py-4 sm:px-6 xl:grid-cols-[0.7fr_1.3fr]">
           <div className="space-y-6">
-            <Card className="rounded-xl border-slate-300 shadow-sm">
+            <Card className="rounded-xl border border-[#D5D7DA] bg-white shadow-[0_1px_2px_0_#1018280D]">
               <CardHeader className="flex flex-row items-start justify-between px-4 pb-3 pt-4">
-                <div>
-                  <CardTitle className="text-sm font-semibold">Private Visibility Map</CardTitle>
-                  <p className="mt-1 text-xs text-gray-500">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <CardTitle className="text-base font-semibold leading-[135%] tracking-normal text-[#535862]">
+                      Phrase Visibility Map
+                    </CardTitle>
+                    <MetricInfoIcon />
+                  </div>
+                  <p className="mt-2 text-sm leading-[150%] text-[#535862]">
                     Data-backed actions to close visibility gaps and capture missed AI-driven traffic.
                   </p>
                 </div>
@@ -1603,17 +1915,11 @@ const AIResultsReportPreview = () => {
               </CardHeader>
               <CardContent className="space-y-3 px-4 pb-4">
                 <div className="flex flex-wrap gap-2">
-                  <Button variant="outline" className="h-8 rounded-lg px-3 text-[11px]">
-                    Sort by
-                    <ChevronDown className="ml-1 h-3 w-3" />
-                  </Button>
-                  <Button variant="outline" className="h-8 rounded-lg px-3 text-[11px]">
-                    Filters
-                    <ChevronDown className="ml-1 h-3 w-3" />
-                  </Button>
+                  <FilterPill label="Sort" icon="sort" />
+                  <FilterPill label="Filters" icon="filter" />
                 </div>
                 {privateVisibilityItems.map((item, index) => (
-                  <OpportunityCard
+                  <VisibilityRow
                     key={`${item.title}-${index}`}
                     title={item.title}
                     meta={item.count}
@@ -1624,11 +1930,16 @@ const AIResultsReportPreview = () => {
               </CardContent>
             </Card>
 
-            <Card className="rounded-xl border-slate-300 shadow-sm">
+            <Card className="rounded-xl border border-[#D5D7DA] bg-white shadow-[0_1px_2px_0_#1018280D]">
               <CardHeader className="flex flex-row items-start justify-between px-4 pb-3 pt-4">
-                <div>
-                  <CardTitle className="text-sm font-semibold">Opportunities to Outrank Competitors</CardTitle>
-                  <p className="mt-1 text-xs text-gray-500">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <CardTitle className="text-base font-semibold leading-[135%] tracking-normal text-[#535862]">
+                      Opportunities to Outrank Competitors
+                    </CardTitle>
+                    <MetricInfoIcon />
+                  </div>
+                  <p className="mt-2 text-sm leading-[150%] text-[#535862]">
                     Data-backed actions to close visibility gaps and capture missed AI-driven traffic.
                   </p>
                 </div>
@@ -1636,49 +1947,64 @@ const AIResultsReportPreview = () => {
               </CardHeader>
               <CardContent className="space-y-3 px-4 pb-4">
                 <div className="flex flex-wrap gap-2">
-                  <Button variant="outline" className="h-8 rounded-lg px-3 text-[11px]">
-                    Sort by Mode
-                    <ChevronDown className="ml-1 h-3 w-3" />
-                  </Button>
-                  <Button variant="outline" className="h-8 rounded-lg px-3 text-[11px]">
-                    From 12
-                    <ChevronDown className="ml-1 h-3 w-3" />
+                  <FilterPill label="Sort: By Models" icon="sort" />
+                  <FilterPill label="Filters (2)" icon="filter" />
+                  <FilterPill label="Gemini 2.0" removable />
+                  <Button
+                    variant="outline"
+                    className="h-8 rounded-full border border-[#D5D7DA] bg-white px-3 text-[11px] text-[#717680] shadow-[0_1px_2px_0_#1018280D] hover:bg-white"
+                  >
+                    +1
                   </Button>
                 </div>
                 {opportunityItems.map((item, index) => (
-                  <OpportunityCard
+                  <OpportunityRow
                     key={`${item.title}-${index}`}
-                    title={item.title}
-                    meta={`${item.severity} - ${item.priority}`}
-                    status="danger"
-                    actionLabel="Generate Content"
+                    title="Create comprehensive backlink analysis guide"
+                    severity="Critical"
+                    priority="Very High"
                   />
                 ))}
               </CardContent>
             </Card>
           </div>
 
-          <Card className="rounded-xl border-slate-300 shadow-sm">
-            <CardHeader className="px-4 pb-2 pt-4">
-              <CardTitle className="text-sm font-semibold">Visibility & Coverage</CardTitle>
+          <Card className="rounded-xl border border-[#D5D7DA] bg-white shadow-[0_1px_2px_0_#1018280D]">
+            <CardHeader className="flex flex-col gap-3 px-4 pb-2 pt-4 sm:flex-row sm:items-center sm:justify-between">
+              <CardTitle className="text-base font-semibold text-[#2D4059]">Visibility & Coverage</CardTitle>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  variant="outline"
+                  className="h-8 rounded-lg border border-[#D5D7DA] bg-white px-3 text-[11px] text-[#717680] shadow-[0_1px_2px_0_#1018280D] hover:bg-white"
+                >
+                  <Calendar className="mr-1.5 h-3.5 w-3.5 text-[#717680]" strokeWidth={1.8} />
+                  7 days
+                  <ChevronDown className="ml-1.5 h-3.5 w-3.5 text-[#717680]" strokeWidth={1.8} />
+                </Button>
+                <FilterPill label="Sort" icon="sort" />
+              </div>
             </CardHeader>
-            <CardContent className="space-y-4 px-4 pb-4">
+            <CardContent className="space-y-8 px-4 pb-4">
               <AreaChartCard
                 title="Share of Voice"
                 subtitle="Data-backed actions to close visibility gaps and capture missed AI-driven traffic."
                 data={shareOfVoiceData}
+                series={shareOfVoiceSeries}
+                tooltipTitle="AI Share of voice"
               />
               <AreaChartCard
                 title="Citations"
                 subtitle="How often your brand is cited in AI responses on each LLM Models"
                 data={citationsData}
+                series={citationsSeries}
+                tooltipTitle="Citations"
               />
               <AreaChartCard
                 title="Mentions rate trend"
                 subtitle="Monthly mentions over 6 months."
                 data={mentionsData}
-                secondKey="competitors"
-                thirdKey="competitors"
+                series={mentionsSeries}
+                tooltipTitle="Mentions"
               />
             </CardContent>
           </Card>
