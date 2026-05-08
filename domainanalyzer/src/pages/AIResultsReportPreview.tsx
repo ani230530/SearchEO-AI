@@ -67,6 +67,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { AIResultsLayout } from '@/features/ai-results/components/AIResultsLayout';
 import { maskDomainId, unmaskDomainId } from '../lib/domainUtils';
 
 const getDomainHost = (rawUrl: string | undefined): string => {
@@ -348,8 +349,8 @@ const ModelComparisonGrid = ({ results }: { results: any[] }) => {
                         </div>
                       ) : (
                         <span className="text-[13px] font-normal text-slate-500">
-                          {r[metric.key] !== null && r[metric.key] !== undefined 
-                            ? Number(r[metric.key]).toFixed(1) 
+                          {r[metric.key] !== null && r[metric.key] !== undefined
+                            ? Number(r[metric.key]).toFixed(1)
                             : 'N/A'}
                         </span>
                       )}
@@ -474,8 +475,8 @@ const ExpandedDetails = ({ results }: { results: any[] }) => {
     results.forEach(r => {
       if (!r || !r.model) return;
       if (!grouped[r.model]) {
-        grouped[r.model] = { 
-          ...r, 
+        grouped[r.model] = {
+          ...r,
           _count: 1,
           _mentionCount: r.presence > 0 ? 1 : 0,
           relevance: r.presence > 0 ? (r.relevance || 0) : 0,
@@ -708,13 +709,15 @@ type PromptTableProps = {
   selectedRowIds: Set<string>;
   onToggleRow: (id: string) => void;
   onOpenWorksheetModal: (singleRowId?: string) => void;
+  title?: string;
 };
 
-const PromptTable = ({
+export const PromptTable = ({
   data,
   selectedRowIds,
   onToggleRow,
   onOpenWorksheetModal,
+  title = 'Top searched Prompts',
 }: PromptTableProps) => {
   const selectedCount = selectedRowIds.size;
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -754,7 +757,7 @@ const PromptTable = ({
     <Card className="rounded-xl border-slate-300 shadow-sm overflow-hidden">
       <CardHeader className="space-y-6 px-6 pt-6 pb-4">
         <div className="flex flex-col gap-1">
-          <CardTitle className="text-xl font-bold text-[#1e293b]">Top searched Prompts</CardTitle>
+          <CardTitle className="text-xl font-bold text-[#1e293b]">{title}</CardTitle>
           <p className="text-sm text-slate-500">
             Compare how AI models respond, cite sources, and surface competitors across queries
           </p>
@@ -1031,7 +1034,7 @@ const OpportunityCard = ({
   </div>
 );
 
-const AreaChartCard = ({
+export const AreaChartCard = ({
   title,
   subtitle,
   data,
@@ -1430,7 +1433,7 @@ const AIResultsReportPreview = () => {
 
       try {
         let realId = unmaskDomainId(maskedDomainId);
-        
+
         // Fallback: If mapping is missing (e.g. fresh page reload on deep link),
         // fetch all domains and find which one matches this mask.
         if (!realId) {
@@ -1438,7 +1441,7 @@ const AIResultsReportPreview = () => {
           const domainsResp = await apiGet<any>('/dashboard/all');
           const domains = domainsResp?.domains || [];
           setAllDomains(domains);
-          
+
           const found = domains.find((d: any) => maskDomainId(d.id) === maskedDomainId);
           if (found) {
             realId = found.id;
@@ -1479,261 +1482,102 @@ const AIResultsReportPreview = () => {
   }, [maskedDomainId]);
 
   return (
-    <div className="flex min-h-screen w-full flex-col bg-[#f5f5f7] text-slate-900 lg:flex-row lg:items-start">
-      <aside className="min-h-[220px] w-full shrink-0 basis-auto border-b border-slate-300 bg-white p-4 lg:sticky lg:top-0 lg:h-screen lg:basis-[18%] lg:min-w-[260px] lg:max-w-[342px] lg:overflow-y-auto lg:border-b-0 lg:border-r">
-        <div className="flex h-full flex-col">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-gray-500">logo</span>
-            <IconButton label="Settings" icon={Settings} />
-          </div>
-
-          <div className="mt-6">
-            <p className="mb-2 text-xs font-semibold text-gray-700">Domain</p>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button className="flex w-full items-center justify-between rounded-lg border border-slate-300 bg-white px-3 py-2 text-left text-xs shadow-sm transition hover:bg-gray-50">
-                  <span className="flex min-w-0 items-center gap-2">
-                    <span className="grid h-6 w-6 flex-shrink-0 place-items-center overflow-hidden rounded-md bg-gray-50">
-                      {getDomainLogo(reportData?.domainInfo?.url) ? (
-                        <img
-                          src={getDomainLogo(reportData?.domainInfo?.url)!}
-                          alt=""
-                          className="h-5 w-5 object-contain"
-                          onError={(e) => {
-                            (e.currentTarget as HTMLImageElement).style.display = 'none';
-                          }}
-                        />
-                      ) : (
-                        <Globe2 className="h-3.5 w-3.5 text-gray-500" />
-                      )}
-                    </span>
-                    <span className="truncate text-xs font-medium text-gray-900">
-                      {getDomainHost(reportData?.domainInfo?.url) || 'Loading…'}
-                    </span>
-                  </span>
-                  <ChevronDown className="h-3.5 w-3.5 text-gray-400" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent
-                className="max-h-[60vh] w-[260px] overflow-y-auto p-1"
-                align="start"
-              >
-                {allDomains.length > 0 ? (
-                  allDomains.map((domain) => {
-                    const isActive = domain.id === reportData?.domainInfo?.id;
-                    const logo = getDomainLogo(domain.url);
-                    return (
-                      <DropdownMenuItem
-                        key={domain.id}
-                        onClick={() => navigate(`/ai-results/${maskDomainId(domain.id)}`)}
-                        className={`flex items-start gap-2 px-3 py-2 cursor-pointer ${isActive ? 'bg-gray-50' : ''}`}
-                      >
-                        <span className="grid h-7 w-7 flex-shrink-0 place-items-center overflow-hidden rounded-md bg-gray-50">
-                          {logo ? (
-                            <img
-                              src={logo}
-                              alt=""
-                              className="h-6 w-6 object-contain"
-                              onError={(e) => {
-                                (e.currentTarget as HTMLImageElement).style.display = 'none';
-                              }}
-                            />
-                          ) : (
-                            <Globe2 className="h-3.5 w-3.5 text-gray-500" />
-                          )}
-                        </span>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex w-full items-center justify-between gap-2">
-                            <span className="truncate text-xs font-semibold text-gray-900">
-                              {getDomainHost(domain.url)}
-                            </span>
-                            {isActive && (
-                              <CheckCircle2 className="h-3 w-3 flex-shrink-0 text-emerald-600" />
-                            )}
-                          </div>
-                          {domain.createdAt && (
-                            <span className="text-[10px] text-gray-500">
-                              Last analyzed: {new Date(domain.createdAt).toLocaleDateString()}
-                            </span>
-                          )}
-                        </div>
-                      </DropdownMenuItem>
-                    );
-                  })
-                ) : (
-                  <div className="p-3 text-center text-xs text-gray-500">
-                    No other domains found
-                  </div>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-
-          <nav className="mt-5 space-y-1">
-            {sidebarItems.map((item) => {
-              const Icon = item.icon;
-              const isActive = item.id === 'ai-results';
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => {
-                    if (item.id === 'ai-results') {
-                      // Already on this page
-                      window.scrollTo({ top: 0, behavior: 'smooth' });
-                    } else if (item.id === 'competitors') {
-                      navigate(`/dashboard?tab=analytics&subtab=competitors&domain=${maskedDomainId}`);
-                    } else if (item.id === 'analytics') {
-                      navigate(`/dashboard?tab=analytics&domain=${maskedDomainId}`);
-                    } else {
-                      // For Top Prompts/Keywords, we can just scroll to the table
-                      const tableElement = document.getElementById('report-table-section');
-                      if (tableElement) {
-                        tableElement.scrollIntoView({ behavior: 'smooth' });
-                      }
-                    }
-                  }}
-                  className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-xs font-medium transition ${isActive
-                    ? 'bg-[#2f4462] text-white'
-                    : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-                    }`}
-                >
-                  <Icon className="h-4 w-4" />
-                  {item.label}
-                </button>
-              );
-            })}
-          </nav>
-
-          <div className="mt-auto hidden space-y-3 pt-8 lg:block">
-            {[LayoutDashboard, Bot, ShieldCheck, Settings].map((Icon, index) => (
-              <button
-                key={index}
-                type="button"
-                className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-700"
-              >
-                <Icon className="h-4 w-4" />
-              </button>
-            ))}
-          </div>
-        </div>
-      </aside>
-
-      <main className="ml-0 flex min-h-screen flex-1 min-w-0 flex-col gap-2.5 bg-white">
-        <header className="w-full bg-white px-6 py-6">
-          <div className="flex min-h-[3.75rem] w-full items-center justify-between gap-2.5 py-2.5 pr-2.5">
-            <button
-              onClick={() => navigate('/ai-visibility')}
-              className="inline-flex items-center gap-2.5 text-left text-2xl font-semibold leading-[1.35] tracking-normal text-gray-950"
-            >
-              <BackArrowIcon />
-              AI Results
-            </button>
-
-            <div className="flex h-8 items-center">
-              <div className="flex items-center gap-2">
-                <HeaderIconButton label="Help">
-                  <HelperIcon />
-                </HeaderIconButton>
-                <HeaderIconButton label="Notifications">
-                  <BellIcon />
-                </HeaderIconButton>
+    <AIResultsLayout
+      activeItem="ai-results"
+      allDomains={allDomains}
+      currentDomainId={reportData?.domainInfo?.id}
+      currentDomainUrl={reportData?.domainInfo?.url}
+      maskedDomainId={maskedDomainId}
+      title="AI Results"
+    >
+          <section className="flex w-full flex-col gap-5 bg-white px-6 py-3">
+            <div className="flex w-full flex-col gap-6 lg:flex-row lg:flex-nowrap lg:items-center lg:justify-between">
+              <div className="flex min-h-[59px] w-full min-w-0 flex-col gap-2 lg:max-w-[882px] lg:flex-1">
+                <h1 className="text-xl font-semibold text-gray-950">Your AI Visibility Report</h1>
+                <p className=" font-normal text-base leading-normal tracking-normal text-slate-600">
+                  See how your domain appears across AI platforms and where you can improve visibility,
+                  relevance, and performance.
+                </p>
               </div>
-              <div className="ml-6">
-                <HeaderProfileButton />
+
+              <div className="ml-auto flex h-auto w-full max-w-[591px] flex-wrap items-center justify-start gap-[9px] opacity-100 lg:h-[41px] lg:w-[591px] lg:flex-nowrap lg:justify-end lg:shrink-0">
+                <Button variant="outline" size="icon" aria-label="Download" className="h-[41px] w-[41px] shrink-0 rounded-lg">
+                  <Download className="h-4 w-4" />
+                </Button>
+                <Button variant="outline" className="h-[41px] rounded-lg px-3 text-xs">
+                  <Calendar className="mr-1.5 h-3.5 w-3.5" />
+                  7 days
+                  <ChevronDown className="ml-1.5 h-3.5 w-3.5" />
+                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" className="h-[41px] rounded-lg px-3 text-xs capitalize">
+                      <LineChart className="mr-1.5 h-3.5 w-3.5" />
+                      {filterType === 'all' ? 'Sort' : filterType}
+                      <ChevronDown className="ml-1.5 h-3.5 w-3.5" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-[150px]">
+                    <DropdownMenuItem onClick={() => setFilterType('all')}>All Queries</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setFilterType('prompt')}>Prompts Only</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setFilterType('keyword')}>Keywords Only</DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                <Button variant="outline" className="h-[41px] rounded-lg px-3 text-xs">
+                  <Filter className="mr-1.5 h-3.5 w-3.5" />
+                  Filters
+                  <ChevronDown className="ml-1.5 h-3.5 w-3.5" />
+                </Button>
+                <Button className="h-[41px] rounded-lg bg-[#2f4462] px-4 text-xs text-white hover:bg-[#263852]">
+                  <Plus className="mr-1.5 h-3.5 w-3.5" />
+                  Start New Audit
+                </Button>
               </div>
             </div>
-          </div>
-        </header>
 
-        <section className="flex w-full flex-col gap-5 bg-white px-6 py-3">
-          <div className="flex w-full flex-col gap-6 lg:flex-row lg:flex-nowrap lg:items-center lg:justify-between">
-            <div className="flex min-h-[59px] w-full min-w-0 flex-col gap-2 lg:max-w-[882px] lg:flex-1">
-              <h1 className="text-xl font-semibold text-gray-950">Your AI Visibility Report</h1>
-              <p className=" font-normal text-base leading-normal tracking-normal text-slate-600">
-                See how your domain appears across AI platforms and where you can improve visibility,
-                relevance, and performance.
-              </p>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              {loading ? (
+                Array(4).fill(0).map((_, i) => (
+                  <div key={i} className="h-[120px] w-full animate-pulse rounded-xl bg-gray-50 border border-slate-200" />
+                ))
+              ) : (
+                metricCards.map((card) => (
+                  <MetricCard key={card.title} card={card} />
+                ))
+              )}
             </div>
 
-            <div className="ml-auto flex h-auto w-full max-w-[591px] flex-wrap items-center justify-start gap-[9px] opacity-100 lg:h-[41px] lg:w-[591px] lg:flex-nowrap lg:justify-end lg:shrink-0">
-              <Button variant="outline" size="icon" aria-label="Download" className="h-[41px] w-[41px] shrink-0 rounded-lg">
-                <Download className="h-4 w-4" />
-              </Button>
-              <Button variant="outline" className="h-[41px] rounded-lg px-3 text-xs">
-                <Calendar className="mr-1.5 h-3.5 w-3.5" />
-                7 days
-                <ChevronDown className="ml-1.5 h-3.5 w-3.5" />
-              </Button>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" className="h-[41px] rounded-lg px-3 text-xs capitalize">
-                    <LineChart className="mr-1.5 h-3.5 w-3.5" />
-                    {filterType === 'all' ? 'Sort' : filterType}
-                    <ChevronDown className="ml-1.5 h-3.5 w-3.5" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-[150px]">
-                  <DropdownMenuItem onClick={() => setFilterType('all')}>All Queries</DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setFilterType('prompt')}>Prompts Only</DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setFilterType('keyword')}>Keywords Only</DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-              <Button variant="outline" className="h-[41px] rounded-lg px-3 text-xs">
-                <Filter className="mr-1.5 h-3.5 w-3.5" />
-                Filters
-                <ChevronDown className="ml-1.5 h-3.5 w-3.5" />
-              </Button>
-              <Button className="h-[41px] rounded-lg bg-[#2f4462] px-4 text-xs text-white hover:bg-[#263852]">
-                <Plus className="mr-1.5 h-3.5 w-3.5" />
-                Start New Audit
-              </Button>
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+              {loading ? (
+                Array(3).fill(0).map((_, i) => (
+                  <div key={i} className="h-[100px] w-full animate-pulse rounded-xl bg-gray-50 border border-slate-200" />
+                ))
+              ) : (
+                scoreCards.map((card) => (
+                  <Card key={card.label} className="rounded-xl border-slate-300 shadow-sm">
+                    <CardContent className="p-4">
+                      <p className="text-xs font-semibold text-gray-800">{card.label}</p>
+                      {card.note ? <p className="mt-3 text-[11px] text-gray-500">{card.note}</p> : null}
+                      <p className={`mt-2 text-2xl font-semibold ${card.tone}`}>{card.value}</p>
+                    </CardContent>
+                  </Card>
+                ))
+              )}
             </div>
-          </div>
 
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            {loading ? (
-              Array(4).fill(0).map((_, i) => (
-                <div key={i} className="h-[120px] w-full animate-pulse rounded-xl bg-gray-50 border border-slate-200" />
-              ))
-            ) : (
-              metricCards.map((card) => (
-                <MetricCard key={card.title} card={card} />
-              ))
-            )}
-          </div>
-
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-            {loading ? (
-              Array(3).fill(0).map((_, i) => (
-                <div key={i} className="h-[100px] w-full animate-pulse rounded-xl bg-gray-50 border border-slate-200" />
-              ))
-            ) : (
-              scoreCards.map((card) => (
-                <Card key={card.label} className="rounded-xl border-slate-300 shadow-sm">
-                  <CardContent className="p-4">
-                    <p className="text-xs font-semibold text-gray-800">{card.label}</p>
-                    {card.note ? <p className="mt-3 text-[11px] text-gray-500">{card.note}</p> : null}
-                    <p className={`mt-2 text-2xl font-semibold ${card.tone}`}>{card.value}</p>
-                  </CardContent>
-                </Card>
-              ))
-            )}
-          </div>
-
-          <div>
-            {loading ? (
-              <div className="h-[400px] w-full animate-pulse rounded-xl bg-gray-50 border border-slate-200" />
-            ) : (
-              <PromptTable
-                data={filteredPrompts}
-                selectedRowIds={selectedRowIds}
-                onToggleRow={handleToggleRow}
-                onOpenWorksheetModal={handleOpenWorksheetModal}
-              />
-            )}
-          </div>
-        </section>
+  <div>
+    {loading ? (
+      <div className="h-[400px] w-full animate-pulse rounded-xl bg-gray-50 border border-slate-200" />
+    ) : (
+      <PromptTable
+        data={filteredPrompts}
+        selectedRowIds={selectedRowIds}
+        onToggleRow={handleToggleRow}
+        onOpenWorksheetModal={handleOpenWorksheetModal}
+      />
+    )}
+  </div>
+        </section >
 
         <section className="grid w-full grid-cols-1 gap-6 bg-white px-4 py-4 sm:px-6 xl:grid-cols-[0.72fr_1.28fr]">
           <div className="space-y-6">
@@ -1840,20 +1684,19 @@ const AIResultsReportPreview = () => {
             Connect Google
           </Button>
         </section>
-      </main>
 
-      <WorksheetPickerModal
-        open={isWorksheetModalOpen}
-        selectedCount={selectedCount}
-        activeWorksheetId={activeWorksheetId}
-        worksheets={worksheetOptions}
-        loading={worksheetOptionsLoading}
-        onOpenChange={handleWorksheetModalOpenChange}
-        onWorksheetSelect={setActiveWorksheetId}
-        onAddToWorksheet={handleAddToWorksheet}
-        onCreateNewWorksheet={handleCreateNewWorksheet}
-      />
-    </div>
+  <WorksheetPickerModal
+    open={isWorksheetModalOpen}
+    selectedCount={selectedCount}
+    activeWorksheetId={activeWorksheetId}
+    worksheets={worksheetOptions}
+    loading={worksheetOptionsLoading}
+    onOpenChange={handleWorksheetModalOpenChange}
+    onWorksheetSelect={setActiveWorksheetId}
+    onAddToWorksheet={handleAddToWorksheet}
+    onCreateNewWorksheet={handleCreateNewWorksheet}
+  />
+    </AIResultsLayout>
   );
 };
 
