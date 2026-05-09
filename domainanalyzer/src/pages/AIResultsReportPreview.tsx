@@ -1,7 +1,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { useNavigate, useParams } from 'react-router-dom';
-import { apiGet } from '../services/apiClient';
+import { apiGet, apiPost } from '../services/apiClient';
 import { cn } from '@/lib/utils';
 import {
   Area,
@@ -1979,11 +1979,30 @@ const AIResultsReportPreview = () => {
 
   const handleWorksheetModalOpenChange = useCallback((open: boolean) => {
     setIsWorksheetModalOpen(open);
-    if (!open) setActiveWorksheetId(null);
+    if (!open) {
+      setActiveWorksheetId(null);
+      setPendingGeneration(null);
+    }
   }, []);
 
   const handleAddToWorksheet = useCallback(() => {
     if (!activeWorksheetId) return;
+
+    // Branch 1: a phrase / opportunity Generate-Content click is waiting on
+    // this pick — close the modal, fire the topic+keywords build into the
+    // chosen worksheet (campaignId), then n8n.
+    if (pendingGeneration) {
+      const { key, payload } = pendingGeneration;
+      const campaignId = Number(activeWorksheetId);
+      setIsWorksheetModalOpen(false);
+      setPendingGeneration(null);
+      setActiveWorksheetId(null);
+      void runGeneration(key, payload, Number.isFinite(campaignId) ? campaignId : null);
+      return;
+    }
+
+    // Branch 2 (existing): table multi-select → hand off to the worksheet
+    // page via sessionStorage.
     const rowsById = new Map<string, any>(
       (reportData?.topPrompts || []).map((p: any) => [String(p.id), p])
     );
@@ -1999,11 +2018,36 @@ const AIResultsReportPreview = () => {
     localStorage.setItem('activeTab', 'projects');
     setIsWorksheetModalOpen(false);
     navigate('/dashboard');
-  }, [activeWorksheetId, navigate, reportData, selectedRowIds]);
+  }, [activeWorksheetId, navigate, pendingGeneration, reportData, runGeneration, selectedRowIds]);
 
-  const handleCreateNewWorksheet = useCallback(() => {
+  const handleCreateNewWorksheet = useCallback(async () => {
+    // For the Generate-Content flow, prompt for a name and create the
+    // worksheet inline so the user doesn't lose their place.
+    if (pendingGeneration) {
+      const name = window.prompt('Worksheet name?')?.trim();
+      if (!name) return;
+      try {
+        const created = await apiPost<{ campaign?: { id: number; title: string } }>(
+          '/campaigns',
+          { title: name }
+        );
+        const newId = created?.campaign?.id;
+        if (!newId) return;
+        const newOption: WorksheetOption = { id: String(newId), name, description: null };
+        setWorksheetOptions((prev) => [newOption, ...prev]);
+        const { key, payload } = pendingGeneration;
+        setIsWorksheetModalOpen(false);
+        setPendingGeneration(null);
+        setActiveWorksheetId(null);
+        void runGeneration(key, payload, newId);
+      } catch (err) {
+        console.error('[AIResults] Create worksheet failed:', err);
+        alert('Failed to create worksheet. Please try again.');
+      }
+      return;
+    }
     setIsWorksheetModalOpen(false);
-  }, []);
+  }, [pendingGeneration, runGeneration]);
 
   // Derived metrics for the 4×2 dashboard cards.
   //
@@ -2465,64 +2509,56 @@ const AIResultsReportPreview = () => {
   // We track per-key generation state so multiple rows can run in parallel.
   const [generationByKey, setGenerationByKey] = useState<Record<string, GenerationState>>({});
 
-  const handleGenerateContent = useCallback(
-    async (
-      key: string,
-      payload: {
-        kind: 'opportunity' | 'phrase';
-        title: string;
-        rationale: string;
-        primaryKeyword: string | null;
-        longtailKeywords: string[];
-        suggestedTemplate: 'blog' | 'landing_page' | 'case_study' | 'faq';
-        category: string | null;
-        intentStage: string | null;
-        // LLM-enriched fields (opportunities only). Phrase rows pass null
-        // and the backend falls back to template-derived defaults.
-        recommendedAngle?: string;
-        brief?: {
-          audience?: string;
-          tone?: 'Authoritative' | 'Helpful' | 'Conversational' | 'Technical';
-          structure?: string;
-          keyPoints?: string[];
-          wordCount?: number;
-          cta?: string;
-        };
-      }
-    ) => {
+  // The opportunity / phrase row currently waiting on a worksheet pick.
+  // Set when the user clicks "Generate Content" / "Reinforce", consumed by
+  // handleAddToWorksheet → runGeneration after they choose a worksheet.
+  type GenerationPayload = {
+    kind: 'opportunity' | 'phrase';
+    title: string;
+    rationale: string;
+    primaryKeyword: string | null;
+    longtailKeywords: string[];
+    suggestedTemplate: 'blog' | 'landing_page' | 'case_study' | 'faq';
+    category: string | null;
+    intentStage: string | null;
+    recommendedAngle?: string;
+    brief?: {
+      audience?: string;
+      tone?: 'Authoritative' | 'Helpful' | 'Conversational' | 'Technical';
+      structure?: string;
+      keyPoints?: string[];
+      wordCount?: number;
+      cta?: string;
+    };
+  };
+  const [pendingGeneration, setPendingGeneration] = useState<{ key: string; payload: GenerationPayload } | null>(null);
+
+  const runGeneration = useCallback(
+    async (key: string, payload: GenerationPayload, campaignId: number | null) => {
       if (!reportData?.domainInfo?.id) return;
       setGenerationByKey((prev) => ({ ...prev, [key]: { kind: 'submitting' } }));
       try {
-        // 1. Atomically create-or-resolve the topic in the user's company-domain
-        //    worksheet, with primary + longtail keywords + LLM-enriched brief.
-        const buildResp = await fetch(
-          `${import.meta.env.VITE_API_URL}/api/campaigns/topics/from-opportunity`,
+        // 1. Atomically create-or-resolve the topic in the chosen worksheet
+        //    (campaignId), with primary + longtail keywords + LLM-enriched
+        //    brief. apiPost handles VITE_API_URL fallback so we don't 404
+        //    when the env var isn't set in the build.
+        const built = await apiPost<{ topicId: number; campaignId: number }>(
+          '/campaigns/topics/from-opportunity',
           {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${localStorage.getItem('authToken') ?? ''}`,
-            },
-            body: JSON.stringify({
-              domainId: reportData.domainInfo.id,
-              opportunityKey: key,
-              title: payload.title,
-              rationale: payload.rationale,
-              primaryKeyword: payload.primaryKeyword,
-              longtailKeywords: payload.longtailKeywords,
-              suggestedTemplate: payload.suggestedTemplate,
-              recommendedAngle: payload.recommendedAngle,
-              brief: payload.brief,
-            }),
+            domainId: reportData.domainInfo.id,
+            opportunityKey: key,
+            campaignId,
+            title: payload.title,
+            rationale: payload.rationale,
+            primaryKeyword: payload.primaryKeyword,
+            longtailKeywords: payload.longtailKeywords,
+            suggestedTemplate: payload.suggestedTemplate,
+            recommendedAngle: payload.recommendedAngle,
+            brief: payload.brief,
           }
         );
-        if (!buildResp.ok) throw new Error(`Topic build failed (${buildResp.status})`);
-        const built = (await buildResp.json()) as { topicId: number; campaignId: number };
 
-        // 2. Fire n8n with the LLM-enriched brief baked in. Audience / tone /
-        //    wordCount / cta come from the enriched brief when available;
-        //    structure + keyPoints + recommendedAngle land in the topic
-        //    field so the writer has real direction.
+        // 2. Fire n8n with the LLM-enriched brief baked in.
         const audience = payload.brief?.audience?.trim();
         const tone =
           payload.brief?.tone ?? (payload.category === 'branded_trust' ? 'Conversational' : 'Authoritative');
@@ -2542,30 +2578,22 @@ const AIResultsReportPreview = () => {
         }
         const topicBrief = topicBriefLines.join('\n\n');
 
-        const genResp = await fetch(
-          `${import.meta.env.VITE_API_URL}/api/campaigns/topics/${built.topicId}/generate`,
+        const genJson = await apiPost<{ job?: { jobId: string; progress: number; phase: string | null } }>(
+          `/campaigns/topics/${built.topicId}/generate`,
           {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${localStorage.getItem('authToken') ?? ''}`,
-            },
-            body: JSON.stringify({
-              template_type: payload.suggestedTemplate,
-              project_name: reportData.domainInfo.companyName ?? reportData.domainInfo.host,
-              project_goal: payload.rationale,
-              target_audience: 'Custom',
-              custom_audience_text: audience ?? payload.intentStage ?? 'general buyer',
-              tone,
-              word_count: wordCount,
-              language: 'en',
-              cta,
-              templateFields: { topic: topicBrief },
-            }),
+            template_type: payload.suggestedTemplate,
+            project_name: reportData.domainInfo.companyName ?? reportData.domainInfo.host,
+            project_goal: payload.rationale,
+            target_audience: 'Custom',
+            custom_audience_text: audience ?? payload.intentStage ?? 'general buyer',
+            tone,
+            word_count: wordCount,
+            language: 'en',
+            cta,
+            templateFields: { topic: topicBrief },
           }
         );
-        if (!genResp.ok) throw new Error(`Generation failed (${genResp.status})`);
-        const genJson = (await genResp.json()) as { job?: { jobId: string; progress: number; phase: string | null } };
+
         if (genJson.job?.jobId) {
           setGenerationByKey((prev) => ({
             ...prev,
@@ -2584,6 +2612,19 @@ const AIResultsReportPreview = () => {
     [reportData]
   );
 
+  // Click handler on phrase / opportunity rows. Opens the worksheet picker
+  // first — the actual API calls run after the user picks a worksheet (or
+  // creates a new one). Mirrors the table-flow UX.
+  const handleGenerateContent = useCallback(
+    (key: string, payload: GenerationPayload) => {
+      if (!reportData?.domainInfo?.id) return;
+      setPendingGeneration({ key, payload });
+      setActiveWorksheetId(null);
+      setIsWorksheetModalOpen(true);
+    },
+    [reportData]
+  );
+
   // SSE listener — flips running rows to done/failed when n8n pings back.
   useEffect(() => {
     const runningKeys = Object.entries(generationByKey).filter(([, s]) => s.kind === 'running');
@@ -2592,7 +2633,8 @@ const AIResultsReportPreview = () => {
     const token = localStorage.getItem('authToken');
     if (!token) return;
 
-    const url = `${import.meta.env.VITE_API_URL}/api/sse?token=${encodeURIComponent(token)}`;
+    const apiBase = import.meta.env.VITE_API_URL ?? 'http://localhost:3002';
+    const url = `${apiBase}/api/sse?token=${encodeURIComponent(token)}`;
     const es = new EventSource(url);
     es.onmessage = (ev) => {
       try {
@@ -3130,7 +3172,7 @@ const AIResultsReportPreview = () => {
 
   <WorksheetPickerModal
     open={isWorksheetModalOpen}
-    selectedCount={selectedCount}
+    selectedCount={pendingGeneration ? 1 : selectedCount}
     activeWorksheetId={activeWorksheetId}
     worksheets={worksheetOptions}
     loading={worksheetOptionsLoading}

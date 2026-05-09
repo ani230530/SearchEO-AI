@@ -1359,6 +1359,10 @@ router.post(
     const userId = (req as AuthenticatedRequest).user.userId;
     const body = (req.body ?? {}) as {
       domainId?: number;
+      // Optional — when the user picks a worksheet on the dashboard's
+      // Generate-Content flow we route the topic into THAT campaign instead
+      // of falling back to the first/auto campaign for the domain.
+      campaignId?: number | null;
       opportunityKey?: string;
       title?: string;
       rationale?: string;
@@ -1395,14 +1399,28 @@ router.post(
     });
     if (!domain) return res.status(404).json({ success: false, error: 'Domain not found' });
 
-    // Resolve (or create) the campaign for this domain. Most users have
-    // exactly one campaign per company domain; if there's no campaign yet
-    // we create a default one so the user doesn't have to leave the page.
-    let campaign = await prisma.campaign.findFirst({
-      where: { domainId },
-      select: { id: true },
-      orderBy: { createdAt: 'asc' },
-    });
+    // Resolve the target campaign (worksheet). Three paths:
+    //   1. Caller passed campaignId — use it after ownership check.
+    //   2. No campaignId, but a campaign exists for this domain — use the
+    //      oldest (existing behaviour, preserves idempotency).
+    //   3. No campaign at all — create a default one so the user can
+    //      generate without leaving the page.
+    let campaign: { id: number } | null = null;
+    const requestedCampaignId = Number(body.campaignId);
+    if (Number.isFinite(requestedCampaignId) && requestedCampaignId > 0) {
+      const owned = await prisma.campaign.findFirst({
+        where: { id: requestedCampaignId, domain: { userId } },
+        select: { id: true },
+      });
+      if (!owned) return res.status(404).json({ success: false, error: 'Worksheet not found' });
+      campaign = owned;
+    } else {
+      campaign = await prisma.campaign.findFirst({
+        where: { domainId },
+        select: { id: true },
+        orderBy: { createdAt: 'asc' },
+      });
+    }
     if (!campaign) {
       campaign = await prisma.campaign.create({
         data: {
