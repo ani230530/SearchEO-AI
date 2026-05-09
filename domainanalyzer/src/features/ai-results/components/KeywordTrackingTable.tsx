@@ -1,4 +1,5 @@
-import { Fragment, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
+import { apiGet } from "@/services/apiClient";
 import ReactMarkdown from "react-markdown";
 import {
   Area,
@@ -65,11 +66,14 @@ export type KeywordModelResult = {
 };
 
 export type KeywordTableRow = {
-  avgSentiment: number;
+  /** 0..10 average across rows where the brand was mentioned. null when nothing was measurable. */
+  avgSentiment: number | null;
   bestRank: number;
   competitorCount: number;
   competitors: string[];
   id: string;
+  /** Raw DB id (Keyword.id) — used by the expanded row to fetch /history. */
+  rawId?: number;
   mentions: number;
   phrase: string;
   results: KeywordModelResult[];
@@ -88,19 +92,9 @@ type ProcessedKeywordResult = KeywordModelResult & {
   sources: string[];
 };
 
-const detailGraphData = [
-  { day: "17 April", value: 10, x: 17 },
-  { day: "18 April", value: 18, x: 18 },
-  { day: "19 April", value: 15, x: 19 },
-  { day: "20 April", value: 12, x: 20 },
-  { day: "21 April", value: 42, x: 21 },
-  { day: "22 April", value: 48, x: 22 },
-  { day: "23 April", value: 15, x: 23 },
-  { day: "24 April", value: 22, x: 24 },
-];
-
-const detailGraphTicks = [18, 21, 22, 23, 24];
-const detailGraphHighlight = detailGraphData[3];
+// detailGraphData / detailGraphTicks / detailGraphHighlight removed —
+// the keyword detail chart now derives from the live /history endpoint
+// (see KeywordVisibilityComparisonGraph below).
 
 const getSentimentColor = (sentiment: string) => {
   const s = sentiment.toLowerCase();
@@ -140,32 +134,114 @@ const CitationCard = () => (
   </div>
 );
 
-const KeywordVisibilityComparisonGraph = ({ results }: { results: ProcessedKeywordResult[] }) => {
-  const rankingRows = [
-    { label: "Chat GPT", score: "24/100" },
-    { label: "Gemini", score: "27/100" },
-    { label: "Claude", score: "16/100" },
-  ];
+/** Friendly model label — mirrors the prompt-table mapping. */
+const getKeywordModelLabel = (model?: string): string => {
+  if (!model) return "Unknown model";
+  const lower = model.toLowerCase();
+  if (/gpt|openai/.test(lower)) return "ChatGPT";
+  if (/claude|anthropic/.test(lower)) return "Claude";
+  if (/gemini|google/.test(lower)) return "Gemini";
+  if (/deep/.test(lower)) return "DeepSeek";
+  return model.replace(/[-_/]/g, " ");
+};
+
+/** Real per-model presence rollup for THIS keyword's results. */
+const buildKeywordModelPresenceRows = (results: ProcessedKeywordResult[]) => {
+  const byModel = new Map<string, { total: number; mentions: number }>();
+  for (const r of results) {
+    if (!byModel.has(r.model)) byModel.set(r.model, { total: 0, mentions: 0 });
+    const slot = byModel.get(r.model)!;
+    slot.total += 1;
+    slot.mentions += r.presence > 0 ? 1 : 0;
+  }
+  return Array.from(byModel.entries()).map(([model, v]) => ({
+    label: getKeywordModelLabel(model),
+    model,
+    score: `${v.mentions}/${v.total}`,
+  }));
+};
+
+/**
+ * Per-keyword history chart. Fetches /history for this keyword (which
+ * rolls up across all child prompts) and renders presence-rate% over each
+ * completed audit run. Same empty-state ladder as the prompt chart.
+ */
+const KeywordVisibilityComparisonGraph = ({
+  results,
+  domainId,
+  keywordRawId,
+}: {
+  results: ProcessedKeywordResult[];
+  domainId?: number | null;
+  keywordRawId?: number | null;
+}) => {
+  const presenceRows = buildKeywordModelPresenceRows(results);
+  const [history, setHistory] = useState<Array<{ runId: number; startedAt: string; presenceRate: number; mentions: number; total: number }>>([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    if (!domainId || !keywordRawId) {
+      setHistory([]);
+      return;
+    }
+    setLoadingHistory(true);
+    apiGet<{ runs: Array<{ runId: number; startedAt: string; presenceRate: number; mentions: number; total: number }> }>(
+      `/wizard/domain/${domainId}/keywords/${keywordRawId}/history`
+    )
+      .then((res) => { if (alive) setHistory(res.runs ?? []); })
+      .catch(() => { if (alive) setHistory([]); })
+      .finally(() => { if (alive) setLoadingHistory(false); });
+    return () => { alive = false; };
+  }, [domainId, keywordRawId]);
+
+  const chartData = history.map((h, i) => ({
+    x: i,
+    presence: h.presenceRate,
+    label: new Date(h.startedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" }),
+  }));
+  const ticks = chartData.length > 0
+    ? [0, Math.floor(chartData.length / 2), chartData.length - 1].filter((v, i, a) => a.indexOf(v) === i)
+    : [];
+  const lastIdx = chartData.length - 1;
+  const emptyMessage = !domainId || !keywordRawId
+    ? "Open from a tracked domain to see history"
+    : loadingHistory
+      ? "Loading history…"
+      : history.length === 0
+        ? "No audit history for this keyword yet"
+        : history.length === 1
+          ? "Trend appears after your next audit"
+          : null;
 
   return (
     <div className="relative border-r border-[#e7ebf2] pr-3">
-      <div className="absolute left-[102px] top-[24px] z-10 w-max rounded-[8px] border border-[#f1f3f7] bg-white px-3 py-2.5 shadow-[0_4px_16px_rgba(15,23,42,0.06)]">
-        <p className="text-[11px] font-semibold text-[#1e293b]">Ranking across LLMS</p>
-        <div className="mt-2 space-y-2">
-          {rankingRows.map((item) => (
-            <div key={item.label} className="flex items-center justify-between gap-5 text-[9px] font-medium text-[#475569]">
-              <span className="flex items-center gap-1.5">
-                {getModelIcon(item.label)}
-                {item.label}
-              </span>
-              <span>{item.score}</span>
-            </div>
-          ))}
+      {presenceRows.length > 0 ? (
+        <div className="absolute left-[102px] top-[24px] z-10 w-max rounded-[8px] border border-[#f1f3f7] bg-white px-3 py-2.5 shadow-[0_4px_16px_rgba(15,23,42,0.06)]">
+          <p className="text-[11px] font-semibold text-[#1e293b]">Mentioned per model</p>
+          <div className="mt-2 space-y-2">
+            {presenceRows.map((item) => (
+              <div key={item.model} className="flex items-center justify-between gap-5 text-[9px] font-medium text-[#475569]">
+                <span className="flex items-center gap-1.5">
+                  {getModelIcon(item.model)}
+                  {item.label}
+                </span>
+                <span>{item.score}</span>
+              </div>
+            ))}
+          </div>
         </div>
-      </div>
-      <div className="h-[246px]">
+      ) : null}
+      <div className="relative h-[246px]">
+        {emptyMessage ? (
+          <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
+            <span className="rounded-full bg-white/95 border border-slate-200 px-3 py-1.5 text-[11px] text-slate-500 shadow-sm">
+              {emptyMessage}
+            </span>
+          </div>
+        ) : null}
         <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={detailGraphData} margin={{ top: 6, right: 10, left: -18, bottom: 0 }}>
+          <AreaChart data={chartData} margin={{ top: 6, right: 10, left: -18, bottom: 0 }}>
             <defs>
               <linearGradient id="keyword-detail-fill" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stopColor="#c8d9f3" stopOpacity={0.95} />
@@ -176,23 +252,18 @@ const KeywordVisibilityComparisonGraph = ({ results }: { results: ProcessedKeywo
             <XAxis
               axisLine={false}
               dataKey="x"
-              domain={[17, 24]}
+              domain={[0, Math.max(0, chartData.length - 1)]}
               tick={{ fill: "#8d97a6", fontSize: 12 }}
-              tickFormatter={(value) => `${value} April`}
+              tickFormatter={(value) => chartData[value]?.label ?? ""}
               tickLine={false}
-              ticks={detailGraphTicks}
+              ticks={ticks}
               type="number"
             />
-            <YAxis axisLine={false} domain={[0, 60]} hide tickLine={false} />
-            <Area dataKey="value" fill="url(#keyword-detail-fill)" stroke="none" type="monotone" />
-            <ReferenceDot
-              fill="#83a9da"
-              isFront
-              r={4.5}
-              stroke="#83a9da"
-              x={detailGraphHighlight.x}
-              y={detailGraphHighlight.value}
-            />
+            <YAxis axisLine={false} domain={[0, 100]} hide tickLine={false} />
+            <Area dataKey="presence" fill="url(#keyword-detail-fill)" stroke="#83a9da" strokeWidth={1.5} type="monotone" />
+            {lastIdx >= 0 ? (
+              <ReferenceDot fill="#83a9da" isFront r={4.5} stroke="#83a9da" x={lastIdx} y={chartData[lastIdx]?.presence ?? 0} />
+            ) : null}
           </AreaChart>
         </ResponsiveContainer>
       </div>
@@ -302,7 +373,17 @@ const KeywordAIResponsePanel = ({
   );
 };
 
-const KeywordExpandedDetails = ({ results, phrase }: { results: KeywordModelResult[]; phrase: string }) => {
+const KeywordExpandedDetails = ({
+  results,
+  phrase,
+  domainId,
+  rawId,
+}: {
+  results: KeywordModelResult[];
+  phrase: string;
+  domainId?: number | null;
+  rawId?: number | null;
+}) => {
   const processedResults = useMemo<ProcessedKeywordResult[]>(() => {
     const grouped = new Map<string, ProcessedKeywordResult>();
 
@@ -390,7 +471,11 @@ const KeywordExpandedDetails = ({ results, phrase }: { results: KeywordModelResu
         </div>
       </div>
       <div className="grid grid-cols-[1fr_2.4fr] gap-3 border-t border-[#eef2f6] pt-4">
-        <KeywordVisibilityComparisonGraph results={processedResults} />
+        <KeywordVisibilityComparisonGraph
+          results={processedResults}
+          domainId={domainId}
+          keywordRawId={rawId}
+        />
         <KeywordAIResponsePanel
           results={processedResults}
           selectedModel={selectedModel}
@@ -404,9 +489,12 @@ const KeywordExpandedDetails = ({ results, phrase }: { results: KeywordModelResu
 export const KeywordTrackingTable = ({
   data,
   title = "Keywords Tracking",
+  domainId,
 }: {
   data: KeywordTableRow[];
   title?: string;
+  /** Real Domain.id used by the expanded row to fetch /history. */
+  domainId?: number | null;
 }) => {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [tableMetric, setTableMetric] = useState<string | null>(null);
@@ -415,12 +503,13 @@ export const KeywordTrackingTable = ({
     let items = [...data];
 
     if (tableMetric) {
+      const num = (v: number | null | undefined) => (typeof v === "number" ? v : -1);
       items.sort((a, b) => {
         if (tableMetric === "Ranking") return b.mentions - a.mentions;
         if (tableMetric === "Position") return a.bestRank - b.bestRank;
         if (tableMetric === "SOV") return Number.parseInt(b.sov, 10) - Number.parseInt(a.sov, 10);
         if (tableMetric === "Competitors") return b.competitorCount - a.competitorCount;
-        return b.avgSentiment - a.avgSentiment;
+        return num(b.avgSentiment) - num(a.avgSentiment);
       });
     }
 
@@ -625,14 +714,20 @@ export const KeywordTrackingTable = ({
                       <span className="text-[11px] font-medium text-slate-600">500</span>
                     </TableCell>
                     <TableCell className="px-2 py-3">
-                      <Badge
-                        variant="outline"
-                        className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${getSentimentColor(
-                          row.avgSentiment > 7 ? "Positive" : row.avgSentiment > 4 ? "Neutral" : "Negative"
-                        )}`}
-                      >
-                        {row.avgSentiment > 7 ? "Positive" : row.avgSentiment > 4 ? "Neutral" : "Negative"}
-                      </Badge>
+                      {row.avgSentiment === null || row.mentions === 0 ? (
+                        // Honest empty: no model mentioned the brand for this
+                        // keyword, so there's nothing to label Positive/Neg.
+                        <span className="text-[10px] font-medium text-slate-400 italic">Not mentioned</span>
+                      ) : (
+                        <Badge
+                          variant="outline"
+                          className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${getSentimentColor(
+                            row.avgSentiment >= 7 ? "Positive" : row.avgSentiment >= 4 ? "Neutral" : "Negative"
+                          )}`}
+                        >
+                          {row.avgSentiment >= 7 ? "Positive" : row.avgSentiment >= 4 ? "Neutral" : "Negative"}
+                        </Badge>
+                      )}
                     </TableCell>
                     <TableCell className="px-4 py-3 text-right">
                       <div className="flex justify-end gap-2">
@@ -649,7 +744,12 @@ export const KeywordTrackingTable = ({
                   {expandedId === row.id ? (
                     <TableRow className="border-b border-slate-300 bg-white hover:bg-white">
                       <TableCell colSpan={8} className="p-0">
-                        <KeywordExpandedDetails results={row.results} phrase={row.phrase} />
+                        <KeywordExpandedDetails
+                          results={row.results}
+                          phrase={row.phrase}
+                          domainId={domainId}
+                          rawId={row.rawId}
+                        />
                       </TableCell>
                     </TableRow>
                   ) : null}
