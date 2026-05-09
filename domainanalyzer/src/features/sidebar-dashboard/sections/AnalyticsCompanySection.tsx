@@ -227,72 +227,81 @@ export function AnalyticsCompanySection({
                 {/* Company Info Tab Content */}
                 {activeCompanySubTab === "company-info" && (
                   <div>
-                    {/* Always-visible domain card + tracked-keywords block.
-                        Renders even when domainContext is empty / there are
-                        no keywords (the fancy grid below still gates on
-                        domainContext, but the user still sees something). */}
-                    <DomainInfoContent
-                      companyDomain={companyDomain}
-                      domainContext={domainContext}
-                      domainId={createdDomainId}
-                      keywords={keywords as any}
-                      loading={companyDomainLoading}
-                      error={companyDomainFetchError ?? null}
-                      onRetry={onRetryCompanyDomain}
-                    />
+                    {/* When the domain has no synthesized context yet,
+                        render the empty/setup card. Once the 8-section
+                        markdown is present the original card grid takes
+                        over below — the user wanted the OLD UI back, no
+                        intermediate card on top. */}
+                    {!domainContext ? (
+                      <DomainInfoContent
+                        companyDomain={companyDomain}
+                        domainContext={domainContext}
+                        domainId={createdDomainId}
+                        keywords={keywords as any}
+                        loading={companyDomainLoading}
+                        error={companyDomainFetchError ?? null}
+                        onRetry={onRetryCompanyDomain}
+                      />
+                    ) : null}
                     {/* Domain Context - Centered and Wide */}
                     {domainContext && (
                       <div className="mb-16">
                         {(() => {
                           const full = domainContext;
+                        // Each section's icon. The alt MUST match the
+                        // section title — when the Cloudinary SVG fails
+                        // to load (or is blocked), the browser shows the
+                        // alt text, and copy-pasting "Target Audience
+                        // Profiling" onto every section made all eight
+                        // cards display the same fallback label.
                         const iconMap: Record<string, JSX.Element> = {
   "Business Model Analysis": <img
     src="https://res.cloudinary.com/dgfzjdi68/image/upload/v1772020198/Group_1_vvjxuz.svg"
-    alt="Target Audience Profiling"
+    alt=""
     width={50}
     height={50}
   />,
   "Target Audience Profiling": (
   <img
     src="https://res.cloudinary.com/dgfzjdi68/image/upload/v1772020378/Group_2_t45oi4.svg"
-    alt="Target Audience Profiling"
+    alt=""
     width={50}
     height={50}
   />
 ),
   "Value Proposition & Positioning": <img
     src="https://res.cloudinary.com/dgfzjdi68/image/upload/v1772020608/streamline-plump_target-3_zf59wp.svg"
-    alt="Target Audience Profiling"
+    alt=""
     width={50}
     height={50}
   />,
   "SEO & Content Strategy Insights": <img
     src="https://res.cloudinary.com/dgfzjdi68/image/upload/v1772020608/hugeicons_seo_itfmdp.svg"
-    alt="Target Audience Profiling"
+    alt=""
     width={50}
     height={50}
   />,
   "Competitive Intelligence": <img
     src="https://res.cloudinary.com/dgfzjdi68/image/upload/v1772020606/Group_ho0bh5.svg"
-    alt="Target Audience Profiling"
+    alt=""
     width={50}
     height={50}
   />,
   "Market Dynamics": <img
     src="https://res.cloudinary.com/dgfzjdi68/image/upload/v1772020608/market-analysis_svgrepo.com_wjuzuv.svg"
-    alt="Target Audience Profiling"
+    alt=""
     width={50}
     height={50}
   />,
   "Location-Based SEO Analysis": <img
     src="https://res.cloudinary.com/dgfzjdi68/image/upload/v1772020608/location-med-2_svgrepo.com_y5xuuh.svg"
-    alt="Target Audience Profiling"
+    alt=""
     width={50}
     height={50}
   />,
   "SEO Opportunity Analysis": <img
     src="https://res.cloudinary.com/dgfzjdi68/image/upload/v1772020609/seo_svgrepo.com_wwqcub.svg"
-    alt="Target Audience Profiling"
+    alt=""
     width={50}
     height={50}
   />,
