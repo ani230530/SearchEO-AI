@@ -58,6 +58,7 @@ import { DashboardContentRouter } from "@/features/sidebar-dashboard/components/
 import { DashboardHeader } from "@/features/sidebar-dashboard/components/DashboardHeader";
 import { DashboardSidebar } from "@/features/sidebar-dashboard/components/DashboardSidebar";
 import { AnalyticsCompanySection } from "@/features/sidebar-dashboard/sections/AnalyticsCompanySection";
+import { DomainInfoContent } from "@/features/sidebar-dashboard/sections/DomainInfoContent";
 import { ProjectsSection } from "@/features/sidebar-dashboard/sections/ProjectsSection";
 import WorksheetDraftOverlay from "@/features/campaign/WorksheetDraftOverlay";
 import { DASHBOARD_TABS } from "@/features/sidebar-dashboard/constants";
@@ -113,6 +114,7 @@ useEffect(() => {
   const [isSidebarHovered, setIsSidebarHovered] = useState(false);
   const [companyDomain, setCompanyDomain] = useState("");
   const [companyDomainLoading, setCompanyDomainLoading] = useState(false);
+  const [companyDomainFetchError, setCompanyDomainFetchError] = useState<string | null>(null);
   const [domainError, setDomainError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [deleteId, setDeleteId] = useState<number | null>(null);
@@ -840,6 +842,7 @@ useEffect(() => {
     
     try {
       setCompanyDomainLoading(true);
+      setCompanyDomainFetchError(null);
       // Add timestamp to prevent caching
       const response = await fetch(
         `${import.meta.env.VITE_API_URL}/api/user/company-domain?t=${Date.now()}`,
@@ -892,6 +895,9 @@ useEffect(() => {
       }
     } catch (error) {
       console.error("Error fetching company domain:", error);
+      setCompanyDomainFetchError(
+        error instanceof Error ? error.message : 'Failed to fetch company domain'
+      );
       // On error, DO NOT clear state immediately to avoid flickering or data loss on transient network issues
       // unless we are sure it's a "not found" case (handled above).
     } finally {
@@ -2465,7 +2471,17 @@ useEffect(() => {
       companyDomainLoading,
       isLoading,
       loadingContent: null,
-      resultsContent: null,
+      resultsContent: (
+        <DomainInfoContent
+          companyDomain={companyDomain}
+          domainContext={domainContext}
+          domainId={createdDomainId}
+          keywords={keywords as any}
+          loading={companyDomainLoading}
+          error={companyDomainFetchError}
+          onRetry={() => fetchCompanyDomain(true)}
+        />
+      ),
       setupContent: null,
       showResults,
     },
