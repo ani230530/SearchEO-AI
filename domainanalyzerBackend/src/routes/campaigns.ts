@@ -199,14 +199,16 @@ const ensureCampaignOwnership = async (campaignId: number, userId: number) =>
     },
     include: {
       domain: {
-        select: {
-          id: true,
-          url: true,
-          userId: true,
-          isCompanyDomain: true,
-          context: true,
-          location: true,
-          locationContext: true,
+        include: {
+          // New schema: brand context lives on DomainInferred + DomainProfile,
+          // crawl text on the latest CrawlSnapshot.
+          inferred: { select: { summary: true, brandVoice: true, targetAudience: true } },
+          profile: { select: { country: true, state: true, targetLocation: true } },
+          crawls: {
+            orderBy: { createdAt: 'desc' },
+            take: 1,
+            select: { rawText: true },
+          },
           keywords: {
             select: { term: true },
             orderBy: { volume: 'desc' },
@@ -703,38 +705,27 @@ router.post(
       })
     ).map((t) => t.title);
 
-    const semanticAnalysis = await prisma.semanticAnalysis.findFirst({
-      where: { domainId: domain.id },
-      orderBy: { createdAt: 'desc' },
-      select: { contentSummary: true },
-    });
-
-    let brandVoice: any;
-    let targetAudience: any;
-    if (semanticAnalysis?.contentSummary) {
-      try {
-        const parsed = JSON.parse(semanticAnalysis.contentSummary);
-        brandVoice = parsed.brandVoice;
-        targetAudience = parsed.targetAudience;
-      } catch {
-        /* ignore */
-      }
-    }
+    const brandVoice = (domain as any).inferred?.brandVoice ?? undefined;
+    const targetAudience = (domain as any).inferred?.targetAudience ?? undefined;
+    const domainContext =
+      (domain as any).inferred?.summary
+      ?? (domain as any).crawls?.[0]?.rawText
+      ?? null;
 
     const domainKeywords = extractDomainKeywords(domain).slice(0, 25);
     const seedKeywords = domainKeywords.sort(() => 0.5 - Math.random()).slice(0, 12);
 
     const generatedTopics = await generateCampaignTopics({
       domainUrl: domain.url,
-      domainContext: domain.context,
+      domainContext,
       keywords: seedKeywords,
       count,
       focus,
       excludeTopics: existingTitles,
       campaignTitle: campaign.title,
       campaignDescription: campaign.description || undefined,
-      location: (domain as any).location,
-      locationContext: (domain as any).locationContext,
+      location: (domain as any).profile?.country ?? null,
+      locationContext: (domain as any).profile?.targetLocation ?? null,
       brandVoice,
       targetAudience,
     });
@@ -781,7 +772,17 @@ router.post(
       },
       include: {
         keywords: true,
-        campaign: { include: { domain: true } },
+        campaign: {
+          include: {
+            domain: {
+              include: {
+                inferred: { select: { summary: true, brandVoice: true, targetAudience: true } },
+                profile: { select: { country: true, state: true, targetLocation: true } },
+                crawls: { orderBy: { createdAt: 'desc' }, take: 1, select: { rawText: true } },
+              },
+            },
+          },
+        },
       },
     });
 
@@ -800,32 +801,22 @@ router.post(
       })
       .map((k) => k.term);
 
-    const semanticAnalysis = await prisma.semanticAnalysis.findFirst({
-      where: { domainId: topic.campaign.domain.id },
-      orderBy: { createdAt: 'desc' },
-      select: { contentSummary: true },
-    });
-    let brandVoice: any;
-    let targetAudience: any;
-    if (semanticAnalysis?.contentSummary) {
-      try {
-        const parsed = JSON.parse(semanticAnalysis.contentSummary);
-        brandVoice = parsed.brandVoice;
-        targetAudience = parsed.targetAudience;
-      } catch {
-        /* ignore */
-      }
-    }
+    const brandVoice = (topic.campaign.domain as any).inferred?.brandVoice ?? undefined;
+    const targetAudience = (topic.campaign.domain as any).inferred?.targetAudience ?? undefined;
+    const domainContext =
+      (topic.campaign.domain as any).inferred?.summary
+      ?? (topic.campaign.domain as any).crawls?.[0]?.rawText
+      ?? null;
 
     const suggestion = await generateTopicTitleSuggestion({
       domainUrl: topic.campaign.domain.url,
-      domainContext: topic.campaign.domain.context,
+      domainContext,
       keywordTerms: sortedKeywords,
       campaignTitle: topic.campaign.title,
       campaignDescription: topic.campaign.description || undefined,
       currentTitle: topic.title,
-      location: (topic.campaign.domain as any).location,
-      locationContext: (topic.campaign.domain as any).locationContext,
+      location: (topic.campaign.domain as any).profile?.country ?? null,
+      locationContext: (topic.campaign.domain as any).profile?.targetLocation ?? null,
       brandVoice,
       targetAudience,
     });
@@ -984,36 +975,26 @@ router.post(
       (k) => (k.aiMetadata as any)?.isPrimary === true
     );
 
-    // Pull semantic analysis for richer brand context (matches topic-gen path).
-    const semanticAnalysis = await prisma.semanticAnalysis.findFirst({
-      where: { domainId: topic.campaign.domain.id },
-      orderBy: { createdAt: 'desc' },
-      select: { contentSummary: true },
-    });
-    let brandVoice: any;
-    let targetAudience: any;
-    if (semanticAnalysis?.contentSummary) {
-      try {
-        const parsed = JSON.parse(semanticAnalysis.contentSummary);
-        brandVoice = parsed.brandVoice;
-        targetAudience = parsed.targetAudience;
-      } catch {
-        /* ignore */
-      }
-    }
+    // Brand context now lives on DomainInferred + DomainProfile + latest CrawlSnapshot.
+    const brandVoice = (topic.campaign.domain as any).inferred?.brandVoice ?? undefined;
+    const targetAudience = (topic.campaign.domain as any).inferred?.targetAudience ?? undefined;
+    const domainContext =
+      (topic.campaign.domain as any).inferred?.summary
+      ?? (topic.campaign.domain as any).crawls?.[0]?.rawText
+      ?? null;
 
     const domainKeywords = extractDomainKeywords(topic.campaign.domain).slice(0, 25);
     const suggestions = await generateKeywordsSuggestion({
       domainUrl: topic.campaign.domain.url,
-      domainContext: topic.campaign.domain.context,
+      domainContext,
       keywords: domainKeywords,
       topicTitle: topic.title,
       existingTerms,
       campaignTitle: topic.campaign.title,
       campaignDescription: topic.campaign.description || undefined,
       count,
-      location: (topic.campaign.domain as any).location,
-      locationContext: (topic.campaign.domain as any).locationContext,
+      location: (topic.campaign.domain as any).profile?.country ?? null,
+      locationContext: (topic.campaign.domain as any).profile?.targetLocation ?? null,
       brandVoice,
       targetAudience,
     });
@@ -1353,6 +1334,169 @@ router.get(
         createdAt: draft.createdAt.toISOString(),
       },
     });
+  })
+);
+
+/**
+ * POST /api/campaigns/topics/from-opportunity
+ *
+ * One call to take a Phrase Visibility row or Outrank Opportunity straight
+ * to a worksheet topic that's ready to generate. Atomic: resolves the
+ * domain's company-domain campaign (creating one if missing), creates a
+ * `CampaignTopic` for this opportunity, and seeds it with the primary
+ * keyword + longtails in a single Prisma transaction. Returns
+ * { topicId, campaignId } so the caller can immediately fire
+ * /topics/:topicId/generate.
+ *
+ * Idempotent on `opportunityKey`: re-clicking the same opportunity returns
+ * the existing topic instead of creating a duplicate. Stored on
+ * CampaignTopic.aiMetadata.opportunityKey.
+ */
+router.post(
+  '/topics/from-opportunity',
+  authenticateToken,
+  asyncHandler(async (req: Request, res: Response) => {
+    const userId = (req as AuthenticatedRequest).user.userId;
+    const body = (req.body ?? {}) as {
+      domainId?: number;
+      opportunityKey?: string;
+      title?: string;
+      rationale?: string;
+      primaryKeyword?: string | null;
+      longtailKeywords?: string[];
+      suggestedTemplate?: string;
+      // Optional LLM-enriched brief from /report. When present we store it
+      // on aiMetadata so the worksheet's generation path can read it.
+      brief?: {
+        audience?: string;
+        tone?: string;
+        structure?: string;
+        keyPoints?: string[];
+        wordCount?: number;
+        cta?: string;
+      };
+      recommendedAngle?: string;
+    };
+
+    const domainId = Number(body.domainId);
+    const opportunityKey = typeof body.opportunityKey === 'string' ? body.opportunityKey.trim() : '';
+    const title = typeof body.title === 'string' ? body.title.trim() : '';
+    if (!Number.isFinite(domainId) || !opportunityKey || !title) {
+      return res.status(400).json({
+        success: false,
+        error: 'domainId, opportunityKey, and title are required',
+      });
+    }
+
+    // Ownership check + grab the domain row.
+    const domain = await prisma.domain.findFirst({
+      where: { id: domainId, userId },
+      select: { id: true, host: true, isCompanyDomain: true },
+    });
+    if (!domain) return res.status(404).json({ success: false, error: 'Domain not found' });
+
+    // Resolve (or create) the campaign for this domain. Most users have
+    // exactly one campaign per company domain; if there's no campaign yet
+    // we create a default one so the user doesn't have to leave the page.
+    let campaign = await prisma.campaign.findFirst({
+      where: { domainId },
+      select: { id: true },
+      orderBy: { createdAt: 'asc' },
+    });
+    if (!campaign) {
+      campaign = await prisma.campaign.create({
+        data: {
+          domainId,
+          title: `Default worksheet for ${domain.host}`,
+          description: 'Auto-created from an Outrank Opportunity in the AI Results dashboard.',
+        },
+        select: { id: true },
+      });
+    }
+    const campaignId = campaign.id;
+
+    // Idempotency — if a topic for this opportunityKey already exists,
+    // return it instead of duplicating.
+    const existingTopic = await prisma.campaignTopic.findFirst({
+      where: {
+        campaignId,
+        aiMetadata: { path: ['opportunityKey'], equals: opportunityKey } as any,
+      },
+      select: { id: true },
+    });
+    if (existingTopic) {
+      return res.json({ success: true, topicId: existingTopic.id, campaignId, reused: true });
+    }
+
+    // Create the topic + keywords inside a single transaction so a partial
+    // failure can never leave a topic with missing keywords.
+    const created = await prisma.$transaction(async (tx) => {
+      // Compose a description that gives the writer real direction —
+      // rationale + recommended angle + bulleted key points.
+      const briefBullets = Array.isArray(body.brief?.keyPoints)
+        ? body.brief!.keyPoints.filter((s): s is string => typeof s === 'string' && s.trim().length > 0)
+        : [];
+      const descriptionParts: string[] = [];
+      if (typeof body.rationale === 'string' && body.rationale.trim()) descriptionParts.push(body.rationale.trim());
+      if (typeof body.recommendedAngle === 'string' && body.recommendedAngle.trim())
+        descriptionParts.push(`Angle: ${body.recommendedAngle.trim()}`);
+      if (briefBullets.length > 0) descriptionParts.push(`Cover:\n- ${briefBullets.join('\n- ')}`);
+      const description = descriptionParts.join('\n\n').slice(0, 1500) || null;
+
+      const topic = await tx.campaignTopic.create({
+        data: {
+          campaignId,
+          title,
+          description,
+          summary: typeof body.rationale === 'string' ? body.rationale.slice(0, 500) : null,
+          source: 'AI',
+          aiMetadata: {
+            opportunityKey,
+            suggestedTemplate: body.suggestedTemplate ?? 'blog',
+            // Stash the full brief so the generation step can pick up
+            // audience/tone/structure/wordCount/cta without re-deriving.
+            brief: body.brief ?? null,
+            recommendedAngle: typeof body.recommendedAngle === 'string' ? body.recommendedAngle : null,
+          } as any,
+        },
+        select: { id: true },
+      });
+
+      const primary = typeof body.primaryKeyword === 'string' ? body.primaryKeyword.trim() : '';
+      if (primary) {
+        await tx.campaignKeyword.create({
+          data: {
+            topicId: topic.id,
+            term: primary,
+            source: 'AI',
+            aiMetadata: { isPrimary: true } as any,
+          },
+        });
+      }
+      const longtails = Array.isArray(body.longtailKeywords)
+        ? body.longtailKeywords
+            .filter((s): s is string => typeof s === 'string' && s.trim().length > 0)
+            .map((s) => s.trim())
+            .slice(0, 6)
+        : [];
+      for (const term of longtails) {
+        // Skip duplicates against the primary; CampaignKeyword has a unique
+        // (term, topicId) so a duplicate insert would error the txn.
+        if (primary && term.toLowerCase() === primary.toLowerCase()) continue;
+        await tx.campaignKeyword.create({
+          data: {
+            topicId: topic.id,
+            term,
+            source: 'AI',
+            aiMetadata: { isLongtail: true } as any,
+          },
+        });
+      }
+
+      return topic;
+    });
+
+    return res.json({ success: true, topicId: created.id, campaignId, reused: false });
   })
 );
 

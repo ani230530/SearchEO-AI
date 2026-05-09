@@ -91,17 +91,21 @@ const getIntegrationOrThrow = async (userId: number) => {
   return integration;
 };
 
-const getCompanyDomainForUser = async (userId: number) => {
-  return prisma.domain.findFirst({
-    where: {
-      userId,
-      isCompanyDomain: true,
-    },
+const getCompanyDomainForUser = async (userId: number): Promise<{ url: string; context: string } | null> => {
+  // Domain.context lived on the legacy schema. Crawl text now lives on the
+  // latest CrawlSnapshot.rawText, and the synthesized profile sits on
+  // DomainInferred. Return both flat for callers that expect a `context` blob.
+  const domain = await prisma.domain.findFirst({
+    where: { userId, isCompanyDomain: true },
     select: {
       url: true,
-      context: true,
+      inferred: { select: { summary: true } },
+      crawls: { orderBy: { createdAt: 'desc' }, take: 1, select: { rawText: true } },
     },
   });
+  if (!domain) return null;
+  const context = domain.inferred?.summary ?? domain.crawls[0]?.rawText ?? '';
+  return { url: domain.url, context };
 };
 
 const summarizeContext = (input?: string | null, maxLines = 6, maxChars = 1000) => {
@@ -466,7 +470,8 @@ router.post(
       title: bodyTitle,
       metaDescription: bodyMetaDescription,
       slug: bodySlug,
-      pageId, // Extract pageId for campaign synchronization
+      pageId, // legacy — accepted for compatibility but no longer used
+      topicId, // flat-topic model: drafts link to CampaignTopic
     } = req.body;
 
     let integration;
@@ -569,20 +574,18 @@ router.post(
       });
     }
 
-    // Link draft to CampaignPage if pageId is provided
-    if (pageId) {
-      console.log(`[Publish] Linking draft ${savedDraft.id} to page ${pageId}`);
-      await prisma.campaignPage.update({
-        where: { id: Number(pageId) },
-        data: { latestDraftId: savedDraft.id }
-      }).catch(err => console.error('[Publish] Failed to link draft to page:', err));
+    // Flat-topic model: link draft to CampaignTopic via topicId. Page-level
+    // linking is gone with the CampaignPage table.
+    if (topicId) {
+      await prisma.campaignTopic.update({
+        where: { id: Number(topicId) },
+        data: { latestDraftId: savedDraft.id },
+      }).catch((err: unknown) => console.error('[Publish] Failed to link draft to topic:', err));
     }
 
-    // Use the provided pageId if available, otherwise fallback to existing link
-    const finalPageId = pageId ? Number(pageId) : (await prisma.campaignPage.findFirst({
-      where: { latestDraftId: savedDraft.id },
-      select: { id: true }
-    }))?.id;
+    // pageId is no longer a real concept. Keep variable for downstream calls
+    // but always undefined under the new model.
+    const finalPageId: number | undefined = undefined;
 
     // Add to Queue
     // We need to pass necessary meta info for the worker to update DB later
@@ -705,12 +708,12 @@ router.post(
           },
         });
 
-        // Link to Campaign Page if pageId is present
-        if (pageId) {
-          await prisma.campaignPage.update({
-            where: { id: Number(pageId) },
+        // Flat-topic model: link to CampaignTopic instead of CampaignPage.
+        if (topicId) {
+          await prisma.campaignTopic.update({
+            where: { id: Number(topicId) },
             data: { latestDraftId: updated.id }
-          }).catch(e => console.error('Failed to link draft to page', e));
+          }).catch((e: unknown) => console.error('Failed to link draft to topic', e));
         }
 
         return res.json({
@@ -732,12 +735,11 @@ router.post(
         },
       });
 
-      // Link to Campaign Page if pageId is present
-      if (pageId) {
-        await prisma.campaignPage.update({
-          where: { id: Number(pageId) },
+      if (topicId) {
+        await prisma.campaignTopic.update({
+          where: { id: Number(topicId) },
           data: { latestDraftId: draft.id }
-        }).catch(e => console.error('Failed to link draft to page', e));
+        }).catch((e: unknown) => console.error('Failed to link draft to topic', e));
       }
 
       return res.json({
@@ -812,12 +814,15 @@ router.post(
         : null) ||
       null;
 
-    // Find associated pageId for SSE update
-    const linkedPage = await prisma.campaignPage.findFirst({
+    // Flat-topic model: page-level linkage no longer exists. SSE downstream
+    // uses topicId instead, looked up below.
+    const linkedTopic = await prisma.campaignTopic.findFirst({
       where: { latestDraftId: Number(draftId) },
-      select: { id: true }
+      select: { id: true },
     });
-    const pageId = linkedPage?.id;
+    const pageId: number | undefined = undefined;
+    const linkedTopicId = linkedTopic?.id;
+    void linkedTopicId; // surfaced via existing topicId variable when present
 
     if (error || !finalUrl) {
       // Handle Failure

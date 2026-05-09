@@ -51,13 +51,8 @@ router.post('/send', authenticateToken, async (req: Request, res: Response) => {
                 isCompanyDomain: true,
             },
             include: {
-                auditResults: {
-                    orderBy: {
-                        updatedAt: 'desc'
-                    },
-                    take: 1
-                }
-            }
+                auditResult: true,
+            },
         });
 
         if (!companyDomain) {
@@ -67,7 +62,7 @@ router.post('/send', authenticateToken, async (req: Request, res: Response) => {
             });
         }
 
-        const auditResult = companyDomain.auditResults[0];
+        const auditResult = companyDomain.auditResult;
         if (!auditResult) {
             return res.status(404).json({
                 success: false,

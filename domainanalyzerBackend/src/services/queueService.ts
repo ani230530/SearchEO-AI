@@ -296,51 +296,36 @@ async function handleCampaignGenerationFailure(job: Job, error: any, meta: any) 
     const { jobId, topicId, userId } = meta;
 
     try {
-        // 1. Mark Job as failed
+        // Flat-topic model: GenerationJob is failed directly. Per-page rows
+        // (GenerationJobPage) no longer exist. The associated draft is found
+        // via GenerationJob.draftId and updated with the error response.
         const generationJob = await prisma.generationJob.findUnique({
             where: { jobId },
-            include: { pages: true }
+            select: { id: true, draftId: true, status: true },
         });
-
         if (generationJob) {
             await prisma.generationJob.update({
                 where: { id: generationJob.id },
-                data: { status: 'failed' }
+                data: { status: 'failed', error: error.message || 'Generation queue job failed' },
             });
-
-            // 2. Mark pending/generating pages as failed
-            const stuckPages = generationJob.pages.filter(p => ['pending', 'generating'].includes(p.status));
-
-            for (const page of stuckPages) {
-                await prisma.generationJobPage.update({
-                    where: { id: page.id },
-                    data: {
-                        status: 'failed',
-                        error: error.message || 'Generation queue job failed'
-                    }
+            if (generationJob.draftId) {
+                const existingDraft = await prisma.wordpressPublishLog.findUnique({
+                    where: { id: generationJob.draftId },
+                    select: { response: true },
                 });
-
-                // Update draft if exists
-                if (page.draftId) {
-                    const existingDraft = await prisma.wordpressPublishLog.findUnique({
-                        where: { id: page.draftId },
-                        select: { response: true }
-                    });
-                    const currentResponse = ((existingDraft?.response as Record<string, unknown> | null) || {}) as Record<string, unknown>;
-
-                    await prisma.wordpressPublishLog.update({
-                        where: { id: page.draftId },
-                        data: {
-                            status: 'draft',
-                            response: {
-                                ...currentResponse,
-                                error: error.message || 'Generation queue job failed',
-                                status: 'failed',
-                                failedAt: new Date().toISOString()
-                            }
-                        }
-                    }).catch(e => console.error(`Failed to update draft ${page.draftId} failure`, e));
-                }
+                const currentResponse = ((existingDraft?.response as Record<string, unknown> | null) || {}) as Record<string, unknown>;
+                await prisma.wordpressPublishLog.update({
+                    where: { id: generationJob.draftId },
+                    data: {
+                        status: 'draft',
+                        response: {
+                            ...currentResponse,
+                            error: error.message || 'Generation queue job failed',
+                            status: 'failed',
+                            failedAt: new Date().toISOString(),
+                        },
+                    },
+                }).catch((e: unknown) => console.error(`Failed to update draft ${generationJob.draftId} failure`, e));
             }
         }
     } catch (dbError) {
