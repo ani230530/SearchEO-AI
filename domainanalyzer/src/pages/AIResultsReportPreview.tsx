@@ -2036,19 +2036,17 @@ const AIResultsReportPreview = () => {
           }
         );
 
-        // Hand off to the worksheet page, mirroring the table-row flow:
-        // sessionStorage tells the worksheet which campaign to focus + which
-        // topic was just added so it can scroll/highlight.
+        // Hand off to the worksheet page. The topic + keywords are already
+        // persisted by /from-opportunity, so unlike the table-row "import
+        // selected rows" flow we DON'T set WORKSHEET_IMPORT_KEY — that
+        // payload shape requires selectedRows[] which Worksheet.tsx maps
+        // over (would crash here with "Cannot read properties of undefined
+        // (reading 'map')"). Just stash WORKSHEET_TARGET_KEY so the
+        // dashboard opens straight to the right campaign and the new topic
+        // shows up via the worksheet's normal API fetch.
         const targetCampaignId = String(built.campaignId);
         sessionStorage.setItem(WORKSHEET_TARGET_KEY, targetCampaignId);
-        sessionStorage.setItem(
-          WORKSHEET_IMPORT_KEY,
-          JSON.stringify({
-            activeWorksheetId: targetCampaignId,
-            addedTopicId: built.topicId,
-            addedFromOpportunity: { key, title: payload.title },
-          })
-        );
+        sessionStorage.removeItem(WORKSHEET_IMPORT_KEY);
         localStorage.setItem('activeTab', 'projects');
         setGenerationByKey((prev) => ({ ...prev, [key]: { kind: 'done', draftId: null } }));
         navigate('/dashboard');
