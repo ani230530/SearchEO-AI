@@ -1514,7 +1514,7 @@ const GenerateInlineButton = ({
   if (state.kind === 'submitting') {
     return (
       <span className="inline-flex h-[37px] items-center gap-1.5 rounded-lg bg-slate-100 px-3 text-[12px] font-medium text-slate-500">
-        <Sparkles className="h-3.5 w-3.5 animate-pulse" /> Starting…
+        <Sparkles className="h-3.5 w-3.5 animate-pulse" /> Adding to worksheet…
       </span>
     );
   }
@@ -2011,6 +2011,10 @@ const AIResultsReportPreview = () => {
   const [generationByKey, setGenerationByKey] = useState<Record<string, GenerationState>>({});
   const [pendingGeneration, setPendingGeneration] = useState<{ key: string; payload: GenerationPayload } | null>(null);
 
+  // Adds the opportunity / phrase as a new topic + keywords row in the
+  // chosen worksheet, then redirects the user to the dashboard so they can
+  // handle generation from the worksheet just like any other table row.
+  // We DO NOT fire n8n here — generation is driven from the worksheet.
   const runGeneration = useCallback(
     async (key: string, payload: GenerationPayload, campaignId: number | null) => {
       if (!reportData?.domainInfo?.id) return;
@@ -2032,57 +2036,30 @@ const AIResultsReportPreview = () => {
           }
         );
 
-        const audience = payload.brief?.audience?.trim();
-        const tone =
-          payload.brief?.tone ?? (payload.category === 'branded_trust' ? 'Conversational' : 'Authoritative');
-        const wordCount =
-          payload.brief?.wordCount ??
-          (payload.suggestedTemplate === 'landing_page'
-            ? 1400
-            : payload.suggestedTemplate === 'blog'
-              ? 1000
-              : 800);
-        const cta = payload.brief?.cta?.trim();
-        const topicBriefLines: string[] = [payload.title];
-        if (payload.recommendedAngle) topicBriefLines.push(`Angle: ${payload.recommendedAngle}`);
-        if (payload.brief?.structure) topicBriefLines.push(`Structure: ${payload.brief.structure}`);
-        if (payload.brief?.keyPoints && payload.brief.keyPoints.length > 0) {
-          topicBriefLines.push(`Cover:\n- ${payload.brief.keyPoints.join('\n- ')}`);
-        }
-        const topicBrief = topicBriefLines.join('\n\n');
-
-        const genJson = await apiPost<{ job?: { jobId: string; progress: number; phase: string | null } }>(
-          `/campaigns/topics/${built.topicId}/generate`,
-          {
-            template_type: payload.suggestedTemplate,
-            project_name: reportData.domainInfo.companyName ?? reportData.domainInfo.host,
-            project_goal: payload.rationale,
-            target_audience: 'Custom',
-            custom_audience_text: audience ?? payload.intentStage ?? 'general buyer',
-            tone,
-            word_count: wordCount,
-            language: 'en',
-            cta,
-            templateFields: { topic: topicBrief },
-          }
+        // Hand off to the worksheet page, mirroring the table-row flow:
+        // sessionStorage tells the worksheet which campaign to focus + which
+        // topic was just added so it can scroll/highlight.
+        const targetCampaignId = String(built.campaignId);
+        sessionStorage.setItem(WORKSHEET_TARGET_KEY, targetCampaignId);
+        sessionStorage.setItem(
+          WORKSHEET_IMPORT_KEY,
+          JSON.stringify({
+            activeWorksheetId: targetCampaignId,
+            addedTopicId: built.topicId,
+            addedFromOpportunity: { key, title: payload.title },
+          })
         );
-
-        if (genJson.job?.jobId) {
-          setGenerationByKey((prev) => ({
-            ...prev,
-            [key]: { kind: 'running', jobId: genJson.job!.jobId, progress: genJson.job!.progress, phase: genJson.job!.phase },
-          }));
-        } else {
-          setGenerationByKey((prev) => ({ ...prev, [key]: { kind: 'done', draftId: null } }));
-        }
+        localStorage.setItem('activeTab', 'projects');
+        setGenerationByKey((prev) => ({ ...prev, [key]: { kind: 'done', draftId: null } }));
+        navigate('/dashboard');
       } catch (err) {
         setGenerationByKey((prev) => ({
           ...prev,
-          [key]: { kind: 'failed', error: err instanceof Error ? err.message : 'Generation failed' },
+          [key]: { kind: 'failed', error: err instanceof Error ? err.message : 'Failed to add to worksheet' },
         }));
       }
     },
-    [reportData]
+    [navigate, reportData]
   );
 
   const handleGenerateContent = useCallback(
