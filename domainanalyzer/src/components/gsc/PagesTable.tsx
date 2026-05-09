@@ -95,10 +95,10 @@ const [activeGscSubTab, setActiveGscSubTab] = useState<'whole-analytics' | 'blog
       ...filteredData.map((row) =>
         [
           `"${row.page}"`,
-          row.clicks,
-          row.impressions,
-          row.position.toFixed(1),
-          (row.ctr * 100).toFixed(1),
+          typeof row.clicks === 'number' ? row.clicks : 0,
+          typeof row.impressions === 'number' ? row.impressions : 0,
+          (typeof row.position === 'number' ? row.position : 0).toFixed(1),
+          ((typeof row.ctr === 'number' ? row.ctr : 0) * 100).toFixed(1),
         ].join(",")
       ),
     ].join("\n");
@@ -150,7 +150,8 @@ const [activeGscSubTab, setActiveGscSubTab] = useState<'whole-analytics' | 'blog
       accessorKey: "position",
       header: "Avg Position",
       cell: ({ row }) => {
-        const position = row.getValue("position") as number;
+        const raw = row.getValue("position");
+        const position = typeof raw === 'number' && Number.isFinite(raw) ? raw : 0;
         return <span className="text-gray-700 text-sm">{position.toFixed(1)}</span>;
       },
     },
@@ -158,7 +159,8 @@ const [activeGscSubTab, setActiveGscSubTab] = useState<'whole-analytics' | 'blog
       accessorKey: "ctr",
       header: "CTR",
       cell: ({ row }) => {
-        const ctr = row.getValue("ctr") as number;
+        const raw = row.getValue("ctr");
+        const ctr = typeof raw === 'number' && Number.isFinite(raw) ? raw : 0;
         return <span className="text-gray-700 text-sm">{(ctr * 100).toFixed(1)}%</span>;
       },
     },
@@ -573,22 +575,22 @@ const [activeGscSubTab, setActiveGscSubTab] = useState<'whole-analytics' | 'blog
               </div>
               <div className="flex items-center justify-center">
                 <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ">
-                  {page.clicks.toLocaleString()}
+                  {(typeof page.clicks === 'number' ? page.clicks : 0).toLocaleString()}
                 </span>
               </div>
               <div className="flex items-center justify-center">
                 <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ">
-                  {page.impressions.toLocaleString()}
+                  {(typeof page.impressions === 'number' ? page.impressions : 0).toLocaleString()}
                 </span>
               </div>
               <div className="flex items-center justify-center">
                 <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium">
-                  {page.position.toFixed(1)}
+                  {(typeof page.position === 'number' ? page.position : 0).toFixed(1)}
                 </span>
               </div>
               <div className="flex items-center justify-center">
                 <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-100">
-                  {(page.ctr * 100).toFixed(1)}%
+                  {((typeof page.ctr === 'number' ? page.ctr : 0) * 100).toFixed(1)}%
                 </span>
               </div>
               <div className="flex items-center justify-center">
