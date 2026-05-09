@@ -790,11 +790,10 @@ const allSections = [...leftSections, ...rightSections];
                                       {/* Volume Column */}
                                       <div className="col-span-1 flex items-center justify-center">
                                         <span className="font-medium text-gray-900 text-sm">
-                                          {keyword.volume >= 1000
-                                            ? `${(
-                                                keyword.volume / 1000
-                                              ).toFixed(1)}K`
-                                            : keyword.volume.toLocaleString()}
+                                          {(() => {
+                                            const v = typeof keyword.volume === 'number' && Number.isFinite(keyword.volume) ? keyword.volume : 0;
+                                            return v >= 1000 ? `${(v / 1000).toFixed(1)}K` : v.toLocaleString();
+                                          })()}
                                         </span>
                                       </div>
 
@@ -812,7 +811,7 @@ const allSections = [...leftSections, ...rightSections];
                                       {/* Organic Column */}
                                       <div className="col-span-1 flex items-center justify-center">
                                         <span className="text-gray-700 text-sm">
-                                          {keyword.organic.toLocaleString()}
+                                          {(typeof keyword.organic === 'number' && Number.isFinite(keyword.organic) ? keyword.organic : 0).toLocaleString()}
                                         </span>
                                       </div>
 
@@ -867,15 +866,16 @@ const allSections = [...leftSections, ...rightSections];
                                         <div className="rounded-xl border border-gray-100 bg-gray-50 px-3 py-2">
                                           <p className="text-xs text-gray-500">Volume (AI Est.)</p>
                                           <p className="font-medium text-gray-900">
-                                            {keyword.volume >= 1000
-                                              ? `${(keyword.volume / 1000).toFixed(1)}K`
-                                              : keyword.volume.toLocaleString()}
+                                            {(() => {
+                                              const v = typeof keyword.volume === 'number' && Number.isFinite(keyword.volume) ? keyword.volume : 0;
+                                              return v >= 1000 ? `${(v / 1000).toFixed(1)}K` : v.toLocaleString();
+                                            })()}
                                           </p>
                                         </div>
                                         <div className="rounded-xl border border-gray-100 bg-gray-50 px-3 py-2">
                                           <p className="text-xs text-gray-500">Organic (AI Est.)</p>
                                           <p className="font-medium text-gray-900">
-                                            {keyword.organic.toLocaleString()}
+                                            {(typeof keyword.organic === 'number' && Number.isFinite(keyword.organic) ? keyword.organic : 0).toLocaleString()}
                                           </p>
                                         </div>
                                         <div className="rounded-xl border border-gray-100 bg-gray-50 px-3 py-2">
@@ -1129,12 +1129,10 @@ const allSections = [...leftSections, ...rightSections];
                                                         </span>
                                                       </div>
                                                       <span className="text-sm font-bold text-gray-900">
-                                                        {keyword.volume >= 1000
-                                                          ? `${(
-                                                              keyword.volume /
-                                                              1000
-                                                            ).toFixed(1)}K`
-                                                          : keyword.volume.toLocaleString()}
+                                                        {(() => {
+                                                          const v = typeof keyword.volume === 'number' && Number.isFinite(keyword.volume) ? keyword.volume : 0;
+                                                          return v >= 1000 ? `${(v / 1000).toFixed(1)}K` : v.toLocaleString();
+                                                        })()}
                                                       </span>
                                                     </div>
                                                   </div>
