@@ -121,7 +121,13 @@ export function DomainInfoContent({
                   navigate('/ai-checker-v2');
                   return;
                 }
-                navigate(`/ai-checker-v2?domainId=${domainId}`);
+                // Wizard reads `?domain=<id>` (see AIChecker.v2.tsx:129).
+                // No `?restart=` — let the wizard's `canResumeAt` decide the
+                // landing step from the wizard state. That way:
+                //   • crawled-but-no-prompts domain → lands at Step 4
+                //   • brand-new domain (just created via setup form) →
+                //     lands at Step 2 (crawl) so the URL gets crawled first
+                navigate(`/ai-checker-v2?domain=${domainId}`);
               }}
             />
           ) : (
