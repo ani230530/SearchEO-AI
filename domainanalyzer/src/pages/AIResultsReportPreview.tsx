@@ -2923,8 +2923,8 @@ const AIResultsReportPreview = () => {
         </div>
       </section>
 
-        <section className="grid w-full grid-cols-1 gap-6 bg-white px-4 py-4 sm:px-6 xl:grid-cols-[0.7fr_1.3fr]">
-          <div className="space-y-6">
+        <section className="grid w-full grid-cols-1 gap-6 bg-white px-4 py-4 sm:px-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
+          <div className="min-w-0 space-y-6">
             <Card className="rounded-xl border border-[#D5D7DA] bg-white shadow-[0_1px_2px_0_#1018280D]">
               <CardHeader className="flex flex-row items-start justify-between px-4 pb-3 pt-4">
                 <div className="min-w-0">
@@ -3073,7 +3073,7 @@ const AIResultsReportPreview = () => {
             </Card>
           </div>
 
-          <Card className="rounded-xl border border-[#D5D7DA] bg-white shadow-[0_1px_2px_0_#1018280D]">
+          <Card className="min-w-0 rounded-xl border border-[#D5D7DA] bg-white shadow-[0_1px_2px_0_#1018280D]">
             <CardHeader className="flex flex-col gap-3 px-4 pb-2 pt-4 sm:flex-row sm:items-center sm:justify-between">
               <CardTitle className="text-base font-semibold text-[#2D4059]">Visibility & Coverage</CardTitle>
               <div className="flex flex-wrap items-center gap-2">
