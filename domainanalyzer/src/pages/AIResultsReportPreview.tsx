@@ -1367,14 +1367,14 @@ const VisibilityRow = ({
   const titleColor =
     status === 'positive' ? 'text-[#2D4059]' : status === 'warn' ? 'text-[#93370D]' : 'text-[#B23131]';
   return (
-    <div className={cn('rounded-md px-2.5 py-2', wrapperClass)}>
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+    <div className={cn('rounded-lg px-4 py-3', wrapperClass)}>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
-          <div className="flex items-center gap-1.5">
-            <StatusIcon className={cn('h-3 w-3 shrink-0', statusIconColor)} strokeWidth={2.25} />
-            <p className={cn('truncate text-[11.5px] italic leading-[140%]', titleColor)}>{title}</p>
+          <div className="flex items-center gap-2">
+            <StatusIcon className={cn('h-4 w-4 shrink-0', statusIconColor)} strokeWidth={2} />
+            <p className={cn('truncate text-[13px] italic leading-[140%]', titleColor)}>{title}</p>
           </div>
-          <p className="mt-0.5 text-[10.5px] leading-[140%] text-[#717680]">{meta}</p>
+          <p className="mt-1 text-[12px] leading-[140%] text-[#717680]">{meta}</p>
         </div>
         {actionLabel && onAction ? (
           <GenerateInlineButton onClick={onAction} state={generation ?? { kind: 'idle' }} label={actionLabel} />
@@ -2416,19 +2416,44 @@ const AIResultsReportPreview = () => {
   // hits /report again so the LLM enrichment cache is exercised (or rebuilt
   // if the run summary was cleared).
   const [opportunitiesRetrying, setOpportunitiesRetrying] = useState(false);
+  const [retryError, setRetryError] = useState<string | null>(null);
   const handleRetryOpportunities = useCallback(async () => {
-    if (!maskedDomainId) return;
-    const realId = unmaskDomainId(maskedDomainId);
-    if (!realId) return;
+    console.log('[AIResults] Retry clicked', { maskedDomainId, selectedRunId });
+    if (!maskedDomainId) {
+      setRetryError('No domain selected.');
+      return;
+    }
     setOpportunitiesRetrying(true);
+    setRetryError(null);
     try {
+      let realId = unmaskDomainId(maskedDomainId);
+      if (!realId) {
+        // Fallback to the same recovery path as initial load — the mask map
+        // can be empty after a hard reload before the domains list is fetched.
+        const domainsResp = await apiGet<any>('/wizard/domains');
+        const domains = domainsResp?.domains || [];
+        setAllDomains(domains);
+        const found = domains.find((d: any) => maskDomainId(d.id) === maskedDomainId);
+        realId = found?.id ?? null;
+      }
+      if (!realId) {
+        setRetryError('Could not resolve domain.');
+        return;
+      }
       const path = selectedRunId
         ? `/wizard/domain/${realId}/report?runId=${selectedRunId}`
         : `/wizard/domain/${realId}/report`;
+      console.log('[AIResults] Retry fetching', path);
       const data = await apiGet<any>(path);
+      console.log('[AIResults] Retry got data', {
+        phraseVisibility: (data?.phraseVisibility ?? []).length,
+        opportunities: (data?.opportunities ?? []).length,
+      });
       if (data) setReportData(data);
-    } catch (err) {
-      console.error('[AIResults] Retry opportunities failed:', err);
+      else setRetryError('No data returned.');
+    } catch (err: any) {
+      console.error('[AIResults] Retry failed:', err);
+      setRetryError(err?.message ?? 'Retry failed');
     } finally {
       setOpportunitiesRetrying(false);
     }
@@ -3004,6 +3029,9 @@ const AIResultsReportPreview = () => {
                     <p className="text-xs text-slate-600">
                       No outrank opportunities yet. This usually means the latest run hasn't completed enrichment, or selected competitors didn't appear in any answer.
                     </p>
+                    {retryError ? (
+                      <p className="text-xs text-rose-600">Error: {retryError}</p>
+                    ) : null}
                     <button
                       type="button"
                       onClick={handleRetryOpportunities}
