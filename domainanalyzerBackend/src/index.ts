@@ -11,6 +11,7 @@ import auditN8nRouter from './routes/auditN8n';
 import n8nErrorRouter from './routes/n8nError';
 import wizardRouter from './wizard/routes';
 import userRouter from './routes/user';
+import blogAnalyticsRouter from './routes/blogAnalytics';
 
 import { PrismaClient } from '../generated/prisma';
 import { authenticateToken, AuthenticatedRequest } from './middleware/auth';
@@ -92,6 +93,7 @@ app.get('/api/debug/domains', authenticateToken, async (req: Request, res: Respo
 app.use('/api/auth', authRouter);
 app.use('/api/user', userRouter);
 app.use('/api/wizard', wizardRouter);
+app.use('/api/blog-analytics', blogAnalyticsRouter);
 app.use('/api/gsc', googleSearchConsoleRouter);
 app.use('/api/campaigns', campaignsRouter);
 app.use('/api/publish', publishRouter);
@@ -107,8 +109,13 @@ app.get('/api/sse', async (req: Request, res: Response) => {
   const token = req.query.token as string | undefined;
   if (!token) return res.status(401).json({ error: 'Missing auth token' });
   const jwt = await import('jsonwebtoken');
+  // Match the fallback in services/authService.ts so SSE works in dev when
+  // JWT_SECRET isn't set in .env. Without the fallback, jwt.verify(token,
+  // undefined) throws and SSE returns 401 even with a valid token signed
+  // by the auth service against the same default secret.
+  const SECRET = process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-in-production';
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as { userId: number };
+    const decoded = jwt.verify(token, SECRET) as { userId: number };
     const userId = decoded.userId;
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
