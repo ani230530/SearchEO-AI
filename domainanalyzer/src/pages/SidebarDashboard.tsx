@@ -3006,6 +3006,10 @@ useEffect(() => {
               currentTaskIndex={currentTaskIndex}
               handleDomainChange={handleDomainChange}
               openWordpressConnectionView={openWordpressConnectionView}
+              createdDomainId={createdDomainId}
+              keywords={keywords as any}
+              companyDomainFetchError={companyDomainFetchError}
+              onRetryCompanyDomain={() => fetchCompanyDomain(true)}
             />
           ) : activeTab === "projects" ? (
             <ProjectsSection

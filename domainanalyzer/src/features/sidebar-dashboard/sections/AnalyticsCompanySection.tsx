@@ -16,6 +16,7 @@ import remarkGfm from 'remark-gfm';
 import { cn } from '@/lib/utils';
 import { AnalyticsIntegrationSection } from '@/features/sidebar-dashboard/sections/AnalyticsIntegrationSection';
 import { CompanySection } from '@/features/sidebar-dashboard/sections/CompanySection';
+import { DomainInfoContent } from '@/features/sidebar-dashboard/sections/DomainInfoContent';
 import type { CompanySubTabId } from '@/features/sidebar-dashboard/types';
 import { getCompetitionBadgeClassName } from '@/features/sidebar-dashboard/utils';
 import type { KeywordTableItem } from '@/types';
@@ -114,6 +115,18 @@ export interface AnalyticsCompanySectionProps {
   loadingSteps: LoadingStep[];
   currentTaskIndex: number;
   handleDomainChange: (value: string) => void;
+  // Domain Info — minimal data for the always-visible domain card.
+  createdDomainId: number | null;
+  keywords: Array<{
+    id: number;
+    term: string;
+    intent?: string | null;
+    volume?: number | null;
+    difficulty?: string | null;
+    cpc?: number | null;
+  }>;
+  companyDomainFetchError: string | null;
+  onRetryCompanyDomain: () => void;
 }
 
 export function AnalyticsCompanySection({
@@ -184,6 +197,10 @@ export function AnalyticsCompanySection({
   loadingSteps,
   currentTaskIndex,
   handleDomainChange,
+  createdDomainId,
+  keywords,
+  companyDomainFetchError,
+  onRetryCompanyDomain,
 }: AnalyticsCompanySectionProps) {
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + currentKeywords.length;
@@ -210,6 +227,19 @@ export function AnalyticsCompanySection({
                 {/* Company Info Tab Content */}
                 {activeCompanySubTab === "company-info" && (
                   <div>
+                    {/* Always-visible domain card + tracked-keywords block.
+                        Renders even when domainContext is empty / there are
+                        no keywords (the fancy grid below still gates on
+                        domainContext, but the user still sees something). */}
+                    <DomainInfoContent
+                      companyDomain={companyDomain}
+                      domainContext={domainContext}
+                      domainId={createdDomainId}
+                      keywords={keywords as any}
+                      loading={companyDomainLoading}
+                      error={companyDomainFetchError ?? null}
+                      onRetry={onRetryCompanyDomain}
+                    />
                     {/* Domain Context - Centered and Wide */}
                     {domainContext && (
                       <div className="mb-16">
