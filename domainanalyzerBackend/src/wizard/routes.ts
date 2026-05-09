@@ -155,23 +155,45 @@ router.post('/validate', authenticateToken, async (req: Request, res: Response) 
     return res.status(200).json({ ok: false, reason: 'Please enter a valid URL like example.com' });
   }
 
-  // Reachability — HEAD with GET fallback.
+  // Reachability — HEAD then GET. Send a real Chrome UA + Accept header
+  // so Cloudflare/WAF doesn't bounce us with a 403, and treat ANY HTTP
+  // response (even 403/406) as "reachable enough" — the crawlService has
+  // a Puppeteer fallback for WAF-blocked sites, so a non-2xx here doesn't
+  // mean the wizard can't crawl it. Only DNS / network failures should
+  // surface as "Site is unreachable".
+  const REACH_HEADERS = {
+    'User-Agent':
+      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+    Accept: 'text/html,application/xhtml+xml,*/*;q=0.8',
+  };
   let reachable = false;
   let finalUrl: string | undefined;
   try {
-    const head = await fetch(norm.canonicalUrl, { method: 'HEAD', redirect: 'follow', signal: AbortSignal.timeout(5000) });
-    reachable = head.ok;
+    const head = await fetch(norm.canonicalUrl, {
+      method: 'HEAD',
+      redirect: 'follow',
+      headers: REACH_HEADERS,
+      signal: AbortSignal.timeout(5000),
+    });
+    // Anything that produced a status code → the host resolved and the
+    // server answered, even if it returned 403/405/501.
+    reachable = head.status > 0;
     finalUrl = head.url;
   } catch {
     /* try GET */
   }
   if (!reachable) {
     try {
-      const get = await fetch(norm.canonicalUrl, { method: 'GET', redirect: 'follow', signal: AbortSignal.timeout(5000) });
-      reachable = get.ok;
+      const get = await fetch(norm.canonicalUrl, {
+        method: 'GET',
+        redirect: 'follow',
+        headers: REACH_HEADERS,
+        signal: AbortSignal.timeout(5000),
+      });
+      reachable = get.status > 0;
       finalUrl = get.url;
     } catch {
-      /* still unreachable */
+      /* DNS / network failure — actually unreachable */
     }
   }
 
