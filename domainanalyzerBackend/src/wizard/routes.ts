@@ -911,9 +911,14 @@ router.post('/domain/:id/restart', authenticateToken, async (req: Request, res: 
     });
     const aiKwIds = aiKeywords.map((k) => k.id);
 
+    // Soft reset: drop AI prompts/keywords. We deliberately keep AiRun rows
+    // (and let AiQueryResult cascade-delete via the prompt FK) so the
+    // dashboard's "latest completed run" lookup still finds the previous
+    // run's summary.avgOverall while the user re-picks prompts. Without this,
+    // the Domain History card flips from "Visibility 72%" to "Pick prompts"
+    // the moment the user enters Step 4 from the AI Dashboard, which is
+    // disorienting — the prior result hasn't been replaced yet.
     await prisma.$transaction([
-      prisma.aiQueryResult.deleteMany({ where: { run: { domainId: domain.id } } }),
-      prisma.aiRun.deleteMany({ where: { domainId: domain.id } }),
       prisma.prompt.deleteMany({
         where: {
           domainId: domain.id,
@@ -1411,8 +1416,23 @@ router.post('/domain/:id/select', authenticateToken, async (req: Request, res: R
   if (!got.ok) return res.status(got.status).json({ error: got.error });
   const { domain } = got;
   const { keywordIds, promptIds } = (req.body ?? {}) as { keywordIds?: number[]; promptIds?: number[] };
-  const kwIds = Array.isArray(keywordIds) ? keywordIds.filter((n): n is number => Number.isFinite(n)) : [];
+  const kwIdsRaw = Array.isArray(keywordIds) ? keywordIds.filter((n): n is number => Number.isFinite(n)) : [];
   const prIds = Array.isArray(promptIds) ? promptIds.filter((n): n is number => Number.isFinite(n)) : [];
+  // The wizard only collects prompt selections — derive the keyword ids from
+  // the selected prompts so Keyword.isSelected accurately reflects which
+  // keywords drove the run. Otherwise the dashboard's "Top Keywords" count
+  // is stuck at 0.
+  const promptKwRows = prIds.length
+    ? await prisma.prompt.findMany({
+        where: { id: { in: prIds }, domainId: domain.id, keywordId: { not: null } },
+        select: { keywordId: true },
+        distinct: ['keywordId'],
+      })
+    : [];
+  const derivedKwIds = promptKwRows
+    .map((r) => r.keywordId)
+    .filter((id): id is number => typeof id === 'number');
+  const kwIds = Array.from(new Set([...kwIdsRaw, ...derivedKwIds]));
   await prisma.$transaction([
     prisma.keyword.updateMany({ where: { domainId: domain.id }, data: { isSelected: false } }),
     prisma.prompt.updateMany({ where: { domainId: domain.id }, data: { isSelected: false } }),

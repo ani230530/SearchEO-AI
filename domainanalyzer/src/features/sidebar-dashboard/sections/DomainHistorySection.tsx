@@ -83,9 +83,13 @@ const getDisplayName = (domain: DashboardDomain) => {
 const toItem = (d: DashboardDomain): DomainItem => {
   const step = d.currentStep ?? 0;
   const hasVisibility = typeof d.metrics?.visibilityScore === "number";
-  // currentStep 5 = run completed (5-step wizard).
+  // A completed audit owns the card. Even if the user later re-enters the
+  // wizard to pick new prompts (which demotes currentStep below 5), the
+  // existing run's visibility score should keep showing until the next run
+  // replaces it — otherwise the card flips to "Pick prompts" mid-edit and
+  // the prior result looks lost.
   const status: DomainItem["status"] =
-    step >= 5 && hasVisibility ? "success" : step > 0 ? "inprogress" : "retry";
+    hasVisibility ? "success" : step > 0 ? "inprogress" : "retry";
   return {
     id: d.id,
     name: getDisplayName(d),
