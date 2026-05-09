@@ -122,10 +122,12 @@ export function DomainInfoContent({
                   return;
                 }
                 // Wizard reads `?domain=<id>` (see AIChecker.v2.tsx:129).
-                // `?restart=topics` keeps crawl + competitors and lands the
-                // user at Step 4 (pick keywords/prompts) — fastest path back
-                // to populated keywords for an already-crawled domain.
-                navigate(`/ai-checker-v2?domain=${domainId}&restart=topics`);
+                // No `?restart=` — let the wizard's `canResumeAt` decide the
+                // landing step from the wizard state. That way:
+                //   • crawled-but-no-prompts domain → lands at Step 4
+                //   • brand-new domain (just created via setup form) →
+                //     lands at Step 2 (crawl) so the URL gets crawled first
+                navigate(`/ai-checker-v2?domain=${domainId}`);
               }}
             />
           ) : (
