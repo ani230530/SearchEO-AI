@@ -10,6 +10,7 @@ import auditRoutes from './routes/auditRoutes';
 import auditN8nRouter from './routes/auditN8n';
 import n8nErrorRouter from './routes/n8nError';
 import wizardRouter from './wizard/routes';
+import userRouter from './routes/user';
 
 import { PrismaClient } from '../generated/prisma';
 import { authenticateToken, AuthenticatedRequest } from './middleware/auth';
@@ -89,6 +90,7 @@ app.get('/api/debug/domains', authenticateToken, async (req: Request, res: Respo
 
 // API routes — clean surface.
 app.use('/api/auth', authRouter);
+app.use('/api/user', userRouter);
 app.use('/api/wizard', wizardRouter);
 app.use('/api/gsc', googleSearchConsoleRouter);
 app.use('/api/campaigns', campaignsRouter);

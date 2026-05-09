@@ -171,6 +171,16 @@ export default function Worksheet({
       return;
     }
 
+    // A stale/foreign payload (e.g. one written by a flow that doesn't
+    // include selectedRows[] — like the AI Results "add opportunity to
+    // worksheet" handoff before we stopped writing this key) would crash
+    // here on .map(). Drop anything that doesn't look like the table-row
+    // import shape and clear it so subsequent renders don't re-trip.
+    if (!Array.isArray(payload.selectedRows) || payload.selectedRows.length === 0) {
+      sessionStorage.removeItem(PENDING_WORKSHEET_IMPORT_KEY);
+      return;
+    }
+
     const signature = `${payload.activeWorksheetId}:${payload.selectedRows
       .map((row) => row.id)
       .join(',')}`;
