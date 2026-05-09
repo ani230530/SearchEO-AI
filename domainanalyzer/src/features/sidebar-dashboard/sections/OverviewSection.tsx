@@ -238,16 +238,19 @@ const blogImpressionsData = blogAggregateData?.dateBreakdown.map(d => ({
 const [isPageLoading, setIsPageLoading] = useState(true);
 
 useEffect(() => {
+  // The previous guard required keywordsTableData.length > 0 — but an empty
+  // keywords list is a legitimate state (new users, or company domains with
+  // no tracked keywords yet) and the page would spin forever waiting. Drop
+  // that check; the other async sources (audit, GSC trends, blog analytics)
+  // are sufficient to gate the loading screen.
   const auditReady = !!auditResult || !auditLoading;
-  const keywordsReady = keywordsTableData.length > 0;
   const gscReady = !isLoadingTrends;
-  const blogReady = !isLoadingBlogData; // Add this
-  
-  // Page is ready when all critical data checks are complete
-  if (auditReady && keywordsReady && gscReady && blogReady) {
+  const blogReady = !isLoadingBlogData;
+
+  if (auditReady && gscReady && blogReady) {
     setIsPageLoading(false);
   }
-}, [auditResult, auditLoading, keywordsTableData, isLoadingTrends, isLoadingBlogData]);
+}, [auditResult, auditLoading, isLoadingTrends, isLoadingBlogData]);
 
   return (
     <>
