@@ -121,7 +121,11 @@ export function DomainInfoContent({
                   navigate('/ai-checker-v2');
                   return;
                 }
-                navigate(`/ai-checker-v2?domainId=${domainId}`);
+                // Wizard reads `?domain=<id>` (see AIChecker.v2.tsx:129).
+                // `?restart=topics` keeps crawl + competitors and lands the
+                // user at Step 4 (pick keywords/prompts) — fastest path back
+                // to populated keywords for an already-crawled domain.
+                navigate(`/ai-checker-v2?domain=${domainId}&restart=topics`);
               }}
             />
           ) : (
