@@ -1367,14 +1367,14 @@ const VisibilityRow = ({
   const titleColor =
     status === 'positive' ? 'text-[#2D4059]' : status === 'warn' ? 'text-[#93370D]' : 'text-[#B23131]';
   return (
-    <div className={cn('rounded-lg px-4 py-3', wrapperClass)}>
+    <div className={cn('rounded-lg px-5 py-4', wrapperClass)}>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2.5">
             <StatusIcon className={cn('h-4 w-4 shrink-0', statusIconColor)} strokeWidth={2} />
-            <p className={cn('truncate text-[13px] italic leading-[140%]', titleColor)}>{title}</p>
+            <p className={cn('truncate text-[14px] italic leading-[150%]', titleColor)}>{title}</p>
           </div>
-          <p className="mt-1 text-[12px] leading-[140%] text-[#717680]">{meta}</p>
+          <p className="mt-1.5 text-[12.5px] leading-[150%] text-[#717680]">{meta}</p>
         </div>
         {actionLabel && onAction ? (
           <GenerateInlineButton onClick={onAction} state={generation ?? { kind: 'idle' }} label={actionLabel} />
