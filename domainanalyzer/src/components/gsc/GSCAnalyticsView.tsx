@@ -82,14 +82,22 @@ const BlogPerformancePanel = ({ days }: { days: string }) => {
       </div>
     );
   }
-  const fmtPct = (n: number) => `${(n * 100).toFixed(1)}%`;
+  // Defensive number formatters — every numeric field can come back as
+  // null from the GSC API for rows / totals with no measurements (e.g.
+  // a blog that's never been shown). Without these guards the page
+  // crashes inside Array.map with
+  //   "Cannot read properties of null (reading 'toLocaleString')".
+  const num = (n: unknown): number => (typeof n === 'number' && Number.isFinite(n) ? n : 0);
+  const fmtInt = (n: unknown) => num(n).toLocaleString();
+  const fmtPct = (n: unknown) => `${(num(n) * 100).toFixed(1)}%`;
+  const fmtFixed = (n: unknown, d = 1) => num(n).toFixed(d);
   return (
     <div className="space-y-4 p-4">
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <SummaryCard label="Total clicks" value={data.totalClicks.toLocaleString()} />
-        <SummaryCard label="Impressions" value={data.totalImpressions.toLocaleString()} />
+        <SummaryCard label="Total clicks" value={fmtInt(data.totalClicks)} />
+        <SummaryCard label="Impressions" value={fmtInt(data.totalImpressions)} />
         <SummaryCard label="Avg CTR" value={fmtPct(data.avgCTR)} />
-        <SummaryCard label="Avg position" value={data.avgPosition.toFixed(1)} />
+        <SummaryCard label="Avg position" value={fmtFixed(data.avgPosition)} />
       </div>
       <div className="overflow-hidden rounded-lg border border-slate-200">
         <table className="w-full text-sm">
@@ -119,10 +127,10 @@ const BlogPerformancePanel = ({ days }: { days: string }) => {
                     <p className="mt-0.5 text-xs text-slate-500">{b.primaryKeyword}</p>
                   ) : null}
                 </td>
-                <td className="px-3 py-2 text-right tabular-nums">{b.clicks.toLocaleString()}</td>
-                <td className="px-3 py-2 text-right tabular-nums">{b.impressions.toLocaleString()}</td>
+                <td className="px-3 py-2 text-right tabular-nums">{fmtInt(b.clicks)}</td>
+                <td className="px-3 py-2 text-right tabular-nums">{fmtInt(b.impressions)}</td>
                 <td className="px-3 py-2 text-right tabular-nums">{fmtPct(b.ctr)}</td>
-                <td className="px-3 py-2 text-right tabular-nums">{b.position.toFixed(1)}</td>
+                <td className="px-3 py-2 text-right tabular-nums">{fmtFixed(b.position)}</td>
               </tr>
             ))}
           </tbody>
