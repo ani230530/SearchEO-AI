@@ -729,6 +729,145 @@ router.get('/domain/:id/state', authenticateToken, async (req: Request, res: Res
   });
 });
 
+// ── GET /domain/:id/prompts/:promptId/history ─────────────────────────────
+//
+// Per-prompt time series for the Track Prompts inline detail chart. One row
+// per completed AiRun, ordered ascending by startedAt. Y values come from
+// the AiQueryResult rows tied to this promptId in each run.
+//
+//   {
+//     prompt: { id, text },
+//     runs: [{ runId, startedAt, presenceRate, mentions, total, avgSentiment }]
+//   }
+router.get('/domain/:id/prompts/:promptId/history', authenticateToken, async (req: Request, res: Response) => {
+  const got = await ensureDomain(req, req.params.id);
+  if (!got.ok) return res.status(got.status).json({ error: got.error });
+  const { domain } = got;
+  const promptId = Number(req.params.promptId);
+  if (!Number.isFinite(promptId)) return res.status(400).json({ error: 'Invalid promptId' });
+
+  const prompt = await prisma.prompt.findFirst({
+    where: { id: promptId, domainId: domain.id },
+    select: { id: true, text: true },
+  });
+  if (!prompt) return res.status(404).json({ error: 'Prompt not found' });
+
+  const rows = await prisma.aiQueryResult.findMany({
+    where: {
+      promptId,
+      run: { domainId: domain.id, status: 'completed' },
+    },
+    select: {
+      runId: true,
+      presence: true,
+      sentiment: true,
+      run: { select: { startedAt: true } },
+    },
+  });
+
+  // Bucket per run.
+  type Bucket = { runId: number; startedAt: Date; mentions: number; total: number; sentSum: number; sentCount: number };
+  const byRun = new Map<number, Bucket>();
+  for (const r of rows) {
+    let b = byRun.get(r.runId);
+    if (!b) {
+      b = { runId: r.runId, startedAt: r.run.startedAt, mentions: 0, total: 0, sentSum: 0, sentCount: 0 };
+      byRun.set(r.runId, b);
+    }
+    b.total += 1;
+    b.mentions += r.presence;
+    if (r.presence === 1 && r.sentiment !== null) {
+      // Convert raw -10..10 into displayed 0..10 (matches /report transform).
+      b.sentSum += Math.max(0, Math.min(10, (r.sentiment + 10) / 2));
+      b.sentCount += 1;
+    }
+  }
+
+  const runs = [...byRun.values()]
+    .sort((a, b) => a.startedAt.getTime() - b.startedAt.getTime())
+    .map((b) => ({
+      runId: b.runId,
+      startedAt: b.startedAt,
+      presenceRate: b.total > 0 ? Math.round((b.mentions / b.total) * 100) : 0,
+      mentions: b.mentions,
+      total: b.total,
+      avgSentiment: b.sentCount > 0 ? Number((b.sentSum / b.sentCount).toFixed(2)) : null,
+    }));
+
+  return res.json({ prompt, runs });
+});
+
+// ── GET /domain/:id/keywords/:keywordId/history ───────────────────────────
+//
+// Same shape as the prompt history endpoint, but rolls up across every
+// child prompt belonging to the keyword. Drives the Track Keywords inline
+// detail chart.
+router.get('/domain/:id/keywords/:keywordId/history', authenticateToken, async (req: Request, res: Response) => {
+  const got = await ensureDomain(req, req.params.id);
+  if (!got.ok) return res.status(got.status).json({ error: got.error });
+  const { domain } = got;
+  const keywordId = Number(req.params.keywordId);
+  if (!Number.isFinite(keywordId)) return res.status(400).json({ error: 'Invalid keywordId' });
+
+  const keyword = await prisma.keyword.findFirst({
+    where: { id: keywordId, domainId: domain.id },
+    select: { id: true, term: true },
+  });
+  if (!keyword) return res.status(404).json({ error: 'Keyword not found' });
+
+  // Pull the child prompt ids first so we can scope the result query.
+  const childPrompts = await prisma.prompt.findMany({
+    where: { domainId: domain.id, keywordId },
+    select: { id: true },
+  });
+  const childIds = childPrompts.map((p) => p.id);
+  if (childIds.length === 0) {
+    return res.json({ keyword, runs: [] });
+  }
+
+  const rows = await prisma.aiQueryResult.findMany({
+    where: {
+      promptId: { in: childIds },
+      run: { domainId: domain.id, status: 'completed' },
+    },
+    select: {
+      runId: true,
+      presence: true,
+      sentiment: true,
+      run: { select: { startedAt: true } },
+    },
+  });
+
+  type Bucket = { runId: number; startedAt: Date; mentions: number; total: number; sentSum: number; sentCount: number };
+  const byRun = new Map<number, Bucket>();
+  for (const r of rows) {
+    let b = byRun.get(r.runId);
+    if (!b) {
+      b = { runId: r.runId, startedAt: r.run.startedAt, mentions: 0, total: 0, sentSum: 0, sentCount: 0 };
+      byRun.set(r.runId, b);
+    }
+    b.total += 1;
+    b.mentions += r.presence;
+    if (r.presence === 1 && r.sentiment !== null) {
+      b.sentSum += Math.max(0, Math.min(10, (r.sentiment + 10) / 2));
+      b.sentCount += 1;
+    }
+  }
+
+  const runs = [...byRun.values()]
+    .sort((a, b) => a.startedAt.getTime() - b.startedAt.getTime())
+    .map((b) => ({
+      runId: b.runId,
+      startedAt: b.startedAt,
+      presenceRate: b.total > 0 ? Math.round((b.mentions / b.total) * 100) : 0,
+      mentions: b.mentions,
+      total: b.total,
+      avgSentiment: b.sentCount > 0 ? Number((b.sentSum / b.sentCount).toFixed(2)) : null,
+    }));
+
+  return res.json({ keyword, runs });
+});
+
 // ── GET /domain/:id/runs  (past audit runs for the dashboard run-picker) ──
 //
 // Returns one row per completed AiRun for this domain, newest first. The

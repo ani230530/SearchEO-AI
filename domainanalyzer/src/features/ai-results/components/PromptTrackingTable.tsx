@@ -1,4 +1,5 @@
-import { Fragment, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
+import { apiGet } from "@/services/apiClient";
 import ReactMarkdown from "react-markdown";
 import {
   AlignLeft,
@@ -73,6 +74,8 @@ export type PromptTableRow = {
   competitorCount: number;
   competitors: string[];
   id: string;
+  /** Raw DB id (Prompt.id or Keyword.id). Used to fetch /history for this row. */
+  rawId?: number;
   mentions: number;
   phrase: string;
   results: PromptModelResult[];
@@ -91,19 +94,10 @@ type ProcessedPromptResult = PromptModelResult & {
   sources: string[];
 };
 
-const detailGraphData = [
-  { day: "17 April", value: 10, x: 17 },
-  { day: "18 April", value: 18, x: 18 },
-  { day: "19 April", value: 15, x: 19 },
-  { day: "20 April", value: 12, x: 20 },
-  { day: "21 April", value: 42, x: 21 },
-  { day: "22 April", value: 48, x: 22 },
-  { day: "23 April", value: 15, x: 23 },
-  { day: "24 April", value: 22, x: 24 },
-];
-
-const detailGraphTicks = [18, 21, 22, 23, 24];
-const detailGraphHighlight = detailGraphData[3];
+// detailGraphData / detailGraphTicks / detailGraphHighlight removed — the
+// per-prompt detail chart now derives from the live /history endpoint
+// (see PromptVisibilityComparisonGraph below) so a single audit shows one
+// honest dot instead of a fabricated 17–24 April series.
 
 const getSentimentColor = (sentiment: string) => {
   const s = sentiment.toLowerCase();
@@ -201,32 +195,119 @@ const getHref = (value: string) => {
   }
 };
 
-const PromptVisibilityComparisonGraph = ({ results }: { results: ProcessedPromptResult[] }) => {
-  const rankingRows = [
-    { label: "Chat GPT", score: "24/100" },
-    { label: "Gemini", score: "27/100" },
-    { label: "Claude", score: "16/100" },
-  ];
+/**
+ * Per-model presence rollup for THIS row's results in the current run.
+ * Replaces the old hardcoded "ChatGPT 24/100, Gemini 27/100, Claude 16/100"
+ * — those numbers were never wired to anything. Now: count how many of this
+ * model's responses for this prompt actually mentioned the brand.
+ */
+const buildModelPresenceRows = (results: ProcessedPromptResult[]) => {
+  const byModel = new Map<string, { total: number; mentions: number }>();
+  for (const r of results) {
+    const k = r.model;
+    if (!byModel.has(k)) byModel.set(k, { total: 0, mentions: 0 });
+    const slot = byModel.get(k)!;
+    slot.total += 1;
+    slot.mentions += r.presence > 0 ? 1 : 0;
+  }
+  return Array.from(byModel.entries()).map(([model, v]) => ({
+    label: getModelLabel(model),
+    model,
+    score: `${v.mentions}/${v.total}`,
+  }));
+};
+
+/**
+ * Per-prompt history chart. Fetches /history for this prompt on mount and
+ * renders presence-rate% over each completed audit run.
+ *   - 0 runs   → empty pill overlay ("No runs yet")
+ *   - 1 run    → single dot + "Trend appears after your next audit"
+ *   - 2+ runs  → real area chart with auto-scaled Y axis (0..100)
+ */
+const PromptVisibilityComparisonGraph = ({
+  results,
+  domainId,
+  promptRawId,
+  rowType,
+}: {
+  results: ProcessedPromptResult[];
+  domainId?: number | null;
+  promptRawId?: number | null;
+  rowType: "prompt" | "keyword";
+}) => {
+  const presenceRows = buildModelPresenceRows(results);
+  const [history, setHistory] = useState<Array<{ runId: number; startedAt: string; presenceRate: number; mentions: number; total: number }>>([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    if (!domainId || !promptRawId) {
+      setHistory([]);
+      return;
+    }
+    setLoadingHistory(true);
+    // Same payload shape from both endpoints — only the path segment changes
+    // ('prompts/:id' vs 'keywords/:id') so the component can render either.
+    const path = rowType === "keyword"
+      ? `/wizard/domain/${domainId}/keywords/${promptRawId}/history`
+      : `/wizard/domain/${domainId}/prompts/${promptRawId}/history`;
+    apiGet<{ runs: Array<{ runId: number; startedAt: string; presenceRate: number; mentions: number; total: number }> }>(path)
+      .then((res) => { if (alive) setHistory(res.runs ?? []); })
+      .catch(() => { if (alive) setHistory([]); })
+      .finally(() => { if (alive) setLoadingHistory(false); });
+    return () => { alive = false; };
+  }, [domainId, promptRawId, rowType]);
+
+  const chartData = history.map((h, i) => ({
+    x: i,
+    presence: h.presenceRate,
+    label: new Date(h.startedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" }),
+  }));
+  const ticks = chartData.length > 0
+    ? [0, Math.floor(chartData.length / 2), chartData.length - 1].filter((v, i, a) => a.indexOf(v) === i)
+    : [];
+  const lastIdx = chartData.length - 1;
+  const emptyMessage = !domainId || !promptRawId
+    ? "Open from a tracked domain to see history"
+    : loadingHistory
+      ? "Loading history…"
+      : history.length === 0
+        ? "No audit history for this prompt yet"
+        : history.length === 1
+          ? "Trend appears after your next audit"
+          : null;
 
   return (
     <div className="relative border-r border-[#e7ebf2] pr-3">
-      <div className="absolute left-[102px] top-[24px] z-10 w-max rounded-[8px] border border-[#f1f3f7] bg-white px-3 py-2.5 shadow-[0_4px_16px_rgba(15,23,42,0.06)]">
-        <p className="text-[11px] font-semibold text-[#1e293b]">Ranking across LLMS</p>
-        <div className="mt-2 space-y-2">
-          {rankingRows.map((item) => (
-            <div key={item.label} className="flex items-center justify-between gap-5 text-[9px] font-medium text-[#475569]">
-              <span className="flex items-center gap-1.5">
-                {getModelIcon(item.label)}
-                {item.label}
-              </span>
-              <span>{item.score}</span>
-            </div>
-          ))}
+      {/* Real per-model presence summary — one row per model with the live
+          mention/total ratio for this prompt. Falls back to nothing if no
+          results were captured. */}
+      {presenceRows.length > 0 ? (
+        <div className="absolute left-[102px] top-[24px] z-10 w-max rounded-[8px] border border-[#f1f3f7] bg-white px-3 py-2.5 shadow-[0_4px_16px_rgba(15,23,42,0.06)]">
+          <p className="text-[11px] font-semibold text-[#1e293b]">Mentioned per model</p>
+          <div className="mt-2 space-y-2">
+            {presenceRows.map((item) => (
+              <div key={item.model} className="flex items-center justify-between gap-5 text-[9px] font-medium text-[#475569]">
+                <span className="flex items-center gap-1.5">
+                  {getModelIcon(item.model)}
+                  {item.label}
+                </span>
+                <span>{item.score}</span>
+              </div>
+            ))}
+          </div>
         </div>
-      </div>
-      <div className="h-[246px]">
+      ) : null}
+      <div className="relative h-[246px]">
+        {emptyMessage ? (
+          <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
+            <span className="rounded-full bg-white/95 border border-slate-200 px-3 py-1.5 text-[11px] text-slate-500 shadow-sm">
+              {emptyMessage}
+            </span>
+          </div>
+        ) : null}
         <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={detailGraphData} margin={{ top: 6, right: 10, left: -18, bottom: 0 }}>
+          <AreaChart data={chartData} margin={{ top: 6, right: 10, left: -18, bottom: 0 }}>
             <defs>
               <linearGradient id="prompt-detail-fill" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stopColor="#c8d9f3" stopOpacity={0.95} />
@@ -237,23 +318,25 @@ const PromptVisibilityComparisonGraph = ({ results }: { results: ProcessedPrompt
             <XAxis
               axisLine={false}
               dataKey="x"
-              domain={[17, 24]}
+              domain={[0, Math.max(0, chartData.length - 1)]}
               tick={{ fill: "#8d97a6", fontSize: 12 }}
-              tickFormatter={(value) => `${value} April`}
+              tickFormatter={(value) => chartData[value]?.label ?? ""}
               tickLine={false}
-              ticks={detailGraphTicks}
+              ticks={ticks}
               type="number"
             />
-            <YAxis axisLine={false} domain={[0, 60]} hide tickLine={false} />
-            <Area dataKey="value" fill="url(#prompt-detail-fill)" stroke="none" type="monotone" />
-            <ReferenceDot
-              fill="#83a9da"
-              isFront
-              r={4.5}
-              stroke="#83a9da"
-              x={detailGraphHighlight.x}
-              y={detailGraphHighlight.value}
-            />
+            <YAxis axisLine={false} domain={[0, 100]} hide tickLine={false} />
+            <Area dataKey="presence" fill="url(#prompt-detail-fill)" stroke="#83a9da" strokeWidth={1.5} type="monotone" />
+            {lastIdx >= 0 ? (
+              <ReferenceDot
+                fill="#83a9da"
+                isFront
+                r={4.5}
+                stroke="#83a9da"
+                x={lastIdx}
+                y={chartData[lastIdx]?.presence ?? 0}
+              />
+            ) : null}
           </AreaChart>
         </ResponsiveContainer>
       </div>
@@ -474,7 +557,19 @@ const PromptAIResponsePanel = ({
   );
 };
 
-const PromptExpandedDetails = ({ results, phrase }: { results: PromptModelResult[]; phrase: string }) => {
+const PromptExpandedDetails = ({
+  results,
+  phrase,
+  domainId,
+  rawId,
+  rowType,
+}: {
+  results: PromptModelResult[];
+  phrase: string;
+  domainId?: number | null;
+  rawId?: number | null;
+  rowType: "prompt" | "keyword";
+}) => {
   const processedResults = useMemo<ProcessedPromptResult[]>(() => {
     const grouped = new Map<string, ProcessedPromptResult>();
 
@@ -562,8 +657,14 @@ const PromptExpandedDetails = ({ results, phrase }: { results: PromptModelResult
         </div>
       </div>
       <div className="grid grid-cols-[0.98fr_1.08fr] gap-3 border-t border-[#eef2f6] pt-4">
-        <PromptVisibilityComparisonGraph results={processedResults} />
+        <PromptVisibilityComparisonGraph
+          results={processedResults}
+          domainId={domainId}
+          promptRawId={rawId}
+          rowType={rowType}
+        />
         <PromptAIResponsePanel
+          phrase={phrase}
           results={processedResults}
           selectedModel={selectedModel}
           setSelectedModel={setSelectedModel}
@@ -576,9 +677,12 @@ const PromptExpandedDetails = ({ results, phrase }: { results: PromptModelResult
 export const PromptTable = ({
   data,
   title = "Top searched Prompts",
+  domainId,
 }: {
   data: PromptTableRow[];
   title?: string;
+  /** Real Domain.id used by the expanded row to fetch /history. */
+  domainId?: number | null;
 }) => {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [tableFilter, setTableFilter] = useState<"all" | "prompt" | "keyword">("all");
@@ -594,12 +698,15 @@ export const PromptTable = ({
     }
 
     if (tableMetric) {
+      // Real numeric fields (avgSentiment may be null when no model mentioned
+      // the brand; sov is "42%" string so we parseInt).
+      const num = (v: number | null | undefined) => (typeof v === "number" ? v : -1);
       items.sort((a, b) => {
         if (tableMetric === "Ranking") return b.mentions - a.mentions;
         if (tableMetric === "Position") return a.bestRank - b.bestRank;
         if (tableMetric === "SOV") return Number.parseInt(b.sov, 10) - Number.parseInt(a.sov, 10);
         if (tableMetric === "Competitors") return b.competitorCount - a.competitorCount;
-        return b.avgSentiment - a.avgSentiment;
+        return num(b.avgSentiment) - num(a.avgSentiment);
       });
     }
 
@@ -858,7 +965,13 @@ export const PromptTable = ({
                   {expandedId === row.id ? (
                     <TableRow className="border-b border-slate-300 bg-white hover:bg-white">
                       <TableCell colSpan={8} className="p-0">
-                        <PromptExpandedDetails results={row.results} phrase={row.phrase} />
+                        <PromptExpandedDetails
+                          results={row.results}
+                          phrase={row.phrase}
+                          domainId={domainId}
+                          rawId={row.rawId}
+                          rowType={row.type}
+                        />
                       </TableCell>
                     </TableRow>
                   ) : null}
