@@ -2934,7 +2934,7 @@ const AIResultsReportPreview = () => {
                 {(reportData?.phraseVisibility ?? []).slice(0, 8).map((row: any) => {
                   const status: 'positive' | 'warn' | 'danger' =
                     row.status === 'won' ? 'positive' : row.status === 'at_risk' ? 'warn' : 'danger';
-                  const showCta = row.status !== 'won';
+                  const ctaLabel = row.status === 'won' ? 'Reinforce' : 'Generate Content';
                   const key = `phrase:${row.promptId}`;
                   return (
                     <VisibilityRow
@@ -2942,28 +2942,28 @@ const AIResultsReportPreview = () => {
                       title={row.phrase}
                       meta={row.subtitle}
                       status={status}
-                      actionLabel={showCta ? 'Generate Content' : undefined}
-                      onAction={
-                        showCta
-                          ? () =>
-                              handleGenerateContent(key, {
-                                kind: 'phrase',
-                                title: `Improve coverage for ${row.keyword ?? 'this prompt'}`,
-                                rationale: row.subtitle,
-                                primaryKeyword: row.keyword ?? null,
-                                longtailKeywords: [row.phrase],
-                                suggestedTemplate:
-                                  row.category === 'brand_vs_competitor'
-                                    ? 'landing_page'
-                                    : row.category === 'branded_trust'
-                                      ? 'case_study'
-                                      : row.category === 'problem_statement'
-                                        ? 'faq'
-                                        : 'blog',
-                                category: row.category ?? null,
-                                intentStage: row.intentStage ?? null,
-                              })
-                          : undefined
+                      actionLabel={ctaLabel}
+                      onAction={() =>
+                        handleGenerateContent(key, {
+                          kind: 'phrase',
+                          title:
+                            row.status === 'won'
+                              ? `Reinforce coverage for ${row.keyword ?? 'this prompt'}`
+                              : `Improve coverage for ${row.keyword ?? 'this prompt'}`,
+                          rationale: row.subtitle,
+                          primaryKeyword: row.keyword ?? null,
+                          longtailKeywords: [row.phrase],
+                          suggestedTemplate:
+                            row.category === 'brand_vs_competitor'
+                              ? 'landing_page'
+                              : row.category === 'branded_trust'
+                                ? 'case_study'
+                                : row.category === 'problem_statement'
+                                  ? 'faq'
+                                  : 'blog',
+                          category: row.category ?? null,
+                          intentStage: row.intentStage ?? null,
+                        })
                       }
                       generation={generationByKey[key]}
                     />
