@@ -8,7 +8,7 @@ import {
   AreaChart,
   CartesianGrid,
   ResponsiveContainer,
-  Tooltip,
+  Tooltip as RechartsTooltip,
   XAxis,
   YAxis,
 } from 'recharts';
@@ -16,6 +16,7 @@ import {
   BarChart3,
   Bot,
   Calendar,
+  Check,
   CheckCircle2,
   ChevronDown,
   ChevronRight,
@@ -27,7 +28,6 @@ import {
   LineChart,
   Languages,
   LayoutGrid,
-  Link2,
   Plus,
   RefreshCw,
   Search,
@@ -42,7 +42,6 @@ import {
   Users,
   TrendingUp,
   X,
-  Zap,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -69,6 +68,11 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { AIResultsLayout } from '@/features/ai-results/components/AIResultsLayout';
 import { maskDomainId, unmaskDomainId } from '../lib/domainUtils';
 
@@ -81,6 +85,92 @@ const getDomainLogo = (rawUrl: string | undefined): string | null => {
   const host = getDomainHost(rawUrl);
   if (!host) return null;
   return `https://img.logo.dev/${host}?token=pk_DTdFFG1JT9WOCjATvZEzIA&size=64`;
+};
+
+const getHostFromAnyUrl = (value?: string): string | null => {
+  if (!value) return null;
+  try {
+    const target = value.startsWith('http') ? value : `https://${value}`;
+    const host = new URL(target).hostname.replace(/^www\./, '');
+    return host || null;
+  } catch {
+    return null;
+  }
+};
+
+const getFaviconUrl = (value?: string): string | null => {
+  const host = getHostFromAnyUrl(value);
+  if (!host) return null;
+  return `https://img.logo.dev/${host}?token=pk_DTdFFG1JT9WOCjATvZEzIA&size=64`;
+};
+
+const MODEL_ICON_SRC: Array<{ match: RegExp; src: string; label: string }> = [
+  { match: /(gpt|chatgpt|openai)/i, src: '/report-icons/chat-gpt.svg', label: 'ChatGPT' },
+  { match: /claude/i, src: '/report-icons/claude.svg', label: 'Claude' },
+  { match: /gemini/i, src: '/report-icons/gemini.svg', label: 'Gemini' },
+];
+
+const resolveModelMeta = (model?: string) => {
+  if (!model) return null;
+  return MODEL_ICON_SRC.find((entry) => entry.match.test(model)) ?? null;
+};
+
+const getModelLabel = (model?: string) => {
+  if (!model) return 'Model';
+  return resolveModelMeta(model)?.label ?? model;
+};
+
+const getModelIconNode = (model?: string, size: 'sm' | 'md' = 'sm') => {
+  const dim = size === 'md' ? 'h-[18px] w-[18px]' : 'h-4 w-4';
+  const meta = resolveModelMeta(model);
+  if (meta) {
+    return (
+      <img
+        src={meta.src}
+        alt={meta.label}
+        className={`${dim} object-contain`}
+        loading="lazy"
+      />
+    );
+  }
+  return <Bot className={`${dim} text-slate-400`} />;
+};
+
+const sentimentTone = (sentiment?: number | null) => {
+  if (sentiment == null || Number.isNaN(Number(sentiment))) {
+    return 'border-slate-200 bg-white text-slate-600';
+  }
+  const value = Number(sentiment);
+  if (value > 2) return 'border-emerald-200 bg-emerald-50 text-emerald-700';
+  if (value < -2) return 'border-rose-200 bg-rose-50 text-rose-700';
+  return 'border-slate-200 bg-slate-50 text-slate-600';
+};
+
+const CompetitorPill = ({ mention }: { mention: any }) => {
+  if (!mention) return null;
+  const brand = (mention.brand || mention.name || '').toString().trim();
+  if (!brand) return null;
+  const sentiment = mention.sentiment ?? null;
+  const favicon = mention.logoUrl || getFaviconUrl(mention.url || mention.domain || brand);
+  const tone = sentimentTone(sentiment);
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10.5px] font-medium ${tone}`}
+    >
+      {favicon ? (
+        <img
+          src={favicon}
+          alt={brand}
+          className="h-3.5 w-3.5 flex-shrink-0 rounded-full border border-white bg-white object-cover"
+          loading="lazy"
+          onError={(e) => {
+            (e.target as HTMLImageElement).style.display = 'none';
+          }}
+        />
+      ) : null}
+      {brand}
+    </span>
+  );
 };
 
 const sidebarItems = [
@@ -149,86 +239,32 @@ const promptRows = [
   },
 ];
 
-const privateVisibilityItems = [
-  { title: 'Best SaaS analytics tools', count: 'Found in 2 competitors', status: 'positive' },
-  { title: 'Enterprise analytics comparison', count: 'Found in 2 competitors', status: 'danger' },
-  { title: 'Enterprise analytics comparison', count: 'Position #2, 4 competitors', status: 'danger' },
-  { title: 'Best SaaS analytics tools', count: 'Found in 2 competitors', status: 'positive' },
-  { title: 'Enterprise analytics comparison', count: 'Found in 2 competitors', status: 'danger' },
-];
+// Phrase Visibility Map + Opportunities are now derived from
+// reportData.phraseVisibility / reportData.opportunities — see
+// the inline mappers in the page render below. The mock arrays
+// that used to live here ("Best SaaS analytics tools", etc.) are gone.
 
-const opportunityItems = [
-  { title: 'Create comparison analytics page', priority: 'Very High', severity: 'Critical' },
-  { title: 'Create experimental content analysis', priority: 'High', severity: 'Critical' },
-  { title: 'Create experimental content analysis', priority: 'High', severity: 'Critical' },
-  { title: 'Create experimental content analysis guide', priority: 'High', severity: 'Critical' },
-];
+/** Map analytics severity bucket → display string. */
+const SEVERITY_LABEL: Record<string, string> = {
+  critical: 'Critical',
+  high: 'High',
+  medium: 'Medium',
+  low: 'Low',
+};
 
-const shareOfVoiceData = [
-  { date: '10 April', semrush: 620, ahref: 220, athenaHq: 120, scrunch: 80 },
-  { date: '11 April', semrush: 960, ahref: 300, athenaHq: 180, scrunch: 120 },
-  { date: '12 April', semrush: 1800, ahref: 520, athenaHq: 340, scrunch: 220 },
-  { date: '13 April', semrush: 2300, ahref: 780, athenaHq: 460, scrunch: 320 },
-  { date: '14 April', semrush: 1850, ahref: 820, athenaHq: 520, scrunch: 400 },
-  { date: '15 April', semrush: 1700, ahref: 1120, athenaHq: 700, scrunch: 560 },
-  { date: '16 April', semrush: 5200, ahref: 1750, athenaHq: 980, scrunch: 820 },
-  { date: '17 April', semrush: 5800, ahref: 2050, athenaHq: 1300, scrunch: 1100 },
-  { date: '18 April', semrush: 3400, ahref: 1120, athenaHq: 900, scrunch: 720 },
-  { date: '19 April', semrush: 900, ahref: 3800, athenaHq: 1700, scrunch: 1400 },
-  { date: '20 April', semrush: 1200, ahref: 5200, athenaHq: 2400, scrunch: 1900 },
-];
+/** Map analytics traffic potential bucket → display string. */
+const TRAFFIC_LABEL: Record<string, string> = {
+  very_high: 'Very High',
+  high: 'High',
+  medium: 'Medium',
+  low: 'Low',
+};
 
-const citationsData = [
-  { date: 'April 25', chatgpt: 920, gemini: 220, claude: 110 },
-  { date: 'May 25', chatgpt: 940, gemini: 260, claude: 140 },
-  { date: 'June 25', chatgpt: 2100, gemini: 440, claude: 220 },
-  { date: 'July 25', chatgpt: 2600, gemini: 620, claude: 320 },
-  { date: 'Aug 25', chatgpt: 1550, gemini: 420, claude: 230 },
-  { date: 'Sept 25', chatgpt: 1450, gemini: 380, claude: 180 },
-  { date: 'Oct 25', chatgpt: 1750, gemini: 460, claude: 240 },
-  { date: 'Nov 25', chatgpt: 2450, gemini: 680, claude: 300 },
-  { date: 'Dec 25', chatgpt: 5200, gemini: 1350, claude: 760 },
-  { date: 'Jan 26', chatgpt: 6900, gemini: 1750, claude: 980 },
-  { date: 'Feb 26', chatgpt: 4400, gemini: 1600, claude: 1180 },
-  { date: 'Mar 26', chatgpt: 3200, gemini: 1180, claude: 860 },
-  { date: 'April 26', chatgpt: 860, gemini: 1100, claude: 760 },
-  { date: 'May 26', chatgpt: 1200, gemini: 3600, claude: 2200 },
-];
-
-const mentionsData = [
-  { date: 'April 25', brand: 120, competitors: 260 },
-  { date: 'May 25', brand: 180, competitors: 320 },
-  { date: 'June 25', brand: 260, competitors: 420 },
-  { date: 'July 25', brand: 220, competitors: 380 },
-  { date: 'Aug 25', brand: 80, competitors: 120 },
-  { date: 'Sept 25', brand: 90, competitors: 140 },
-  { date: 'Oct 25', brand: 160, competitors: 220 },
-  { date: 'Nov 25', brand: 320, competitors: 620 },
-  { date: 'Dec 25', brand: 1000, competitors: 2600 },
-  { date: 'Jan 26', brand: 1150, competitors: 2700 },
-  { date: 'Feb 26', brand: 1050, competitors: 1800 },
-  { date: 'Mar 26', brand: 820, competitors: 1500 },
-  { date: 'April 26', brand: 650, competitors: 1300 },
-  { date: 'May 26', brand: 2100, competitors: 3200 },
-];
-
-const shareOfVoiceSeries = [
-  { key: 'semrush', label: 'Semrush', stroke: '#E9897E' },
-  { key: 'ahref', label: 'Ahref', stroke: '#8DD9E8' },
-  { key: 'athenaHq', label: 'Athena HQ', stroke: '#79A7F2' },
-  { key: 'scrunch', label: 'Scrunch', stroke: '#9D8CF4' },
-] as const;
-
-const citationsSeries = [
-  { key: 'chatgpt', label: 'ChatGPT', stroke: '#E9897E' },
-  { key: 'gemini', label: 'Gemini', stroke: '#8DD9E8' },
-  { key: 'claude', label: 'Claude', stroke: '#79A7F2' },
-] as const;
-
-const mentionsSeries = [
-  { key: 'brand', label: 'Brand mentions', stroke: '#6EA8FF' },
-  { key: 'competitors', label: 'Competitors Mentions', stroke: '#7BD8EB' },
-] as const;
+// Trend chart data is now derived from /trends inside the page component —
+// shareOfVoice, citations, and mentions arrays used to live here as static
+// mocks (Semrush/Ahref/Athena HQ/Scrunch competitors, dates running into
+// May 26). Removed in favor of real per-AiRun rollups so the dashboard
+// can't lie about progress over time.
 
 const formatChartTick = (value: string | number) => {
   const numericValue = Number(value);
@@ -350,24 +386,86 @@ interface MetricCardData {
   details: MetricCardDetail[];
 }
 
-const MetricInfoIcon = () => (
+/**
+ * Plain "i" badge — used as the trigger inside MetricInfoTooltip below.
+ * Kept as a separate component so we can also drop a tip-less version for
+ * places where the design wants the badge but no help text.
+ */
+const MetricInfoBadge = () => (
   <span
     aria-hidden="true"
-    className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-[#717680] text-[9px] font-semibold leading-none text-[#717680]"
+    className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-[#717680] text-[9px] font-semibold leading-none text-[#717680] cursor-help"
   >
     i
   </span>
 );
 
+/**
+ * Hover-help tooltip for every dashboard card title.
+ *
+ * Each card gets a short, plain-English explanation of what the number
+ * actually means and how to read it — no jargon, no marketing fluff. The
+ * goal is the same as a friendly product-tour caption: in two breaths the
+ * user understands what they're looking at and what they should do about it.
+ */
+const MetricInfoTooltip = ({ tip }: { tip: string }) => (
+  <Tooltip delayDuration={150}>
+    <TooltipTrigger asChild>
+      <button type="button" className="focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 rounded-full">
+        <MetricInfoBadge />
+        <span className="sr-only">More info</span>
+      </button>
+    </TooltipTrigger>
+    <TooltipContent
+      side="top"
+      align="start"
+      className="max-w-[280px] bg-slate-900 text-slate-100 text-[12px] leading-relaxed font-normal px-3 py-2 rounded-lg shadow-xl"
+    >
+      {tip}
+    </TooltipContent>
+  </Tooltip>
+);
+
+/**
+ * Plain-English explanation per card title. Keep these short (~30-50 words),
+ * answer "what is this and how do I read it", and avoid acronyms unless
+ * already familiar to a marketer (SOV, AI Overview, etc.).
+ */
+const CARD_TOOLTIPS: Record<string, string> = {
+  'AI Citations':
+    'How many web sources each AI assistant cited when answering your prompts. A higher count means the model is grounding its answer in real research — and the unique-host count tells you how diverse those sources are.',
+  'Top Keywords':
+    'Total keywords we generated for your audit, and how many actually got tested in this run. Visibility is the share of model responses that mentioned your brand across those tested keywords.',
+  'Top Prompts':
+    'Total prompts the wizard wrote, and how many were run through the AI models. Visibility is the share of model responses that mentioned your brand — measured only across prompts you actually selected.',
+  'Mentions':
+    'Of every brand mention in the AI responses, what share is yours vs your competitors. Brand 100% means every mention was you; high competitor % means the AIs are talking about your space but recommending others.',
+  'Overall Sentiment':
+    'How the AI assistants talk about your brand when they mention it. Positive means glowing language ("trusted", "industry-leading"), Negative means critical ("avoid", "outdated"). "Not measurable" means no prompt mentioned you in this run.',
+  'Brand Accuracy Score':
+    'When AIs make claims about your brand, how often those claims are factually correct based on your own website content. Low scores mean models are hallucinating things about you — a signal to publish clearer info.',
+  'AI Share of Voice':
+    'The headline number: across every model query in this run, what percentage of responses mentioned your brand at all. Think of this as your "page-1 ranking" for AI search.',
+  'Phrase Visibility Map':
+    'Per-prompt breakdown showing which questions you win on and which you lose. Click a row to see the actual model responses, citations, and competitor mentions for that prompt.',
+  'Opportunities to Outrank Competitors':
+    'Specific actions derived from the audit data — which prompts your competitors are winning, which sources they\'re cited from, and concrete content moves to close the gap.',
+};
+
+/** Convenience — wraps a card title + tip badge inline. */
+const CardTitleWithTip = ({ title, className }: { title: string; className?: string }) => (
+  <div className="flex items-center gap-1.5">
+    <CardTitle className={className ?? 'text-base font-semibold leading-[135%] tracking-normal text-[#535862]'}>
+      {title}
+    </CardTitle>
+    {CARD_TOOLTIPS[title] ? <MetricInfoTooltip tip={CARD_TOOLTIPS[title]} /> : <MetricInfoBadge />}
+  </div>
+);
+
 const MetricCard = ({ card }: { card: MetricCardData }) => (
   <Card className="h-full rounded-xl border border-[#D5D7DA] bg-white shadow-[0_1px_2px_0_#1018280D]">
     <CardContent className={cn('flex h-full flex-col p-5 sm:p-6', card.kind === 'citations' ? 'min-h-[228px] gap-5' : 'min-h-[120px] gap-4')}>
-      <div className="flex items-center gap-1.5">
-        <CardTitle className="text-base font-semibold leading-[135%] tracking-normal text-[#535862]">
-          {card.title}
-        </CardTitle>
-        <MetricInfoIcon />
-      </div>
+      <CardTitleWithTip title={card.title} />
 
       {card.kind === 'citations' ? (
         <div className="grid flex-1 grid-cols-1 gap-x-6 gap-y-6 sm:grid-cols-2">
@@ -416,16 +514,6 @@ const ModelComparisonGrid = ({ results }: { results: any[] }) => {
     { label: 'Sentiments', key: 'displaySentiment', type: 'number' }
   ];
 
-  const getModelIcon = (model?: string) => {
-    if (!model) return <Bot className="h-4 w-4 text-gray-400" />;
-    const m = model.toLowerCase();
-    if (m.includes('gpt')) return <Bot className="h-4 w-4 text-gray-900" />;
-    if (m.includes('claude')) return <Sparkles className="h-4 w-4 text-[#d97706]" />;
-    if (m.includes('gemini')) return <Globe2 className="h-4 w-4 text-[#2563eb]" />;
-    if (m.includes('deep')) return <Zap className="h-4 w-4 text-[#4f46e5]" />;
-    return <Zap className="h-4 w-4 text-purple-500" />;
-  };
-
   return (
     <div className="flex flex-col gap-2 lg:px-4 lg:pt-3 lg:pb-4">
       <div className="flex items-center h-9 px-1">
@@ -442,8 +530,8 @@ const ModelComparisonGrid = ({ results }: { results: any[] }) => {
                 {results.map((r) => (
                   <th key={r.id} className="py-4 px-4 border-r border-slate-200 last:border-r-0">
                     <div className="flex items-center justify-center gap-2">
-                      {getModelIcon(r.model)}
-                      <span className="text-[12px] font-medium text-slate-700 whitespace-nowrap">{r.model}</span>
+                      {getModelIconNode(r.model, 'sm')}
+                      <span className="text-[12px] font-medium text-slate-700 whitespace-nowrap">{getModelLabel(r.model)}</span>
                     </div>
                   </th>
                 ))}
@@ -493,16 +581,11 @@ const AIResponseViewer = ({
 }) => {
   const activeResult = results.find(r => r.model === selectedModel) || results[0];
 
-  const getModelIcon = (model?: string) => {
-    if (!model) return <Bot className="h-3.5 w-3.5 text-gray-400" />;
-    const m = model.toLowerCase();
-    if (m.includes('gpt')) return <Bot className="h-3.5 w-3.5 text-emerald-600" />;
-    if (m.includes('claude')) return <Sparkles className="h-3.5 w-3.5 text-orange-500" />;
-    if (m.includes('gemini')) return <Globe2 className="h-3.5 w-3.5 text-blue-500" />;
-    return <Zap className="h-3.5 w-3.5 text-purple-500" />;
-  };
-
   if (!activeResult) return null;
+
+  const competitorMentions = Array.isArray(activeResult.competitorMentions)
+    ? activeResult.competitorMentions
+    : [];
 
   return (
     <div className="flex flex-col gap-2 lg:px-4 lg:pt-3 lg:pb-4">
@@ -512,15 +595,15 @@ const AIResponseViewer = ({
           <span className="text-[11px] text-gray-400 font-medium">Select Model</span>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" className="h-9 min-w-[140px] justify-between gap-2 rounded-lg border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-gray-700 shadow-sm transition hover:bg-gray-50">
+              <Button variant="outline" className="h-9 min-w-[150px] justify-between gap-2 rounded-lg border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-gray-700 shadow-sm transition hover:bg-gray-50">
                 <span className="flex items-center gap-2">
-                  {getModelIcon(selectedModel)}
-                  {selectedModel}
+                  {getModelIconNode(selectedModel, 'sm')}
+                  {getModelLabel(selectedModel)}
                 </span>
                 <ChevronDown className="h-3.5 w-3.5 text-gray-400" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-[160px] p-1">
+            <DropdownMenuContent align="end" className="w-[180px] p-1">
               {results.map((r) => (
                 <DropdownMenuItem
                   key={r.id}
@@ -528,8 +611,8 @@ const AIResponseViewer = ({
                   className={`flex items-center gap-2 px-2 py-2 text-xs font-medium cursor-pointer ${r.model === selectedModel ? 'bg-gray-50' : ''
                     }`}
                 >
-                  {getModelIcon(r.model)}
-                  {r.model}
+                  {getModelIconNode(r.model, 'sm')}
+                  {getModelLabel(r.model)}
                 </DropdownMenuItem>
               ))}
             </DropdownMenuContent>
@@ -546,24 +629,51 @@ const AIResponseViewer = ({
               <h3 className="text-[20px] font-medium text-slate-800 leading-tight mb-4 tracking-tight">
                 {activeResult.phrase || 'Analysis Result'}
               </h3>
-              <div className="prose prose-slate prose-sm max-w-none prose-headings:font-medium prose-p:text-slate-600/90 prose-p:leading-relaxed prose-strong:text-slate-800 prose-strong:font-semibold prose-ul:list-disc prose-li:text-slate-600/90">
+              <div className="prose prose-slate prose-sm max-w-none prose-headings:font-semibold prose-headings:text-slate-800 prose-h1:text-[18px] prose-h2:text-[15px] prose-h3:text-[14px] prose-p:text-slate-600/95 prose-p:leading-relaxed prose-strong:text-slate-800 prose-strong:font-semibold prose-ul:list-disc prose-ul:pl-5 prose-ol:pl-5 prose-li:text-slate-600/95 prose-li:my-0.5 prose-a:text-blue-600 prose-a:no-underline hover:prose-a:underline prose-code:rounded prose-code:bg-slate-100 prose-code:px-1 prose-code:py-0.5 prose-code:text-[12px] prose-code:before:content-[''] prose-code:after:content-[''] prose-pre:rounded-md prose-pre:bg-slate-900 prose-pre:text-slate-100">
                 <ReactMarkdown>{activeResult.response || 'No response available.'}</ReactMarkdown>
               </div>
 
-              <div className="mt-8 flex flex-wrap items-center gap-2 pb-2">
+              {competitorMentions.length > 0 && (
+                <div className="mt-7 border-t border-slate-200 pt-5">
+                  <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                    Competitors mentioned
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {competitorMentions.map((mention: any, idx: number) => (
+                      <CompetitorPill key={`${mention?.brand || mention?.name || idx}-${idx}`} mention={mention} />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="mt-7 flex flex-wrap items-center gap-2 pb-2">
                 {Array.isArray(activeResult.sources) && activeResult.sources.length > 0 ? (
-                  activeResult.sources.slice(0, 3).map((source: string, idx: number) => (
-                    <a
-                      key={idx}
-                      href={getHref(source)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50/50 border border-blue-100/50 text-[10.5px] font-medium text-blue-600 hover:bg-blue-100/80 transition-all group"
-                    >
-                      {getDisplayUrl(source)}
-                      <ExternalLink className="h-2.5 w-2.5 opacity-60 group-hover:opacity-100" />
-                    </a>
-                  ))
+                  activeResult.sources.slice(0, 3).map((source: string, idx: number) => {
+                    const favicon = getFaviconUrl(source);
+                    return (
+                      <a
+                        key={idx}
+                        href={getHref(source)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-blue-50/50 border border-blue-100/50 text-[10.5px] font-medium text-blue-600 hover:bg-blue-100/80 transition-all group"
+                      >
+                        {favicon ? (
+                          <img
+                            src={favicon}
+                            alt=""
+                            className="h-3.5 w-3.5 rounded-full border border-white bg-white object-cover"
+                            loading="lazy"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).style.display = 'none';
+                            }}
+                          />
+                        ) : null}
+                        {getDisplayUrl(source)}
+                        <ExternalLink className="h-2.5 w-2.5 opacity-60 group-hover:opacity-100" />
+                      </a>
+                    );
+                  })
                 ) : (
                   <span className="flex items-center gap-1.5 text-[11px] font-bold text-slate-400">
                     System Analysis
@@ -619,9 +729,27 @@ const ExpandedDetails = ({ results }: { results: any[] }) => {
       // Collect all unique sources across all result chunks for this model
       const allSources: string[] = [];
       const allCitations: any[] = [];
+      const allMentions: any[] = [];
+      const seenMentionKeys = new Set<string>();
 
       results.forEach(r => {
         if (r.model !== g.model) return;
+
+        // Handle competitor mentions (from scorer JSON)
+        const rawMentions = Array.isArray(r.competitorMentions)
+          ? r.competitorMentions
+          : Array.isArray(r.competitorMentions?.mentions)
+            ? r.competitorMentions.mentions
+            : [];
+        rawMentions.forEach((m: any) => {
+          if (!m) return;
+          const brand = (m.brand || m.name || '').toString().trim();
+          if (!brand) return;
+          const key = brand.toLowerCase();
+          if (seenMentionKeys.has(key)) return;
+          seenMentionKeys.add(key);
+          allMentions.push(m);
+        });
 
         // Helper to validate basic URL structure (must have a dot, no spaces)
         const isValidUrl = (str: string) => {
@@ -681,7 +809,8 @@ const ExpandedDetails = ({ results }: { results: any[] }) => {
         displaySentiment: mentioned ? g.sentiment / mentionCount : null,
         displayOverall: mentioned ? g.overall / mentionCount : null,
         sources: allSources.length > 0 ? allSources : null,
-        citations: allCitations.length > 0 ? allCitations : null
+        citations: allCitations.length > 0 ? allCitations : null,
+        competitorMentions: allMentions.length > 0 ? allMentions : []
       };
     });
   }, [results]);
@@ -778,41 +907,79 @@ const CitationSidebar = ({ activeResult }: { activeResult: any }) => {
 
   return (
     <div className="flex flex-col gap-3 max-h-[280px] overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent">
-      {citations.slice(0, 3).map((citation: any, idx: number) => {
+      <div className="flex items-center justify-between mb-1">
+        <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+          Sources cited
+        </p>
+        <span className="text-[10px] font-medium text-slate-400">{citations.length}</span>
+      </div>
+
+      {citations.slice(0, 4).map((citation: any, idx: number) => {
         const url = typeof citation === 'object' ? citation.url : String(citation);
-        const title = (typeof citation === 'object' ? (citation.title || citation.hostname) : null) || getDisplayUrl(url);
+        const host = getHostFromAnyUrl(url) || getDisplayUrl(url);
+        const favicon = getFaviconUrl(url);
+        const title = (typeof citation === 'object' ? (citation.title || citation.hostname) : null) || host;
         const text = typeof citation === 'object' ? (citation.citedText || citation.snippet || citation.content) : null;
+        const isDirect = typeof citation === 'object'
+          && (citation.type || '').toString().toLowerCase() === 'direct';
+        const typeLabel = isDirect ? 'Direct' : 'Indirect';
 
         return (
-          <div key={idx} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition-all hover:shadow-md group flex flex-col gap-2">
-            <h5 className="text-[14px] font-semibold text-slate-800 leading-tight line-clamp-2">
+          <a
+            key={idx}
+            href={getHref(url)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block rounded-xl border border-slate-200 bg-white p-3.5 shadow-sm transition-all hover:border-slate-300 hover:shadow-md group flex flex-col gap-1.5"
+          >
+            <div className="flex items-center gap-2">
+              {favicon ? (
+                <img
+                  src={favicon}
+                  alt={host}
+                  className="h-5 w-5 flex-shrink-0 rounded-full border border-slate-200 bg-white object-cover"
+                  loading="lazy"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).style.display = 'none';
+                  }}
+                />
+              ) : (
+                <Globe2 className="h-5 w-5 flex-shrink-0 text-slate-400" />
+              )}
+              <span className="truncate text-[10.5px] font-medium text-slate-500">{host}</span>
+              <span
+                className={`ml-auto inline-flex flex-shrink-0 items-center rounded-full px-2 py-0.5 text-[9px] font-semibold ${
+                  isDirect
+                    ? 'bg-emerald-50 text-emerald-700'
+                    : 'bg-blue-50 text-blue-700'
+                }`}
+              >
+                {typeLabel}
+              </span>
+            </div>
+
+            <h5 className="text-[12.5px] font-semibold text-slate-800 leading-snug line-clamp-2">
               {title}
             </h5>
 
-            <p className="text-[11px] text-slate-500 leading-relaxed mt-1 mb-3 line-clamp-4">
-              {text || "Knowledge base context confirms relevance and authority for this specific analysis. Their transparency helps businesses make informed tech decisions."}
-            </p>
+            {text ? (
+              <p className="text-[10.5px] text-slate-500 leading-relaxed line-clamp-3">
+                {text}
+              </p>
+            ) : null}
 
-            <div className="flex items-center gap-2 mt-auto">
-              <button
-                onClick={() => window.open(getHref(url), '_blank')}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 bg-[#f0f7ff] text-[9px] font-bold text-[#2563eb] rounded-lg hover:bg-[#e0efff] transition-all whitespace-nowrap"
-              >
-                Visit Source
-                <Link2 className="h-3 w-3 stroke-[2.5px]" />
-              </button>
-              <div className="px-2.5 py-1.5 bg-white border border-[#e2e8f0] text-[9px] font-bold text-[#64748b] rounded-lg whitespace-nowrap">
-                In-Direct Citation
-              </div>
+            <div className="mt-1 flex items-center gap-1 text-[10px] font-semibold text-blue-600">
+              Visit source
+              <ExternalLink className="h-2.5 w-2.5" />
             </div>
-          </div>
+          </a>
         );
       })}
 
-      {citations.length > 3 && (
+      {citations.length > 4 && (
         <div className="text-center py-1">
-          <p className="text-[9px] font-medium text-slate-400 italic">
-            + {citations.length - 3} more sources cited
+          <p className="text-[9.5px] font-medium text-slate-400 italic">
+            + {citations.length - 4} more sources cited
           </p>
         </div>
       )}
@@ -853,11 +1020,17 @@ export const PromptTable = ({
 
     // Then apply metric sorting if selected
     if (tableMetric) {
-      items.sort((a, b) => {
-        const valA = a[tableMetric.toLowerCase()] || 0;
-        const valB = b[tableMetric.toLowerCase()] || 0;
-        return (typeof valB === 'number' ? valB : 0) - (typeof valA === 'number' ? valA : 0);
-      });
+      const numericFor = (row: any): number => {
+        switch (tableMetric) {
+          case 'Sentiment':   return Number(row?.avgSentiment ?? 0);
+          case 'Ranking':     return Number(row?.mentions ?? 0);
+          case 'Position':    return Number(row?.bestRank ?? 0);
+          case 'SOV':         return Number(row?.metrics?.visibility ?? 0);
+          case 'Competitors': return Number(row?.competitorCount ?? 0);
+          default:            return 0;
+        }
+      };
+      items.sort((a, b) => numericFor(b) - numericFor(a));
     }
 
     // Default mixed view slicing if no metric is chosen
@@ -1051,13 +1224,30 @@ export const PromptTable = ({
                       </Badge>
                     </TableCell>
                     <TableCell className="py-3 px-2 text-[11px] font-medium text-slate-600">{row.sov}</TableCell>
-                    <TableCell className="max-w-[140px] py-2 px-2">
+                    <TableCell className="max-w-[160px] py-2 px-2">
                       <div className="flex flex-wrap items-center gap-1">
-                        {row.competitors?.slice(0, 2).map((name: string) => (
-                          <Badge key={name} variant="secondary" className="rounded-full bg-gray-100 px-2 py-0 text-[9px] text-gray-600">
-                            {name}
-                          </Badge>
-                        ))}
+                        {row.competitors?.slice(0, 2).map((name: string) => {
+                          const favicon = getFaviconUrl(name);
+                          return (
+                            <span
+                              key={name}
+                              className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[9.5px] font-medium text-slate-600"
+                            >
+                              {favicon ? (
+                                <img
+                                  src={favicon}
+                                  alt={name}
+                                  className="h-3 w-3 flex-shrink-0 rounded-full border border-white bg-white object-cover"
+                                  loading="lazy"
+                                  onError={(e) => {
+                                    (e.target as HTMLImageElement).style.display = 'none';
+                                  }}
+                                />
+                              ) : null}
+                              <span className="truncate max-w-[80px]">{name}</span>
+                            </span>
+                          );
+                        })}
                         {row.competitorCount > 2 && (
                           <span className="text-[10px] text-gray-400">+{row.competitorCount - 2} more</span>
                         )}
@@ -1143,90 +1333,230 @@ const FilterPill = ({
   </Button>
 );
 
+type GenerationState =
+  | { kind: 'idle' }
+  | { kind: 'submitting' }
+  | { kind: 'running'; jobId: string; progress: number; phase: string | null }
+  | { kind: 'done'; draftId: number | null }
+  | { kind: 'failed'; error: string };
+
 const VisibilityRow = ({
   title,
   meta,
   status,
   actionLabel,
+  onAction,
+  generation,
 }: {
   title: string;
   meta: string;
-  status: 'positive' | 'danger';
+  status: 'positive' | 'danger' | 'warn';
   actionLabel?: string;
-}) => (
-  <div
-    className={cn(
-      'rounded-lg px-3 py-3',
-      status === 'positive'
-        ? 'border border-[#B9F8CF] bg-[#E5FFE6]'
-        : 'border border-[#D5D7DA] border-t-[0.8px] border-t-[#D5D7DA] bg-white shadow-[0_1px_2px_0_#1018280D]'
-    )}
-  >
-    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-      <div className="min-w-0">
-        <div className="flex items-center gap-2">
-          {status === 'positive' ? (
-            <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-[#0A6D0E]" strokeWidth={2} />
-          ) : (
-            <Target className="h-3.5 w-3.5 shrink-0 text-[#B42318]" strokeWidth={2} />
-          )}
-          <p
-            className={cn(
-              'truncate text-[12px] italic leading-[150%]',
-              status === 'positive' ? 'text-[#2D4059]' : 'text-[#B23131]'
-            )}
-          >
-            {title}
-          </p>
+  onAction?: () => void;
+  generation?: GenerationState;
+}) => {
+  const StatusIcon = status === 'positive' ? CheckCircle2 : Target;
+  const statusIconColor =
+    status === 'positive' ? 'text-[#0A6D0E]' : status === 'warn' ? 'text-[#B54708]' : 'text-[#B42318]';
+  const wrapperClass =
+    status === 'positive'
+      ? 'border border-[#B9F8CF] bg-[#E5FFE6]'
+      : status === 'warn'
+        ? 'border border-[#FEDF89] bg-[#FFFAEB]'
+        : 'border border-[#D5D7DA] bg-white shadow-[0_1px_2px_0_#1018280D]';
+  const titleColor =
+    status === 'positive' ? 'text-[#2D4059]' : status === 'warn' ? 'text-[#93370D]' : 'text-[#B23131]';
+  return (
+    <div className={cn('rounded-lg px-3 py-3', wrapperClass)}>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <StatusIcon className={cn('h-3.5 w-3.5 shrink-0', statusIconColor)} strokeWidth={2} />
+            <p className={cn('truncate text-[12px] italic leading-[150%]', titleColor)}>{title}</p>
+          </div>
+          <p className="mt-1 text-[11px] leading-[150%] text-[#717680]">{meta}</p>
         </div>
-        <p className="mt-1 text-[11px] leading-[150%] text-[#717680]">{meta}</p>
+        {actionLabel && onAction ? (
+          <GenerateInlineButton onClick={onAction} state={generation ?? { kind: 'idle' }} label={actionLabel} />
+        ) : null}
       </div>
-      {actionLabel ? (
-        <Button
-          variant="outline"
-          className="h-[37px] shrink-0 rounded-lg border border-[#D5D7DA] bg-[#F9F9F9] px-[10px] text-[12px] font-medium text-[#2D4059] shadow-[0_1px_2px_0_#1018280D] hover:bg-[#F9F9F9]"
-        >
-          <Sparkles className="mr-1.5 h-3.5 w-3.5 text-[#2D4059]" strokeWidth={1.8} />
-          {actionLabel}
-        </Button>
-      ) : null}
     </div>
-  </div>
-);
+  );
+};
 
 const OpportunityRow = ({
   title,
   severity,
   priority,
+  rationale,
+  recommendedAngle,
+  brief,
+  onAction,
+  generation,
 }: {
   title: string;
   severity: string;
   priority: string;
-}) => (
-  <div className="rounded-lg border-l-[3px] border-l-[#7E9BD7] bg-white px-3 py-3 shadow-[0_1px_4px_0_#0000000D]">
-    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-      <div className="min-w-0">
-        <p className="max-w-[240px] text-[12px] italic leading-[150%] text-[#2D4059]">{title}</p>
-        <div className="mt-2 flex flex-wrap items-center gap-2">
-          <span className="inline-flex items-center rounded-full border border-[#FDA29B] bg-[#FEF3F2] px-2.5 py-0.5 text-[11px] text-[#B42318]">
-            {severity}
-          </span>
-          <span className="inline-flex items-center gap-1 text-[12px] font-medium text-[#0A6D0E]">
-            <TrendingUp className="h-3.5 w-3.5" strokeWidth={2} />
-            {priority}
-          </span>
+  rationale?: string;
+  recommendedAngle?: string;
+  brief?: {
+    audience?: string;
+    tone?: string;
+    structure?: string;
+    keyPoints?: string[];
+    wordCount?: number;
+    cta?: string;
+  };
+  onAction?: () => void;
+  generation?: GenerationState;
+}) => {
+  const sevClass =
+    severity.toLowerCase() === 'critical'
+      ? 'border-[#FDA29B] bg-[#FEF3F2] text-[#B42318]'
+      : severity.toLowerCase() === 'high'
+        ? 'border-[#FEDF89] bg-[#FFFAEB] text-[#B54708]'
+        : severity.toLowerCase() === 'medium'
+          ? 'border-[#B9E6FE] bg-[#F0F9FF] text-[#026AA2]'
+          : 'border-[#D5D7DA] bg-[#F9FAFB] text-[#475467]';
+
+  const [expanded, setExpanded] = useState(false);
+  const hasDetail = Boolean(
+    recommendedAngle ||
+      brief?.structure ||
+      (brief?.keyPoints && brief.keyPoints.length > 0) ||
+      brief?.audience
+  );
+
+  return (
+    <div className="rounded-lg border-l-[3px] border-l-[#7E9BD7] bg-white px-3 py-3 shadow-[0_1px_4px_0_#0000000D]">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0 flex-1">
+          <p className="text-[12px] font-medium leading-[150%] text-[#2D4059]">{title}</p>
+          {rationale ? (
+            <p className="mt-0.5 text-[11px] leading-[150%] text-[#717680]">{rationale}</p>
+          ) : null}
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <span className={cn('inline-flex items-center rounded-full border px-2.5 py-0.5 text-[11px]', sevClass)}>
+              {severity}
+            </span>
+            <span className="inline-flex items-center gap-1 text-[12px] font-medium text-[#0A6D0E]">
+              <TrendingUp className="h-3.5 w-3.5" strokeWidth={2} />
+              {priority}
+            </span>
+            {hasDetail ? (
+              <button
+                type="button"
+                onClick={() => setExpanded((v) => !v)}
+                className="text-[11px] font-medium text-blue-600 hover:text-blue-700 transition-colors"
+              >
+                {expanded ? 'Hide brief' : 'View brief'}
+              </button>
+            ) : null}
+          </div>
+          {expanded && hasDetail ? (
+            // Expanded brief — surfaces the LLM's strategic detail (angle,
+            // audience, structure, key points, CTA) without exporting them
+            // to a modal. Keeps the user in flow.
+            <div className="mt-3 space-y-1.5 rounded-md bg-slate-50 px-3 py-2.5 text-[11px] leading-[160%] text-[#475467]">
+              {recommendedAngle ? (
+                <p>
+                  <span className="font-semibold text-[#2D4059]">Angle:</span> {recommendedAngle}
+                </p>
+              ) : null}
+              {brief?.audience ? (
+                <p>
+                  <span className="font-semibold text-[#2D4059]">Audience:</span> {brief.audience}
+                </p>
+              ) : null}
+              {brief?.structure ? (
+                <p>
+                  <span className="font-semibold text-[#2D4059]">Structure:</span> {brief.structure}
+                  {brief.tone ? ` · ${brief.tone}` : ''}
+                  {brief.wordCount ? ` · ~${brief.wordCount} words` : ''}
+                </p>
+              ) : null}
+              {brief?.keyPoints && brief.keyPoints.length > 0 ? (
+                <div>
+                  <p className="font-semibold text-[#2D4059]">Cover:</p>
+                  <ul className="mt-1 list-disc pl-4 space-y-0.5">
+                    {brief.keyPoints.map((p, i) => (
+                      <li key={i}>{p}</li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+              {brief?.cta ? (
+                <p>
+                  <span className="font-semibold text-[#2D4059]">CTA:</span> {brief.cta}
+                </p>
+              ) : null}
+            </div>
+          ) : null}
         </div>
+        {onAction ? (
+          <GenerateInlineButton onClick={onAction} state={generation ?? { kind: 'idle' }} label="Generate Content" />
+        ) : null}
       </div>
+    </div>
+  );
+};
+
+/** Shared CTA — swaps to a status pill while the generation job is running. */
+const GenerateInlineButton = ({
+  onClick,
+  state,
+  label,
+}: {
+  onClick: () => void;
+  state: GenerationState;
+  label: string;
+}) => {
+  if (state.kind === 'submitting') {
+    return (
+      <span className="inline-flex h-[37px] items-center gap-1.5 rounded-lg bg-slate-100 px-3 text-[12px] font-medium text-slate-500">
+        <Sparkles className="h-3.5 w-3.5 animate-pulse" /> Starting…
+      </span>
+    );
+  }
+  if (state.kind === 'running') {
+    return (
+      <span className="inline-flex h-[37px] items-center gap-1.5 rounded-lg bg-blue-50 px-3 text-[12px] font-medium text-blue-700">
+        <Sparkles className="h-3.5 w-3.5 animate-pulse" />
+        Generating · {state.progress}%
+      </span>
+    );
+  }
+  if (state.kind === 'done') {
+    return (
+      <span className="inline-flex h-[37px] items-center gap-1.5 rounded-lg bg-emerald-50 px-3 text-[12px] font-medium text-emerald-700">
+        <CheckCircle2 className="h-3.5 w-3.5" /> Draft ready
+      </span>
+    );
+  }
+  if (state.kind === 'failed') {
+    return (
       <Button
         variant="outline"
-        className="h-[37px] shrink-0 rounded-lg border border-[#D5D7DA] bg-[#F9F9F9] px-[10px] text-[12px] font-medium text-[#2D4059] shadow-[0_1px_2px_0_#1018280D] hover:bg-[#F9F9F9]"
+        onClick={onClick}
+        className="h-[37px] shrink-0 rounded-lg border border-rose-200 bg-rose-50 px-[10px] text-[12px] font-medium text-rose-700 shadow-[0_1px_2px_0_#1018280D] hover:bg-rose-100"
+        title={state.error}
       >
-        <Sparkles className="mr-1.5 h-3.5 w-3.5 text-[#2D4059]" strokeWidth={1.8} />
-        Generate Content
+        <Sparkles className="mr-1.5 h-3.5 w-3.5" strokeWidth={1.8} />
+        Retry
       </Button>
-    </div>
-  </div>
-);
+    );
+  }
+  return (
+    <Button
+      variant="outline"
+      onClick={onClick}
+      className="h-[37px] shrink-0 rounded-lg border border-[#D5D7DA] bg-[#F9F9F9] px-[10px] text-[12px] font-medium text-[#2D4059] shadow-[0_1px_2px_0_#1018280D] hover:bg-[#F9F9F9]"
+    >
+      <Sparkles className="mr-1.5 h-3.5 w-3.5 text-[#2D4059]" strokeWidth={1.8} />
+      {label}
+    </Button>
+  );
+};
 
 type ChartSeries = {
   key: string;
@@ -1280,24 +1610,56 @@ export const AreaChartCard = ({
   data,
   series,
   tooltipTitle,
-  yMax = 8000,
+  yMax,
+  emptyMessage,
 }: {
   title: string;
   subtitle: string;
   data: Array<Record<string, string | number>>;
   series: readonly ChartSeries[];
   tooltipTitle?: string;
+  /** Optional manual cap. When omitted, auto-scales from the actual data
+   *  so a 12-citation chart doesn't get rendered as a flat line under the
+   *  old hardcoded 8000 ceiling. */
   yMax?: number;
+  /** Rendered as a centered overlay when the chart has 0 or 1 data points. */
+  emptyMessage?: string;
 }) => {
   const chartId = title.toLowerCase().replace(/[^a-z0-9]+/g, '-');
-  const ticks = [0, yMax * 0.25, yMax * 0.5, yMax * 0.75, yMax];
+  // Auto-scale: find the max stacked total (areas are stackId="coverage"),
+  // round up to a friendly ceiling, and cap at 10 if everything is tiny so
+  // the chart doesn't try to render a 0-1 axis with no resolution.
+  const computedMax = (() => {
+    if (typeof yMax === 'number' && yMax > 0) return yMax;
+    let max = 0;
+    for (const row of data) {
+      let stackTotal = 0;
+      for (const s of series) stackTotal += Number(row[s.key] ?? 0);
+      if (stackTotal > max) max = stackTotal;
+    }
+    if (max <= 0) return 10;
+    // Round up to a nice tick (1, 2, 5, 10, 20, 50, 100, 200, 500, ...).
+    const niceCeiling = (n: number) => {
+      const exp = Math.floor(Math.log10(n));
+      const base = Math.pow(10, exp);
+      const fraction = n / base;
+      const niceFraction = fraction <= 1 ? 1 : fraction <= 2 ? 2 : fraction <= 5 ? 5 : 10;
+      return niceFraction * base;
+    };
+    return niceCeiling(max * 1.15);
+  })();
+  const ticks = [0, computedMax * 0.25, computedMax * 0.5, computedMax * 0.75, computedMax];
 
   return (
     <div className="w-full min-w-0">
       <div className="px-0.5">
         <div className="flex items-center gap-1.5">
           <h3 className="text-[20px] font-semibold leading-[135%] text-[#414651]">{title}</h3>
-          <MetricInfoIcon />
+          {/* Chart title gets the same per-title tooltip lookup; falls back
+              to a plain badge if the title isn't in CARD_TOOLTIPS. */}
+          {CARD_TOOLTIPS[title]
+            ? <MetricInfoTooltip tip={CARD_TOOLTIPS[title]} />
+            : <MetricInfoBadge />}
         </div>
         <p className="mt-2 text-sm leading-[150%] text-[#535862]">{subtitle}</p>
         <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
@@ -1308,7 +1670,14 @@ export const AreaChartCard = ({
         </div>
       </div>
 
-      <div className="mt-2 h-[170px] w-full overflow-x-auto">
+      <div className="relative mt-2 h-[170px] w-full overflow-x-auto">
+        {emptyMessage ? (
+          <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
+            <span className="rounded-full bg-white/90 border border-slate-200 px-3 py-1.5 text-[11px] text-slate-500 shadow-sm">
+              {emptyMessage}
+            </span>
+          </div>
+        ) : null}
         <div className="h-full min-w-[520px] sm:min-w-0">
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={data} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
@@ -1332,7 +1701,7 @@ export const AreaChartCard = ({
               />
               <YAxis
                 orientation="right"
-                domain={[0, yMax]}
+                domain={[0, computedMax]}
                 ticks={ticks}
                 tickLine={false}
                 axisLine={false}
@@ -1340,7 +1709,7 @@ export const AreaChartCard = ({
                 tick={{ fontSize: 11, fill: '#D5D7DA' }}
                 tickFormatter={formatChartTick}
               />
-              <Tooltip
+              <RechartsTooltip
                 cursor={{ stroke: '#A8C4F6', strokeWidth: 1 }}
                 content={({ active, payload }) => (
                   <ChartTooltip
@@ -1527,6 +1896,28 @@ const AIResultsReportPreview = () => {
   const [allDomains, setAllDomains] = useState<any[]>([]);
   const [filterType, setFilterType] = useState<'all' | 'prompt' | 'keyword'>('all');
 
+  // Filter state — drives header dropdowns + per-card / table scoping.
+  // pastRuns = list for the run picker; selectedRunId = which one we're viewing
+  // (null = latest). modelFilter / categoryFilter are client-side scopers.
+  const [pastRuns, setPastRuns] = useState<Array<{ id: number; startedAt: string; visibilityScore: number | null; totalQueries: number | null }>>([]);
+  const [selectedRunId, setSelectedRunId] = useState<number | null>(null);
+  const [modelFilter, setModelFilter] = useState<Set<string>>(new Set()); // empty = all
+  const [categoryFilter, setCategoryFilter] = useState<Set<string>>(new Set()); // empty = all
+
+  // Per-run trend data for the three Visibility-section charts. Fetched
+  // separately from /trends so the page can render the static cards before
+  // the trend rollup completes (it reads every result row across runs).
+  type TrendRun = {
+    runId: number;
+    startedAt: string;
+    endedAt: string | null;
+    perModel: Record<string, { cites: number; presenceCount: number }>;
+    brandMentions: number;
+    competitorMentions: number;
+    perCompetitor: Record<string, number>;
+  };
+  const [trendsData, setTrendsData] = useState<{ runs: TrendRun[]; topCompetitors: string[] }>({ runs: [], topCompetitors: [] });
+
   const [selectedRowIds, setSelectedRowIds] = useState<Set<string>>(new Set());
   const [worksheetOptions, setWorksheetOptions] = useState<WorksheetOption[]>([]);
   const [worksheetOptionsLoading, setWorksheetOptionsLoading] = useState(false);
@@ -1614,75 +2005,290 @@ const AIResultsReportPreview = () => {
     setIsWorksheetModalOpen(false);
   }, []);
 
-  // Derived metrics for dynamic cards
+  // Derived metrics for the 4×2 dashboard cards.
+  //
+  // The cards re-derive whenever the page-header Sort / Filters dropdowns
+  // change — narrowing the row set (filterType, categoryFilter) and the
+  // per-result model set (modelFilter) so headline numbers reflect what the
+  // user is actually scoping to. Empty filter sets = show everything.
   const metricCards = useMemo<MetricCardData[]>(() => {
     if (!reportData) return [];
 
-    const keywords = reportData.topPrompts?.filter((p: any) => p.type === 'keyword') || [];
-    const prompts = reportData.topPrompts?.filter((p: any) => p.type === 'prompt') || [];
-    const trackedKeywords = keywords.filter((k: any) => Array.isArray(k.results) ? k.results.length > 0 : true).length || keywords.length;
-    const trackedPrompts = prompts.filter((p: any) => Array.isArray(p.results) ? p.results.length > 0 : true).length || prompts.length;
+    const allItems = (reportData.topPrompts ?? []) as any[];
 
-    const modelStats = reportData.metrics?.modelPerformance || [];
-    const gptMentions = modelStats.find((m: any) => m.model?.toLowerCase().includes('gpt'))?.mentions || 0;
-    const geminiMentions = modelStats.find((m: any) => m.model?.toLowerCase().includes('gemini'))?.mentions || 0;
-    const claudeMentions = modelStats.find((m: any) => m.model?.toLowerCase().includes('claude'))?.mentions || 0;
-    const totalMentions = modelStats.reduce((sum: number, m: any) => sum + m.mentions, 0);
-    const keywordVisibility = keywords.length > 0 ? `${Math.round(keywords.reduce((acc: number, k: any) => acc + Number.parseFloat(k.sov || '0'), 0) / keywords.length)}%` : '0%';
-    const promptVisibility = prompts.length > 0 ? `${Math.round(prompts.reduce((acc: number, p: any) => acc + Number.parseFloat(p.sov || '0'), 0) / prompts.length)}%` : '0%';
-    const mentionRate = Math.round(reportData.metrics?.mentionRate || 0);
+    // Apply the same filter chain that PromptTable uses, so the cards and
+    // the table tell a consistent story.
+    let scoped = allItems.filter((p: any) => Array.isArray(p?.results) && p.results.length > 0);
+    if (filterType !== 'all') scoped = scoped.filter((p) => p.type?.toLowerCase() === filterType);
+    if (categoryFilter.size > 0) scoped = scoped.filter((p: any) => p.category && categoryFilter.has(p.category));
+    if (modelFilter.size > 0) {
+      scoped = scoped
+        .map((p: any) => ({ ...p, results: (p.results ?? []).filter((r: any) => modelFilter.has(r.model)) }))
+        .filter((p: any) => p.results.length > 0);
+    }
+
+    const keywords = scoped.filter((p) => p.type === 'keyword');
+    const prompts = scoped.filter((p) => p.type === 'prompt');
+
+    // Tracked == has at least one model result remaining after filters.
+    const trackedPrompts = prompts;
+    const trackedKeywords = keywords;
+
+    // Visibility within the scoped set — recomputed from the rows the user
+    // is actually looking at, not the static server-side rollup.
+    const allResults = scoped.flatMap((p: any) => p.results ?? []);
+    const presenceCount = allResults.reduce((s: number, r: any) => s + Number(r.presence ?? 0), 0);
+    const visibilityPct = allResults.length > 0
+      ? Math.round((presenceCount / allResults.length) * 100)
+      : 0;
+
+    // Per-model citation totals across scoped rows.
+    const citationCounts: Record<string, { cites: number; uniqueHosts: number }> = {};
+    const hostsByModel: Record<string, Set<string>> = {};
+    for (const p of scoped) {
+      for (const r of (p.results ?? [])) {
+        if (!citationCounts[r.model]) citationCounts[r.model] = { cites: 0, uniqueHosts: 0 };
+        if (!hostsByModel[r.model]) hostsByModel[r.model] = new Set();
+        const cits = Array.isArray(r.citations) ? r.citations : [];
+        citationCounts[r.model].cites += cits.length;
+        for (const c of cits) {
+          if (c?.url) { try { hostsByModel[r.model].add(new URL(c.url).hostname.replace(/^www\./, '')); } catch {/* ignore */} }
+        }
+      }
+    }
+    for (const m of Object.keys(citationCounts)) {
+      citationCounts[m].uniqueHosts = (hostsByModel[m] ?? new Set()).size;
+    }
+    const cite = (modelKey: string) => {
+      const found = Object.entries(citationCounts).find(([m]) => m.toLowerCase().includes(modelKey));
+      return found ? found[1] : { cites: 0, uniqueHosts: 0 };
+    };
+    const gpt = cite('gpt');
+    const claude = cite('claude');
+    const gemini = cite('gemini');
+
+    // Mentions: brand presence count vs competitor host count across scoped rows.
+    const brandPages = presenceCount;
+    const competitorPages = allResults.reduce((s: number, r: any) => {
+      const arr = Array.isArray(r.competitorHosts) ? r.competitorHosts : [];
+      return s + arr.length;
+    }, 0);
+    const mentionsTotal = brandPages + competitorPages;
+    const brandSharePct = mentionsTotal > 0 ? Math.round((brandPages / mentionsTotal) * 100) : 0;
 
     return [
       {
         title: 'AI Citations',
         kind: 'citations',
         details: [
-          { label: 'AI Overview', value: totalMentions.toString(), iconSrc: '/report-icons/google.svg', subValue: '1' },
-          { label: 'ChatGPT', value: gptMentions.toString(), iconSrc: '/report-icons/chat-gpt.svg', subValue: '1' },
-          { label: 'Gemini', value: geminiMentions.toString(), iconSrc: '/report-icons/gemini.svg', subValue: '3' },
-          { label: 'Claude', value: claudeMentions.toString(), iconSrc: '/report-icons/claude.svg', subValue: '1' },
+          // AI Overview removed — we never query Google's SGE separately.
+          // Per-model: real citation count + unique source hosts.
+          { label: 'ChatGPT', value: gpt.cites.toString(), iconSrc: '/report-icons/chat-gpt.svg', subValue: `${gpt.uniqueHosts} unique` },
+          { label: 'Claude',  value: claude.cites.toString(), iconSrc: '/report-icons/claude.svg',  subValue: `${claude.uniqueHosts} unique` },
+          { label: 'Gemini',  value: gemini.cites.toString(), iconSrc: '/report-icons/gemini.svg',  subValue: `${gemini.uniqueHosts} unique` },
         ],
       },
       {
         title: 'Top Keywords',
         kind: 'summary',
         details: [
-          { label: 'Total', value: keywords.length.toString(), subLabel: 'Visibility', subValue: keywordVisibility },
-          { label: 'Tracked', value: trackedKeywords.toString(), subLabel: 'Visibility', subValue: keywordVisibility },
+          { label: 'Total', value: keywords.length.toString(), subLabel: 'Tracked', subValue: trackedKeywords.length.toString() },
+          { label: 'Visibility', value: trackedKeywords.length > 0 ? `${visibilityPct}%` : '—', subLabel: 'across tracked', subValue: trackedKeywords.length > 0 ? `${trackedKeywords.length} of ${keywords.length}` : 'no run yet' },
         ],
       },
       {
         title: 'Top Prompts',
         kind: 'summary',
         details: [
-          { label: 'Total', value: prompts.length.toString(), subLabel: 'Visibility', subValue: promptVisibility },
-          { label: 'Tracked', value: trackedPrompts.toString(), subLabel: 'Visibility', subValue: promptVisibility },
+          { label: 'Total', value: prompts.length.toString(), subLabel: 'Tracked', subValue: trackedPrompts.length.toString() },
+          { label: 'Visibility', value: trackedPrompts.length > 0 ? `${visibilityPct}%` : '—', subLabel: 'across tracked', subValue: trackedPrompts.length > 0 ? `${trackedPrompts.length} of ${prompts.length}` : 'no run yet' },
         ],
       },
       {
         title: 'Mentions',
         kind: 'summary',
         details: [
-          { label: 'Brand', value: `${mentionRate}%`, subLabel: 'No. of Pages', subValue: String(reportData.metrics?.brandPages ?? 45) },
-          { label: 'Competitors', value: `${100 - mentionRate}%`, subLabel: 'No. of Pages', subValue: String(reportData.metrics?.competitorPages ?? 354) },
+          { label: 'Brand',       value: mentionsTotal > 0 ? `${brandSharePct}%`         : '—', subLabel: 'mentions', subValue: brandPages.toString() },
+          { label: 'Competitors', value: mentionsTotal > 0 ? `${100 - brandSharePct}%`  : '—', subLabel: 'mentions', subValue: competitorPages.toString() },
         ],
       },
     ];
-  }, [reportData]);
+  }, [reportData, filterType, categoryFilter, modelFilter]);
 
+  // Sentiment / Accuracy / Share of Voice cards — three single-number cards.
+  // Threshold scale fix: backend returns avgSentiment on a 0-10 displayed
+  // scale (or null when there are zero measurable rows). Old code used
+  // 70/40 thresholds → every real number fell into "Negative".
   const scoreCards = useMemo(() => {
     if (!reportData) return [];
 
-    const sentiment = reportData.metrics?.avgSentiment || 0;
-    const sentimentLabel = sentiment > 70 ? 'Positive' : sentiment > 40 ? 'Neutral' : 'Negative';
-    const sentimentColor = sentiment > 70 ? 'text-emerald-600' : sentiment > 40 ? 'text-amber-600' : 'text-rose-600';
+    // Apply same filter scope as metricCards so all dashboard headlines tell
+    // a single consistent story when the user narrows by model / category.
+    const allItems = (reportData.topPrompts ?? []) as any[];
+    let scoped = allItems.filter((p: any) => Array.isArray(p?.results) && p.results.length > 0);
+    if (filterType !== 'all') scoped = scoped.filter((p) => p.type?.toLowerCase() === filterType);
+    if (categoryFilter.size > 0) scoped = scoped.filter((p: any) => p.category && categoryFilter.has(p.category));
+    if (modelFilter.size > 0) {
+      scoped = scoped
+        .map((p: any) => ({ ...p, results: (p.results ?? []).filter((r: any) => modelFilter.has(r.model)) }))
+        .filter((p: any) => p.results.length > 0);
+    }
+
+    const allResults = scoped.flatMap((p: any) => p.results ?? []);
+    const totalRows = allResults.length;
+    const presenceRows = allResults.filter((r: any) => Number(r.presence ?? 0) === 1);
+
+    // Sentiment: only rows where the brand was mentioned AND sentiment is
+    // non-null contribute to the average. 0-10 scale per backend transform.
+    const sentimentMeasurements = presenceRows
+      .map((r: any) => (r.sentiment === null || r.sentiment === undefined ? null : Number(r.sentiment)))
+      .filter((s: number | null): s is number => s !== null);
+    const sentimentAvg = sentimentMeasurements.length > 0
+      ? sentimentMeasurements.reduce((a, b) => a + b, 0) / sentimentMeasurements.length
+      : null;
+
+    let sentimentLabel = '—';
+    let sentimentTone = 'text-slate-400';
+    let sentimentNote: string | undefined;
+    if (sentimentAvg === null) {
+      sentimentLabel = 'Not measurable';
+      sentimentTone = 'text-slate-400';
+      sentimentNote = totalRows === 0
+        ? 'No data in current filter scope'
+        : 'No prompt mentioned the brand in this scope';
+    } else if (sentimentAvg >= 7) {
+      sentimentLabel = 'Positive';
+      sentimentTone = 'text-emerald-600';
+    } else if (sentimentAvg >= 4) {
+      sentimentLabel = 'Neutral';
+      sentimentTone = 'text-sky-600';
+    } else {
+      sentimentLabel = 'Negative';
+      sentimentTone = 'text-amber-600';
+    }
+    if (sentimentLabel !== 'Not measurable') {
+      sentimentNote = `Based on ${sentimentMeasurements.length} model response${sentimentMeasurements.length === 1 ? '' : 's'}`;
+    }
+
+    // Brand accuracy: average of per-result `accuracy` (0-10) across rows
+    // where the brand was actually mentioned. Surface as a 0-100% figure.
+    const accuracyMeasurements = presenceRows
+      .map((r: any) => (r.accuracy === null || r.accuracy === undefined ? null : Number(r.accuracy)))
+      .filter((a: number | null): a is number => a !== null);
+    const accuracyAvg = accuracyMeasurements.length > 0
+      ? accuracyMeasurements.reduce((a, b) => a + b, 0) / accuracyMeasurements.length
+      : null;
+    const accuracyValue = accuracyAvg === null ? '—' : `${Math.round(accuracyAvg * 10)}%`;
+    const accuracyNote = presenceRows.length === 0
+      ? 'No brand mentions to verify'
+      : `Across ${presenceRows.length} brand mention${presenceRows.length === 1 ? '' : 's'}`;
+
+    // Share of voice = brand presence rate within the scoped rows.
+    const visibility = totalRows > 0 ? Math.round((presenceRows.length / totalRows) * 100) : 0;
+    const visibilityNote = totalRows > 0
+      ? `${presenceRows.length} of ${totalRows} response${totalRows === 1 ? '' : 's'} mentioned you`
+      : 'No data in current filter scope';
 
     return [
-      { label: 'Overall Sentiment', value: sentimentLabel, tone: sentimentColor },
-      { label: 'Brand Accuracy Score', value: `${Math.round(reportData.metrics?.avgAccuracy || 0)}%`, tone: 'text-[#3393F2]' },
-      { label: 'AI Share of Voice', value: `${Math.round(reportData.metrics?.visibilityScore || 0)}%`, tone: 'text-[#3393F2]', note: 'Across all AI Models' },
+      { label: 'Overall Sentiment', value: sentimentLabel, tone: sentimentTone, note: sentimentNote },
+      { label: 'Brand Accuracy Score', value: accuracyValue, tone: 'text-slate-900', note: accuracyNote },
+      { label: 'AI Share of Voice', value: `${visibility}%`, tone: 'text-slate-900', note: visibilityNote },
     ];
-  }, [reportData]);
+  }, [reportData, filterType, categoryFilter, modelFilter]);
+
+  // ── Trend chart data ─────────────────────────────────────────────────────
+  //
+  // The three Visibility-section charts (Citations / Mentions rate / Share
+  // of Voice) all derive from the same /trends payload — one X point per
+  // completed AiRun, ordered ascending by startedAt. The frontend keeps the
+  // chart component dumb (it just renders rows + series); we shape the
+  // rows + series here so empty/single-run states are handled honestly.
+
+  const formatRunDate = (iso: string) => {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return iso;
+    return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  };
+
+  // Citations chart — per-run, per-model citation totals.
+  const citationsChart = useMemo(() => {
+    const series = [
+      { key: 'chatgpt', label: 'ChatGPT', stroke: '#E9897E', match: 'gpt' },
+      { key: 'claude',  label: 'Claude',  stroke: '#79A7F2', match: 'claude' },
+      { key: 'gemini',  label: 'Gemini',  stroke: '#8DD9E8', match: 'gemini' },
+    ] as const;
+    // Drop series the user has filtered out via the modelFilter pill (header).
+    const visibleSeries = modelFilter.size === 0
+      ? series
+      : series.filter((s) => {
+          for (const m of modelFilter) if (m.toLowerCase().includes(s.match)) return true;
+          return false;
+        });
+    const data = trendsData.runs.map((run) => {
+      const row: Record<string, string | number> = { date: formatRunDate(run.startedAt) };
+      for (const s of visibleSeries) {
+        // Find any model id containing the matcher (gpt-4o-mini, claude-sonnet-4.5...).
+        const found = Object.entries(run.perModel).find(([m]) => m.toLowerCase().includes(s.match));
+        row[s.key] = found ? found[1].cites : 0;
+      }
+      return row;
+    });
+    return { data, series: visibleSeries.map(({ key, label, stroke }) => ({ key, label, stroke })) };
+  }, [trendsData, modelFilter]);
+
+  // Mentions rate trend — brand vs total competitor mentions per run.
+  const mentionsChart = useMemo(() => {
+    const series = [
+      { key: 'brand',       label: 'Brand mentions',       stroke: '#6EA8FF' },
+      { key: 'competitors', label: 'Competitors Mentions', stroke: '#7BD8EB' },
+    ] as const;
+    const data = trendsData.runs.map((run) => ({
+      date: formatRunDate(run.startedAt),
+      brand: run.brandMentions,
+      competitors: run.competitorMentions,
+    }));
+    return { data, series };
+  }, [trendsData]);
+
+  // Share of Voice — brand + the top 4 competitors observed in the latest
+  // run. Each series shows that host's mention count per run, so users see
+  // their position vs real competitors over time.
+  const shareOfVoiceChart = useMemo(() => {
+    const palette = ['#6EA8FF', '#E9897E', '#8DD9E8', '#9D8CF4', '#FBBF77'];
+    const brandKey = 'brand';
+    const compKeys = trendsData.topCompetitors.slice(0, 4);
+    const brandLabel = reportData?.domainInfo?.companyName
+      || reportData?.domainInfo?.host
+      || 'Your brand';
+
+    const series = [
+      { key: brandKey, label: brandLabel, stroke: palette[0] },
+      ...compKeys.map((host, i) => ({
+        key: `c_${i}`,
+        label: host,
+        stroke: palette[(i + 1) % palette.length],
+      })),
+    ];
+
+    const data = trendsData.runs.map((run) => {
+      const row: Record<string, string | number> = { date: formatRunDate(run.startedAt) };
+      row[brandKey] = run.brandMentions;
+      compKeys.forEach((host, i) => {
+        row[`c_${i}`] = run.perCompetitor?.[host] ?? 0;
+      });
+      return row;
+    });
+    return { data, series };
+  }, [trendsData, reportData]);
+
+  // Empty-state copy shared by all three trend charts. Uses the same phrasing
+  // so the message blends with the rest of the dashboard's "honest empty"
+  // language elsewhere.
+  const trendEmptyMessage = (() => {
+    if (trendsData.runs.length === 0) return 'Run an audit to see trend data';
+    if (trendsData.runs.length === 1) return 'Trend appears after your next audit';
+    return undefined;
+  })();
 
   const filteredPrompts = useMemo(() => {
     if (!reportData?.topPrompts) return [];
@@ -1691,11 +2297,30 @@ const AIResultsReportPreview = () => {
     // AI calls ran for this prompt/keyword, so the metrics row is all zeros
     // and adds no signal. Only show items the user actually selected and ran.
     items = items.filter((p: any) => Array.isArray(p?.results) && p.results.length > 0);
+
+    // Type filter (Sort dropdown — Prompts only / Keywords only / Mixed).
     if (filterType !== 'all') {
-      items = items.filter(p => p.type?.toLowerCase() === filterType);
+      items = items.filter((p) => p.type?.toLowerCase() === filterType);
     }
+
+    // Category filter (header Filters dropdown). Empty set = show all.
+    if (categoryFilter.size > 0) {
+      items = items.filter((p: any) => p.category && categoryFilter.has(p.category));
+    }
+
+    // Model filter — narrow each prompt's `results` array to only the selected
+    // models. If a prompt ends up with zero matching results it disappears.
+    if (modelFilter.size > 0) {
+      items = items
+        .map((p: any) => ({
+          ...p,
+          results: (p.results ?? []).filter((r: any) => modelFilter.has(r.model)),
+        }))
+        .filter((p: any) => p.results.length > 0);
+    }
+
     return items;
-  }, [reportData, filterType]);
+  }, [reportData, filterType, categoryFilter, modelFilter]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -1714,7 +2339,7 @@ const AIResultsReportPreview = () => {
         // fetch all domains and find which one matches this mask.
         if (!realId) {
           console.log('[AIResults] realId mapping missing, fetching domains to resolve...');
-          const domainsResp = await apiGet<any>('/dashboard/all');
+          const domainsResp = await apiGet<any>('/wizard/domains');
           const domains = domainsResp?.domains || [];
           setAllDomains(domains);
 
@@ -1730,10 +2355,17 @@ const AIResultsReportPreview = () => {
         }
 
         console.log('[AIResults] Fetching data for realId:', realId);
-        // Parallel fetch for report data and domain list (if not already fetched)
-        const [data, domainsResponse] = await Promise.all([
-          apiGet<any>(`/dashboard/${realId}`),
-          allDomains.length === 0 ? apiGet<any>('/dashboard/all') : Promise.resolve({ domains: allDomains })
+        // Three things in parallel: the report (scoped to selectedRunId if
+        // the user picked a past run), the user's domain list, and the past
+        // runs for *this* domain so the run-picker dropdown can populate.
+        const reportPath = selectedRunId
+          ? `/wizard/domain/${realId}/report?runId=${selectedRunId}`
+          : `/wizard/domain/${realId}/report`;
+        const [data, domainsResponse, runsResponse, trendsResponse] = await Promise.all([
+          apiGet<any>(reportPath),
+          allDomains.length === 0 ? apiGet<any>('/wizard/domains') : Promise.resolve({ domains: allDomains }),
+          apiGet<any>(`/wizard/domain/${realId}/runs`).catch(() => ({ runs: [] })),
+          apiGet<any>(`/wizard/domain/${realId}/trends`).catch(() => ({ runs: [], topCompetitors: [] })),
         ]);
 
         if (data) {
@@ -1746,6 +2378,26 @@ const AIResultsReportPreview = () => {
         if (domainsResponse?.domains) {
           setAllDomains(domainsResponse.domains);
         }
+
+        if (Array.isArray(runsResponse?.runs)) {
+          setPastRuns(
+            runsResponse.runs
+              .filter((r: any) => r.status === 'completed')
+              .map((r: any) => ({
+                id: r.id,
+                startedAt: r.startedAt,
+                visibilityScore: r.visibilityScore,
+                totalQueries: r.totalQueries,
+              }))
+          );
+        }
+
+        if (trendsResponse && Array.isArray(trendsResponse.runs)) {
+          setTrendsData({
+            runs: trendsResponse.runs as TrendRun[],
+            topCompetitors: Array.isArray(trendsResponse.topCompetitors) ? trendsResponse.topCompetitors : [],
+          });
+        }
       } catch (err) {
         console.error('[AIResults] Failed to fetch dashboard data:', err);
       } finally {
@@ -1755,7 +2407,168 @@ const AIResultsReportPreview = () => {
     };
 
     fetchData();
-  }, [maskedDomainId]);
+    // selectedRunId is included so the picker re-fetches the report scoped
+    // to the chosen past run. eslint disable kept for the same reason.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [maskedDomainId, selectedRunId]);
+
+  // ── Generate-Content lifecycle ─────────────────────────────────────────
+  // Each opportunity / Lost-or-At-risk phrase row carries a stable `key`
+  // (opportunity.key for opportunities, `phrase:${promptId}` for phrases).
+  // We track per-key generation state so multiple rows can run in parallel.
+  const [generationByKey, setGenerationByKey] = useState<Record<string, GenerationState>>({});
+
+  const handleGenerateContent = useCallback(
+    async (
+      key: string,
+      payload: {
+        kind: 'opportunity' | 'phrase';
+        title: string;
+        rationale: string;
+        primaryKeyword: string | null;
+        longtailKeywords: string[];
+        suggestedTemplate: 'blog' | 'landing_page' | 'case_study' | 'faq';
+        category: string | null;
+        intentStage: string | null;
+        // LLM-enriched fields (opportunities only). Phrase rows pass null
+        // and the backend falls back to template-derived defaults.
+        recommendedAngle?: string;
+        brief?: {
+          audience?: string;
+          tone?: 'Authoritative' | 'Helpful' | 'Conversational' | 'Technical';
+          structure?: string;
+          keyPoints?: string[];
+          wordCount?: number;
+          cta?: string;
+        };
+      }
+    ) => {
+      if (!reportData?.domainInfo?.id) return;
+      setGenerationByKey((prev) => ({ ...prev, [key]: { kind: 'submitting' } }));
+      try {
+        // 1. Atomically create-or-resolve the topic in the user's company-domain
+        //    worksheet, with primary + longtail keywords + LLM-enriched brief.
+        const buildResp = await fetch(
+          `${import.meta.env.VITE_API_URL}/api/campaigns/topics/from-opportunity`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${localStorage.getItem('authToken') ?? ''}`,
+            },
+            body: JSON.stringify({
+              domainId: reportData.domainInfo.id,
+              opportunityKey: key,
+              title: payload.title,
+              rationale: payload.rationale,
+              primaryKeyword: payload.primaryKeyword,
+              longtailKeywords: payload.longtailKeywords,
+              suggestedTemplate: payload.suggestedTemplate,
+              recommendedAngle: payload.recommendedAngle,
+              brief: payload.brief,
+            }),
+          }
+        );
+        if (!buildResp.ok) throw new Error(`Topic build failed (${buildResp.status})`);
+        const built = (await buildResp.json()) as { topicId: number; campaignId: number };
+
+        // 2. Fire n8n with the LLM-enriched brief baked in. Audience / tone /
+        //    wordCount / cta come from the enriched brief when available;
+        //    structure + keyPoints + recommendedAngle land in the topic
+        //    field so the writer has real direction.
+        const audience = payload.brief?.audience?.trim();
+        const tone =
+          payload.brief?.tone ?? (payload.category === 'branded_trust' ? 'Conversational' : 'Authoritative');
+        const wordCount =
+          payload.brief?.wordCount ??
+          (payload.suggestedTemplate === 'landing_page'
+            ? 1400
+            : payload.suggestedTemplate === 'blog'
+              ? 1000
+              : 800);
+        const cta = payload.brief?.cta?.trim();
+        const topicBriefLines: string[] = [payload.title];
+        if (payload.recommendedAngle) topicBriefLines.push(`Angle: ${payload.recommendedAngle}`);
+        if (payload.brief?.structure) topicBriefLines.push(`Structure: ${payload.brief.structure}`);
+        if (payload.brief?.keyPoints && payload.brief.keyPoints.length > 0) {
+          topicBriefLines.push(`Cover:\n- ${payload.brief.keyPoints.join('\n- ')}`);
+        }
+        const topicBrief = topicBriefLines.join('\n\n');
+
+        const genResp = await fetch(
+          `${import.meta.env.VITE_API_URL}/api/campaigns/topics/${built.topicId}/generate`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${localStorage.getItem('authToken') ?? ''}`,
+            },
+            body: JSON.stringify({
+              template_type: payload.suggestedTemplate,
+              project_name: reportData.domainInfo.companyName ?? reportData.domainInfo.host,
+              project_goal: payload.rationale,
+              target_audience: 'Custom',
+              custom_audience_text: audience ?? payload.intentStage ?? 'general buyer',
+              tone,
+              word_count: wordCount,
+              language: 'en',
+              cta,
+              templateFields: { topic: topicBrief },
+            }),
+          }
+        );
+        if (!genResp.ok) throw new Error(`Generation failed (${genResp.status})`);
+        const genJson = (await genResp.json()) as { job?: { jobId: string; progress: number; phase: string | null } };
+        if (genJson.job?.jobId) {
+          setGenerationByKey((prev) => ({
+            ...prev,
+            [key]: { kind: 'running', jobId: genJson.job!.jobId, progress: genJson.job!.progress, phase: genJson.job!.phase },
+          }));
+        } else {
+          setGenerationByKey((prev) => ({ ...prev, [key]: { kind: 'done', draftId: null } }));
+        }
+      } catch (err) {
+        setGenerationByKey((prev) => ({
+          ...prev,
+          [key]: { kind: 'failed', error: err instanceof Error ? err.message : 'Generation failed' },
+        }));
+      }
+    },
+    [reportData]
+  );
+
+  // SSE listener — flips running rows to done/failed when n8n pings back.
+  useEffect(() => {
+    const runningKeys = Object.entries(generationByKey).filter(([, s]) => s.kind === 'running');
+    if (runningKeys.length === 0) return;
+
+    const token = localStorage.getItem('authToken');
+    if (!token) return;
+
+    const url = `${import.meta.env.VITE_API_URL}/api/sse?token=${encodeURIComponent(token)}`;
+    const es = new EventSource(url);
+    es.onmessage = (ev) => {
+      try {
+        const msg = JSON.parse(ev.data);
+        if (msg?.type !== 'generation:update') return;
+        const jobId = msg.jobId as string | undefined;
+        if (!jobId) return;
+        setGenerationByKey((prev) => {
+          const next = { ...prev };
+          for (const [key, state] of Object.entries(prev)) {
+            if (state.kind !== 'running' || state.jobId !== jobId) continue;
+            if (msg.status === 'completed') next[key] = { kind: 'done', draftId: msg.draftId ?? null };
+            else if (msg.status === 'failed') next[key] = { kind: 'failed', error: msg.error ?? 'Generation failed' };
+            else next[key] = { kind: 'running', jobId, progress: msg.progress ?? state.progress, phase: msg.phase ?? state.phase };
+          }
+          return next;
+        });
+      } catch {
+        /* ignore non-JSON */
+      }
+    };
+    return () => es.close();
+  }, [generationByKey]);
 
   return (
     <AIResultsLayout
@@ -1763,6 +2576,8 @@ const AIResultsReportPreview = () => {
       allDomains={allDomains}
       currentDomainId={reportData?.domainInfo?.id}
       currentDomainUrl={reportData?.domainInfo?.url}
+      currentDomainHost={reportData?.domainInfo?.host}
+      currentDomainName={reportData?.domainInfo?.companyName ?? reportData?.domainInfo?.host}
       maskedDomainId={maskedDomainId}
       title="AI Results"
     >
@@ -1801,14 +2616,61 @@ const AIResultsReportPreview = () => {
               >
                 <ReportDownloadIcon />
               </Button>
-              <Button
-                variant="outline"
-                className="h-[41px] rounded-lg border border-[#D5D7DA] bg-[#FFFFFF] px-3 text-xs text-[#717680] shadow-[0_1px_2px_0_#1018280D]"
-              >
-                <Calendar className="mr-1.5 h-3.5 w-3.5 text-[#717680]" strokeWidth={1.8} />
-                7 days
-                <ChevronDown className="ml-1.5 h-3.5 w-3.5 text-[#717680]" strokeWidth={1.8} />
-              </Button>
+              {/* Run picker — replaces the static "7 days" pill. Lists past
+                  completed AiRuns for this domain so the user can A/B against
+                  earlier audits. Hidden when only one (or zero) runs exist. */}
+              {pastRuns.length > 1 ? (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className="h-[41px] rounded-lg border border-[#D5D7DA] bg-white px-3 text-xs text-[#374252] shadow-[0_1px_2px_0_#1018280D]"
+                    >
+                      <Calendar className="mr-1.5 h-3.5 w-3.5 text-[#717680]" strokeWidth={1.8} />
+                      {selectedRunId
+                        ? new Date(pastRuns.find((r) => r.id === selectedRunId)?.startedAt ?? Date.now()).toLocaleDateString()
+                        : 'Latest run'}
+                      <ChevronDown className="ml-1.5 h-3.5 w-3.5 text-[#717680]" strokeWidth={1.8} />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-[260px] p-1.5">
+                    <DropdownMenuItem
+                      className="rounded-md px-3 py-2 cursor-pointer"
+                      onClick={() => setSelectedRunId(null)}
+                    >
+                      <span className="flex-1 text-[12px] font-medium text-slate-900">Latest run</span>
+                      {!selectedRunId ? <Check className="h-3.5 w-3.5 text-blue-600" /> : null}
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    {pastRuns.map((r) => (
+                      <DropdownMenuItem
+                        key={r.id}
+                        className="flex items-center gap-2 rounded-md px-3 py-2 cursor-pointer"
+                        onClick={() => setSelectedRunId(r.id)}
+                      >
+                        <div className="flex-1 min-w-0">
+                          <div className="text-[12px] font-medium text-slate-900">
+                            {new Date(r.startedAt).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                          </div>
+                          <div className="text-[10px] text-slate-500">
+                            {r.visibilityScore !== null ? `${Math.round(r.visibilityScore)}% visibility` : '—'} · {r.totalQueries ?? '—'} queries
+                          </div>
+                        </div>
+                        {selectedRunId === r.id ? <Check className="h-3.5 w-3.5 text-blue-600" /> : null}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              ) : (
+                <Button
+                  variant="outline"
+                  disabled
+                  className="h-[41px] rounded-lg border border-[#D5D7DA] bg-white px-3 text-xs text-[#717680] shadow-[0_1px_2px_0_#1018280D] cursor-default"
+                >
+                  <Calendar className="mr-1.5 h-3.5 w-3.5 text-[#717680]" strokeWidth={1.8} />
+                  Latest run
+                </Button>
+              )}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button
@@ -1826,21 +2688,144 @@ const AIResultsReportPreview = () => {
                   <DropdownMenuItem onClick={() => setFilterType('keyword')}>Keywords Only</DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
-              <Button
-                variant="outline"
-                className="h-[41px] rounded-lg border border-[#D5D7DA] bg-[#FFFFFF] px-3 text-xs text-[#717680] shadow-[0_1px_2px_0_#1018280D]"
-              >
-                <Filter className="mr-1.5 h-3.5 w-3.5 text-[#717680]" strokeWidth={1.8} />
-                Filters
-                <ChevronDown className="ml-1.5 h-3.5 w-3.5 text-[#717680]" strokeWidth={1.8} />
-              </Button>
-              <Button
-                onClick={() => navigate('/ai-checker-v2')}
-                className="h-[41px] rounded-lg bg-gradient-to-r from-[#2D4059] to-[#4C74C2] px-4 text-xs text-white shadow-[0_1px_2px_0_#1018280D] hover:opacity-95"
-              >
-                <Plus className="mr-1.5 h-3.5 w-3.5" />
-                Start New Audit
-              </Button>
+              {/* Filters — model + category, multi-select. Active count
+                  shows on the trigger so the user can tell at a glance
+                  whether they're looking at filtered or full data. */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="h-[41px] rounded-lg border border-[#D5D7DA] bg-white px-3 text-xs text-[#374252] shadow-[0_1px_2px_0_#1018280D]"
+                  >
+                    <Filter className="mr-1.5 h-3.5 w-3.5 text-[#717680]" strokeWidth={1.8} />
+                    Filters
+                    {modelFilter.size + categoryFilter.size > 0 ? (
+                      <span className="ml-1.5 inline-flex h-4 min-w-[16px] items-center justify-center rounded-full bg-blue-600 px-1 text-[10px] font-semibold text-white">
+                        {modelFilter.size + categoryFilter.size}
+                      </span>
+                    ) : null}
+                    <ChevronDown className="ml-1.5 h-3.5 w-3.5 text-[#717680]" strokeWidth={1.8} />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-[260px] p-2">
+                  <div className="px-2 pb-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                    Models
+                  </div>
+                  {(['gpt-4o-mini', 'claude-sonnet-4-5', 'gemini-2.0-flash'] as const).map((m) => {
+                    const label = m.includes('gpt') ? 'ChatGPT' : m.includes('claude') ? 'Claude' : 'Gemini';
+                    const on = modelFilter.has(m);
+                    return (
+                      <DropdownMenuItem
+                        key={m}
+                        onSelect={(e) => {
+                          e.preventDefault(); // keep menu open on toggle
+                          setModelFilter((prev) => {
+                            const next = new Set(prev);
+                            on ? next.delete(m) : next.add(m);
+                            return next;
+                          });
+                        }}
+                        className="flex items-center gap-2 rounded-md px-2 py-1.5 cursor-pointer"
+                      >
+                        <span className={`flex h-4 w-4 items-center justify-center rounded border ${on ? 'border-blue-500 bg-blue-500 text-white' : 'border-slate-300 bg-white text-transparent'}`}>
+                          <Check className="h-3 w-3" />
+                        </span>
+                        <span className="text-[12px] text-slate-700">{label}</span>
+                      </DropdownMenuItem>
+                    );
+                  })}
+                  <DropdownMenuSeparator />
+                  <div className="px-2 pb-1.5 pt-1 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                    Categories
+                  </div>
+                  {([
+                    ['unbranded_recommendation', 'Unbranded recommendation'],
+                    ['top_n_listicle', 'Top-N listicle'],
+                    ['alternatives_to_competitor', 'Alternatives to competitor'],
+                    ['problem_statement', 'Problem statement'],
+                  ] as const).map(([key, label]) => {
+                    const on = categoryFilter.has(key);
+                    return (
+                      <DropdownMenuItem
+                        key={key}
+                        onSelect={(e) => {
+                          e.preventDefault();
+                          setCategoryFilter((prev) => {
+                            const next = new Set(prev);
+                            on ? next.delete(key) : next.add(key);
+                            return next;
+                          });
+                        }}
+                        className="flex items-center gap-2 rounded-md px-2 py-1.5 cursor-pointer"
+                      >
+                        <span className={`flex h-4 w-4 items-center justify-center rounded border ${on ? 'border-blue-500 bg-blue-500 text-white' : 'border-slate-300 bg-white text-transparent'}`}>
+                          <Check className="h-3 w-3" />
+                        </span>
+                        <span className="text-[12px] text-slate-700">{label}</span>
+                      </DropdownMenuItem>
+                    );
+                  })}
+                  {(modelFilter.size + categoryFilter.size > 0) ? (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        onSelect={() => { setModelFilter(new Set()); setCategoryFilter(new Set()); }}
+                        className="rounded-md px-2 py-1.5 text-[12px] text-slate-500 cursor-pointer hover:text-slate-700"
+                      >
+                        Clear all filters
+                      </DropdownMenuItem>
+                    </>
+                  ) : null}
+                </DropdownMenuContent>
+              </DropdownMenu>
+              {/* Start New Audit — dropdown blends with the other header
+                  controls (white, slate text). Two re-audit modes: a full
+                  re-crawl from Step 2, or jump straight back to picking
+                  prompts on the existing crawl + competitors. */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    className="h-[41px] rounded-lg bg-gradient-to-r from-[#2D4059] to-[#4C74C2] px-4 text-xs text-white shadow-[0_1px_2px_0_#1018280D] hover:opacity-95"
+                  >
+                    <Plus className="mr-1.5 h-3.5 w-3.5" />
+                    Start New Audit
+                    <ChevronDown className="ml-1.5 h-3.5 w-3.5" strokeWidth={1.8} />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-[280px] p-1.5">
+                  <DropdownMenuItem
+                    className="flex flex-col items-start gap-0.5 rounded-md px-3 py-2.5 cursor-pointer"
+                    onClick={() => {
+                      const id = reportData?.domainInfo?.id;
+                      if (id) navigate(`/ai-checker-v2?domain=${id}&restart=crawl`);
+                    }}
+                  >
+                    <span className="text-[12px] font-semibold text-slate-900">Re-audit from start</span>
+                    <span className="text-[11px] text-slate-500 leading-snug">
+                      Re-crawl the site, find competitors fresh, and run new prompts. Keeps your country / industry profile.
+                    </span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    className="flex flex-col items-start gap-0.5 rounded-md px-3 py-2.5 cursor-pointer"
+                    onClick={() => {
+                      const id = reportData?.domainInfo?.id;
+                      if (id) navigate(`/ai-checker-v2?domain=${id}&restart=topics`);
+                    }}
+                  >
+                    <span className="text-[12px] font-semibold text-slate-900">Pick new prompts</span>
+                    <span className="text-[11px] text-slate-500 leading-snug">
+                      Skip the crawl. Generate fresh prompts on top of the existing competitors and pick which to run.
+                    </span>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    className="rounded-md px-3 py-2 text-[12px] text-slate-600 cursor-pointer"
+                    onClick={() => navigate('/dashboard?tab=domain-history')}
+                  >
+                    Audit a different domain →
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </div>
 
@@ -1863,12 +2848,7 @@ const AIResultsReportPreview = () => {
                   ) : (
                     <Card key={card.label} className="h-full rounded-xl border border-[#D5D7DA] bg-white shadow-[0_1px_2px_0_#1018280D]">
                       <CardContent className="flex h-full flex-col gap-4 p-5 sm:p-6">
-                        <div className="flex items-center gap-1.5">
-                          <CardTitle className="text-base font-semibold leading-[135%] tracking-normal text-[#535862]">
-                            {card.label}
-                          </CardTitle>
-                          <MetricInfoIcon />
-                        </div>
+                        <CardTitleWithTip title={card.label} />
                         {card.note ? <p className="text-sm font-medium text-[#535862]">{card.note}</p> : null}
                         <p className={cn('text-[27px] font-semibold leading-[1] tracking-normal', card.tone)}>
                           {card.value}
@@ -1901,12 +2881,7 @@ const AIResultsReportPreview = () => {
             <Card className="rounded-xl border border-[#D5D7DA] bg-white shadow-[0_1px_2px_0_#1018280D]">
               <CardHeader className="flex flex-row items-start justify-between px-4 pb-3 pt-4">
                 <div className="min-w-0">
-                  <div className="flex items-center gap-1.5">
-                    <CardTitle className="text-base font-semibold leading-[135%] tracking-normal text-[#535862]">
-                      Phrase Visibility Map
-                    </CardTitle>
-                    <MetricInfoIcon />
-                  </div>
+                  <CardTitleWithTip title="Phrase Visibility Map" />
                   <p className="mt-2 text-sm leading-[150%] text-[#535862]">
                     Data-backed actions to close visibility gaps and capture missed AI-driven traffic.
                   </p>
@@ -1918,27 +2893,56 @@ const AIResultsReportPreview = () => {
                   <FilterPill label="Sort" icon="sort" />
                   <FilterPill label="Filters" icon="filter" />
                 </div>
-                {privateVisibilityItems.map((item, index) => (
-                  <VisibilityRow
-                    key={`${item.title}-${index}`}
-                    title={item.title}
-                    meta={item.count}
-                    status={item.status as 'positive' | 'danger'}
-                    actionLabel={item.status === 'danger' ? 'Generate Content' : undefined}
-                  />
-                ))}
+                {(reportData?.phraseVisibility ?? []).length === 0 ? (
+                  <p className="px-1 py-2 text-xs text-slate-500">
+                    No phrase data yet — run the wizard to populate.
+                  </p>
+                ) : null}
+                {(reportData?.phraseVisibility ?? []).slice(0, 8).map((row: any) => {
+                  const status: 'positive' | 'warn' | 'danger' =
+                    row.status === 'won' ? 'positive' : row.status === 'at_risk' ? 'warn' : 'danger';
+                  const showCta = row.status !== 'won';
+                  const key = `phrase:${row.promptId}`;
+                  return (
+                    <VisibilityRow
+                      key={key}
+                      title={row.phrase}
+                      meta={row.subtitle}
+                      status={status}
+                      actionLabel={showCta ? 'Generate Content' : undefined}
+                      onAction={
+                        showCta
+                          ? () =>
+                              handleGenerateContent(key, {
+                                kind: 'phrase',
+                                title: `Improve coverage for ${row.keyword ?? 'this prompt'}`,
+                                rationale: row.subtitle,
+                                primaryKeyword: row.keyword ?? null,
+                                longtailKeywords: [row.phrase],
+                                suggestedTemplate:
+                                  row.category === 'brand_vs_competitor'
+                                    ? 'landing_page'
+                                    : row.category === 'branded_trust'
+                                      ? 'case_study'
+                                      : row.category === 'problem_statement'
+                                        ? 'faq'
+                                        : 'blog',
+                                category: row.category ?? null,
+                                intentStage: row.intentStage ?? null,
+                              })
+                          : undefined
+                      }
+                      generation={generationByKey[key]}
+                    />
+                  );
+                })}
               </CardContent>
             </Card>
 
             <Card className="rounded-xl border border-[#D5D7DA] bg-white shadow-[0_1px_2px_0_#1018280D]">
               <CardHeader className="flex flex-row items-start justify-between px-4 pb-3 pt-4">
                 <div className="min-w-0">
-                  <div className="flex items-center gap-1.5">
-                    <CardTitle className="text-base font-semibold leading-[135%] tracking-normal text-[#535862]">
-                      Opportunities to Outrank Competitors
-                    </CardTitle>
-                    <MetricInfoIcon />
-                  </div>
+                  <CardTitleWithTip title="Opportunities to Outrank Competitors" />
                   <p className="mt-2 text-sm leading-[150%] text-[#535862]">
                     Data-backed actions to close visibility gaps and capture missed AI-driven traffic.
                   </p>
@@ -1957,12 +2961,35 @@ const AIResultsReportPreview = () => {
                     +1
                   </Button>
                 </div>
-                {opportunityItems.map((item, index) => (
+                {(reportData?.opportunities ?? []).length === 0 ? (
+                  <p className="px-1 py-2 text-xs text-slate-500">
+                    No outrank opportunities yet — once a run completes we'll surface action items here.
+                  </p>
+                ) : null}
+                {(reportData?.opportunities ?? []).map((opp: any) => (
                   <OpportunityRow
-                    key={`${item.title}-${index}`}
-                    title="Create comprehensive backlink analysis guide"
-                    severity="Critical"
-                    priority="Very High"
+                    key={opp.key}
+                    title={opp.title}
+                    rationale={opp.rationale}
+                    recommendedAngle={opp.recommendedAngle}
+                    brief={opp.brief}
+                    severity={SEVERITY_LABEL[opp.severity] ?? opp.severity}
+                    priority={TRAFFIC_LABEL[opp.trafficPotential] ?? opp.trafficPotential}
+                    onAction={() =>
+                      handleGenerateContent(opp.key, {
+                        kind: 'opportunity',
+                        title: opp.title,
+                        rationale: opp.rationale,
+                        primaryKeyword: opp.primaryKeyword,
+                        longtailKeywords: opp.longtailKeywords ?? [],
+                        suggestedTemplate: opp.suggestedTemplate ?? 'blog',
+                        category: opp.category ?? null,
+                        intentStage: opp.intentStage ?? null,
+                        recommendedAngle: opp.recommendedAngle,
+                        brief: opp.brief,
+                      })
+                    }
+                    generation={generationByKey[opp.key]}
                   />
                 ))}
               </CardContent>
@@ -1987,24 +3014,27 @@ const AIResultsReportPreview = () => {
             <CardContent className="space-y-8 px-4 pb-4">
               <AreaChartCard
                 title="Share of Voice"
-                subtitle="Data-backed actions to close visibility gaps and capture missed AI-driven traffic."
-                data={shareOfVoiceData}
-                series={shareOfVoiceSeries}
+                subtitle="Brand vs top competitors — mention count per audit."
+                data={shareOfVoiceChart.data}
+                series={shareOfVoiceChart.series}
                 tooltipTitle="AI Share of voice"
+                emptyMessage={trendEmptyMessage}
               />
               <AreaChartCard
                 title="Citations"
-                subtitle="How often your brand is cited in AI responses on each LLM Models"
-                data={citationsData}
-                series={citationsSeries}
+                subtitle="How often each AI assistant cited a source when answering your prompts."
+                data={citationsChart.data}
+                series={citationsChart.series}
                 tooltipTitle="Citations"
+                emptyMessage={trendEmptyMessage}
               />
               <AreaChartCard
                 title="Mentions rate trend"
-                subtitle="Monthly mentions over 6 months."
-                data={mentionsData}
-                series={mentionsSeries}
+                subtitle="Brand mentions vs total competitor mentions per audit."
+                data={mentionsChart.data}
+                series={mentionsChart.series}
                 tooltipTitle="Mentions"
+                emptyMessage={trendEmptyMessage}
               />
             </CardContent>
           </Card>

@@ -5,7 +5,8 @@ import { useToast } from "@/components/ui/use-toast";
 import PagesTable from "./PagesTable";
 import PageQueriesTable from "./PageQueriesTable";
 import { getDefaultDateRange, formatDateForDisplay, getDateRangeDescription } from "@/lib/gsc/dateUtils";
-import GSCBlogAnalytics from '@/features/analytics/GSCBlogAnalytics';
+// GSCBlogAnalytics was deleted in the foundational rewrite — to be rebuilt
+// against the new schema. Blog-performance tab shows a placeholder for now.
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3002';
 
@@ -371,7 +372,9 @@ const GSCAnalyticsView = () => {
       )}
 
       {activeGscSubTab === 'blog-performance' && (
-        <GSCBlogAnalytics />
+        <div className="p-6 text-sm text-slate-500">
+          Blog analytics is being rebuilt against the new schema.
+        </div>
       )}
 
     </div>

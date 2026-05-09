@@ -1,3 +1,13 @@
+// =============================================================================
+// AI Visibility — Clean Schema (Foundational Rewrite)
+// -----------------------------------------------------------------------------
+// One wizard, five phases (crawl → profile → competitors → topics → select → run).
+// Domain identity is split from profile, inferred attributes, and wizard state.
+// All "phrase / intent / unified / enhanced / semantic / niche" legacy tables
+// have been removed. The blog/campaign/wordpress/gsc/audit pipelines are
+// preserved untouched (only deprecated columns dropped).
+// =============================================================================
+
 generator client {
   provider = "prisma-client-js"
   output   = "../generated/prisma"
@@ -8,700 +18,259 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// -----------------------------------------------------------------------------
+// User
+// -----------------------------------------------------------------------------
+
 model User {
-  id        Int      @id @default(autoincrement())
-  email     String   @unique
-  password  String
-  name      String?
-  refreshToken String?
-  refreshTokenExpiry DateTime?
-  emailVerified Boolean @default(false)
-  emailVerificationToken String?
+  id                           Int       @id @default(autoincrement())
+  email                        String    @unique
+  password                     String
+  name                         String?
+  refreshToken                 String?
+  refreshTokenExpiry           DateTime?
+  emailVerified                Boolean   @default(false)
+  emailVerificationToken       String?
   emailVerificationTokenExpiry DateTime?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  domains   Domain[]
-  googleSearchConsole GoogleSearchConsoleConnection?
+  createdAt                    DateTime  @default(now())
+  updatedAt                    DateTime  @updatedAt
+
+  domains              Domain[]
+  googleSearchConsole  GoogleSearchConsoleConnection?
   wordpressIntegration WordpressIntegration?
-  publishLogs WordpressPublishLog[]
-  generationJobs GenerationJob[]
+  publishLogs          WordpressPublishLog[]
+  generationJobs       GenerationJob[]
 }
 
+// -----------------------------------------------------------------------------
+// Domain — identity only. Profile / inferred / wizard state live in side tables.
+// -----------------------------------------------------------------------------
+
 model Domain {
-  id                          Int                          @id @default(autoincrement())
-  url                         String
-  context                     String?
-  contextJson                 Json?
-  createdAt                   DateTime                     @default(now())
-  updatedAt                   DateTime                     @updatedAt
-  userId                      Int?
-  location                    String?
-  chatModel                   String?
-  customKeywords              String?
-  intentPhrases               String?
-  runAllModels                Boolean                      @default(false)
-  locationContext             String?
-  currentStep                 Int                          @default(0)
-  isCompanyDomain             Boolean                      @default(false)
-  // Wizard v2 — user-supplied profile (Step 1 form)
-  country                     String?
-  state                       String?
-  industry                    String?
-  // Wizard v2 — inferred from crawl, not user-input
-  companySize                 String?
-  // Wizard v2 — comma-separated seeds the user adds in Step 1 advanced options
-  customSeeds                 Json?
-  // Wizard v2 — list of competitor URLs the user kept in Step 3
-  selectedCompetitors         Json?
-  // Wizard v2 — auto-saved selection draft for Step 4 so closing the tab restores checkboxes
-  selectionDraft              Json?
-  analysisPhases              AnalysisPhase[]
-  analysisReports             AnalysisReport[]
-  communityInsights           CommunityInsight[]
-  communityMiningResults      CommunityMiningResult[]
-  competitorAnalyses          CompetitorAnalysis[]
-  competitorTrackings         CompetitorTracking[]
-  crawlResults                CrawlResult[]
-  dashboardAnalyses           DashboardAnalysis[]
-  user                        User?                        @relation(fields: [userId], references: [id])
-  generatedIntentPhrases      GeneratedIntentPhrase[]
-  intentClassifications       IntentClassification[]
-  intentClassificationResults IntentClassificationResult[]
-  intentPhraseGenerations     IntentPhraseGeneration[]
-  keywords                    Keyword[]
-  keywordAnalyses             KeywordAnalysis[]
-  modelPerformances           ModelPerformance[]
-  performanceInsights         PerformanceInsight[]
-  relevanceScoreResults       RelevanceScoreResult[]
-  searchPatterns              SearchPattern[]
-  searchPatternResults        SearchPatternResult[]
-  searchVolumeClassifications SearchVolumeClassification[]
-  semanticAnalyses            SemanticAnalysis[]
-  suggestedCompetitors        SuggestedCompetitor[]
-  campaigns                   Campaign[]
-  auditResults                AuditResult[]
-  googleAnalyticsId           String?
+  id              Int      @id @default(autoincrement())
+  userId          Int
+  url             String   // canonical https://host
+  host            String   // normalized: lowercased, no www, no path
+  isCompanyDomain Boolean  @default(false)
+  // GSC analytics property id, kept here because GSC integration writes to it.
+  googleAnalyticsId String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
+  user        User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([url, userId])
+  profile     DomainProfile?
+  inferred    DomainInferred?
+  wizardState WizardState?
+  crawls      CrawlSnapshot[]
+  competitors Competitor[]
+  keywords    Keyword[]
+  prompts     Prompt[]
+  runs        AiRun[]
+  campaigns   Campaign[]
+  auditResult AuditResult?
+
+  @@unique([userId, host])
   @@index([userId])
   @@index([userId, isCompanyDomain])
 }
 
-model CrawlResult {
-  id               Int      @id @default(autoincrement())
-  pagesScanned     Int
-  extractedContext String
-  createdAt        DateTime @default(now())
-  tokenUsage       Int?
-  domainId         Int?
-  analyzedUrls     String
-  pageSnapshots    Json?
-  crawlPolicy      Json?
-  quality          Json?
-  contextJson      Json?
-  domain           Domain?  @relation(fields: [domainId], references: [id])
-}
-
-model Keyword {
-  id                          Int                          @id @default(autoincrement())
-  term                        String
-  volume                      Int
-  difficulty                  String
-  cpc                         Float
-  isSelected                  Boolean                      @default(false)
-  createdAt                   DateTime                     @default(now())
-  updatedAt                   DateTime                     @updatedAt
-  domainId                    Int?
-  intent                      String?
-  isCustom                    Boolean                      @default(false)
-  communityInsights           CommunityInsight[]
-  communityMiningResults      CommunityMiningResult[]
-  generatedIntentPhrases      GeneratedIntentPhrase[]
-  intentClassificationResults IntentClassificationResult[]
-  domain                      Domain?                      @relation(fields: [domainId], references: [id])
-  phrases                     Phrase[]
-  searchPatterns              SearchPattern[]
-  searchPatternResults        SearchPatternResult[]
-
-  @@unique([term, domainId])
-  @@index([domainId])
-}
-
-model Phrase {
-  id                          Int                          @id @default(autoincrement())
-  text                        String
-  keywordId                   Int
-  createdAt                   DateTime                     @default(now())
-  updatedAt                   DateTime                     @updatedAt
-  relevanceScore              Int?
-  sources                     Json?
-  trend                       String?
-  isSelected                  Boolean                      @default(false)
-  confidence                  Int?
-  intent                      String?
-  keyword                     Keyword                      @relation(fields: [keywordId], references: [id])
-  phraseIntentClassifications PhraseIntentClassification[]
-  phraseScores                PhraseScore[]
-}
-
-model AIQueryResult {
-  id                   Int                   @id @default(autoincrement())
-  phraseId             Int
-  model                String
-  response             String
-  latency              Float
-  cost                 Float
-  presence             Int
-  relevance            Int
-  accuracy             Int
-  sentiment            Int
-  overall              Float
-  createdAt            DateTime              @default(now())
-  competitorMatchScore Float?
-  competitorUrls       Json?
-  confidence           Float?
-  domainRank           Int?
-  foundDomains         Json?
-  sources              Json?
-  highlightContext     String?
-  detectionMethod      String?
-  mentions             Int?
-  context              String?
-  comprehensiveness    Float?
-  aiConfidence         Float?
-  rankingFactors       Json?
-  domainSentiment      String?
-  positionScore        Float?
-  prominenceScore      Float?
-  contextQualityScore  Float?
-  mentionTypeScore     Float?
-  intelligentScore     Float?
-  competitorNames      Json?
-  competitorMentions   Json?
-  competitorCount      Int?
-  competitorDomains    Json?
-  citations            Json?
-  searchQueries        Json?
-  citationStrength     Float?
-  phrase               GeneratedIntentPhrase @relation(fields: [phraseId], references: [id])
-}
-
-model AnalysisReport {
-  id                  Int      @id @default(autoincrement())
-  domainId            Int?
-  overallScore        Float
-  scoreBreakdown      Json
-  modelPerformance    Json
-  competitorAnalysis  Json
-  performanceInsights Json
-  recommendations     Json
-  analysisMetadata    Json
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
-  domain              Domain?  @relation(fields: [domainId], references: [id])
-
-  @@index([domainId])
-}
-
-model ModelPerformance {
-  id             Int      @id @default(autoincrement())
-  domainId       Int?
-  model          String
-  totalQueries   Int
-  rankedQueries  Int
-  avgScore       Float
-  avgLatency     Float
-  avgCost        Float
-  presenceRate   Float
-  relevanceScore Float
-  accuracyScore  Float
-  sentimentScore Float
-  overallScore   Float
-  createdAt      DateTime @default(now())
+// User-supplied profile from Step 1 of the wizard.
+model DomainProfile {
+  domainId       Int     @id
+  country        String?
+  state          String?
+  industry       String?
+  targetLocation String?
+  // { keywords: string[], prompts: string[] } — survives regenerations.
+  customSeeds    Json?
   updatedAt      DateTime @updatedAt
-  domain         Domain?  @relation(fields: [domainId], references: [id])
-
-  @@unique([domainId, model])
-  @@index([domainId])
+  domain         Domain   @relation(fields: [domainId], references: [id], onDelete: Cascade)
 }
 
-model CompetitorTracking {
-  id               Int      @id @default(autoincrement())
-  domainId         Int?
-  competitorDomain String
-  frequency        Int
-  threatLevel      String
-  marketShare      Float
-  lastSeen         DateTime
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-  domain           Domain?  @relation(fields: [domainId], references: [id])
-
-  @@unique([domainId, competitorDomain])
-  @@index([domainId])
+// LLM/heuristic-inferred attributes synthesized from CrawlSnapshot.
+// Absorbs what the old SemanticAnalysis.contentSummary stored.
+model DomainInferred {
+  domainId       Int      @id
+  companyName    String?
+  companySize    String?  // solo | smb | mid | enterprise
+  brandVoice     Json?
+  targetAudience Json?
+  productsJson   Json?
+  schemaOrgJson  Json?
+  // float[] embedding stored as Json — used for competitor + prompt similarity.
+  embedding      Json?
+  // Free-form text summary for downstream content generation.
+  summary        String?
+  inferredAt     DateTime @default(now())
+  domain         Domain   @relation(fields: [domainId], references: [id], onDelete: Cascade)
 }
 
-model PerformanceInsight {
-  id          Int      @id @default(autoincrement())
-  domainId    Int?
-  insightType String
-  area        String
-  score       Float?
-  description String
-  potential   String?
-  action      String?
-  risk        String?
-  mitigation  String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  domain      Domain?  @relation(fields: [domainId], references: [id])
-
-  @@index([domainId, insightType])
-}
-
-model DashboardAnalysis {
-  id               Int      @id @default(autoincrement())
-  metrics          Json
-  insights         Json
-  industryAnalysis Json
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-  domainId         Int?
-  domain           Domain?  @relation(fields: [domainId], references: [id])
-
-  @@index([domainId])
-}
-
-model CompetitorAnalysis {
-  id                       Int      @id @default(autoincrement())
-  competitors              Json
-  marketInsights           Json
-  strategicRecommendations Json
-  competitiveAnalysis      Json
-  competitorList           String
-  createdAt                DateTime @default(now())
-  updatedAt                DateTime @updatedAt
-  domainId                 Int?
-  domain                   Domain?  @relation(fields: [domainId], references: [id])
-
-  @@index([domainId])
-}
-
-model SuggestedCompetitor {
-  id         Int      @id @default(autoincrement())
-  analysis   Json
-  tokenUsage Int?
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-  domainId   Int?
-  domain     Domain?  @relation(fields: [domainId], references: [id])
-
-  @@index([domainId])
-}
-
-model AnalysisPhase {
-  id         Int       @id @default(autoincrement())
-  domainId   Int?
-  phase      String
-  status     String
-  progress   Int       @default(0)
-  startTime  DateTime?
-  endTime    DateTime?
-  result     Json?
-  error      String?
-  tokenUsage Int?
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
-  domain     Domain?   @relation(fields: [domainId], references: [id])
-
-  @@unique([domainId, phase])
-  @@index([domainId])
-}
-
-model SemanticAnalysis {
-  id             Int      @id @default(autoincrement())
-  domainId       Int?
-  contentSummary String
-  keyThemes      Json
-  brandVoice     String
-  targetAudience Json
-  contentGaps    Json
-  tokenUsage     Int?
-  createdAt      DateTime @default(now())
+// Per-domain wizard progress. Replaces AnalysisPhase + Domain.currentStep + selectionDraft.
+model WizardState {
+  domainId       Int      @id
+  // { crawl: 'completed', profile: 'completed', competitors: 'running', ... }
+  phases         Json     @default("{}")
+  // { keywordIds: number[], promptIds: number[] } — debounced auto-save.
+  selectionDraft Json?
   updatedAt      DateTime @updatedAt
-  domain         Domain?  @relation(fields: [domainId], references: [id])
-
-  @@index([domainId])
+  domain         Domain   @relation(fields: [domainId], references: [id], onDelete: Cascade)
 }
 
-model KeywordAnalysis {
-  id                   Int      @id @default(autoincrement())
-  domainId             Int?
-  keywords             Json
-  searchVolumeData     Json
-  intentClassification Json
-  competitiveAnalysis  Json
-  tokenUsage           Int?
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime @updatedAt
-  domain               Domain?  @relation(fields: [domainId], references: [id])
+// One row per crawl. Versioned — old crawls are retained, never overwritten.
+model CrawlSnapshot {
+  id           Int      @id @default(autoincrement())
+  domainId     Int
+  pagesScanned Int
+  // [{ url, title, description, ogTags, schemaJson, content }]
+  pages        Json
+  rawText      String   // concatenated content blob for downstream LLM
+  contextJson  Json?    // synthesized structure
+  quality      Json?    // % metrics
+  policy       Json?    // robots + sitemap discovery
+  tokenUsage   Int      @default(0)
+  createdAt    DateTime @default(now())
+  domain       Domain   @relation(fields: [domainId], references: [id], onDelete: Cascade)
 
-  @@index([domainId])
+  @@index([domainId, createdAt])
 }
 
-model SearchVolumeClassification {
-  id                   Int      @id @default(autoincrement())
-  domainId             Int?
-  highVolumeKeywords   Json
-  mediumVolumeKeywords Json
-  lowVolumeKeywords    Json
-  volumeTrends         Json
-  seasonalPatterns     Json
-  tokenUsage           Int?
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime @updatedAt
-  domain               Domain?  @relation(fields: [domainId], references: [id])
-
-  @@index([domainId])
-}
-
-model IntentClassification {
-  id                    Int      @id @default(autoincrement())
-  domainId              Int?
-  informationalKeywords Json
-  navigationalKeywords  Json
-  transactionalKeywords Json
-  commercialKeywords    Json
-  intentDistribution    Json
-  tokenUsage            Int?
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
-  domain                Domain?  @relation(fields: [domainId], references: [id])
-
-  @@index([domainId])
-}
-
-model CommunityInsight {
-  id         Int      @id @default(autoincrement())
-  domainId   Int?
-  keywordId  Int?
-  sources    Json
-  summary    String
-  tokenUsage Int?
-  createdAt  DateTime @default(now())
-  domain     Domain?  @relation(fields: [domainId], references: [id])
-  keyword    Keyword? @relation(fields: [keywordId], references: [id])
-
-  @@index([domainId])
-  @@index([keywordId])
-}
-
-model SearchPattern {
-  id         Int      @id @default(autoincrement())
-  domainId   Int?
-  keywordId  Int?
-  patterns   Json
-  summary    String
-  tokenUsage Int?
-  createdAt  DateTime @default(now())
-  domain     Domain?  @relation(fields: [domainId], references: [id])
-  keyword    Keyword? @relation(fields: [keywordId], references: [id])
-
-  @@index([domainId])
-  @@index([keywordId])
-}
-
-model PhraseIntentClassification {
-  id         Int      @id @default(autoincrement())
-  phraseId   Int
-  intent     String
-  confidence Int?
-  createdAt  DateTime @default(now())
-  phrase     Phrase   @relation(fields: [phraseId], references: [id])
-
-  @@index([phraseId])
-}
-
-model WordpressIntegration {
-  id             Int      @id @default(autoincrement())
-  userId         Int      @unique
-  siteUrl        String
-  username       String
-  password       String
-  lastPublishedAt DateTime?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-  user           User     @relation(fields: [userId], references: [id])
-  publishLogs    WordpressPublishLog[]
-}
-
-model WordpressPublishLog {
-  id            Int      @id @default(autoincrement())
-  userId        Int
-  wordpressUrl  String
-  wordpressPostId Int?
-  primaryKeyword String?
-  normalizedPrimaryKeyword String?
-  generationJobId String?
-  /// @deprecated Use generationTopicId. Retained for forensics on legacy rows.
-  generationPageId Int?
-  /// Worksheet-model link (added in flatten-topics migration).
-  generationTopicId Int?
-  title         String?
-  slug          String?
-  status        String?
-  response      Json?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @default(now()) @updatedAt
-  user          User     @relation(fields: [userId], references: [id])
-  integration   WordpressIntegration? @relation(fields: [integrationId], references: [id])
-  integrationId Int?
-  /// @deprecated Frozen archive — retained for forensics.
-  campaignPages CampaignPage[] @relation("PageLatestDraft")
-  campaignTopics CampaignTopic[] @relation("TopicLatestDraft")
-
-  @@index([userId])
-  @@index([generationJobId])
-  @@index([generationJobId, normalizedPrimaryKeyword])
-  @@index([generationPageId])
-  @@index([generationTopicId])
-}
-
-model GenerationJob {
-  id        Int      @id @default(autoincrement())
-  jobId     String   @unique
-  topicId   Int
-  userId    Int
-  status    String   @default("pending") // pending | generating | completed | failed
-  /// 0..100. Honest server-driven progress. While n8n is sync, advanced by
-  /// a heartbeat timer; capped at 90 until the n8n response arrives.
-  progress  Int      @default(0)
-  /// Optional human-readable phase label (preparing / generating / persisting).
-  phase     String?
-  /// Failure reason. Only set when status = 'failed'.
-  error     String?
-  /// Resulting WordpressPublishLog id when status = 'completed'.
-  draftId   Int?
-  startedAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  topic     CampaignTopic @relation(fields: [topicId], references: [id])
-  user      User          @relation(fields: [userId], references: [id])
-  /// @deprecated Retained for legacy job rows; new jobs do not write here.
-  pages     GenerationJobPage[]
-
-  @@index([topicId])
-  @@index([userId])
-  @@index([userId, status])
-}
-
-/// @deprecated Frozen archive — replaced by direct status fields on GenerationJob in the flat topic model.
-model GenerationJobPage {
-  id          Int      @id @default(autoincrement())
-  jobId       String
-  pageId      Int
-  pageType    String   // pillar | subpage
-  status      String   @default("pending") // pending | generating | completed | failed
-  draftId     Int?
-  primaryKeyword String?
-  progress    Int?     @default(0)
-  error       String?
-  hasHtml     Boolean  @default(false)
-  updatedAt   DateTime @updatedAt
-  createdAt   DateTime @default(now())
-
-  job         GenerationJob @relation(fields: [jobId], references: [jobId], onDelete: Cascade)
-
-  @@index([jobId])
-  @@index([pageId])
-}
-
-model PhraseScore {
-  id        Int      @id @default(autoincrement())
-  phraseId  Int
-  score     Int
-  breakdown Json?
-  createdAt DateTime @default(now())
-  phrase    Phrase   @relation(fields: [phraseId], references: [id])
-
-  @@index([phraseId])
-}
-
-model IntentPhraseGeneration {
-  id         Int       @id @default(autoincrement())
-  domainId   Int
-  status     String    @default("pending")
-  phase      String
-  progress   Int       @default(0)
-  startTime  DateTime  @default(now())
-  endTime    DateTime?
-  result     Json?
-  error      String?
-  tokenUsage Int?
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
-  domain     Domain    @relation(fields: [domainId], references: [id])
-
-  @@index([domainId, phase])
-  @@index([domainId])
-}
-
-model CommunityMiningResult {
-  id         Int      @id @default(autoincrement())
-  domainId   Int
-  keywordId  Int?
-  platform   String
-  insights   Json
-  sentiment  String?
-  frequency  Int?
-  tokenUsage Int?
-  createdAt  DateTime @default(now())
-  domain     Domain   @relation(fields: [domainId], references: [id])
-  keyword    Keyword? @relation(fields: [keywordId], references: [id])
-
-  @@index([domainId])
-  @@index([keywordId])
-}
-
-model SearchPatternResult {
-  id          Int      @id @default(autoincrement())
-  domainId    Int
-  keywordId   Int?
-  patterns    Json
-  volume      Int?
-  seasonality Json?
-  trends      Json?
-  tokenUsage  Int?
-  createdAt   DateTime @default(now())
-  domain      Domain   @relation(fields: [domainId], references: [id])
-  keyword     Keyword? @relation(fields: [keywordId], references: [id])
-
-  @@index([domainId])
-  @@index([keywordId])
-}
-
-model IntentClassificationResult {
-  id         Int      @id @default(autoincrement())
-  domainId   Int
-  keywordId  Int?
-  intent     String
-  confidence Int?
-  patterns   Json?
-  tokenUsage Int?
-  createdAt  DateTime @default(now())
-  domain     Domain   @relation(fields: [domainId], references: [id])
-  keyword    Keyword? @relation(fields: [keywordId], references: [id])
-
-  @@index([domainId])
-  @@index([keywordId])
-}
-
-model GeneratedIntentPhrase {
-  id                    Int                    @id @default(autoincrement())
-  domainId              Int
-  keywordId             Int?
-  phrase                String
-  relevanceScore        Int?
-  sources               Json?
-  trend                 String?
-  intent                String?
-  communityInsights     Json?
-  searchPatterns        Json?
-  isSelected            Boolean                @default(false)
-  tokenUsage            Int?
-  createdAt             DateTime               @default(now())
-  updatedAt             DateTime               @updatedAt
-  intentConfidence      Int?
-  aiQueryResults        AIQueryResult[]
-  domain                Domain                 @relation(fields: [domainId], references: [id])
-  keyword               Keyword?               @relation(fields: [keywordId], references: [id])
-  relevanceScoreResults RelevanceScoreResult[]
-
-  @@index([domainId])
-  @@index([keywordId])
-}
-
-model RelevanceScoreResult {
-  id         Int                    @id @default(autoincrement())
-  domainId   Int
-  phraseId   Int?
-  score      Int
-  breakdown  Json?
-  factors    Json?
-  tokenUsage Int?
-  createdAt  DateTime               @default(now())
-  domain     Domain                 @relation(fields: [domainId], references: [id])
-  phrase     GeneratedIntentPhrase? @relation(fields: [phraseId], references: [id])
-
-  @@index([domainId])
-  @@index([phraseId])
-}
-
-model NichePromptPattern {
+// Single competitor table. Replaces CompetitorAnalysis + SuggestedCompetitor + CompetitorTracking.
+// Each row is one verified-or-pending competitor company.
+model Competitor {
   id              Int      @id @default(autoincrement())
-  niche           String                   // e.g. "project management", "CRM", "email marketing"
-  template        String                   // e.g. "I need a {category} that {capability} for {constraint}"
-  retrievalFrame  String                   // category_formation | attribute_recall | procedural | evaluation | provider_comparison | trust | roi
-  buyerStage      String                   // awareness | consideration | decision
-  source          String?                  // e.g. "reddit_r/smallbusiness", "quora", "autocomplete"
-  realExample     String?                  // verbatim Reddit/Quora post title
-  variables       Json?                    // {category: {type, examples}, constraint: {type, examples}}
-  humannessScore  Float    @default(0)     // 0-1 based on pronoun usage, constraint count, word count
-  usageCount      Int      @default(0)     // times used across domains
-  mentionRate     Float?                   // avg % of times this pattern triggers brand mentions
+  domainId        Int
+  competitorHost  String   // normalized host
+  // 'serp' | 'overlap' | 'mention' | 'enrichment' | 'llm-rank'
+  source          String
+  // Raw payload from each discovery source (merged on conflict).
+  rawSignals      Json
+  verified        Boolean  @default(false)
+  industry        String?
+  location        String?
+  companySize     String?
+  similarityScore Float?   // 0..1, deterministic
+  threatLevel     String?  // High | Medium | Low (LLM-labelled)
+  rank            Int?     // final rank within domain
+  reasoning       String?  // one-line LLM justification
+  isSelected      Boolean  @default(false)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+  domain          Domain   @relation(fields: [domainId], references: [id], onDelete: Cascade)
 
-  @@index([niche])
-  @@index([retrievalFrame])
-  @@index([niche, retrievalFrame])
+  @@unique([domainId, competitorHost])
+  @@index([domainId, isSelected])
+  @@index([domainId, rank])
 }
 
-model RedditPattern {
-  id              Int      @id @default(autoincrement())
-  subreddit       String                   // e.g. "r/smallbusiness"
-  postTitle       String                   // original post title
-  postUrl         String?
-  postScore       Int      @default(0)
-  commentCount    Int      @default(0)
-  patternType     String                   // recommendation | comparison | troubleshooting | discovery | complaint
-  extractedPattern String?                 // structural pattern extracted from the post
-  niche           String                   // linked niche category
-  keywords        Json?                    // extracted keywords from the post
-  createdAt       DateTime @default(now())
+// Keywords. Cleaned from Keyword + KeywordAnalysis + GeneratedIntentPhrase.keywordId.
+model Keyword {
+  id         Int      @id @default(autoincrement())
+  domainId   Int
+  term       String
+  intent     String   // Informational | Commercial | Transactional | Navigational
+  source     String   // 'ai' | 'custom'
+  volume     Int?
+  difficulty String?  // Low | Medium | High
+  cpc        Float?
+  isSelected Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  domain     Domain   @relation(fields: [domainId], references: [id], onDelete: Cascade)
+  prompts    Prompt[]
 
-  @@index([niche])
-  @@index([subreddit])
-  @@index([patternType])
+  @@unique([domainId, term])
+  @@index([domainId, isSelected])
 }
 
-model GoogleSearchConsoleConnection {
-  id            Int      @id @default(autoincrement())
-  userId        Int      @unique
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  // Google account info
-  googleEmail   String?
-  googleUserId  String?
-  
-  // Encrypted tokens (refresh token should be encrypted)
-  accessToken   String
-  refreshToken  String   // Encrypted
-  tokenExpiry   DateTime
-  
-  // Selected GSC property
-  selectedProperty String? // e.g., "sc-domain:example.com" or "https://example.com/"
-  
-  // Connection status
-  isConnected   Boolean  @default(false)
-  lastSyncedAt DateTime?
-  
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  
-  @@index([userId])
+// Prompts. Each prompt is a discrete query we send to the LLM roster.
+// Metadata fields drive category-weighted scoring on the dashboard — without
+// them the audit can't separate "unbranded category recommendation" signal
+// from "branded sanity-check" noise.
+model Prompt {
+  id                 Int      @id @default(autoincrement())
+  domainId           Int
+  keywordId          Int?
+  text               String
+  intent             String?  // Informational | Commercial | Transactional | Navigational
+  source             String   // 'ai' | 'custom'
+  isSelected         Boolean  @default(false)
+  // ── Audit-research metadata (Soar / Profound / Ahrefs taxonomy) ────────
+  /// One of: unbranded_recommendation | top_n_listicle | alternatives_to_competitor
+  ///        | problem_statement | brand_vs_competitor | branded_trust
+  category           String?
+  /// Funnel position: awareness | consideration | decision
+  intentStage        String?
+  /// Persona that would naturally ask this prompt (e.g. "Series B SaaS founder").
+  persona            String?
+  /// Job-to-be-done / use case (e.g. "tracking team OKRs").
+  useCase            String?
+  /// Constraint qualifier (budget, scale, integration, vertical).
+  constraint         String?
+  /// True if the prompt explicitly names the user's brand.
+  isBranded          Boolean  @default(false)
+  /// Competitor host explicitly named in the prompt (alternatives / vs queries).
+  competitorMentioned String?
+  createdAt          DateTime @default(now())
+  domain             Domain   @relation(fields: [domainId], references: [id], onDelete: Cascade)
+  keyword            Keyword? @relation(fields: [keywordId], references: [id], onDelete: SetNull)
+  results            AiQueryResult[]
+
+  @@index([domainId, isSelected])
+  @@index([domainId, category])
+  @@index([keywordId])
 }
+
+// One run = one execution of the user's selected prompts × selected models.
+// Replaces AnalysisReport + DashboardAnalysis + ModelPerformance + PerformanceInsight.
+model AiRun {
+  id        Int       @id @default(autoincrement())
+  domainId  Int
+  startedAt DateTime  @default(now())
+  endedAt   DateTime?
+  status    String    @default("running") // running | completed | failed
+  // Aggregate scores: { presenceRate, avgRelevance, avgSentiment, avgOverall, perModel }
+  summary   Json?
+  domain    Domain    @relation(fields: [domainId], references: [id], onDelete: Cascade)
+  results   AiQueryResult[]
+
+  @@index([domainId, startedAt])
+}
+
+model AiQueryResult {
+  id                 Int      @id @default(autoincrement())
+  runId              Int
+  promptId           Int
+  model              String   // e.g. 'gpt-4o-mini', 'claude-3-5-haiku', 'gemini-1.5-flash'
+  response           String
+  presence           Int      @default(0) // 0 | 1
+  relevance          Int      @default(0) // 0..10 (always measurable — answer quality)
+  sentiment          Int?     // -10..10. NULL when presence=0 (no brand to measure sentiment toward)
+  accuracy           Int?     // 0..10. NULL when presence=0 (no claims to verify)
+  rankPosition       Int?     // 1-based position when brand appears in a numbered list; NULL otherwise
+  overall            Float    @default(0) // 0..10. Always 0 when presence=0
+  scorerSummary      String?  // one-line LLM summary of the brand mention (or absence)
+  factualClaims      Json?    // [{ claim, verdict: true|false|uncertain }] — claims about the brand the LLM made
+  competitorHosts    Json?    // string[] — competitor hosts mentioned (legacy / fast lookup)
+  // [{ url, title, host }] — every link or bare URL the model cited
+  citations          Json?
+  // [{ host, count, sentiment }] — per-competitor mention breakdown with sentiment
+  competitorMentions Json?
+  latencyMs          Int?
+  costUsd            Float?
+  createdAt          DateTime @default(now())
+  run                AiRun    @relation(fields: [runId], references: [id], onDelete: Cascade)
+  prompt             Prompt   @relation(fields: [promptId], references: [id], onDelete: Cascade)
+
+  @@index([runId])
+  @@index([promptId])
+}
+
+// -----------------------------------------------------------------------------
+// Blog / Campaign / Wordpress / GSC / Audit — preserved
+// (deprecated columns and frozen archive tables removed)
+// -----------------------------------------------------------------------------
+
 model Campaign {
   id          Int      @id @default(autoincrement())
   title       String
@@ -711,7 +280,7 @@ model Campaign {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   topics      CampaignTopic[]
-  
+
   @@index([domainId])
 }
 
@@ -720,77 +289,33 @@ enum CampaignNodeSource {
   AI
 }
 
-/// @deprecated Worksheet-model refactor flattened pillar/subpage into a single topic.
-/// Enum retained because frozen CampaignPage rows still reference it.
-enum CampaignPageType {
-  PILLAR
-  SUBPAGE
-}
-
 model CampaignTopic {
-  id          Int                @id @default(autoincrement())
-  campaignId  Int
-  campaign    Campaign           @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  title       String
-  description String?
-  /// Worksheet-model fields (added in flatten-topics migration). Replace data previously
-  /// stored on CampaignPage. Old CampaignPage rows remain in the DB for forensics but
-  /// are not read or written by application code.
-  summary     String?
-  aiSummary   String?
-  /// Latest draft for this topic. Was previously CampaignPage.latestDraftId.
+  id            Int                @id @default(autoincrement())
+  campaignId    Int
+  campaign      Campaign           @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  title         String
+  description   String?
+  summary       String?
+  aiSummary     String?
   latestDraftId Int?
-  latestDraft WordpressPublishLog? @relation("TopicLatestDraft", fields: [latestDraftId], references: [id])
-  /// Provenance: if this topic was split off from a CampaignPage during the flatten-topics
-  /// migration, this records the source page id. Null for topics created in the new model.
-  archivedFromPageId Int?
-  status      String             @default("active")
-  source      CampaignNodeSource @default(MANUAL)
-  order       Int                @default(0)
-  aiMetadata  Json?
-  createdAt   DateTime           @default(now())
-  updatedAt   DateTime           @updatedAt
-  /// @deprecated Frozen archive — retained for forensics, never written by new code.
-  pages       CampaignPage[]
-  keywords    CampaignKeyword[]
+  latestDraft   WordpressPublishLog? @relation("TopicLatestDraft", fields: [latestDraftId], references: [id])
+  status        String             @default("active")
+  source        CampaignNodeSource @default(MANUAL)
+  order         Int                @default(0)
+  aiMetadata    Json?
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+  keywords      CampaignKeyword[]
   generationJobs GenerationJob[]
 
   @@index([campaignId])
   @@index([latestDraftId])
 }
 
-/// @deprecated Frozen archive — pillar/subpage was replaced by the flat topic model.
-/// Rows are retained read-only for forensics. Application code must not write to this table.
-model CampaignPage {
-  id          Int                @id @default(autoincrement())
-  topicId     Int
-  topic       CampaignTopic      @relation(fields: [topicId], references: [id], onDelete: Cascade)
-  pageType    CampaignPageType   @default(PILLAR)
-  title       String
-  description String?
-  summary     String?
-  aiSummary   String?
-  status      String             @default("active")
-  source      CampaignNodeSource @default(MANUAL)
-  order       Int                @default(0)
-  aiMetadata  Json?
-  createdAt   DateTime           @default(now())
-  updatedAt   DateTime           @updatedAt
-  keywords    CampaignKeyword[]
-  latestDraftId Int?
-  latestDraft WordpressPublishLog? @relation("PageLatestDraft", fields: [latestDraftId], references: [id])
-
-  @@index([topicId])
-}
-
 model CampaignKeyword {
   id         Int                @id @default(autoincrement())
-  /// Worksheet-model link. Always set by new code. Nullable for legacy rows only.
-  topicId    Int?
-  topic      CampaignTopic?     @relation(fields: [topicId], references: [id], onDelete: Cascade)
-  /// @deprecated Use topicId. Retained for forensics on legacy rows.
-  pageId     Int?
-  page       CampaignPage?      @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  topicId    Int
+  topic      CampaignTopic      @relation(fields: [topicId], references: [id], onDelete: Cascade)
   term       String
   volume     Int?
   difficulty String?
@@ -801,39 +326,115 @@ model CampaignKeyword {
   createdAt  DateTime           @default(now())
   updatedAt  DateTime           @updatedAt
 
-  @@unique([term, topicId, pageId])
+  @@unique([term, topicId])
   @@index([topicId])
-  @@index([pageId])
+}
+
+model WordpressIntegration {
+  id              Int       @id @default(autoincrement())
+  userId          Int       @unique
+  siteUrl         String
+  username        String
+  password        String
+  lastPublishedAt DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  publishLogs     WordpressPublishLog[]
+}
+
+model WordpressPublishLog {
+  id                       Int      @id @default(autoincrement())
+  userId                   Int
+  wordpressUrl             String
+  wordpressPostId          Int?
+  primaryKeyword           String?
+  normalizedPrimaryKeyword String?
+  generationJobId          String?
+  generationTopicId        Int?
+  title                    String?
+  slug                     String?
+  status                   String?
+  response                 Json?
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @default(now()) @updatedAt
+  integrationId            Int?
+  user                     User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  integration              WordpressIntegration? @relation(fields: [integrationId], references: [id])
+  campaignTopics           CampaignTopic[]       @relation("TopicLatestDraft")
+
+  @@index([userId])
+  @@index([generationJobId])
+  @@index([generationJobId, normalizedPrimaryKeyword])
+  @@index([generationTopicId])
+}
+
+model GenerationJob {
+  id        Int      @id @default(autoincrement())
+  jobId     String   @unique
+  topicId   Int
+  userId    Int
+  status    String   @default("pending") // pending | generating | completed | failed
+  progress  Int      @default(0)         // 0..100
+  phase     String?
+  error     String?
+  draftId   Int?
+  startedAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  topic     CampaignTopic @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([topicId])
+  @@index([userId])
+  @@index([userId, status])
+}
+
+model GoogleSearchConsoleConnection {
+  id               Int       @id @default(autoincrement())
+  userId           Int       @unique
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  googleEmail      String?
+  googleUserId     String?
+  accessToken      String
+  refreshToken     String    // encrypted
+  tokenExpiry      DateTime
+  selectedProperty String?
+  isConnected      Boolean   @default(false)
+  lastSyncedAt     DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@index([userId])
 }
 
 model AuditResult {
-  id             Int      @id @default(autoincrement())
-  domainId       Int      @unique
-  performance    Float
-  seo            Float
-  accessibility  Float
-  bestPractices  Float
-  pwa            Float
-  audits         Json
-  screenshotUrl  String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-  domain         Domain   @relation(fields: [domainId], references: [id], onDelete: Cascade)
-  n8nRequests    N8nRequest[]
+  id            Int          @id @default(autoincrement())
+  domainId      Int          @unique
+  performance   Float
+  seo           Float
+  accessibility Float
+  bestPractices Float
+  pwa           Float
+  audits        Json
+  screenshotUrl String?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  domain        Domain       @relation(fields: [domainId], references: [id], onDelete: Cascade)
+  n8nRequests   N8nRequest[]
 
   @@index([domainId])
 }
 
 model N8nRequest {
-  id             Int      @id @default(autoincrement())
-  requestId      String   @unique @default(uuid())
+  id             Int         @id @default(autoincrement())
+  requestId      String      @unique @default(uuid())
   auditResultId  Int
   auditResult    AuditResult @relation(fields: [auditResultId], references: [id], onDelete: Cascade)
-  status         String   @default("pending")  // pending | processing | completed | failed
+  status         String      @default("pending") // pending | processing | completed | failed
   requestPayload Json
   responseData   Json?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
 
   @@index([auditResultId])
   @@index([requestId])

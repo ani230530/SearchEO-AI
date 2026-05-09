@@ -357,16 +357,16 @@ export class AuthService {
           select: {
             id: true,
             url: true,
-            context: true,
+            host: true,
             createdAt: true,
             _count: {
               select: {
                 keywords: true,
-                crawlResults: true
-              }
-            }
-          }
-        }
+                crawls: true,
+              },
+            },
+          },
+        },
       }
     });
   }

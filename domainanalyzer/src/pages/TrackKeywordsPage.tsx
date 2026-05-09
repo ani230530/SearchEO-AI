@@ -187,7 +187,7 @@ const TrackKeywordsPage = () => {
 
       try {
         let realId = unmaskDomainId(maskedDomainId);
-        const domainsResp = await apiGet<DashboardAllResponse>("/dashboard/all");
+        const domainsResp = await apiGet<DashboardAllResponse>("/wizard/domains");
         const domains = domainsResp?.domains || [];
         setAllDomains(domains);
 

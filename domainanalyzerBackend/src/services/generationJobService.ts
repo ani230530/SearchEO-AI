@@ -300,7 +300,18 @@ async function runGenerationJob(jobId: string, input: RunGenerationInput): Promi
     },
     include: {
       keywords: true,
-      campaign: { include: { domain: true } },
+      // Pull the domain plus its inferred profile + latest crawl, so brand
+      // description has a real source under the new schema.
+      campaign: {
+        include: {
+          domain: {
+            include: {
+              inferred: { select: { summary: true } },
+              crawls: { orderBy: { createdAt: 'desc' }, take: 1, select: { rawText: true } },
+            },
+          },
+        },
+      },
     },
   });
 
@@ -363,7 +374,11 @@ async function runGenerationJob(jobId: string, input: RunGenerationInput): Promi
       primaryKeyword: primary.term,
       longtailKeywords: longtails,
       brandName: sanitizeDomainHost(topic.campaign.domain.url) || 'Brand',
-      brandDescription: summarizeContext(topic.campaign.domain.context),
+      brandDescription: summarizeContext(
+        topic.campaign.domain.inferred?.summary
+        ?? topic.campaign.domain.crawls[0]?.rawText
+        ?? null,
+      ),
       targetAudience: String(body.target_audience ?? ''),
       customAudienceText: body.custom_audience_text as string | undefined,
       tone: String(body.tone ?? ''),

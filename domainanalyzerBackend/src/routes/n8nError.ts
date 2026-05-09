@@ -93,59 +93,35 @@ router.post('/error', async (req: Request, res: Response) => {
             }));
         }
 
-        // 3. Mark GenerationJobPage entries as failed
-        const jobPages = await prisma.generationJobPage.findMany({ where: { jobId } });
-        if (jobPages.length > 0) {
-            await prisma.generationJobPage.updateMany({
-                where: { jobId },
-                data: {
-                    status: 'failed',
-                    error: errorMessage,
-                    progress: 0,
-                    hasHtml: false
-                }
-            });
-
-            // Update main job status to 'failed'
+        // 3. Mark the GenerationJob itself as failed (flat-topic model — no per-page rows).
+        const job = await prisma.generationJob.findUnique({
+            where: { jobId },
+            select: { topicId: true },
+        });
+        if (job) {
             await prisma.generationJob.update({
                 where: { jobId },
-                data: { status: 'failed' }
+                data: { status: 'failed', error: errorMessage, progress: 0 },
             });
         }
 
-        // 4. Broadcast error to user via SSE
-        // We send a 'n8n_error' event or just a 'drafts' update with failed status
-        // Sending a specific error event is better for toasts
+        // 4. Broadcast error to user via SSE.
         broadcastToUser(userId, {
             type: 'n8n_error',
             jobId,
             error: errorMessage,
             details: errorDetails,
-            timestamp: new Date().toISOString()
+            timestamp: new Date().toISOString(),
         });
 
-        // Also broadcast updated drafts status so UI updates the rows
-        if (jobPages.length > 0) {
-            // We need to map pages to the format expected by frontend
-            // For simplicity, we just trigger a status refresh or send pages with 'failed' status
-            const topicId = await prisma.generationJob.findUnique({
-                where: { jobId },
-                select: { topicId: true }
-            }).then(j => j?.topicId);
-
-            if (topicId) {
-                broadcastToUser(userId, {
-                    type: 'drafts',
-                    jobId,
-                    topicId,
-                    pages: jobPages.map(p => ({
-                        pageId: p.pageId,
-                        pageType: p.pageType,
-                        status: 'failed',
-                        error: errorMessage
-                    }))
-                });
-            }
+        if (job?.topicId) {
+            broadcastToUser(userId, {
+                type: 'drafts',
+                jobId,
+                topicId: job.topicId,
+                status: 'failed',
+                error: errorMessage,
+            });
         }
 
         console.log(`[n8n-error] Processed error for job ${jobId}, broadcast to user ${userId}`);

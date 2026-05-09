@@ -53,21 +53,22 @@ import {
 } from "@/components/ui/table";
 
 export type PromptModelResult = {
-  accuracy?: number;
+  accuracy?: number | null;
   citations?: Array<{ title?: string; url: string; citedText?: string; snippet?: string; content?: string }>;
   id: string;
   model: string;
-  overall?: number;
+  overall?: number | null;
   phrase?: string;
   presence?: number;
   relevance?: number;
   response?: string;
-  sentiment?: number;
+  sentiment?: number | null;  // null when presence=0 (not mentioned)
   sources?: string[];
 };
 
 export type PromptTableRow = {
-  avgSentiment: number;
+  /** Average sentiment ON A 0..10 SCALE — null if no model in this row mentioned the brand. */
+  avgSentiment: number | null;
   bestRank: number;
   competitorCount: number;
   competitors: string[];
@@ -112,15 +113,50 @@ const getSentimentColor = (sentiment: string) => {
   return "bg-slate-50 text-slate-500 border border-slate-200";
 };
 
+/**
+ * Real-asset model icons (PNG/SVG in /report-icons/) — replaces the previous
+ * lucide-react placeholder shapes. Falls back to a neutral lucide icon if
+ * we hit a model id we don't recognise.
+ */
+const MODEL_ICON_SRC: Array<{ test: RegExp; src: string }> = [
+  { test: /gpt|openai|chatgpt/i, src: "/report-icons/chat-gpt.svg" },
+  { test: /claude|anthropic/i,   src: "/report-icons/claude.svg" },
+  { test: /gemini|google/i,      src: "/report-icons/gemini.svg" },
+];
+
+/** Human-friendly label for a model id. */
+const MODEL_LABELS: Record<string, string> = {
+  "gpt-4o-mini": "ChatGPT",
+  "openai/gpt-4o-mini": "ChatGPT",
+  "claude-3-5-haiku": "Claude",
+  "claude-sonnet-4-5": "Claude",
+  "anthropic/claude-3.5-haiku": "Claude",
+  "gemini-2.0-flash": "Gemini",
+  "gemini-1.5-flash": "Gemini",
+  "google/gemini-2.0-flash-001": "Gemini",
+};
+
+const getModelLabel = (model?: string): string => {
+  if (!model) return "Unknown model";
+  if (MODEL_LABELS[model]) return MODEL_LABELS[model];
+  const lower = model.toLowerCase();
+  if (/gpt|openai/.test(lower)) return "ChatGPT";
+  if (/claude|anthropic/.test(lower)) return "Claude";
+  if (/gemini|google/.test(lower)) return "Gemini";
+  if (/deep/.test(lower)) return "DeepSeek";
+  // last resort: humanise the slug
+  return model.replace(/[-_/]/g, " ");
+};
+
 const getModelIcon = (model?: string, size: "sm" | "md" = "sm") => {
-  const className = size === "md" ? "h-4.5 w-4.5" : "h-4 w-4";
-  if (!model) return <Bot className={`${className} text-gray-400`} />;
-  const normalized = model.toLowerCase();
-  if (normalized.includes("gpt")) return <Bot className={`${className} text-[#16a34a]`} />;
-  if (normalized.includes("claude")) return <Sparkles className={`${className} text-[#d97706]`} />;
-  if (normalized.includes("gemini")) return <Globe2 className={`${className} text-[#2563eb]`} />;
-  if (normalized.includes("deep")) return <Zap className={`${className} text-[#4f46e5]`} />;
-  return <Zap className={`${className} text-purple-500`} />;
+  const px = size === "md" ? "h-5 w-5" : "h-4 w-4";
+  if (model) {
+    const match = MODEL_ICON_SRC.find((m) => m.test.test(model));
+    if (match) {
+      return <img src={match.src} alt="" aria-hidden className={`${px} object-contain`} />;
+    }
+  }
+  return <Bot className={`${px} text-slate-400`} />;
 };
 
 const getDisplayUrl = (value: string) => {
@@ -225,30 +261,123 @@ const PromptVisibilityComparisonGraph = ({ results }: { results: ProcessedPrompt
   );
 };
 
-const CitationCard = () => (
-  <div className="rounded-[6px] border border-[#e2e8f0] p-2.5 bg-white">
-    <h4 className="text-[10px] font-semibold text-[#334155] mb-1.5 leading-snug">
-      Understanding G2 Reviews: A<br />Comprehensive Guide
-    </h4>
-    <p className="text-[8.5px] text-[#94a3b8] leading-[1.4] mb-2.5">
-      G2 reviews revolutionize business software by offering real-world insights into tools' performance, user experience, and satisfaction. Their transparency helps businesses make informed ...
-    </p>
-    <div className="flex gap-1.5">
-      <div className="inline-flex items-center gap-1 bg-[#eff6ff] text-[#3b82f6] px-2 py-1 rounded-[4px] text-[8px] font-medium">
-        Visit Source <Link2 className="h-2 w-2" />
+/**
+ * Single citation card — renders a real link the model returned. Logo
+ * comes from logo.dev based on the citation's host so every source has a
+ * consistent favicon-style avatar.
+ */
+type CitationLike = {
+  url?: string;
+  title?: string | null;
+  host?: string | null;
+  type?: "direct" | "indirect";
+  snippet?: string | null;
+  citedText?: string | null;
+};
+
+const hostFromCitation = (c: CitationLike): string => {
+  if (c.host) return c.host;
+  if (!c.url) return "";
+  try {
+    return new URL(c.url).hostname.replace(/^www\./, "");
+  } catch {
+    return "";
+  }
+};
+
+const CitationCard = ({ citation }: { citation: CitationLike }) => {
+  const host = hostFromCitation(citation);
+  const logo = host ? `https://img.logo.dev/${host}?token=pk_DTdFFG1JT9WOCjATvZEzIA&size=64` : null;
+  const title = citation.title?.trim() || host || "Source";
+  const blurb = (citation.snippet || citation.citedText || "")?.toString().trim();
+  return (
+    <a
+      href={citation.url ?? `https://${host}`}
+      target="_blank"
+      rel="noreferrer"
+      className="group block rounded-[10px] border border-slate-200 bg-white p-3 transition hover:border-slate-300 hover:shadow-sm"
+    >
+      <div className="flex items-start gap-2.5">
+        {logo ? (
+          <img
+            src={logo}
+            alt=""
+            aria-hidden
+            className="h-7 w-7 shrink-0 rounded-md object-contain bg-slate-50"
+            onError={(e) => ((e.currentTarget as HTMLImageElement).style.display = "none")}
+          />
+        ) : (
+          <span className="grid h-7 w-7 shrink-0 place-items-center rounded-md bg-slate-50 text-slate-400">
+            <Link2 className="h-3.5 w-3.5" />
+          </span>
+        )}
+        <div className="min-w-0 flex-1">
+          <p className="text-[12px] font-semibold text-slate-900 leading-snug line-clamp-2">{title}</p>
+          {host ? <p className="mt-0.5 text-[10px] text-slate-400">{host}</p> : null}
+        </div>
+        <ExternalLink className="h-3.5 w-3.5 shrink-0 text-slate-300 transition group-hover:text-blue-500" />
       </div>
-      <div className="inline-flex items-center gap-1 border border-[#e2e8f0] text-[#64748b] px-2 py-1 rounded-[4px] text-[8px] font-medium">
-        In-Direct Citation
+      {blurb ? (
+        <p className="mt-2 text-[11px] text-slate-500 leading-relaxed line-clamp-2">{blurb}</p>
+      ) : null}
+      <div className="mt-2 flex items-center gap-1.5">
+        <span
+          className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ${
+            citation.type === "indirect"
+              ? "border border-slate-200 bg-slate-50 text-slate-500"
+              : "bg-blue-50 text-blue-600"
+          }`}
+        >
+          {citation.type === "indirect" ? "Indirect" : "Direct citation"}
+        </span>
       </div>
-    </div>
-  </div>
-);
+    </a>
+  );
+};
+
+/**
+ * Per-competitor mention pill. Renders the brand's logo + name; intent is
+ * to match the "Direct citation" pill density so the right column feels
+ * like one composed list rather than two stacked feeds.
+ */
+const CompetitorPill = ({ host, name, sentiment }: { host: string; name?: string | null; sentiment?: number | null }) => {
+  const logo = host ? `https://img.logo.dev/${host}?token=pk_DTdFFG1JT9WOCjATvZEzIA&size=64` : null;
+  const tone =
+    typeof sentiment === "number"
+      ? sentiment > 2
+        ? "text-emerald-700 bg-emerald-50 border-emerald-200"
+        : sentiment < -2
+          ? "text-rose-700 bg-rose-50 border-rose-200"
+          : "text-slate-700 bg-slate-50 border-slate-200"
+      : "text-slate-700 bg-slate-50 border-slate-200";
+  return (
+    <a
+      href={host ? `https://${host}` : "#"}
+      target="_blank"
+      rel="noreferrer"
+      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium transition hover:shadow-sm ${tone}`}
+    >
+      {logo ? (
+        <img
+          src={logo}
+          alt=""
+          aria-hidden
+          className="h-3.5 w-3.5 rounded-full object-contain"
+          onError={(e) => ((e.currentTarget as HTMLImageElement).style.display = "none")}
+        />
+      ) : null}
+      <span>{name ?? host}</span>
+    </a>
+  );
+};
 
 const PromptAIResponsePanel = ({
+  phrase,
   results,
   selectedModel,
   setSelectedModel,
 }: {
+  phrase: string;
   results: ProcessedPromptResult[];
   selectedModel: string;
   setSelectedModel: (value: string) => void;
@@ -257,89 +386,88 @@ const PromptAIResponsePanel = ({
 
   if (!activeResult) return null;
 
+  // The scorer attaches per-competitor mentions to each row; types.ts only
+  // declares the legacy fields, so we read the extra payload defensively.
+  const mentions = ((activeResult as unknown as { competitorMentions?: Array<{ host?: string; name?: string | null; sentiment?: number | null }> }).competitorMentions) ?? [];
+  const citations = (activeResult.citations ?? []) as CitationLike[];
+
   return (
-    <div className="flex flex-col gap-2.5 rounded-[8px] border border-[#e2e8f0] bg-white p-3.5 h-[246px]">
-      <div className="flex items-center justify-between pb-0.5">
-        <h4 className="text-[12px] font-semibold leading-none text-[#334155]">AI Response</h4>
-        <div className="flex items-center gap-2">
-          <span className="text-[9px] font-medium text-[#64748b]">Select Model</span>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="outline"
-                className="h-[22px] min-w-[90px] justify-between rounded-[4px] border-[#cbd5e1] bg-white px-2 text-[9px] font-medium text-[#475569] shadow-none"
-              >
-                <span className="flex items-center gap-1.5">
-                  <Bot className="h-3 w-3 text-[#10b981]" />
-                  {selectedModel}
-                </span>
-                <ChevronDown className="h-3 w-3 text-[#94a3b8]" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-[160px] p-1.5">
-              {results.map((result) => (
-                <DropdownMenuItem
-                  key={result.id}
-                  onClick={() => setSelectedModel(result.model)}
-                  className={`flex items-center gap-2 rounded-md px-2 py-1.5 text-[10px] font-medium ${
-                    result.model === selectedModel ? "bg-gray-50" : ""
-                  }`}
-                >
-                  {getModelIcon(result.model, "sm")}
-                  {result.model}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
+    <div className="flex h-full flex-col rounded-[12px] border border-slate-200 bg-white">
+      {/* Header — model picker on the right, prompt title on the left. */}
+      <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-3">
+        <div className="min-w-0">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-400">Response</p>
+          <p className="truncate text-[13px] font-medium text-slate-700">{phrase}</p>
         </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="outline"
+              className="h-8 shrink-0 gap-2 rounded-lg border-slate-200 bg-white px-2.5 text-[12px] font-medium text-slate-600 shadow-none hover:bg-slate-50"
+            >
+              {getModelIcon(activeResult.model, "sm")}
+              <span>{getModelLabel(activeResult.model)}</span>
+              <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-[180px] p-1">
+            {results.map((result) => (
+              <DropdownMenuItem
+                key={result.id}
+                onClick={() => setSelectedModel(result.model)}
+                className={`flex items-center gap-2 rounded-md px-2 py-1.5 text-[12px] font-medium ${
+                  result.model === selectedModel ? "bg-slate-50" : ""
+                }`}
+              >
+                {getModelIcon(result.model, "sm")}
+                {getModelLabel(result.model)}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
-      <div className="grid grid-cols-[1.6fr_1fr] gap-3 flex-1 overflow-hidden">
-        {/* Left: AI Response Content */}
-        <div className="relative rounded-[6px] bg-[#f8fafc] p-3 pr-5 overflow-y-auto scrollbar-none">
-          <h3 className="mb-2 text-[12px] font-semibold text-[#1e293b]">
-            Free Trial Options for Prototyping Software
-          </h3>
-          <div className="text-[8.5px] leading-[1.5] text-[#64748b]">
-            <p className="mb-2.5">
-              Prototyping software is essential for designers and developers to visualize and test their ideas before full-scale development. Many prototyping tools offer free.
+      {/* Body — response on the left, citations + competitors on the right.
+          Stacks on mobile, side-by-side from `lg` up. */}
+      <div className="flex flex-1 flex-col overflow-hidden lg:grid lg:grid-cols-[1.4fr_1fr]">
+        <div className="min-h-[260px] flex-1 overflow-y-auto px-4 py-4 lg:max-h-[420px] lg:border-r lg:border-slate-100 custom-scrollbar">
+          {activeResult.response?.trim() ? (
+            <article className="prose prose-sm prose-slate max-w-none prose-headings:font-semibold prose-headings:text-slate-900 prose-h1:text-[15px] prose-h2:text-[14px] prose-h3:text-[13px] prose-p:text-[13px] prose-p:leading-relaxed prose-p:text-slate-700 prose-li:text-[13px] prose-li:text-slate-700 prose-a:text-blue-600 prose-a:no-underline hover:prose-a:underline prose-strong:text-slate-900 prose-code:rounded prose-code:bg-slate-100 prose-code:px-1 prose-code:py-0.5 prose-code:text-[12px] prose-code:font-medium prose-code:text-slate-800">
+              <ReactMarkdown>{activeResult.response}</ReactMarkdown>
+            </article>
+          ) : (
+            <p className="text-[13px] italic text-slate-400">
+              {activeResult.mentioned ? "No response captured." : "This model didn't mention your brand."}
             </p>
-            <h4 className="mb-2 text-[9px] font-semibold text-[#475569]">
-              Popular Prototyping Tools with Free Trials
-            </h4>
-            <div className="space-y-2.5">
-              <div>
-                <p className="mb-1 font-semibold text-[#334155]">1. Figma</p>
-                <ul className="mb-2 list-outside list-disc space-y-1 pl-4">
-                  <li>
-                    Free Trial/Plan: <span className="text-[#3b82f6]">Figma</span> offers a free plan that includes basic prototyping features, which is ideal for individuals or small teams.
-                  </li>
-                  <li>
-                    Features: Collaborative design, vector networks, and prototyping capabilities.
-                  </li>
-                </ul>
-                <div className="flex items-center gap-1.5 mt-2">
-                  <div className="inline-flex items-center gap-1 rounded-[4px] bg-[#eff6ff] px-1.5 py-1 text-[8px] font-medium text-[#3b82f6]">
-                    Figma <ExternalLink className="h-2 w-2" />
-                  </div>
-                  <div className="inline-flex items-center gap-1 rounded-[4px] bg-[#eff6ff] px-1.5 py-1 text-[8px] font-medium text-[#3b82f6]">
-                    Figma's Free Plan <ExternalLink className="h-2 w-2" />
-                  </div>
-                </div>
-              </div>
-              <div>
-                <p className="font-semibold text-[#334155]">2. Adobe XD</p>
-              </div>
-            </div>
-          </div>
-          {/* Scrollbar Mock */}
-          <div className="absolute bottom-3 right-1 top-3 w-[3px] rounded-full bg-[#cbd5e1] opacity-60"></div>
+          )}
         </div>
 
-        {/* Right: Citations */}
-        <div className="flex flex-col gap-2 overflow-y-auto scrollbar-none">
-          <CitationCard />
-          <CitationCard />
+        <div className="min-h-[140px] flex-1 overflow-y-auto px-4 py-4 lg:max-h-[420px] custom-scrollbar">
+          {mentions.length > 0 ? (
+            <section className="mb-4">
+              <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-400">
+                Competitors mentioned
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {mentions.map((m, i) => (
+                  <CompetitorPill key={`${m.host ?? m.name ?? "c"}-${i}`} host={m.host ?? ""} name={m.name ?? null} sentiment={m.sentiment ?? null} />
+                ))}
+              </div>
+            </section>
+          ) : null}
+
+          <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-400">
+            Sources cited ({citations.length})
+          </p>
+          {citations.length > 0 ? (
+            <div className="flex flex-col gap-2">
+              {citations.map((c, i) => (
+                <CitationCard key={`${c.url ?? c.host ?? "src"}-${i}`} citation={c} />
+              ))}
+            </div>
+          ) : (
+            <p className="text-[12px] italic text-slate-400">No sources cited in this response.</p>
+          )}
         </div>
       </div>
     </div>
@@ -669,28 +797,51 @@ export const PromptTable = ({
                       {row.sov}
                     </TableCell>
                     <TableCell className="px-2 py-3">
+                      {/* Coverage = how many models out of total mentioned the brand */}
                       <Badge
                         variant="outline"
-                        className="rounded-full border-[#a8dab5] bg-[#e6f4ea] text-[#1e8e3e] px-2.5 py-[2px] text-[10px] font-medium tracking-normal shadow-sm"
+                        className={`rounded-full px-2.5 py-[2px] text-[10px] font-medium tracking-normal shadow-sm ${
+                          row.mentions === 0
+                            ? "border-slate-200 bg-slate-50 text-slate-500"
+                            : row.mentions === row.results.length
+                              ? "border-[#a8dab5] bg-[#e6f4ea] text-[#1e8e3e]"
+                              : "border-amber-200 bg-amber-50 text-amber-700"
+                        }`}
                       >
-                        {row.mentions > 0 ? "Yes" : "No"}
+                        {row.mentions === 0 ? "0 of " + row.results.length : `${row.mentions}/${row.results.length} models`}
                       </Badge>
                     </TableCell>
                     <TableCell className="px-2 py-3 text-[11px] font-medium text-slate-600">
-                      {row.bestRank}/{row.results.length}
+                      {/* Ranking = best position in any ranked list (lower = better).
+                          Falls back to "—" if the brand never appeared in a list. */}
+                      {(() => {
+                        const positions = row.results
+                          .map((r: any) => r.rankPosition)
+                          .filter((p: any): p is number => typeof p === "number" && p > 0);
+                        if (positions.length === 0) return <span className="text-slate-400">—</span>;
+                        return <span>#{Math.min(...positions)}</span>;
+                      })()}
                     </TableCell>
                     <TableCell className="px-2 py-3">
                       <span className="text-[11px] font-medium text-slate-600">500</span>
                     </TableCell>
                     <TableCell className="px-2 py-3">
-                      <Badge
-                        variant="outline"
-                        className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${getSentimentColor(
-                          row.avgSentiment > 7 ? "Positive" : row.avgSentiment > 4 ? "Neutral" : "Negative"
-                        )}`}
-                      >
-                        {row.avgSentiment > 7 ? "Positive" : row.avgSentiment > 4 ? "Neutral" : "Negative"}
-                      </Badge>
+                      {row.avgSentiment === null || row.mentions === 0 ? (
+                        // No model mentioned the brand → there's no sentiment
+                        // to measure. Honest display instead of a fake badge.
+                        <span className="text-[10px] font-medium text-slate-400 italic">
+                          Not mentioned
+                        </span>
+                      ) : (
+                        <Badge
+                          variant="outline"
+                          className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${getSentimentColor(
+                            row.avgSentiment > 7 ? "Positive" : row.avgSentiment >= 4 ? "Neutral" : "Negative"
+                          )}`}
+                        >
+                          {row.avgSentiment > 7 ? "Positive" : row.avgSentiment >= 4 ? "Neutral" : "Negative"}
+                        </Badge>
+                      )}
                     </TableCell>
                     <TableCell className="px-4 py-3 text-right">
                       <div className="flex justify-end gap-2">

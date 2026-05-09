@@ -2531,17 +2531,22 @@ useEffect(() => {
     >
       <style>{`
         .sidebar {
+          /* Anchor to all four viewport edges (top + bottom instead of an
+             explicit height) so the rail stays glued to the viewport even
+             when the page content scrolls below it. Avoids the iOS quirk
+             where 100vh shifts when the URL bar collapses. */
           position: fixed;
-          left: 0;
           top: 0;
-          height: 100vh;
+          bottom: 0;
+          left: 0;
           width: 280px;
           background: rgba(255, 255, 255, 0.72);
           border-right: 1px solid #d9dde3;
           z-index: 50;
           transition: width 0.26s ease, transform 0.26s ease;
-          overflow-y: auto;
-          transform: translateX(0);
+          /* The rail itself never scrolls; if the section list outgrows the
+             viewport the fix belongs upstream (sub-menus). */
+          overflow: hidden;
         }
 
         .sidebar.open {
