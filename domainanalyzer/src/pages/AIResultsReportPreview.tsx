@@ -1750,6 +1750,30 @@ type WorksheetOption = {
   description: string | null;
 };
 
+// Payload threaded from a phrase / opportunity row click through the
+// worksheet picker into the actual /from-opportunity + n8n calls.
+// Defined at module scope so the useState for pendingGeneration can
+// reference it without TDZ ordering issues inside the component.
+type GenerationPayload = {
+  kind: 'opportunity' | 'phrase';
+  title: string;
+  rationale: string;
+  primaryKeyword: string | null;
+  longtailKeywords: string[];
+  suggestedTemplate: 'blog' | 'landing_page' | 'case_study' | 'faq';
+  category: string | null;
+  intentStage: string | null;
+  recommendedAngle?: string;
+  brief?: {
+    audience?: string;
+    tone?: 'Authoritative' | 'Helpful' | 'Conversational' | 'Technical';
+    structure?: string;
+    keyPoints?: string[];
+    wordCount?: number;
+    cta?: string;
+  };
+};
+
 type WorksheetPickerModalProps = {
   open: boolean;
   selectedCount: number;
@@ -1975,6 +1999,100 @@ const AIResultsReportPreview = () => {
       setIsWorksheetModalOpen(true);
     },
     [selectedRowIds]
+  );
+
+  // ── Generate-Content lifecycle ─────────────────────────────────────────
+  // Each opportunity / Lost-or-At-risk phrase row carries a stable `key`
+  // (opportunity.key for opportunities, `phrase:${promptId}` for phrases).
+  // We track per-key generation state so multiple rows can run in parallel.
+  // NOTE: declared HERE (above handleAddToWorksheet) so the worksheet
+  // handlers can read pendingGeneration / runGeneration without TDZ
+  // ("Cannot access 'qe' before initialization") in the deps array.
+  const [generationByKey, setGenerationByKey] = useState<Record<string, GenerationState>>({});
+  const [pendingGeneration, setPendingGeneration] = useState<{ key: string; payload: GenerationPayload } | null>(null);
+
+  const runGeneration = useCallback(
+    async (key: string, payload: GenerationPayload, campaignId: number | null) => {
+      if (!reportData?.domainInfo?.id) return;
+      setGenerationByKey((prev) => ({ ...prev, [key]: { kind: 'submitting' } }));
+      try {
+        const built = await apiPost<{ topicId: number; campaignId: number }>(
+          '/campaigns/topics/from-opportunity',
+          {
+            domainId: reportData.domainInfo.id,
+            opportunityKey: key,
+            campaignId,
+            title: payload.title,
+            rationale: payload.rationale,
+            primaryKeyword: payload.primaryKeyword,
+            longtailKeywords: payload.longtailKeywords,
+            suggestedTemplate: payload.suggestedTemplate,
+            recommendedAngle: payload.recommendedAngle,
+            brief: payload.brief,
+          }
+        );
+
+        const audience = payload.brief?.audience?.trim();
+        const tone =
+          payload.brief?.tone ?? (payload.category === 'branded_trust' ? 'Conversational' : 'Authoritative');
+        const wordCount =
+          payload.brief?.wordCount ??
+          (payload.suggestedTemplate === 'landing_page'
+            ? 1400
+            : payload.suggestedTemplate === 'blog'
+              ? 1000
+              : 800);
+        const cta = payload.brief?.cta?.trim();
+        const topicBriefLines: string[] = [payload.title];
+        if (payload.recommendedAngle) topicBriefLines.push(`Angle: ${payload.recommendedAngle}`);
+        if (payload.brief?.structure) topicBriefLines.push(`Structure: ${payload.brief.structure}`);
+        if (payload.brief?.keyPoints && payload.brief.keyPoints.length > 0) {
+          topicBriefLines.push(`Cover:\n- ${payload.brief.keyPoints.join('\n- ')}`);
+        }
+        const topicBrief = topicBriefLines.join('\n\n');
+
+        const genJson = await apiPost<{ job?: { jobId: string; progress: number; phase: string | null } }>(
+          `/campaigns/topics/${built.topicId}/generate`,
+          {
+            template_type: payload.suggestedTemplate,
+            project_name: reportData.domainInfo.companyName ?? reportData.domainInfo.host,
+            project_goal: payload.rationale,
+            target_audience: 'Custom',
+            custom_audience_text: audience ?? payload.intentStage ?? 'general buyer',
+            tone,
+            word_count: wordCount,
+            language: 'en',
+            cta,
+            templateFields: { topic: topicBrief },
+          }
+        );
+
+        if (genJson.job?.jobId) {
+          setGenerationByKey((prev) => ({
+            ...prev,
+            [key]: { kind: 'running', jobId: genJson.job!.jobId, progress: genJson.job!.progress, phase: genJson.job!.phase },
+          }));
+        } else {
+          setGenerationByKey((prev) => ({ ...prev, [key]: { kind: 'done', draftId: null } }));
+        }
+      } catch (err) {
+        setGenerationByKey((prev) => ({
+          ...prev,
+          [key]: { kind: 'failed', error: err instanceof Error ? err.message : 'Generation failed' },
+        }));
+      }
+    },
+    [reportData]
+  );
+
+  const handleGenerateContent = useCallback(
+    (key: string, payload: GenerationPayload) => {
+      if (!reportData?.domainInfo?.id) return;
+      setPendingGeneration({ key, payload });
+      setActiveWorksheetId(null);
+      setIsWorksheetModalOpen(true);
+    },
+    [reportData]
   );
 
   const handleWorksheetModalOpenChange = useCallback((open: boolean) => {
@@ -2502,128 +2620,6 @@ const AIResultsReportPreview = () => {
       setOpportunitiesRetrying(false);
     }
   }, [maskedDomainId, selectedRunId]);
-
-  // ── Generate-Content lifecycle ─────────────────────────────────────────
-  // Each opportunity / Lost-or-At-risk phrase row carries a stable `key`
-  // (opportunity.key for opportunities, `phrase:${promptId}` for phrases).
-  // We track per-key generation state so multiple rows can run in parallel.
-  const [generationByKey, setGenerationByKey] = useState<Record<string, GenerationState>>({});
-
-  // The opportunity / phrase row currently waiting on a worksheet pick.
-  // Set when the user clicks "Generate Content" / "Reinforce", consumed by
-  // handleAddToWorksheet → runGeneration after they choose a worksheet.
-  type GenerationPayload = {
-    kind: 'opportunity' | 'phrase';
-    title: string;
-    rationale: string;
-    primaryKeyword: string | null;
-    longtailKeywords: string[];
-    suggestedTemplate: 'blog' | 'landing_page' | 'case_study' | 'faq';
-    category: string | null;
-    intentStage: string | null;
-    recommendedAngle?: string;
-    brief?: {
-      audience?: string;
-      tone?: 'Authoritative' | 'Helpful' | 'Conversational' | 'Technical';
-      structure?: string;
-      keyPoints?: string[];
-      wordCount?: number;
-      cta?: string;
-    };
-  };
-  const [pendingGeneration, setPendingGeneration] = useState<{ key: string; payload: GenerationPayload } | null>(null);
-
-  const runGeneration = useCallback(
-    async (key: string, payload: GenerationPayload, campaignId: number | null) => {
-      if (!reportData?.domainInfo?.id) return;
-      setGenerationByKey((prev) => ({ ...prev, [key]: { kind: 'submitting' } }));
-      try {
-        // 1. Atomically create-or-resolve the topic in the chosen worksheet
-        //    (campaignId), with primary + longtail keywords + LLM-enriched
-        //    brief. apiPost handles VITE_API_URL fallback so we don't 404
-        //    when the env var isn't set in the build.
-        const built = await apiPost<{ topicId: number; campaignId: number }>(
-          '/campaigns/topics/from-opportunity',
-          {
-            domainId: reportData.domainInfo.id,
-            opportunityKey: key,
-            campaignId,
-            title: payload.title,
-            rationale: payload.rationale,
-            primaryKeyword: payload.primaryKeyword,
-            longtailKeywords: payload.longtailKeywords,
-            suggestedTemplate: payload.suggestedTemplate,
-            recommendedAngle: payload.recommendedAngle,
-            brief: payload.brief,
-          }
-        );
-
-        // 2. Fire n8n with the LLM-enriched brief baked in.
-        const audience = payload.brief?.audience?.trim();
-        const tone =
-          payload.brief?.tone ?? (payload.category === 'branded_trust' ? 'Conversational' : 'Authoritative');
-        const wordCount =
-          payload.brief?.wordCount ??
-          (payload.suggestedTemplate === 'landing_page'
-            ? 1400
-            : payload.suggestedTemplate === 'blog'
-              ? 1000
-              : 800);
-        const cta = payload.brief?.cta?.trim();
-        const topicBriefLines: string[] = [payload.title];
-        if (payload.recommendedAngle) topicBriefLines.push(`Angle: ${payload.recommendedAngle}`);
-        if (payload.brief?.structure) topicBriefLines.push(`Structure: ${payload.brief.structure}`);
-        if (payload.brief?.keyPoints && payload.brief.keyPoints.length > 0) {
-          topicBriefLines.push(`Cover:\n- ${payload.brief.keyPoints.join('\n- ')}`);
-        }
-        const topicBrief = topicBriefLines.join('\n\n');
-
-        const genJson = await apiPost<{ job?: { jobId: string; progress: number; phase: string | null } }>(
-          `/campaigns/topics/${built.topicId}/generate`,
-          {
-            template_type: payload.suggestedTemplate,
-            project_name: reportData.domainInfo.companyName ?? reportData.domainInfo.host,
-            project_goal: payload.rationale,
-            target_audience: 'Custom',
-            custom_audience_text: audience ?? payload.intentStage ?? 'general buyer',
-            tone,
-            word_count: wordCount,
-            language: 'en',
-            cta,
-            templateFields: { topic: topicBrief },
-          }
-        );
-
-        if (genJson.job?.jobId) {
-          setGenerationByKey((prev) => ({
-            ...prev,
-            [key]: { kind: 'running', jobId: genJson.job!.jobId, progress: genJson.job!.progress, phase: genJson.job!.phase },
-          }));
-        } else {
-          setGenerationByKey((prev) => ({ ...prev, [key]: { kind: 'done', draftId: null } }));
-        }
-      } catch (err) {
-        setGenerationByKey((prev) => ({
-          ...prev,
-          [key]: { kind: 'failed', error: err instanceof Error ? err.message : 'Generation failed' },
-        }));
-      }
-    },
-    [reportData]
-  );
-
-  // Click handler on phrase / opportunity rows. Opens the worksheet picker
-  // first — the actual API calls run after the user picks a worksheet (or
-  // creates a new one). Mirrors the table-flow UX.
-  const handleGenerateContent = useCallback(
-    (key: string, payload: GenerationPayload) => {
-      if (!reportData?.domainInfo?.id) return;
-      setPendingGeneration({ key, payload });
-      setActiveWorksheetId(null);
-      setIsWorksheetModalOpen(true);
-    },
-    [reportData]
-  );
 
   // SSE listener — flips running rows to done/failed when n8n pings back.
   useEffect(() => {
