@@ -521,6 +521,47 @@ export function computeOpportunities(
     });
   }
 
+  // ── G. Per-prompt topic-gap fallback — any Lost prompt not already
+  // covered by sections A–F (e.g. unbranded_recommendation Lost where
+  // sibling prompts under the same keyword Won, so the keyword-rollup in
+  // A didn't fire). Without this, a single Lost prompt would never surface
+  // as an opportunity, leaving the user with "No outrank opportunities yet"
+  // even when their dashboard clearly shows a Lost row.
+  const coveredPromptIds = new Set<number>();
+  for (const o of opportunities) for (const pid of o.promptIds) coveredPromptIds.add(pid);
+  for (const v of visibility) {
+    if (v.status !== 'lost') continue;
+    if (coveredPromptIds.has(v.promptId)) continue;
+    const stage = v.intentStage ?? null;
+    const isBranded = promptById.get(v.promptId)?.isBranded ?? false;
+    const competitors = v.competitorsMentioned.map((c) => c.host).slice(0, 5);
+    const score = baseSeverity.topic_gap * intentStageWeight(stage) * (0.5 + v.competitorCoverage / 2);
+    const key = `topic_gap_phrase:${v.promptId}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const rationale = competitors.length > 0
+      ? `Lost on this prompt; ${competitors.length} competitor${competitors.length === 1 ? '' : 's'} appear (${competitors.slice(0, 3).join(', ')}).`
+      : `Lost on this prompt — no AI model is mentioning you for this phrase.`;
+    opportunities.push({
+      key,
+      type: 'topic_gap',
+      severity: binSeverity(score),
+      severityScore: Number(score.toFixed(2)),
+      trafficPotential: trafficForStage(stage, isBranded),
+      title: `Win answers for "${v.keyword ?? v.phrase.slice(0, 60)}"`,
+      rationale,
+      keywordId: v.keywordId,
+      keyword: v.keyword,
+      primaryKeyword: v.keyword ?? v.phrase,
+      longtailKeywords: [v.phrase],
+      competitors,
+      promptIds: [v.promptId],
+      suggestedTemplate: templateForCategory(v.category),
+      intentStage: stage,
+      category: v.category,
+    });
+  }
+
   // ── Dedup precedence: topic_gap > brand_comparison_gap > listicle_absence > position_downgrade.
   // For each keyword, drop lower-precedence types if a higher-precedence one already covers it.
   const precedence: Record<OpportunityType, number> = {
