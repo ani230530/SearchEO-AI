@@ -134,14 +134,17 @@ export function computePhraseVisibility(input: AnalyticsInput): PhraseVisibility
       competitorsMentioned.length > 0 ? competitorsMentioned[0].bestPosition : null;
 
     // Status logic — see plan doc §3.
+    //   lost   = we're not mentioned at all (regardless of competitors —
+    //            either competitors took the slot or no one did, both are
+    //            failure states for AI visibility).
+    //   at_risk= we appear, but a competitor outranks us / shows up more.
+    //   won    = we appear and no selected competitor outranks us.
     let status: PhraseStatus;
-    if (ourCoverage === 0 && competitorCoverage > 0) {
+    if (ourCoverage === 0) {
       status = 'lost';
     } else if (
-      // We're mentioned, but a competitor outranks us OR appears in more models.
-      ourCoverage > 0 &&
-      ((ourBestPosition !== null && competitorBestPosition !== null && competitorBestPosition < ourBestPosition) ||
-        competitorCoverage > ourCoverage)
+      (ourBestPosition !== null && competitorBestPosition !== null && competitorBestPosition < ourBestPosition) ||
+      competitorCoverage > ourCoverage
     ) {
       status = 'at_risk';
     } else {
@@ -170,12 +173,15 @@ export function computePhraseVisibility(input: AnalyticsInput): PhraseVisibility
             : 'a competitor outranks you';
       subtitle = `You ${ourBestPosition ? `#${ourBestPosition}` : 'mentioned'} · ${compSnippet}`;
     } else {
+      // status === 'lost' — we're not mentioned at all.
       const named = competitorsMentioned.map((c) => c.host).slice(0, 3).join(', ');
-      subtitle = competitorsMentioned.length > 0
-        ? `Found in ${competitorsMentioned.length} competitor${
-            competitorsMentioned.length === 1 ? '' : 's'
-          }${named ? ` · ${named}` : ''}`
-        : 'Not mentioned by any model';
+      if (competitorsMentioned.length > 0) {
+        subtitle = `Not mentioned · ${competitorsMentioned.length} competitor${
+          competitorsMentioned.length === 1 ? '' : 's'
+        } found${named ? ` · ${named}` : ''}`;
+      } else {
+        subtitle = `Not mentioned by ${totalModels} of ${totalModels} model${totalModels === 1 ? '' : 's'}`;
+      }
     }
 
     rows.push({
@@ -309,10 +315,16 @@ export function computeOpportunities(
     const competitorCoverage = lost[0]?.competitorCoverage ?? 0;
     const stage = lost[0]?.intentStage ?? null;
     const isBranded = lost.every((l) => promptById.get(l.promptId)?.isBranded);
+    // Score is still useful even when no competitors appear — total invisibility
+    // on a decision-stage keyword is a real opportunity. Floor at 0.5 so the
+    // severity bin doesn't collapse to "low" purely because competitorCoverage=0.
     const score = baseSeverity.topic_gap * intentStageWeight(stage) * (0.5 + competitorCoverage / 2);
     const key = `topic_gap:${kwId}`;
     if (seen.has(key)) continue;
     seen.add(key);
+    const rationale = competitors.length > 0
+      ? `Lost on all ${lost.length} prompts under "${keywordRow.term}"; ${competitors.length} competitor${competitors.length === 1 ? '' : 's'} appear here.`
+      : `Lost on all ${lost.length} prompts under "${keywordRow.term}" — no AI model is mentioning you for this keyword.`;
     opportunities.push({
       key,
       type: 'topic_gap',
@@ -320,7 +332,7 @@ export function computeOpportunities(
       severityScore: Number(score.toFixed(2)),
       trafficPotential: trafficForStage(stage, isBranded),
       title: `Build a comprehensive guide on ${keywordRow.term}`,
-      rationale: `Lost on all ${lost.length} prompts under "${keywordRow.term}"; ${competitors.length} competitor${competitors.length === 1 ? '' : 's'} appear here.`,
+      rationale,
       keywordId: kwId,
       keyword: keywordRow.term,
       primaryKeyword: keywordRow.term,

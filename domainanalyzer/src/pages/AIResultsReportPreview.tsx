@@ -1367,14 +1367,14 @@ const VisibilityRow = ({
   const titleColor =
     status === 'positive' ? 'text-[#2D4059]' : status === 'warn' ? 'text-[#93370D]' : 'text-[#B23131]';
   return (
-    <div className={cn('rounded-lg px-3 py-3', wrapperClass)}>
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <div className={cn('rounded-md px-2.5 py-2', wrapperClass)}>
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <StatusIcon className={cn('h-3.5 w-3.5 shrink-0', statusIconColor)} strokeWidth={2} />
-            <p className={cn('truncate text-[12px] italic leading-[150%]', titleColor)}>{title}</p>
+          <div className="flex items-center gap-1.5">
+            <StatusIcon className={cn('h-3 w-3 shrink-0', statusIconColor)} strokeWidth={2.25} />
+            <p className={cn('truncate text-[11.5px] italic leading-[140%]', titleColor)}>{title}</p>
           </div>
-          <p className="mt-1 text-[11px] leading-[150%] text-[#717680]">{meta}</p>
+          <p className="mt-0.5 text-[10.5px] leading-[140%] text-[#717680]">{meta}</p>
         </div>
         {actionLabel && onAction ? (
           <GenerateInlineButton onClick={onAction} state={generation ?? { kind: 'idle' }} label={actionLabel} />
@@ -2412,6 +2412,28 @@ const AIResultsReportPreview = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [maskedDomainId, selectedRunId]);
 
+  // Manual refetch for the "Retry" affordance on the opportunities card —
+  // hits /report again so the LLM enrichment cache is exercised (or rebuilt
+  // if the run summary was cleared).
+  const [opportunitiesRetrying, setOpportunitiesRetrying] = useState(false);
+  const handleRetryOpportunities = useCallback(async () => {
+    if (!maskedDomainId) return;
+    const realId = unmaskDomainId(maskedDomainId);
+    if (!realId) return;
+    setOpportunitiesRetrying(true);
+    try {
+      const path = selectedRunId
+        ? `/wizard/domain/${realId}/report?runId=${selectedRunId}`
+        : `/wizard/domain/${realId}/report`;
+      const data = await apiGet<any>(path);
+      if (data) setReportData(data);
+    } catch (err) {
+      console.error('[AIResults] Retry opportunities failed:', err);
+    } finally {
+      setOpportunitiesRetrying(false);
+    }
+  }, [maskedDomainId, selectedRunId]);
+
   // ── Generate-Content lifecycle ─────────────────────────────────────────
   // Each opportunity / Lost-or-At-risk phrase row carries a stable `key`
   // (opportunity.key for opportunities, `phrase:${promptId}` for phrases).
@@ -2888,15 +2910,26 @@ const AIResultsReportPreview = () => {
                 </div>
                 <button className="text-xs font-medium text-blue-600">View all</button>
               </CardHeader>
-              <CardContent className="space-y-3 px-4 pb-4">
+              <CardContent className="space-y-2 px-4 pb-4">
                 <div className="flex flex-wrap gap-2">
                   <FilterPill label="Sort" icon="sort" />
                   <FilterPill label="Filters" icon="filter" />
                 </div>
                 {(reportData?.phraseVisibility ?? []).length === 0 ? (
-                  <p className="px-1 py-2 text-xs text-slate-500">
-                    No phrase data yet — run the wizard to populate.
-                  </p>
+                  <div className="flex flex-col items-start gap-2 rounded-md border border-dashed border-slate-200 bg-slate-50 px-3 py-3">
+                    <p className="text-xs text-slate-600">
+                      No phrase data yet — run the wizard or retry to refresh.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={handleRetryOpportunities}
+                      disabled={opportunitiesRetrying}
+                      className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm hover:bg-slate-100 disabled:opacity-50"
+                    >
+                      <RefreshCw className={cn('h-3.5 w-3.5', opportunitiesRetrying && 'animate-spin')} />
+                      {opportunitiesRetrying ? 'Retrying…' : 'Retry'}
+                    </button>
+                  </div>
                 ) : null}
                 {(reportData?.phraseVisibility ?? []).slice(0, 8).map((row: any) => {
                   const status: 'positive' | 'warn' | 'danger' =
@@ -2947,24 +2980,40 @@ const AIResultsReportPreview = () => {
                     Data-backed actions to close visibility gaps and capture missed AI-driven traffic.
                   </p>
                 </div>
-                <button className="text-xs font-medium text-blue-600">View all</button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleRetryOpportunities}
+                    disabled={opportunitiesRetrying}
+                    className="flex items-center gap-1 text-xs font-medium text-slate-600 hover:text-slate-900 disabled:opacity-50"
+                    title="Re-run analysis"
+                  >
+                    <RefreshCw className={cn('h-3.5 w-3.5', opportunitiesRetrying && 'animate-spin')} />
+                    Retry
+                  </button>
+                  <button className="text-xs font-medium text-blue-600">View all</button>
+                </div>
               </CardHeader>
-              <CardContent className="space-y-3 px-4 pb-4">
+              <CardContent className="space-y-2 px-4 pb-4">
                 <div className="flex flex-wrap gap-2">
                   <FilterPill label="Sort: By Models" icon="sort" />
-                  <FilterPill label="Filters (2)" icon="filter" />
-                  <FilterPill label="Gemini 2.0" removable />
-                  <Button
-                    variant="outline"
-                    className="h-8 rounded-full border border-[#D5D7DA] bg-white px-3 text-[11px] text-[#717680] shadow-[0_1px_2px_0_#1018280D] hover:bg-white"
-                  >
-                    +1
-                  </Button>
+                  <FilterPill label="Filters" icon="filter" />
                 </div>
                 {(reportData?.opportunities ?? []).length === 0 ? (
-                  <p className="px-1 py-2 text-xs text-slate-500">
-                    No outrank opportunities yet — once a run completes we'll surface action items here.
-                  </p>
+                  <div className="flex flex-col items-start gap-2 rounded-md border border-dashed border-slate-200 bg-slate-50 px-3 py-3">
+                    <p className="text-xs text-slate-600">
+                      No outrank opportunities yet. This usually means the latest run hasn't completed enrichment, or selected competitors didn't appear in any answer.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={handleRetryOpportunities}
+                      disabled={opportunitiesRetrying}
+                      className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm hover:bg-slate-100 disabled:opacity-50"
+                    >
+                      <RefreshCw className={cn('h-3.5 w-3.5', opportunitiesRetrying && 'animate-spin')} />
+                      {opportunitiesRetrying ? 'Retrying…' : 'Retry analysis'}
+                    </button>
+                  </div>
                 ) : null}
                 {(reportData?.opportunities ?? []).map((opp: any) => (
                   <OpportunityRow
