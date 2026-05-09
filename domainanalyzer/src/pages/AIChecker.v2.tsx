@@ -1,6 +1,25 @@
+/**
+ * Wizard host page.
+ *
+ * Owns:
+ *  - Current step (1..5) + the cross-step state (domainId, profile, drafts).
+ *  - Resume-from-URL (?domain=:id reads /state and lands the user on the
+ *    right step with prior selections rehydrated).
+ *  - Form persistence for Step 1 (sessionStorage) so a tab crash doesn't
+ *    eat the URL + country + industry the user just typed.
+ *  - Back navigation between steps. Going back skips the auto-only crawl
+ *    step (Step 2) since it has no user input — Step 3's "Back" sends the
+ *    user to Step 1 to edit the profile that drove the crawl + competitors.
+ *  - Retry-by-remount via a key nonce: each step that fires an effect on
+ *    mount remounts when the user hits Retry, which re-fires the request
+ *    without us having to plumb retry handlers through each component.
+ *  - Global error banner that uses the wizardErrors classifier so the user
+ *    never sees raw stack traces / status codes.
+ */
+
 import { useEffect, useState } from "react";
-import { useSearchParams } from "react-router-dom";
-import { apiGet } from "@/services/apiClient";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { apiGet, apiPost } from "@/services/apiClient";
 import { WizardShell } from "@/features/wizard-v2/WizardShell";
 import { Step1AddDomain } from "@/features/wizard-v2/Step1AddDomain";
 import { Step2Crawling } from "@/features/wizard-v2/Step2Crawling";
@@ -8,37 +27,60 @@ import { Step3Competitors } from "@/features/wizard-v2/Step3Competitors";
 import { Step4SelectTopics } from "@/features/wizard-v2/Step4SelectTopics";
 import { Step5RunQueries } from "@/features/wizard-v2/Step5RunQueries";
 import { PHASE_TO_STEP, type WizardProfile, type WizardStateResponse, type WizardStep } from "@/features/wizard-v2/types";
+import { classifyError, isSilentError } from "@/features/wizard-v2/wizardErrors";
 
+// Per-step UI copy. Heading + subtitle + eyebrow shown by WizardShell.
 const HEADINGS: Record<WizardStep, { eyebrow: string; heading: string; description?: string }> = {
   1: {
     eyebrow: "Get to know us",
     heading: "Add your domain",
-    description: "We will analyze your public pages to pre-fill your brand profile. You can review and edit everything.",
+    description: "Tell us a bit about your business — country, industry, anything you want us to keep in mind.",
   },
   2: {
     eyebrow: "Get to know us",
     heading: "Add your domain",
-    description: "Hang tight — we're reading your site and extracting structured context.",
+    description: "Hang tight — we're getting to know your site so the rest of this audit lands right.",
   },
   3: {
     eyebrow: "Get to know us",
-    heading: "Track Your Competitors in AI Search",
-    description: "Add competitor domains that matter most to your industry.",
+    heading: "Track your competitors in AI search",
+    description: "Pick the brands you actually compete with. We'll measure your share of voice against theirs.",
   },
   4: {
-    eyebrow: "Select for precise results",
-    heading: "Select prompts & keywords in your niche",
-    description: "Choose backend-generated keywords and prompts for the full AI visibility analysis.",
+    eyebrow: "Pick what to test",
+    heading: "Choose the prompts to run",
+    description: "These are the questions a real customer would ask ChatGPT, Claude, or Gemini.",
   },
   5: {
     eyebrow: "Almost there",
-    heading: "Generating your report",
-    description: "Querying ChatGPT, Gemini, and Claude with the prompts you selected.",
+    heading: "Running your audit",
+    description: "Asking each AI assistant your prompts, watching how they answer.",
   },
 };
 
+// sessionStorage key for the Step 1 form so a refresh doesn't lose work.
+const FORM_STORAGE_KEY = "wizard:step1:form";
+
+interface PersistedStep1 {
+  url: string;
+  profile: WizardProfile;
+}
+
+function loadPersistedForm(): PersistedStep1 | null {
+  try {
+    const raw = sessionStorage.getItem(FORM_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === "object" && parsed.profile) return parsed as PersistedStep1;
+  } catch {
+    /* ignore — corrupted state, treat as fresh */
+  }
+  return null;
+}
+
 export default function AICheckerV2() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
   const [step, setStep] = useState<WizardStep>(1);
   const [domainId, setDomainId] = useState<number | null>(null);
   const [normalizedUrl, setNormalizedUrl] = useState<string>("");
@@ -54,16 +96,64 @@ export default function AICheckerV2() {
   const [loadingState, setLoadingState] = useState(false);
   const [globalError, setGlobalError] = useState<string | null>(null);
 
-  // Resume from URL ?domain=:id
+  // Hydrate Step 1 form from sessionStorage on first mount. Resume from
+  // ?domain=:id overrides this if it succeeds.
+  useEffect(() => {
+    const persisted = loadPersistedForm();
+    if (!persisted) return;
+    setNormalizedUrl(persisted.url ?? "");
+    setProfile(persisted.profile);
+  }, []);
+
+  // Save Step 1 form whenever it changes — only meaningful when the user
+  // is actually on Step 1 (later steps don't edit the profile in place).
+  useEffect(() => {
+    if (step !== 1) return;
+    try {
+      sessionStorage.setItem(
+        FORM_STORAGE_KEY,
+        JSON.stringify({ url: normalizedUrl, profile } as PersistedStep1)
+      );
+    } catch {
+      /* sessionStorage can throw in private mode — silent */
+    }
+  }, [step, normalizedUrl, profile]);
+
+  // Resume from URL ?domain=:id — fetches the wizard state, rehydrates the
+  // profile / drafts / selected competitors, and lands the user on the
+  // right step using the canResumeAt → step map.
+  //
+  // ?restart=crawl  → wipe everything downstream of the profile, kick Step 2
+  // ?restart=topics → keep crawl + competitors, regenerate prompts, kick Step 4
   useEffect(() => {
     const idParam = searchParams.get("domain");
     if (!idParam) return;
     const id = Number(idParam);
     if (!Number.isFinite(id)) return;
+    const restart = searchParams.get("restart"); // 'crawl' | 'topics' | null
     setDomainId(id);
     setLoadingState(true);
-    apiGet<WizardStateResponse>(`/wizard/domain/${id}/state`)
-      .then((res) => {
+
+    const run = async () => {
+      try {
+        // If the dashboard sent us here with ?restart=…, hit the backend
+        // restart endpoint first so the next state read reflects the wiped
+        // phases. Without this we'd still see the old run's state and
+        // canResumeAt would land us at the wrong step.
+        if (restart === 'crawl' || restart === 'topics') {
+          await apiPost(`/wizard/domain/${id}/restart`, { from: restart });
+          // Strip the param from the URL so a refresh doesn't re-restart.
+          setSearchParams(
+            (prev) => {
+              const next = new URLSearchParams(prev);
+              next.delete('restart');
+              return next;
+            },
+            { replace: true }
+          );
+        }
+
+        const res = await apiGet<WizardStateResponse>(`/wizard/domain/${id}/state`);
         setNormalizedUrl(res.url);
         setProfile({
           country: res.profile.country ?? "",
@@ -74,78 +164,171 @@ export default function AICheckerV2() {
         });
         setRestoredCompetitors(res.selectedCompetitors ?? []);
         setRestoredDraft(res.selectionDraft ?? null);
-        const target = res.canResumeAt ? PHASE_TO_STEP[res.canResumeAt] ?? 1 : 1;
-        setStep(target);
-      })
-      .catch(() => setGlobalError("Could not resume — please start over."))
-      .finally(() => setLoadingState(false));
-  }, [searchParams]);
 
+        // Land at the explicit target if restart was used; else use canResumeAt.
+        const target: WizardStep =
+          restart === 'crawl'  ? 2 :
+          restart === 'topics' ? 4 :
+          (res.canResumeAt ? (PHASE_TO_STEP[res.canResumeAt] ?? 1) : 1);
+        setStep(target);
+      } catch (err) {
+        const e = classifyError(err);
+        if (e.kind === "unauthorized") return; // apiClient handles redirect.
+        setGlobalError(
+          e.kind === "user"
+            ? "We couldn't pick up where you left off. Starting fresh."
+            : e.message
+        );
+      } finally {
+        setLoadingState(false);
+      }
+    };
+    run();
+  }, [searchParams, setSearchParams]);
+
+  // Advance to a target step, optionally pinning a fresh domainId into the URL
+  // so a refresh restores the right resume point.
   const advanceTo = (target: WizardStep, id?: number) => {
     if (id) {
       setDomainId(id);
-      setSearchParams((prev) => {
-        const next = new URLSearchParams(prev);
-        next.set("domain", String(id));
-        return next;
-      }, { replace: true });
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          next.set("domain", String(id));
+          return next;
+        },
+        { replace: true }
+      );
     }
+    setGlobalError(null);
     setStep(target);
+  };
+
+  // Step-internal back navigation. We skip Step 2 (auto-only crawl page —
+  // there's nothing to "go back to" on it) and route Step 3's Back to
+  // Step 1 so the user can edit profile fields that drove the crawl.
+  const goBack = (target: WizardStep) => {
+    setGlobalError(null);
+    setStep(target);
+  };
+
+  // Top-level retry for steps that auto-fire on mount. Bumping the nonce
+  // remounts the step component, which re-runs its initial effect.
+  const [retryNonce, setRetryNonce] = useState(0);
+  const handleRetry = () => {
+    setGlobalError(null);
+    setRetryNonce((n) => n + 1);
+  };
+
+  // Per-step error handler so each step routes through the same classifier.
+  const handleStepError = (
+    err: unknown,
+    fallbackStep: WizardStep,
+    onUserMsg?: (msg: string) => void
+  ) => {
+    const e = classifyError(err);
+    if (isSilentError(e)) return; // user-aborted — never noise the screen
+    if (e.kind === "unauthorized") return; // apiClient handles re-auth redirect
+    setGlobalError(e.message);
+    if (onUserMsg) onUserMsg(e.message);
+    setStep(fallbackStep);
   };
 
   const heading = HEADINGS[step];
 
+  // Wire onBack per step. Step 1 has no "back" inside the wizard — the top
+  // bar falls through to "Domain history" (an exit, not a back).
+  const onBack: (() => void) | undefined =
+    step === 3
+      ? () => goBack(1) // skip Step 2 (auto crawl); send user to profile form
+      : step === 4
+        ? () => goBack(3)
+        : step === 5
+          ? () => goBack(4)
+          : undefined;
+  const backLabel =
+    step === 3 ? "Edit details" : step === 4 ? "Back to competitors" : step === 5 ? "Back to prompts" : "Back";
+
+  const retryableStep = step === 2 || step === 3 || step === 4 || step === 5;
+
   return (
-    <WizardShell step={step} eyebrow={heading.eyebrow} heading={heading.heading} description={heading.description}>
+    <WizardShell
+      step={step}
+      eyebrow={heading.eyebrow}
+      heading={heading.heading}
+      description={heading.description}
+      onRetry={retryableStep ? handleRetry : undefined}
+      onBack={onBack}
+      backLabel={backLabel}
+    >
       {globalError && (
-        <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-          {globalError}
+        <div className="mb-4 flex items-start justify-between gap-3 rounded-md border border-rose-100 bg-rose-50/60 px-3 py-2.5 text-sm text-rose-700">
+          <span>{globalError}</span>
+          <button
+            type="button"
+            onClick={() => setGlobalError(null)}
+            className="text-rose-400 hover:text-rose-600 transition-colors"
+            aria-label="Dismiss"
+          >
+            ×
+          </button>
         </div>
       )}
       {loadingState ? (
-        <p className="text-sm text-[#717680]">Restoring your session…</p>
+        <p className="text-sm text-slate-500">Picking up where you left off…</p>
       ) : step === 1 ? (
         <Step1AddDomain
           initialUrl={normalizedUrl}
+          initialProfile={profile}
           onContinue={({ normalizedUrl: u, profile: p, existingDomainId }) => {
             setNormalizedUrl(u);
             setProfile(p);
+            // Step 1 form is committed — clear the sessionStorage draft.
+            sessionStorage.removeItem(FORM_STORAGE_KEY);
             if (existingDomainId) {
               advanceTo(2, existingDomainId);
             } else {
-              setStep(2);
+              advanceTo(2);
             }
+          }}
+          onExistingDomain={(id) => {
+            // User picked "View existing report" on the existing-domain prompt.
+            navigate(`/ai-results/${id}`);
           }}
         />
       ) : step === 2 ? (
         <Step2Crawling
+          key={`s2-${retryNonce}`}
           url={normalizedUrl}
           profile={profile}
           onComplete={(id) => advanceTo(3, id)}
-          onError={(msg) => {
-            setGlobalError(msg);
-            setStep(1);
-          }}
+          onError={(err) => handleStepError(err, 1)}
         />
       ) : step === 3 && domainId ? (
         <Step3Competitors
+          key={`s3-${retryNonce}`}
           domainId={domainId}
           initialSelected={restoredCompetitors}
+          // Only force a full re-run when the user explicitly hit Retry.
+          // First mount (nonce 0) prefers the cached read so refresh is fast.
+          forceRefresh={retryNonce > 0}
           onContinue={() => advanceTo(4)}
         />
       ) : step === 4 && domainId ? (
         <Step4SelectTopics
+          key={`s4-${retryNonce}`}
           domainId={domainId}
           initialDraft={restoredDraft}
+          // Cached read on first mount (instant resume), force a fresh
+          // topics generation only when the user explicitly hit Retry.
+          forceRefresh={retryNonce > 0}
           onContinue={() => advanceTo(5)}
         />
       ) : step === 5 && domainId ? (
         <Step5RunQueries
+          key={`s5-${retryNonce}`}
           domainId={domainId}
-          onError={(msg) => {
-            setGlobalError(msg);
-            setStep(4);
-          }}
+          onError={(err) => handleStepError(err, 4)}
         />
       ) : null}
     </WizardShell>

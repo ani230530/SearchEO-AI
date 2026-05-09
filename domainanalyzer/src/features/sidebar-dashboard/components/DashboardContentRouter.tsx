@@ -8,7 +8,9 @@ import { ProfileSection } from "@/features/sidebar-dashboard/sections/ProfileSec
 import { OverviewSection } from "@/features/sidebar-dashboard/sections/OverviewSection";
 import { SettingsSection } from "@/features/sidebar-dashboard/sections/SettingsSection";
 import type { DashboardContentRouterProps } from "@/features/sidebar-dashboard/types";
-import CompetitorPage from "../sections/CompetitorPage";
+// CompetitorPage was deleted in the foundational rewrite — competitor data
+// now lives on the wizard pipeline. Tab is hidden until rebuilt against the
+// new Competitor schema.
 export function DashboardContentRouter({
   activeTab,
   tabs,
@@ -33,7 +35,13 @@ export function DashboardContentRouter({
     case "gsc-analytics":
       return <GscAnalyticsSection {...gscAnalytics} />;
     case "competitor-intelligence":
-      return <CompetitorPage {...competitorIntelligence} />;
+      // Pending rebuild against /api/wizard/domain/:id (returns ranked Competitor[]).
+      void competitorIntelligence;
+      return (
+        <div className="p-6 text-sm text-slate-500">
+          Competitor view is being rebuilt against the new wizard pipeline.
+        </div>
+      );
     case "knowledge-base":
       return <KnowledgeBaseSection />;
     case "domain-history":

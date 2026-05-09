@@ -1,13 +1,21 @@
 import { useEffect, useState } from "react";
-import { Check, Loader2, Plus } from "lucide-react";
+import { ArrowUpRight, Check, Loader2, Plus } from "lucide-react";
 
-import { apiPost } from "@/services/apiClient";
+import { apiGet, apiPost } from "@/services/apiClient";
+import { WizardStatusRow } from "./WizardShell";
 import type { WizardCompetitor } from "./types";
 
 interface Step3Props {
   domainId: number;
   initialSelected?: string[];
   onContinue: () => void;
+  /**
+   * When true, skip the cached-read short circuit and re-fire the pipeline.
+   * Wizard host sets this to true on Retry so the user can deliberately
+   * regenerate the competitor list. Default false: prefer cached data
+   * for the fast resume path.
+   */
+  forceRefresh?: boolean;
 }
 
 interface CompetitorsResponse {
@@ -19,14 +27,38 @@ interface CompetitorRow extends WizardCompetitor {
   selected: boolean;
 }
 
-export function Step3Competitors({ domainId, initialSelected = [], onContinue }: Step3Props) {
+export function Step3Competitors({ domainId, initialSelected = [], onContinue, forceRefresh = false }: Step3Props) {
   const [competitors, setCompetitors] = useState<CompetitorRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [newCompetitor, setNewCompetitor] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  const loadCompetitors = async () => {
+  /**
+   * Map a backend competitor row (from /wizard/domain/:id) into the
+   * WizardCompetitor shape the UI renders.
+   */
+  const adaptStoredCompetitor = (
+    c: { competitorHost: string; reasoning?: string | null; threatLevel?: string | null; isSelected?: boolean }
+  ): CompetitorRow => {
+    const host = c.competitorHost;
+    return {
+      name: host,
+      domain: host,
+      url: `https://${host}`,
+      logoUrl: `https://img.logo.dev/${host}?token=pk_DTdFFG1JT9WOCjATvZEzIA&size=64`,
+      reasoning: c.reasoning ?? undefined,
+      threatLevel: (c.threatLevel as WizardCompetitor["threatLevel"]) ?? undefined,
+      selected: !!c.isSelected,
+    };
+  };
+
+  /**
+   * Run the competitor pipeline (LLM proposes → verify → score → rank).
+   * Used on first arrival when there's nothing stored, and when the user
+   * hits Retry from the wizard chrome.
+   */
+  const runPipeline = async () => {
     setLoading(true);
     setError(null);
     try {
@@ -47,7 +79,39 @@ export function Step3Competitors({ domainId, initialSelected = [], onContinue }:
   };
 
   useEffect(() => {
-    loadCompetitors();
+    let alive = true;
+    // Resume-friendly load:
+    //   1. Try to read whatever's already saved for this domain. If we find
+    //      ranked competitors there, render them immediately — no LLM call,
+    //      no waiting screen, picks up the user's prior selections.
+    //   2. Only run the full pipeline when there's literally nothing stored
+    //      (first time the user lands on Step 3 for this domain).
+    //   3. The "Retry" button in the wizard header bypasses this path by
+    //      remounting the component — see AICheckerV2's retry nonce.
+    const loadOrRun = async () => {
+      // Retry path — caller asked for a fresh pipeline run, skip the cache.
+      if (forceRefresh) {
+        await runPipeline();
+        return;
+      }
+      try {
+        const data = await apiGet<{ competitors?: any[] }>(`/wizard/domain/${domainId}`);
+        if (!alive) return;
+        const stored = Array.isArray(data?.competitors) ? data!.competitors : [];
+        const ranked = stored.filter((c: any) => typeof c?.rank === "number");
+        if (ranked.length > 0) {
+          setCompetitors(ranked.map(adaptStoredCompetitor));
+          setLoading(false);
+          return;
+        }
+      } catch {
+        /* fall through to running the pipeline */
+      }
+      if (!alive) return;
+      await runPipeline();
+    };
+    loadOrRun();
+    return () => { alive = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [domainId]);
 
@@ -98,26 +162,18 @@ export function Step3Competitors({ domainId, initialSelected = [], onContinue }:
   return (
     <>
       <div className="space-y-6">
-        <div className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="space-y-4">
+        <div>
+          <div className="space-y-3">
             {loading && (
-              <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
-                <div className="flex items-center gap-3 mb-4 text-slate-700">
-                  <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
-                  <p className="text-sm font-medium">Finding peer competitors…</p>
-                </div>
-                <div className="h-2 overflow-hidden rounded-full bg-slate-100">
-                  <div className="h-full rounded-full bg-blue-600 transition-all w-1/2 animate-pulse" />
-                </div>
-                <p className="mt-3 text-xs text-slate-500">
-                  Same-tier match by industry, location and company size — usually ~30 seconds.
-                </p>
-              </div>
+              <WizardStatusRow
+                message="Looking around for the brands you go up against…"
+                subtle="Thinking about who'd show up alongside you when someone asks an AI for options like yours. Takes about half a minute."
+              />
             )}
             {!loading && competitors.length === 0 && (
-              <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-5 text-sm text-slate-600">
-                No backend competitors found yet. Add competitor domains manually to continue.
-              </div>
+              <p className="text-sm text-slate-500">
+                We couldn't surface any competitors automatically. Add a domain manually below to continue.
+              </p>
             )}
             {!loading &&
               competitors.map((competitor) => (
@@ -131,9 +187,9 @@ export function Step3Competitors({ domainId, initialSelected = [], onContinue }:
                       : "border-slate-200 bg-white hover:bg-slate-50"
                   }`}
                 >
-                  <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-4 min-w-0">
                     <span
-                      className={`flex h-5 w-5 items-center justify-center rounded-sm border ${
+                      className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-sm border ${
                         competitor.selected
                           ? "border-blue-500 bg-blue-500 text-white"
                           : "border-slate-300 bg-white text-transparent"
@@ -141,7 +197,7 @@ export function Step3Competitors({ domainId, initialSelected = [], onContinue }:
                     >
                       <Check className="h-3.5 w-3.5" />
                     </span>
-                    <span className="grid h-7 w-7 flex-shrink-0 place-items-center overflow-hidden rounded-md bg-slate-50">
+                    <span className="grid h-7 w-7 shrink-0 place-items-center overflow-hidden rounded-md bg-slate-50">
                       <img
                         src={competitor.logoUrl}
                         alt=""
@@ -149,48 +205,55 @@ export function Step3Competitors({ domainId, initialSelected = [], onContinue }:
                         onError={(e) => ((e.currentTarget as HTMLImageElement).style.display = "none")}
                       />
                     </span>
-                    <div className="min-w-0">
-                      <p className="font-semibold text-slate-900">{competitor.name}</p>
-                      <p className="truncate text-sm text-slate-500">{competitor.url}</p>
-                    </div>
+                    <p className="font-semibold text-slate-900 truncate">{competitor.name}</p>
                   </div>
+                  {/* Tiny "open in new tab" affordance — icon only, sits on
+                      the right edge of the row. stopPropagation so clicking
+                      the icon doesn't toggle the row's selection. */}
                   <a
                     href={competitor.url}
                     target="_blank"
                     rel="noreferrer"
+                    aria-label={`Visit ${competitor.name}`}
                     onClick={(e) => e.stopPropagation()}
-                    className="text-sm font-medium text-blue-600 truncate"
+                    className="shrink-0 inline-flex h-7 w-7 items-center justify-center rounded-md text-slate-400 hover:text-blue-600 hover:bg-white/70 transition-colors"
+                    title={competitor.url}
                   >
-                    {competitor.url}
+                    <ArrowUpRight className="h-4 w-4" />
                   </a>
                 </button>
               ))}
           </div>
 
-          <div className="mt-5 rounded-[10px] border border-dashed border-slate-300 bg-slate-50 p-4">
-            <div className="flex items-center justify-between gap-3">
-              <input
-                type="text"
-                value={newCompetitor}
-                onChange={(e) => setNewCompetitor(e.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") {
-                    event.preventDefault();
-                    handleAddCompetitor();
-                  }
-                }}
-                placeholder="Add Competitor"
-                className="flex-1 bg-transparent text-sm text-slate-700 placeholder:text-slate-400 focus:outline-none"
-              />
-              <button
-                type="button"
-                onClick={handleAddCompetitor}
-                className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-slate-100 text-slate-500 transition hover:bg-slate-200"
-              >
-                <Plus className="h-5 w-5" />
-              </button>
+          {/* Manual add row — only show once the pipeline has finished
+              looking for competitors. Showing this while we're still
+              searching just confuses the user. */}
+          {!loading && (
+            <div className="mt-5 rounded-[10px] border border-dashed border-slate-300 bg-slate-50 p-4">
+              <div className="flex items-center justify-between gap-3">
+                <input
+                  type="text"
+                  value={newCompetitor}
+                  onChange={(e) => setNewCompetitor(e.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      handleAddCompetitor();
+                    }
+                  }}
+                  placeholder="Add a competitor"
+                  className="flex-1 bg-transparent text-sm text-slate-700 placeholder:text-slate-400 focus:outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={handleAddCompetitor}
+                  className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-slate-100 text-slate-500 transition hover:bg-slate-200"
+                >
+                  <Plus className="h-5 w-5" />
+                </button>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
 
@@ -200,17 +263,22 @@ export function Step3Competitors({ domainId, initialSelected = [], onContinue }:
         </div>
       )}
 
-      <div className="mt-6 flex flex-col gap-3">
-        <button
-          onClick={handleContinue}
-          disabled={submitting || loading}
-          className="w-full rounded-[10px] bg-slate-400 px-4 py-4 text-sm font-semibold text-white hover:bg-slate-500 transition-colors flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-70"
-        >
-          {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-          {submitting ? "Loading backend data..." : "Continue"}
-          <span>→</span>
-        </button>
-      </div>
+      {/* Continue is meaningless while we're still discovering — there's
+          nothing to save yet. Hide it entirely instead of disabling so the
+          UI stays calm while the loading row is on screen. */}
+      {!loading && (
+        <div className="mt-6 flex flex-col gap-3">
+          <button
+            onClick={handleContinue}
+            disabled={submitting}
+            className="w-full rounded-[10px] bg-slate-700 px-4 py-3.5 text-sm font-semibold text-white hover:bg-slate-800 transition-colors flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+            {submitting ? "Saving your picks…" : "Continue"}
+            <span>→</span>
+          </button>
+        </div>
+      )}
     </>
   );
 }

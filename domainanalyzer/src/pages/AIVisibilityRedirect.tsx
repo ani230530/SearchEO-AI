@@ -26,7 +26,7 @@ const AIVisibilityRedirect = () => {
       try {
         // We always fetch the domains list to ensure we have fresh data and 
         // to populate the sessionStorage mapping via maskDomainId.
-        const data = await apiGet<any>('/dashboard/all');
+        const data = await apiGet<any>('/wizard/domains');
         const domains = data.domains ?? [];
         
         if (cancelled) return;

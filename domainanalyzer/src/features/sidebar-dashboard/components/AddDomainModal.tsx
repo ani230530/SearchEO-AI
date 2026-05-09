@@ -1,21 +1,34 @@
-import { fetchEventSource } from "@microsoft/fetch-event-source";
-import { Globe, Loader2 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+/**
+ * AddDomainModal — single self-contained wizard component.
+ *
+ * Drives the full add-domain pipeline against `/api/wizard/*`:
+ *
+ *   Step 1  profile form           — POST /api/wizard/validate, then /api/wizard/domain (SSE)
+ *   Step 2  competitor selection   — POST /api/wizard/domain/:id/competitors then …/competitors/select
+ *   Step 3  topic selection        — POST /api/wizard/domain/:id/topics, debounced /draft, then /select
+ *
+ * No SSE for the topics or competitor phases — they're synchronous JSON. SSE is
+ * reserved for the long-running crawl + (future) AI-query run phases.
+ */
+
+import { fetchEventSource } from '@microsoft/fetch-event-source';
+import { Globe, Loader2 } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { maskDomainId } from "@/lib/domainUtils";
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { maskDomainId } from '@/lib/domainUtils';
 
-type Phase = "idle" | "extract" | "phrases" | "queries" | "done" | "error";
+type Phase = 'idle' | 'crawl' | 'competitors' | 'topics' | 'done' | 'error';
 
-type AddDomainModalProps = {
+interface AddDomainModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   initialUrl?: string;
@@ -23,421 +36,478 @@ type AddDomainModalProps = {
   title?: string;
   description?: string;
   ctaLabel?: string;
-};
+}
 
-const API_BASE_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3002";
+interface CompetitorRow {
+  competitorHost: string;
+  rank: number | null;
+  threatLevel: 'High' | 'Medium' | 'Low' | null;
+  reasoning: string | null;
+  similarityScore: number | null;
+  industry: string | null;
+  location: string | null;
+  isSelected?: boolean;
+}
 
-const PHASE_LABEL: Record<Exclude<Phase, "idle">, string> = {
-  extract: "1 / 3 — Crawling site & generating keywords",
-  phrases: "2 / 3 — Generating prompts",
-  queries: "3 / 3 — Running AI queries & scoring",
-  done: "Audit complete",
-  error: "Audit failed",
-};
+interface TopicItem {
+  id: number;
+  type: 'keyword' | 'prompt';
+  text: string;
+  intent: string | null;
+  source: 'ai' | 'custom';
+  parentKeywordId?: number;
+}
 
-const authHeaders = (): Record<string, string> => {
-  const token = localStorage.getItem("authToken");
+const API_BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3002';
+
+function authHeaders(): Record<string, string> {
+  const token = localStorage.getItem('authToken');
   return {
-    "Content-Type": "application/json",
+    'Content-Type': 'application/json',
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
   };
-};
+}
 
-/**
- * Phase 1+2 — POST /api/domain. Events come as `data: {...}` with a `type`
- * discriminator. Returns the new domainId on `complete`.
- */
-const runExtractAndKeywords = (
-  url: string,
-  parentSignal: AbortSignal,
-  onProgress: (pct: number, step: string) => void
-): Promise<number> =>
-  new Promise((resolve, reject) => {
+async function postJson<T>(path: string, body: unknown, signal?: AbortSignal): Promise<T> {
+  const res = await fetch(`${API_BASE_URL}${path}`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify(body ?? {}),
+    signal,
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`${res.status} ${path}: ${text || res.statusText}`);
+  }
+  return res.json();
+}
+
+async function patchJson<T>(path: string, body: unknown): Promise<T> {
+  const res = await fetch(`${API_BASE_URL}${path}`, {
+    method: 'PATCH',
+    headers: authHeaders(),
+    body: JSON.stringify(body ?? {}),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`${res.status} ${path}: ${text || res.statusText}`);
+  }
+  return res.json();
+}
+
+/** Subscribe to /api/wizard/domain SSE. Resolves with the new domainId. */
+function streamCrawl(args: {
+  url: string;
+  country: string;
+  state: string;
+  industry: string;
+  customSeeds: { keywords: string[]; prompts: string[] };
+  signal: AbortSignal;
+  onProgress: (pct: number, step: string) => void;
+}): Promise<number> {
+  return new Promise((resolve, reject) => {
     const ctrl = new AbortController();
-    const onParentAbort = () => ctrl.abort();
-    parentSignal.addEventListener("abort", onParentAbort);
+    const onAbort = () => ctrl.abort();
+    args.signal.addEventListener('abort', onAbort);
 
-    let capturedId: number | null = null;
-    let settled = false;
-    const settle = (fn: () => void) => {
-      if (settled) return;
-      settled = true;
-      parentSignal.removeEventListener("abort", onParentAbort);
-      ctrl.abort();
-      fn();
-    };
+    let domainId: number | null = null;
 
-    fetchEventSource(`${API_BASE_URL}/api/domain`, {
-      method: "POST",
+    fetchEventSource(`${API_BASE_URL}/api/wizard/domain`, {
+      method: 'POST',
       headers: authHeaders(),
-      body: JSON.stringify({ url }),
+      body: JSON.stringify({
+        url: args.url,
+        country: args.country || undefined,
+        state: args.state || undefined,
+        industry: args.industry || undefined,
+        customSeeds: args.customSeeds,
+      }),
       signal: ctrl.signal,
       openWhenHidden: true,
-      async onopen(response) {
-        if (response.ok) return;
-        const text = await response.text().catch(() => "");
-        throw new Error(text || `Failed to start extraction (${response.status})`);
-      },
       onmessage(ev) {
-        if (!ev.data) return;
         try {
-          const data = JSON.parse(ev.data);
-          switch (data.type) {
-            case "progress":
-              if (typeof data.progress === "number") {
-                onProgress(data.progress, data.step ?? "");
-              }
-              break;
-            case "domain_created":
-              if (typeof data.domainId === "number") capturedId = data.domainId;
-              break;
-            case "complete":
-              if (data.result?.domain?.id) capturedId = data.result.domain.id;
-              if (capturedId) settle(() => resolve(capturedId!));
-              else settle(() => reject(new Error("Phase 1 finished but no domain id returned")));
-              break;
-            case "error":
-              settle(() =>
-                reject(new Error(data.error || data.details || "Extraction failed"))
-              );
-              break;
+          const data = JSON.parse(ev.data ?? '{}') as Record<string, unknown>;
+          if (data.type === 'domain_created' && typeof data.domainId === 'number') {
+            domainId = data.domainId;
+          }
+          if (data.type === 'progress') {
+            const pct = typeof data.progress === 'number' ? data.progress : 0;
+            const step = typeof data.step === 'string' ? data.step : '';
+            args.onProgress(pct, step);
+          }
+          if (data.type === 'complete') {
+            args.signal.removeEventListener('abort', onAbort);
+            ctrl.abort();
+            if (domainId == null) reject(new Error('Crawl finished without a domainId'));
+            else resolve(domainId);
+          }
+          if (data.type === 'error') {
+            args.signal.removeEventListener('abort', onAbort);
+            ctrl.abort();
+            reject(new Error(typeof data.error === 'string' ? data.error : 'Crawl failed'));
           }
         } catch {
-          // ignore non-JSON pings
+          /* ignore malformed event */
         }
       },
       onerror(err) {
-        settle(() => reject(err instanceof Error ? err : new Error("Connection error")));
-        throw err;
+        args.signal.removeEventListener('abort', onAbort);
+        ctrl.abort();
+        reject(err instanceof Error ? err : new Error('Crawl SSE failed'));
+        throw err; // stop retrying
       },
-    }).catch(() => {
-      // settle already invoked in onerror — swallow
-    });
+    }).catch(() => undefined);
   });
+}
 
-/**
- * Phase 3 — POST /api/enhanced-phrases/:domainId/step3/generate.
- * Uses named SSE events: `progress`, `step-update`, `complete`, `error`.
- */
-const runPhraseGeneration = (
-  domainId: number,
-  parentSignal: AbortSignal,
-  onProgress: (pct: number, step: string) => void
-): Promise<void> =>
-  new Promise((resolve, reject) => {
-    const ctrl = new AbortController();
-    const onParentAbort = () => ctrl.abort();
-    parentSignal.addEventListener("abort", onParentAbort);
-
-    let settled = false;
-    const settle = (fn: () => void) => {
-      if (settled) return;
-      settled = true;
-      parentSignal.removeEventListener("abort", onParentAbort);
-      ctrl.abort();
-      fn();
-    };
-
-    fetchEventSource(
-      `${API_BASE_URL}/api/enhanced-phrases/${domainId}/step3/generate`,
-      {
-        method: "POST",
-        headers: authHeaders(),
-        body: JSON.stringify({}),
-        signal: ctrl.signal,
-        openWhenHidden: true,
-        async onopen(response) {
-          if (response.ok) return;
-          const text = await response.text().catch(() => "");
-          throw new Error(text || `Failed to start phrase generation (${response.status})`);
-        },
-        onmessage(ev) {
-          switch (ev.event) {
-            case "progress":
-              try {
-                const data = JSON.parse(ev.data);
-                if (typeof data.progress === "number") {
-                  onProgress(data.progress, data.step ?? data.message ?? "");
-                }
-              } catch {}
-              break;
-            case "step-update":
-              try {
-                const data = JSON.parse(ev.data);
-                if (typeof data.progress === "number") {
-                  onProgress(data.progress, `Step ${(data.index ?? 0) + 1}: ${data.status ?? ""}`);
-                }
-              } catch {}
-              break;
-            case "complete":
-              settle(() => resolve());
-              break;
-            case "error":
-              try {
-                const data = JSON.parse(ev.data);
-                settle(() => reject(new Error(data.error ?? "Phrase generation failed")));
-              } catch {
-                settle(() => reject(new Error("Phrase generation failed")));
-              }
-              break;
-            // ignore phrase-generated, debug, steps
-          }
-        },
-        onerror(err) {
-          settle(() => reject(err instanceof Error ? err : new Error("Connection error")));
-          throw err;
-        },
-      }
-    ).catch(() => {});
-  });
-
-/**
- * Phase 4+5 — POST /api/ai-queries/:domainId.
- * Uses named SSE events: `progress`, `result`, `stats`, `complete`, `error`.
- * Progress is reported as text only, so we count `result` events against an
- * optional total parsed from the first `progress` message.
- */
-const runAIQueries = (
-  domainId: number,
-  parentSignal: AbortSignal,
-  onProgress: (pct: number, step: string) => void
-): Promise<void> =>
-  new Promise((resolve, reject) => {
-    const ctrl = new AbortController();
-    const onParentAbort = () => ctrl.abort();
-    parentSignal.addEventListener("abort", onParentAbort);
-
-    let totalExpected = 0;
-    let resultsCount = 0;
-    let settled = false;
-    const settle = (fn: () => void) => {
-      if (settled) return;
-      settled = true;
-      parentSignal.removeEventListener("abort", onParentAbort);
-      ctrl.abort();
-      fn();
-    };
-
-    fetchEventSource(`${API_BASE_URL}/api/ai-queries/${domainId}`, {
-      method: "POST",
-      headers: authHeaders(),
-      body: JSON.stringify({}),
-      signal: ctrl.signal,
-      openWhenHidden: true,
-      async onopen(response) {
-        if (response.ok) return;
-        const text = await response.text().catch(() => "");
-        throw new Error(text || `Failed to start AI queries (${response.status})`);
-      },
-      onmessage(ev) {
-        switch (ev.event) {
-          case "progress":
-            try {
-              const data = JSON.parse(ev.data);
-              const msg: string = data.message ?? "";
-              const m = msg.match(/Processing (\d+) queries/);
-              if (m) totalExpected = parseInt(m[1], 10);
-              const pct = totalExpected > 0
-                ? Math.min(99, Math.round((resultsCount / totalExpected) * 100))
-                : 5;
-              onProgress(pct, msg);
-            } catch {}
-            break;
-          case "result":
-            resultsCount += 1;
-            if (totalExpected > 0) {
-              const pct = Math.min(99, Math.round((resultsCount / totalExpected) * 100));
-              onProgress(pct, `Scored ${resultsCount} of ${totalExpected} queries`);
-            } else {
-              onProgress(50, `Scored ${resultsCount} queries`);
-            }
-            break;
-          case "complete":
-            settle(() => resolve());
-            break;
-          case "error":
-            try {
-              const data = JSON.parse(ev.data);
-              settle(() => reject(new Error(data.error ?? "AI queries failed")));
-            } catch {
-              settle(() => reject(new Error("AI queries failed")));
-            }
-            break;
-          // ignore stats
-        }
-      },
-      onerror(err) {
-        settle(() => reject(err instanceof Error ? err : new Error("Connection error")));
-        throw err;
-      },
-    }).catch(() => {});
-  });
-
-export const AddDomainModal = ({
+export function AddDomainModal({
   open,
   onOpenChange,
   initialUrl,
   lockUrl,
-  title = "Audit a new domain",
-  description = "Enter a URL — we'll crawl it, generate prompts, and run AI queries. You'll land on the report when it's done.",
-  ctaLabel = "Start audit",
-}: AddDomainModalProps) => {
+  title = 'Add domain',
+  description = 'We crawl your site, find competitors, and build the prompt set we will run against the AI models.',
+  ctaLabel = 'Start audit',
+}: AddDomainModalProps) {
   const navigate = useNavigate();
-  const [url, setUrl] = useState(initialUrl ?? "");
-  const [phase, setPhase] = useState<Phase>("idle");
-  const [overall, setOverall] = useState(0);
-  const [step, setStep] = useState("");
-  const [errorMsg, setErrorMsg] = useState("");
+
+  // Step 1 — profile form
+  const [url, setUrl] = useState(initialUrl ?? '');
+  const [country, setCountry] = useState('');
+  const [stateField, setStateField] = useState('');
+  const [industry, setIndustry] = useState('');
+  const [customKeywords, setCustomKeywords] = useState('');
+  const [customPrompts, setCustomPrompts] = useState('');
+
+  // Wizard state
+  const [phase, setPhase] = useState<Phase>('idle');
+  const [progressPct, setProgressPct] = useState(0);
+  const [progressStep, setProgressStep] = useState('');
+  const [error, setError] = useState<string | null>(null);
   const [domainId, setDomainId] = useState<number | null>(null);
-  const ctrlRef = useRef<AbortController | null>(null);
+
+  const [competitors, setCompetitors] = useState<CompetitorRow[]>([]);
+  const [selectedHosts, setSelectedHosts] = useState<Set<string>>(new Set());
+
+  const [topics, setTopics] = useState<TopicItem[]>([]);
+  const [selectedKeywordIds, setSelectedKeywordIds] = useState<Set<number>>(new Set());
+  const [selectedPromptIds, setSelectedPromptIds] = useState<Set<number>>(new Set());
+
+  const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
-    if (open) {
-      setUrl(initialUrl ?? "");
-      setPhase("idle");
-      setOverall(0);
-      setStep("");
-      setErrorMsg("");
-      setDomainId(null);
+    if (initialUrl !== undefined) setUrl(initialUrl);
+  }, [initialUrl]);
+
+  useEffect(() => {
+    if (!open) {
+      // Reset on close.
+      abortRef.current?.abort();
+      abortRef.current = null;
+      setPhase('idle');
+      setError(null);
+      setProgressPct(0);
+      setProgressStep('');
     }
-  }, [open, initialUrl]);
+  }, [open]);
 
-  useEffect(() => {
-    if (phase !== "done" || !domainId) return;
-    const slug = maskDomainId(domainId);
-    const t = setTimeout(() => {
-      onOpenChange(false);
-      navigate(`/ai-results/${slug}`);
-    }, 800);
-    return () => clearTimeout(t);
-  }, [phase, domainId, navigate, onOpenChange]);
+  const customSeeds = useMemo(
+    () => ({
+      keywords: customKeywords.split(',').map((s) => s.trim()).filter(Boolean),
+      prompts: customPrompts.split('\n').map((s) => s.trim()).filter(Boolean),
+    }),
+    [customKeywords, customPrompts]
+  );
 
-  const handleOpenChange = (next: boolean) => {
-    if (!next) ctrlRef.current?.abort();
-    onOpenChange(next);
-  };
-
-  const handleSubmit = async () => {
-    const trimmed = url.trim();
-    if (!trimmed) return;
-
-    setErrorMsg("");
-    setStep("");
-    setOverall(0);
+  async function handleStart() {
+    setError(null);
+    setPhase('crawl');
+    setProgressPct(2);
+    setProgressStep('Validating URL…');
 
     const ctrl = new AbortController();
-    ctrlRef.current = ctrl;
+    abortRef.current = ctrl;
 
     try {
-      setPhase("extract");
-      const id = await runExtractAndKeywords(trimmed, ctrl.signal, (pct, s) => {
-        setOverall(Math.round(pct * 0.33));
-        if (s) setStep(s);
+      // 1. Validate (fast preflight). Stop early on hard failure.
+      const validation = await postJson<{ ok: boolean; reason?: string }>(
+        '/api/wizard/validate',
+        { url },
+        ctrl.signal
+      );
+      if (!validation.ok) throw new Error(validation.reason ?? 'URL validation failed');
+
+      // 2. Crawl + profile via SSE.
+      const id = await streamCrawl({
+        url,
+        country,
+        state: stateField,
+        industry,
+        customSeeds,
+        signal: ctrl.signal,
+        onProgress: (pct, step) => {
+          setProgressPct(Math.max(progressPct, pct));
+          if (step) setProgressStep(step);
+        },
       });
       setDomainId(id);
 
-      setPhase("phrases");
-      setOverall(33);
-      setStep("");
-      await runPhraseGeneration(id, ctrl.signal, (pct, s) => {
-        setOverall(33 + Math.round(pct * 0.33));
-        if (s) setStep(s);
-      });
-
-      setPhase("queries");
-      setOverall(66);
-      setStep("");
-      await runAIQueries(id, ctrl.signal, (pct, s) => {
-        setOverall(66 + Math.round(pct * 0.34));
-        if (s) setStep(s);
-      });
-
-      setPhase("done");
-      setOverall(100);
+      // 3. Competitor pipeline.
+      setPhase('competitors');
+      setProgressPct(0);
+      setProgressStep('Discovering, verifying and ranking competitors…');
+      const compResp = await postJson<{ competitors: CompetitorRow[] }>(
+        `/api/wizard/domain/${id}/competitors`,
+        {},
+        ctrl.signal
+      );
+      setCompetitors(compResp.competitors ?? []);
+      setSelectedHosts(new Set((compResp.competitors ?? []).slice(0, 5).map((c) => c.competitorHost)));
     } catch (err) {
-      if (ctrl.signal.aborted) return; // user-initiated cancel
-      setPhase("error");
-      setErrorMsg(err instanceof Error ? err.message : "Audit failed");
+      if ((err as Error).name === 'AbortError') return;
+      setPhase('error');
+      setError(err instanceof Error ? err.message : 'Wizard failed');
     }
-  };
+  }
 
-  const isBusy = phase === "extract" || phase === "phrases" || phase === "queries";
-  const submitDisabled = isBusy || phase === "done" || !url.trim();
+  async function handleConfirmCompetitors() {
+    if (!domainId) return;
+    setError(null);
+    setProgressStep('Saving competitor selection…');
+    try {
+      await postJson(`/api/wizard/domain/${domainId}/competitors/select`, {
+        hosts: Array.from(selectedHosts),
+      });
+      setPhase('topics');
+      setProgressStep('Generating topics…');
+      const topicsResp = await postJson<{ items: TopicItem[] }>(
+        `/api/wizard/domain/${domainId}/topics`,
+        {}
+      );
+      setTopics(topicsResp.items ?? []);
+      // Default-select all generated items.
+      setSelectedKeywordIds(new Set(topicsResp.items.filter((i) => i.type === 'keyword').map((i) => i.id)));
+      setSelectedPromptIds(new Set(topicsResp.items.filter((i) => i.type === 'prompt').map((i) => i.id)));
+    } catch (err) {
+      setPhase('error');
+      setError(err instanceof Error ? err.message : 'Topics generation failed');
+    }
+  }
+
+  // Debounced auto-save of selection draft.
+  useEffect(() => {
+    if (!domainId || phase !== 'topics') return;
+    const timer = setTimeout(() => {
+      patchJson(`/api/wizard/domain/${domainId}/draft`, {
+        keywordIds: Array.from(selectedKeywordIds),
+        promptIds: Array.from(selectedPromptIds),
+      }).catch(() => undefined);
+    }, 600);
+    return () => clearTimeout(timer);
+  }, [domainId, phase, selectedKeywordIds, selectedPromptIds]);
+
+  async function handleGenerateReport() {
+    if (!domainId) return;
+    setError(null);
+    setProgressStep('Locking selection…');
+    try {
+      await postJson(`/api/wizard/domain/${domainId}/select`, {
+        keywordIds: Array.from(selectedKeywordIds),
+        promptIds: Array.from(selectedPromptIds),
+      });
+      setPhase('done');
+      // Navigate to results page (preserves existing route shape).
+      navigate(`/ai-results/${maskDomainId(domainId)}`);
+    } catch (err) {
+      setPhase('error');
+      setError(err instanceof Error ? err.message : 'Final selection failed');
+    }
+  }
+
+  const renderProgress = () => (
+    <div className="space-y-3">
+      <div className="flex items-center gap-3">
+        <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
+        <span className="text-sm text-slate-700">{progressStep || 'Working…'}</span>
+      </div>
+      <div className="h-1.5 bg-slate-100 rounded">
+        <div
+          className="h-1.5 bg-blue-600 rounded transition-all"
+          style={{ width: `${Math.min(100, Math.max(0, progressPct))}%` }}
+        />
+      </div>
+    </div>
+  );
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-lg">
-            <Globe className="h-5 w-5 text-[#4f628a]" />
-            {title}
+          <DialogTitle className="flex items-center gap-2">
+            <Globe className="h-4 w-4" /> {title}
           </DialogTitle>
           <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 py-2">
-          <div className="space-y-1.5">
-            <label htmlFor="domain-url" className="text-xs font-semibold text-[#4d5d78]">
-              Domain URL
-            </label>
-            <Input
-              id="domain-url"
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-              placeholder="https://example.com"
-              disabled={isBusy || phase === "done" || lockUrl}
-              autoFocus={!lockUrl}
-            />
+        {phase === 'idle' || phase === 'error' ? (
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm text-slate-600 mb-1 block">Domain URL</label>
+              <Input
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                placeholder="example.com"
+                disabled={lockUrl}
+              />
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              <Input value={country} onChange={(e) => setCountry(e.target.value)} placeholder="Country" />
+              <Input value={stateField} onChange={(e) => setStateField(e.target.value)} placeholder="State" />
+              <Input value={industry} onChange={(e) => setIndustry(e.target.value)} placeholder="Industry" />
+            </div>
+            <div>
+              <label className="text-xs text-slate-500 mb-1 block">Custom keywords (comma-separated)</label>
+              <Input
+                value={customKeywords}
+                onChange={(e) => setCustomKeywords(e.target.value)}
+                placeholder="ai seo audit, best ai visibility tool"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-slate-500 mb-1 block">Custom prompts (one per line)</label>
+              <textarea
+                className="w-full text-sm rounded border border-slate-200 p-2 min-h-[60px]"
+                value={customPrompts}
+                onChange={(e) => setCustomPrompts(e.target.value)}
+                placeholder="What is the best AI visibility tool for SaaS startups?"
+              />
+            </div>
+            {error ? <p className="text-sm text-red-600">{error}</p> : null}
+            <div className="flex justify-end gap-2">
+              <Button variant="ghost" onClick={() => onOpenChange(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleStart} disabled={!url.trim()}>
+                {ctaLabel}
+              </Button>
+            </div>
           </div>
-
-          {phase !== "idle" && phase !== "error" && (
-            <div className="space-y-2 rounded-lg border border-[#e2e6ee] bg-[#f7f8fb] p-3">
-              <div className="flex items-center justify-between text-xs">
-                <span className="font-medium text-[#374252]">{PHASE_LABEL[phase]}</span>
-                <span className="font-semibold text-[#4f628a]">{overall}%</span>
-              </div>
-              <div className="h-1.5 w-full overflow-hidden rounded-full bg-[#d6dbe5]">
-                <div
-                  className="h-full rounded-full bg-gradient-to-r from-[#2D4059] to-[#4E76C7] transition-[width] duration-300"
-                  style={{ width: `${Math.max(0, Math.min(100, overall))}%` }}
-                />
-              </div>
-              {step && phase !== "done" && (
-                <p className="line-clamp-2 text-[11px] text-[#7f8795]">{step}</p>
-              )}
-              {phase === "done" && (
-                <p className="text-xs text-[#4e9f2d]">Audit complete — opening report…</p>
-              )}
+        ) : phase === 'crawl' ? (
+          renderProgress()
+        ) : phase === 'competitors' ? (
+          <div className="space-y-4">
+            <p className="text-sm text-slate-600">
+              {competitors.length === 0 ? renderProgress() : 'Pick the competitors you want to track:'}
+            </p>
+            <div className="max-h-72 overflow-y-auto space-y-1">
+              {competitors.map((c) => (
+                <label
+                  key={c.competitorHost}
+                  className="flex items-start gap-3 p-2 rounded hover:bg-slate-50 cursor-pointer"
+                >
+                  <input
+                    type="checkbox"
+                    checked={selectedHosts.has(c.competitorHost)}
+                    onChange={(e) => {
+                      const next = new Set(selectedHosts);
+                      if (e.target.checked) next.add(c.competitorHost);
+                      else next.delete(c.competitorHost);
+                      setSelectedHosts(next);
+                    }}
+                    className="mt-1"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-sm text-slate-900">{c.competitorHost}</span>
+                      {c.threatLevel ? (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">
+                          {c.threatLevel}
+                        </span>
+                      ) : null}
+                      {typeof c.similarityScore === 'number' ? (
+                        <span className="text-[10px] text-slate-400">
+                          score {c.similarityScore.toFixed(2)}
+                        </span>
+                      ) : null}
+                    </div>
+                    {c.reasoning ? <p className="text-xs text-slate-500">{c.reasoning}</p> : null}
+                  </div>
+                </label>
+              ))}
             </div>
-          )}
-
-          {phase === "error" && (
-            <div className="rounded-lg border border-[#fad4d4] bg-[#fff5f5] p-3 text-xs text-[#cf3d3d]">
-              {errorMsg || "Audit failed. Try again."}
+            <div className="flex justify-end gap-2">
+              <Button variant="ghost" onClick={() => onOpenChange(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleConfirmCompetitors} disabled={competitors.length === 0}>
+                Continue
+              </Button>
             </div>
-          )}
-        </div>
+          </div>
+        ) : phase === 'topics' ? (
+          <div className="space-y-4">
+            <p className="text-sm text-slate-600">
+              {topics.length === 0 ? renderProgress() : 'Confirm the keywords + prompts to test against AI models:'}
+            </p>
+            <div className="max-h-80 overflow-y-auto space-y-1">
+              {topics.map((t) => {
+                const isKeyword = t.type === 'keyword';
+                const checked = isKeyword
+                  ? selectedKeywordIds.has(t.id)
+                  : selectedPromptIds.has(t.id);
+                return (
+                  <label
+                    key={`${t.type}-${t.id}`}
+                    className={`flex items-center gap-3 p-2 rounded hover:bg-slate-50 cursor-pointer ${
+                      isKeyword ? 'bg-slate-50/50 font-medium' : 'pl-8 text-sm'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={(e) => {
+                        if (isKeyword) {
+                          const next = new Set(selectedKeywordIds);
+                          if (e.target.checked) next.add(t.id);
+                          else next.delete(t.id);
+                          setSelectedKeywordIds(next);
+                        } else {
+                          const next = new Set(selectedPromptIds);
+                          if (e.target.checked) next.add(t.id);
+                          else next.delete(t.id);
+                          setSelectedPromptIds(next);
+                        }
+                      }}
+                    />
+                    <span className="flex-1">{t.text}</span>
+                    {t.intent ? (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-500">
+                        {t.intent}
+                      </span>
+                    ) : null}
+                  </label>
+                );
+              })}
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="ghost" onClick={() => onOpenChange(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleGenerateReport} disabled={selectedPromptIds.size === 0}>
+                Generate report
+              </Button>
+            </div>
+          </div>
+        ) : phase === 'done' ? (
+          <p className="text-sm text-slate-600">Selection saved. Redirecting…</p>
+        ) : null}
 
-        <div className="flex items-center justify-end gap-2 pt-2">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => handleOpenChange(false)}
-            disabled={isBusy && phase !== "queries"}
-          >
-            {phase === "done" ? "Close" : "Cancel"}
-          </Button>
-          <Button
-            type="button"
-            onClick={handleSubmit}
-            disabled={submitDisabled}
-            className="bg-[#2D4059] text-white hover:bg-[#24364d]"
-          >
-            {isBusy && <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />}
-            {phase === "error" ? "Retry" : ctaLabel}
-          </Button>
-        </div>
+        {error && phase !== 'idle' ? (
+          <p className="text-sm text-red-600 mt-2">{error}</p>
+        ) : null}
       </DialogContent>
     </Dialog>
   );
-};
+}
+
+export default AddDomainModal;

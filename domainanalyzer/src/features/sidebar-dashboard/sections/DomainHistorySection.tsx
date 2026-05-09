@@ -38,10 +38,32 @@ type DomainItem = {
   id: number;
   name: string;
   url: string;
-  status: "success" | "retry";
+  /**
+   * - "success": run has completed at least once → render visibility score
+   * - "inprogress": wizard partially done → render "Resume at Step N"
+   * - "retry": never crawled → render "Run analysis"
+   */
+  status: "success" | "inprogress" | "retry";
+  /** Wizard step the user left off at (1..5). Used for the resume label. */
+  currentStep: number;
   visibility?: number;
   topKeywords?: number;
   topPrompts?: number;
+};
+
+// Human-readable label for the next thing the user should DO, given the
+// last completed phase (currentStep).
+//
+// Note: at currentStep 3 the topics LLM has generated, but the user has
+// not yet picked which prompts to run — so the next user action is still
+// "Pick prompts", not "Run analysis". The cached topics just mean the
+// picker loads instantly when the user resumes.
+const NEXT_STEP_LABEL: Record<number, string> = {
+  0: "Start audit",
+  1: "Pick competitors",
+  2: "Pick prompts",
+  3: "Pick prompts",
+  4: "Resume run",
 };
 
 type FetchState =
@@ -59,13 +81,20 @@ const getDisplayName = (domain: DashboardDomain) => {
 };
 
 const toItem = (d: DashboardDomain): DomainItem => {
-  const isComplete = d.currentStep === 4 && Boolean(d.metrics);
+  const step = d.currentStep ?? 0;
+  const hasVisibility = typeof d.metrics?.visibilityScore === "number";
+  // currentStep 5 = run completed (5-step wizard).
+  const status: DomainItem["status"] =
+    step >= 5 && hasVisibility ? "success" : step > 0 ? "inprogress" : "retry";
   return {
     id: d.id,
     name: getDisplayName(d),
     url: d.url,
-    status: isComplete ? "success" : "retry",
-    visibility: d.metrics?.visibilityScore,
+    status,
+    currentStep: step,
+    visibility: typeof d.metrics?.visibilityScore === "number"
+      ? Math.round((d.metrics.visibilityScore as number) * 10) // 0..10 → 0..100 for the bar
+      : undefined,
     topKeywords: d.metrics?.keywordCount,
     topPrompts: d.metrics?.phraseCount,
   };
@@ -84,7 +113,7 @@ export function DomainHistorySection({ onMenuItemClick }: DomainHistorySectionPr
 
   useEffect(() => {
     let alive = true;
-    apiGet<{ domains: DashboardDomain[] }>("/dashboard/all")
+    apiGet<{ domains: DashboardDomain[] }>("/wizard/domains")
       .then((data) => {
         if (!alive) return;
         setState({ status: "ready", domains: data?.domains ?? [] });
@@ -105,9 +134,9 @@ export function DomainHistorySection({ onMenuItemClick }: DomainHistorySectionPr
 
   const stats = useMemo(() => {
     const total = allDomains.length;
-    const completed = allDomains.filter((d) => d.currentStep === 4).length;
+    const completed = allDomains.filter((d) => (d.currentStep ?? 0) >= 5).length;
     const inProgress = allDomains.filter(
-      (d) => (d.currentStep ?? 0) > 0 && (d.currentStep ?? 0) < 4
+      (d) => (d.currentStep ?? 0) > 0 && (d.currentStep ?? 0) < 5
     ).length;
     const totalQueries = allDomains.reduce(
       (sum, d) => sum + (d.metrics?.totalQueries ?? 0),
@@ -375,27 +404,62 @@ export function DomainHistorySection({ onMenuItemClick }: DomainHistorySectionPr
                     )}
                   </div>
 
-                  <div className={`flex h-8 w-8 items-center justify-center rounded-lg ${domain.status === "retry" ? "bg-[#ffeef0]" : "bg-[#eaf7e9]"}`}>
-                    {domain.status === "retry" ? (
-                      <RefreshCw className="h-3.5 w-3.5 text-[#cf3d3d]" />
-                    ) : (
+                  <div
+                    className={`flex h-8 w-8 items-center justify-center rounded-lg ${
+                      domain.status === "success"
+                        ? "bg-[#eaf7e9]"
+                        : domain.status === "inprogress"
+                          ? "bg-[#fff7e5]"
+                          : "bg-[#ffeef0]"
+                    }`}
+                  >
+                    {domain.status === "success" ? (
                       <Check className="h-4 w-4 text-[#4e9f2d]" />
+                    ) : domain.status === "inprogress" ? (
+                      <CircleAlert className="h-3.5 w-3.5 text-[#d59a00]" />
+                    ) : (
+                      <RefreshCw className="h-3.5 w-3.5 text-[#cf3d3d]" />
                     )}
                   </div>
                 </div>
 
                 {domain.status === "retry" ? (
                   <div className="flex h-[145px] flex-col items-center justify-center">
-                    <p className="text-[20px] font-semibold text-[#414651]">Retry analysis</p>
+                    <p className="text-[20px] font-semibold text-[#414651]">Run analysis</p>
                     <button
                       type="button"
-                      onClick={() => setRetryUrl(domain.url)}
-                      aria-label={`Retry analysis for ${domain.name}`}
+                      onClick={() => navigate(`/ai-checker-v2?domain=${domain.id}`)}
+                      aria-label={`Run analysis for ${domain.name}`}
                       className="mt-4 inline-flex h-11 w-11 items-center justify-center rounded-md bg-[#f0f3f8] text-[#4d5d78] hover:bg-[#e6ebf3]"
                     >
                       <RefreshCw className="h-4 w-4" />
                     </button>
                   </div>
+                ) : domain.status === "inprogress" ? (
+                  <button
+                    type="button"
+                    onClick={() => navigate(`/ai-checker-v2?domain=${domain.id}`)}
+                    className="block w-full text-left"
+                  >
+                    <div className="mb-2 border-t border-[#edf1f7] pt-3">
+                      <p className="mb-1 text-[13px] font-medium uppercase tracking-wide text-[#7f8795]">
+                        Resume at step {Math.min(5, domain.currentStep + 1)} of 5
+                      </p>
+                      <p className="text-[20px] font-semibold text-[#414651]">
+                        {NEXT_STEP_LABEL[domain.currentStep] ?? "Continue"}
+                      </p>
+                      <div className="mt-3 h-2 rounded-full bg-[#d6dbe5]">
+                        <div
+                          className="h-2 rounded-full bg-[#6f8fc9] transition-all"
+                          style={{ width: `${(domain.currentStep / 5) * 100}%` }}
+                        />
+                      </div>
+                    </div>
+                    <div className="mt-3 flex items-center justify-between text-xs text-[#7f8795]">
+                      <span>Click to resume</span>
+                      <span className="text-[#3d83df] font-medium">→</span>
+                    </div>
+                  </button>
                 ) : (
                   <button
                     type="button"
