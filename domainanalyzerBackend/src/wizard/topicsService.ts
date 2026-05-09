@@ -310,20 +310,49 @@ export interface PersistedTopicsItem {
 }
 
 export async function persistAuditPrompts(args: PersistArgs): Promise<PersistedTopicsItem[]> {
-  // Fresh regen wipes AI-source rows; append mode keeps them.
+  // Fresh regen used to delete AI prompts/keywords, which cascade-deleted
+  // their AiQueryResult rows and destroyed Track-pages history every time
+  // the user clicked "Pick new prompts". Now we archive instead of delete:
+  //   - Prompts that have any results: set archivedAt=now (kept for history,
+  //     hidden from picker via the listAllTopicItems archivedAt:null filter).
+  //   - Prompts with no results: safe to delete (clean up unpicked dross).
+  //   - Keywords: never deleted on regen — the (domainId, term) unique
+  //     constraint keeps the row stable across regens, so the upsert below
+  //     reuses the existing id (preserving /keywords/:id/history), and we
+  //     just clear archivedAt to bring it back into the picker.
   if (!args.append) {
+    const aiPrompts = await args.prisma.prompt.findMany({
+      where: { domainId: args.domainId, source: 'ai' },
+      select: { id: true, _count: { select: { results: true } } },
+    });
+    const archiveIds = aiPrompts.filter((p) => p._count.results > 0).map((p) => p.id);
+    const deleteIds  = aiPrompts.filter((p) => p._count.results === 0).map((p) => p.id);
+    if (archiveIds.length > 0) {
+      await args.prisma.prompt.updateMany({
+        where: { id: { in: archiveIds } },
+        data: { archivedAt: new Date(), isSelected: false },
+      });
+    }
+    if (deleteIds.length > 0) {
+      await args.prisma.prompt.deleteMany({ where: { id: { in: deleteIds } } });
+    }
+    // Archive AI keywords whose prompts still exist (kept for history),
+    // delete the rest. The upsert in the loop below will revive any term
+    // that comes back this regen by clearing archivedAt + isSelected.
     const aiKeywords = await args.prisma.keyword.findMany({
       where: { domainId: args.domainId, source: 'ai' },
-      select: { id: true },
+      select: { id: true, _count: { select: { prompts: true } } },
     });
-    const aiKeywordIds = aiKeywords.map((k) => k.id);
-    if (aiKeywordIds.length > 0) {
-      await args.prisma.prompt.deleteMany({
-        where: { domainId: args.domainId, OR: [{ keywordId: { in: aiKeywordIds } }, { keywordId: null, source: 'ai' }] },
+    const kwArchiveIds = aiKeywords.filter((k) => k._count.prompts > 0).map((k) => k.id);
+    const kwDeleteIds  = aiKeywords.filter((k) => k._count.prompts === 0).map((k) => k.id);
+    if (kwArchiveIds.length > 0) {
+      await args.prisma.keyword.updateMany({
+        where: { id: { in: kwArchiveIds } },
+        data: { archivedAt: new Date(), isSelected: false },
       });
-      await args.prisma.keyword.deleteMany({ where: { id: { in: aiKeywordIds } } });
-    } else {
-      await args.prisma.prompt.deleteMany({ where: { domainId: args.domainId, source: 'ai', keywordId: null } });
+    }
+    if (kwDeleteIds.length > 0) {
+      await args.prisma.keyword.deleteMany({ where: { id: { in: kwDeleteIds } } });
     }
   }
 
@@ -343,7 +372,9 @@ export async function persistAuditPrompts(args: PersistArgs): Promise<PersistedT
     const intent = prompts[0]?.intent ?? 'Commercial';
     const keyword = await args.prisma.keyword.upsert({
       where: { domainId_term: { domainId: args.domainId, term: keywordTerm } },
-      update: { intent, source: 'ai' },
+      // Clear archivedAt on revive so the picker shows this keyword again.
+      // The id stays stable, so /keywords/:id/history rolls up across runs.
+      update: { intent, source: 'ai', archivedAt: null },
       create: {
         domainId: args.domainId,
         term: keywordTerm,

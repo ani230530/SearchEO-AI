@@ -337,8 +337,10 @@ router.get('/domain/:id', authenticateToken, async (req: Request, res: Response)
   const [crawls, competitors, keywords, prompts, runs] = await Promise.all([
     prisma.crawlSnapshot.findMany({ where: { domainId: domain.id }, orderBy: { createdAt: 'desc' }, take: 1 }),
     prisma.competitor.findMany({ where: { domainId: domain.id }, orderBy: { rank: 'asc' } }),
-    prisma.keyword.findMany({ where: { domainId: domain.id } }),
-    prisma.prompt.findMany({ where: { domainId: domain.id } }),
+    // archivedAt: null hides the historical generations of AI prompts/keywords
+    // from the wizard picker — they're kept for trend history but not pickable.
+    prisma.keyword.findMany({ where: { domainId: domain.id, archivedAt: null } }),
+    prisma.prompt.findMany({ where: { domainId: domain.id, archivedAt: null } }),
     prisma.aiRun.findMany({ where: { domainId: domain.id }, orderBy: { startedAt: 'desc' }, take: 5 }),
   ]);
   return res.json({ domain, crawls, competitors, keywords, prompts, runs });
@@ -376,13 +378,14 @@ router.get('/domain/:id/report', authenticateToken, async (req: Request, res: Re
       orderBy: { createdAt: 'desc' },
       take: 1000,
     }),
-    // Load ALL keywords for this domain (not just isSelected). Many AI-generated
-    // keywords have isSelected=false because the user picked the child prompts
-    // rather than the keyword itself, but we still need the keyword rows so the
-    // rollup at line ~398 can render parent rows for queried prompts. Filtering
-    // by `queriedKeywordIds.has(k.id)` further down keeps the result set tight.
+    // Load ALL keywords for this domain INCLUDING archived ones — past-run
+    // reports need to surface keywords whose current generation is gone.
+    // The rollup further down filters by queried ids so the response stays tight.
     prisma.keyword.findMany({ where: { domainId: domain.id } }),
-    prisma.prompt.findMany({ where: { domainId: domain.id, isSelected: true } }),
+    // Load all prompts in this domain regardless of isSelected/archivedAt —
+    // we filter by queried ids further down. Loading by isSelected only would
+    // miss prompts that ran in a past audit but were since archived/deselected.
+    prisma.prompt.findMany({ where: { domainId: domain.id } }),
   ]);
 
   const summary = (latestRun?.summary as Record<string, unknown> | null) ?? null;
@@ -774,9 +777,22 @@ router.get('/domain/:id/prompts/:promptId/history', authenticateToken, async (re
   });
   if (!prompt) return res.status(404).json({ error: 'Prompt not found' });
 
+  // Match across regens by TEXT (case-insensitive, trimmed). Each "Pick new
+  // prompts" creates new Prompt rows, but their text often repeats verbatim
+  // across regens. The archived-prompts retention guarantees the rows are
+  // still in the DB so we can include their results in the rollup.
+  const normalized = prompt.text.trim().toLowerCase();
+  const siblingPrompts = await prisma.prompt.findMany({
+    where: { domainId: domain.id, text: { equals: prompt.text, mode: 'insensitive' } },
+    select: { id: true },
+  });
+  // Defensive: if the case-insensitive index miss anything, also include the
+  // exact id we were asked about so we never under-report this prompt's data.
+  const siblingIds = Array.from(new Set([...siblingPrompts.map((p) => p.id), promptId]));
+
   const rows = await prisma.aiQueryResult.findMany({
     where: {
-      promptId,
+      promptId: { in: siblingIds },
       run: { domainId: domain.id, status: 'completed' },
     },
     select: {
@@ -786,6 +802,8 @@ router.get('/domain/:id/prompts/:promptId/history', authenticateToken, async (re
       run: { select: { startedAt: true } },
     },
   });
+  // Reference the normalized text to keep TS happy + signal intent.
+  void normalized;
 
   // Bucket per run.
   type Bucket = { runId: number; startedAt: Date; mentions: number; total: number; sentSum: number; sentCount: number };
@@ -837,9 +855,18 @@ router.get('/domain/:id/keywords/:keywordId/history', authenticateToken, async (
   });
   if (!keyword) return res.status(404).json({ error: 'Keyword not found' });
 
-  // Pull the child prompt ids first so we can scope the result query.
+  // Pull child prompt ids across all generations of this keyword. Even
+  // though the (domainId, term) unique index keeps Keyword.id stable across
+  // regens, this query also matches by term to be defensive against any
+  // term-renaming edge cases. Includes archived prompts so historical
+  // results stay in the rollup.
+  const siblingKeywords = await prisma.keyword.findMany({
+    where: { domainId: domain.id, term: { equals: keyword.term, mode: 'insensitive' } },
+    select: { id: true },
+  });
+  const siblingKwIds = Array.from(new Set([...siblingKeywords.map((k) => k.id), keywordId]));
   const childPrompts = await prisma.prompt.findMany({
-    where: { domainId: domain.id, keywordId },
+    where: { domainId: domain.id, keywordId: { in: siblingKwIds } },
     select: { id: true },
   });
   const childIds = childPrompts.map((p) => p.id);
@@ -1048,12 +1075,37 @@ router.post('/domain/:id/restart', authenticateToken, async (req: Request, res: 
   }
 
   if (from === 'crawl') {
-    // Hard reset — keep Domain + DomainProfile, wipe everything generated.
+    // Hard reset of the WIZARD state — keep Domain + DomainProfile, but
+    // also keep AiRun + AiQueryResult so the Track pages' trend chart
+    // doesn't reset to one dot every time the user re-crawls. Prompts and
+    // keywords with results are archived (not deleted) so /history can
+    // still resolve them; rows with no results are safe to delete.
+    const promptsWithCounts = await prisma.prompt.findMany({
+      where: { domainId: domain.id },
+      select: { id: true, _count: { select: { results: true } } },
+    });
+    const promptArchive = promptsWithCounts.filter((p) => p._count.results > 0).map((p) => p.id);
+    const promptDelete  = promptsWithCounts.filter((p) => p._count.results === 0).map((p) => p.id);
+    const keywordsWithCounts = await prisma.keyword.findMany({
+      where: { domainId: domain.id },
+      select: { id: true, _count: { select: { prompts: true } } },
+    });
+    const keywordArchive = keywordsWithCounts.filter((k) => k._count.prompts > 0).map((k) => k.id);
+    const keywordDelete  = keywordsWithCounts.filter((k) => k._count.prompts === 0).map((k) => k.id);
+
     await prisma.$transaction([
-      prisma.aiQueryResult.deleteMany({ where: { run: { domainId: domain.id } } }),
-      prisma.aiRun.deleteMany({ where: { domainId: domain.id } }),
-      prisma.prompt.deleteMany({ where: { domainId: domain.id } }),
-      prisma.keyword.deleteMany({ where: { domainId: domain.id } }),
+      promptArchive.length > 0
+        ? prisma.prompt.updateMany({ where: { id: { in: promptArchive } }, data: { archivedAt: new Date(), isSelected: false } })
+        : prisma.prompt.updateMany({ where: { id: { in: [] } }, data: {} }),
+      promptDelete.length > 0
+        ? prisma.prompt.deleteMany({ where: { id: { in: promptDelete } } })
+        : prisma.prompt.deleteMany({ where: { id: { in: [] } } }),
+      keywordArchive.length > 0
+        ? prisma.keyword.updateMany({ where: { id: { in: keywordArchive } }, data: { archivedAt: new Date(), isSelected: false } })
+        : prisma.keyword.updateMany({ where: { id: { in: [] } }, data: {} }),
+      keywordDelete.length > 0
+        ? prisma.keyword.deleteMany({ where: { id: { in: keywordDelete } } })
+        : prisma.keyword.deleteMany({ where: { id: { in: [] } } }),
       prisma.competitor.deleteMany({ where: { domainId: domain.id } }),
       prisma.crawlSnapshot.deleteMany({ where: { domainId: domain.id } }),
       // Reset wizard phases to "nothing done".
@@ -1064,29 +1116,36 @@ router.post('/domain/:id/restart', authenticateToken, async (req: Request, res: 
       }),
     ]);
   } else {
-    // Soft reset — keep crawl, competitors, custom prompts/keywords.
-    // Drop AI-source prompts/keywords + every run.
+    // Soft reset — keep crawl, competitors, custom prompts/keywords. Same
+    // archive-instead-of-delete pattern as the crawl branch above so the
+    // Track pages' trend history survives the regen. AiRun + AiQueryResult
+    // are never touched here — past audits stay queryable.
+    const aiPrompts = await prisma.prompt.findMany({
+      where: { domainId: domain.id, source: 'ai' },
+      select: { id: true, _count: { select: { results: true } } },
+    });
+    const promptArchive = aiPrompts.filter((p) => p._count.results > 0).map((p) => p.id);
+    const promptDelete  = aiPrompts.filter((p) => p._count.results === 0).map((p) => p.id);
     const aiKeywords = await prisma.keyword.findMany({
       where: { domainId: domain.id, source: 'ai' },
-      select: { id: true },
+      select: { id: true, _count: { select: { prompts: true } } },
     });
-    const aiKwIds = aiKeywords.map((k) => k.id);
+    const keywordArchive = aiKeywords.filter((k) => k._count.prompts > 0).map((k) => k.id);
+    const keywordDelete  = aiKeywords.filter((k) => k._count.prompts === 0).map((k) => k.id);
 
-    // Soft reset: drop AI prompts/keywords. We deliberately keep AiRun rows
-    // (and let AiQueryResult cascade-delete via the prompt FK) so the
-    // dashboard's "latest completed run" lookup still finds the previous
-    // run's summary.avgOverall while the user re-picks prompts. Without this,
-    // the Domain History card flips from "Visibility 72%" to "Pick prompts"
-    // the moment the user enters Step 4 from the AI Dashboard, which is
-    // disorienting — the prior result hasn't been replaced yet.
     await prisma.$transaction([
-      prisma.prompt.deleteMany({
-        where: {
-          domainId: domain.id,
-          OR: [{ source: 'ai' }, { keywordId: { in: aiKwIds } }],
-        },
-      }),
-      prisma.keyword.deleteMany({ where: { id: { in: aiKwIds } } }),
+      promptArchive.length > 0
+        ? prisma.prompt.updateMany({ where: { id: { in: promptArchive } }, data: { archivedAt: new Date(), isSelected: false } })
+        : prisma.prompt.updateMany({ where: { id: { in: [] } }, data: {} }),
+      promptDelete.length > 0
+        ? prisma.prompt.deleteMany({ where: { id: { in: promptDelete } } })
+        : prisma.prompt.deleteMany({ where: { id: { in: [] } } }),
+      keywordArchive.length > 0
+        ? prisma.keyword.updateMany({ where: { id: { in: keywordArchive } }, data: { archivedAt: new Date(), isSelected: false } })
+        : prisma.keyword.updateMany({ where: { id: { in: [] } }, data: {} }),
+      keywordDelete.length > 0
+        ? prisma.keyword.deleteMany({ where: { id: { in: keywordDelete } } })
+        : prisma.keyword.deleteMany({ where: { id: { in: [] } } }),
       // Drop topics/select/run phases; keep crawl + profile + competitors.
       prisma.wizardState.upsert({
         where: { domainId: domain.id },
@@ -1497,9 +1556,12 @@ router.post('/domain/:id/prompts/custom', authenticateToken, async (req: Request
  * shape regardless of which endpoint produced the change.
  */
 async function listAllTopicItems(prismaClient: typeof prisma, domainId: number) {
+  // Picker only shows the CURRENT generation — archived rows (kept for
+  // /history rollups on the Track pages) are filtered out so the user
+  // doesn't see stale prompts from previous re-audits in the picker.
   const [keywords, prompts] = await Promise.all([
-    prismaClient.keyword.findMany({ where: { domainId }, orderBy: { id: 'asc' } }),
-    prismaClient.prompt.findMany({ where: { domainId }, orderBy: { id: 'asc' } }),
+    prismaClient.keyword.findMany({ where: { domainId, archivedAt: null }, orderBy: { id: 'asc' } }),
+    prismaClient.prompt.findMany({ where: { domainId, archivedAt: null }, orderBy: { id: 'asc' } }),
   ]);
   // Keep this object literal forgiving — the new audit-research metadata
   // (category / intentStage / persona / useCase / constraint / isBranded /
