@@ -96,10 +96,10 @@ const PageQueriesTable = ({
       ...data.map((row) =>
         [
           `"${row.query}"`,
-          row.clicks,
-          row.impressions,
-          row.position.toFixed(1),
-          (row.ctr * 100).toFixed(1) + "%",
+          typeof row.clicks === 'number' ? row.clicks : 0,
+          typeof row.impressions === 'number' ? row.impressions : 0,
+          (typeof row.position === 'number' ? row.position : 0).toFixed(1),
+          ((typeof row.ctr === 'number' ? row.ctr : 0) * 100).toFixed(1) + "%",
         ].join(",")
       ),
     ].join("\n");
@@ -152,7 +152,8 @@ const PageQueriesTable = ({
         accessorKey: "position",
         header: "Avg Position",
         cell: ({ row }) => {
-          const position = row.getValue("position") as number;
+          const raw = row.getValue("position");
+          const position = typeof raw === 'number' && Number.isFinite(raw) ? raw : 0;
           return <span className="text-gray-700 text-sm">{position.toFixed(1)}</span>;
         },
       },
@@ -160,7 +161,8 @@ const PageQueriesTable = ({
         accessorKey: "ctr",
         header: "CTR",
         cell: ({ row }) => {
-          const ctr = row.getValue("ctr") as number;
+          const raw = row.getValue("ctr");
+          const ctr = typeof raw === 'number' && Number.isFinite(raw) ? raw : 0;
           return <span className="text-gray-700 text-sm">{(ctr * 100).toFixed(1)}%</span>;
         },
       },
@@ -598,22 +600,22 @@ const PageQueriesTable = ({
                 </div>
                 <div className="flex items-center justify-center">
                   <span className="font-medium text-gray-900 text-sm">
-                    {query.clicks.toLocaleString()}
+                    {(typeof query.clicks === 'number' ? query.clicks : 0).toLocaleString()}
                   </span>
                 </div>
                 <div className="flex items-center justify-center">
                   <span className="font-medium text-gray-900 text-sm">
-                    {query.impressions.toLocaleString()}
+                    {(typeof query.impressions === 'number' ? query.impressions : 0).toLocaleString()}
                   </span>
                 </div>
                 <div className="flex items-center justify-center">
                   <span className="text-gray-700 text-sm">
-                    {query.position.toFixed(1)}
+                    {(typeof query.position === 'number' ? query.position : 0).toFixed(1)}
                   </span>
                 </div>
                 <div className="flex items-center justify-center">
                   <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-100">
-                    {(query.ctr * 100).toFixed(1)}%
+                    {((typeof query.ctr === 'number' ? query.ctr : 0) * 100).toFixed(1)}%
                   </span>
                 </div>
               </div>
