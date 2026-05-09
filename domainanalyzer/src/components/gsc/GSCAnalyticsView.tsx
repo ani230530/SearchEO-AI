@@ -1,12 +1,143 @@
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { RefreshCw, Calendar, Plug, AlertCircle, Loader2 } from "lucide-react";
+import { RefreshCw, Calendar, Plug, AlertCircle, Loader2, ExternalLink } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import PagesTable from "./PagesTable";
 import PageQueriesTable from "./PageQueriesTable";
 import { getDefaultDateRange, formatDateForDisplay, getDateRangeDescription } from "@/lib/gsc/dateUtils";
-// GSCBlogAnalytics was deleted in the foundational rewrite — to be rebuilt
-// against the new schema. Blog-performance tab shows a placeholder for now.
+
+type BlogAggregateRow = {
+  id: number;
+  url: string;
+  title: string;
+  primaryKeyword: string | null;
+  clicks: number;
+  impressions: number;
+  ctr: number;
+  position: number;
+};
+
+type BlogAggregate = {
+  success: boolean;
+  connected: boolean;
+  totalClicks: number;
+  totalImpressions: number;
+  avgCTR: number;
+  avgPosition: number;
+  blogs: BlogAggregateRow[];
+  topPerformingBlogs: BlogAggregateRow[];
+  totalBlogsAnalyzed: number;
+};
+
+const BlogPerformancePanel = ({ days }: { days: string }) => {
+  const { data, isLoading, error, refetch } = useQuery<BlogAggregate>({
+    queryKey: ['blog-analytics-aggregate', days],
+    queryFn: async () => {
+      const params = days !== 'custom' ? `?days=${days}` : '';
+      const r = await fetch(`${API_BASE_URL}/api/blog-analytics/aggregate${params}`, {
+        headers: getAuthHeaders(),
+      });
+      if (!r.ok) throw new Error(`Aggregate fetch failed (${r.status})`);
+      return r.json();
+    },
+  });
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-16">
+        <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+      </div>
+    );
+  }
+  if (error) {
+    return (
+      <div className="text-center py-16">
+        <AlertCircle className="h-8 w-8 mx-auto mb-3 text-rose-400" />
+        <p className="text-sm text-slate-600">{(error as Error).message}</p>
+        <button
+          onClick={() => refetch()}
+          className="mt-3 inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+        >
+          <RefreshCw className="h-3.5 w-3.5" /> Retry
+        </button>
+      </div>
+    );
+  }
+  if (!data) return null;
+  if (!data.connected) {
+    return (
+      <div className="text-center py-16">
+        <Plug className="h-8 w-8 mx-auto mb-3 text-gray-400" />
+        <p className="text-sm text-slate-600">
+          Connect Google Search Console to see how your published blogs are performing.
+        </p>
+      </div>
+    );
+  }
+  if (data.totalBlogsAnalyzed === 0) {
+    return (
+      <div className="text-center py-16">
+        <AlertCircle className="h-8 w-8 mx-auto mb-3 text-gray-400" />
+        <p className="text-sm text-slate-600">No published blogs yet to analyse.</p>
+      </div>
+    );
+  }
+  const fmtPct = (n: number) => `${(n * 100).toFixed(1)}%`;
+  return (
+    <div className="space-y-4 p-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <SummaryCard label="Total clicks" value={data.totalClicks.toLocaleString()} />
+        <SummaryCard label="Impressions" value={data.totalImpressions.toLocaleString()} />
+        <SummaryCard label="Avg CTR" value={fmtPct(data.avgCTR)} />
+        <SummaryCard label="Avg position" value={data.avgPosition.toFixed(1)} />
+      </div>
+      <div className="overflow-hidden rounded-lg border border-slate-200">
+        <table className="w-full text-sm">
+          <thead className="bg-slate-50 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+            <tr>
+              <th className="px-3 py-2">Page</th>
+              <th className="px-3 py-2 text-right">Clicks</th>
+              <th className="px-3 py-2 text-right">Impr.</th>
+              <th className="px-3 py-2 text-right">CTR</th>
+              <th className="px-3 py-2 text-right">Position</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {data.blogs.map((b) => (
+              <tr key={b.id} className="hover:bg-slate-50">
+                <td className="px-3 py-2">
+                  <a
+                    href={b.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-slate-800 hover:text-blue-600"
+                  >
+                    {b.title || b.url}
+                    <ExternalLink className="h-3 w-3 text-slate-400" />
+                  </a>
+                  {b.primaryKeyword ? (
+                    <p className="mt-0.5 text-xs text-slate-500">{b.primaryKeyword}</p>
+                  ) : null}
+                </td>
+                <td className="px-3 py-2 text-right tabular-nums">{b.clicks.toLocaleString()}</td>
+                <td className="px-3 py-2 text-right tabular-nums">{b.impressions.toLocaleString()}</td>
+                <td className="px-3 py-2 text-right tabular-nums">{fmtPct(b.ctr)}</td>
+                <td className="px-3 py-2 text-right tabular-nums">{b.position.toFixed(1)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+};
+
+const SummaryCard = ({ label, value }: { label: string; value: string }) => (
+  <div className="rounded-lg border border-slate-200 bg-white px-3 py-2.5">
+    <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">{label}</p>
+    <p className="mt-0.5 text-lg font-semibold text-slate-900 tabular-nums">{value}</p>
+  </div>
+);
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3002';
 
@@ -372,9 +503,7 @@ const GSCAnalyticsView = () => {
       )}
 
       {activeGscSubTab === 'blog-performance' && (
-        <div className="p-6 text-sm text-slate-500">
-          Blog analytics is being rebuilt against the new schema.
-        </div>
+        <BlogPerformancePanel days={days} />
       )}
 
     </div>
