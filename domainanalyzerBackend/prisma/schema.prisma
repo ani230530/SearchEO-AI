@@ -174,6 +174,10 @@ model Keyword {
   difficulty String?  // Low | Medium | High
   cpc        Float?
   isSelected Boolean  @default(false)
+  /// When set, this keyword has been replaced by a fresh regen but is kept
+  /// so its child prompts' AiQueryResult history remains queryable. The
+  /// wizard picker filters archivedAt:null; /history queries ignore it.
+  archivedAt DateTime?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
   domain     Domain   @relation(fields: [domainId], references: [id], onDelete: Cascade)
@@ -181,6 +185,7 @@ model Keyword {
 
   @@unique([domainId, term])
   @@index([domainId, isSelected])
+  @@index([domainId, archivedAt])
 }
 
 // Prompts. Each prompt is a discrete query we send to the LLM roster.
@@ -211,6 +216,10 @@ model Prompt {
   isBranded          Boolean  @default(false)
   /// Competitor host explicitly named in the prompt (alternatives / vs queries).
   competitorMentioned String?
+  /// When set, this prompt has been replaced by a fresh regen but is kept
+  /// so its AiQueryResult history remains queryable for the Track pages
+  /// trend chart. Wizard picker filters archivedAt:null; /history ignores it.
+  archivedAt         DateTime?
   createdAt          DateTime @default(now())
   domain             Domain   @relation(fields: [domainId], references: [id], onDelete: Cascade)
   keyword            Keyword? @relation(fields: [keywordId], references: [id], onDelete: SetNull)
@@ -218,6 +227,7 @@ model Prompt {
 
   @@index([domainId, isSelected])
   @@index([domainId, category])
+  @@index([domainId, archivedAt])
   @@index([keywordId])
 }
 
