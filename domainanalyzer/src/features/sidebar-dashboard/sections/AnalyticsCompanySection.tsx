@@ -416,7 +416,7 @@ const allSections = [...leftSections, ...rightSections];
         </button>
 <div className="mt-2 mb-4 mx-4 border-t border-gray-200 w-[calc(100%-2rem)]" />
         {/* Content */}
-        <div className={`px-4 mb-2 text-gray-600 break-words relative sm:px-6 ${!isOpen ? "line-clamp-4" : ""}`}>
+        <div className={`px-4 mb-2 break-words relative sm:px-6 prose prose-sm max-w-none prose-p:my-1.5 prose-p:text-[13.5px] prose-p:leading-[1.6] prose-p:text-gray-600 prose-headings:font-medium prose-headings:text-gray-900 prose-strong:text-gray-900 prose-strong:font-semibold prose-ul:my-1.5 prose-ul:pl-5 prose-li:my-0.5 prose-li:text-[13.5px] prose-li:text-gray-600 prose-a:text-blue-600 prose-a:no-underline hover:prose-a:underline ${!isOpen ? "line-clamp-4" : ""}`}>
           <ReactMarkdown remarkPlugins={[remarkGfm]}>
             {sec.content}
           </ReactMarkdown>
@@ -454,7 +454,7 @@ const allSections = [...leftSections, ...rightSections];
         </button>
 <div className="mt-2 mb-4 mx-4 border-t border-gray-200 w-[calc(100%-2rem)]" />
         {/* Content */}
-        <div className={`px-4 mb-2 text-gray-600 break-words relative sm:px-6 ${!isOpen ? "line-clamp-4" : ""}`}>
+        <div className={`px-4 mb-2 break-words relative sm:px-6 prose prose-sm max-w-none prose-p:my-1.5 prose-p:text-[13.5px] prose-p:leading-[1.6] prose-p:text-gray-600 prose-headings:font-medium prose-headings:text-gray-900 prose-strong:text-gray-900 prose-strong:font-semibold prose-ul:my-1.5 prose-ul:pl-5 prose-li:my-0.5 prose-li:text-[13.5px] prose-li:text-gray-600 prose-a:text-blue-600 prose-a:no-underline hover:prose-a:underline ${!isOpen ? "line-clamp-4" : ""}`}>
           <ReactMarkdown remarkPlugins={[remarkGfm]}>
             {sec.content}
           </ReactMarkdown>
