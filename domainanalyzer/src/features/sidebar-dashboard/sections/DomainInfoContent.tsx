@@ -9,9 +9,11 @@
  * common after the foundational rewrite, since the legacy Keyword table
  * was dropped and the user has to re-run the wizard to repopulate).
  */
-import { ExternalLink, Globe, Loader2, RefreshCw, AlertCircle, KeyRound, ArrowRight } from 'lucide-react';
+import { ExternalLink, Globe, Loader2, RefreshCw, AlertCircle, KeyRound, ArrowRight, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
+import { useState } from 'react';
+import { apiPost } from '@/services/apiClient';
 
 export type DomainInfoKeyword = {
   id: number;
@@ -68,14 +70,15 @@ export function DomainInfoContent({
               <ExternalLink className="h-3.5 w-3.5 text-slate-400" />
             </a>
             {domainContext ? (
-              <p className="mt-2 text-sm leading-[1.55] text-slate-600">{domainContext}</p>
+              <DomainContextDisplay context={domainContext} />
             ) : (
               <p className="mt-2 text-sm italic text-slate-400">
-                No company context summary yet.
+                No company context summary yet — click <span className="font-medium">Regenerate</span> to build a richer profile from the latest crawl.
               </p>
             )}
           </div>
           <div className="flex shrink-0 items-center gap-2">
+            <ResyncContextButton domainId={domainId} onDone={onRetry} />
             <Button
               variant="outline"
               size="sm"
@@ -215,3 +218,95 @@ const KeywordsTable = ({ keywords }: { keywords: DomainInfoKeyword[] }) => (
     </table>
   </div>
 );
+
+// Renders the LLM-generated context. If it has the 8-section markdown
+// shape (## headings) we split into a card grid; otherwise we just print
+// the prose. Either way the user sees something useful.
+const SECTION_TITLES = [
+  'Business Model Analysis',
+  'Target Audience Profiling',
+  'Value Proposition & Positioning',
+  'SEO & Content Strategy Insights',
+  'Competitive Intelligence',
+  'Market Dynamics',
+  'Location-Based SEO Analysis',
+  'SEO Opportunity Analysis',
+] as const;
+
+const DomainContextDisplay = ({ context }: { context: string }) => {
+  const sections = parseContextSections(context);
+  if (sections.length === 0) {
+    // Plain prose fallback for legacy short summaries.
+    return <p className="mt-2 text-sm leading-[1.55] text-slate-600">{context}</p>;
+  }
+  return (
+    <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+      {sections.map((s) => (
+        <div key={s.title} className="rounded-lg border border-slate-200 bg-slate-50/60 px-3 py-2.5">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+            {s.title}
+          </p>
+          <p className="mt-1 text-[12.5px] leading-[1.55] text-slate-700">{s.body}</p>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+function parseContextSections(context: string): Array<{ title: string; body: string }> {
+  const norm = (s: string) =>
+    s.replace(/^#+\s*/, '').replace(/\*\*/g, '').replace(/^\s*\d+\.\s*/, '').replace(/[:]+$/, '').trim().toUpperCase();
+  const expected = SECTION_TITLES.map((t) => norm(t));
+  const lines = context.split(/\r?\n/);
+  const map: Record<string, string[]> = {};
+  let current: string | null = null;
+  for (const line of lines) {
+    const matched = expected.find((t) => norm(line) === t);
+    if (matched) {
+      current = matched;
+      map[current] = map[current] ?? [];
+      continue;
+    }
+    if (current) {
+      (map[current] = map[current] ?? []).push(line);
+    }
+  }
+  const out: Array<{ title: string; body: string }> = [];
+  for (const t of SECTION_TITLES) {
+    const body = (map[norm(t)] ?? []).join('\n').trim();
+    if (body) out.push({ title: t, body });
+  }
+  return out;
+}
+
+// Re-runs LLM synthesis from the latest crawl on demand. Lets users
+// regenerate the rich 8-section context for domains crawled before the
+// upgraded synthesis prompt landed (legacy domains have just a short
+// prose summary).
+const ResyncContextButton = ({
+  domainId,
+  onDone,
+}: {
+  domainId: number | null;
+  onDone: () => void;
+}) => {
+  const [busy, setBusy] = useState(false);
+  if (!domainId) return null;
+  const handleClick = async () => {
+    setBusy(true);
+    try {
+      await apiPost(`/wizard/domain/${domainId}/resync-context`, {});
+      onDone();
+    } catch (err) {
+      console.error('[domain-info] resync-context failed:', err);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <Button variant="outline" size="sm" onClick={handleClick} disabled={busy} className="gap-1.5">
+      <Sparkles className={`h-3.5 w-3.5 ${busy ? 'animate-pulse' : ''}`} />
+      {busy ? 'Regenerating…' : 'Regenerate'}
+    </Button>
+  );
+};
