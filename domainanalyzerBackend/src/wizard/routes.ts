@@ -17,10 +17,10 @@
  */
 
 import { Router, Request, Response } from 'express';
-import { PrismaClient } from '../../generated/prisma';
+import { Prisma, PrismaClient } from '../../generated/prisma';
 import { authenticateToken, AuthenticatedRequest } from '../middleware/auth';
 import { extractHost, normalizeUrl } from './urlNormalize';
-import { crawlDomain, inferCompanySize } from './crawlService';
+import { crawlDomain, inferCompanySize, synthesizeContext } from './crawlService';
 import { embedText } from './llmClient';
 import { runCompetitorPipeline, persistCompetitors } from './competitorService';
 import { generateAuditPrompts, persistAuditPrompts, type PromptCategory } from './topicsService';
@@ -1038,6 +1038,67 @@ router.get('/domain/:id/trends', authenticateToken, async (req: Request, res: Re
 //
 // User-supplied selections (Competitor.isSelected, custom prompts/keywords)
 // are preserved on a 'topics' restart; both kinds are wiped on 'crawl'.
+// ── POST /domain/:id/resync-context ──────────────────────────────────────
+//
+// Re-runs the LLM context synthesis from the latest CrawlSnapshot's raw text
+// + schema, without re-crawling. Lets the dashboard's "Refresh" button
+// regenerate the 8-section Domain Info summary for domains crawled before
+// the synthesis prompt was upgraded — without forcing the user back through
+// the wizard.
+router.post('/domain/:id/resync-context', authenticateToken, async (req: Request, res: Response) => {
+  const got = await ensureDomain(req, req.params.id);
+  if (!got.ok) return res.status(got.status).json({ error: got.error });
+  const { domain } = got;
+
+  const latest = await prisma.crawlSnapshot.findFirst({
+    where: { domainId: domain.id },
+    orderBy: { createdAt: 'desc' },
+  });
+  if (!latest) return res.status(400).json({ error: 'No crawl snapshot available — run the wizard first.' });
+
+  const rawText = (latest.contextJson as { rawText?: string })?.rawText
+    ?? (latest as unknown as { rawText?: string }).rawText
+    ?? '';
+  const schemaJson = Array.isArray((latest.contextJson as { schemaOrg?: unknown[] })?.schemaOrg)
+    ? ((latest.contextJson as { schemaOrg?: unknown[] }).schemaOrg as unknown[])
+    : [];
+
+  if (!rawText.trim()) {
+    return res.status(400).json({ error: 'Latest crawl has no text — re-crawl the domain first.' });
+  }
+
+  const synthesized = await synthesizeContext(rawText, schemaJson);
+  if (!synthesized) return res.status(502).json({ error: 'LLM synthesis failed — try again shortly.' });
+
+  await prisma.crawlSnapshot.update({
+    where: { id: latest.id },
+    data: { contextJson: synthesized.context as unknown as Prisma.InputJsonValue },
+  });
+  await prisma.domainInferred.upsert({
+    where: { domainId: domain.id },
+    update: {
+      companyName: synthesized.context.companyName,
+      productsJson: synthesized.context.products as unknown as Prisma.InputJsonValue,
+      schemaOrgJson: synthesized.context.schemaOrg as unknown as Prisma.InputJsonValue,
+      summary: synthesized.context.summary,
+      inferredAt: new Date(),
+    },
+    create: {
+      domainId: domain.id,
+      companyName: synthesized.context.companyName,
+      productsJson: synthesized.context.products as unknown as Prisma.InputJsonValue,
+      schemaOrgJson: synthesized.context.schemaOrg as unknown as Prisma.InputJsonValue,
+      summary: synthesized.context.summary,
+    },
+  });
+
+  return res.json({
+    ok: true,
+    summary: synthesized.context.summary,
+    companyName: synthesized.context.companyName,
+  });
+});
+
 router.post('/domain/:id/restart', authenticateToken, async (req: Request, res: Response) => {
   const got = await ensureDomain(req, req.params.id);
   if (!got.ok) return res.status(got.status).json({ error: got.error });

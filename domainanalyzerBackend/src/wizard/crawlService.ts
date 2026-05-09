@@ -221,7 +221,22 @@ export interface CrawlOptions {
   skipSynthesis?: boolean;
 }
 
-async function synthesizeContext(rawText: string, schemaJson: unknown[]): Promise<{ context: ContextJson; tokens: number } | null> {
+// The eight section headings the dashboard's Domain Info card grid expects
+// (see domainanalyzer/src/features/sidebar-dashboard/sections/AnalyticsCompanySection.tsx
+// — the parser there matches on these exact titles, case-insensitive,
+// stripping `# ` / `**` / leading numbers / trailing colons).
+const CONTEXT_SECTIONS: ReadonlyArray<string> = [
+  'Business Model Analysis',
+  'Target Audience Profiling',
+  'Value Proposition & Positioning',
+  'SEO & Content Strategy Insights',
+  'Competitive Intelligence',
+  'Market Dynamics',
+  'Location-Based SEO Analysis',
+  'SEO Opportunity Analysis',
+];
+
+export async function synthesizeContext(rawText: string, schemaJson: unknown[]): Promise<{ context: ContextJson; tokens: number } | null> {
   if (!rawText.trim()) return null;
   try {
     const payload = await callJson<{
@@ -234,18 +249,28 @@ async function synthesizeContext(rawText: string, schemaJson: unknown[]): Promis
     }>({
       model: Models.synthesis,
       system:
-        'You distil a website crawl into a structured business profile. Output strict JSON. Be specific. If a field is unknown, use null or [].',
+        'You distil a website crawl into a rich, structured business profile. Output strict JSON. Be specific and substantive. If a field is unknown, use null or [].',
       user: [
         'Crawled text (concatenated from key pages):',
-        rawText.slice(0, 8000),
+        rawText.slice(0, 12000),
         '',
         'JSON-LD blocks found on the site:',
         JSON.stringify(schemaJson).slice(0, 2000),
         '',
-        'Return JSON: { "companyName": string|null, "industry": string|null, "products": string[], "services": string[], "location": string|null, "summary": string }',
+        'Return strict JSON with this exact shape:',
+        '{ "companyName": string|null, "industry": string|null, "products": string[], "services": string[], "location": string|null, "summary": string }',
+        '',
+        'The `summary` field MUST be a markdown string with EIGHT sections, in this exact order, each with its heading on its own line followed by 2–4 substantive sentences:',
+        ...CONTEXT_SECTIONS.map((h, i) => `${i + 1}. ${h}`),
+        '',
+        'Format each section as:',
+        '## <Heading>',
+        '<2–4 sentences with concrete details from the crawl>',
+        '',
+        'No bullet points. No tables. Use full prose paragraphs. Reference the actual company / industry / offerings the crawl revealed — do NOT produce generic boilerplate.',
       ].join('\n'),
-      temperature: 0.1,
-      maxTokens: 800,
+      temperature: 0.2,
+      maxTokens: 2200,
     });
     const context: ContextJson = {
       companyName: payload.companyName ?? null,
