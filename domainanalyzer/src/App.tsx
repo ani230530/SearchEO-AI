@@ -14,6 +14,7 @@ import KnowledgeBase from "./pages/KnowledgeBase";
 import AIVisibilityRedirect from "./pages/AIVisibilityRedirect";
 import AICheckerV2 from "./pages/AIChecker.v2";
 import AIResultsReportPreview from "./pages/AIResultsReportPreview";
+import AIResultsCompetitors from "./pages/AIResultsCompetitors";
 import TrackPromptsPage from "./pages/TrackPromptsPage";
 import TrackKeywordsPage from "./pages/TrackKeywordsPage";
 
@@ -87,6 +88,9 @@ const App = () => (
             } />
             <Route path="/ai-results-report-preview" element={
                <AIResultsReportPreview />
+            } />
+            <Route path="/airesults-competitors-preview" element={
+               <AIResultsCompetitors />
             } />
             
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
