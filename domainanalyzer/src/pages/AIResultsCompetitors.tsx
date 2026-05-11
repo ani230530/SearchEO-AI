@@ -1,25 +1,37 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
-  ArrowLeft,
   ArrowUpRight,
-  Bell,
-  Bot,
+  Calendar,
   ChevronDown,
   ChevronRight,
-  HelpCircle,
   Info,
-  LayoutDashboard,
   Plus,
   Search,
   Sparkles,
-  Target,
-  User,
   Users,
 } from 'lucide-react';
+import { Drawer } from '@/components/Drawer';
+import { CompetitorDetail } from '@/components/competitors/CompetitorDetail';
+import { AiResponseAnalysis } from '@/components/competitors/AiResponseAnalysis';
+import { AHREFS_COMPETITOR_DETAIL, type CompetitorDetailData } from '@/components/competitors/competitorDetailData';
+import type { PromptGapContext } from '@/components/competitors/aiResponseAnalysisData';
 import { MOCK_ANALYSIS_DATA } from '@/data/competitorMockData';
 import type { MetricTrend } from '@/types/competitor';
+import { apiGet } from '../services/apiClient';
+import { AIResultsLayout } from '@/features/ai-results/components/AIResultsLayout';
+import { maskDomainId, unmaskDomainId } from '@/lib/domainUtils';
+import { useNavigate } from 'react-router-dom';
 
 const data = MOCK_ANALYSIS_DATA;
+
+type AnalysisResult = {
+  name: string;
+  marketShare: string;
+  threat: string;
+  threatTone: 'high' | 'medium';
+  logo: string;
+  logoBg: string;
+};
 
 const competitors = [
   { name: 'semrush.com', color: '#F26B57', logo: 'https://img.logo.dev/semrush.com?token=pk_DTdFFG1JT9WOCjATvZEzIA&size=32' },
@@ -36,7 +48,7 @@ const opportunities = [
   { badge: 'High Impact', importance: '92/100', title: 'How to track competitor backlinks prompts effectively?', competitors: ['ahrefs.com', 'semrush.com'] },
 ];
 
-const analysisResults = [
+const analysisResults: AnalysisResult[] = [
   {
     name: 'SEMrush',
     marketShare: '24%',
@@ -78,6 +90,42 @@ const contentOpportunities = Array.from({ length: 5 }, (_, index) => ({
   impact: 'Very High',
   relatedTo: 'ahrefs.com',
 }));
+
+const toDomain = (name: string) => `${name.replace(/[^a-z0-9]/gi, '').toLowerCase()}.com`;
+
+const buildCompetitorDetailFromAnalysisResult = (result: AnalysisResult): CompetitorDetailData => {
+  if (result.name.toLowerCase() === 'ahrefs') {
+    return AHREFS_COMPETITOR_DETAIL;
+  }
+
+  return {
+    ...AHREFS_COMPETITOR_DETAIL,
+    name: result.name,
+    domain: toDomain(result.name),
+    logo: result.logo,
+    logoBackground: result.logoBg,
+  };
+};
+
+const buildPromptGapContext = (item: (typeof opportunities)[number]): PromptGapContext => ({
+  title: item.title,
+  importance: item.importance,
+  competitors: item.competitors,
+});
+
+function GenerateContentButton({ className = '' }: { className?: string }) {
+  return (
+    <button
+      type="button"
+      className={`inline-flex h-10 min-w-0 items-center justify-center gap-2.5 rounded-md border-2 border-[#F1F6FF] bg-white px-4 text-[14px] font-semibold leading-[150%] tracking-[0%] shadow-[0_1px_2px_0_#1018280D] transition hover:bg-[#F9FBFF] ${className}`}
+    >
+      <img src="/icons/target-04.svg" alt="" aria-hidden="true" className="h-5 w-5 shrink-0" />
+      <span className="whitespace-nowrap bg-gradient-to-r from-[#2D4059] to-[#4C74C2] bg-clip-text text-transparent">
+        Generate Content
+      </span>
+    </button>
+  );
+}
 
 function InfoIcon({ label }: { label: string }) {
   return (
@@ -193,45 +241,6 @@ function InsightCard() {
   );
 }
 
-function Sidebar() {
-  const items = [
-    { label: 'AI Results', icon: Sparkles },
-    { label: 'Competitors', icon: Users, active: true },
-    { label: 'Track Prompts', icon: Bot },
-    { label: 'Analytics', icon: LayoutDashboard },
-  ];
-
-  return (
-    <aside className="hidden w-64 shrink-0 border-r border-slate-200 bg-white px-4 py-5 lg:block">
-      <div className="flex items-center gap-3">
-        <span className="grid h-10 w-10 place-items-center rounded-xl bg-[#2D4059] text-sm font-bold text-white">S</span>
-        <div className="min-w-0">
-          <p className="truncate text-sm font-semibold text-[#2D4059]">SEO GPT</p>
-          <p className="truncate text-xs text-[#7B8494]">Domain analyzer</p>
-        </div>
-      </div>
-
-      <nav className="mt-8 space-y-1">
-        {items.map((item) => {
-          const Icon = item.icon;
-          return (
-            <button
-              key={item.label}
-              type="button"
-              className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium transition ${
-                item.active ? 'bg-[#2D4059] text-white' : 'text-[#667085] hover:bg-slate-50 hover:text-[#2D4059]'
-              }`}
-            >
-              <Icon className="h-4 w-4" />
-              <span className="truncate">{item.label}</span>
-            </button>
-          );
-        })}
-      </nav>
-    </aside>
-  );
-}
-
 function CompetitorSelector() {
   return (
     <section className="flex flex-col gap-3">
@@ -259,7 +268,7 @@ function CompetitorSelector() {
           <button
             key={competitor.name}
             type="button"
-            className="inline-flex h-9 items-center gap-2 rounded border border-slate-200 bg-white px-3 text-xs font-semibold text-[#2D4059] shadow-sm"
+            className="inline-flex h-9 items-center gap-2 rounded border border-slate-200 bg-white px-3 text-xs font-semibold text-[#2D4059] shadow-sm transition hover:bg-slate-50"
           >
             <span className="grid h-6 w-6 place-items-center overflow-hidden rounded" style={{ backgroundColor: `${competitor.color}22` }}>
               <img src={competitor.logo} alt="" className="h-5 w-5 object-contain" />
@@ -349,10 +358,11 @@ function TrendComparisonPanel() {
         </div>
         <button
           type="button"
-          className="inline-flex h-8 items-center gap-2 rounded border border-slate-200 bg-white px-3 text-xs font-medium text-[#667085]"
+          className="inline-flex h-9 items-center gap-2.5 rounded-lg border border-[#D5D7DA] bg-white px-3.5 text-[#717680] shadow-none transition hover:bg-gray-50"
         >
-          7 days
-          <ChevronDown className="h-3.5 w-3.5" />
+          <Calendar className="h-4 w-4" />
+          <span className="text-[13px] font-medium leading-none">7 days</span>
+          <ChevronDown className="h-3.5 w-3.5 opacity-60" />
         </button>
       </div>
 
@@ -365,7 +375,13 @@ function TrendComparisonPanel() {
   );
 }
 
-function OpportunityCard({ item }: { item: (typeof opportunities)[number] }) {
+function OpportunityCard({
+  item,
+  onAiResponse,
+}: {
+  item: (typeof opportunities)[number];
+  onAiResponse: (item: (typeof opportunities)[number]) => void;
+}) {
   return (
     <article className="relative overflow-hidden rounded-xl border border-[#E8ECF2] bg-white py-5 pl-6 pr-5 shadow-[0_10px_24px_rgba(15,23,42,0.08)]">
       <div className="absolute inset-y-0 left-0 w-1.5 bg-[#7EA6FF]" />
@@ -402,21 +418,16 @@ function OpportunityCard({ item }: { item: (typeof opportunities)[number] }) {
             <span className="ml-1 text-sm font-medium text-[#58657A]">Opportunity</span>
           </div>
 
-          <div className="flex w-full flex-col gap-3 sm:w-[122px]">
+          <div className="flex w-full flex-col gap-3 sm:min-w-[176px] sm:max-w-[208px]">
             <button
               type="button"
-              className="inline-flex h-9 w-full items-center justify-center gap-2 rounded-md border border-[#D7DDE6] bg-white px-3 text-xs font-bold text-[#40516A] shadow-sm transition hover:bg-slate-50"
+              onClick={() => onAiResponse(item)}
+              className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-md border border-[#D5D7DA] bg-[#F9F9F9] px-3 text-[14px] font-semibold leading-[150%] text-[#40516A] shadow-none transition hover:bg-[#F4F4F5]"
             >
               <Sparkles className="h-3.5 w-3.5" />
               AI Response
             </button>
-            <button
-              type="button"
-              className="inline-flex h-9 w-full items-center justify-center gap-2 rounded-md bg-[#F3F7FD] px-3 text-xs font-bold text-[#315A90] transition hover:bg-[#EAF2FC]"
-            >
-              <Target className="h-3.5 w-3.5" />
-              Generate Content
-            </button>
+            <GenerateContentButton className="w-full" />
           </div>
         </div>
       </div>
@@ -424,7 +435,13 @@ function OpportunityCard({ item }: { item: (typeof opportunities)[number] }) {
   );
 }
 
-function PromptGapPanel() {
+function PromptGapPanel({
+  onAiResponse,
+  onViewAll,
+}: {
+  onAiResponse: (item: (typeof opportunities)[number]) => void;
+  onViewAll: () => void;
+}) {
   return (
     <section className="min-w-0 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
       <div className="flex items-start justify-between gap-4">
@@ -432,7 +449,11 @@ function PromptGapPanel() {
           <h3 className="text-xl font-semibold leading-none text-[#2D4059]">Prompt Gaps Opportunities</h3>
           <p className="mt-3 text-base text-[#7B8494]">Turn missed prompts into content</p>
         </div>
-        <button type="button" className="inline-flex h-10 shrink-0 items-center gap-3 rounded-md border border-[#D7DDE6] bg-white px-4 text-xs font-semibold text-[#7B8494] shadow-sm">
+        <button
+          type="button"
+          onClick={onViewAll}
+          className="inline-flex h-10 shrink-0 items-center gap-3 rounded-md border border-[#D7DDE6] bg-white px-4 text-xs font-semibold text-[#7B8494] shadow-sm"
+        >
           View all
           <ChevronDown className="h-3.5 w-3.5 -rotate-90" />
         </button>
@@ -440,7 +461,7 @@ function PromptGapPanel() {
 
       <div className="mt-8 space-y-6">
         {opportunities.map((item, index) => (
-          <OpportunityCard key={`${item.title}-${index}`} item={item} />
+          <OpportunityCard key={`${item.title}-${index}`} item={item} onAiResponse={onAiResponse} />
         ))}
       </div>
     </section>
@@ -456,14 +477,20 @@ function AnalysisInfoBox({ title, value }: { title: string; value: string }) {
   );
 }
 
-function AnalysisResultCard({ result }: { result: (typeof analysisResults)[number] }) {
+function AnalysisResultCard({
+  result,
+  onOpenDetail,
+}: {
+  result: (typeof analysisResults)[number];
+  onOpenDetail: (result: (typeof analysisResults)[number]) => void;
+}) {
   const threatStyles =
     result.threatTone === 'high'
       ? 'border-[#FFC9C9] bg-[#FFF2F2] text-[#F05F5F]'
       : 'border-[#F6D985] bg-[#FFF8D9] text-[#C99714]';
 
   return (
-    <article className="grid min-w-0 grid-cols-[minmax(0,1fr)_44px] overflow-hidden rounded-xl border border-slate-200 bg-white">
+    <article className="grid min-w-0 grid-cols-[minmax(0,1fr)_56px] overflow-hidden rounded-xl border border-slate-200 bg-white">
       <div className="min-w-0 p-5">
         <div className="flex items-start justify-between gap-4">
           <div className="flex min-w-0 items-center gap-4">
@@ -493,15 +520,20 @@ function AnalysisResultCard({ result }: { result: (typeof analysisResults)[numbe
       <button
         type="button"
         aria-label={`View ${result.name} competitor analysis`}
-        className="flex h-full items-center justify-center border-l border-slate-100 bg-[#F7F8FA] text-[#8A93A3] transition hover:bg-slate-100 hover:text-[#2D4059]"
+        onClick={() => onOpenDetail(result)}
+        className="flex h-full items-center justify-center border-l border-[#D5D7DA] bg-[#F9F9F9] text-[#8A93A3] transition hover:bg-[#F4F4F5] hover:text-[#2D4059]"
       >
-        <ChevronRight className="h-8 w-8" strokeWidth={2.4} />
+        <ChevronRight className="h-9 w-9" strokeWidth={2.25} />
       </button>
     </article>
   );
 }
 
-function AICompetitorAnalysisResults() {
+function AICompetitorAnalysisResults({
+  onOpenDetail,
+}: {
+  onOpenDetail: (result: (typeof analysisResults)[number]) => void;
+}) {
   return (
     <section className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
       <div>
@@ -511,7 +543,7 @@ function AICompetitorAnalysisResults() {
 
       <div className="mt-7 grid grid-cols-1 gap-6 xl:grid-cols-2">
         {analysisResults.map((result) => (
-          <AnalysisResultCard key={result.name} result={result} />
+          <AnalysisResultCard key={result.name} result={result} onOpenDetail={onOpenDetail} />
         ))}
       </div>
     </section>
@@ -575,16 +607,17 @@ function PositioningComparison() {
             <circle cx="254" cy="172" r="45" fill="#DDEBF3" opacity="0.95" />
 
             <g filter="drop-shadow(0 10px 14px rgba(15,23,42,0.18))">
-              <rect x="412" y="202" width="134" height="118" rx="6" fill="#fff" stroke="#E4E9F0" />
-              <text x="426" y="226" className="fill-[#7B8494] text-[10px]">Semrush</text>
+              <rect x="412" y="202" width="134" height="132" rx="6" fill="#fff" stroke="#E4E9F0" />
+              <text x="426" y="226" className="fill-[#5F6877] text-[10px] font-medium">Semrush</text>
               <text x="426" y="250" className="fill-[#7B8494] text-[10px]">Sentiment</text>
               <text x="517" y="250" textAnchor="end" className="fill-[#2D4059] text-[10px] font-bold">Positive</text>
               <text x="426" y="270" className="fill-[#7B8494] text-[10px]">Role</text>
               <text x="517" y="270" textAnchor="end" className="fill-[#2D4059] text-[10px] font-bold">Market leader</text>
               <text x="426" y="290" className="fill-[#7B8494] text-[10px]">Prompts</text>
               <text x="517" y="290" textAnchor="end" className="fill-[#2D4059] text-[10px] font-bold">37%</text>
-              <rect x="426" y="300" width="98" height="32" rx="4" fill="#2D4059" />
-              <text x="475" y="320" textAnchor="middle" className="fill-white text-[9px] font-semibold">Generate Report</text>
+              <rect x="424" y="295" width="110" height="32" rx="5" fill="#2D4059" />
+              <image href="/report-icons/file-05.svg" x="432" y="303" width="14" height="14" />
+              <text x="450" y="315" textAnchor="start" className="fill-white text-[9px] font-semibold">Generate Report</text>
             </g>
           </svg>
 
@@ -621,13 +654,7 @@ function ContentOpportunityCard({ item }: { item: (typeof contentOpportunities)[
           </p>
         </div>
 
-        <button
-          type="button"
-          className="inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-md bg-[#F3F7FD] px-4 text-xs font-bold text-[#315A90] transition hover:bg-[#EAF2FC]"
-        >
-          <Target className="h-3.5 w-3.5" />
-          Generate Content
-        </button>
+        <GenerateContentButton className="w-full sm:w-auto sm:self-center" />
       </div>
     </article>
   );
@@ -640,7 +667,7 @@ function ContentOpportunitiesToCreate() {
         <h3 className="text-xl font-semibold leading-none text-[#2D4059]">Content Opportunities to Create</h3>
         <button
           type="button"
-          className="inline-flex h-9 shrink-0 items-center gap-3 rounded-md border border-slate-200 bg-white px-4 text-xs font-medium text-[#7B8494] shadow-sm"
+          className="inline-flex h-9 shrink-0 items-center gap-1 rounded-md border border-slate-200 bg-white px-4 text-xs font-medium text-[#7B8494] shadow-sm"
         >
           View All
           <ChevronDown className="h-3.5 w-3.5 -rotate-90" />
@@ -666,103 +693,141 @@ function PositioningAndContentSection() {
 }
 
 export default function CompetitorsPage() {
+  const navigate = useNavigate();
+  const storedSlug = localStorage.getItem('ai-visibility:lastDomainSlug');
+  const [allDomains, setAllDomains] = useState<any[]>([]);
+  const [currentDomain, setCurrentDomain] = useState<any | null>(null);
+  const [selectedCompetitor, setSelectedCompetitor] = useState<CompetitorDetailData | null>(null);
+  const [selectedPromptGap, setSelectedPromptGap] = useState<PromptGapContext | null>(null);
+  const [activeDrawer, setActiveDrawer] = useState<'competitor' | 'prompt-gap' | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+
+    const loadDomains = async () => {
+      try {
+        const data = await apiGet<any>('/wizard/domains');
+        const domains = Array.isArray(data?.domains) ? data.domains : [];
+        if (!alive) return;
+        setAllDomains(domains);
+
+        let selected = storedSlug ? domains.find((domain: any) => maskDomainId(domain.id) === storedSlug) : null;
+        if (!selected && domains.length > 0) {
+          selected = [...domains].sort((a: any, b: any) => {
+            const aTime = a.lastAnalyzed ? new Date(a.lastAnalyzed).getTime() : 0;
+            const bTime = b.lastAnalyzed ? new Date(b.lastAnalyzed).getTime() : 0;
+            return bTime - aTime;
+          })[0];
+        }
+        if (selected && alive) {
+          setCurrentDomain(selected);
+          localStorage.setItem('ai-visibility:lastDomainSlug', maskDomainId(selected.id));
+        }
+      } catch (err) {
+        console.error('[Competitors] Failed to load domains:', err);
+      }
+    };
+
+    void loadDomains();
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const closeDrawer = () => {
+    setActiveDrawer(null);
+    setSelectedCompetitor(null);
+    setSelectedPromptGap(null);
+  };
+
+  const openCompetitorDrawer = (result: AnalysisResult) => {
+    setSelectedPromptGap(null);
+    setSelectedCompetitor(buildCompetitorDetailFromAnalysisResult(result));
+    setActiveDrawer('competitor');
+  };
+
+  const openPromptGapDrawer = (item: (typeof opportunities)[number]) => {
+    setSelectedCompetitor(null);
+    setSelectedPromptGap(buildPromptGapContext(item));
+    setActiveDrawer('prompt-gap');
+  };
+
+  const openPromptGapsReport = () => {
+    navigate('/ai-results-prompt-gaps');
+  };
+
   return (
-    <div className="flex min-h-screen w-full overflow-hidden bg-white text-[#2D4059]">
-      <Sidebar />
-
-      <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex h-[70px] w-full shrink-0 items-center justify-between bg-white px-5">
-          <div className="flex min-w-0 items-center gap-3">
-            <button
-              type="button"
-              aria-label="Back"
-              className="inline-flex h-7 w-7 shrink-0 items-center justify-center text-[#14243B] transition hover:text-[#2D4059]"
-            >
-              <ArrowLeft className="h-5 w-5" strokeWidth={2} />
-            </button>
-            <h1 className="truncate text-lg font-semibold tracking-normal text-[#2D4059]">Competitors</h1>
-          </div>
-
-          <div className="flex items-center gap-3 text-[#8D9199]">
-            <button
-              type="button"
-              aria-label="Help"
-              className="inline-flex h-6 w-6 items-center justify-center transition hover:text-[#2D4059]"
-            >
-              <HelpCircle className="h-4 w-4" strokeWidth={2} />
-            </button>
-            <button
-              type="button"
-              aria-label="Notifications"
-              className="inline-flex h-6 w-6 items-center justify-center transition hover:text-[#2D4059]"
-            >
-              <Bell className="h-4 w-4" strokeWidth={2} />
-            </button>
-            <button
-              type="button"
-              aria-label="User profile"
-              className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#F1F3F6] text-[#4C5563] transition hover:text-[#2D4059]"
-            >
-              <User className="h-4 w-4" strokeWidth={2} />
-            </button>
-          </div>
-        </header>
-
-        <div className="h-0.5 w-full shrink-0 bg-[#1E9BFF]" />
-
-        <main className="min-h-0 w-full flex-1 overflow-y-auto bg-white">
-          <div className="mx-auto flex w-full max-w-[1530px] flex-col gap-5 px-5 py-3">
-            <section className="flex flex-col gap-4">
-              <div className="flex items-center justify-between">
-                <h2 className="text-base font-semibold leading-none text-[#2D4059]">Competitor Analysis</h2>
-              </div>
-
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5">
-                <ScoreCard
-                  title={data.aiVisibility.title}
-                  score={data.aiVisibility.score}
-                  maxScore={data.aiVisibility.maxScore}
-                  footer={data.aiVisibility.footer}
-                  tooltipText={data.aiVisibility.tooltipText}
-                  trend={data.aiVisibility.trend}
-                />
-                <ScoreCard
-                  title={data.bestCompetitor.title}
-                  score={data.bestCompetitor.score}
-                  maxScore={data.bestCompetitor.maxScore}
-                  footer={data.bestCompetitor.footer}
-                  tooltipText={data.bestCompetitor.tooltipText}
-                  trend={data.bestCompetitor.trend}
-                />
-                <ValueCard
-                  title={data.largestGap.title}
-                  value={data.largestGap.value}
-                  footer={data.largestGap.footer}
-                  badge="Prompt"
-                />
-                <ValueCard
-                  title={data.competitorSOV.title}
-                  value={data.competitorSOV.value}
-                  footer={data.competitorSOV.footer}
-                  tooltipText={data.competitorSOV.tooltipText}
-                />
-                <InsightCard />
-              </div>
-            </section>
-
-            <CompetitorSelector />
-
-            <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.45fr)_minmax(360px,0.85fr)]">
-              <TrendComparisonPanel />
-              <PromptGapPanel />
+    <AIResultsLayout
+      activeItem="competitors"
+      allDomains={allDomains}
+      currentDomainId={currentDomain?.id}
+      currentDomainUrl={currentDomain?.url}
+      currentDomainHost={currentDomain?.host}
+      currentDomainName={currentDomain?.companyName ?? currentDomain?.host}
+      maskedDomainId={currentDomain ? maskDomainId(currentDomain.id) : storedSlug ?? undefined}
+      title="Competitors"
+    >
+      <div className="min-h-0 w-full flex-1 overflow-y-auto bg-white">
+        <div className="mx-auto flex w-full max-w-[1530px] flex-col gap-5 px-5 py-3">
+          <section className="flex flex-col gap-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-base font-semibold leading-none text-[#2D4059]">Competitor Analysis</h2>
             </div>
 
-            <AICompetitorAnalysisResults />
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5">
+              <ScoreCard
+                title={data.aiVisibility.title}
+                score={data.aiVisibility.score}
+                maxScore={data.aiVisibility.maxScore}
+                footer={data.aiVisibility.footer}
+                tooltipText={data.aiVisibility.tooltipText}
+                trend={data.aiVisibility.trend}
+              />
+              <ScoreCard
+                title={data.bestCompetitor.title}
+                score={data.bestCompetitor.score}
+                maxScore={data.bestCompetitor.maxScore}
+                footer={data.bestCompetitor.footer}
+                tooltipText={data.bestCompetitor.tooltipText}
+                trend={data.bestCompetitor.trend}
+              />
+              <ValueCard
+                title={data.largestGap.title}
+                value={data.largestGap.value}
+                footer={data.largestGap.footer}
+                badge="Prompt"
+              />
+              <ValueCard
+                title={data.competitorSOV.title}
+                value={data.competitorSOV.value}
+                footer={data.competitorSOV.footer}
+                tooltipText={data.competitorSOV.tooltipText}
+              />
+              <InsightCard />
+            </div>
+          </section>
 
-            <PositioningAndContentSection />
+          <CompetitorSelector />
+
+          <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.45fr)_minmax(360px,0.85fr)]">
+            <TrendComparisonPanel />
+            <PromptGapPanel onAiResponse={openPromptGapDrawer} onViewAll={openPromptGapsReport} />
           </div>
-        </main>
+
+          <AICompetitorAnalysisResults onOpenDetail={openCompetitorDrawer} />
+
+          <PositioningAndContentSection />
+        </div>
       </div>
-    </div>
+
+      <Drawer open={activeDrawer !== null} onOpenChange={(open) => !open && closeDrawer()}>
+        {activeDrawer === 'competitor' && selectedCompetitor ? (
+          <CompetitorDetail competitor={selectedCompetitor} />
+        ) : null}
+        {activeDrawer === 'prompt-gap' && selectedPromptGap ? (
+          <AiResponseAnalysis prompt={selectedPromptGap} />
+        ) : null}
+      </Drawer>
+    </AIResultsLayout>
   );
 }

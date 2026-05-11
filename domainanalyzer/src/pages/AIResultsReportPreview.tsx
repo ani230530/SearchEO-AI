@@ -1,4 +1,5 @@
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
+import type { ReactNode } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { useNavigate, useParams } from 'react-router-dom';
 import { apiGet, apiPost } from '../services/apiClient';
@@ -993,6 +994,12 @@ type PromptTableProps = {
   onToggleRow: (id: string) => void;
   onOpenWorksheetModal: (singleRowId?: string) => void;
   title?: string;
+  defaultExpandedId?: string | null;
+  renderExpandedDetails?: (row: any) => ReactNode;
+  footerActionLabel?: string;
+  footerActionIconSrc?: string;
+  footerActionClassName?: string;
+  footerActionIconClassName?: string;
 };
 
 export const PromptTable = ({
@@ -1001,9 +1008,15 @@ export const PromptTable = ({
   onToggleRow,
   onOpenWorksheetModal,
   title = 'Top searched Prompts',
+  defaultExpandedId = null,
+  renderExpandedDetails,
+  footerActionLabel = 'View all',
+  footerActionIconSrc,
+  footerActionClassName,
+  footerActionIconClassName,
 }: PromptTableProps) => {
   const selectedCount = selectedRowIds.size;
-  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(defaultExpandedId);
   const [tableFilter, setTableFilter] = useState<'all' | 'prompt' | 'keyword'>('all');
   const [tableMetric, setTableMetric] = useState<string | null>(null);
   const [showAllQueries, setShowAllQueries] = useState(false);
@@ -1277,7 +1290,7 @@ export const PromptTable = ({
                   {expandedId === row.id && (
                     <TableRow className="bg-gray-50/30 hover:bg-gray-50/30 border-b border-slate-300">
                       <TableCell colSpan={8} className="p-0">
-                        <ExpandedDetails results={row.results} />
+                        {renderExpandedDetails ? renderExpandedDetails(row) : <ExpandedDetails results={row.results} />}
                       </TableCell>
                     </TableRow>
                   )}
@@ -1299,9 +1312,20 @@ export const PromptTable = ({
               setShowAllQueries(true);
             }}
             disabled={showAllQueries || displayData.length >= data.length}
-            className="px-2.5 py-1 text-[11px] font-bold text-[#3B82F6] bg-gray-50/80 hover:bg-gray-100 rounded-lg transition-all"
+            className={cn(
+              'inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[11px] font-bold transition-all',
+              footerActionClassName ?? 'bg-gray-50/80 text-[#3B82F6] hover:bg-gray-100'
+            )}
           >
-            View all
+            {footerActionIconSrc ? (
+              <img
+                src={footerActionIconSrc}
+                alt=""
+                aria-hidden="true"
+                className={cn('h-3.5 w-3.5 shrink-0', footerActionIconClassName)}
+              />
+            ) : null}
+            {footerActionLabel}
           </button>
         </div>
       </CardContent>
@@ -1786,7 +1810,7 @@ type WorksheetPickerModalProps = {
   onCreateNewWorksheet: () => void;
 };
 
-const WorksheetPickerModal = ({
+export const WorksheetPickerModal = ({
   open,
   selectedCount,
   activeWorksheetId,
