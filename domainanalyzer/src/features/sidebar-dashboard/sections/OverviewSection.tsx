@@ -235,6 +235,47 @@ const blogImpressionsData = blogAggregateData?.dateBreakdown.map(d => ({
   value: d.impressions
 })) ?? [];
 
+const recentActivities = [
+  { title: 'Published "Ultimate Guide to SEO"', time: "less than a minute ago" },
+  { title: 'Edited "Keyword Research Tips"', time: "about 1 hour ago" },
+  { title: 'Generated "Link Building Strategies"', time: "about 1 hour ago" },
+  { title: "Added 15 new keywords", time: "about 1 hour ago" },
+  { title: "Generated subpages from top keywords", time: "about 1 hour ago" },
+];
+
+const suggestedActions = [
+  {
+    title: "Publish-Ready Blog",
+    subtitle: "These blogs have been reviewed and are ready to go live",
+    icon: "https://www.figma.com/api/mcp/asset/0562e448-0ae6-4aa5-9d72-041196f56236",
+    tone: "warning" as const,
+  },
+  {
+    title: "Integrate your website",
+    subtitle: "Enable one-click publishing to your site",
+    icon: "https://www.figma.com/api/mcp/asset/3a8bdd17-0bd9-42f6-abf5-c5293cbd8f89",
+    tone: "danger" as const,
+  },
+  {
+    title: "Connect Google Search Console",
+    subtitle: "Enable your google search console to fetch data",
+    icon: "https://www.figma.com/api/mcp/asset/47d925ce-d57e-42d9-9071-24e3613430db",
+    tone: "danger" as const,
+  },
+  {
+    title: "Optimize 2 Blogs",
+    subtitle: "Optimize content to improve search rankings",
+    icon: "https://www.figma.com/api/mcp/asset/b21afc72-459a-43fa-a890-200998b97d2f",
+    tone: "default" as const,
+  },
+  {
+    title: "Create Pages from Top Keywords",
+    subtitle: "Create supporting content to boost your pillar pages",
+    icon: "https://www.figma.com/api/mcp/asset/e8fe94aa-2477-4211-bfac-ce2fc01e0064",
+    tone: "default" as const,
+  },
+];
+
 const [isPageLoading, setIsPageLoading] = useState(true);
 
 useEffect(() => {
@@ -512,9 +553,9 @@ useEffect(() => {
             Run an audit to view performance metrics.
           </p>
         ) : (
-        <div className="flex flex-col 2xl:flex-row gap-4 sm:gap-6">
+        <div className="flex flex-col 2xl:flex-row gap-4 sm:gap-6 min-w-0">
           {/* LEFT: 4 metric cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 flex-1 min-w-0">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 flex-1 min-w-0">
             {[
               ["Performance", auditResult.performance],
               ["SEO", auditResult.seo],
@@ -526,18 +567,18 @@ useEffect(() => {
               return (
                 <div
           key={label}
-          className="rounded-xl p-3 sm:p-4 bg-white shadow-md flex items-center gap-3 sm:gap-4 min-w-0 w-full"
+          className="rounded-xl p-3 sm:p-4 bg-white shadow-md flex items-center gap-3 sm:gap-4 min-w-0 w-full overflow-hidden"
         >
           {/* Left Icon */}
-          <ChartNoAxesCombined className="w-6 h-6 sm:w-8 sm:h-8 text-gray-500 shrink-0" />
+          <ChartNoAxesCombined className="w-6 h-6 text-gray-500 shrink-0" />
         
           {/* Right Content */}
-          <div className="flex flex-col min-w-0">
-            <span className="text-sm text-gray-600 break-words">
+          <div className="flex flex-col min-w-0 flex-1">
+            <span className="text-sm text-gray-600 leading-tight break-words">
               {label}
             </span>
         
-            <span className="text-xl sm:text-2xl font-semibold text-gray-900">
+            <span className="text-lg sm:text-2xl font-semibold text-gray-900 leading-tight">
               {pct}%
             </span>
           </div>
@@ -547,7 +588,7 @@ useEffect(() => {
           </div>
         
           {/* RIGHT: Overall Score */}
-          <div className="w-full 2xl:w-auto rounded-xl p-2 sm:p-4 flex flex-col items-center justify-center">
+          <div className="w-full 2xl:w-auto rounded-xl p-2 sm:p-4 flex flex-col items-center justify-center shrink-0">
             <OverallScoreGauge
               size={160}
               score={
@@ -745,6 +786,70 @@ useEffect(() => {
   )} */}
 </div>
         
+        </div>
+        
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div className="rounded-xl bg-white border border-gray-200 p-5">
+            <div className="flex items-start justify-between mb-4">
+              <h3 className="text-[20px] leading-normal font-semibold text-[#414651]">Recent Activity</h3>
+              <button className="text-xs font-normal text-[#2D4059] underline underline-offset-2">View All</button>
+            </div>
+
+            <div className="space-y-3">
+              {recentActivities.map((activity, idx) => (
+                <div
+                  key={`${activity.title}-${idx}`}
+                  className="bg-[#F9F9F9] rounded-lg px-6 py-[18px] shadow-sm"
+                >
+                  <p className="text-base font-medium text-[#414651] leading-normal">{activity.title}</p>
+                  <p className="text-xs text-[#2D4059] mt-1 leading-normal">{activity.time}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="rounded-xl bg-white border border-gray-200 p-5">
+            <h3 className="text-[20px] leading-normal font-semibold text-[#414651] mb-4">Suggested Next Actions</h3>
+
+            <div className="space-y-3">
+              {suggestedActions.map((action, idx) => {
+                const rowTone =
+                  action.tone === "warning"
+                    ? "bg-[#FFFEF2] border-l-[#F59E0B]"
+                    : action.tone === "danger"
+                    ? "bg-[#FFF2F2] border-l-[#B23131]"
+                    : "bg-white border-l-[#A4A7AE]";
+
+                const titleTone = action.tone === "danger" ? "text-[#B23131]" : "text-[#414651]";
+                const subtitleTone = action.tone === "danger" ? "text-[#7C3636]" : "text-[#2D4059]";
+                const iconWrapTone =
+                  action.tone === "danger"
+                    ? "border-[#F1D0D0] bg-[#FFF2F2]"
+                    : action.tone === "warning"
+                    ? "border-[#F2E5B9] bg-[#FFFEF2]"
+                    : "border-gray-200 bg-white";
+
+                return (
+                  <div
+                    key={`${action.title}-${idx}`}
+                    className={cn(
+                      "rounded-lg px-6 py-[18px] border-l-[3px] shadow-sm flex items-center gap-[15px]",
+                      rowTone
+                    )}
+                  >
+                    <div className={cn("w-10 h-10 rounded-full border flex items-center justify-center shrink-0", iconWrapTone)}>
+                      <img src={action.icon} alt="" className="w-7 h-7 object-contain" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className={cn("text-base font-medium leading-normal", titleTone)}>{action.title}</p>
+                      <p className={cn("text-xs leading-normal", subtitleTone)}>{action.subtitle}</p>
+                    </div>
+                    <ArrowRight className={cn("w-5 h-5 shrink-0", action.tone === "danger" ? "text-[#B23131]" : "text-[#2D4059]")} />
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         </div>
 
           {showAuditModal && (
