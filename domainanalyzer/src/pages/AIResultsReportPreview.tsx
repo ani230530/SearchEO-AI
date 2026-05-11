@@ -2880,7 +2880,7 @@ const AIResultsReportPreview = () => {
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
                     className="rounded-md px-3 py-2 text-[12px] text-slate-600 cursor-pointer"
-                    onClick={() => navigate('/dashboard?tab=domain-history')}
+                    onClick={() => navigate('/ai-checker-v2')}
                   >
                     Audit a different domain →
                   </DropdownMenuItem>
