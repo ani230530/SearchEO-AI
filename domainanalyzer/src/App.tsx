@@ -14,6 +14,8 @@ import KnowledgeBase from "./pages/KnowledgeBase";
 import AIVisibilityRedirect from "./pages/AIVisibilityRedirect";
 import AICheckerV2 from "./pages/AIChecker.v2";
 import AIResultsReportPreview from "./pages/AIResultsReportPreview";
+import AIResultsPromptGaps from "./pages/AIResultsPromptGaps";
+import AIResultsCompetitors from "./pages/AIResultsCompetitors";
 import TrackPromptsPage from "./pages/TrackPromptsPage";
 import TrackKeywordsPage from "./pages/TrackKeywordsPage";
 
@@ -65,6 +67,11 @@ const App = () => (
                 <AIResultsReportPreview />
               </ProtectedRoute>
             } />
+            <Route path="/ai-results-prompt-gaps" element={
+              <ProtectedRoute>
+                <AIResultsPromptGaps />
+              </ProtectedRoute>
+            } />
             <Route path="/profile" element={
               <ProtectedRoute>
                 <Profile />
@@ -85,8 +92,10 @@ const App = () => (
                 <Navigate to="/dashboard?tab=integration&subtab=integration&wordpress=1" replace />
               </ProtectedRoute>
             } />
-            <Route path="/ai-results-report-preview" element={
-               <AIResultsReportPreview />
+            <Route path="/ai-results-report-preview" element={<AIVisibilityRedirect />} />
+            <Route path="/ai-results-report" element={<AIVisibilityRedirect />} />
+            <Route path="/airesults-competitors-preview" element={
+               <AIResultsCompetitors />
             } />
             
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

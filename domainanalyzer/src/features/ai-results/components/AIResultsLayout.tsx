@@ -1,4 +1,13 @@
-import { ArrowLeft, ChevronDown, Globe2, HelpCircle, LayoutDashboard, Sparkles, Star, Users } from "lucide-react";
+import {
+  ArrowLeft,
+  Bell,
+  ChevronDown,
+  Globe2,
+  HelpCircle,
+  Settings2,
+  Sparkles,
+  User,
+} from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { maskDomainId } from "@/lib/domainUtils";
@@ -52,15 +61,23 @@ const logoUrlFor = (host: string | null | undefined): string | null => {
 };
 
 const sidebarItems: Array<{
-  icon: typeof Sparkles;
   id: AIResultsNavItemId;
+  iconSrc: string;
   label: string;
 }> = [
-  { id: "ai-results", label: "AI Results", icon: Sparkles },
-  { id: "competitors", label: "Competitors", icon: Users },
-  { id: "track-prompts", label: "Track Prompts", icon: Star },
-  { id: "top-keywords", label: "Track Keyword", icon: Star },
-  { id: "analytics", label: "Analytics", icon: LayoutDashboard },
+  { id: "ai-results", label: "AI Results", iconSrc: "/sidebar-icons/ai-results.svg" },
+  { id: "competitors", label: "Competitors", iconSrc: "/sidebar-icons/competitors.svg" },
+  { id: "track-prompts", label: "Track Prompts", iconSrc: "/sidebar-icons/track-prompts.svg" },
+  { id: "top-keywords", label: "Track Keyword", iconSrc: "/sidebar-icons/track-keyword.svg" },
+  { id: "analytics", label: "Opportunities", iconSrc: "/sidebar-icons/analytics.svg" },
+];
+
+const railItems = [
+  { id: "ai", iconSrc: "/sidebar-icons/content.svg", label: "AI Results", action: "ai-results" as const },
+  { id: "create", iconSrc: "/sidebar-icons/create-project.svg", label: "Create Project", action: "projects" as const },
+  { id: "projects", iconSrc: "/sidebar-icons/content-1.svg", label: "All Projects", action: "projects" as const },
+  { id: "domain-info", iconSrc: "/sidebar-icons/text-and-icon-1.svg", label: "Domain Info", action: "analytics" as const },
+  { id: "global", icon: Globe2, label: "Global" },
 ];
 
 export function AIResultsLayout({
@@ -90,8 +107,9 @@ export function AIResultsLayout({
     "Loading…";
   const triggerLogo = logoUrlFor(triggerHost);
   const navigate = useNavigate();
+  const resolvedMaskedDomainId = maskedDomainId ?? (currentDomainId ? maskDomainId(currentDomainId) : undefined);
 
-  const navigateToItem = (itemId: AIResultsNavItemId, nextMaskedId = maskedDomainId) => {
+  const navigateToItem = (itemId: AIResultsNavItemId, nextMaskedId = resolvedMaskedDomainId) => {
     if (!nextMaskedId) return;
 
     if (itemId === "ai-results") {
@@ -110,7 +128,7 @@ export function AIResultsLayout({
     }
 
     if (itemId === "competitors") {
-      navigate(`/dashboard?tab=analytics&subtab=competitors&domain=${nextMaskedId}`);
+      navigate(`/airesults-competitors-preview`);
       return;
     }
 
@@ -119,6 +137,64 @@ export function AIResultsLayout({
 
   return (
     <div className="flex min-h-screen w-full flex-col bg-[#f5f5f7] text-slate-900 lg:flex-row">
+      <aside className="hidden min-h-[220px] w-[72px] shrink-0 basis-auto border-b border-slate-300 bg-white px-0 py-4 lg:sticky lg:top-0 lg:flex lg:h-screen lg:max-h-screen lg:flex-col lg:items-center lg:border-b-0 lg:border-r lg:self-start">
+        <div className="flex h-full w-full flex-col items-center overflow-hidden">
+          <div className="flex w-full flex-col items-center gap-3">
+            <div className="flex h-10 w-full items-center justify-center text-sm font-semibold text-slate-900">
+              logo
+            </div>
+
+            <nav className="mt-1 flex flex-1 flex-col items-center gap-1.5 pt-1">
+              {railItems.map((item) => {
+                const isActive = item.id === "ai";
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => {
+                      if (item.action === "dashboard") navigate("/dashboard");
+                      if (item.action === "ai-results" && resolvedMaskedDomainId) navigate(`/ai-results/${resolvedMaskedDomainId}`);
+                      if (item.action === "projects") navigate("/dashboard?tab=projects");
+                      if (item.action === "analytics") navigate(`/dashboard?tab=analytics&domain=${resolvedMaskedDomainId ?? ""}`);
+                    }}
+                    className={`inline-flex h-8 w-8 items-center justify-center rounded-lg transition ${
+                      isActive ? "bg-[#2f4462] text-white shadow-sm" : "text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+                    }`}
+                    aria-label={item.label}
+                    title={item.label}
+                  >
+                    {item.iconSrc ? (
+                      <img src={item.iconSrc} alt="" aria-hidden="true" className={`h-8 w-8 ${isActive ? "" : ""}`} />
+                    ) : (
+                      <item.icon className="h-4 w-4" strokeWidth={1.8} />
+                    )}
+                  </button>
+                );
+              })}
+            </nav>
+          </div>
+
+          <div className="mt-auto flex w-full flex-col items-center gap-2 pb-1">
+            <button
+              type="button"
+              className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
+              aria-label="Account"
+              title="Account"
+            >
+              <User className="h-4 w-4" strokeWidth={1.8} />
+            </button>
+            <button
+              type="button"
+              className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
+              aria-label="Settings"
+              title="Settings"
+            >
+              <Settings2 className="h-4 w-4" strokeWidth={1.8} />
+            </button>
+          </div>
+        </div>
+      </aside>
+
       <aside className="min-h-[220px] w-full shrink-0 basis-auto border-b border-slate-300 bg-white p-4 lg:sticky lg:top-0 lg:h-screen lg:max-h-screen lg:basis-[18%] lg:min-w-[260px] lg:max-w-[342px] lg:border-b-0 lg:border-r lg:self-start">
         <div className="flex h-full flex-col overflow-hidden">
           {/* Top of the sidebar — domain logo on the left, back button on the right.
@@ -223,7 +299,6 @@ export function AIResultsLayout({
 
           <nav className="mt-5 space-y-1">
             {sidebarItems.map((item) => {
-              const Icon = item.icon;
               const isActive = item.id === activeItem;
 
               return (
@@ -233,7 +308,20 @@ export function AIResultsLayout({
                   onClick={() => navigateToItem(item.id)}
                   className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-xs font-medium transition ${isActive ? "bg-[#2f4462] text-white" : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"}`}
                 >
-                  <Icon className="h-4 w-4" />
+                  <img
+                    src={item.iconSrc}
+                    alt=""
+                    aria-hidden="true"
+                    className={`h-4 w-4 shrink-0 ${
+                      item.id === "ai-results"
+                        ? isActive
+                          ? "opacity-100"
+                          : "brightness-0 opacity-80"
+                        : isActive
+                          ? "brightness-0 invert"
+                          : "opacity-80"
+                    }`}
+                  />
                   {item.label}
                 </button>
               );
@@ -243,21 +331,45 @@ export function AIResultsLayout({
       </aside>
 
       <main className="ml-0 flex min-h-screen min-w-0 flex-1 flex-col gap-2.5 bg-white">
-        <header className="w-full bg-white px-6 py-6">
-          {/* Page title only — notification + profile chrome was removed
-              for a cleaner, focused report header. Help link kept since it's
-              the only nav action that does something on this page. */}
-          <div className="flex min-h-[3.75rem] w-full items-center justify-between gap-2.5 py-2.5 pr-2.5">
-            <h1 className="text-2xl font-semibold leading-[1.35] tracking-normal text-gray-950">
-              {title}
-            </h1>
-            <button
-              type="button"
-              aria-label="Help"
-              className="inline-flex h-5 w-5 items-center justify-center bg-transparent text-[#8D9199] hover:text-slate-700 transition-colors"
-            >
-              <HelpCircle className="h-4 w-4" />
-            </button>
+        <header className="w-full bg-white px-6 py-4">
+          <div className="flex min-h-[2.25rem] w-full items-center justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-3">
+              <button
+                type="button"
+                aria-label="Back"
+                onClick={() => navigate("/dashboard?tab=domain-history")}
+                className="inline-flex h-6 w-6 shrink-0 items-center justify-center text-[#101828] transition hover:text-slate-700"
+              >
+                <ArrowLeft className="h-4 w-4" />
+              </button>
+              <h1 className="truncate text-base font-semibold leading-[1.35] tracking-normal text-gray-950 sm:text-lg">
+                {title}
+              </h1>
+            </div>
+
+            <div className="flex items-center gap-3 text-[#98A2B3]">
+              <button
+                type="button"
+                aria-label="Help"
+                className="inline-flex h-5 w-5 items-center justify-center bg-transparent transition-colors hover:text-slate-700"
+              >
+                <HelpCircle className="h-3.5 w-3.5" />
+              </button>
+              <button
+                type="button"
+                aria-label="Notifications"
+                className="inline-flex h-5 w-5 items-center justify-center bg-transparent transition-colors hover:text-slate-700"
+              >
+                <Bell className="h-3.5 w-3.5" />
+              </button>
+              <button
+                type="button"
+                aria-label="Profile"
+                className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-[#F2F4F7] text-[#667085] transition hover:text-slate-700"
+              >
+                <User className="h-3.5 w-3.5" />
+              </button>
+            </div>
           </div>
         </header>
 
