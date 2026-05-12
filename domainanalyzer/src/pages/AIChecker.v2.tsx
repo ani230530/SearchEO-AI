@@ -283,6 +283,13 @@ export default function AICheckerV2() {
           onContinue={({ normalizedUrl: u, profile: p, existingDomainId }) => {
             setNormalizedUrl(u);
             setProfile(p);
+            if (searchParams.get("fromSignup") === "1") {
+              try {
+                localStorage.setItem("pendingAutoAuditRun", "1");
+              } catch {
+                // ignore storage failures
+              }
+            }
             // Step 1 form is committed — clear the sessionStorage draft.
             sessionStorage.removeItem(FORM_STORAGE_KEY);
             if (existingDomainId) {
