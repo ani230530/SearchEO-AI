@@ -1,15 +1,28 @@
 import {
   ArrowLeft,
+  BarChart3,
   Bell,
   ChevronDown,
+  ClipboardList,
+  Globe,
   Globe2,
   HelpCircle,
-  Settings2,
+  History,
+  LayoutDashboard,
+  Link,
+  Lightbulb,
+  LogOut,
+  PieChart,
+  Settings,
   Sparkles,
+  Send,
+  Tag,
   User,
 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
+import { useMemo } from "react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { useAuth } from "@/contexts/AuthContext";
 import { maskDomainId } from "@/lib/domainUtils";
 
 type AIResultsNavItemId =
@@ -72,13 +85,19 @@ const sidebarItems: Array<{
   { id: "analytics", label: "Opportunities", iconSrc: "/sidebar-icons/analytics.svg" },
 ];
 
-const railItems = [
-  { id: "ai", iconSrc: "/sidebar-icons/content.svg", label: "AI Results", action: "ai-results" as const },
-  { id: "create", iconSrc: "/sidebar-icons/create-project.svg", label: "Create Project", action: "projects" as const },
-  { id: "projects", iconSrc: "/sidebar-icons/content-1.svg", label: "All Projects", action: "projects" as const },
-  { id: "domain-info", iconSrc: "/sidebar-icons/text-and-icon-1.svg", label: "Domain Info", action: "analytics" as const },
-  { id: "global", icon: Globe2, label: "Global" },
-];
+type RailSectionItem = {
+  id: string;
+  label: string;
+  icon: React.ComponentType<{ className?: string; strokeWidth?: number }>;
+  onClick: () => void;
+  isActive?: boolean;
+  ariaLabel?: string;
+};
+
+type RailSection = {
+  title: string;
+  items: RailSectionItem[];
+};
 
 export function AIResultsLayout({
   activeItem,
@@ -91,6 +110,8 @@ export function AIResultsLayout({
   maskedDomainId,
   title,
 }: AIResultsLayoutProps) {
+  const { logout } = useAuth();
+  const location = useLocation();
   // Resolve the trigger button's display name. Prefer explicit props, then
   // look up the current domain in allDomains, then fall back to the host
   // sliced out of currentDomainUrl.
@@ -108,6 +129,7 @@ export function AIResultsLayout({
   const triggerLogo = logoUrlFor(triggerHost);
   const navigate = useNavigate();
   const resolvedMaskedDomainId = maskedDomainId ?? (currentDomainId ? maskDomainId(currentDomainId) : undefined);
+  const activeRailItem = "projects";
 
   const navigateToItem = (itemId: AIResultsNavItemId, nextMaskedId = resolvedMaskedDomainId) => {
     if (!nextMaskedId) return;
@@ -135,62 +157,179 @@ export function AIResultsLayout({
     navigate(`/dashboard?tab=analytics&domain=${nextMaskedId}`);
   };
 
+  const railSections = useMemo<RailSection[]>(() => {
+    return [
+      {
+        title: "",
+        items: [
+          {
+            id: "dashboard",
+            label: "Dashboard",
+            icon: LayoutDashboard,
+            onClick: () => navigate("/dashboard"),
+            isActive: activeRailItem === "dashboard",
+          },
+          {
+            id: "ai-visibility",
+            label: "AI Visibility",
+            icon: Sparkles,
+            onClick: () => navigate("/ai-visibility"),
+            isActive: activeRailItem === "ai-visibility",
+          },
+        ],
+      },
+      {
+        title: "Projects",
+        items: [
+          {
+            id: "all-projects",
+            label: "All Projects",
+            icon: Send,
+            onClick: () => navigate("/dashboard?tab=projects"),
+            isActive: activeRailItem === "projects",
+          },
+        ],
+      },
+      {
+        title: "Company Tools",
+        items: [
+          {
+            id: "domain-info",
+            label: "Domain Info",
+            icon: Globe,
+            onClick: () => navigate("/dashboard?tab=analytics"),
+          },
+          {
+            id: "website-audit",
+            label: "Website Audit",
+            icon: Globe2,
+            onClick: () => navigate("/dashboard?tab=audit"),
+          },
+          {
+            id: "domain-history",
+            label: "Domain History",
+            icon: History,
+            onClick: () => navigate("/dashboard?tab=domain-history"),
+          },
+          {
+            id: "competitor-analysis",
+            label: "Competitor analysis",
+            icon: ClipboardList,
+            onClick: () => navigate("/dashboard?tab=competitor-intelligence"),
+            isActive: location.pathname === "/airesults-competitors-preview",
+          },
+          {
+            id: "gsc-analytics",
+            label: "GSC Analytics",
+            icon: PieChart,
+            onClick: () => navigate("/dashboard?tab=gsc-analytics"),
+          },
+          {
+            id: "performance-reports",
+            label: "Performance Reports",
+            icon: BarChart3,
+            onClick: () => navigate("/dashboard?tab=analytics-report"),
+          },
+          {
+            id: "integration",
+            label: "Integration",
+            icon: Link,
+            onClick: () => navigate("/dashboard?tab=integration"),
+          },
+        ],
+      },
+      {
+        title: "Drive & Data",
+        items: [
+          {
+            id: "knowledge-base",
+            label: "Knowledge Base",
+            icon: Lightbulb,
+            onClick: () => navigate("/knowledge-base"),
+          },
+        ],
+      },
+      {
+        title: "Billing",
+        items: [
+          {
+            id: "pricing",
+            label: "Pricing",
+            icon: Tag,
+            onClick: () => navigate("/dashboard?tab=settings"),
+          },
+          {
+            id: "settings",
+            label: "Settings",
+            icon: Settings,
+            onClick: () => navigate("/dashboard?tab=settings"),
+          },
+        ],
+      },
+    ];
+  }, [activeRailItem, location.pathname, navigate]);
+
   return (
     <div className="flex min-h-screen w-full flex-col bg-[#f5f5f7] text-slate-900 lg:flex-row">
-      <aside className="hidden min-h-[220px] w-[72px] shrink-0 basis-auto border-b border-slate-300 bg-white px-0 py-4 lg:sticky lg:top-0 lg:flex lg:h-screen lg:max-h-screen lg:flex-col lg:items-center lg:border-b-0 lg:border-r lg:self-start">
-        <div className="flex h-full w-full flex-col items-center overflow-hidden">
-          <div className="flex w-full flex-col items-center gap-3">
-            <div className="flex h-10 w-full items-center justify-center text-sm font-semibold text-slate-900">
-              logo
+      <aside className="relative z-40 hidden min-h-[220px] w-[72px] shrink-0 basis-auto overflow-visible border-b border-slate-300 bg-transparent lg:sticky lg:top-0 lg:flex lg:h-screen lg:max-h-screen lg:border-b-0 lg:self-start">
+        <div className="absolute inset-y-0 left-0 z-50 flex h-full w-[72px] flex-col overflow-hidden border-b border-slate-300 bg-white px-2 py-4 shadow-sm lg:border-b-0 lg:border-r">
+          <div className="flex h-full w-full flex-col overflow-hidden">
+            <div className="flex w-full justify-center">
+              <div className="grid h-9 w-9 place-items-center rounded-lg bg-white text-[11px] font-semibold uppercase tracking-wide text-slate-700 ring-1 ring-slate-200">
+                logo
+              </div>
             </div>
 
-            <nav className="mt-1 flex flex-1 flex-col items-center gap-1.5 pt-1">
-              {railItems.map((item) => {
-                const isActive = item.id === "ai";
-                return (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => {
-                      if (item.action === "dashboard") navigate("/dashboard");
-                      if (item.action === "ai-results" && resolvedMaskedDomainId) navigate(`/ai-results/${resolvedMaskedDomainId}`);
-                      if (item.action === "projects") navigate("/dashboard?tab=projects");
-                      if (item.action === "analytics") navigate(`/dashboard?tab=analytics&domain=${resolvedMaskedDomainId ?? ""}`);
-                    }}
-                    className={`inline-flex h-8 w-8 items-center justify-center rounded-lg transition ${
-                      isActive ? "bg-[#2f4462] text-white shadow-sm" : "text-slate-500 hover:bg-slate-100 hover:text-slate-700"
-                    }`}
-                    aria-label={item.label}
-                    title={item.label}
-                  >
-                    {item.iconSrc ? (
-                      <img src={item.iconSrc} alt="" aria-hidden="true" className={`h-8 w-8 ${isActive ? "" : ""}`} />
-                    ) : (
-                      <item.icon className="h-4 w-4" strokeWidth={1.8} />
-                    )}
-                  </button>
-                );
-              })}
-            </nav>
-          </div>
+            <nav className="mt-4 flex flex-1 flex-col gap-3 overflow-y-auto pr-1">
+              {railSections.map((section) => (
+                <div key={section.title || "primary"} className="space-y-1">
+                  {section.title ? (
+                    <p className="sr-only">
+                      {section.title}
+                    </p>
+                  ) : null}
 
-          <div className="mt-auto flex w-full flex-col items-center gap-2 pb-1">
-            <button
-              type="button"
-              className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
-              aria-label="Account"
-              title="Account"
-            >
-              <User className="h-4 w-4" strokeWidth={1.8} />
-            </button>
-            <button
-              type="button"
-              className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
-              aria-label="Settings"
-              title="Settings"
-            >
-              <Settings2 className="h-4 w-4" strokeWidth={1.8} />
-            </button>
+                  <div className="space-y-1.5">
+                    {section.items.map((item) => {
+                      const ItemIcon = item.icon;
+                      const isActive = Boolean(item.isActive);
+
+                      return (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={item.onClick}
+                          className={`flex h-9 w-full items-center rounded-lg transition ${
+                            isActive
+                              ? "bg-[#2f4462] text-white shadow-sm"
+                              : "text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+                          } justify-center px-0`}
+                          aria-label={item.ariaLabel ?? item.label}
+                          title={item.label}
+                        >
+                          <ItemIcon className="h-4 w-4 shrink-0" strokeWidth={1.8} />
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </nav>
+
+            <div className="mt-auto flex w-full flex-col gap-2 pb-1">
+              <button
+                type="button"
+                onClick={() => {
+                  logout();
+                  navigate("/auth");
+                }}
+                className="flex h-9 w-full items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 px-0"
+                aria-label="Logout"
+                title="Logout"
+              >
+                <LogOut className="h-4 w-4 shrink-0" strokeWidth={1.8} />
+              </button>
+            </div>
           </div>
         </div>
       </aside>
