@@ -141,6 +141,7 @@ const [n8nRequestId, setN8nRequestId] = useState<string | null>(null);
 const [n8nStatus, setN8nStatus] = useState<'processing' | 'completed' | 'failed' | null>(null);
 const [n8nResults, setN8nResults] = useState<{sheetsUrl?: string; slidesUrl?: string} | null>(null);
 const sseRef = useRef<EventSource | null>(null);
+const autoAuditTriggeredRef = useRef(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loadingSteps, setLoadingSteps] = useState([
     {
@@ -598,6 +599,12 @@ const fetchAudit = useCallback(async () => {
           bestPractices: data.audit.bestPractices,
           audits: data.audit.audits,
           screenshot: data.audit.screenshotUrl || null,
+          recommendations: data.audit.recommendations ?? null,
+          suggestions: data.audit.suggestions ?? null,
+          opportunities: data.audit.opportunities ?? null,
+          insights: data.audit.insights ?? null,
+          pageSpeedSuggestions:
+            data.audit.pageSpeedSuggestions ?? data.audit.pagespeedSuggestions ?? null,
         });
         setAuditData(data.audit);
       }
@@ -626,9 +633,9 @@ const handleRunAudit = async (url?: string) => {
   }
 
   setAuditLoading(true);
-  setAuditResult(null);
+  setAuditError(null);
 
-  try {
+  const runAuditRequest = async () => {
     const resp = await fetch(`${import.meta.env.VITE_API_URL}/api/audit`, {
       method: 'POST',
       headers: {
@@ -640,21 +647,87 @@ const handleRunAudit = async (url?: string) => {
 
     if (!resp.ok) {
       const errorData = await resp.json().catch(() => ({}));
-      throw new Error(errorData.error || 'Failed to run audit');
+      throw new Error(errorData.error || `Failed to run audit (${resp.status})`);
     }
 
-    const data = await resp.json();
+    return resp.json();
+  };
+
+  try {
+    let data: any;
+    try {
+      data = await runAuditRequest();
+    } catch (firstError) {
+      // First-run failures can happen on cold starts / transient infra hiccups.
+      // Retry once automatically before surfacing an error.
+      await new Promise((resolve) => setTimeout(resolve, 1200));
+      data = await runAuditRequest();
+    }
+
     if (data.success) {
-      setAuditResult(data.normalized);
+      const normalizedAudit = data.normalized ?? data.audit ?? data;
+      setAuditResult({
+        performance: normalizedAudit?.performance ?? 0,
+        seo: normalizedAudit?.seo ?? 0,
+        accessibility: normalizedAudit?.accessibility ?? 0,
+        bestPractices: normalizedAudit?.bestPractices ?? 0,
+        audits: normalizedAudit?.audits ?? null,
+        screenshot:
+          normalizedAudit?.screenshot ??
+          normalizedAudit?.screenshotUrl ??
+          data?.screenshot ??
+          data?.screenshotUrl ??
+          null,
+        screenshotUrl:
+          normalizedAudit?.screenshotUrl ??
+          normalizedAudit?.screenshot ??
+          data?.screenshotUrl ??
+          data?.screenshot ??
+          null,
+        recommendations:
+          normalizedAudit?.recommendations ?? data?.recommendations ?? null,
+        suggestions: normalizedAudit?.suggestions ?? data?.suggestions ?? null,
+        opportunities: normalizedAudit?.opportunities ?? data?.opportunities ?? null,
+        insights: normalizedAudit?.insights ?? data?.insights ?? null,
+        pageSpeedSuggestions:
+          normalizedAudit?.pageSpeedSuggestions ??
+          normalizedAudit?.pagespeedSuggestions ??
+          data?.pageSpeedSuggestions ??
+          data?.pagespeedSuggestions ??
+          null,
+        pagespeedSuggestions:
+          normalizedAudit?.pagespeedSuggestions ??
+          normalizedAudit?.pageSpeedSuggestions ??
+          data?.pagespeedSuggestions ??
+          data?.pageSpeedSuggestions ??
+          null,
+      });
+      setAuditData({
+        performance: normalizedAudit?.performance ?? 0,
+        seo: normalizedAudit?.seo ?? 0,
+        accessibility: normalizedAudit?.accessibility ?? 0,
+        bestPractices: normalizedAudit?.bestPractices ?? 0,
+        audits: normalizedAudit?.audits ?? null,
+        screenshotUrl:
+          normalizedAudit?.screenshot ??
+          normalizedAudit?.screenshotUrl ??
+          data?.screenshot ??
+          data?.screenshotUrl ??
+          null,
+      });
       setAuditComplete(true);
       setShowAuditModal(true);
       setTimeout(() => setAuditComplete(false), 3500);
+      return;
     }
+    throw new Error('Audit did not complete successfully');
   } catch (err) {
     console.error(err);
+    const message = err instanceof Error ? err.message : 'Failed to run audit';
+    setAuditError(message);
     toast({
       title: 'Audit Failed',
-      description: err instanceof Error ? err.message : 'Failed to run audit',
+      description: message,
       variant: 'destructive',
     });
   } finally {
@@ -998,6 +1071,29 @@ useEffect(() => {
     }
     fetchAudit();
   }, [fetchCompanyDomain, fetchAudit]);
+
+  // One-time auto-run audit after signup onboarding domain entry.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const hasQueryAutoRun = params.get("autoRunAudit") === "1";
+    const hasPendingFlag = localStorage.getItem("pendingAutoAuditRun") === "1";
+    const shouldAutoRun = hasQueryAutoRun || hasPendingFlag;
+
+    if (!shouldAutoRun) return;
+    if (autoAuditTriggeredRef.current) return;
+    if (!companyDomain || auditLoading) return;
+
+    autoAuditTriggeredRef.current = true;
+    setActiveTab("audit");
+    void handleRunAudit(companyDomain);
+
+    localStorage.removeItem("pendingAutoAuditRun");
+    if (hasQueryAutoRun) {
+      params.delete("autoRunAudit");
+      const next = params.toString();
+      window.history.replaceState({}, "", next ? `${window.location.pathname}?${next}` : window.location.pathname);
+    }
+  }, [companyDomain, auditLoading, handleRunAudit]);
 
   // Helper function to determine intent based on keyword content
   const determineIntent = (keyword: string): string => {
@@ -2901,6 +2997,14 @@ useEffect(() => {
         onToggleSidebar={setSidebarOpen}
         onLogout={logout}
         onSelectCompanySubTab={setActiveCompanySubTab}
+        onSelectCreateProject={() => {
+          setOpenWordpressConnectionView(false);
+          setSelectedCampaignId(null);
+          setNewCampaignTitle("");
+          setNewCampaignDescription("");
+          setActiveTab("projects");
+          setShowCreateCampaign(true);
+        }}
         onSelectTab={(tabId) => {
           if (tabId === "ai-visibility") {
             navigate("/ai-visibility");

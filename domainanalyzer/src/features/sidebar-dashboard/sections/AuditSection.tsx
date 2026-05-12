@@ -344,7 +344,7 @@ export function AuditSection({
                 ))}
             </div>
 
-            {auditResult?.screenshot && (
+            {(auditResult?.screenshot || auditResult?.screenshotUrl) && (
               <div
                 className="bg-white/70 backdrop-blur-md rounded-2xl border border-gray-200 p-8 shadow-sm overflow-hidden h-full flex flex-col"
                 style={{ borderWidth: "0.5px", minHeight: "367px" }}
@@ -360,7 +360,7 @@ export function AuditSection({
                   style={{ borderWidth: "0.5px" }}
                 >
                   <img
-                    src={auditResult.screenshot}
+                    src={auditResult.screenshot || auditResult.screenshotUrl}
                     alt="Website Screenshot"
                     className="w-full h-full object-cover"
                   />

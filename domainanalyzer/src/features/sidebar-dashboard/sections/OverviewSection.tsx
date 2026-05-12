@@ -789,9 +789,9 @@ useEffect(() => {
         </div>
         
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <div className="rounded-xl bg-white border border-gray-200 p-5">
+          <div className="rounded-xl bg-white border border-gray-200 p-4">
             <div className="flex items-start justify-between mb-4">
-              <h3 className="text-[20px] leading-normal font-semibold text-[#414651]">Recent Activity</h3>
+              <h3 className="text-[18px] leading-normal font-semibold text-[#414651]">Recent Activity</h3>
               <button className="text-xs font-normal text-[#2D4059] underline underline-offset-2">View All</button>
             </div>
 
@@ -799,17 +799,17 @@ useEffect(() => {
               {recentActivities.map((activity, idx) => (
                 <div
                   key={`${activity.title}-${idx}`}
-                  className="bg-[#F9F9F9] rounded-lg px-6 py-[18px] shadow-sm"
+                  className="bg-[#F9F9F9] rounded-lg px-5 py-3 shadow-sm"
                 >
-                  <p className="text-base font-medium text-[#414651] leading-normal">{activity.title}</p>
+                  <p className="text-[15px] font-medium text-[#414651] leading-normal">{activity.title}</p>
                   <p className="text-xs text-[#2D4059] mt-1 leading-normal">{activity.time}</p>
                 </div>
               ))}
             </div>
           </div>
 
-          <div className="rounded-xl bg-white border border-gray-200 p-5">
-            <h3 className="text-[20px] leading-normal font-semibold text-[#414651] mb-4">Suggested Next Actions</h3>
+          <div className="rounded-xl bg-white border border-gray-200 p-4">
+            <h3 className="text-[18px] leading-normal font-semibold text-[#414651] mb-4">Suggested Next Actions</h3>
 
             <div className="space-y-3">
               {suggestedActions.map((action, idx) => {
@@ -833,18 +833,18 @@ useEffect(() => {
                   <div
                     key={`${action.title}-${idx}`}
                     className={cn(
-                      "rounded-lg px-6 py-[18px] border-l-[3px] shadow-sm flex items-center gap-[15px]",
+                      "rounded-lg px-5 py-3 border-l-[3px] shadow-sm flex items-center gap-3",
                       rowTone
                     )}
                   >
-                    <div className={cn("w-10 h-10 rounded-full border flex items-center justify-center shrink-0", iconWrapTone)}>
-                      <img src={action.icon} alt="" className="w-7 h-7 object-contain" />
+                    <div className={cn("w-9 h-9 rounded-full border flex items-center justify-center shrink-0", iconWrapTone)}>
+                      <img src={action.icon} alt="" className="w-6 h-6 object-contain" />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className={cn("text-base font-medium leading-normal", titleTone)}>{action.title}</p>
+                      <p className={cn("text-[15px] font-medium leading-normal", titleTone)}>{action.title}</p>
                       <p className={cn("text-xs leading-normal", subtitleTone)}>{action.subtitle}</p>
                     </div>
-                    <ArrowRight className={cn("w-5 h-5 shrink-0", action.tone === "danger" ? "text-[#B23131]" : "text-[#2D4059]")} />
+                    <ArrowRight className={cn("w-4 h-4 shrink-0", action.tone === "danger" ? "text-[#B23131]" : "text-[#2D4059]")} />
                   </div>
                 );
               })}

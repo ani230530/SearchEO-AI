@@ -53,8 +53,9 @@ const Register: React.FC<RegisterProps> = ({ onSwitchToLogin }) => {
     try {
       await register(email, password, name || undefined);
       localStorage.setItem('lastLoginEmail', email);
-      // Auto-login successful, redirect to dashboard
-      navigate('/');
+      localStorage.setItem('postAuthRedirect', '/ai-checker-v2?fromSignup=1');
+      // Auto-login successful, send new users to domain onboarding flow.
+      navigate('/ai-checker-v2?fromSignup=1');
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Registration failed';
       

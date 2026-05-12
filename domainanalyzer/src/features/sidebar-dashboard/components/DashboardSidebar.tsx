@@ -16,6 +16,8 @@ import {
   ClipboardList,
   PieChart,
   Settings,
+  Route,
+  Plus,
 } from "lucide-react";
 import {
   Tooltip,
@@ -37,6 +39,7 @@ interface DashboardSidebarProps {
   onToggleSidebar: (open: boolean) => void;
   onLogout: () => void;
   onSelectCompanySubTab: (tab: CompanySubTabId) => void;
+  onSelectCreateProject: () => void;
   onSelectTab: (tab: TabId) => void;
   showResults: boolean;
   sidebarOpen: boolean;
@@ -65,6 +68,7 @@ export function DashboardSidebar({
   onToggleSidebar,
   onLogout,
   onSelectCompanySubTab,
+  onSelectCreateProject,
   onSelectTab,
   showResults: _showResults,
   sidebarOpen,
@@ -125,6 +129,12 @@ export function DashboardSidebar({
       {
         title: "Projects",
         items: [
+          {
+            key: "create-project",
+            label: "Create new project",
+            icon: <Plus className="h-4 w-4" />,
+            onClick: onSelectCreateProject,
+          },
           {
             key: "all-projects",
             label: "All Projects",
@@ -191,6 +201,12 @@ export function DashboardSidebar({
               onSelectTab("integration");
               onSelectCompanySubTab("integration");
             },
+          },
+          {key: "attribution",
+           label: "Attribution",
+           icon: <Route className="h-4 w-4" />,
+           isActive: activeTab === "attribution",
+           onClick: () => onSelectTab("attribution"),
           },
         ],
       },

@@ -1,5 +1,4 @@
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
-import type { ReactNode } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { useNavigate, useParams } from 'react-router-dom';
 import { apiGet, apiPost } from '../services/apiClient';
@@ -47,6 +46,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import {
   Dialog,
   DialogContent,
@@ -994,12 +994,6 @@ type PromptTableProps = {
   onToggleRow: (id: string) => void;
   onOpenWorksheetModal: (singleRowId?: string) => void;
   title?: string;
-  defaultExpandedId?: string | null;
-  renderExpandedDetails?: (row: any) => ReactNode;
-  footerActionLabel?: string;
-  footerActionIconSrc?: string;
-  footerActionClassName?: string;
-  footerActionIconClassName?: string;
 };
 
 export const PromptTable = ({
@@ -1008,15 +1002,9 @@ export const PromptTable = ({
   onToggleRow,
   onOpenWorksheetModal,
   title = 'Top searched Prompts',
-  defaultExpandedId = null,
-  renderExpandedDetails,
-  footerActionLabel = 'View all',
-  footerActionIconSrc,
-  footerActionClassName,
-  footerActionIconClassName,
 }: PromptTableProps) => {
   const selectedCount = selectedRowIds.size;
-  const [expandedId, setExpandedId] = useState<string | null>(defaultExpandedId);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   const [tableFilter, setTableFilter] = useState<'all' | 'prompt' | 'keyword'>('all');
   const [tableMetric, setTableMetric] = useState<string | null>(null);
   const [showAllQueries, setShowAllQueries] = useState(false);
@@ -1290,7 +1278,7 @@ export const PromptTable = ({
                   {expandedId === row.id && (
                     <TableRow className="bg-gray-50/30 hover:bg-gray-50/30 border-b border-slate-300">
                       <TableCell colSpan={8} className="p-0">
-                        {renderExpandedDetails ? renderExpandedDetails(row) : <ExpandedDetails results={row.results} />}
+                        <ExpandedDetails results={row.results} />
                       </TableCell>
                     </TableRow>
                   )}
@@ -1312,20 +1300,9 @@ export const PromptTable = ({
               setShowAllQueries(true);
             }}
             disabled={showAllQueries || displayData.length >= data.length}
-            className={cn(
-              'inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[11px] font-bold transition-all',
-              footerActionClassName ?? 'bg-gray-50/80 text-[#3B82F6] hover:bg-gray-100'
-            )}
+            className="px-2.5 py-1 text-[11px] font-bold text-[#3B82F6] bg-gray-50/80 hover:bg-gray-100 rounded-lg transition-all"
           >
-            {footerActionIconSrc ? (
-              <img
-                src={footerActionIconSrc}
-                alt=""
-                aria-hidden="true"
-                className={cn('h-3.5 w-3.5 shrink-0', footerActionIconClassName)}
-              />
-            ) : null}
-            {footerActionLabel}
+            View all
           </button>
         </div>
       </CardContent>
@@ -1810,6 +1787,16 @@ type WorksheetPickerModalProps = {
   onCreateNewWorksheet: () => void;
 };
 
+type CreateWorksheetModalProps = {
+  open: boolean;
+  name: string;
+  isSubmitting: boolean;
+  error: string | null;
+  onOpenChange: (open: boolean) => void;
+  onNameChange: (value: string) => void;
+  onSubmit: () => void;
+};
+
 export const WorksheetPickerModal = ({
   open,
   selectedCount,
@@ -1928,6 +1915,52 @@ export const WorksheetPickerModal = ({
   );
 };
 
+const CreateWorksheetModal = ({
+  open,
+  name,
+  isSubmitting,
+  error,
+  onOpenChange,
+  onNameChange,
+  onSubmit,
+}: CreateWorksheetModalProps) => {
+  const disabled = isSubmitting || !name.trim();
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-[520px] rounded-2xl">
+        <DialogHeader>
+          <DialogTitle>Create New Worksheet</DialogTitle>
+          <DialogDescription>
+            Enter the project name.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-3">
+          <Input
+            value={name}
+            onChange={(e) => onNameChange(e.target.value)}
+            placeholder="Worksheet name"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !disabled) onSubmit();
+            }}
+          />
+          {error ? <p className="text-xs text-rose-600">{error}</p> : null}
+        </div>
+
+        <div className="flex items-center justify-end gap-2">
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
+            Cancel
+          </Button>
+          <Button type="button" onClick={onSubmit} disabled={disabled}>
+            {isSubmitting ? 'Creating...' : 'Create Worksheet'}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
 
 const AIResultsReportPreview = () => {
   const navigate = useNavigate();
@@ -1971,6 +2004,10 @@ const AIResultsReportPreview = () => {
   const [worksheetOptionsLoading, setWorksheetOptionsLoading] = useState(false);
   const [activeWorksheetId, setActiveWorksheetId] = useState<string | null>(null);
   const [isWorksheetModalOpen, setIsWorksheetModalOpen] = useState(false);
+  const [isCreateWorksheetModalOpen, setIsCreateWorksheetModalOpen] = useState(false);
+  const [newWorksheetName, setNewWorksheetName] = useState('');
+  const [createWorksheetError, setCreateWorksheetError] = useState<string | null>(null);
+  const [isCreatingWorksheet, setIsCreatingWorksheet] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -2137,34 +2174,80 @@ const AIResultsReportPreview = () => {
     navigate('/dashboard');
   }, [activeWorksheetId, navigate, pendingGeneration, reportData, runGeneration, selectedRowIds]);
 
-  const handleCreateNewWorksheet = useCallback(async () => {
-    // For the Generate-Content flow, prompt for a name and create the
-    // worksheet inline so the user doesn't lose their place.
-    if (pendingGeneration) {
-      const name = window.prompt('Worksheet name?')?.trim();
-      if (!name) return;
-      try {
-        const created = await apiPost<{ campaign?: { id: number; title: string } }>(
-          '/campaigns',
-          { title: name }
-        );
-        const newId = created?.campaign?.id;
-        if (!newId) return;
-        const newOption: WorksheetOption = { id: String(newId), name, description: null };
-        setWorksheetOptions((prev) => [newOption, ...prev]);
+  const handleCreateNewWorksheet = useCallback(() => {
+    setCreateWorksheetError(null);
+    setNewWorksheetName('');
+    setIsCreateWorksheetModalOpen(true);
+  }, []);
+
+  const handleCreateWorksheetModalOpenChange = useCallback((open: boolean) => {
+    if (!isCreatingWorksheet) {
+      setIsCreateWorksheetModalOpen(open);
+    }
+    if (!open) {
+      setCreateWorksheetError(null);
+      setNewWorksheetName('');
+    }
+  }, [isCreatingWorksheet]);
+
+  const handleConfirmCreateWorksheet = useCallback(async () => {
+    const name = newWorksheetName.trim();
+    if (!name || isCreatingWorksheet) return;
+    setIsCreatingWorksheet(true);
+    setCreateWorksheetError(null);
+    try {
+      const created = await apiPost<{ campaign?: { id: number; title: string } }>(
+        '/campaigns',
+        { title: name }
+      );
+      const newId = created?.campaign?.id;
+      const newTitle = created?.campaign?.title?.trim() || name;
+      if (!newId) return;
+      const newWorksheetId = String(newId);
+      const newOption: WorksheetOption = { id: newWorksheetId, name: newTitle, description: null };
+      setWorksheetOptions((prev) => [newOption, ...prev]);
+      setIsCreateWorksheetModalOpen(false);
+      setNewWorksheetName('');
+
+      if (pendingGeneration) {
         const { key, payload } = pendingGeneration;
         setIsWorksheetModalOpen(false);
         setPendingGeneration(null);
         setActiveWorksheetId(null);
         void runGeneration(key, payload, newId);
-      } catch (err) {
-        console.error('[AIResults] Create worksheet failed:', err);
-        alert('Failed to create worksheet. Please try again.');
+        return;
       }
-      return;
+
+      // Table-row flow: map selected prompts into the newly created worksheet
+      // exactly like "Add to Worksheet" does, then hand off to dashboard.
+      const rowsById = new Map<string, any>(
+        (reportData?.topPrompts || []).map((p: any) => [String(p.id), p])
+      );
+      const selectedItemIds = Array.from(selectedRowIds);
+      const selectedRows = selectedItemIds
+        .map((id) => rowsById.get(id))
+        .filter(Boolean)
+        .map((row: any) => ({ id: String(row.id), prompt: row.phrase ?? row.prompt ?? '' }));
+
+      const payload = {
+        activeWorksheetId: newWorksheetId,
+        selectedItemIds,
+        selectedRows,
+      };
+
+      sessionStorage.setItem(WORKSHEET_TARGET_KEY, newWorksheetId);
+      sessionStorage.setItem(WORKSHEET_IMPORT_KEY, JSON.stringify(payload));
+      localStorage.setItem('activeTab', 'projects');
+      setIsWorksheetModalOpen(false);
+      setActiveWorksheetId(null);
+      navigate('/dashboard');
+    } catch (err) {
+      console.error('[AIResults] Create worksheet failed:', err);
+      setCreateWorksheetError('Failed to create worksheet. Please try again.');
+    } finally {
+      setIsCreatingWorksheet(false);
     }
-    setIsWorksheetModalOpen(false);
-  }, [pendingGeneration, runGeneration]);
+  }, [isCreatingWorksheet, navigate, newWorksheetName, pendingGeneration, reportData, runGeneration, selectedRowIds]);
 
   // Derived metrics for the 4×2 dashboard cards.
   //
@@ -3175,6 +3258,15 @@ const AIResultsReportPreview = () => {
     onWorksheetSelect={setActiveWorksheetId}
     onAddToWorksheet={handleAddToWorksheet}
     onCreateNewWorksheet={handleCreateNewWorksheet}
+  />
+  <CreateWorksheetModal
+    open={isCreateWorksheetModalOpen}
+    name={newWorksheetName}
+    isSubmitting={isCreatingWorksheet}
+    error={createWorksheetError}
+    onOpenChange={handleCreateWorksheetModalOpenChange}
+    onNameChange={setNewWorksheetName}
+    onSubmit={handleConfirmCreateWorksheet}
   />
     </AIResultsLayout>
   );

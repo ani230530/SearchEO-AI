@@ -13,6 +13,12 @@ const Auth: React.FC = () => {
   // Redirect if user is already authenticated
   useEffect(() => {
     if (user && !loading) {
+      const postAuthRedirect = localStorage.getItem('postAuthRedirect');
+      if (postAuthRedirect) {
+        localStorage.removeItem('postAuthRedirect');
+        navigate(postAuthRedirect);
+        return;
+      }
       navigate('/dashboard');
     }
   }, [user, loading, navigate]);
