@@ -1,12 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ChevronLeft } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import Login from '@/components/auth/Login';
-import Register from '@/components/auth/Register';
 
+/**
+ * /auth — sign-in page for existing users. Signup no longer lives here;
+ * the legacy Register component was removed when the anonymous AI
+ * Visibility audit funnel became the single signup entry point. The
+ * "switch to register" link on Login.tsx navigates to /audit instead.
+ */
 const Auth: React.FC = () => {
-  const [isLogin, setIsLogin] = useState(true);
   const { user, loading } = useAuth();
   const navigate = useNavigate();
 
@@ -85,11 +89,9 @@ const Auth: React.FC = () => {
 
       <main className="auth-container relative z-10">
         <div className="w-full max-w-md">
-          {isLogin ? (
-            <Login onSwitchToRegister={() => setIsLogin(false)} />
-          ) : (
-            <Register onSwitchToLogin={() => setIsLogin(true)} />
-          )}
+          {/* Signup is handled by /audit — Login's "switch to register"
+              link routes there. We never render Register inline anymore. */}
+          <Login onSwitchToRegister={() => navigate('/audit')} />
         </div>
       </main>
     </div>
