@@ -6,7 +6,6 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import Auth from "./pages/Auth";
-import AnonymousAudit from "./pages/AnonymousAudit";
 import NotFound from "./pages/NotFound";
 import Profile from "./pages/Profile";
 import LandingPage from "./pages/LandingPage";
@@ -33,12 +32,15 @@ const App = () => (
             {console.log("App Rendering Routes")}
             {/* Public routes */}
             <Route path="/" element={<LandingPage />} />
-            {/* Anonymous AI Visibility audit funnel. Replaces direct signup.
-                Existing users who land here are redirected into the
-                authenticated wizard by AnonymousAudit itself. */}
-            <Route path="/audit" element={<AnonymousAudit />} />
-            {/* /signup is a permanent shortcut to the funnel — old marketing
-                links and "Sign Up" buttons across the app point here. */}
+            {/* Anonymous AI Visibility audit. Same component as the
+                authenticated dashboard wizard — runs against the wizard
+                cookie identity when no JWT is present. Steps 1-4 work
+                anonymously; Step 5 (/run) returns 402 SIGNUP_REQUIRED
+                which AIChecker.v2 surfaces as a signup wall modal. */}
+            <Route path="/audit" element={<AICheckerV2 />} />
+            {/* /signup is a permanent shortcut to the audit funnel — old
+                marketing links and "Sign Up" buttons across the app
+                point here. */}
             <Route path="/signup" element={<Navigate to="/audit" replace />} />
             <Route path="/auth" element={<Auth />} />
             {/* /login is a shortcut for existing users; /auth handles the form. */}

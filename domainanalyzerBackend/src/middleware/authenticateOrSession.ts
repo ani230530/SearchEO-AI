@@ -94,6 +94,28 @@ export const canRunPaidStep = (
   identity: WizardIdentity | undefined
 ): boolean => identity?.kind === 'user';
 
+/**
+ * Resolve the "current user id" for wizard route handlers that own data.
+ *
+ * For an authenticated identity we return the JWT's userId. For an anon
+ * identity we return the shadow User's id stashed on the session at
+ * issue-time. Returns null when neither is set — a defensive failsafe
+ * for the very narrow window between session create and shadow-user
+ * row visibility (shouldn't happen in practice since both rows are
+ * created in the same transaction).
+ *
+ * This is the single piece of glue that lets the existing wizard schema
+ * (every domain-scoped table has `userId` non-nullable) accept anonymous
+ * callers without any per-route refactor: each route swaps
+ * `req.user.userId` → `getOwnerUserId(req)` and everything else works.
+ */
+export const getOwnerUserId = (req: Request): number | null => {
+  const identity = req.identity;
+  if (!identity) return null;
+  if (identity.kind === 'user') return identity.userId;
+  return identity.session.anonUserId ?? null;
+};
+
 export interface AuthenticateOrSessionOptions {
   /**
    * When true (default), if no JWT and no cookie are present we mint a new

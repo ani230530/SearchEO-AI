@@ -20,7 +20,10 @@
 import { Router, Request, Response } from 'express';
 import { Prisma, PrismaClient } from '../../generated/prisma';
 import { authenticateToken, AuthenticatedRequest } from '../middleware/auth';
-import { authenticateOrSession } from '../middleware/authenticateOrSession';
+import {
+  authenticateOrSession,
+  getOwnerUserId,
+} from '../middleware/authenticateOrSession';
 import { extractHost, normalizeUrl } from './urlNormalize';
 import { crawlDomain, inferCompanySize, synthesizeContext } from './crawlService';
 import { embedText } from './llmClient';
@@ -57,7 +60,11 @@ async function ensureDomain(req: Request, idParam: string | undefined): Promise<
     where: { id },
     include: { profile: true, inferred: true },
   });
-  if (!domain || domain.userId !== authReq(req).user.userId) {
+  // Owner can be either the JWT user OR the anon session's shadow user.
+  // getOwnerUserId resolves both. Anon callers only see their own shadow-
+  // owned Domain, since the shadow user id is private to their cookie.
+  const ownerId = getOwnerUserId(req);
+  if (!ownerId || !domain || domain.userId !== ownerId) {
     return { ok: false, error: 'Domain not found', status: 404 };
   }
   return { ok: true, domain: domain as NonNullable<DomainWithRelations> };
@@ -251,8 +258,18 @@ router.post('/validate', authenticateOrSession(), async (req: Request, res: Resp
 });
 
 // ── POST /domain  (create + crawl, SSE) ────────────────────────────────────
+//
+// Dual-identity: JWT or anonymous wizard cookie. For anon callers the
+// Domain is owned by the shadow user; on signup the linkage handler
+// transfers Domain.userId to the real account. Step 5 (`/run`) stays
+// auth-only because it triggers expensive LLM/SerpAPI calls.
 
-router.post('/domain', authenticateToken, async (req: Request, res: Response) => {
+router.post('/domain', authenticateOrSession(), async (req: Request, res: Response) => {
+  const ownerId = getOwnerUserId(req);
+  if (!ownerId) {
+    return res.status(401).json({ error: 'No identity attached to request' });
+  }
+
   const { url, country, state, industry, targetLocation, customSeeds } = (req.body ?? {}) as {
     url?: string;
     country?: string;
@@ -273,17 +290,31 @@ router.post('/domain', authenticateToken, async (req: Request, res: Response) =>
   const send = (data: object) => res.write(`data: ${JSON.stringify(data)}\n\n`);
 
   try {
-    // Upsert Domain (identity row only).
+    // Upsert Domain (identity row only). For anon callers `ownerId` is the
+    // shadow user's id; transfer happens at signup.
     const domain = await prisma.domain.upsert({
-      where: { userId_host: { userId: authReq(req).user.userId, host: norm.host } },
+      where: { userId_host: { userId: ownerId, host: norm.host } },
       update: { url: norm.canonicalUrl },
       create: {
-        userId: authReq(req).user.userId,
+        userId: ownerId,
         url: norm.canonicalUrl,
         host: norm.host,
         isCompanyDomain: false,
       },
     });
+
+    // Record the Domain id on the WizardSession so the post-signup
+    // linkage handler can find it and the redirect target is known.
+    if (req.identity?.kind === 'anon') {
+      void prisma.wizardSession
+        .update({
+          where: { id: req.identity.session.id },
+          data: { linkedDomainId: domain.id, domainHost: norm.host, domainUrl: norm.canonicalUrl, step: 'crawl' },
+        })
+        .catch((err: unknown) => {
+          console.warn('[wizard/domain] session update failed', err);
+        });
+    }
     send({ type: 'domain_created', domainId: domain.id });
 
     // Persist user-supplied profile.
@@ -361,7 +392,7 @@ router.post('/domain', authenticateToken, async (req: Request, res: Response) =>
 
 // ── GET /domain/:id ────────────────────────────────────────────────────────
 
-router.get('/domain/:id', authenticateToken, async (req: Request, res: Response) => {
+router.get('/domain/:id', authenticateOrSession(), async (req: Request, res: Response) => {
   const got = await ensureDomain(req, req.params.id);
   if (!got.ok) return res.status(got.status).json({ error: got.error });
   const { domain } = got;
@@ -765,7 +796,7 @@ router.get('/domain/:id/report', authenticateToken, async (req: Request, res: Re
 
 // ── GET /domain/:id/state ──────────────────────────────────────────────────
 
-router.get('/domain/:id/state', authenticateToken, async (req: Request, res: Response) => {
+router.get('/domain/:id/state', authenticateOrSession(), async (req: Request, res: Response) => {
   const got = await ensureDomain(req, req.params.id);
   if (!got.ok) return res.status(got.status).json({ error: got.error });
   const { domain } = got;
@@ -1202,7 +1233,7 @@ router.post('/domain/:id/restart', authenticateToken, async (req: Request, res: 
 
 // ── POST /domain/:id/competitors ───────────────────────────────────────────
 
-router.post('/domain/:id/competitors', authenticateToken, async (req: Request, res: Response) => {
+router.post('/domain/:id/competitors', authenticateOrSession(), async (req: Request, res: Response) => {
   const got = await ensureDomain(req, req.params.id);
   if (!got.ok) return res.status(got.status).json({ error: got.error });
   const { domain } = got;
@@ -1266,7 +1297,7 @@ router.post('/domain/:id/competitors', authenticateToken, async (req: Request, r
 
 // ── POST /domain/:id/competitors/select ────────────────────────────────────
 
-router.post('/domain/:id/competitors/select', authenticateToken, async (req: Request, res: Response) => {
+router.post('/domain/:id/competitors/select', authenticateOrSession(), async (req: Request, res: Response) => {
   const got = await ensureDomain(req, req.params.id);
   if (!got.ok) return res.status(got.status).json({ error: got.error });
   const { domain } = got;
@@ -1289,7 +1320,7 @@ router.post('/domain/:id/competitors/select', authenticateToken, async (req: Req
 
 // ── POST /domain/:id/topics ────────────────────────────────────────────────
 
-router.post('/domain/:id/topics', authenticateToken, async (req: Request, res: Response) => {
+router.post('/domain/:id/topics', authenticateOrSession(), async (req: Request, res: Response) => {
   const got = await ensureDomain(req, req.params.id);
   if (!got.ok) return res.status(got.status).json({ error: got.error });
   const { domain } = got;
@@ -1714,7 +1745,7 @@ async function listAllTopicItems(prismaClient: typeof prisma, domainId: number) 
 
 // ── PATCH /domain/:id/draft ────────────────────────────────────────────────
 
-router.patch('/domain/:id/draft', authenticateToken, async (req: Request, res: Response) => {
+router.patch('/domain/:id/draft', authenticateOrSession(), async (req: Request, res: Response) => {
   const got = await ensureDomain(req, req.params.id);
   if (!got.ok) return res.status(got.status).json({ error: got.error });
   const { domain } = got;
@@ -1733,7 +1764,7 @@ router.patch('/domain/:id/draft', authenticateToken, async (req: Request, res: R
 
 // ── POST /domain/:id/select ────────────────────────────────────────────────
 
-router.post('/domain/:id/select', authenticateToken, async (req: Request, res: Response) => {
+router.post('/domain/:id/select', authenticateOrSession(), async (req: Request, res: Response) => {
   const got = await ensureDomain(req, req.params.id);
   if (!got.ok) return res.status(got.status).json({ error: got.error });
   const { domain } = got;
@@ -1766,8 +1797,20 @@ router.post('/domain/:id/select', authenticateToken, async (req: Request, res: R
 });
 
 // ── POST /domain/:id/run  (Step 5 — runs AI queries via SSE) ───────────────
+//
+// Auth gate: dual-identity middleware so the server-rendered identity is
+// always available, but explicitly rejects anonymous callers with a 402
+// + code 'SIGNUP_REQUIRED'. The frontend reads this to pop the signup
+// wall modal. This keeps the actual signup gate server-enforced — we
+// never trust the client to gate the paid LLM run.
 
-router.post('/domain/:id/run', authenticateToken, async (req: Request, res: Response) => {
+router.post('/domain/:id/run', authenticateOrSession(), async (req: Request, res: Response) => {
+  if (req.identity?.kind !== 'user') {
+    return res.status(402).json({
+      error: 'Sign up to view your full AI Visibility report.',
+      code: 'SIGNUP_REQUIRED',
+    });
+  }
   const got = await ensureDomain(req, req.params.id);
   if (!got.ok) return res.status(got.status).json({ error: got.error });
   const { domain } = got;
