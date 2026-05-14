@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
-import { apiGet } from "@/services/apiClient";
+import { apiGet, apiPost } from "@/services/apiClient";
+import { useToast } from "@/components/ui/use-toast";
 import ReactMarkdown from "react-markdown";
 import {
   AlignLeft,
@@ -18,6 +19,7 @@ import {
   Languages,
   LayoutGrid,
   Link2,
+  Loader2,
   Plus,
   RefreshCw,
   Search,
@@ -684,9 +686,66 @@ export const PromptTable = ({
   /** Real Domain.id used by the expanded row to fetch /history. */
   domainId?: number | null;
 }) => {
+  const { toast } = useToast();
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [tableFilter, setTableFilter] = useState<"all" | "prompt" | "keyword">("all");
   const [tableMetric, setTableMetric] = useState<string | null>(null);
+
+  // Analyze Prompt state.
+  // - `analyzeText` is the input.
+  // - `analyzing` flips the button to a spinner + disables it.
+  // - `newlyAnalyzedRows` are prompts the user just ran via the button.
+  //   They're kept in insertion order (newest first) so they always sort
+  //   to the top of the table when no filter is applied.
+  // - `pendingRows` are optimistic placeholder rows shown immediately on
+  //   submit so the user sees that something is happening; replaced by
+  //   real rows once the backend returns.
+  const [analyzeText, setAnalyzeText] = useState("");
+  const [analyzing, setAnalyzing] = useState(false);
+  const [newlyAnalyzedRows, setNewlyAnalyzedRows] = useState<PromptTableRow[]>([]);
+  const [pendingRows, setPendingRows] = useState<
+    Array<{ id: string; phrase: string }>
+  >([]);
+
+  const handleAnalyzePrompt = async () => {
+    const text = analyzeText.trim();
+    if (!text || analyzing) return;
+    if (!domainId) {
+      toast({
+        title: "No domain context",
+        description: "Open a domain's report before analyzing a prompt.",
+        variant: "destructive",
+      });
+      return;
+    }
+    const optimisticId = `pending-${Date.now()}`;
+    setAnalyzing(true);
+    setPendingRows((prev) => [{ id: optimisticId, phrase: text }, ...prev]);
+    try {
+      const res = await apiPost<{
+        runId: number;
+        prompt: { id: number; keywordId: number | null; text: string };
+        row: PromptTableRow;
+      }>(`/wizard/domain/${domainId}/prompts/analyze`, { text });
+      setNewlyAnalyzedRows((prev) => [res.row, ...prev]);
+      setAnalyzeText("");
+      toast({
+        title: "Prompt analyzed",
+        description: `Tracked across ${res.row.results.length} model${res.row.results.length === 1 ? "" : "s"}.`,
+      });
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Could not analyze prompt. Try again.";
+      toast({
+        title: "Analyze failed",
+        description: message,
+        variant: "destructive",
+      });
+    } finally {
+      setPendingRows((prev) => prev.filter((p) => p.id !== optimisticId));
+      setAnalyzing(false);
+    }
+  };
 
   const displayData = useMemo(() => {
     let items = [...data];
@@ -710,14 +769,30 @@ export const PromptTable = ({
       });
     }
 
+    // No filter / no metric sort: newly analyzed prompts pin to the top.
+    // Dedupe by rawId so a prompt that the user just analyzed AND that's
+    // also been pulled in by the parent's /report fetch doesn't render
+    // twice. The newly-analyzed row wins (it has the fresh result data).
+    const mergedNewIds = new Set(newlyAnalyzedRows.map((r) => r.rawId).filter((id): id is number => typeof id === "number"));
     if (!tableMetric && tableFilter === "all") {
-      const prompts = items.filter((item) => item.type === "prompt").slice(0, 4);
-      const keywords = items.filter((item) => item.type === "keyword").slice(0, 2);
-      return [...prompts, ...keywords];
+      const baseItems = items.filter(
+        (item) =>
+          !(typeof item.rawId === "number" && mergedNewIds.has(item.rawId)),
+      );
+      const prompts = baseItems.filter((item) => item.type === "prompt").slice(0, 4);
+      const keywords = baseItems.filter((item) => item.type === "keyword").slice(0, 2);
+      return [...newlyAnalyzedRows, ...prompts, ...keywords];
+    }
+    if (!tableMetric && tableFilter === "prompt") {
+      const baseItems = items.filter(
+        (item) =>
+          !(typeof item.rawId === "number" && mergedNewIds.has(item.rawId)),
+      );
+      return [...newlyAnalyzedRows, ...baseItems].slice(0, 6);
     }
 
     return items.slice(0, 6);
-  }, [data, tableFilter, tableMetric]);
+  }, [data, tableFilter, tableMetric, newlyAnalyzedRows]);
 
   return (
     <Card className="border-none bg-transparent shadow-none">
@@ -810,13 +885,36 @@ export const PromptTable = ({
             <input
               type="text"
               placeholder="Enter your custom prompt to track"
-              className="h-[38px] w-full rounded-lg border border-slate-200 pl-10 pr-4 text-[13px] outline-none transition-all placeholder:text-gray-400 focus:border-slate-300 focus:ring-1 focus:ring-slate-300"
+              value={analyzeText}
+              onChange={(e) => setAnalyzeText(e.target.value)}
+              disabled={analyzing}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  void handleAnalyzePrompt();
+                }
+              }}
+              className="h-[38px] w-full rounded-lg border border-slate-200 pl-10 pr-4 text-[13px] outline-none transition-all placeholder:text-gray-400 focus:border-slate-300 focus:ring-1 focus:ring-slate-300 disabled:bg-slate-50 disabled:cursor-not-allowed"
             />
           </div>
 
-          <Button className="h-[38px] shrink-0 gap-1.5 rounded-lg bg-[#4b6eb8] px-4 text-white transition-all hover:bg-[#3f5d9c]">
-            <Plus className="h-4 w-4" />
-            <span className="text-[13px] font-medium">Analyze Prompt</span>
+          <Button
+            type="button"
+            onClick={() => void handleAnalyzePrompt()}
+            disabled={analyzing || !analyzeText.trim()}
+            className="h-[38px] shrink-0 gap-1.5 rounded-lg bg-[#4b6eb8] px-4 text-white transition-all hover:bg-[#3f5d9c] disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            {analyzing ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span className="text-[13px] font-medium">Analyzing…</span>
+              </>
+            ) : (
+              <>
+                <Plus className="h-4 w-4" />
+                <span className="text-[13px] font-medium">Analyze Prompt</span>
+              </>
+            )}
           </Button>
         </div>
       </CardHeader>
@@ -867,6 +965,40 @@ export const PromptTable = ({
               </TableRow>
             </TableHeader>
             <TableBody>
+              {/*
+                Optimistic skeleton rows for prompts currently being
+                analyzed. Rendered above real rows so the user sees
+                immediate feedback. Removed when the backend responds
+                (the real row gets prepended via newlyAnalyzedRows).
+                Matches the table's design system — Loader2 spinner
+                inline, slate-50 row background, slate-400 muted text.
+              */}
+              {pendingRows.map((p) => (
+                <TableRow
+                  key={p.id}
+                  className="border-b border-slate-200 bg-slate-50/60"
+                >
+                  <TableCell className="w-8 px-4 py-3">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin text-slate-400" />
+                  </TableCell>
+                  <TableCell className="max-w-[340px] px-2 py-3">
+                    <div className="flex flex-col gap-1">
+                      <span className="truncate text-[12px] italic text-slate-500">
+                        {p.phrase}
+                      </span>
+                      <span className="text-[11px] text-slate-400">
+                        Asking ChatGPT, Claude, and Gemini…
+                      </span>
+                    </div>
+                  </TableCell>
+                  <TableCell colSpan={6} className="px-2 py-3">
+                    <div className="flex items-center gap-2 text-[12px] font-light text-slate-400">
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                      Running across models — typically 15–30s
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
               {displayData.map((row) => (
                 <Fragment key={row.id}>
                   <TableRow

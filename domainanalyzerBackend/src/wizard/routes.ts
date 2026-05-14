@@ -32,7 +32,7 @@ import { generateAuditPrompts, persistAuditPrompts, type PromptCategory } from '
 import { generateKeywordsForDomain, persistKeywords } from './keywordsService';
 import { enrichDomainContext } from './enrichmentService';
 import { setPhase, readState } from './wizardState';
-import { runQueries } from './runService';
+import { runOnePrompt, runQueries } from './runService';
 import { computePhraseVisibility, computeOpportunities } from './analyticsService';
 import { enrichOpportunities, type EnrichedOpportunity } from './opportunityEnrichment';
 
@@ -1681,6 +1681,247 @@ router.post('/domain/:id/prompts/custom', authenticateToken, async (req: Request
   // Return the canonical updated list so the UI just replaces its state.
   const items = await listAllTopicItems(prisma, domain.id);
   return res.json({ domainId: domain.id, prompt: { id: created.id, keywordId: created.keywordId }, items });
+});
+
+/**
+ * POST /api/wizard/domain/:id/prompts/analyze
+ * Body: { text: string }
+ *
+ * The "Analyze Prompt" button on the AI Checker dashboard.
+ *
+ * Pipeline:
+ *   1. LLM keyword-detect — find an existing Keyword that fits the prompt's
+ *      topic, or propose+create a brand-new short Keyword. Same logic as
+ *      /prompts/custom — kept inline rather than refactored out because
+ *      the shape of the LLM call is small and shared logic would couple
+ *      two routes that may diverge.
+ *   2. Create the Prompt with isSelected=true (so the next full re-run
+ *      also covers it) and source='custom'.
+ *   3. Call runOnePrompt(prisma, { domainId, promptId }) — runs the
+ *      prompt across the ROSTER (3 models), heuristic + LLM scoring,
+ *      persists AiQueryResult rows under a fresh completed AiRun.
+ *   4. Shape the persisted results into the PromptTableRow shape the
+ *      frontend's PromptTable expects, and return.
+ *
+ * The new AiRun is status='completed', so the existing /report endpoint
+ * (which aggregates across completed runs) starts surfacing this prompt
+ * the next time the dashboard refreshes.
+ */
+router.post('/domain/:id/prompts/analyze', authenticateToken, async (req: Request, res: Response) => {
+  const got = await ensureDomain(req, req.params.id);
+  if (!got.ok) return res.status(got.status).json({ error: got.error });
+  const { domain } = got;
+
+  const text = typeof (req.body ?? {}).text === 'string' ? (req.body as { text: string }).text.trim() : '';
+  if (!text) return res.status(400).json({ error: 'text is required' });
+  if (text.length > 800) return res.status(400).json({ error: 'Prompt is too long (max 800 chars)' });
+
+  // 1. LLM keyword-detect (same logic as /prompts/custom).
+  const keywords = await prisma.keyword.findMany({
+    where: { domainId: domain.id },
+    select: { id: true, term: true, intent: true },
+  });
+
+  let assignedKeywordId: number | null = null;
+  let assignedIntent: string | null = null;
+  let newKeywordTerm: string | null = null;
+
+  if (process.env.OPENROUTER_API_KEY) {
+    try {
+      const OpenAI = (await import('openai')).default;
+      const llm = new OpenAI({
+        apiKey: process.env.OPENROUTER_API_KEY,
+        baseURL: 'https://openrouter.ai/api/v1',
+        defaultHeaders: {
+          'HTTP-Referer': process.env.OPENROUTER_REFERRER || 'http://localhost:3002',
+          'X-Title': 'AI Visibility / Analyze prompt',
+        },
+      });
+      const completion = await llm.chat.completions.create({
+        model: 'openai/gpt-4o-mini',
+        messages: [
+          {
+            role: 'system',
+            content:
+              'You assign a user-supplied prompt to a keyword group. ' +
+              'First try to match it to one of the existing keywords. ' +
+              "If none fit, propose a brand new short keyword (1–4 words, lowercase, no quotes) that captures the prompt's topic. " +
+              'Output strict JSON only.',
+          },
+          {
+            role: 'user',
+            content: [
+              `User's prompt: "${text}"`,
+              '',
+              keywords.length > 0
+                ? [
+                    'Existing keywords for this domain:',
+                    keywords.map((k) => `  - id=${k.id} term="${k.term}" intent=${k.intent}`).join('\n'),
+                  ].join('\n')
+                : '(no existing keywords yet — propose a new one)',
+              '',
+              'Return JSON exactly in this shape:',
+              '{',
+              '  "keywordId": <id of one of the existing keywords if a clean fit, else null>,',
+              '  "newKeyword": <if keywordId is null, propose a 1–4 word keyword string, else null>,',
+              '  "intent": "Informational"|"Commercial"|"Transactional"|"Navigational"',
+              '}',
+            ].join('\n'),
+          },
+        ],
+        response_format: { type: 'json_object' },
+        temperature: 0.1,
+        max_tokens: 120,
+      });
+      const parsed = JSON.parse(completion.choices[0]?.message?.content ?? '{}');
+      const allowedIds = new Set(keywords.map((k) => k.id));
+      if (typeof parsed.keywordId === 'number' && allowedIds.has(parsed.keywordId)) {
+        assignedKeywordId = parsed.keywordId;
+        const parent = keywords.find((k) => k.id === parsed.keywordId);
+        assignedIntent = parent?.intent ?? null;
+      } else if (typeof parsed.newKeyword === 'string' && parsed.newKeyword.trim()) {
+        newKeywordTerm = parsed.newKeyword.trim().toLowerCase().slice(0, 80);
+      }
+      if (typeof parsed.intent === 'string') assignedIntent = parsed.intent;
+    } catch {
+      // Fall through — prompt still gets created (orphan if necessary).
+    }
+  }
+
+  if (assignedKeywordId === null && newKeywordTerm) {
+    const newKw = await prisma.keyword.upsert({
+      where: { domainId_term: { domainId: domain.id, term: newKeywordTerm } },
+      update: {},
+      create: {
+        domainId: domain.id,
+        term: newKeywordTerm,
+        intent: assignedIntent ?? 'Commercial',
+        source: 'custom',
+        // The keyword is implicitly tracked via its child prompt; we don't
+        // need to flip its own isSelected. Same convention as /prompts/custom.
+        isSelected: false,
+      },
+    });
+    assignedKeywordId = newKw.id;
+  }
+
+  // 2. Create the Prompt with isSelected=true — it WILL be tracked.
+  const prompt = await prisma.prompt.create({
+    data: {
+      domainId: domain.id,
+      keywordId: assignedKeywordId,
+      text,
+      intent: assignedIntent ?? 'Commercial',
+      source: 'custom',
+      isSelected: true,
+    },
+  });
+
+  // 3. Run the prompt across ROSTER and persist results.
+  let runResult: Awaited<ReturnType<typeof runOnePrompt>>;
+  try {
+    runResult = await runOnePrompt(prisma, { domainId: domain.id, promptId: prompt.id });
+  } catch (err) {
+    // Persist context but tell the client the LLM run itself failed. The
+    // Prompt row remains in the DB; a future full re-run will pick it up.
+    const message = err instanceof Error ? err.message : 'AI analysis failed';
+    return res.status(502).json({
+      error: 'Analysis service unavailable — please try again.',
+      details: message,
+      // Surface the created Prompt so the client can still show "added".
+      prompt: { id: prompt.id, keywordId: prompt.keywordId, text: prompt.text },
+    });
+  }
+
+  // 4. Build a PromptTableRow-shaped response. Same construction as the
+  //    /report endpoint's per-prompt loop, but for just this one prompt.
+  const toDisplaySentiment = (raw: number | null): number | null =>
+    raw === null ? null : Math.max(0, Math.min(10, (raw + 10) / 2));
+
+  const built = runResult.persistedResults.map((r) => ({
+    id: `res-${r.id}`,
+    model: r.model,
+    presence: r.presence,
+    overall: r.overall,
+    accuracy: r.accuracy,
+    relevance: r.relevance,
+    sentiment:
+      toDisplaySentiment(r.sentiment) === null
+        ? null
+        : Number((toDisplaySentiment(r.sentiment) as number).toFixed(2)),
+    sentimentRaw: r.sentiment,
+    rankPosition: r.rankPosition,
+    scorerSummary: r.scorerSummary,
+    factualClaims: r.factualClaims ?? [],
+    response: r.response,
+    citations: Array.isArray(r.citations)
+      ? (r.citations as Array<{ title?: string | null; url: string; host: string }>).map((c) => ({
+          title: c.title ?? c.host,
+          url: c.url,
+          snippet: c.host,
+        }))
+      : [],
+    sources: Array.isArray(r.citations)
+      ? Array.from(
+          new Set(
+            (r.citations as Array<{ host: string }>).map((c) => c.host).filter(Boolean)
+          )
+        )
+      : [],
+    competitorMentions: r.competitorMentions ?? [],
+    competitorHosts: Array.isArray(r.competitorHosts)
+      ? (r.competitorHosts as string[])
+      : [],
+    latencyMs: r.latencyMs,
+  }));
+
+  const mentions = built.reduce((s, r) => s + (r.presence ?? 0), 0);
+  const total = built.length;
+  const sovPct = total > 0 ? Math.round((mentions / total) * 100) : 0;
+  const sentimentMeasurements = built.map((r) => r.sentiment).filter((s): s is number => s !== null);
+  const avgSentiment =
+    sentimentMeasurements.length > 0
+      ? Number(
+          (sentimentMeasurements.reduce((s, n) => s + n, 0) / sentimentMeasurements.length).toFixed(2)
+        )
+      : null;
+  const competitorsSet = new Set<string>();
+  for (const r of built) {
+    for (const h of r.competitorHosts) competitorsSet.add(h);
+  }
+  const competitors = Array.from(competitorsSet);
+
+  const row = {
+    id: `pr-${prompt.id}`,
+    rawId: prompt.id,
+    type: 'prompt' as const,
+    phrase: prompt.text,
+    text: prompt.text,
+    intent: prompt.intent,
+    source: prompt.source,
+    keywordId: prompt.keywordId,
+    sov: `${sovPct}%`,
+    mentions,
+    bestRank: mentions,
+    avgSentiment,
+    competitors,
+    competitorCount: competitors.length,
+    results: built,
+    metrics: {
+      visibility: sovPct,
+      avgOverall:
+        total > 0
+          ? Number((built.reduce((s, r) => s + (r.overall ?? 0), 0) / total).toFixed(2))
+          : 0,
+      runs: total,
+    },
+  };
+
+  return res.json({
+    runId: runResult.runId,
+    prompt: { id: prompt.id, keywordId: prompt.keywordId, text: prompt.text },
+    row,
+  });
 });
 
 /**
