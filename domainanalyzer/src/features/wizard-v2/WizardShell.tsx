@@ -1,6 +1,7 @@
 import { ReactNode, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { ArrowLeft, RefreshCw } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 import type { WizardStep } from "./types";
 
 interface WizardShellProps {
@@ -53,6 +54,13 @@ export function WizardShell({
   backLabel = "Back",
   children,
 }: WizardShellProps) {
+  // Anonymous wizard runs (signup-after-audit funnel) have no Domain History
+  // to go back to. Send those users to /auth instead; authenticated users
+  // continue to fall back to their dashboard's Domain History tab.
+  const { user } = useAuth();
+  const fallbackBackTo = user ? "/dashboard?tab=domain-history" : "/auth";
+  const fallbackBackLabel = user ? "Domain history" : "Sign in";
+
   // Hide the document scrollbar while the wizard is mounted so the canvas
   // stays uninterrupted; restored on unmount for the rest of the app.
   useEffect(() => {
@@ -102,11 +110,11 @@ export function WizardShell({
           </button>
         ) : (
           <Link
-            to="/dashboard?tab=domain-history"
+            to={fallbackBackTo}
             className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700 transition-colors"
           >
             <ArrowLeft className="h-4 w-4" />
-            Domain history
+            {fallbackBackLabel}
           </Link>
         )}
         <StepPills current={step} total={totalSteps} />
