@@ -58,24 +58,39 @@ describe('parseCookieHeader', () => {
 
 describe('buildSetCookieHeader / buildClearCookieHeader', () => {
   const future = new Date(Date.now() + 60_000);
-  it('contains the wizard cookie name and Path=/', () => {
+  it('contains the wizard cookie name and Path=/ in dev', () => {
     const h = buildSetCookieHeader('tok', future);
     expect(h).toContain(`${WIZARD_COOKIE_NAME}=`);
     expect(h).toContain('Path=/');
     expect(h).toContain('HttpOnly');
+    // Dev uses Lax so localhost works without HTTPS.
     expect(h).toContain('SameSite=Lax');
+    expect(h).not.toContain('Secure');
   });
   it('clear header has Max-Age=0', () => {
     const h = buildClearCookieHeader();
     expect(h).toContain('Max-Age=0');
     expect(h).toContain(`${WIZARD_COOKIE_NAME}=`);
   });
-  it('production adds Secure flag', () => {
+  it('production uses SameSite=None + Secure (cross-site posture)', () => {
     const prev = process.env.NODE_ENV;
     process.env.NODE_ENV = 'production';
-    expect(buildSetCookieHeader('t', future)).toContain('Secure');
-    expect(buildClearCookieHeader()).toContain('Secure');
-    process.env.NODE_ENV = prev;
+    try {
+      const set = buildSetCookieHeader('t', future);
+      // SameSite=None is required for cross-site fetch + credentials:'include'
+      // (e.g. Vercel frontend → Render backend). The browser refuses to
+      // send a SameSite=Lax cookie in that context.
+      expect(set).toContain('SameSite=None');
+      // Browsers reject SameSite=None unless Secure is also set.
+      expect(set).toContain('Secure');
+      const clear = buildClearCookieHeader();
+      // Clear header attributes must match the set header so the
+      // browser actually clears the cookie.
+      expect(clear).toContain('SameSite=None');
+      expect(clear).toContain('Secure');
+    } finally {
+      process.env.NODE_ENV = prev;
+    }
   });
 });
 
