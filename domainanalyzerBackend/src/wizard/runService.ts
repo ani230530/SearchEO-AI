@@ -885,3 +885,259 @@ export async function runQueries({ prisma, domainId, onProgress }: RunOptions): 
     onProgress({ type: 'error', error: err instanceof Error ? err.message : 'AI queries failed' });
   }
 }
+
+/**
+ * runOnePrompt — single-prompt variant of runQueries.
+ *
+ * Fans ONE prompt across the ROSTER, scores each response with the same
+ * heuristic + LLM scorer pipeline, persists AiQueryResult rows under a
+ * fresh AiRun, and returns the new run's id + the persisted results so
+ * the caller can shape them into a PromptTableRow.
+ *
+ * Used by POST /api/wizard/domain/:id/prompts/analyze — the "Analyze
+ * Prompt" button on the AI Checker dashboard. The dashboard never wants
+ * a full re-run of every selected prompt when the user adds a single
+ * one; that would be both slow and budget-amplifying.
+ *
+ * The AiRun this creates is marked `status='completed'` on success, so
+ * the existing /report endpoint (which aggregates across all completed
+ * runs for the domain) picks up the new results without any further
+ * plumbing.
+ */
+export interface RunOnePromptResult {
+  runId: number;
+  persistedResults: Array<{
+    id: number;
+    model: string;
+    presence: number;
+    overall: number;
+    relevance: number;
+    sentiment: number | null;
+    accuracy: number | null;
+    rankPosition: number | null;
+    scorerSummary: string | null;
+    response: string;
+    citations: unknown;
+    competitorMentions: unknown;
+    competitorHosts: unknown;
+    factualClaims: unknown;
+    latencyMs: number;
+  }>;
+}
+
+export async function runOnePrompt(
+  prisma: PrismaClient,
+  args: { domainId: number; promptId: number }
+): Promise<RunOnePromptResult> {
+  if (!router) {
+    throw new Error('OPENROUTER_API_KEY not configured.');
+  }
+  const { domainId, promptId } = args;
+
+  // Same context shape as runQueries — keeps the scorer apples-to-apples
+  // with the full-wizard run.
+  const [domain, latestCrawl, promptRow, selectedCompetitors] = await Promise.all([
+    prisma.domain.findUnique({
+      where: { id: domainId },
+      select: {
+        host: true,
+        inferred: { select: { companyName: true, summary: true } },
+        profile: { select: { country: true, state: true, targetLocation: true } },
+      },
+    }),
+    prisma.crawlSnapshot.findFirst({
+      where: { domainId },
+      orderBy: { createdAt: 'desc' },
+      select: { rawText: true },
+    }),
+    prisma.prompt.findUnique({
+      where: { id: promptId },
+      select: { id: true, text: true, domainId: true },
+    }),
+    prisma.competitor.findMany({
+      where: { domainId, isSelected: true },
+      select: { competitorHost: true, rawSignals: true },
+    }),
+  ]);
+
+  if (!domain) throw new Error('Domain not found');
+  if (!promptRow || promptRow.domainId !== domainId) throw new Error('Prompt not found');
+
+  const brandName = domain.inferred?.companyName ?? null;
+  const brandFacts =
+    domain.inferred?.summary ?? latestCrawl?.rawText?.slice(0, 1500) ?? '';
+  const competitorHosts = selectedCompetitors.map((c) => c.competitorHost);
+  const competitorRoster = selectedCompetitors.map((c) => ({
+    host: c.competitorHost,
+    name:
+      typeof (c.rawSignals as Record<string, unknown> | null)?.llmName === 'string'
+        ? ((c.rawSignals as Record<string, unknown>).llmName as string)
+        : null,
+  }));
+  const userLocation: UserLocation = {
+    country: domain.profile?.country ?? null,
+    state: domain.profile?.state ?? null,
+    city: domain.profile?.targetLocation ?? null,
+    timezone: null,
+  };
+
+  const run = await prisma.aiRun.create({ data: { domainId, status: 'running' } });
+
+  // Run each model in parallel — bounded by ROSTER size (currently 3), so
+  // we don't bother with the worker-queue concurrency control runQueries
+  // uses for tens of prompts.
+  let summaryPresence = 0;
+  let summaryOverall = 0;
+  const sentimentSamples: number[] = [];
+  let totalLatency = 0;
+
+  const persistedResults: RunOnePromptResult['persistedResults'] = [];
+
+  try {
+    const tasks = ROSTER.map(async (model) => {
+      let response = '';
+      let latencyMs = 0;
+      let costUsd: number | null = null;
+      try {
+        const out = await callModel(model, promptRow.text, userLocation);
+        response = out.response;
+        latencyMs = out.latencyMs;
+        costUsd = out.costUsd;
+      } catch {
+        response = '';
+      }
+
+      const heuristic = scoreResponse({
+        ownDomainHost: domain.host,
+        competitorHosts,
+        modelResponse: response,
+      });
+
+      const llm = response.trim()
+        ? await llmScoreResponse({
+            prompt: promptRow.text,
+            response,
+            brand: { name: brandName, aliases: [], host: domain.host },
+            competitors: competitorRoster,
+            brandFacts,
+          }).catch(() => null)
+        : null;
+
+      const final = llm
+        ? {
+            presence: llm.presence,
+            relevance: Math.round(llm.relevance),
+            sentiment: llm.sentiment === null ? null : Math.round(llm.sentiment),
+            accuracy: llm.accuracy,
+            overall: Number(llm.overall.toFixed(2)),
+            rankPosition: llm.rankPosition,
+            summary: llm.summary,
+            citations: mergeCitations(llm.citationsClassified, heuristic.citations),
+            competitorMentions: llm.competitorMentions.map((c) => ({
+              host: c.host ?? resolveHostFromRoster(c.name, competitorRoster) ?? '',
+              name: c.name,
+              count: c.mentionCount,
+              sentiment: c.sentiment,
+              rankPosition: c.rankPosition,
+            })).filter((c) => c.host || c.name),
+            factualClaims: llm.factualClaims,
+          }
+        : {
+            presence: heuristic.presence,
+            relevance: heuristic.relevance,
+            sentiment: heuristic.presence === 1 ? heuristic.sentiment : null,
+            accuracy: null,
+            overall: heuristic.presence === 1 ? heuristic.overall : 0,
+            rankPosition: null,
+            summary: '',
+            citations: heuristic.citations.map((c) => ({ ...c, type: 'direct' as const })),
+            competitorMentions: heuristic.competitorMentions.map((m) => ({
+              ...m,
+              name: m.host,
+              rankPosition: null,
+            })),
+            factualClaims: [] as Array<{ claim: string; verdict: 'true' | 'false' | 'uncertain' }>,
+          };
+
+      const competitorHostsForRow = Array.from(
+        new Set(final.competitorMentions.map((m) => m.host).filter(Boolean))
+      );
+
+      const created = await prisma.aiQueryResult.create({
+        data: {
+          runId: run.id,
+          promptId: promptRow.id,
+          model: model.id,
+          response,
+          presence: final.presence,
+          relevance: final.relevance,
+          sentiment: final.sentiment,
+          accuracy: final.accuracy,
+          rankPosition: final.rankPosition,
+          overall: final.overall,
+          scorerSummary: final.summary || null,
+          factualClaims: final.factualClaims as any,
+          competitorHosts: competitorHostsForRow as any,
+          citations: final.citations as any,
+          competitorMentions: final.competitorMentions as any,
+          latencyMs,
+          costUsd,
+        },
+      });
+      persistedResults.push({
+        id: created.id,
+        model: model.id,
+        presence: final.presence,
+        overall: final.overall,
+        relevance: final.relevance,
+        sentiment: final.sentiment,
+        accuracy: final.accuracy,
+        rankPosition: final.rankPosition,
+        scorerSummary: final.summary || null,
+        response,
+        citations: final.citations,
+        competitorMentions: final.competitorMentions,
+        competitorHosts: competitorHostsForRow,
+        factualClaims: final.factualClaims,
+        latencyMs,
+      });
+
+      summaryPresence += final.presence;
+      summaryOverall += final.overall;
+      if (final.sentiment !== null) sentimentSamples.push(final.sentiment);
+      totalLatency += latencyMs;
+      void costUsd; // accounted for elsewhere
+    });
+    await Promise.all(tasks);
+
+    const totalQueries = ROSTER.length;
+    const avgSentiment =
+      sentimentSamples.length > 0
+        ? Number((sentimentSamples.reduce((s, n) => s + n, 0) / sentimentSamples.length).toFixed(2))
+        : null;
+    const summary = {
+      totalQueries,
+      models: ROSTER.map((r) => r.id),
+      presenceRate: Number((summaryPresence / totalQueries).toFixed(3)),
+      avgOverall: Number((summaryOverall / totalQueries).toFixed(2)),
+      avgSentiment,
+      sentimentSampleSize: sentimentSamples.length,
+      totalLatencyMs: totalLatency,
+      singlePromptAnalysis: true, // discriminator for ops queries
+    };
+    await prisma.aiRun.update({
+      where: { id: run.id },
+      data: { status: 'completed', endedAt: new Date(), summary: summary as any },
+    });
+  } catch (err) {
+    await prisma.aiRun
+      .update({
+        where: { id: run.id },
+        data: { status: 'failed', endedAt: new Date() },
+      })
+      .catch(() => undefined);
+    throw err;
+  }
+
+  return { runId: run.id, persistedResults };
+}
