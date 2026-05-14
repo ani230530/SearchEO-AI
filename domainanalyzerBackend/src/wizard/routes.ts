@@ -813,6 +813,55 @@ router.get('/domain/:id/state', authenticateOrSession(), async (req: Request, re
   });
 });
 
+// ── PATCH /domain/:id/prompts/:promptId ───────────────────────────────────
+//
+// Lets the user edit a prompt's text in Step 4 before running. We
+// intentionally allow editing AI-generated prompts (source='ai') in
+// addition to custom ones — the value here is wording refinement, and
+// the user knows their domain better than the generator.
+//
+// Body: { text: string }
+//
+// Returns the updated prompt. Domain ownership scoped via ensureDomain.
+router.patch('/domain/:id/prompts/:promptId', authenticateOrSession(), async (req: Request, res: Response) => {
+  const got = await ensureDomain(req, req.params.id);
+  if (!got.ok) return res.status(got.status).json({ error: got.error });
+  const { domain } = got;
+
+  const promptId = Number(req.params.promptId);
+  if (!Number.isFinite(promptId)) return res.status(400).json({ error: 'Invalid promptId' });
+
+  const text = typeof (req.body ?? {}).text === 'string'
+    ? (req.body as { text: string }).text.trim()
+    : '';
+  if (!text) return res.status(400).json({ error: 'text is required' });
+  if (text.length > 800) return res.status(400).json({ error: 'Prompt is too long (max 800 chars)' });
+
+  // Verify the prompt belongs to this domain BEFORE we update — a
+  // missing-or-mismatched promptId becomes a 404 instead of leaking
+  // existence via a Prisma not-found error.
+  const existing = await prisma.prompt.findFirst({
+    where: { id: promptId, domainId: domain.id },
+    select: { id: true },
+  });
+  if (!existing) return res.status(404).json({ error: 'Prompt not found' });
+
+  const updated = await prisma.prompt.update({
+    where: { id: promptId },
+    data: { text },
+    select: {
+      id: true,
+      text: true,
+      intent: true,
+      source: true,
+      keywordId: true,
+      isSelected: true,
+    },
+  });
+
+  return res.json({ prompt: updated });
+});
+
 // ── GET /domain/:id/prompts/:promptId/history ─────────────────────────────
 //
 // Per-prompt time series for the Track Prompts inline detail chart. One row

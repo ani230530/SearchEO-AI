@@ -15,7 +15,7 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Check, Loader2, Plus } from "lucide-react";
+import { Check, Loader2, Pencil, Plus } from "lucide-react";
 import { apiGet, apiPatch, apiPost } from "@/services/apiClient";
 import { WizardStatusRow } from "./WizardShell";
 import type { PromptCategory, WizardItem } from "./types";
@@ -209,6 +209,49 @@ export function Step4SelectTopics({ domainId, initialDraft, onContinue, forceRef
     });
   };
 
+  // Inline-edit state for prompts. We only allow one prompt to be edited
+  // at a time. `editingId` is the prompt id being edited; `editDraft` is
+  // the work-in-progress text; `savingEditId` flips a spinner on the
+  // Save action and prevents double-submits.
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editDraft, setEditDraft] = useState('');
+  const [savingEditId, setSavingEditId] = useState<number | null>(null);
+
+  const startEdit = (id: number, currentText: string) => {
+    setEditingId(id);
+    setEditDraft(currentText);
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditDraft('');
+  };
+
+  const saveEdit = async (id: number) => {
+    const next = editDraft.trim();
+    if (!next) return; // empty is a cancel-equivalent; ignore.
+    setSavingEditId(id);
+    try {
+      const res = await apiPatch<{ prompt: { id: number; text: string } }>(
+        `/wizard/domain/${domainId}/prompts/${id}`,
+        { text: next }
+      );
+      // Replace in local items list so the UI updates immediately
+      // without needing a full re-fetch.
+      setItems((prev) =>
+        prev.map((it) =>
+          it.type === 'prompt' && it.id === id ? { ...it, text: res.prompt.text } : it
+        )
+      );
+      setEditingId(null);
+      setEditDraft('');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not update prompt');
+    } finally {
+      setSavingEditId(null);
+    }
+  };
+
   const selectAll = () => {
     setSelectedPr(new Set(items.filter((i) => i.type === "prompt").map((i) => i.id)));
   };
@@ -371,16 +414,30 @@ export function Step4SelectTopics({ domainId, initialDraft, onContinue, forceRef
               </header>
               {group.prompts.map((prompt) => {
                 const isOn = selectedPr.has(prompt.id);
+                const isEditing = editingId === prompt.id;
                 return (
-                  <button
+                  <div
                     key={`pr-${prompt.id}`}
-                    type="button"
-                    onClick={() => togglePrompt(prompt.id)}
-                    className={`group/prompt w-full rounded-[10px] border px-3.5 py-3 text-left transition ${
+                    role="button"
+                    tabIndex={isEditing ? -1 : 0}
+                    onClick={() => {
+                      // Don't toggle selection while the user is editing
+                      // the text — the click events would be ambiguous.
+                      if (isEditing) return;
+                      togglePrompt(prompt.id);
+                    }}
+                    onKeyDown={(e) => {
+                      if (isEditing) return;
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        togglePrompt(prompt.id);
+                      }
+                    }}
+                    className={`group/prompt w-full cursor-pointer rounded-[10px] border px-3.5 py-3 text-left transition ${
                       isOn
                         ? "border-blue-500 bg-blue-50/60"
                         : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/60"
-                    }`}
+                    } ${isEditing ? "cursor-default ring-2 ring-blue-500/30" : ""}`}
                   >
                     {/* Vertical card layout — badges sit ABOVE the prompt
                         text, both inside the card. Long prompts wrap freely;
@@ -417,10 +474,78 @@ export function Step4SelectTopics({ domainId, initialDraft, onContinue, forceRef
                             ) : null}
                           </div>
                         ) : null}
-                        <p className="text-[13.5px] leading-snug text-slate-900 break-words">
-                          {prompt.text}
-                        </p>
-                        {prompt.persona || prompt.useCase || prompt.constraint ? (
+                        {isEditing ? (
+                          <div className="flex flex-col gap-2" onClick={(e) => e.stopPropagation()}>
+                            <textarea
+                              autoFocus
+                              value={editDraft}
+                              onChange={(e) => setEditDraft(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                                  e.preventDefault();
+                                  void saveEdit(prompt.id);
+                                }
+                                if (e.key === 'Escape') {
+                                  e.preventDefault();
+                                  cancelEdit();
+                                }
+                              }}
+                              rows={Math.min(4, Math.max(2, Math.ceil(editDraft.length / 80)))}
+                              maxLength={800}
+                              disabled={savingEditId === prompt.id}
+                              className="w-full resize-y rounded-md border border-slate-200 bg-white px-3 py-2 text-[13.5px] leading-snug text-slate-900 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-400/20 disabled:opacity-60"
+                            />
+                            <div className="flex items-center justify-end gap-2">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  cancelEdit();
+                                }}
+                                disabled={savingEditId === prompt.id}
+                                className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-[12px] font-medium text-slate-600 transition-colors hover:bg-slate-50 disabled:opacity-60"
+                              >
+                                Cancel
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  void saveEdit(prompt.id);
+                                }}
+                                disabled={!editDraft.trim() || savingEditId === prompt.id}
+                                className="inline-flex items-center gap-1.5 rounded-md bg-[#2D4059] px-3 py-1.5 text-[12px] font-medium text-white transition-all hover:bg-[#243349] disabled:cursor-not-allowed disabled:opacity-60"
+                              >
+                                {savingEditId === prompt.id ? (
+                                  <>
+                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                    Saving…
+                                  </>
+                                ) : (
+                                  'Save'
+                                )}
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex items-start gap-2">
+                            <p className="flex-1 text-[13.5px] leading-snug text-slate-900 break-words">
+                              {prompt.text}
+                            </p>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                startEdit(prompt.id, prompt.text);
+                              }}
+                              aria-label="Edit prompt"
+                              className="shrink-0 rounded-md p-1 text-slate-400 opacity-0 transition-opacity hover:bg-slate-100 hover:text-slate-700 focus:opacity-100 group-hover/prompt:opacity-100"
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        )}
+                        {!isEditing && (prompt.persona || prompt.useCase || prompt.constraint) ? (
                           <p className="mt-1.5 text-[11px] text-slate-400 leading-relaxed break-words">
                             {[prompt.persona, prompt.useCase, prompt.constraint]
                               .filter(Boolean)
@@ -429,7 +554,7 @@ export function Step4SelectTopics({ domainId, initialDraft, onContinue, forceRef
                         ) : null}
                       </div>
                     </div>
-                  </button>
+                  </div>
                 );
               })}
             </section>
@@ -444,20 +569,32 @@ export function Step4SelectTopics({ domainId, initialDraft, onContinue, forceRef
             </header>
             {standalonePrompts.map((prompt) => {
               const isOn = selectedPr.has(prompt.id);
+              const isEditing = editingId === prompt.id;
               return (
-                <button
+                <div
                   key={`pr-${prompt.id}`}
-                  type="button"
-                  onClick={() => togglePrompt(prompt.id)}
-                  className={`w-full flex items-center justify-between gap-4 rounded-[8px] border px-4 py-3.5 text-left transition ${
+                  role="button"
+                  tabIndex={isEditing ? -1 : 0}
+                  onClick={() => {
+                    if (isEditing) return;
+                    togglePrompt(prompt.id);
+                  }}
+                  onKeyDown={(e) => {
+                    if (isEditing) return;
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      togglePrompt(prompt.id);
+                    }
+                  }}
+                  className={`group/prompt w-full flex items-center justify-between gap-4 cursor-pointer rounded-[8px] border px-4 py-3.5 text-left transition ${
                     isOn
                       ? "border-blue-500 bg-blue-50"
                       : "border-slate-200 bg-white hover:bg-slate-50"
-                  }`}
+                  } ${isEditing ? "cursor-default ring-2 ring-blue-500/30" : ""}`}
                 >
-                  <div className="flex items-center gap-4">
+                  <div className="flex flex-1 items-center gap-4 min-w-0">
                     <span
-                      className={`flex h-5 w-5 items-center justify-center rounded-md border ${
+                      className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border ${
                         isOn
                           ? "border-blue-500 bg-blue-500 text-white"
                           : "border-slate-300 bg-white text-transparent"
@@ -465,12 +602,82 @@ export function Step4SelectTopics({ domainId, initialDraft, onContinue, forceRef
                     >
                       <Check className="h-3.5 w-3.5" />
                     </span>
-                    <p className="text-sm text-slate-900">{prompt.text}</p>
+                    {isEditing ? (
+                      <div className="flex-1 flex flex-col gap-2" onClick={(e) => e.stopPropagation()}>
+                        <textarea
+                          autoFocus
+                          value={editDraft}
+                          onChange={(e) => setEditDraft(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                              e.preventDefault();
+                              void saveEdit(prompt.id);
+                            }
+                            if (e.key === 'Escape') {
+                              e.preventDefault();
+                              cancelEdit();
+                            }
+                          }}
+                          rows={Math.min(4, Math.max(2, Math.ceil(editDraft.length / 80)))}
+                          maxLength={800}
+                          disabled={savingEditId === prompt.id}
+                          className="w-full resize-y rounded-md border border-slate-200 bg-white px-3 py-2 text-sm leading-snug text-slate-900 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-400/20 disabled:opacity-60"
+                        />
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              cancelEdit();
+                            }}
+                            disabled={savingEditId === prompt.id}
+                            className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-[12px] font-medium text-slate-600 transition-colors hover:bg-slate-50 disabled:opacity-60"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              void saveEdit(prompt.id);
+                            }}
+                            disabled={!editDraft.trim() || savingEditId === prompt.id}
+                            className="inline-flex items-center gap-1.5 rounded-md bg-[#2D4059] px-3 py-1.5 text-[12px] font-medium text-white transition-all hover:bg-[#243349] disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            {savingEditId === prompt.id ? (
+                              <>
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                                Saving…
+                              </>
+                            ) : (
+                              'Save'
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="flex-1 text-sm text-slate-900 break-words">{prompt.text}</p>
+                    )}
                   </div>
-                  <span className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-amber-700">
-                    Custom
-                  </span>
-                </button>
+                  {!isEditing && (
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          startEdit(prompt.id, prompt.text);
+                        }}
+                        aria-label="Edit prompt"
+                        className="rounded-md p-1 text-slate-400 opacity-0 transition-opacity hover:bg-slate-100 hover:text-slate-700 focus:opacity-100 group-hover/prompt:opacity-100"
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </button>
+                      <span className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-amber-700">
+                        Custom
+                      </span>
+                    </div>
+                  )}
+                </div>
               );
             })}
           </section>
