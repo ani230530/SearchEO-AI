@@ -1,6 +1,8 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { apiGet, apiPost } from "@/services/apiClient";
 import { useToast } from "@/components/ui/use-toast";
+import { maskDomainId } from "@/lib/domainUtils";
 import ReactMarkdown from "react-markdown";
 import {
   AlignLeft,
@@ -687,15 +689,34 @@ export const PromptTable = ({
   domainId?: number | null;
 }) => {
   const { toast } = useToast();
+  const navigate = useNavigate();
+  // Worksheet / Draft Blog buttons in this table navigate to the
+  // dashboard with ?openWorksheet=<rowId> so the existing modal there
+  // handles the rest. Avoids duplicating ~200 lines of orchestration.
+  const navigateToWorksheet = (rowId?: string) => {
+    if (!domainId) {
+      toast({
+        title: "No domain context",
+        description: "Domain not loaded yet — try again in a moment.",
+        variant: "destructive",
+      });
+      return;
+    }
+    const slug = maskDomainId(domainId);
+    const url = rowId
+      ? `/ai-results/${slug}?openWorksheet=${encodeURIComponent(rowId)}`
+      : `/ai-results/${slug}?openWorksheet=1`;
+    navigate(url);
+  };
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [tableFilter, setTableFilter] = useState<"all" | "prompt" | "keyword">("all");
   const [tableMetric, setTableMetric] = useState<string | null>(null);
-  // showAll controls whether the table is truncated to the default
-  // view (4 prompts + 2 keywords for mixed, 6 for filtered) or expanded
-  // to show every row in `data`. Without this, any prompt past the
-  // truncation point is permanently invisible — the "rows can never be
-  // seen" bug. The toggle is rendered at the bottom of the card.
-  const [showAll, setShowAll] = useState(false);
+  // Page-based pagination (10 rows / page). Replaces the prior
+  // View all / Show less toggle — both because page navigation is more
+  // predictable for large lists, and because the parent flow can now
+  // create many new rows via Analyze Prompt.
+  const PAGE_SIZE = 10;
+  const [currentPage, setCurrentPage] = useState(1);
 
   // Analyze Prompt state.
   // - `analyzeText` is the input.
@@ -753,7 +774,8 @@ export const PromptTable = ({
     }
   };
 
-  const displayData = useMemo(() => {
+  // Full sorted/filtered list (before pagination).
+  const fullSortedData = useMemo(() => {
     let items = [...data];
 
     if (tableFilter === "prompt") {
@@ -763,8 +785,6 @@ export const PromptTable = ({
     }
 
     if (tableMetric) {
-      // Real numeric fields (avgSentiment may be null when no model mentioned
-      // the brand; sov is "42%" string so we parseInt).
       const num = (v: number | null | undefined) => (typeof v === "number" ? v : -1);
       items.sort((a, b) => {
         if (tableMetric === "Ranking") return b.mentions - a.mentions;
@@ -775,34 +795,39 @@ export const PromptTable = ({
       });
     }
 
-    // No filter / no metric sort: newly analyzed prompts pin to the top.
-    // Dedupe by rawId so a prompt that the user just analyzed AND that's
-    // also been pulled in by the parent's /report fetch doesn't render
-    // twice. The newly-analyzed row wins (it has the fresh result data).
-    const mergedNewIds = new Set(newlyAnalyzedRows.map((r) => r.rawId).filter((id): id is number => typeof id === "number"));
-    if (!tableMetric && tableFilter === "all") {
-      const baseItems = items.filter(
-        (item) =>
-          !(typeof item.rawId === "number" && mergedNewIds.has(item.rawId)),
-      );
-      if (showAll) {
-        return [...newlyAnalyzedRows, ...baseItems];
-      }
-      const prompts = baseItems.filter((item) => item.type === "prompt").slice(0, 4);
-      const keywords = baseItems.filter((item) => item.type === "keyword").slice(0, 2);
-      return [...newlyAnalyzedRows, ...prompts, ...keywords];
-    }
-    if (!tableMetric && tableFilter === "prompt") {
-      const baseItems = items.filter(
-        (item) =>
-          !(typeof item.rawId === "number" && mergedNewIds.has(item.rawId)),
-      );
-      const merged = [...newlyAnalyzedRows, ...baseItems];
-      return showAll ? merged : merged.slice(0, 6);
-    }
+    // Dedupe parent rows that match a row we just analyzed — the
+    // newly-analyzed copy has the fresher result data and wins.
+    const mergedNewIds = new Set(
+      newlyAnalyzedRows.map((r) => r.rawId).filter((id): id is number => typeof id === "number"),
+    );
+    const baseItems = items.filter(
+      (item) => !(typeof item.rawId === "number" && mergedNewIds.has(item.rawId)),
+    );
 
-    return showAll ? items : items.slice(0, 6);
-  }, [data, tableFilter, tableMetric, newlyAnalyzedRows, showAll]);
+    // Without a metric sort, newly-analyzed rows pin to the top — that
+    // matches the user's expectation that the result they JUST produced
+    // is most relevant. With a metric sort, we don't pin (that would
+    // lie about the sort order).
+    if (!tableMetric) {
+      return [...newlyAnalyzedRows, ...baseItems];
+    }
+    return baseItems;
+  }, [data, tableFilter, tableMetric, newlyAnalyzedRows]);
+
+  const totalCount = fullSortedData.length;
+  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [tableFilter, tableMetric]);
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(totalPages);
+  }, [currentPage, totalPages]);
+
+  const displayData = useMemo(() => {
+    const start = (currentPage - 1) * PAGE_SIZE;
+    return fullSortedData.slice(start, start + PAGE_SIZE);
+  }, [fullSortedData, currentPage]);
 
   return (
     <Card className="border-none bg-transparent shadow-none">
@@ -882,7 +907,11 @@ export const PromptTable = ({
               </DropdownMenuContent>
             </DropdownMenu>
 
-            <Button className="h-[38px] gap-2 rounded-lg border-none bg-[#94a3b8] px-4 text-white shadow-none transition-all hover:bg-[#64748b]">
+            <Button
+              type="button"
+              onClick={() => navigateToWorksheet()}
+              className="h-[38px] gap-2 rounded-lg border-none bg-[#2d3748] px-4 text-white shadow-none transition-all hover:bg-[#1a202c]"
+            >
               <LayoutGrid className="h-4 w-4" />
               <span className="text-[13px] font-medium">Add to Worksheet</span>
             </Button>
@@ -1061,14 +1090,24 @@ export const PromptTable = ({
                       </Badge>
                     </TableCell>
                     <TableCell className="px-2 py-3 text-[11px] font-medium text-slate-600">
-                      {/* Ranking = best position in any ranked list (lower = better).
-                          Falls back to "—" if the brand never appeared in a list. */}
+                      {/* Ranking column with three honest states:
+                          1. Brand IS in a ranked list (rankPosition > 0) → "#N" (best)
+                          2. Brand mentioned but never in a ranked list → "Mentioned"
+                             (most prose AI responses fall here)
+                          3. Brand not mentioned anywhere → "—"
+                          Previous version collapsed cases 2 + 3 into a single
+                          "—" which made the column look uniformly broken. */}
                       {(() => {
                         const positions = row.results
                           .map((r: any) => r.rankPosition)
                           .filter((p: any): p is number => typeof p === "number" && p > 0);
-                        if (positions.length === 0) return <span className="text-slate-400">—</span>;
-                        return <span>#{Math.min(...positions)}</span>;
+                        if (positions.length > 0) {
+                          return <span>#{Math.min(...positions)}</span>;
+                        }
+                        if (row.mentions > 0) {
+                          return <span className="text-emerald-600">Mentioned</span>;
+                        }
+                        return <span className="text-slate-400">—</span>;
                       })()}
                     </TableCell>
                     <TableCell className="px-2 py-3">
@@ -1095,7 +1134,12 @@ export const PromptTable = ({
                     <TableCell className="px-4 py-3 text-right">
                       <div className="flex justify-end gap-2">
                         <Button
+                          type="button"
                           variant="outline"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigateToWorksheet(row.id);
+                          }}
                           className="h-8 rounded-[8px] border-[#e2e8f0] bg-[#f8fafc] px-3 text-[11px] font-semibold text-[#3b82f6] shadow-none hover:bg-slate-100"
                         >
                           <FileText className="mr-1.5 h-3.5 w-3.5" />
@@ -1122,26 +1166,33 @@ export const PromptTable = ({
             </TableBody>
           </Table>
         </div>
-        <div className="mt-2 flex items-center gap-3 border-t border-slate-200 px-6 py-3">
+        <div className="mt-2 flex items-center justify-between gap-3 border-t border-slate-200 px-6 py-3">
           <span className="text-[11px] font-medium tracking-tight text-gray-500">
-            Showing {displayData.length} of {data.length + newlyAnalyzedRows.length} queries
+            {totalCount === 0
+              ? "No rows"
+              : `Showing ${(currentPage - 1) * PAGE_SIZE + 1}–${Math.min(currentPage * PAGE_SIZE, totalCount)} of ${totalCount}`}
           </span>
-          <div className="h-3 w-[1px] bg-gray-300" />
-          <button
-            type="button"
-            onClick={() => setShowAll((v) => !v)}
-            disabled={
-              // Disabled only when we already show every available row
-              // AND we're in "expanded" mode — otherwise the user always
-              // has a way back to the full view.
-              showAll
-                ? false
-                : displayData.length >= data.length + newlyAnalyzedRows.length
-            }
-            className="rounded-lg bg-gray-50/80 px-2.5 py-1 text-[11px] font-bold text-[#3B82F6] transition-all hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {showAll ? "Show less" : "View all"}
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              disabled={currentPage <= 1}
+              className="rounded-md border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-medium text-slate-600 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Prev
+            </button>
+            <span className="px-2 text-[11px] font-medium text-slate-500 tabular-nums">
+              {currentPage} / {totalPages}
+            </span>
+            <button
+              type="button"
+              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              disabled={currentPage >= totalPages}
+              className="rounded-md border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-medium text-slate-600 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Next
+            </button>
+          </div>
         </div>
       </CardContent>
     </Card>

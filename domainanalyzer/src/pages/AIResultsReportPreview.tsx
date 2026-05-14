@@ -1,6 +1,6 @@
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { apiGet, apiPost } from '../services/apiClient';
 import { cn } from '@/lib/utils';
 import {
@@ -1071,7 +1071,24 @@ export const PromptTable = ({
     }
   };
 
-  const displayData = useMemo(() => {
+  // ───────────────────────────────────────────────────────────────────────
+  // Pagination. We replaced the prior "View all / Show less" toggle with
+  // page-based controls so users can navigate large result sets in a
+  // predictable way (Prev / Next / page indicator) rather than dumping
+  // everything into one infinite-scrolling card.
+  //
+  //   PAGE_SIZE — fixed at 10 rows. Most dashboards converge on 10/25/50;
+  //               10 is the smallest sane page that still feels useful.
+  //   currentPage — 1-indexed.
+  //
+  // Filter/sort changes reset currentPage to 1 via the useEffect below.
+  // ───────────────────────────────────────────────────────────────────────
+  const PAGE_SIZE = 10;
+  const [currentPage, setCurrentPage] = useState(1);
+
+  // Full sorted/filtered list, before pagination. We split this from the
+  // paginated `displayData` so we know `totalCount` for the pager.
+  const fullSortedData = useMemo(() => {
     let items = [...data];
 
     // Dedupe parent rows that match a row we just analyzed — the
@@ -1087,14 +1104,12 @@ export const PromptTable = ({
       );
     }
 
-    // First apply type filter
     if (tableFilter === 'prompt') {
       items = items.filter(item => item.type?.toLowerCase() === 'prompt');
     } else if (tableFilter === 'keyword') {
       items = items.filter(item => item.type?.toLowerCase() === 'keyword');
     }
 
-    // Then apply metric sorting if selected
     if (tableMetric) {
       const numericFor = (row: any): number => {
         switch (tableMetric) {
@@ -1109,24 +1124,36 @@ export const PromptTable = ({
       items.sort((a, b) => numericFor(b) - numericFor(a));
     }
 
-    // Default mixed view slicing if no metric is chosen
-    if (!showAllQueries && !tableMetric && tableFilter === 'all') {
-      const prompts = items.filter(item => item.type?.toLowerCase() === 'prompt').slice(0, 3);
-      const keywords = items.filter(item => item.type?.toLowerCase() === 'keyword').slice(0, 2);
-      // newlyAnalyzedRows pin to the very top of the table when no
-      // filter / metric is active — newest analyses are most relevant.
-      return [...newlyAnalyzedRows, ...prompts, ...keywords];
+    // newlyAnalyzedRows pin to the top of the full list — they're the
+    // freshest data the user just produced. We DON'T pin them above
+    // the metric-sort (that would lie about the sort).
+    if (!tableMetric) {
+      return [...newlyAnalyzedRows, ...items];
     }
+    return items;
+  }, [data, tableFilter, tableMetric, newlyAnalyzedRows]);
 
-    // For type-filter-only views (no metric sort), still pin newly
-    // analyzed prompts to the top.
-    if (!tableMetric && tableFilter === 'prompt') {
-      const promptItems = items.filter(item => item.type?.toLowerCase() === 'prompt');
-      return [...newlyAnalyzedRows, ...promptItems].slice(0, showAllQueries ? Infinity : 5);
-    }
+  const totalCount = fullSortedData.length;
+  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
 
-    return showAllQueries ? items : items.slice(0, 5);
-  }, [data, showAllQueries, tableFilter, tableMetric, newlyAnalyzedRows]);
+  // Clamp currentPage if filter/sort shrinks the list below it. Also
+  // reset to page 1 when filter/sort changes so the user lands on the
+  // top of the new view.
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [tableFilter, tableMetric]);
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(totalPages);
+  }, [currentPage, totalPages]);
+
+  const displayData = useMemo(() => {
+    const start = (currentPage - 1) * PAGE_SIZE;
+    return fullSortedData.slice(start, start + PAGE_SIZE);
+  }, [fullSortedData, currentPage]);
+  // Reference unused legacy state so the lint stays clean — showAllQueries
+  // / setShowAllQueries are kept for now in case other branches rely on
+  // them; once this PR ships they can be removed entirely.
+  void showAllQueries; void setShowAllQueries;
 
   return (
     <Card className="rounded-xl border-slate-300 shadow-sm overflow-hidden">
@@ -1427,23 +1454,33 @@ export const PromptTable = ({
             </TableBody>
           </Table>
         </div>
-        <div className="flex items-center gap-3 px-6 py-3 border-t border-slate-200 mt-2">
+        <div className="flex items-center justify-between gap-3 px-6 py-3 border-t border-slate-200 mt-2">
           <span className="text-[11px] text-gray-500 font-medium tracking-tight">
-            Showing {displayData.length} of {data.length} queries
+            {totalCount === 0
+              ? 'No rows'
+              : `Showing ${(currentPage - 1) * PAGE_SIZE + 1}–${Math.min(currentPage * PAGE_SIZE, totalCount)} of ${totalCount}`}
           </span>
-          <div className="h-3 w-[1px] bg-gray-300" />
-          <button
-            type="button"
-            onClick={() => {
-              setTableFilter('all');
-              setTableMetric(null);
-              setShowAllQueries(true);
-            }}
-            disabled={showAllQueries || displayData.length >= data.length}
-            className="px-2.5 py-1 text-[11px] font-bold text-[#3B82F6] bg-gray-50/80 hover:bg-gray-100 rounded-lg transition-all"
-          >
-            View all
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              disabled={currentPage <= 1}
+              className="rounded-md border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-medium text-slate-600 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Prev
+            </button>
+            <span className="px-2 text-[11px] font-medium text-slate-500 tabular-nums">
+              {currentPage} / {totalPages}
+            </span>
+            <button
+              type="button"
+              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              disabled={currentPage >= totalPages}
+              className="rounded-md border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-medium text-slate-600 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Next
+            </button>
+          </div>
         </div>
       </CardContent>
     </Card>
@@ -2201,6 +2238,37 @@ const AIResultsReportPreview = () => {
     },
     [selectedRowIds]
   );
+
+  // Open the worksheet modal automatically when the URL has
+  // ?openWorksheet=<rowId>. The tracking tables (TrackPromptsPage /
+  // TrackKeywordsPage) navigate here with that param so the existing
+  // modal handles the worksheet flow — saves ~200 lines of duplicated
+  // orchestration. The param is consumed once and cleared from the
+  // URL so refresh doesn't re-open the modal.
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    const openWorksheet = searchParams.get('openWorksheet');
+    if (!openWorksheet || loading) return;
+    // "1" is the no-row-id form (top-of-table Add to Worksheet). For a
+    // specific row, pass the id; otherwise just open the picker with
+    // whatever selection is already active.
+    if (openWorksheet === '1') {
+      setActiveWorksheetId(null);
+      setIsWorksheetModalOpen(true);
+    } else {
+      handleOpenWorksheetModal(openWorksheet);
+    }
+    // Strip the param so a refresh doesn't loop us back into the modal.
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete('openWorksheet');
+        return next;
+      },
+      { replace: true }
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, loading]);
 
   // ── Generate-Content lifecycle ─────────────────────────────────────────
   // Each opportunity / Lost-or-At-risk phrase row carries a stable `key`

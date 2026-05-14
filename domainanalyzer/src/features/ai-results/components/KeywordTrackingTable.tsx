@@ -1,5 +1,8 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
-import { apiGet } from "@/services/apiClient";
+import { useNavigate } from "react-router-dom";
+import { apiGet, apiPost } from "@/services/apiClient";
+import { useToast } from "@/components/ui/use-toast";
+import { maskDomainId } from "@/lib/domainUtils";
 import ReactMarkdown from "react-markdown";
 import {
   Area,
@@ -26,6 +29,7 @@ import {
   Languages,
   LayoutGrid,
   Link2,
+  Loader2,
   Plus,
   Search,
   ShieldCheck,
@@ -496,14 +500,82 @@ export const KeywordTrackingTable = ({
   /** Real Domain.id used by the expanded row to fetch /history. */
   domainId?: number | null;
 }) => {
+  const { toast } = useToast();
+  const navigate = useNavigate();
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [tableMetric, setTableMetric] = useState<string | null>(null);
-  // showAll toggles between the default truncated view (10 rows) and
-  // the full list. Without this, any keyword past row 10 was permanently
-  // unreachable. See the "View all" / "Show less" button in the footer.
-  const [showAll, setShowAll] = useState(false);
+  // Page-based pagination (10 rows / page). Replaces the prior
+  // View all / Show less toggle.
+  const PAGE_SIZE = 10;
+  const [currentPage, setCurrentPage] = useState(1);
 
-  const displayData = useMemo(() => {
+  // Analyze Keywords state — same shape as Analyze Prompt in
+  // PromptTrackingTable. Reuses the /prompts/analyze backend endpoint
+  // (the endpoint auto-detects keyword and creates one if missing, so
+  // it works for both "prompt" and "keyword" intents).
+  const [analyzeText, setAnalyzeText] = useState("");
+  const [analyzing, setAnalyzing] = useState(false);
+  const [newlyAnalyzedRows, setNewlyAnalyzedRows] = useState<KeywordTableRow[]>([]);
+  const [pendingRows, setPendingRows] = useState<Array<{ id: string; phrase: string }>>([]);
+
+  const handleAnalyzeKeyword = async () => {
+    const text = analyzeText.trim();
+    if (!text || analyzing) return;
+    if (!domainId) {
+      toast({
+        title: "No domain loaded",
+        description: "Wait for the report to finish loading.",
+        variant: "destructive",
+      });
+      return;
+    }
+    const optimisticId = `pending-${Date.now()}`;
+    setAnalyzing(true);
+    setPendingRows((prev) => [{ id: optimisticId, phrase: text }, ...prev]);
+    try {
+      const res = await apiPost<{
+        runId: number;
+        prompt: { id: number; keywordId: number | null; text: string };
+        row: KeywordTableRow;
+      }>(`/wizard/domain/${domainId}/prompts/analyze`, { text });
+      setNewlyAnalyzedRows((prev) => [res.row, ...prev]);
+      setAnalyzeText("");
+      toast({
+        title: "Keyword analyzed",
+        description: `Tracked across ${res.row?.results?.length ?? 3} models.`,
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Analyze failed";
+      toast({ title: "Analyze failed", description: message, variant: "destructive" });
+    } finally {
+      setPendingRows((prev) => prev.filter((p) => p.id !== optimisticId));
+      setAnalyzing(false);
+    }
+  };
+
+  // Add to Worksheet / Draft Blog handlers. Both navigate to the AI
+  // Checker dashboard with query params so the existing modal there
+  // handles the worksheet flow — avoids duplicating ~200 lines of
+  // worksheet orchestration here. The dashboard reads ?openWorksheet=
+  // and opens the picker prefilled with the row id.
+  const navigateToWorksheet = (rowId?: string) => {
+    if (!domainId) {
+      toast({
+        title: "No domain context",
+        description: "Domain not loaded yet — try again in a moment.",
+        variant: "destructive",
+      });
+      return;
+    }
+    const slug = maskDomainId(domainId);
+    const url = rowId
+      ? `/ai-results/${slug}?openWorksheet=${encodeURIComponent(rowId)}`
+      : `/ai-results/${slug}?openWorksheet=1`;
+    navigate(url);
+  };
+
+  // Full sorted list (before pagination).
+  const fullSortedData = useMemo(() => {
     let items = [...data];
 
     if (tableMetric) {
@@ -517,8 +589,35 @@ export const KeywordTrackingTable = ({
       });
     }
 
-    return showAll ? items : items.slice(0, 10);
-  }, [data, tableMetric, showAll]);
+    // Dedupe rows that are already in newlyAnalyzedRows so they don't
+    // double-render after the parent /report refetches.
+    const newIds = new Set(
+      newlyAnalyzedRows.map((r) => r.rawId).filter((id): id is number => typeof id === "number"),
+    );
+    const base = items.filter(
+      (item) => !(typeof item.rawId === "number" && newIds.has(item.rawId)),
+    );
+
+    if (!tableMetric) {
+      return [...newlyAnalyzedRows, ...base];
+    }
+    return base;
+  }, [data, tableMetric, newlyAnalyzedRows]);
+
+  const totalCount = fullSortedData.length;
+  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [tableMetric]);
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(totalPages);
+  }, [currentPage, totalPages]);
+
+  const displayData = useMemo(() => {
+    const start = (currentPage - 1) * PAGE_SIZE;
+    return fullSortedData.slice(start, start + PAGE_SIZE);
+  }, [fullSortedData, currentPage]);
 
   return (
     <Card className="border-none bg-transparent shadow-none">
@@ -597,7 +696,11 @@ export const KeywordTrackingTable = ({
               </DropdownMenuContent>
             </DropdownMenu>
 
-            <Button className="h-[38px] gap-2 rounded-lg border-none bg-[#2d3748] px-4 text-white shadow-none transition-all hover:bg-[#1a202c]">
+            <Button
+              type="button"
+              onClick={() => navigateToWorksheet()}
+              className="h-[38px] gap-2 rounded-lg border-none bg-[#2d3748] px-4 text-white shadow-none transition-all hover:bg-[#1a202c]"
+            >
               <LayoutGrid className="h-4 w-4" />
               <span className="text-[13px] font-medium">Add to Worksheet</span>
             </Button>
@@ -609,14 +712,37 @@ export const KeywordTrackingTable = ({
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
-              placeholder="Enter your custom prompt to track"
-              className="h-[38px] w-full rounded-lg border border-slate-200 pl-10 pr-4 text-[13px] outline-none transition-all placeholder:text-gray-400 focus:border-slate-300 focus:ring-1 focus:ring-slate-300"
+              placeholder="Enter your custom keyword to track"
+              value={analyzeText}
+              onChange={(e) => setAnalyzeText(e.target.value)}
+              disabled={analyzing}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  void handleAnalyzeKeyword();
+                }
+              }}
+              className="h-[38px] w-full rounded-lg border border-slate-200 pl-10 pr-4 text-[13px] outline-none transition-all placeholder:text-gray-400 focus:border-slate-300 focus:ring-1 focus:ring-slate-300 disabled:bg-slate-50 disabled:cursor-not-allowed"
             />
           </div>
 
-          <Button className="h-[38px] shrink-0 gap-1.5 rounded-lg bg-[#4b6eb8] px-4 text-white transition-all hover:bg-[#3f5d9c]">
-            <Plus className="h-4 w-4" />
-            <span className="text-[13px] font-medium">Analyze Keywords</span>
+          <Button
+            type="button"
+            onClick={() => void handleAnalyzeKeyword()}
+            disabled={analyzing || !analyzeText.trim() || !domainId}
+            className="h-[38px] shrink-0 gap-1.5 rounded-lg bg-[#4b6eb8] px-4 text-white transition-all hover:bg-[#3f5d9c] disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            {analyzing ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span className="text-[13px] font-medium">Analyzing…</span>
+              </>
+            ) : (
+              <>
+                <Plus className="h-4 w-4" />
+                <span className="text-[13px] font-medium">Analyze Keywords</span>
+              </>
+            )}
           </Button>
         </div>
       </CardHeader>
@@ -736,7 +862,12 @@ export const KeywordTrackingTable = ({
                     <TableCell className="px-4 py-3 text-right">
                       <div className="flex justify-end gap-2">
                         <Button
+                          type="button"
                           variant="outline"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigateToWorksheet(row.id);
+                          }}
                           className="h-8 rounded-[8px] border-[#e2e8f0] bg-[#f8fafc] px-3 text-[11px] font-semibold text-[#3b82f6] shadow-none hover:bg-slate-100"
                         >
                           <FileText className="mr-1.5 h-3.5 w-3.5" />
@@ -762,19 +893,33 @@ export const KeywordTrackingTable = ({
             </TableBody>
           </Table>
         </div>
-        <div className="mt-2 flex items-center gap-3 border-t border-slate-200 px-6 py-3">
+        <div className="mt-2 flex items-center justify-between gap-3 border-t border-slate-200 px-6 py-3">
           <span className="text-[11px] font-medium tracking-tight text-[#64748b]">
-            Showing {displayData.length} of {data.length} keywords
+            {totalCount === 0
+              ? "No rows"
+              : `Showing ${(currentPage - 1) * PAGE_SIZE + 1}–${Math.min(currentPage * PAGE_SIZE, totalCount)} of ${totalCount}`}
           </span>
-          <div className="h-4 w-[1px] bg-slate-200" />
-          <button
-            type="button"
-            onClick={() => setShowAll((v) => !v)}
-            disabled={showAll ? false : displayData.length >= data.length}
-            className="rounded-lg bg-gray-50/80 px-2.5 py-1 text-[11px] font-bold text-[#3B82F6] transition-all hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {showAll ? "Show less" : "View all"}
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              disabled={currentPage <= 1}
+              className="rounded-md border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-medium text-slate-600 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Prev
+            </button>
+            <span className="px-2 text-[11px] font-medium text-slate-500 tabular-nums">
+              {currentPage} / {totalPages}
+            </span>
+            <button
+              type="button"
+              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              disabled={currentPage >= totalPages}
+              className="rounded-md border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-medium text-slate-600 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Next
+            </button>
+          </div>
         </div>
       </CardContent>
     </Card>
