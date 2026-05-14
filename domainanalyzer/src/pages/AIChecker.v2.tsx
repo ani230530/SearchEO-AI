@@ -98,11 +98,28 @@ export default function AICheckerV2() {
 
   // Hydrate Step 1 form from sessionStorage on first mount. Resume from
   // ?domain=:id overrides this if it succeeds.
+  //
+  // ?prefillHost=<host> takes priority over the persisted form — it's the
+  // fallback path from the anonymous audit funnel when registration
+  // succeeded but the backend linkage didn't return a primaryDomainId
+  // (e.g. the cookie expired between Step 1 and signup). Without this
+  // the user would land on a blank Step 1 having just typed their URL.
   useEffect(() => {
+    const prefillHost = searchParams.get("prefillHost");
+    if (prefillHost) {
+      // Treat the host as a https URL; the validate step will canonicalize.
+      setNormalizedUrl(
+        prefillHost.startsWith("http") ? prefillHost : `https://${prefillHost}`
+      );
+      return;
+    }
     const persisted = loadPersistedForm();
     if (!persisted) return;
     setNormalizedUrl(persisted.url ?? "");
     setProfile(persisted.profile);
+    // searchParams is stable across renders for our purposes; eslint
+    // disable kept narrow.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Save Step 1 form whenever it changes — only meaningful when the user
@@ -155,10 +172,16 @@ export default function AICheckerV2() {
 
         const res = await apiGet<WizardStateResponse>(`/wizard/domain/${id}/state`);
         setNormalizedUrl(res.url);
+        // `profile` is null when the Domain row exists but no DomainProfile
+        // row has been written yet — happens when we arrive from the
+        // anonymous audit funnel, where signup materializes only the
+        // Domain shell. Treat the field as nullable and default to a
+        // blank profile so the user can fill it in on Step 1.
+        const incomingProfile = res.profile ?? null;
         setProfile({
-          country: res.profile.country ?? "",
-          state: res.profile.state ?? "",
-          industry: res.profile.industry ?? "",
+          country: incomingProfile?.country ?? "",
+          state: incomingProfile?.state ?? "",
+          industry: incomingProfile?.industry ?? "",
           customKeywords: (res.customSeeds?.keywords ?? []).join(", "),
           customPrompts: (res.customSeeds?.prompts ?? []).join(", "),
         });
@@ -188,18 +211,26 @@ export default function AICheckerV2() {
 
   // Advance to a target step, optionally pinning a fresh domainId into the URL
   // so a refresh restores the right resume point.
+  //
+  // Side effect: strips ?fromSignup and ?prefillHost from the URL when we
+  // advance past Step 1, so a refresh after Step 1 doesn't re-show the
+  // welcome banner and doesn't re-prefill (we have the domain id now).
   const advanceTo = (target: WizardStep, id?: number) => {
     if (id) {
       setDomainId(id);
-      setSearchParams(
-        (prev) => {
-          const next = new URLSearchParams(prev);
-          next.set("domain", String(id));
-          return next;
-        },
-        { replace: true }
-      );
     }
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        if (id) next.set("domain", String(id));
+        if (target > 1) {
+          next.delete("fromSignup");
+          next.delete("prefillHost");
+        }
+        return next;
+      },
+      { replace: true }
+    );
     setGlobalError(null);
     setStep(target);
   };
@@ -261,6 +292,28 @@ export default function AICheckerV2() {
       onBack={onBack}
       backLabel={backLabel}
     >
+      {/*
+        Welcome banner for users arriving from the anonymous audit funnel.
+        Shows on Step 1 only — once they advance, ?fromSignup=1 is dropped
+        from the URL (advanceTo via setSearchParams) and the banner is
+        gone. Uses dashboard design tokens (rounded-md border bg-green-50
+        text-green-700) so it reads as a friendly confirmation, not an
+        error.
+      */}
+      {searchParams.get("fromSignup") === "1" && step === 1 && (
+        <div className="mb-4 flex items-start justify-between gap-3 rounded-md border border-green-100 bg-green-50/60 px-3 py-2.5 text-sm font-light text-green-700">
+          <span>
+            <span className="font-medium">Welcome.</span> Your domain
+            {normalizedUrl ? (
+              <>
+                {' '}<span className="font-medium">{normalizedUrl.replace(/^https?:\/\//, '')}</span>
+              </>
+            ) : null}{' '}
+            is attached to your new account. Add a few more details to
+            finish your audit.
+          </span>
+        </div>
+      )}
       {globalError && (
         <div className="mb-4 flex items-start justify-between gap-3 rounded-md border border-rose-100 bg-rose-50/60 px-3 py-2.5 text-sm text-rose-700">
           <span>{globalError}</span>

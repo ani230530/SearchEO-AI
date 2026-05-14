@@ -524,7 +524,7 @@ footer {
             <a className="brand" href="#" target="_blank" rel="noopener noreferrer">
               AI Brand Analyzer
             </a>
-          <button className="cta" type="button" onClick={() => navigate('/auth')}>
+          <button className="cta" type="button" onClick={() => navigate('/audit')}>
             login/signup
           </button>
         </header>
@@ -536,9 +536,9 @@ footer {
             <h1 className="title">Discover how AI sees<br/>your brand online</h1>
             <p className="subtitle">Analyze your domain's visibility across AI models, discover competitor insights, and optimize your brand's presence in AI-driven search results.</p>
             <div style={{ marginTop: '48px' }}>
-              <button 
-                type="button" 
-                onClick={() => navigate('/auth')}
+              <button
+                type="button"
+                onClick={() => navigate('/audit')}
                 style={{ 
                   background: 'var(--fg)', 
                   color: 'var(--bg)', 

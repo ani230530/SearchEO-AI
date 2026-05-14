@@ -8,11 +8,26 @@ export interface User {
   name?: string;
 }
 
+/**
+ * Result surfaced by `register()`. `wizardLink` is set when the backend
+ * detected an in-flight anonymous wizard cookie on the signup request and
+ * materialized its snapshot into a Domain for the new user. Callers in the
+ * pre-signup funnel use `primaryDomainId` to redirect into the just-bound
+ * report.
+ */
+export interface RegisterResult {
+  wizardLink?: {
+    linked: boolean;
+    domainsCreated: number;
+    primaryDomainId: number | null;
+  } | null;
+}
+
 export interface AuthContextType {
   user: User | null;
   token: string | null;
   login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string, name?: string) => Promise<void>;
+  register: (email: string, password: string, name?: string) => Promise<RegisterResult>;
   logout: () => void;
   updateProfile: (name: string) => Promise<void>;
   changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
@@ -227,13 +242,23 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-  const register = async (email: string, password: string, name?: string) => {
+  const register = async (
+    email: string,
+    password: string,
+    name?: string
+  ): Promise<RegisterResult> => {
     setError(null);
     setLoading(true);
-    
+
     try {
+      // `credentials: 'include'` is load-bearing — the anon wizard cookie
+      // lives in an HttpOnly cookie set by /api/wizard/validate, and the
+      // backend's register handler reads it to materialize the in-flight
+      // session into a Domain for this new user. Without the include,
+      // signup-from-the-funnel works but the wizard work is orphaned.
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/auth/register`, {
         method: 'POST',
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
         },
@@ -254,6 +279,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         setUser(null);
         setToken(null);
       }
+
+      return { wizardLink: data.wizardLink ?? null };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Registration failed';
       setError(errorMessage);
