@@ -114,6 +114,12 @@ function streamCrawl(args: {
 
     fetchEventSource(`${API_BASE_URL}/api/wizard/domain`, {
       method: 'POST',
+      // credentials:'include' matches the rest of the wizard SSE
+      // callsites (Step2Crawling, Step5RunQueries) so the wizard
+      // cookie round-trips in cross-site deploys. This modal is
+      // dashboard-only and Bearer-authed in practice, so the cookie
+      // path isn't strictly needed — included for uniformity.
+      credentials: 'include',
       headers: authHeaders(),
       body: JSON.stringify({
         url: args.url,

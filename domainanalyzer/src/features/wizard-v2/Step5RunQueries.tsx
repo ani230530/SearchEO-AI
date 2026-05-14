@@ -110,6 +110,14 @@ export function Step5RunQueries({ domainId, onError }: Props) {
 
     fetchEventSource(`${API_BASE_URL}/api/wizard/domain/${domainId}/run`, {
       method: 'POST',
+      // credentials:'include' so the wizard cookie round-trips in
+      // cross-site deploys. /run currently requires JWT (anon callers
+      // are rejected with 402 SIGNUP_REQUIRED at the route level), so
+      // the cookie isn't strictly needed here for identity — but we
+      // include it for consistency with the other wizard fetches and
+      // to keep the post-signup behavior working in environments where
+      // the JWT hand-off briefly leaves us cookie-identified.
+      credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${localStorage.getItem('authToken')}`,

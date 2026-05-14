@@ -56,6 +56,19 @@ export function Step2Crawling({ url, profile, onComplete, onError }: Step2Props)
 
     fetchEventSource(`${API_BASE_URL}/api/wizard/domain`, {
       method: "POST",
+      // credentials:'include' is load-bearing for the cross-site
+      // (Vercel → Render) anon flow. fetchEventSource doesn't default
+      // to 'include', so without this:
+      //   1. The wizard cookie isn't sent on this request
+      //   2. The browser treats the request as non-credentialed and
+      //      IGNORES any Set-Cookie header on the SSE response (per
+      //      the CORS spec)
+      // The net result is the Domain we create here gets owned by a
+      // throwaway shadow session whose cookie the browser refused to
+      // store — so the very next apiClient call (state/competitors)
+      // sends the OLD cookie from /validate, hits a different shadow
+      // user, and 404s with "Domain not found".
+      credentials: "include",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${localStorage.getItem("authToken")}`,
