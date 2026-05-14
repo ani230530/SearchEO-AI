@@ -271,20 +271,36 @@ export function AIResultsLayout({
 
   return (
     <div className="flex min-h-screen w-full flex-col bg-[#f5f5f7] text-slate-900 lg:flex-row">
-      <aside className="relative z-40 hidden min-h-[220px] w-[72px] shrink-0 basis-auto overflow-visible border-b border-slate-300 bg-transparent lg:sticky lg:top-0 lg:flex lg:h-screen lg:max-h-screen lg:border-b-0 lg:self-start">
-        <div className="absolute inset-y-0 left-0 z-50 flex h-full w-[72px] flex-col overflow-hidden border-b border-slate-300 bg-white px-2 py-4 shadow-sm lg:border-b-0 lg:border-r">
+      {/* Collapsible icon rail. The outer <aside> reserves a fixed 72px slot
+       *  so the rest of the layout never reflows. The inner panel is
+       *  absolutely positioned and widens on hover, so the expanded rail
+       *  overlays the next column instead of pushing it. */}
+      <aside className="group relative z-40 hidden min-h-[220px] w-[72px] shrink-0 basis-auto overflow-visible border-b border-slate-300 bg-transparent lg:sticky lg:top-0 lg:flex lg:h-screen lg:max-h-screen lg:border-b-0 lg:self-start">
+        <div className="absolute inset-y-0 left-0 z-50 flex h-full w-[72px] flex-col overflow-hidden border-b border-slate-300 bg-white px-2 py-4 shadow-sm transition-[width] duration-200 ease-out group-hover:w-60 group-hover:shadow-lg lg:border-b-0 lg:border-r">
           <div className="flex h-full w-full flex-col overflow-hidden">
-            <div className="flex w-full justify-center">
-              <div className="grid h-9 w-9 place-items-center rounded-lg bg-white text-[11px] font-semibold uppercase tracking-wide text-slate-700 ring-1 ring-slate-200">
-                logo
-              </div>
+            <div className="flex w-full items-center justify-center group-hover:justify-start group-hover:px-1">
+              <span className="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-lg bg-slate-50 ring-1 ring-slate-200">
+                {triggerLogo ? (
+                  <img
+                    src={triggerLogo}
+                    alt={triggerName}
+                    className="h-7 w-7 object-contain"
+                    onError={(e) => ((e.currentTarget as HTMLImageElement).style.display = "none")}
+                  />
+                ) : (
+                  <Globe2 className="h-4 w-4 text-slate-400" />
+                )}
+              </span>
+              <span className="ml-2 hidden truncate text-sm font-semibold text-slate-800 group-hover:inline">
+                {triggerName}
+              </span>
             </div>
 
             <nav className="mt-4 flex flex-1 flex-col gap-3 overflow-y-auto pr-1">
               {railSections.map((section) => (
                 <div key={section.title || "primary"} className="space-y-1">
                   {section.title ? (
-                    <p className="sr-only">
+                    <p className="hidden px-3 pt-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400 group-hover:block">
                       {section.title}
                     </p>
                   ) : null}
@@ -299,15 +315,18 @@ export function AIResultsLayout({
                           key={item.id}
                           type="button"
                           onClick={item.onClick}
-                          className={`flex h-9 w-full items-center rounded-lg transition ${
+                          className={`flex h-9 w-full items-center gap-3 rounded-lg px-0 transition justify-center group-hover:justify-start group-hover:px-3 ${
                             isActive
                               ? "bg-[#2f4462] text-white shadow-sm"
                               : "text-slate-500 hover:bg-slate-100 hover:text-slate-700"
-                          } justify-center px-0`}
+                          }`}
                           aria-label={item.ariaLabel ?? item.label}
                           title={item.label}
                         >
                           <ItemIcon className="h-4 w-4 shrink-0" strokeWidth={1.8} />
+                          <span className="hidden truncate text-xs font-medium group-hover:inline">
+                            {item.label}
+                          </span>
                         </button>
                       );
                     })}
@@ -323,11 +342,14 @@ export function AIResultsLayout({
                   logout();
                   navigate("/auth");
                 }}
-                className="flex h-9 w-full items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 px-0"
+                className="flex h-9 w-full items-center justify-center gap-3 rounded-lg px-0 text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 group-hover:justify-start group-hover:px-3"
                 aria-label="Logout"
                 title="Logout"
               >
                 <LogOut className="h-4 w-4 shrink-0" strokeWidth={1.8} />
+                <span className="hidden truncate text-xs font-medium group-hover:inline">
+                  Logout
+                </span>
               </button>
             </div>
           </div>
