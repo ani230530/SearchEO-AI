@@ -13,6 +13,7 @@ import {
   CATEGORY_DESCRIPTIONS,
   METRIC_DESCRIPTIONS,
 } from "@/features/sidebar-dashboard/constants";
+import { AuditSetupFlow } from "@/features/sidebar-dashboard/sections/AuditSetupFlow";
 import type { AuditSectionProps } from "@/features/sidebar-dashboard/types";
 import { cn } from "@/lib/utils";
 
@@ -43,6 +44,7 @@ export function AuditSection({
   auditLoading,
   auditResult,
   companyDomain,
+  companyDomainLoading,
   n8nResults,
   n8nStatus,
   overallScore,
@@ -50,6 +52,7 @@ export function AuditSection({
   selectedMetric,
   onActiveChartTabChange,
   onRunAudit,
+  onSetupComplete,
   onSelectedMetricChange,
 }: AuditSectionProps) {
   const categories = auditResult
@@ -67,6 +70,26 @@ export function AuditSection({
   }));
   const best = scored.length > 0 ? scored.reduce((a, b) => (b.score > a.score ? b : a)) : null;
   const worst = scored.length > 0 ? scored.reduce((a, b) => (b.score < a.score ? b : a)) : null;
+
+  // Resolve which view to render before painting anything. We branch
+  // upstream so the audit chrome never flashes for a user who has no
+  // domain yet (and vice versa, the setup flow never flashes for users
+  // we just haven't fetched yet).
+  if (companyDomainLoading) {
+    return (
+      <div className="relative min-h-screen w-full flex items-center justify-center">
+        <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
+      </div>
+    );
+  }
+
+  if (!companyDomain) {
+    return (
+      <div className="relative min-h-screen w-full">
+        <AuditSetupFlow onComplete={onSetupComplete} />
+      </div>
+    );
+  }
 
   return (
     <div className="relative min-h-screen w-full">
@@ -92,14 +115,14 @@ export function AuditSection({
                 className="text-gray-700 font-light truncate "
                 style={{ letterSpacing: "0.011em" }}
               >
-                {companyDomain || "No domain available"}
+                {companyDomain}
               </span>
             </div>
 
             <div className="flex w-full sm:w-auto gap-3">
               <button
                 onClick={onRunAudit}
-                disabled={auditLoading || !companyDomain}
+                disabled={auditLoading}
                 className={cn(
                   "inline-flex w-full sm:w-auto justify-center items-center gap-2 px-6 py-3 text-white rounded-xl text-sm font-medium hover:opacity-90 disabled:opacity-60 transition",
                   auditLoading && "cursor-not-allowed"
@@ -121,31 +144,17 @@ export function AuditSection({
           </div>
 
           {auditLoading && (
-            <div className="w-full flex flex-col items-center justify-center mt-56">
-              <svg
-                className="animate-spin text-blue-600"
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 120 120"
-                width={120}
-                height={120}
-              >
-                <circle
-                  className="opacity-75"
-                  cx="60"
-                  cy="60"
-                  r="50"
-                  stroke="currentColor"
-                  strokeWidth="20"
-                  strokeLinecap="round"
-                  fill="none"
-                  strokeDasharray="250 320"
-                  strokeDashoffset="18"
-                />
-              </svg>
-
-              <span className="mt-4 mb-24 text-blue-600 font-medium text-lg text-center">
-                Running Audit
-              </span>
+            <div className="mt-10 mx-auto max-w-md rounded-2xl border border-slate-200 bg-white/70 backdrop-blur-md px-6 py-8 shadow-sm">
+              <div className="flex items-center gap-3">
+                <span className="relative flex h-2 w-2">
+                  <span className="absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75 animate-ping" />
+                  <span className="relative inline-flex h-2 w-2 rounded-full bg-blue-500" />
+                </span>
+                <p className="text-[15px] font-medium text-slate-700">Running your audit…</p>
+              </div>
+              <p className="mt-2 pl-5 text-[13px] leading-relaxed text-slate-500">
+                Pulling Lighthouse metrics, capturing a screenshot, and crunching the scores. Usually wraps in 20–40 seconds.
+              </p>
             </div>
           )}
 

@@ -101,8 +101,13 @@ export interface UniversalGenerationInput {
   images?: number;
   /** Yes/no flag for the featured image (n8n field: `Featured Image`). */
   featuredImage?: boolean;
-  /** WordPress integration (n8n fields: `Username`, `Password`, `wordpress url`). */
-  wordpress: {
+  /**
+   * WordPress integration (n8n fields: `Username`, `Password`, `wordpress url`).
+   * Optional — when omitted, generation still runs and the resulting draft is
+   * stored without publish targets. The n8n workflow is responsible for
+   * skipping the publish step when these fields are blank.
+   */
+  wordpress?: {
     username: string;
     password: string;
     url: string;
@@ -213,9 +218,9 @@ export function buildUniversalPayload(input: UniversalGenerationInput): Record<s
     tone: input.tone.trim(),
     'Word Count': Math.round(input.wordCount),
     language: trimOrEmpty(input.language) || 'en-US',
-    Username: input.wordpress.username,
-    Password: input.wordpress.password,
-    'wordpress url': input.wordpress.url,
+    Username: input.wordpress?.username ?? '',
+    Password: input.wordpress?.password ?? '',
+    'wordpress url': input.wordpress?.url ?? '',
     ...templateFields,
   };
 

@@ -418,7 +418,7 @@ export const serializeDraftContent = (draft: WordpressPublishLog): CanonicalDraf
 
 export const normalizePublishGenerateResponse = (
   response: unknown,
-  integration: { siteUrl: string }
+  integration: { siteUrl: string } | null
 ): CanonicalDraftContent => {
   const entry = Array.isArray(response) ? ((response[0] || {}) as UnknownRecord) : ((response || {}) as UnknownRecord);
   const featuredImageUrl = normalizeFeaturedImageUrl(
@@ -438,8 +438,9 @@ export const normalizePublishGenerateResponse = (
     slug: firstString(entry.slug, entry.Slug),
     wordpressPostId: firstNumber(entry.wordpressPostId, entry['WordPress Post ID'], entry.id),
     wordpressUrl:
-      firstString(entry['wordpress url '], entry['wordpress url'], entry.wordpressUrl, integration.siteUrl) ||
-      integration.siteUrl,
+      firstString(entry['wordpress url '], entry['wordpress url'], entry.wordpressUrl, integration?.siteUrl ?? undefined) ||
+      integration?.siteUrl ||
+      '',
     longtailKeywords: firstString(entry['longtail keywords'], entry.longtailKeywords),
     status: firstString(entry.status) || 'draft',
     error: firstString(entry.error) || null,

@@ -35,11 +35,25 @@ model User {
   createdAt                    DateTime  @default(now())
   updatedAt                    DateTime  @updatedAt
 
+  // Anon-funnel anti-abuse signals captured at signup. Surveyed by the
+  // background fingerprint-reuse flagger; not used in real-time auth.
+  signupIp          String?
+  signupFingerprint String?
+  // Soft per-user wizard run cap. Default 1 = the "one free audit" promise.
+  // Paid plans raise this. The runner reads this at quota-check time.
+  wizardRunsAllowed Int       @default(1)
+  lastWizardRunAt   DateTime?
+  // Set by the background reuse flagger when a User shares fingerprint/ip
+  // with multiple other recent signups. Suspicious users are throttled, not
+  // banned — see WizardSession quota checks.
+  suspicious        Boolean   @default(false)
+
   domains              Domain[]
   googleSearchConsole  GoogleSearchConsoleConnection?
   wordpressIntegration WordpressIntegration?
   publishLogs          WordpressPublishLog[]
   generationJobs       GenerationJob[]
+  wizardSessions       WizardSession[]
 }
 
 // -----------------------------------------------------------------------------
@@ -47,17 +61,17 @@ model User {
 // -----------------------------------------------------------------------------
 
 model Domain {
-  id              Int      @id @default(autoincrement())
-  userId          Int
-  url             String   // canonical https://host
-  host            String   // normalized: lowercased, no www, no path
-  isCompanyDomain Boolean  @default(false)
+  id                Int      @id @default(autoincrement())
+  userId            Int
+  url               String // canonical https://host
+  host              String // normalized: lowercased, no www, no path
+  isCompanyDomain   Boolean  @default(false)
   // GSC analytics property id, kept here because GSC integration writes to it.
   googleAnalyticsId String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
-  user        User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   profile     DomainProfile?
   inferred    DomainInferred?
@@ -77,7 +91,7 @@ model Domain {
 
 // User-supplied profile from Step 1 of the wizard.
 model DomainProfile {
-  domainId       Int     @id
+  domainId       Int      @id
   country        String?
   state          String?
   industry       String?
@@ -93,7 +107,7 @@ model DomainProfile {
 model DomainInferred {
   domainId       Int      @id
   companyName    String?
-  companySize    String?  // solo | smb | mid | enterprise
+  companySize    String? // solo | smb | mid | enterprise
   brandVoice     Json?
   targetAudience Json?
   productsJson   Json?
@@ -124,10 +138,10 @@ model CrawlSnapshot {
   pagesScanned Int
   // [{ url, title, description, ogTags, schemaJson, content }]
   pages        Json
-  rawText      String   // concatenated content blob for downstream LLM
-  contextJson  Json?    // synthesized structure
-  quality      Json?    // % metrics
-  policy       Json?    // robots + sitemap discovery
+  rawText      String // concatenated content blob for downstream LLM
+  contextJson  Json? // synthesized structure
+  quality      Json? // % metrics
+  policy       Json? // robots + sitemap discovery
   tokenUsage   Int      @default(0)
   createdAt    DateTime @default(now())
   domain       Domain   @relation(fields: [domainId], references: [id], onDelete: Cascade)
@@ -140,7 +154,7 @@ model CrawlSnapshot {
 model Competitor {
   id              Int      @id @default(autoincrement())
   domainId        Int
-  competitorHost  String   // normalized host
+  competitorHost  String // normalized host
   // 'serp' | 'overlap' | 'mention' | 'enrichment' | 'llm-rank'
   source          String
   // Raw payload from each discovery source (merged on conflict).
@@ -149,10 +163,10 @@ model Competitor {
   industry        String?
   location        String?
   companySize     String?
-  similarityScore Float?   // 0..1, deterministic
-  threatLevel     String?  // High | Medium | Low (LLM-labelled)
-  rank            Int?     // final rank within domain
-  reasoning       String?  // one-line LLM justification
+  similarityScore Float? // 0..1, deterministic
+  threatLevel     String? // High | Medium | Low (LLM-labelled)
+  rank            Int? // final rank within domain
+  reasoning       String? // one-line LLM justification
   isSelected      Boolean  @default(false)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
@@ -168,10 +182,10 @@ model Keyword {
   id         Int      @id @default(autoincrement())
   domainId   Int
   term       String
-  intent     String   // Informational | Commercial | Transactional | Navigational
-  source     String   // 'ai' | 'custom'
+  intent     String // Informational | Commercial | Transactional | Navigational
+  source     String // 'ai' | 'custom'
   volume     Int?
-  difficulty String?  // Low | Medium | High
+  difficulty String? // Low | Medium | High
   cpc        Float?
   isSelected Boolean  @default(false)
   createdAt  DateTime @default(now())
@@ -188,33 +202,33 @@ model Keyword {
 // them the audit can't separate "unbranded category recommendation" signal
 // from "branded sanity-check" noise.
 model Prompt {
-  id                 Int      @id @default(autoincrement())
-  domainId           Int
-  keywordId          Int?
-  text               String
-  intent             String?  // Informational | Commercial | Transactional | Navigational
-  source             String   // 'ai' | 'custom'
-  isSelected         Boolean  @default(false)
+  id                  Int             @id @default(autoincrement())
+  domainId            Int
+  keywordId           Int?
+  text                String
+  intent              String? // Informational | Commercial | Transactional | Navigational
+  source              String // 'ai' | 'custom'
+  isSelected          Boolean         @default(false)
   // ── Audit-research metadata (Soar / Profound / Ahrefs taxonomy) ────────
   /// One of: unbranded_recommendation | top_n_listicle | alternatives_to_competitor
   ///        | problem_statement | brand_vs_competitor | branded_trust
-  category           String?
+  category            String?
   /// Funnel position: awareness | consideration | decision
-  intentStage        String?
+  intentStage         String?
   /// Persona that would naturally ask this prompt (e.g. "Series B SaaS founder").
-  persona            String?
+  persona             String?
   /// Job-to-be-done / use case (e.g. "tracking team OKRs").
-  useCase            String?
+  useCase             String?
   /// Constraint qualifier (budget, scale, integration, vertical).
-  constraint         String?
+  constraint          String?
   /// True if the prompt explicitly names the user's brand.
-  isBranded          Boolean  @default(false)
+  isBranded           Boolean         @default(false)
   /// Competitor host explicitly named in the prompt (alternatives / vs queries).
   competitorMentioned String?
-  createdAt          DateTime @default(now())
-  domain             Domain   @relation(fields: [domainId], references: [id], onDelete: Cascade)
-  keyword            Keyword? @relation(fields: [keywordId], references: [id], onDelete: SetNull)
-  results            AiQueryResult[]
+  createdAt           DateTime        @default(now())
+  domain              Domain          @relation(fields: [domainId], references: [id], onDelete: Cascade)
+  keyword             Keyword?        @relation(fields: [keywordId], references: [id], onDelete: SetNull)
+  results             AiQueryResult[]
 
   @@index([domainId, isSelected])
   @@index([domainId, category])
@@ -224,14 +238,14 @@ model Prompt {
 // One run = one execution of the user's selected prompts × selected models.
 // Replaces AnalysisReport + DashboardAnalysis + ModelPerformance + PerformanceInsight.
 model AiRun {
-  id        Int       @id @default(autoincrement())
+  id        Int             @id @default(autoincrement())
   domainId  Int
-  startedAt DateTime  @default(now())
+  startedAt DateTime        @default(now())
   endedAt   DateTime?
-  status    String    @default("running") // running | completed | failed
+  status    String          @default("running") // running | completed | failed
   // Aggregate scores: { presenceRate, avgRelevance, avgSentiment, avgOverall, perModel }
   summary   Json?
-  domain    Domain    @relation(fields: [domainId], references: [id], onDelete: Cascade)
+  domain    Domain          @relation(fields: [domainId], references: [id], onDelete: Cascade)
   results   AiQueryResult[]
 
   @@index([domainId, startedAt])
@@ -241,17 +255,17 @@ model AiQueryResult {
   id                 Int      @id @default(autoincrement())
   runId              Int
   promptId           Int
-  model              String   // e.g. 'gpt-4o-mini', 'claude-3-5-haiku', 'gemini-1.5-flash'
+  model              String // e.g. 'gpt-4o-mini', 'claude-3-5-haiku', 'gemini-1.5-flash'
   response           String
   presence           Int      @default(0) // 0 | 1
   relevance          Int      @default(0) // 0..10 (always measurable — answer quality)
-  sentiment          Int?     // -10..10. NULL when presence=0 (no brand to measure sentiment toward)
-  accuracy           Int?     // 0..10. NULL when presence=0 (no claims to verify)
-  rankPosition       Int?     // 1-based position when brand appears in a numbered list; NULL otherwise
+  sentiment          Int? // -10..10. NULL when presence=0 (no brand to measure sentiment toward)
+  accuracy           Int? // 0..10. NULL when presence=0 (no claims to verify)
+  rankPosition       Int? // 1-based position when brand appears in a numbered list; NULL otherwise
   overall            Float    @default(0) // 0..10. Always 0 when presence=0
-  scorerSummary      String?  // one-line LLM summary of the brand mention (or absence)
-  factualClaims      Json?    // [{ claim, verdict: true|false|uncertain }] — claims about the brand the LLM made
-  competitorHosts    Json?    // string[] — competitor hosts mentioned (legacy / fast lookup)
+  scorerSummary      String? // one-line LLM summary of the brand mention (or absence)
+  factualClaims      Json? // [{ claim, verdict: true|false|uncertain }] — claims about the brand the LLM made
+  competitorHosts    Json? // string[] — competitor hosts mentioned (legacy / fast lookup)
   // [{ url, title, host }] — every link or bare URL the model cited
   citations          Json?
   // [{ host, count, sentiment }] — per-competitor mention breakdown with sentiment
@@ -272,13 +286,13 @@ model AiQueryResult {
 // -----------------------------------------------------------------------------
 
 model Campaign {
-  id          Int      @id @default(autoincrement())
+  id          Int             @id @default(autoincrement())
   title       String
   description String?
   domainId    Int
-  domain      Domain   @relation(fields: [domainId], references: [id], onDelete: Cascade)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  domain      Domain          @relation(fields: [domainId], references: [id], onDelete: Cascade)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
   topics      CampaignTopic[]
 
   @@index([domainId])
@@ -290,22 +304,22 @@ enum CampaignNodeSource {
 }
 
 model CampaignTopic {
-  id            Int                @id @default(autoincrement())
-  campaignId    Int
-  campaign      Campaign           @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  title         String
-  description   String?
-  summary       String?
-  aiSummary     String?
-  latestDraftId Int?
-  latestDraft   WordpressPublishLog? @relation("TopicLatestDraft", fields: [latestDraftId], references: [id])
-  status        String             @default("active")
-  source        CampaignNodeSource @default(MANUAL)
-  order         Int                @default(0)
-  aiMetadata    Json?
-  createdAt     DateTime           @default(now())
-  updatedAt     DateTime           @updatedAt
-  keywords      CampaignKeyword[]
+  id             Int                  @id @default(autoincrement())
+  campaignId     Int
+  campaign       Campaign             @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  title          String
+  description    String?
+  summary        String?
+  aiSummary      String?
+  latestDraftId  Int?
+  latestDraft    WordpressPublishLog? @relation("TopicLatestDraft", fields: [latestDraftId], references: [id])
+  status         String               @default("active")
+  source         CampaignNodeSource   @default(MANUAL)
+  order          Int                  @default(0)
+  aiMetadata     Json?
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+  keywords       CampaignKeyword[]
   generationJobs GenerationJob[]
 
   @@index([campaignId])
@@ -331,20 +345,20 @@ model CampaignKeyword {
 }
 
 model WordpressIntegration {
-  id              Int       @id @default(autoincrement())
-  userId          Int       @unique
+  id              Int                   @id @default(autoincrement())
+  userId          Int                   @unique
   siteUrl         String
   username        String
   password        String
   lastPublishedAt DateTime?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+  user            User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
   publishLogs     WordpressPublishLog[]
 }
 
 model WordpressPublishLog {
-  id                       Int      @id @default(autoincrement())
+  id                       Int                   @id @default(autoincrement())
   userId                   Int
   wordpressUrl             String
   wordpressPostId          Int?
@@ -356,8 +370,8 @@ model WordpressPublishLog {
   slug                     String?
   status                   String?
   response                 Json?
-  createdAt                DateTime @default(now())
-  updatedAt                DateTime @default(now()) @updatedAt
+  createdAt                DateTime              @default(now())
+  updatedAt                DateTime              @default(now()) @updatedAt
   integrationId            Int?
   user                     User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
   integration              WordpressIntegration? @relation(fields: [integrationId], references: [id])
@@ -370,17 +384,17 @@ model WordpressPublishLog {
 }
 
 model GenerationJob {
-  id        Int      @id @default(autoincrement())
-  jobId     String   @unique
+  id        Int           @id @default(autoincrement())
+  jobId     String        @unique
   topicId   Int
   userId    Int
-  status    String   @default("pending") // pending | generating | completed | failed
-  progress  Int      @default(0)         // 0..100
+  status    String        @default("pending") // pending | generating | completed | failed
+  progress  Int           @default(0) // 0..100
   phase     String?
   error     String?
   draftId   Int?
-  startedAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  startedAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
   topic     CampaignTopic @relation(fields: [topicId], references: [id], onDelete: Cascade)
   user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -396,7 +410,7 @@ model GoogleSearchConsoleConnection {
   googleEmail      String?
   googleUserId     String?
   accessToken      String
-  refreshToken     String    // encrypted
+  refreshToken     String // encrypted
   tokenExpiry      DateTime
   selectedProperty String?
   isConnected      Boolean   @default(false)
@@ -438,4 +452,102 @@ model N8nRequest {
 
   @@index([auditResultId])
   @@index([requestId])
+}
+
+// -----------------------------------------------------------------------------
+// Anon wizard sessions — backbone for the pre-signup AI Visibility audit.
+// -----------------------------------------------------------------------------
+//
+// A WizardSession represents a single anonymous browser doing a wizard run.
+// The wizard work is stored as JSON snapshots on the row itself rather than
+// rooted in `Domain`, so existing Domain-bound code (41 query sites) stays
+// untouched. On signup the linkage handler materializes the snapshot into
+// real Domain / CrawlSnapshot / Competitor / Prompt rows owned by the new
+// User. After expiry the row is garbage-collected.
+//
+// `cookieTokenHash` is sha256(cookieToken). The plaintext token lives only
+// in the user's signed HTTP-only cookie. ip + fingerprintHash + userAgent
+// are captured for per-identity rate limiting and the post-signup reuse
+// flagger.
+// -----------------------------------------------------------------------------
+
+model WizardSession {
+  id              Int       @id @default(autoincrement())
+  cookieTokenHash String    @unique
+  ip              String?
+  fingerprintHash String?
+  userAgent       String?
+  // Domain identity entered at Step 1.
+  domainUrl       String?
+  domainHost      String?
+  // Step snapshots. Each holds the public-facing payload for that step.
+  profileData     Json?
+  crawlData       Json?
+  competitorsData Json?
+  topicsData      Json?
+  // Step pointer used by resume + signup-wall logic.
+  step            String    @default("idle") // idle | profile | crawl | competitors | topics | walled | complete
+  // Set once the user signs up and the snapshot is materialized.
+  linkedUserId    Int?
+  linkedDomainId  Int?
+  linkedAt        DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  expiresAt       DateTime
+
+  linkedUser User? @relation(fields: [linkedUserId], references: [id], onDelete: SetNull)
+
+  @@index([linkedUserId])
+  @@index([fingerprintHash])
+  @@index([ip])
+  @@index([expiresAt])
+  @@index([domainHost])
+}
+
+// -----------------------------------------------------------------------------
+// Per-domain wizard result cache. Keyed on (normalizedHost, step, cacheKey)
+// so identical work is shared across users and across re-runs. Cache hits
+// avoid every external LLM/SerpAPI call.
+// -----------------------------------------------------------------------------
+
+model WizardRunCache {
+  id             Int      @id @default(autoincrement())
+  // Normalized host (lowercased, no www, no path). Same normalization as
+  // Domain.host so a cache populated by user A is reusable by user B.
+  normalizedHost String
+  // Step bucket: "crawl" | "competitors" | "topics" | "ai-run".
+  step           String
+  // Extra key for parameterized steps: prompt set hash, model set hash,
+  // etc. "default" if no parameterization.
+  cacheKey       String   @default("default")
+  payload        Json
+  createdAt      DateTime @default(now())
+  expiresAt      DateTime
+
+  @@unique([normalizedHost, step, cacheKey])
+  @@index([expiresAt])
+  @@index([normalizedHost])
+}
+
+// -----------------------------------------------------------------------------
+// Per-call cost log. Every paid external service (OpenRouter LLM, SerpAPI,
+// PageSpeed, n8n) records an estimated USD cost here. The daily circuit
+// breaker sums this table for the current day and blocks new anon runs
+// when the threshold is hit.
+// -----------------------------------------------------------------------------
+
+model ApiSpendLog {
+  id              Int      @id @default(autoincrement())
+  service         String // "openrouter" | "serpapi" | "pagespeed" | "n8n"
+  userId          Int? // null for anonymous spend
+  sessionId       Int? // WizardSession.id for anon spend
+  domainHost      String?
+  costEstimateUsd Float
+  metadata        Json?
+  createdAt       DateTime @default(now())
+
+  @@index([service, createdAt])
+  @@index([userId, createdAt])
+  @@index([sessionId, createdAt])
+  @@index([createdAt])
 }

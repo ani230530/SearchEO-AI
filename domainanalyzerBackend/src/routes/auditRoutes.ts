@@ -20,45 +20,35 @@ function formatUrl(url: string) {
   return url;
 }
 
-// GET /api/audit - Get latest audit for user's company domain
+// GET /api/audit - Get latest audit for user's company domain.
+//
+// Returns 200 with `audit: null` when the user hasn't set up a company
+// domain yet OR when a domain exists but no audit has been run against
+// it. These aren't error states — they're the natural pre-audit shape of
+// the resource, and the dashboard polls this on every mount. Surfacing
+// them as 404s pollutes the browser console with red network errors that
+// look like real failures. The only true error path here is a DB / infra
+// failure (500).
 router.get("/", authenticateToken, asyncHandler(async (req: Request, res: Response) => {
   const authReq = req as AuthenticatedRequest;
   const userId = authReq.user.userId;
 
   try {
-    // Find company domain for user
     const companyDomain = await prisma.domain.findFirst({
-      where: {
-        userId,
-        isCompanyDomain: true,
-      },
+      where: { userId, isCompanyDomain: true },
     });
-
     if (!companyDomain) {
-      return res.status(404).json({
-        success: false,
-        error: "Company domain not found. Please set up your company domain first.",
-      });
+      return res.json({ success: true, audit: null, reason: "no_company_domain" });
     }
 
-    // Find audit result for this domain
     const auditResult = await prisma.auditResult.findUnique({
-      where: {
-        domainId: companyDomain.id,
-      },
+      where: { domainId: companyDomain.id },
     });
-
     if (!auditResult) {
-      return res.status(404).json({
-        success: false,
-        error: "No audit found for your company domain.",
-      });
+      return res.json({ success: true, audit: null, reason: "no_audit_yet" });
     }
 
-    return res.json({
-      success: true,
-      audit: auditResult,
-    });
+    return res.json({ success: true, audit: auditResult });
   } catch (error) {
     console.error("Error fetching audit:", error);
     return res.status(500).json({

@@ -333,28 +333,26 @@ async function runGenerationJob(jobId: string, input: RunGenerationInput): Promi
     .filter((k) => (k.aiMetadata as any)?.isLongtail === true)
     .map((k) => k.term);
 
+  // WordPress integration is used to *publish* the generated draft. It is
+  // not required to generate worksheet rows. When absent, n8n receives empty
+  // WP credentials and is expected to skip the publish step; the resulting
+  // draft is stored with integrationId = null and wordpressPostId = null.
   const integration = await prisma.wordpressIntegration.findUnique({
     where: { userId },
   });
-  if (!integration) {
-    await failJob(
-      jobId,
-      userId,
-      'WordPress integration not configured. Connect WordPress to generate content.'
-    );
-    return;
-  }
 
-  let decryptedPassword: string;
-  try {
-    decryptedPassword = decryptToken(integration.password);
-  } catch {
-    await failJob(
-      jobId,
-      userId,
-      'WordPress integration password cannot be decrypted. Reconfigure WordPress in settings.'
-    );
-    return;
+  let decryptedPassword: string | null = null;
+  if (integration) {
+    try {
+      decryptedPassword = decryptToken(integration.password);
+    } catch {
+      await failJob(
+        jobId,
+        userId,
+        'WordPress integration password cannot be decrypted. Reconfigure WordPress in settings.'
+      );
+      return;
+    }
   }
 
   // Defensive: blog template requires `topic`. Always inject the row title
@@ -393,11 +391,14 @@ async function runGenerationJob(jobId: string, input: RunGenerationInput): Promi
           : body.featured_image === true ||
             body.featured_image === 'yes' ||
             body.featured_image === 1,
-      wordpress: {
-        username: integration.username,
-        password: decryptedPassword,
-        url: integration.siteUrl,
-      },
+      wordpress:
+        integration && decryptedPassword !== null
+          ? {
+              username: integration.username,
+              password: decryptedPassword,
+              url: integration.siteUrl,
+            }
+          : undefined,
       templateFields,
     });
   } catch (err) {
@@ -503,7 +504,7 @@ async function runGenerationJob(jobId: string, input: RunGenerationInput): Promi
       const created = await tx.wordpressPublishLog.create({
         data: {
           userId,
-          wordpressUrl: content.wordpressUrl || integration.siteUrl,
+          wordpressUrl: content.wordpressUrl || integration?.siteUrl || '',
           primaryKeyword: content.primaryKeyword || primary.term,
           normalizedPrimaryKeyword: normalizeKw(content.primaryKeyword || primary.term),
           title: content.title || topic.title,
@@ -512,7 +513,7 @@ async function runGenerationJob(jobId: string, input: RunGenerationInput): Promi
           response: rawForStorage as any,
           generationJobId: jobId,
           generationTopicId: topicId,
-          integrationId: integration.id,
+          integrationId: integration?.id ?? null,
           wordpressPostId: content.wordpressPostId ?? null,
         },
       });
@@ -548,6 +549,13 @@ async function failJob(
   reason: string,
   options?: { progress?: number; details?: Record<string, unknown> }
 ) {
+  console.error('[gen] job failed', {
+    jobId,
+    userId,
+    reason,
+    details: options?.details,
+    progress: options?.progress,
+  });
   const failed = await updateJob(jobId, {
     status: 'failed',
     error: options?.details ? `${reason} ${JSON.stringify(options.details)}` : reason,

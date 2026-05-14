@@ -1,4 +1,4 @@
-import React, { useEffect, useState, type Dispatch, type FormEvent, type ReactNode, type SetStateAction } from 'react';
+import React, { useEffect, useState, type Dispatch, type ReactNode, type SetStateAction } from 'react';
 import {
   BarChart3,
   ChevronDown,
@@ -17,6 +17,7 @@ import { cn } from '@/lib/utils';
 import { AnalyticsIntegrationSection } from '@/features/sidebar-dashboard/sections/AnalyticsIntegrationSection';
 import { CompanySection } from '@/features/sidebar-dashboard/sections/CompanySection';
 import { DomainInfoContent } from '@/features/sidebar-dashboard/sections/DomainInfoContent';
+import { DomainInfoEmpty } from '@/features/sidebar-dashboard/sections/DomainInfoEmpty';
 import type { CompanySubTabId } from '@/features/sidebar-dashboard/types';
 import { getCompetitionBadgeClassName } from '@/features/sidebar-dashboard/utils';
 import type { KeywordTableItem } from '@/types';
@@ -41,11 +42,6 @@ type WpFormState = {
   password: string;
 };
 
-type LoadingStep = {
-  name: string;
-  status: 'pending' | 'running' | 'completed' | 'failed';
-  progress: number;
-};
 
 export interface AnalyticsCompanySectionProps {
   companyDomainLoading: boolean;
@@ -109,12 +105,6 @@ export interface AnalyticsCompanySectionProps {
   wpIntegrationSaving: boolean;
   handleDisconnectWordpress: () => void;
   wpIntegrationDeleting: boolean;
-  handleSubmit: (e: FormEvent) => void | Promise<void>;
-  domainError: string;
-  isSubmitting: boolean;
-  loadingSteps: LoadingStep[];
-  currentTaskIndex: number;
-  handleDomainChange: (value: string) => void;
   // Domain Info — minimal data for the always-visible domain card.
   createdDomainId: number | null;
   keywords: Array<{
@@ -127,6 +117,10 @@ export interface AnalyticsCompanySectionProps {
   }>;
   companyDomainFetchError: string | null;
   onRetryCompanyDomain: () => void;
+  /** Switch the dashboard to the Website Audit tab — used by the empty
+   *  state to send the user to the inline setup flow that now owns
+   *  domain creation. */
+  onGoToAudit: () => void;
 }
 
 export function AnalyticsCompanySection({
@@ -191,16 +185,11 @@ export function AnalyticsCompanySection({
   wpIntegrationSaving,
   handleDisconnectWordpress,
   wpIntegrationDeleting,
-  handleSubmit,
-  domainError,
-  isSubmitting,
-  loadingSteps,
-  currentTaskIndex,
-  handleDomainChange,
   createdDomainId,
   keywords,
   companyDomainFetchError,
   onRetryCompanyDomain,
+  onGoToAudit,
 }: AnalyticsCompanySectionProps) {
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + currentKeywords.length;
@@ -1212,201 +1201,8 @@ const allSections = [...leftSections, ...rightSections];
               </div>
             
               )}
-              loadingContent={(
-
-              <div className="min-h-screen bg-white flex items-center justify-center px-4">
-                <div className="max-w-2xl w-full">
-                  <div className="text-center mb-12">
-                    <div className="w-16 h-16 mx-auto mb-6 bg-gray-100 rounded-full flex items-center justify-center">
-                      <svg
-                        className="w-8 h-8 text-gray-600 animate-pulse"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={1.5}
-                          d="M13 10V3L4 14h7v7l9-11h-7z"
-                        />
-                      </svg>
-                    </div>
-                    <h2 className="text-3xl font-semibold tracking-tight text-gray-900 mb-3">
-                      Domain Setup in Progress
-                    </h2>
-                    <p className="text-lg text-gray-600 leading-relaxed">
-                      Setting up your domain for analysis
-                    </p>
-                  </div>
-
-                  {/* Domain Info */}
-                  <div className="mb-8 p-6 bg-blue-50 rounded-2xl border border-blue-100">
-                    <div className="flex items-center justify-between mb-3">
-                      <span className="text-base font-medium text-blue-900">
-                        Target Domain: {companyDomain}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Apple-style Carousel */}
-                  <div className="relative h-24 mb-8 overflow-hidden">
-                    <div
-                      className="flex transition-transform duration-1000 ease-out"
-                      style={{
-                        transform: `translateX(-${currentTaskIndex * 100}%)`,
-                      }}
-                    >
-                      {loadingSteps.map((task, index) => (
-                        <div
-                          key={index}
-                          className="w-full flex-shrink-0 text-center"
-                        >
-                          <h3 className="text-xl font-medium text-gray-900 mb-2 transition-opacity duration-700">
-                            {task.name}
-                          </h3>
-                          <p className="text-base text-gray-600 transition-opacity duration-700">
-                            {task.status === "completed"
-                              ? "Completed successfully"
-                              : task.status === "running"
-                              ? "In progress..."
-                              : "Pending"}
-                          </p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Apple-style Progress Dots */}
-                  <div className="flex justify-center space-x-3 mb-8">
-                    {loadingSteps.map((task, index) => (
-                      <div
-                        key={index}
-                        className={`w-3 h-3 rounded-full transition-all duration-700 ease-out ${
-                          task.status === "completed"
-                            ? "bg-gray-800 scale-110 shadow-md"
-                            : index === currentTaskIndex
-                            ? "bg-gray-600 scale-125 shadow-lg"
-                            : "bg-gray-300"
-                        }`}
-                      ></div>
-                    ))}
-                  </div>
-
-                  <div className="bg-gray-50 rounded-2xl p-6 border border-gray-100">
-                    <div className="flex items-center text-gray-600">
-                      <svg
-                        className="w-6 h-6 mr-3 text-gray-500"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-                        />
-                      </svg>
-                      <span className="text-base font-medium">
-                        Your data is being securely processed and encrypted
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            
-              )}
-              setupContent={(
-
-              <div className="max-w-2xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
-                {/* Apple-like Hero */}
-                <div className="text-center mb-8 sm:mb-10">
-                  <h1 className="text-4xl sm:text-5xl font-thin text-black leading-tight tracking-tight">
-                    Company Domain
-                  </h1>
-                  <p className="text-base sm:text-lg text-gray-600 font-light mt-3">
-                    Enter your company domain name
-                  </p>
-                </div>
-
-                <div className="rounded-[28px] border border-gray-100 bg-white p-6 sm:p-8 shadow-sm">
-                  <form
-                    onSubmit={handleSubmit}
-                    className="space-y-5 sm:space-y-6"
-                  >
-                    {/* Domain Input */}
-                    <div className="space-y-3">
-                      <label className="block text-base font-light text-black">
-                        Domain
-                      </label>
-                      <div className="relative">
-                        <input
-                          type="text"
-                          value={companyDomain}
-                          onChange={(e) => handleDomainChange(e.target.value)}
-                          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); } }}
-                          placeholder="example.org or brand.co.uk"
-                          className={`w-full px-4 py-3 text-base font-light rounded-2xl border ${
-                            domainError ? "border-red-300" : "border-gray-200"
-                          } bg-gray-50 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all`}
-                          required
-                          disabled={isSubmitting}
-                        />
-                      </div>
-                      {domainError && (
-                        <p className="text-red-500 text-sm font-light mt-2">
-                          {domainError}
-                        </p>
-                      )}
-                    </div>
-
-                    {/* Submit Button */}
-                    <div className="pt-3 sm:pt-4">
-                      <button
-                        type="submit"
-                        disabled={
-                          !companyDomain || !!domainError || isSubmitting
-                        }
-                        className={`w-full py-3 px-5 bg-black text-white text-base font-medium rounded-full hover:bg-black/90 focus:outline-none focus:ring-4 focus:ring-black/10 transition-all shadow ${
-                          !companyDomain || domainError || isSubmitting
-                            ? "opacity-60 cursor-not-allowed hover:-translate-y-0"
-                            : ""
-                        }`}
-                      >
-                        {isSubmitting && (
-                          <span className="inline-flex items-center">
-                            <svg
-                              className="animate-spin h-5 w-5 mr-2 text-white"
-                              xmlns="http://www.w3.org/2000/svg"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                            >
-                              <circle
-                                className="opacity-25"
-                                cx="12"
-                                cy="12"
-                                r="10"
-                                stroke="currentColor"
-                                strokeWidth="4"
-                              ></circle>
-                              <path
-                                className="opacity-75"
-                                fill="currentColor"
-                                d="M4 12a8 8 0 018-8v8z"
-                              ></path>
-                            </svg>
-                            Starting...
-                          </span>
-                        )}
-                        {!isSubmitting && "Start Analysis"}
-                      </button>
-                    </div>
-                  </form>
-                </div>
-              </div>
-            
-              )}
+              loadingContent={null}
+              setupContent={<DomainInfoEmpty onGoToAudit={onGoToAudit} />}
             />
   );
 }

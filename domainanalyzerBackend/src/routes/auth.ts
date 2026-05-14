@@ -1,8 +1,48 @@
 import { Router, Request, Response } from 'express';
+import { PrismaClient } from '../../generated/prisma';
 import { authService } from '../services/authService';
 import { authenticateToken } from '../middleware/auth';
+import {
+  WIZARD_COOKIE_NAME,
+  buildClearCookieHeader,
+  linkSessionToUser,
+  lookupSession,
+  parseCookieHeader,
+} from '../services/wizardSessionService';
 
 const router = Router();
+const prisma = new PrismaClient();
+
+/**
+ * Inspect the request for an anonymous wizard cookie. When present and
+ * valid, link the cookie's WizardSession to the newly-registered user and
+ * clear the cookie on the response. Wrapped in a top-level try/catch so a
+ * linkage failure never fails the signup itself — the user gets their
+ * account either way; the wizard work just isn't auto-attached.
+ *
+ * Returns the link result (or null when nothing was linked) so the route
+ * can include it in the API response — the frontend uses primaryDomainId
+ * to redirect into the just-bound report.
+ */
+async function maybeLinkWizardSession(
+  req: Request,
+  res: Response,
+  userId: number
+) {
+  try {
+    const cookies = parseCookieHeader(req.headers.cookie);
+    const token = cookies[WIZARD_COOKIE_NAME];
+    if (!token) return null;
+    const session = await lookupSession(prisma, token);
+    if (!session) return null;
+    const result = await linkSessionToUser(prisma, session.id, userId);
+    res.setHeader('Set-Cookie', buildClearCookieHeader());
+    return result;
+  } catch (err) {
+    console.warn('[auth/register] wizard session link failed', err);
+    return null;
+  }
+}
 
 // Utility function to wrap async route handlers
 function asyncHandler(fn: (req: Request, res: Response, next: any) => Promise<void>) {
@@ -33,7 +73,13 @@ router.post('/register', asyncHandler(async (req: Request, res: Response) => {
 
   try {
     const result = await authService.register({ email, password, name });
-    res.status(201).json(result);
+    // Link any in-flight anonymous wizard session to the new user.
+    // Failures here don't bubble — the account is created either way.
+    let wizardLink = null;
+    if (result.user?.id) {
+      wizardLink = await maybeLinkWizardSession(req, res, result.user.id);
+    }
+    res.status(201).json({ ...result, wizardLink });
   } catch (error) {
     if (error instanceof Error) {
       if (error.message.includes('already exists')) {
