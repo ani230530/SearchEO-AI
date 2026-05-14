@@ -28,6 +28,7 @@ import {
   LineChart,
   Languages,
   LayoutGrid,
+  Loader2,
   Plus,
   RefreshCw,
   Search,
@@ -74,6 +75,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { useToast } from '@/components/ui/use-toast';
 import { AIResultsLayout } from '@/features/ai-results/components/AIResultsLayout';
 import { maskDomainId, unmaskDomainId } from '../lib/domainUtils';
 
@@ -994,6 +996,10 @@ type PromptTableProps = {
   onToggleRow: (id: string) => void;
   onOpenWorksheetModal: (singleRowId?: string) => void;
   title?: string;
+  /** Real Domain.id. Required for the Add & Analyze button to call
+   *  POST /api/wizard/domain/:id/prompts/analyze. Null when the report
+   *  hasn't loaded yet — in that case the button stays disabled. */
+  domainId?: number | null;
 };
 
 export const PromptTable = ({
@@ -1002,15 +1008,84 @@ export const PromptTable = ({
   onToggleRow,
   onOpenWorksheetModal,
   title = 'Top searched Prompts',
+  domainId,
 }: PromptTableProps) => {
+  const { toast } = useToast();
   const selectedCount = selectedRowIds.size;
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [tableFilter, setTableFilter] = useState<'all' | 'prompt' | 'keyword'>('all');
   const [tableMetric, setTableMetric] = useState<string | null>(null);
   const [showAllQueries, setShowAllQueries] = useState(false);
 
+  // Add & Analyze state.
+  //   - `analyzeText`     the input value
+  //   - `analyzing`       button → spinner + disabled while in flight
+  //   - `pendingRows`     optimistic skeleton rows at the top of the
+  //                       table during the request
+  //   - `newlyAnalyzedRows` permanent newest-on-top list, dedupe'd
+  //                         against parent /report data by rawId
+  const [analyzeText, setAnalyzeText] = useState('');
+  const [analyzing, setAnalyzing] = useState(false);
+  const [newlyAnalyzedRows, setNewlyAnalyzedRows] = useState<any[]>([]);
+  const [pendingRows, setPendingRows] = useState<
+    Array<{ id: string; phrase: string }>
+  >([]);
+
+  const handleAnalyzePrompt = async () => {
+    const text = analyzeText.trim();
+    if (!text || analyzing) return;
+    if (!domainId) {
+      toast({
+        title: 'No domain loaded',
+        description: 'Wait for the report to finish loading before analyzing a prompt.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    const optimisticId = `pending-${Date.now()}`;
+    setAnalyzing(true);
+    setPendingRows((prev) => [{ id: optimisticId, phrase: text }, ...prev]);
+    try {
+      const res = await apiPost<{
+        runId: number;
+        prompt: { id: number; keywordId: number | null; text: string };
+        row: any;
+      }>(`/wizard/domain/${domainId}/prompts/analyze`, { text });
+      setNewlyAnalyzedRows((prev) => [res.row, ...prev]);
+      setAnalyzeText('');
+      toast({
+        title: 'Prompt analyzed',
+        description: `Tracked across ${res.row?.results?.length ?? 3} model${(res.row?.results?.length ?? 3) === 1 ? '' : 's'}.`,
+      });
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : 'Could not analyze prompt. Try again.';
+      toast({
+        title: 'Analyze failed',
+        description: message,
+        variant: 'destructive',
+      });
+    } finally {
+      setPendingRows((prev) => prev.filter((p) => p.id !== optimisticId));
+      setAnalyzing(false);
+    }
+  };
+
   const displayData = useMemo(() => {
     let items = [...data];
+
+    // Dedupe parent rows that match a row we just analyzed — the
+    // newly-analyzed copy has the fresher result data and wins.
+    const newRawIds = new Set(
+      newlyAnalyzedRows
+        .map((r) => r?.rawId)
+        .filter((id): id is number => typeof id === 'number'),
+    );
+    if (newRawIds.size > 0) {
+      items = items.filter(
+        (item) => !(typeof item?.rawId === 'number' && newRawIds.has(item.rawId)),
+      );
+    }
 
     // First apply type filter
     if (tableFilter === 'prompt') {
@@ -1038,11 +1113,20 @@ export const PromptTable = ({
     if (!showAllQueries && !tableMetric && tableFilter === 'all') {
       const prompts = items.filter(item => item.type?.toLowerCase() === 'prompt').slice(0, 3);
       const keywords = items.filter(item => item.type?.toLowerCase() === 'keyword').slice(0, 2);
-      return [...prompts, ...keywords];
+      // newlyAnalyzedRows pin to the very top of the table when no
+      // filter / metric is active — newest analyses are most relevant.
+      return [...newlyAnalyzedRows, ...prompts, ...keywords];
+    }
+
+    // For type-filter-only views (no metric sort), still pin newly
+    // analyzed prompts to the top.
+    if (!tableMetric && tableFilter === 'prompt') {
+      const promptItems = items.filter(item => item.type?.toLowerCase() === 'prompt');
+      return [...newlyAnalyzedRows, ...promptItems].slice(0, showAllQueries ? Infinity : 5);
     }
 
     return showAllQueries ? items : items.slice(0, 5);
-  }, [data, showAllQueries, tableFilter, tableMetric]);
+  }, [data, showAllQueries, tableFilter, tableMetric, newlyAnalyzedRows]);
 
   return (
     <Card className="rounded-xl border-slate-300 shadow-sm overflow-hidden">
@@ -1062,12 +1146,35 @@ export const PromptTable = ({
               <input
                 type="text"
                 placeholder="Enter your custom phrase/Keyword to analyze"
-                className="h-10 w-full rounded-lg border border-slate-300 pl-10 pr-4 text-sm outline-none focus:ring-1 focus:ring-slate-300 transition-all placeholder:text-gray-300"
+                value={analyzeText}
+                onChange={(e) => setAnalyzeText(e.target.value)}
+                disabled={analyzing}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    void handleAnalyzePrompt();
+                  }
+                }}
+                className="h-10 w-full rounded-lg border border-slate-300 pl-10 pr-4 text-sm outline-none focus:ring-1 focus:ring-slate-300 transition-all placeholder:text-gray-300 disabled:bg-slate-50 disabled:cursor-not-allowed"
               />
             </div>
-            <Button className="h-10 bg-[#2d3748] text-white hover:bg-[#1a202c] gap-2 rounded-lg px-4 shrink-0 transition-all">
-              <Plus className="h-4 w-4" />
-              <span className="text-sm font-medium">Add & Analyze</span>
+            <Button
+              type="button"
+              onClick={() => void handleAnalyzePrompt()}
+              disabled={analyzing || !analyzeText.trim() || !domainId}
+              className="h-10 bg-[#2d3748] text-white hover:bg-[#1a202c] gap-2 rounded-lg px-4 shrink-0 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {analyzing ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span className="text-sm font-medium">Analyzing…</span>
+                </>
+              ) : (
+                <>
+                  <Plus className="h-4 w-4" />
+                  <span className="text-sm font-medium">Add &amp; Analyze</span>
+                </>
+              )}
             </Button>
           </div>
 
@@ -1157,6 +1264,39 @@ export const PromptTable = ({
               </TableRow>
             </TableHeader>
             <TableBody>
+              {/*
+                Optimistic skeleton rows for prompts currently being
+                analyzed via the Add & Analyze button. Sits above the
+                real rows so the user sees immediate feedback. Replaced
+                by a real row once the backend returns (the real row is
+                prepended via `newlyAnalyzedRows`).
+              */}
+              {pendingRows.map((p) => (
+                <TableRow
+                  key={p.id}
+                  className="border-b border-slate-200 bg-slate-50/60"
+                >
+                  <TableCell className="w-8 px-4 py-3">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin text-slate-400" />
+                  </TableCell>
+                  <TableCell className="max-w-[340px] px-2 py-3">
+                    <div className="flex flex-col gap-1">
+                      <span className="truncate text-[12px] italic text-slate-500">
+                        {p.phrase}
+                      </span>
+                      <span className="text-[11px] text-slate-400">
+                        Asking ChatGPT, Claude, and Gemini…
+                      </span>
+                    </div>
+                  </TableCell>
+                  <TableCell colSpan={6} className="px-2 py-3">
+                    <div className="flex items-center gap-2 text-[12px] font-light text-slate-400">
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                      Running across models — typically 15–30s
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
               {displayData.map((row) => (
                 <Fragment key={row.id}>
                   <TableRow
@@ -3037,6 +3177,7 @@ const AIResultsReportPreview = () => {
                 selectedRowIds={selectedRowIds}
                 onToggleRow={handleToggleRow}
                 onOpenWorksheetModal={handleOpenWorksheetModal}
+                domainId={reportData?.domainInfo?.id ?? null}
               />
             )}
           </div>

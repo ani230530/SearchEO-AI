@@ -335,15 +335,46 @@ router.post(
       return res.status(400).json({ success: false, error: 'Title is required' });
     }
 
-    const companyDomain = await prisma.domain.findFirst({
+    // Resolve the company domain.
+    //
+    // First-time-creating-a-worksheet UX: users who come in via the
+    // anonymous AI Visibility audit funnel get a Domain materialized
+    // on signup with isCompanyDomain=false (the funnel intentionally
+    // doesn't presume the audit target is publishable). But the
+    // Campaign/Worksheet/Publish surface requires a company domain
+    // — so when a user clicks Add to Worksheet, they hit this 400.
+    //
+    // The pragmatic resolution: when the user has exactly ONE Domain
+    // and no company domain set, promote that Domain in-place and
+    // continue. The user's intent is unambiguous (they only have one
+    // option) and the alternative — bouncing them to Website Audit
+    // setup just to flip a boolean — is friction without value.
+    //
+    // When the user has multiple Domains and none is marked company,
+    // we don't pick for them — that's a meaningful product decision
+    // we won't make on their behalf. They get the original error
+    // pointing at the Website Audit setup.
+    let companyDomain = await prisma.domain.findFirst({
       where: { userId, isCompanyDomain: true },
     });
 
     if (!companyDomain) {
-      return res.status(400).json({
-        success: false,
-        error: 'Company domain not found. Please set up your company domain first.',
+      const userDomains = await prisma.domain.findMany({
+        where: { userId },
+        orderBy: { createdAt: 'asc' },
+        take: 2,
       });
+      if (userDomains.length === 1) {
+        companyDomain = await prisma.domain.update({
+          where: { id: userDomains[0].id },
+          data: { isCompanyDomain: true },
+        });
+      } else {
+        return res.status(400).json({
+          success: false,
+          error: 'Company domain not found. Please set up your company domain first.',
+        });
+      }
     }
 
     const campaign = await prisma.campaign.create({

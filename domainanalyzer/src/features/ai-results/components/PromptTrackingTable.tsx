@@ -690,6 +690,12 @@ export const PromptTable = ({
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [tableFilter, setTableFilter] = useState<"all" | "prompt" | "keyword">("all");
   const [tableMetric, setTableMetric] = useState<string | null>(null);
+  // showAll controls whether the table is truncated to the default
+  // view (4 prompts + 2 keywords for mixed, 6 for filtered) or expanded
+  // to show every row in `data`. Without this, any prompt past the
+  // truncation point is permanently invisible — the "rows can never be
+  // seen" bug. The toggle is rendered at the bottom of the card.
+  const [showAll, setShowAll] = useState(false);
 
   // Analyze Prompt state.
   // - `analyzeText` is the input.
@@ -779,6 +785,9 @@ export const PromptTable = ({
         (item) =>
           !(typeof item.rawId === "number" && mergedNewIds.has(item.rawId)),
       );
+      if (showAll) {
+        return [...newlyAnalyzedRows, ...baseItems];
+      }
       const prompts = baseItems.filter((item) => item.type === "prompt").slice(0, 4);
       const keywords = baseItems.filter((item) => item.type === "keyword").slice(0, 2);
       return [...newlyAnalyzedRows, ...prompts, ...keywords];
@@ -788,11 +797,12 @@ export const PromptTable = ({
         (item) =>
           !(typeof item.rawId === "number" && mergedNewIds.has(item.rawId)),
       );
-      return [...newlyAnalyzedRows, ...baseItems].slice(0, 6);
+      const merged = [...newlyAnalyzedRows, ...baseItems];
+      return showAll ? merged : merged.slice(0, 6);
     }
 
-    return items.slice(0, 6);
-  }, [data, tableFilter, tableMetric, newlyAnalyzedRows]);
+    return showAll ? items : items.slice(0, 6);
+  }, [data, tableFilter, tableMetric, newlyAnalyzedRows, showAll]);
 
   return (
     <Card className="border-none bg-transparent shadow-none">
@@ -1114,14 +1124,23 @@ export const PromptTable = ({
         </div>
         <div className="mt-2 flex items-center gap-3 border-t border-slate-200 px-6 py-3">
           <span className="text-[11px] font-medium tracking-tight text-gray-500">
-            Showing {displayData.length} of {data.length} queries
+            Showing {displayData.length} of {data.length + newlyAnalyzedRows.length} queries
           </span>
           <div className="h-3 w-[1px] bg-gray-300" />
           <button
             type="button"
-            className="rounded-lg bg-gray-50/80 px-2.5 py-1 text-[11px] font-bold text-[#3B82F6] transition-all hover:bg-gray-100"
+            onClick={() => setShowAll((v) => !v)}
+            disabled={
+              // Disabled only when we already show every available row
+              // AND we're in "expanded" mode — otherwise the user always
+              // has a way back to the full view.
+              showAll
+                ? false
+                : displayData.length >= data.length + newlyAnalyzedRows.length
+            }
+            className="rounded-lg bg-gray-50/80 px-2.5 py-1 text-[11px] font-bold text-[#3B82F6] transition-all hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            View all
+            {showAll ? "Show less" : "View all"}
           </button>
         </div>
       </CardContent>
