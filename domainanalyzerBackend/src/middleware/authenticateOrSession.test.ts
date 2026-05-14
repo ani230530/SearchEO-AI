@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   authenticateOrSession,
   canRunPaidStep,
+  getOwnerUserId,
   isUserIdentity,
 } from './authenticateOrSession';
 import {
@@ -266,6 +267,44 @@ describe('canRunPaidStep / isUserIdentity', () => {
     expect(isUserIdentity(undefined)).toBe(false);
     expect(isUserIdentity({ kind: 'anon', session: { id: 1 } as any })).toBe(false);
     expect(isUserIdentity({ kind: 'user', userId: 1, email: 'a' })).toBe(true);
+  });
+});
+
+describe('getOwnerUserId — identity resolution', () => {
+  it('returns userId from req.identity (kind="user")', () => {
+    const req: any = { identity: { kind: 'user', userId: 42, email: 'a@b.com' } };
+    expect(getOwnerUserId(req)).toBe(42);
+  });
+
+  it('returns shadow user id from req.identity (kind="anon")', () => {
+    const req: any = {
+      identity: { kind: 'anon', session: { id: 1, anonUserId: 7 } },
+    };
+    expect(getOwnerUserId(req)).toBe(7);
+  });
+
+  it('returns null when anon session has no anonUserId (legacy)', () => {
+    const req: any = {
+      identity: { kind: 'anon', session: { id: 1, anonUserId: null } },
+    };
+    expect(getOwnerUserId(req)).toBeNull();
+  });
+
+  /**
+   * Regression for the post-signup 404 on /runs / /trends / /report:
+   * those routes use the legacy authenticateToken middleware which sets
+   * req.user but not req.identity. Before this fallback, getOwnerUserId
+   * returned null and ensureDomain treated every request as
+   * unauthorized — even when the JWT had successfully authenticated.
+   */
+  it('falls back to req.user.userId when req.identity is not set', () => {
+    const req: any = { user: { userId: 99, email: 'legacy@b.com' } };
+    expect(getOwnerUserId(req)).toBe(99);
+  });
+
+  it('returns null when neither identity nor user is set', () => {
+    const req: any = {};
+    expect(getOwnerUserId(req)).toBeNull();
   });
 });
 
