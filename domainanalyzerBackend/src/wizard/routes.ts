@@ -9,6 +9,7 @@
  *   POST   /domain/:id/competitors                run discovery pipeline
  *   POST   /domain/:id/competitors/select         persist user's competitor picks
  *   POST   /domain/:id/topics                     generate keywords + prompts
+ *   POST   /domain/:id/keywords                    keyword-only (audit setup)
  *   PATCH  /domain/:id/draft                      auto-save selection draft
  *   POST   /domain/:id/select                     mark final selections (Generate Report)
  *   POST   /domain/:id/run                        run AI queries (SSE) — wired in slice 2
@@ -19,11 +20,13 @@
 import { Router, Request, Response } from 'express';
 import { Prisma, PrismaClient } from '../../generated/prisma';
 import { authenticateToken, AuthenticatedRequest } from '../middleware/auth';
+import { authenticateOrSession } from '../middleware/authenticateOrSession';
 import { extractHost, normalizeUrl } from './urlNormalize';
 import { crawlDomain, inferCompanySize, synthesizeContext } from './crawlService';
 import { embedText } from './llmClient';
 import { runCompetitorPipeline, persistCompetitors } from './competitorService';
 import { generateAuditPrompts, persistAuditPrompts, type PromptCategory } from './topicsService';
+import { generateKeywordsForDomain, persistKeywords } from './keywordsService';
 import { enrichDomainContext } from './enrichmentService';
 import { setPhase, readState } from './wizardState';
 import { runQueries } from './runService';
@@ -146,7 +149,11 @@ router.get('/domains', authenticateToken, async (req: Request, res: Response) =>
 
 // ── POST /validate ─────────────────────────────────────────────────────────
 
-router.post('/validate', authenticateToken, async (req: Request, res: Response) => {
+// POST /validate accepts EITHER a JWT (existing dashboard usage) OR an anon
+// wizard cookie (the new pre-signup funnel). Anon callers get back the same
+// canonical-url + reachability info but with no `dbExistsForUser` since
+// they don't own any rows yet — the WizardSession plays that role.
+router.post('/validate', authenticateOrSession(), async (req: Request, res: Response) => {
   const { url } = (req.body ?? {}) as { url?: string };
   const norm = normalizeUrl(url ?? '');
   if (!norm) {
@@ -197,11 +204,32 @@ router.post('/validate', authenticateToken, async (req: Request, res: Response) 
     }
   }
 
-  // Existing domain for this user (any case-folded variant).
-  const existing = await prisma.domain.findUnique({
-    where: { userId_host: { userId: authReq(req).user.userId, host: norm.host } },
-    select: { id: true, updatedAt: true },
-  });
+  // Look up an existing Domain only when the caller is an authenticated
+  // user. Anonymous callers get dbExistsForUser=false because they don't
+  // own anything yet — their WizardSession will hold the host until signup.
+  let existing: { id: number; updatedAt: Date } | null = null;
+  if (req.identity?.kind === 'user') {
+    existing = await prisma.domain.findUnique({
+      where: { userId_host: { userId: req.identity.userId, host: norm.host } },
+      select: { id: true, updatedAt: true },
+    });
+  } else if (req.identity?.kind === 'anon') {
+    // Best-effort: stash the entered host on the session so the signup
+    // linkage handler can materialize a Domain shell for the new user.
+    // Updates are fire-and-forget; a failure doesn't tear down validation.
+    void prisma.wizardSession
+      .update({
+        where: { id: req.identity.session.id },
+        data: {
+          domainUrl: norm.canonicalUrl,
+          domainHost: norm.host,
+          step: 'profile',
+        },
+      })
+      .catch((err: unknown) => {
+        console.warn('[wizard/validate] session snapshot failed', err);
+      });
+  }
 
   return res.json({
     ok: reachable,
@@ -216,6 +244,9 @@ router.post('/validate', authenticateToken, async (req: Request, res: Response) 
     existingDomainId: existing?.id ?? undefined,
     lastAnalyzedAt: existing?.updatedAt ?? undefined,
     reason: reachable ? undefined : 'Site is unreachable. Check the URL and try again.',
+    // Mode hint for the frontend — anonymous callers should hit the
+    // signup wall at Step 4-5; authenticated callers see full results.
+    mode: req.identity?.kind ?? 'anon',
   });
 });
 
@@ -1322,6 +1353,75 @@ router.post('/domain/:id/topics', authenticateToken, async (req: Request, res: R
   } catch (err) {
     await setPhase(prisma, domain.id, 'topics', 'failed');
     return res.status(500).json({ error: err instanceof Error ? err.message : 'Topics generation failed' });
+  }
+});
+
+/**
+ * POST /api/wizard/domain/:id/keywords
+ *
+ * Keyword-only generation for the Website Audit inline setup flow. Unlike
+ * /topics (which generates 24 prompts × 6 LLM calls), this hits the LLM
+ * once and persists first-class Keyword rows with `isSelected: true` so
+ * Domain Info can render them immediately.
+ *
+ * Phase ledger contract: writes `select: 'completed'` but leaves `topics`
+ * unset. A user who later opens the standalone wizard for this domain will
+ * therefore land on Step 4 (topics) — they can opt into prompt generation
+ * and AI runs at that point without us having to backfill anything here.
+ *
+ * Idempotent: upsert by (domainId, term) + `replaceAi: true` deletes any
+ * prior AI keywords first. Safe to retry from the frontend.
+ */
+router.post('/domain/:id/keywords', authenticateToken, async (req: Request, res: Response) => {
+  const got = await ensureDomain(req, req.params.id);
+  if (!got.ok) return res.status(got.status).json({ error: got.error });
+  const { domain } = got;
+  try {
+    const [latestCrawl, competitors] = await Promise.all([
+      prisma.crawlSnapshot.findFirst({
+        where: { domainId: domain.id },
+        orderBy: { createdAt: 'desc' },
+      }),
+      prisma.competitor.findMany({
+        where: { domainId: domain.id, isSelected: true },
+        select: { competitorHost: true },
+      }),
+    ]);
+
+    const enriched = await enrichDomainContext({
+      url: domain.url,
+      host: domain.host,
+      companyName: domain.inferred?.companyName ?? null,
+      rawText: latestCrawl?.rawText ?? '',
+      inferredSummary: domain.inferred?.summary ?? null,
+      inferredIndustry: domain.profile?.industry ?? null,
+      knownCompetitors: competitors.map((c) => c.competitorHost),
+      country: domain.profile?.country ?? null,
+      state: domain.profile?.state ?? null,
+    });
+
+    const keywords = await generateKeywordsForDomain({
+      brand: domain.inferred?.companyName ?? domain.host,
+      context: enriched,
+    });
+
+    if (keywords.length === 0) {
+      return res.status(500).json({ error: 'Generator returned no keywords' });
+    }
+
+    const persisted = await persistKeywords({
+      prisma,
+      domainId: domain.id,
+      keywords,
+      replaceAi: true,
+    });
+    await setPhase(prisma, domain.id, 'select', 'completed');
+
+    return res.json({ domainId: domain.id, keywords: persisted });
+  } catch (err) {
+    return res
+      .status(500)
+      .json({ error: err instanceof Error ? err.message : 'Keyword generation failed' });
   }
 });
 
