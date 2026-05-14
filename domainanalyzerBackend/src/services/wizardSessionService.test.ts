@@ -141,103 +141,169 @@ describe('issueSession + lookupSession', () => {
   });
 });
 
-describe('linkSessionToUser', () => {
-  it('creates a Domain shell from the session snapshot and marks linkedUserId', async () => {
+describe('issueSession — shadow user', () => {
+  it('creates a shadow User row and points anonUserId at it', async () => {
     const prisma = createPrismaMock();
-    const user = await prisma.user.create({ data: { email: 'u@x.com', password: 'hash' } });
-    const { sessionId } = await issueSession(prisma);
-    await prisma.wizardSession.update({
-      where: { id: sessionId },
-      data: {
-        domainUrl: 'https://example.com',
-        domainHost: 'example.com',
-      } as any,
-    });
-    const result = await linkSessionToUser(prisma, sessionId, user.id);
-    expect(result.linked).toBe(true);
-    expect(result.domainsCreated).toBe(1);
-    expect(result.primaryDomainId).toBeGreaterThan(0);
+    const { sessionId, anonUserId } = await issueSession(prisma);
+    expect(anonUserId).toBeGreaterThan(0);
 
     const session = await prisma.wizardSession.findUnique({ where: { id: sessionId } });
-    expect(session?.linkedUserId).toBe(user.id);
-    expect(session?.linkedDomainId).toBe(result.primaryDomainId);
+    expect(session?.anonUserId).toBe(anonUserId);
 
-    const domain = await prisma.domain.findUnique({
-      where: { userId_host: { userId: user.id, host: 'example.com' } },
+    const shadowUser = await prisma.user.findUnique({ where: { id: anonUserId } });
+    expect(shadowUser?.email).toMatch(/^anon-[a-f0-9]+@system\.local$/);
+  });
+});
+
+describe('linkSessionToUser — shadow-user transfer', () => {
+  /** Helper: shape an anon flow by creating a Domain owned by the shadow user. */
+  const seedAnonDomain = async (prisma: any, host: string) => {
+    const { sessionId, anonUserId } = await issueSession(prisma);
+    const domain = await prisma.domain.create({
+      data: {
+        userId: anonUserId,
+        host,
+        url: `https://${host}`,
+        isCompanyDomain: false,
+      },
     });
-    expect(domain).not.toBeNull();
-    expect(domain?.isCompanyDomain).toBe(false);
-    expect(domain?.url).toBe('https://example.com');
+    return { sessionId, anonUserId, domain };
+  };
+
+  it('transfers all shadow-owned Domain rows to the real user', async () => {
+    const prisma = createPrismaMock();
+    const realUser = await prisma.user.create({
+      data: { email: 'real@x.com', password: 'hash' },
+    });
+    const { sessionId, domain } = await seedAnonDomain(prisma, 'example.com');
+
+    const result = await linkSessionToUser(prisma, sessionId, realUser.id);
+    expect(result.linked).toBe(true);
+    expect(result.domainsTransferred).toBe(1);
+    expect(result.primaryDomainId).toBe(domain.id);
+
+    const after = await prisma.domain.findUnique({ where: { id: domain.id } });
+    expect(after?.userId).toBe(realUser.id);
   });
 
-  it('does not auto-promote to company domain (isCompanyDomain=false)', async () => {
+  it('marks the session linked and records linkedDomainId', async () => {
     const prisma = createPrismaMock();
-    const user = await prisma.user.create({ data: { email: 'u@x.com', password: 'hash' } });
-    const { sessionId } = await issueSession(prisma);
-    await prisma.wizardSession.update({
-      where: { id: sessionId },
-      data: { domainUrl: 'https://co.com', domainHost: 'co.com' } as any,
+    const realUser = await prisma.user.create({
+      data: { email: 'real@x.com', password: 'hash' },
     });
-    await linkSessionToUser(prisma, sessionId, user.id);
-    const domain = await prisma.domain.findUnique({
-      where: { userId_host: { userId: user.id, host: 'co.com' } },
+    const { sessionId, domain } = await seedAnonDomain(prisma, 'example.com');
+    await linkSessionToUser(prisma, sessionId, realUser.id);
+
+    const session = await prisma.wizardSession.findUnique({ where: { id: sessionId } });
+    expect(session?.linkedUserId).toBe(realUser.id);
+    expect(session?.linkedDomainId).toBe(domain.id);
+    expect(session?.linkedAt).toBeInstanceOf(Date);
+  });
+
+  it('deletes the shadow user after transfer', async () => {
+    const prisma = createPrismaMock();
+    const realUser = await prisma.user.create({
+      data: { email: 'real@x.com', password: 'hash' },
     });
-    expect(domain?.isCompanyDomain).toBe(false);
+    const { sessionId, anonUserId } = await seedAnonDomain(prisma, 'example.com');
+    await linkSessionToUser(prisma, sessionId, realUser.id);
+
+    const shadow = await prisma.user.findUnique({ where: { id: anonUserId } });
+    expect(shadow).toBeNull();
+  });
+
+  it('handles a collision: real user already owns Domain for the same host', async () => {
+    const prisma = createPrismaMock();
+    const realUser = await prisma.user.create({
+      data: { email: 'real@x.com', password: 'hash' },
+    });
+    const realDomain = await prisma.domain.create({
+      data: {
+        userId: realUser.id,
+        host: 'collide.com',
+        url: 'https://collide.com',
+        isCompanyDomain: true,
+      },
+    });
+    const { sessionId, domain: anonDomain } = await seedAnonDomain(prisma, 'collide.com');
+
+    const result = await linkSessionToUser(prisma, sessionId, realUser.id);
+    expect(result.linked).toBe(true);
+    expect(result.domainsTransferred).toBe(0);
+    expect(result.primaryDomainId).toBe(realDomain.id);
+
+    // Shadow's domain row should be gone (cleaned up to allow shadow-user delete).
+    const orphan = await prisma.domain.findUnique({ where: { id: anonDomain.id } });
+    expect(orphan).toBeNull();
+    // Real user's Domain still owned by them.
+    const real = await prisma.domain.findUnique({ where: { id: realDomain.id } });
+    expect(real?.userId).toBe(realUser.id);
   });
 
   it('is idempotent on second call', async () => {
     const prisma = createPrismaMock();
-    const user = await prisma.user.create({ data: { email: 'u@x.com', password: 'hash' } });
-    const { sessionId } = await issueSession(prisma);
-    await prisma.wizardSession.update({
-      where: { id: sessionId },
-      data: { domainUrl: 'https://a.com', domainHost: 'a.com' } as any,
+    const realUser = await prisma.user.create({
+      data: { email: 'real@x.com', password: 'hash' },
     });
-    const first = await linkSessionToUser(prisma, sessionId, user.id);
-    const second = await linkSessionToUser(prisma, sessionId, user.id);
+    const { sessionId } = await seedAnonDomain(prisma, 'example.com');
+
+    const first = await linkSessionToUser(prisma, sessionId, realUser.id);
+    const second = await linkSessionToUser(prisma, sessionId, realUser.id);
     expect(second.linked).toBe(true);
     expect(second.primaryDomainId).toBe(first.primaryDomainId);
-    expect(second.domainsCreated).toBe(0);
+    expect(second.domainsTransferred).toBe(0);
   });
 
   it('returns linked=false when the session does not exist', async () => {
     const prisma = createPrismaMock();
     const result = await linkSessionToUser(prisma, 9999, 1);
     expect(result.linked).toBe(false);
-    expect(result.domainsCreated).toBe(0);
+    expect(result.domainsTransferred).toBe(0);
     expect(result.primaryDomainId).toBeNull();
   });
 
-  it('skips domain materialization when the session never had a host', async () => {
+  it('handles a session with no domains (user signed up before Step 1)', async () => {
     const prisma = createPrismaMock();
-    const user = await prisma.user.create({ data: { email: 'u@x.com', password: 'hash' } });
+    const realUser = await prisma.user.create({
+      data: { email: 'real@x.com', password: 'hash' },
+    });
     const { sessionId } = await issueSession(prisma);
-    const result = await linkSessionToUser(prisma, sessionId, user.id);
+    const result = await linkSessionToUser(prisma, sessionId, realUser.id);
     expect(result.linked).toBe(true);
-    expect(result.domainsCreated).toBe(0);
+    expect(result.domainsTransferred).toBe(0);
     expect(result.primaryDomainId).toBeNull();
   });
+});
 
-  it('reuses an existing Domain row instead of creating a duplicate', async () => {
+describe('linkSessionToUser — legacy snapshot fallback', () => {
+  /**
+   * Sessions issued before the shadow-user migration have anonUserId=null
+   * but may have domainUrl/domainHost snapshots. The handler falls back
+   * to the old "materialize a Domain shell" behavior so in-flight sessions
+   * during deploy don't drop their wizard work.
+   */
+  it('materializes a Domain shell for a legacy session', async () => {
     const prisma = createPrismaMock();
-    const user = await prisma.user.create({ data: { email: 'u@x.com', password: 'hash' } });
-    // Pre-existing domain for the user.
-    const preexisting = await prisma.domain.create({
+    const realUser = await prisma.user.create({
+      data: { email: 'real@x.com', password: 'hash' },
+    });
+    // Simulate a pre-migration session: create directly, override anonUserId=null.
+    const legacy = await prisma.wizardSession.create({
       data: {
-        userId: user.id,
-        host: 'dup.com',
-        url: 'https://dup.com',
-        isCompanyDomain: true,
+        cookieTokenHash: 'legacy-hash',
+        anonUserId: null,
+        domainUrl: 'https://legacy.example',
+        domainHost: 'legacy.example',
+        expiresAt: new Date(Date.now() + 60_000),
       } as any,
     });
-    const { sessionId } = await issueSession(prisma);
-    await prisma.wizardSession.update({
-      where: { id: sessionId },
-      data: { domainUrl: 'https://dup.com', domainHost: 'dup.com' } as any,
-    });
-    const result = await linkSessionToUser(prisma, sessionId, user.id);
+    const result = await linkSessionToUser(prisma, legacy.id, realUser.id);
     expect(result.linked).toBe(true);
-    expect(result.domainsCreated).toBe(0);
-    expect(result.primaryDomainId).toBe(preexisting.id);
+    expect(result.domainsTransferred).toBe(1);
+    const dom = await prisma.domain.findUnique({
+      where: { userId_host: { userId: realUser.id, host: 'legacy.example' } },
+    });
+    expect(dom).not.toBeNull();
+    expect(dom?.isCompanyDomain).toBe(false);
   });
 });

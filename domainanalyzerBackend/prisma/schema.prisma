@@ -53,7 +53,12 @@ model User {
   wordpressIntegration WordpressIntegration?
   publishLogs          WordpressPublishLog[]
   generationJobs       GenerationJob[]
-  wizardSessions       WizardSession[]
+  // Wizard sessions where this user signed up from an anonymous funnel.
+  wizardSessionsLinked WizardSession[] @relation("WizardSessionLinkedUser")
+  // Wizard sessions where this user IS the anonymous shadow identity.
+  // Shadow users have email = anon-{sessionId}@system.local and an
+  // unusable password hash. They never log in via the normal auth path.
+  wizardSessionsAnon   WizardSession[] @relation("WizardSessionAnonUser")
 }
 
 // -----------------------------------------------------------------------------
@@ -477,17 +482,29 @@ model WizardSession {
   ip              String?
   fingerprintHash String?
   userAgent       String?
-  // Domain identity entered at Step 1.
+  // Domain identity entered at Step 1. Optional snapshot — useful for
+  // diagnostics and for the orphan-cleanup sweeper even when a Domain
+  // row hasn't been created yet.
   domainUrl       String?
   domainHost      String?
   // Step snapshots. Each holds the public-facing payload for that step.
+  // Now mostly redundant with the real Domain rows that get created for
+  // anon sessions, but kept for backward compatibility and diagnostics.
   profileData     Json?
   crawlData       Json?
   competitorsData Json?
   topicsData      Json?
   // Step pointer used by resume + signup-wall logic.
   step            String    @default("idle") // idle | profile | crawl | competitors | topics | walled | complete
-  // Set once the user signs up and the snapshot is materialized.
+  // Shadow User row created at session-issue time. The anon wizard runs
+  // creates Domain / CrawlSnapshot / Competitor / Prompt rows owned by
+  // this user. On signup the linkage handler reassigns Domain.userId
+  // from anonUserId → linkedUserId, then optionally deletes the shadow
+  // user. Nullable for backward compatibility with sessions issued
+  // before this migration.
+  anonUserId      Int?
+  // Set once the user signs up. linkedDomainId points at the (just-
+  // transferred) Domain so the post-signup redirect knows where to go.
   linkedUserId    Int?
   linkedDomainId  Int?
   linkedAt        DateTime?
@@ -495,9 +512,11 @@ model WizardSession {
   updatedAt       DateTime  @updatedAt
   expiresAt       DateTime
 
-  linkedUser User? @relation(fields: [linkedUserId], references: [id], onDelete: SetNull)
+  linkedUser User? @relation("WizardSessionLinkedUser", fields: [linkedUserId], references: [id], onDelete: SetNull)
+  anonUser   User? @relation("WizardSessionAnonUser", fields: [anonUserId], references: [id], onDelete: SetNull)
 
   @@index([linkedUserId])
+  @@index([anonUserId])
   @@index([fingerprintHash])
   @@index([ip])
   @@index([expiresAt])

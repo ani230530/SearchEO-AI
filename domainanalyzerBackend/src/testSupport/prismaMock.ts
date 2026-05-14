@@ -71,6 +71,19 @@ export const createPrismaMock = (): PrismaMock => {
     __stores: stores,
 
     // -------------------------------------------------------------------------
+    // $transaction — runs the callback with the same mock instance. No
+    // real rollback; the callback either completes or throws. Good enough
+    // for unit tests that exercise transaction-shaped code.
+    // -------------------------------------------------------------------------
+    $transaction: async (fn: any) => {
+      if (typeof fn === 'function') return fn(mock);
+      // Array form: run each in sequence, no rollback.
+      const results = [];
+      for (const op of fn) results.push(await op);
+      return results;
+    },
+
+    // -------------------------------------------------------------------------
     // wizardSession
     // -------------------------------------------------------------------------
     wizardSession: {
@@ -88,6 +101,7 @@ export const createPrismaMock = (): PrismaMock => {
           competitorsData: null,
           topicsData: null,
           step: 'idle',
+          anonUserId: null,
           linkedUserId: null,
           linkedDomainId: null,
           linkedAt: null,
@@ -138,12 +152,37 @@ export const createPrismaMock = (): PrismaMock => {
         if (where.id !== undefined) return rows.find((r) => r.id === where.id) ?? null;
         return null;
       },
+      findMany: async ({ where, select }: any = {}) => {
+        const rows = stores.domain.all().filter((r) => matchWhere(r, where ?? {}));
+        if (!select) return rows;
+        return rows.map((r) => {
+          const out: any = {};
+          for (const key of Object.keys(select)) if (select[key]) out[key] = r[key];
+          return out;
+        });
+      },
       create: async ({ data }: any) =>
         stores.domain.insert({
           isCompanyDomain: false,
           googleAnalyticsId: null,
           ...data,
         }),
+      update: async ({ where, data }: any) => stores.domain.update(where.id, data),
+      delete: async ({ where }: any) => {
+        const row = stores.domain.rows.get(where.id);
+        stores.domain.rows.delete(where.id);
+        return row;
+      },
+      deleteMany: async ({ where }: any = {}) => {
+        let n = 0;
+        for (const [id, r] of stores.domain.rows) {
+          if (matchWhere(r, where ?? {})) {
+            stores.domain.rows.delete(id);
+            n++;
+          }
+        }
+        return { count: n };
+      },
     },
 
     // -------------------------------------------------------------------------
@@ -164,6 +203,11 @@ export const createPrismaMock = (): PrismaMock => {
           ...data,
         }),
       update: async ({ where, data }: any) => stores.user.update(where.id, data),
+      delete: async ({ where }: any) => {
+        const row = stores.user.rows.get(where.id);
+        stores.user.rows.delete(where.id);
+        return row;
+      },
     },
 
     // -------------------------------------------------------------------------

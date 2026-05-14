@@ -137,52 +137,66 @@ async function ensureValidToken(): Promise<string | null> {
 }
 
 /**
- * Make authenticated API request with automatic token refresh
+ * Make an API request, with automatic token refresh when a token IS
+ * present. When no token is present (anonymous flow) the call still goes
+ * through — the backend's authenticateOrSession middleware handles the
+ * identity via the wizard cookie, which we round-trip with
+ * `credentials: 'include'` so HttpOnly cookies are sent.
+ *
+ * Anonymous mode contract:
+ *   - No Authorization header
+ *   - 401/403 from the server is NOT auto-redirected to /auth (anonymous
+ *     callers don't have a JWT to invalidate)
+ *   - 402 with code SIGNUP_REQUIRED is surfaced verbatim so callers can
+ *     pop the signup wall modal
+ *
+ * Authenticated mode contract (unchanged):
+ *   - Authorization: Bearer <token>
+ *   - 401 → try refresh once → retry
+ *   - 401/403 after retry → clear tokens, redirect to /auth
  */
 export async function apiRequest<T>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<T> {
-  // Ensure we have a valid token
-  let token = await ensureValidToken();
-  
-  if (!token) {
-    throw new Error('No valid authentication token');
-  }
+  // Try to get a valid token; absent token means anonymous mode.
+  const token = await ensureValidToken();
+  const isAuthenticated = Boolean(token);
 
-  // Build request with auth header
-  const headers = {
+  const baseHeaders: Record<string, string> = {
     'Content-Type': 'application/json',
-    ...options.headers,
-    'Authorization': `Bearer ${token}`,
+    ...(options.headers as Record<string, string> | undefined),
   };
+  if (token) baseHeaders['Authorization'] = `Bearer ${token}`;
 
   let response = await fetch(`${API_BASE_URL}${endpoint}`, {
     ...options,
-    headers,
+    headers: baseHeaders,
+    // Cookies (the anon wizard cookie in particular) MUST round-trip for
+    // the cookie-based identity path to work. Safe for the authenticated
+    // path too — sending cookies alongside a Bearer is harmless.
+    credentials: 'include',
   });
 
-  // If 401, try refreshing token once
-  if (response.status === 401) {
+  // 401 with a refreshable token — try once.
+  if (response.status === 401 && isAuthenticated) {
     const refreshToken = getRefreshToken();
     if (refreshToken && !isRefreshing) {
-      // Try to refresh
       const newToken = await refreshAccessToken();
       if (newToken) {
-        // Retry request with new token
         response = await fetch(`${API_BASE_URL}${endpoint}`, {
           ...options,
-          headers: {
-            ...headers,
-            'Authorization': `Bearer ${newToken}`,
-          },
+          headers: { ...baseHeaders, Authorization: `Bearer ${newToken}` },
+          credentials: 'include',
         });
       }
     }
   }
 
-  // Handle response
-  if (response.status === 401 || response.status === 403) {
+  // Auth failure handling: only redirect-to-/auth when we WERE
+  // authenticated. Anonymous callers seeing a 401/403 just get the error
+  // bubbled — they're expected to handle it (or it's the signup wall).
+  if ((response.status === 401 || response.status === 403) && isAuthenticated) {
     clearTokens();
     if (window.location.pathname !== '/auth' && window.location.pathname !== '/') {
       window.location.href = '/auth';
@@ -193,7 +207,15 @@ export async function apiRequest<T>(
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
-    throw new Error(error.details || error.error || `HTTP ${response.status}: ${response.statusText}`);
+    // Preserve the server's code in the thrown Error so callers can
+    // discriminate (e.g. SIGNUP_REQUIRED → open the wall instead of
+    // surfacing a generic toast).
+    const err: Error & { status?: number; code?: string } = new Error(
+      error.details || error.error || `HTTP ${response.status}: ${response.statusText}`
+    );
+    err.status = response.status;
+    err.code = error.code;
+    throw err;
   }
 
   return response.json();

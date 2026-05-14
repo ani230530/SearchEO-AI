@@ -20,12 +20,14 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { apiGet, apiPost } from "@/services/apiClient";
+import { useAuth } from "@/contexts/AuthContext";
 import { WizardShell } from "@/features/wizard-v2/WizardShell";
 import { Step1AddDomain } from "@/features/wizard-v2/Step1AddDomain";
 import { Step2Crawling } from "@/features/wizard-v2/Step2Crawling";
 import { Step3Competitors } from "@/features/wizard-v2/Step3Competitors";
 import { Step4SelectTopics } from "@/features/wizard-v2/Step4SelectTopics";
 import { Step5RunQueries } from "@/features/wizard-v2/Step5RunQueries";
+import { SignupWallModal } from "@/features/wizard-v2/SignupWallModal";
 import { PHASE_TO_STEP, type WizardProfile, type WizardStateResponse, type WizardStep } from "@/features/wizard-v2/types";
 import { classifyError, isSilentError } from "@/features/wizard-v2/wizardErrors";
 
@@ -81,8 +83,13 @@ function loadPersistedForm(): PersistedStep1 | null {
 export default function AICheckerV2() {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [step, setStep] = useState<WizardStep>(1);
   const [domainId, setDomainId] = useState<number | null>(null);
+  // Anonymous callers hit a signup wall when they try to start Step 5.
+  // The wall is opened by intercepting the Step 4 onContinue callback;
+  // dismissing it keeps the user on Step 4 with their selections intact.
+  const [signupWallOpen, setSignupWallOpen] = useState(false);
   const [normalizedUrl, setNormalizedUrl] = useState<string>("");
   const [profile, setProfile] = useState<WizardProfile>({
     country: "",
@@ -382,7 +389,17 @@ export default function AICheckerV2() {
           // Cached read on first mount (instant resume), force a fresh
           // topics generation only when the user explicitly hit Retry.
           forceRefresh={retryNonce > 0}
-          onContinue={() => advanceTo(5)}
+          onContinue={() => {
+            // Anonymous callers can browse Steps 1-4 freely but Step 5
+            // (the paid AI run) requires signup. Pop the wall here so
+            // the user never sees the server-side 402 SIGNUP_REQUIRED
+            // — they hit a friendly modal instead.
+            if (!user) {
+              setSignupWallOpen(true);
+              return;
+            }
+            advanceTo(5);
+          }}
         />
       ) : step === 5 && domainId ? (
         <Step5RunQueries
@@ -391,6 +408,20 @@ export default function AICheckerV2() {
           onError={(err) => handleStepError(err, 4)}
         />
       ) : null}
+      {signupWallOpen && (
+        <SignupWallModal
+          host={normalizedUrl.replace(/^https?:\/\//, '') || undefined}
+          onClose={() => setSignupWallOpen(false)}
+          onRegistered={() => {
+            // Backend's maybeLinkWizardSession has already transferred
+            // Domain ownership from shadow user → real user. The Bearer
+            // token is now in AuthContext / tokenManager, so the next
+            // Step 5 request will carry it and the /run gate will pass.
+            setSignupWallOpen(false);
+            advanceTo(5);
+          }}
+        />
+      )}
     </WizardShell>
   );
 }
