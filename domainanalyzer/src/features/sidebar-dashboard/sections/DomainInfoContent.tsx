@@ -9,8 +9,16 @@
  * common after the foundational rewrite, since the legacy Keyword table
  * was dropped and the user has to re-run the wizard to repopulate).
  */
-import { ExternalLink, Globe, Loader2, RefreshCw, AlertCircle, KeyRound, ArrowRight, Sparkles } from 'lucide-react';
+import { ExternalLink, Globe, Loader2, RefreshCw, AlertCircle, KeyRound, ArrowRight, Sparkles, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog';
+import { AuditSetupFlow } from '@/features/sidebar-dashboard/sections/AuditSetupFlow';
 import { useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import { apiPost } from '@/services/apiClient';
@@ -44,6 +52,7 @@ export function DomainInfoContent({
   onRetry,
 }: DomainInfoContentProps) {
   const navigate = useNavigate();
+  const [updateOpen, setUpdateOpen] = useState(false);
 
   const host = companyDomain.replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/$/, '');
   const visitUrl = companyDomain.startsWith('http') ? companyDomain : `https://${companyDomain}`;
@@ -82,6 +91,15 @@ export function DomainInfoContent({
             <Button
               variant="outline"
               size="sm"
+              onClick={() => setUpdateOpen(true)}
+              className="gap-1.5"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+              Update Company Domain
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
               onClick={onRetry}
               disabled={loading}
               className="gap-1.5"
@@ -92,6 +110,30 @@ export function DomainInfoContent({
           </div>
         </div>
       </section>
+
+      {/* Reuses the exact setup flow shown on Website Audit when no company
+       *  domain is set. AuditSetupFlow.onComplete already POSTs the new URL
+       *  to /user/company-domain server-side, so we just close the dialog
+       *  and refetch on this side. */}
+      <Dialog open={updateOpen} onOpenChange={setUpdateOpen}>
+        <DialogContent className="max-h-[92vh] max-w-3xl overflow-y-auto p-0">
+          <DialogHeader className="border-b border-slate-200 px-6 py-4">
+            <DialogTitle>Update Company Domain</DialogTitle>
+            <DialogDescription>
+              Set a different domain as your company's primary site. We'll re-read
+              the new domain and rebuild its context.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="px-2 pb-2">
+            <AuditSetupFlow
+              onComplete={() => {
+                setUpdateOpen(false);
+                onRetry();
+              }}
+            />
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Keywords */}
       <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">

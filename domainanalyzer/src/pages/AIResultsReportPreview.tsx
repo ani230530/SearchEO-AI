@@ -3306,6 +3306,10 @@ const AIResultsReportPreview = () => {
                   <FilterPill label="Sort" icon="sort" />
                   <FilterPill label="Filters" icon="filter" />
                 </div>
+                {/* Inner scroll container — keeps the card height stable so the
+                 *  right-hand Visibility & Coverage column doesn't slide out of
+                 *  alignment when many phrase rows render. */}
+                <div className="max-h-[420px] space-y-2 overflow-y-auto pr-1">
                 {(reportData?.phraseVisibility ?? []).length === 0 ? (
                   <div className="flex flex-col items-start gap-2 rounded-md border border-dashed border-slate-200 bg-slate-50 px-3 py-3">
                     <p className="text-xs text-slate-600">
@@ -3360,6 +3364,7 @@ const AIResultsReportPreview = () => {
                     />
                   );
                 })}
+                </div>
               </CardContent>
             </Card>
 
@@ -3390,6 +3395,10 @@ const AIResultsReportPreview = () => {
                   <FilterPill label="Sort: By Models" icon="sort" />
                   <FilterPill label="Filters" icon="filter" />
                 </div>
+                {/* Inner scroll container — opportunity briefs can be long and
+                 *  numerous; cap the card height so the layout doesn't push the
+                 *  charts column off-screen. */}
+                <div className="max-h-[560px] space-y-2 overflow-y-auto pr-1">
                 {(reportData?.opportunities ?? []).length === 0 ? (
                   <div className="flex flex-col items-start gap-2 rounded-md border border-dashed border-slate-200 bg-slate-50 px-3 py-3">
                     <p className="text-xs text-slate-600">
@@ -3435,6 +3444,7 @@ const AIResultsReportPreview = () => {
                     generation={generationByKey[opp.key]}
                   />
                 ))}
+                </div>
               </CardContent>
             </Card>
           </div>

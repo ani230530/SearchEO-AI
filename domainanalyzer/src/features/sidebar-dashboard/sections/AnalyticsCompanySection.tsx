@@ -578,22 +578,6 @@ const allSections = [...leftSections, ...rightSections];
                                 </div>
 
                                 <select
-                                  value={filters.competition}
-                                  onChange={(e) =>
-                                    setFilters((prev) => ({
-                                      ...prev,
-                                      competition: e.target.value,
-                                    }))
-                                  }
-                                  className="w-full px-3 py-2.5 border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent text-sm bg-gray-50/50 transition-all duration-200 appearance-none cursor-pointer sm:w-auto"
-                                >
-                                  <option value="">All Competition</option>
-                                  <option value="Low">Low</option>
-                                  <option value="Medium">Medium</option>
-                                  <option value="High">High</option>
-                                </select>
-
-                                <select
                                   value={filters.intent}
                                   onChange={(e) =>
                                     setFilters((prev) => ({
@@ -710,8 +694,11 @@ const allSections = [...leftSections, ...rightSections];
                               <div className="bg-white rounded-3xl border border-gray-200 overflow-hidden shadow-sm">
                                 {/* Table Header */}
                                 <div className="overflow-x-auto">
-                                <div className="hidden md:block bg-gray-50/80 border-b border-gray-200 min-w-[920px]">
-                                  <div className="grid grid-cols-9 gap-4 px-6 py-4 text-sm font-semibold text-gray-700">
+                                {/* Only Keyword + Intent are actually generated and persisted
+                                 *  for a domain. Volume / Competition / Organic / Trend were
+                                 *  always 0 / "Medium" / 0 / "Stable" placeholders — removed. */}
+                                <div className="hidden md:block bg-gray-50/80 border-b border-gray-200">
+                                  <div className="grid grid-cols-4 gap-4 px-6 py-4 text-sm font-semibold text-gray-700">
                                     <div
                                       className="col-span-3 flex items-center space-x-2 cursor-pointer hover:text-gray-900 transition-colors"
                                       onClick={() => handleSort("keyword")}
@@ -722,54 +709,20 @@ const allSections = [...leftSections, ...rightSections];
 
                                     <div
                                       className="col-span-1 flex items-center space-x-2 cursor-pointer hover:text-gray-900 transition-colors justify-center"
-                                      onClick={() => handleSort("volume")}
-                                    >
-                                      <span>Volume</span>
-                                      <span className="text-[10px] text-gray-400 font-normal ml-1">(AI Est.)</span>
-                                      {getSortIcon("volume")}
-                                    </div>
-
-                                    <div
-                                      className="col-span-1 flex items-center space-x-2 cursor-pointer hover:text-gray-900 transition-colors justify-center"
-                                      onClick={() => handleSort("competition")}
-                                    >
-                                      <span>Competition</span>
-                                      {getSortIcon("competition")}
-                                    </div>
-
-                                    <div
-                                      className="col-span-1 flex items-center space-x-2 cursor-pointer hover:text-gray-900 transition-colors justify-center"
-                                      onClick={() => handleSort("organic")}
-                                    >
-                                      <span>Organic</span>
-                                      <span className="text-[10px] text-gray-400 font-normal ml-1">(AI Est.)</span>
-                                      {getSortIcon("organic")}
-                                    </div>
-
-                                    <div
-                                      className="col-span-1 flex items-center space-x-2 cursor-pointer hover:text-gray-900 transition-colors justify-center"
                                       onClick={() => handleSort("intent")}
                                     >
                                       <span>Intent</span>
                                       {getSortIcon("intent")}
                                     </div>
-
-                                    <div
-                                      className="col-span-2 flex items-center space-x-2 cursor-pointer hover:text-gray-900 transition-colors justify-center"
-                                      onClick={() => handleSort("trend")}
-                                    >
-                                      <span>Trend</span>
-                                      {getSortIcon("trend")}
-                                    </div>
                                   </div>
                                 </div>
 
                                 {/* Table Body */}
-                                <div className="hidden md:block divide-y divide-gray-100 min-w-[920px]">
+                                <div className="hidden md:block divide-y divide-gray-100">
                                   {currentKeywords.map((keyword) => (
                                     <div
                                       key={keyword.id}
-                                      className="grid grid-cols-9 gap-4 px-6 py-4 hover:bg-gray-50/80 transition-all duration-200"
+                                      className="grid grid-cols-4 gap-4 px-6 py-4 hover:bg-gray-50/80 transition-all duration-200"
                                     >
                                       {/* Keyword Column */}
                                       <div className="col-span-3 flex items-center space-x-3">
@@ -785,59 +738,11 @@ const allSections = [...leftSections, ...rightSections];
                                         </div>
                                       </div>
 
-                                      {/* Volume Column */}
-                                      <div className="col-span-1 flex items-center justify-center">
-                                        <span className="font-medium text-gray-900 text-sm">
-                                          {(() => {
-                                            const v = typeof keyword.volume === 'number' && Number.isFinite(keyword.volume) ? keyword.volume : 0;
-                                            return v >= 1000 ? `${(v / 1000).toFixed(1)}K` : v.toLocaleString();
-                                          })()}
-                                        </span>
-                                      </div>
-
-                                      {/* Competition Column */}
-                                      <div className="col-span-1 flex items-center justify-center">
-                                        <span
-                                          className={getCompetitionBadgeClassName(
-                                            keyword.competition
-                                          )}
-                                        >
-                                          {keyword.competition}
-                                        </span>
-                                      </div>
-
-                                      {/* Organic Column */}
-                                      <div className="col-span-1 flex items-center justify-center">
-                                        <span className="text-gray-700 text-sm">
-                                          {(typeof keyword.organic === 'number' && Number.isFinite(keyword.organic) ? keyword.organic : 0).toLocaleString()}
-                                        </span>
-                                      </div>
-
                                       {/* Intent Column */}
                                       <div className="col-span-1 flex items-center justify-center">
-                                        <span
-                                          className={`px-2 py-1 rounded-full text-sm font-medium `}
-                                        >
+                                        <span className="px-2 py-1 rounded-full text-sm font-medium">
                                           {keyword.intent}
                                         </span>
-                                      </div>
-
-                                      {/* Trend Column */}
-                                      <div className="col-span-2 flex items-center justify-center">
-                                        <div className="flex items-center space-x-1">
-                                          <TrendingUp
-                                            className={`w-4 h-4 ${
-                                              keyword.trend === "Rising"
-                                                ? "text-green-500"
-                                                : keyword.trend === "Falling"
-                                                ? "text-red-500"
-                                                : "text-gray-500"
-                                            }`}
-                                          />
-                                          <span className="text-sm text-gray-700">
-                                            {keyword.trend}
-                                          </span>
-                                        </div>
                                       </div>
                                     </div>
                                   ))}
@@ -860,49 +765,10 @@ const allSections = [...leftSections, ...rightSections];
                                         )}
                                       </div>
 
-                                      <div className="grid grid-cols-2 gap-2 text-sm">
-                                        <div className="rounded-xl border border-gray-100 bg-gray-50 px-3 py-2">
-                                          <p className="text-xs text-gray-500">Volume (AI Est.)</p>
-                                          <p className="font-medium text-gray-900">
-                                            {(() => {
-                                              const v = typeof keyword.volume === 'number' && Number.isFinite(keyword.volume) ? keyword.volume : 0;
-                                              return v >= 1000 ? `${(v / 1000).toFixed(1)}K` : v.toLocaleString();
-                                            })()}
-                                          </p>
-                                        </div>
-                                        <div className="rounded-xl border border-gray-100 bg-gray-50 px-3 py-2">
-                                          <p className="text-xs text-gray-500">Organic (AI Est.)</p>
-                                          <p className="font-medium text-gray-900">
-                                            {(typeof keyword.organic === 'number' && Number.isFinite(keyword.organic) ? keyword.organic : 0).toLocaleString()}
-                                          </p>
-                                        </div>
-                                        <div className="rounded-xl border border-gray-100 bg-gray-50 px-3 py-2">
-                                          <p className="text-xs text-gray-500">Competition</p>
-                                          <div className="pt-1">
-                                            <span className={getCompetitionBadgeClassName(keyword.competition)}>
-                                              {keyword.competition}
-                                            </span>
-                                          </div>
-                                        </div>
+                                      <div className="text-sm">
                                         <div className="rounded-xl border border-gray-100 bg-gray-50 px-3 py-2">
                                           <p className="text-xs text-gray-500">Intent</p>
                                           <p className="font-medium text-gray-900">{keyword.intent}</p>
-                                        </div>
-                                      </div>
-
-                                      <div className="mt-2 rounded-xl border border-gray-100 bg-gray-50 px-3 py-2">
-                                        <p className="text-xs text-gray-500 mb-1">Trend</p>
-                                        <div className="flex items-center gap-1">
-                                          <TrendingUp
-                                            className={`w-4 h-4 ${
-                                              keyword.trend === "Rising"
-                                                ? "text-green-500"
-                                                : keyword.trend === "Falling"
-                                                ? "text-red-500"
-                                                : "text-gray-500"
-                                            }`}
-                                          />
-                                          <span className="text-sm text-gray-700">{keyword.trend}</span>
                                         </div>
                                       </div>
                                     </div>
