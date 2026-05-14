@@ -97,21 +97,31 @@ export const canRunPaidStep = (
 /**
  * Resolve the "current user id" for wizard route handlers that own data.
  *
- * For an authenticated identity we return the JWT's userId. For an anon
- * identity we return the shadow User's id stashed on the session at
- * issue-time. Returns null when neither is set — a defensive failsafe
- * for the very narrow window between session create and shadow-user
- * row visibility (shouldn't happen in practice since both rows are
- * created in the same transaction).
+ * Three sources, in order:
+ *   1. `req.identity` set by `authenticateOrSession` (dual-identity routes)
+ *      - kind='user'  → JWT userId
+ *      - kind='anon'  → shadow User id stashed on the session at issue-time
+ *   2. `req.user` set by the legacy `authenticateToken` middleware
+ *      (auth-only routes that didn't migrate to authenticateOrSession but
+ *      still call into `ensureDomain` / other helpers that resolve owner
+ *      via this function — e.g. `/runs`, `/trends`, `/report`)
+ *
+ * Returns null when neither is set.
  *
  * This is the single piece of glue that lets the existing wizard schema
  * (every domain-scoped table has `userId` non-nullable) accept anonymous
  * callers without any per-route refactor: each route swaps
  * `req.user.userId` → `getOwnerUserId(req)` and everything else works.
+ * The legacy-`req.user` fallback is important — without it, routes that
+ * stayed on `authenticateToken` start returning 404s from ensureDomain
+ * because the JWT auth populated `req.user` but not `req.identity`.
  */
 export const getOwnerUserId = (req: Request): number | null => {
   const identity = req.identity;
-  if (!identity) return null;
+  if (!identity) {
+    // Legacy auth-only route: fall back to authenticateToken's req.user.
+    return req.user?.userId ?? null;
+  }
   if (identity.kind === 'user') return identity.userId;
   return identity.session.anonUserId ?? null;
 };
