@@ -365,33 +365,47 @@ export function parseCookieHeader(
 /**
  * Build a Set-Cookie header value for the wizard session.
  *
- * Production posture: HttpOnly + Secure + SameSite=Lax. In dev (NODE_ENV !=
- * 'production') Secure is dropped so localhost works without HTTPS.
+ * Production posture: HttpOnly + Secure + SameSite=None.
+ *   - SameSite=None is required because the frontend (e.g. *.vercel.app)
+ *     and backend (*.onrender.com) sit on different sites in production.
+ *     SameSite=Lax would block the cookie from being sent on
+ *     cross-site fetch, and our CORS allowlist already restricts who
+ *     can talk to us — so SameSite=None doesn't widen the attack
+ *     surface beyond what CORS already controls.
+ *   - Browsers (Chrome / Firefox / Safari) reject SameSite=None unless
+ *     the Secure flag is also set. Production HTTPS satisfies this.
+ *
+ * Development posture: SameSite=Lax + no Secure. Localhost is same-
+ * site by default and we want HTTP to work without TLS.
  */
 export function buildSetCookieHeader(token: string, expiresAt: Date): string {
+  const isProd = process.env.NODE_ENV === 'production';
   const parts = [
     `${WIZARD_COOKIE_NAME}=${encodeURIComponent(token)}`,
     `Path=/`,
     `Expires=${expiresAt.toUTCString()}`,
     `Max-Age=${Math.floor((expiresAt.getTime() - Date.now()) / 1000)}`,
     `HttpOnly`,
-    `SameSite=Lax`,
+    `SameSite=${isProd ? 'None' : 'Lax'}`,
   ];
-  if (process.env.NODE_ENV === 'production') parts.push('Secure');
+  if (isProd) parts.push('Secure');
   return parts.join('; ');
 }
 
 /** Header value that clears the cookie. Used post-signup once the session
- *  is linked and the cookie is no longer needed. */
+ *  is linked and the cookie is no longer needed. The SameSite + Secure
+ *  attributes must match the Set-Cookie that issued the cookie or the
+ *  browser refuses to clear it. */
 export function buildClearCookieHeader(): string {
+  const isProd = process.env.NODE_ENV === 'production';
   const parts = [
     `${WIZARD_COOKIE_NAME}=`,
     `Path=/`,
     `Expires=Thu, 01 Jan 1970 00:00:00 GMT`,
     `Max-Age=0`,
     `HttpOnly`,
-    `SameSite=Lax`,
+    `SameSite=${isProd ? 'None' : 'Lax'}`,
   ];
-  if (process.env.NODE_ENV === 'production') parts.push('Secure');
+  if (isProd) parts.push('Secure');
   return parts.join('; ');
 }
