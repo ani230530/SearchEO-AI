@@ -290,10 +290,26 @@ router.post(
         result: response,
       });
     } catch (error: any) {
-      console.error('Error editing image:', error?.response?.data || error);
-      res.status(500).json({
+      const status = error?.response?.status;
+      const n8nMessage =
+        error?.response?.data?.message ||
+        (typeof error?.response?.data === 'string' ? error.response.data : undefined) ||
+        error?.message;
+      const reason = error?.code === 'ECONNABORTED'
+        ? `Edit-image webhook timed out after ${N8N_TIMEOUT_MS}ms`
+        : status
+          ? `Edit-image webhook returned ${status}: ${n8nMessage || 'no message'}`
+          : `Edit-image webhook unreachable: ${n8nMessage || 'unknown error'}`;
+      console.error('[publish] edit-image failed', {
+        url: EDIT_IMAGE_WEBHOOK_URL,
+        status,
+        code: error?.code,
+        message: error?.message,
+        responseData: error?.response?.data,
+      });
+      res.status(502).json({
         success: false,
-        error: 'Failed to edit image with automation service',
+        error: reason,
         details: error?.response?.data,
       });
     }
