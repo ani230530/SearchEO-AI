@@ -426,12 +426,17 @@ export function Step1AddDomain({ initialUrl = "", initialProfile, onContinue, on
       )}
 
       {/* Existing-domain branch — surfaced inline instead of as a modal so
-          the user can read both options without losing context. */}
+          the user can read the options without losing context. When the
+          host doesn't wire `onExistingDomain` (inline audit setup), we
+          drop the "View existing report" button and adapt the copy: the
+          user's only choice is to resume by restarting or to cancel. */}
       {existingChoice && !error && (
         <div className="mt-6 rounded-[10px] border border-blue-100 bg-blue-50/40 px-4 py-4 text-sm text-slate-700">
-          <p className="font-medium text-slate-900">You've already audited {existingChoice.url}.</p>
+          <p className="font-medium text-slate-900">You've already started auditing {existingChoice.url}.</p>
           <p className="mt-1 text-slate-600">
-            Want to look at the report you already have, or run a fresh audit and update it?
+            {onExistingDomain
+              ? 'Want to look at the report you already have, or run a fresh audit and update it?'
+              : 'Continuing will reset any partial progress and re-run the audit from scratch.'}
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
             {onExistingDomain ? (
@@ -450,7 +455,7 @@ export function Step1AddDomain({ initialUrl = "", initialProfile, onContinue, on
               className="rounded-md border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors inline-flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {restarting ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
-              {restarting ? "Resetting…" : "Run a fresh audit"}
+              {restarting ? 'Resetting…' : onExistingDomain ? 'Run a fresh audit' : 'Continue'}
             </button>
             <button
               type="button"
