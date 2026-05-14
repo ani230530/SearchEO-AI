@@ -103,12 +103,20 @@ const AnonymousAudit = () => {
             onDone={({ snapshot, registration }) => {
               const targetDomainId =
                 registration.wizardLink?.primaryDomainId ?? undefined;
+              // Drop the user straight into the authenticated wizard with
+              // the Domain shell pre-bound. AIChecker.v2's ?domain=N
+              // resume logic hydrates url/profile from /wizard/domain/:id/
+              // state and lands the user at the right step (Step 1 here
+              // since the anon flow only captured the URL — country /
+              // state / industry are still collected after signup).
+              //
+              // Fallback: if for some reason the backend didn't return
+              // primaryDomainId (e.g. linkage was a no-op), send them to
+              // a blank wizard pre-filled with the host so they don't
+              // lose the URL they already typed.
               const dest = targetDomainId
-                ? `/newdashboard?tab=ai-visibility&domainId=${targetDomainId}`
-                : `/newdashboard?tab=ai-visibility&host=${encodeURIComponent(
-                    snapshot.host
-                  )}`;
-              // Persist for any auth-context-driven post-login redirect logic.
+                ? `/ai-checker-v2?domain=${targetDomainId}&fromSignup=1`
+                : `/ai-checker-v2?prefillHost=${encodeURIComponent(snapshot.host)}&fromSignup=1`;
               localStorage.setItem('postAuthRedirect', dest);
               navigate(dest);
             }}

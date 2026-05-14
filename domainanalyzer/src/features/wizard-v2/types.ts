@@ -68,12 +68,20 @@ export const CATEGORY_BADGE_CLASS: Record<PromptCategory, string> = {
 export interface WizardStateResponse {
   domainId: number;
   url: string;
+  /**
+   * `profile` is null when a Domain row exists but its DomainProfile row
+   * hasn't been written yet. Happens when the user arrives from the
+   * anonymous audit funnel — signup materializes only the Domain shell,
+   * and Step 1 of the wizard is where country / state / industry are
+   * captured. Callers must handle the null case rather than blindly
+   * indexing into `.country`.
+   */
   profile: {
     country: string | null;
     state: string | null;
     industry: string | null;
     companySize: string | null;
-  };
+  } | null;
   customSeeds: { keywords?: string[]; prompts?: string[] } | null;
   selectedCompetitors: string[] | null;
   selectionDraft: { keywordIds?: number[]; promptIds?: number[] } | null;
