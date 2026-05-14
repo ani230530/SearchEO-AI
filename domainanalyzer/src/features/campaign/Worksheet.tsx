@@ -95,6 +95,40 @@ export default function Worksheet({
     Set<number>
   >(new Set());
 
+  // ── Row selection (the table's checkboxes) ────────────────────────────
+  //
+  // Selected topic ids power the batch-action bar (Generate(N) / Publish(M)).
+  // We keep the set keyed on topic.id (number) — the same identifier used
+  // by every per-row handler and by SSE updates, so eligibility queries
+  // are stable across structure refetches.
+  const [selectedTopicIds, setSelectedTopicIds] = useState<Set<number>>(new Set());
+
+  // ── Batch operation state ─────────────────────────────────────────────
+  //
+  // Single batch can be in flight at a time (running Generate AND Publish
+  // concurrently would confuse the UI and double-tax the SSE channel).
+  // `batchOp` discriminates which one's running so the bar can render the
+  // right label. `batchProgress` drives the progress UI; `batchErrors`
+  // collects failures we surface in the summary toast at the end.
+  // `batchCancelRef` is a ref (not state) so the running loop can check
+  // it on every iteration without being stale-closure'd.
+  type BatchOp = 'generate' | 'publish';
+  const [batchOp, setBatchOp] = useState<BatchOp | null>(null);
+  const [batchProgress, setBatchProgress] = useState<{
+    current: number;
+    total: number;
+    label: string;
+  } | null>(null);
+  const [batchErrors, setBatchErrors] = useState<Array<{ topicId: number; title: string; error: string }>>([]);
+  const batchCancelRef = useRef(false);
+  /** Set when the user clicks Generate(N) in the batch bar. The
+   *  WorksheetGenerateDrawer opens in batch mode: same form fields,
+   *  but on submit the payload is fanned out across every topic in
+   *  this array via runBatchGenerate. */
+  const [batchTopicsForGenerate, setBatchTopicsForGenerate] = useState<
+    WorksheetTopic[] | null
+  >(null);
+
   const [search, setSearch] = useState('');
   const [openColumnMenu, setOpenColumnMenu] = useState<WorksheetColumnKey | null>(null);
   const [columnLabels, setColumnLabels] = useState<Record<WorksheetColumnKey, string>>({
@@ -354,6 +388,321 @@ export default function Worksheet({
       return t.keywords.some((k) => k.term.toLowerCase().includes(query));
     });
   }, [topics, search]);
+
+  /* ---------- Selection + eligibility ---------- */
+  //
+  // A topic's eligibility for batch Generate / Publish derives from its
+  // resolved RowState. We resolve it here using the same options the
+  // per-row UI uses (optimistic publish flag + live SSE status) so the
+  // batch counts agree with what the user sees in each row's status
+  // column.
+  //
+  // Eligibility rules:
+  //   Generate: row is not-started / failed / in-progress (no draft yet).
+  //             generating / completed / published / publishing are skipped.
+  //   Publish:  row has a draft AND isn't already publishing or published.
+  //             So only kind='completed' qualifies.
+
+  const eligibilityById = useMemo(() => {
+    const map = new Map<
+      number,
+      { canGenerate: boolean; canPublish: boolean; topic: WorksheetTopic }
+    >();
+    for (const topic of filteredTopics) {
+      const liveSnapshot = topic.draftId
+        ? sharedPublishStatuses?.get(topic.draftId)
+        : undefined;
+      const liveStatus = liveSnapshot?.status;
+      const isPublishing =
+        optimisticPublishingTopicIds.has(topic.id) || liveStatus === 'generating';
+      const state = resolveRowState(topic, {
+        isPublishing,
+        livePublishStatus: liveStatus,
+        livePublishedUrl: liveSnapshot?.publishedUrl,
+      });
+      map.set(topic.id, {
+        topic,
+        canGenerate:
+          state.kind === 'not-started' ||
+          state.kind === 'in-progress' ||
+          state.kind === 'ready' ||
+          state.kind === 'failed',
+        canPublish: state.kind === 'completed',
+      });
+    }
+    return map;
+  }, [filteredTopics, sharedPublishStatuses, optimisticPublishingTopicIds]);
+
+  /** All selected topic ids that are currently visible (after filtering)
+   *  AND still exist in the topics list. */
+  const liveSelectedIds = useMemo(() => {
+    return new Set(
+      Array.from(selectedTopicIds).filter((id) => eligibilityById.has(id)),
+    );
+  }, [selectedTopicIds, eligibilityById]);
+
+  const generateCandidates = useMemo(() => {
+    return Array.from(liveSelectedIds)
+      .map((id) => eligibilityById.get(id))
+      .filter((e): e is { canGenerate: boolean; canPublish: boolean; topic: WorksheetTopic } => !!e)
+      .filter((e) => e.canGenerate)
+      .map((e) => e.topic);
+  }, [liveSelectedIds, eligibilityById]);
+
+  const publishCandidates = useMemo(() => {
+    return Array.from(liveSelectedIds)
+      .map((id) => eligibilityById.get(id))
+      .filter((e): e is { canGenerate: boolean; canPublish: boolean; topic: WorksheetTopic } => !!e)
+      .filter((e) => e.canPublish)
+      .map((e) => e.topic);
+  }, [liveSelectedIds, eligibilityById]);
+
+  // Header checkbox: indeterminate when SOME (but not all) filtered rows
+  // are selected; checked when all are.
+  const allFilteredIds = useMemo(
+    () => filteredTopics.map((t) => t.id),
+    [filteredTopics],
+  );
+  const headerCheckboxState: 'checked' | 'unchecked' | 'indeterminate' = useMemo(() => {
+    if (allFilteredIds.length === 0) return 'unchecked';
+    const selectedFromFiltered = allFilteredIds.filter((id) => selectedTopicIds.has(id)).length;
+    if (selectedFromFiltered === 0) return 'unchecked';
+    if (selectedFromFiltered === allFilteredIds.length) return 'checked';
+    return 'indeterminate';
+  }, [allFilteredIds, selectedTopicIds]);
+
+  const toggleSelectAll = () => {
+    setSelectedTopicIds((prev) => {
+      const next = new Set(prev);
+      if (headerCheckboxState === 'checked') {
+        // Clear all visible.
+        for (const id of allFilteredIds) next.delete(id);
+      } else {
+        // Select all visible. Preserves any selections outside the filter.
+        for (const id of allFilteredIds) next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const toggleRowSelection = (topicId: number) => {
+    setSelectedTopicIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(topicId)) next.delete(topicId);
+      else next.add(topicId);
+      return next;
+    });
+  };
+
+  const clearSelection = () => setSelectedTopicIds(new Set());
+
+  /* ---------- Batch operations ---------- */
+
+  // Wait for a topic's generation job to reach a terminal state. Polls
+  // `topics` via a ref so the resolver sees the latest SSE-driven updates
+  // without re-creating the subscription. Resolves to 'completed' / 'failed'
+  // / 'cancelled' (the last when the user hit Cancel mid-queue).
+  const topicsRef = useRef<WorksheetTopic[]>(topics);
+  useEffect(() => {
+    topicsRef.current = topics;
+  }, [topics]);
+
+  const waitForGenerationTerminal = useCallback(
+    (topicId: number, timeoutMs = 5 * 60_000): Promise<'completed' | 'failed' | 'cancelled' | 'timeout'> => {
+      return new Promise((resolve) => {
+        const startedAt = Date.now();
+        const tick = () => {
+          if (batchCancelRef.current) return resolve('cancelled');
+          if (Date.now() - startedAt > timeoutMs) return resolve('timeout');
+          const t = topicsRef.current.find((x) => x.id === topicId);
+          if (!t) return resolve('failed'); // row went away — treat as failed
+          const job = t.job;
+          if (t.draftId) return resolve('completed');
+          if (job?.status === 'completed') return resolve('completed');
+          if (job?.status === 'failed') return resolve('failed');
+          setTimeout(tick, 1500);
+        };
+        tick();
+      });
+    },
+    [],
+  );
+
+  // Wait for a publish to terminate. Mirrors waitForGenerationTerminal but
+  // pivots on sharedPublishStatuses (the SSE-driven publish channel).
+  const sharedPublishRef = useRef(sharedPublishStatuses);
+  useEffect(() => {
+    sharedPublishRef.current = sharedPublishStatuses;
+  }, [sharedPublishStatuses]);
+
+  const waitForPublishTerminal = useCallback(
+    (draftId: number, timeoutMs = 3 * 60_000): Promise<'published' | 'failed' | 'cancelled' | 'timeout'> => {
+      return new Promise((resolve) => {
+        const startedAt = Date.now();
+        const tick = () => {
+          if (batchCancelRef.current) return resolve('cancelled');
+          if (Date.now() - startedAt > timeoutMs) return resolve('timeout');
+          const snap = sharedPublishRef.current?.get(draftId);
+          if (snap?.status === 'published') return resolve('published');
+          if (snap?.status === 'failed') return resolve('failed');
+          setTimeout(tick, 1500);
+        };
+        tick();
+      });
+    },
+    [],
+  );
+
+  const cancelBatch = () => {
+    batchCancelRef.current = true;
+  };
+
+  const runBatchPublish = useCallback(async () => {
+    const queue = [...publishCandidates];
+    if (queue.length === 0) return;
+    setError(null);
+    setBatchErrors([]);
+    setBatchOp('publish');
+    batchCancelRef.current = false;
+    setBatchProgress({ current: 0, total: queue.length, label: `Publishing 0 of ${queue.length}…` });
+    const errors: Array<{ topicId: number; title: string; error: string }> = [];
+    for (let i = 0; i < queue.length; i++) {
+      if (batchCancelRef.current) break;
+      const topic = queue[i];
+      setBatchProgress({
+        current: i + 1,
+        total: queue.length,
+        label: `Publishing ${i + 1} of ${queue.length}: ${topic.title}`,
+      });
+      if (!topic.draftId) {
+        errors.push({ topicId: topic.id, title: topic.title, error: 'No draft to publish' });
+        continue;
+      }
+      // Flip the row's optimistic publishing flag so the row UI shows it.
+      setOptimisticPublishingTopicIds((prev) => new Set(prev).add(topic.id));
+      try {
+        const result = await publishDraft(topic.draftId);
+        if (result.status === 'failed') {
+          errors.push({ topicId: topic.id, title: topic.title, error: result.error || 'Publish failed' });
+          setOptimisticPublishingTopicIds((prev) => {
+            const next = new Set(prev);
+            next.delete(topic.id);
+            return next;
+          });
+          continue;
+        }
+        // Wait for the publish channel to confirm before moving on, so the
+        // user sees rows transition one at a time (graceful).
+        const outcome = await waitForPublishTerminal(topic.draftId);
+        if (outcome === 'failed' || outcome === 'timeout') {
+          errors.push({
+            topicId: topic.id,
+            title: topic.title,
+            error: outcome === 'timeout' ? 'Publish timed out' : 'Publish failed',
+          });
+        }
+        if (outcome === 'cancelled') break;
+      } catch (err) {
+        errors.push({
+          topicId: topic.id,
+          title: topic.title,
+          error: err instanceof Error ? err.message : 'Publish failed',
+        });
+        setOptimisticPublishingTopicIds((prev) => {
+          const next = new Set(prev);
+          next.delete(topic.id);
+          return next;
+        });
+      }
+    }
+    setBatchProgress(null);
+    setBatchOp(null);
+    const cancelled = batchCancelRef.current;
+    batchCancelRef.current = false;
+    setBatchErrors(errors);
+    const succeeded = queue.length - errors.length - (cancelled ? Math.max(0, queue.length - 0) : 0);
+    if (cancelled) {
+      setNotice(`Cancelled — completed ${queue.length - errors.length - (queue.length - 0)} before stop.`);
+    } else if (errors.length === 0) {
+      setNotice(`Published ${succeeded} ${succeeded === 1 ? 'draft' : 'drafts'}.`);
+    } else {
+      setNotice(
+        `Published ${queue.length - errors.length} of ${queue.length}; ${errors.length} failed. See errors below.`,
+      );
+    }
+    // Force a structure refetch so the rows reflect the new published state
+    // even if some SSE events were missed.
+    reload();
+  }, [publishCandidates, reload, waitForPublishTerminal]);
+
+  /**
+   * Batch generate runner. The WorksheetGenerateDrawer collects ONE
+   * payload (template_type / project_goal / tone / audience / etc) and
+   * we fan that out to every topic in `topics`, sequentially. For each
+   * topic we fire generateTopic and wait for it to terminate before
+   * starting the next — keeps the UI sane (one row spinning at a time),
+   * avoids hammering n8n with parallel jobs, and gives the user a clear
+   * "x of N done" progress bar.
+   *
+   * The drawer closes immediately after calling this; the bar takes
+   * over as the foreground UI for the batch.
+   */
+  const runBatchGenerate = useCallback(
+    async (topics: WorksheetTopic[], generateOne: (topic: WorksheetTopic) => Promise<void>) => {
+      const queue = [...topics];
+      if (queue.length === 0) return;
+      setError(null);
+      setBatchErrors([]);
+      setBatchOp('generate');
+      batchCancelRef.current = false;
+      setBatchProgress({ current: 0, total: queue.length, label: `Generating 0 of ${queue.length}…` });
+      const errors: Array<{ topicId: number; title: string; error: string }> = [];
+      for (let i = 0; i < queue.length; i++) {
+        if (batchCancelRef.current) break;
+        const topic = queue[i];
+        setBatchProgress({
+          current: i + 1,
+          total: queue.length,
+          label: `Generating ${i + 1} of ${queue.length}: ${topic.title}`,
+        });
+        try {
+          await generateOne(topic);
+        } catch (err) {
+          errors.push({
+            topicId: topic.id,
+            title: topic.title,
+            error: err instanceof Error ? err.message : 'Generation start failed',
+          });
+          continue;
+        }
+        const outcome = await waitForGenerationTerminal(topic.id);
+        if (outcome === 'failed' || outcome === 'timeout') {
+          errors.push({
+            topicId: topic.id,
+            title: topic.title,
+            error: outcome === 'timeout' ? 'Generation timed out' : 'Generation failed',
+          });
+        }
+        if (outcome === 'cancelled') break;
+      }
+      const cancelled = batchCancelRef.current;
+      batchCancelRef.current = false;
+      setBatchProgress(null);
+      setBatchOp(null);
+      setBatchErrors(errors);
+      if (cancelled) {
+        setNotice('Generation cancelled.');
+      } else if (errors.length === 0) {
+        setNotice(`Generated ${queue.length} draft${queue.length === 1 ? '' : 's'}.`);
+      } else {
+        setNotice(
+          `Generated ${queue.length - errors.length} of ${queue.length}; ${errors.length} failed.`,
+        );
+      }
+      reload();
+    },
+    [reload, waitForGenerationTerminal],
+  );
 
   /* ---------- Mutations ---------- */
 
@@ -631,13 +980,147 @@ export default function Worksheet({
           {!error && notice && <p className="mt-2 text-xs text-[#58667d]">{notice}</p>}
         </div>
 
+        {/* ── Batch action bar ────────────────────────────────────────
+             Appears when ≥1 row is selected. Shows two grouped buttons
+             reflecting the eligible counts:
+               Generate (G)  — selected rows that don't have a draft yet
+               Publish (P)   — selected rows with a completed draft
+             Disabled when count is 0 (so the user can see the constraint).
+             During a batch op, the bar pivots into a progress strip with
+             "Generating X of Y…" + a Cancel button.
+        ─────────────────────────────────────────────────────────────── */}
+        {(liveSelectedIds.size > 0 || batchOp !== null) && (
+          <div className="mx-3 sm:mx-4 mb-3 mt-1 rounded-md border border-[#c8cfdb] bg-[#F2F6FF] px-4 py-3">
+            {batchOp ? (
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <Loader2 className="h-4 w-4 animate-spin text-[#2D4059] shrink-0" />
+                  <div className="flex flex-col min-w-0">
+                    <span className="text-[13px] font-medium text-[#2D4059] truncate">
+                      {batchProgress?.label ?? `Running ${batchOp}…`}
+                    </span>
+                    {batchProgress ? (
+                      <div className="mt-1 h-1.5 w-[260px] max-w-full rounded-full bg-[#d6dee9] overflow-hidden">
+                        <div
+                          className="h-full bg-[#2D4059] transition-all"
+                          style={{
+                            width: `${Math.round(
+                              (batchProgress.current / Math.max(1, batchProgress.total)) * 100,
+                            )}%`,
+                          }}
+                        />
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={cancelBatch}
+                  disabled={batchCancelRef.current}
+                  className="h-8 shrink-0 rounded-md border border-[#909bb0] bg-white px-3 text-[12px] font-medium text-[#3f4f69] transition-colors hover:bg-[#f6f8fb] disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {batchCancelRef.current ? 'Stopping…' : 'Cancel'}
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <div className="flex items-center gap-3">
+                  <span className="text-[13px] font-medium text-[#2D4059]">
+                    {liveSelectedIds.size} selected
+                  </span>
+                  <button
+                    type="button"
+                    onClick={clearSelection}
+                    className="text-[12px] text-[#5b6878] hover:text-[#2D4059] underline-offset-2 hover:underline"
+                  >
+                    Clear
+                  </button>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (generateCandidates.length === 0) return;
+                      // Single drawer for the whole batch. The drawer's
+                      // submit callback fans out to every candidate
+                      // sequentially (see WorksheetGenerateDrawer batch
+                      // branch below).
+                      setBatchTopicsForGenerate(generateCandidates);
+                    }}
+                    disabled={generateCandidates.length === 0}
+                    title={
+                      generateCandidates.length === 0
+                        ? 'None of the selected rows are ready to generate (they may already have a draft).'
+                        : `Generate drafts for ${generateCandidates.length} row${generateCandidates.length === 1 ? '' : 's'}`
+                    }
+                    className="inline-flex h-9 items-center gap-1.5 rounded-md bg-[#2D4059] px-3.5 text-[12px] font-medium text-white shadow-sm transition-all hover:bg-[#243349] disabled:cursor-not-allowed disabled:bg-[#94a3b8] disabled:opacity-60"
+                  >
+                    <Sparkles className="h-3.5 w-3.5" />
+                    Generate ({generateCandidates.length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void runBatchPublish()}
+                    disabled={publishCandidates.length === 0}
+                    title={
+                      publishCandidates.length === 0
+                        ? 'None of the selected rows have a completed draft ready to publish.'
+                        : `Publish ${publishCandidates.length} draft${publishCandidates.length === 1 ? '' : 's'}`
+                    }
+                    className="inline-flex h-9 items-center gap-1.5 rounded-md bg-emerald-700 px-3.5 text-[12px] font-medium text-white shadow-sm transition-all hover:bg-emerald-800 disabled:cursor-not-allowed disabled:bg-[#94a3b8] disabled:opacity-60"
+                  >
+                    <Radio className="h-3.5 w-3.5" />
+                    Publish ({publishCandidates.length})
+                  </button>
+                </div>
+              </div>
+            )}
+            {/* Error summary surfaced after a batch op finishes. */}
+            {batchErrors.length > 0 && batchOp === null && (
+              <div className="mt-3 rounded-md bg-white border border-rose-200 px-3 py-2">
+                <p className="text-[12px] font-medium text-rose-700 mb-1">
+                  {batchErrors.length} row{batchErrors.length === 1 ? '' : 's'} failed:
+                </p>
+                <ul className="space-y-0.5">
+                  {batchErrors.slice(0, 5).map((e) => (
+                    <li key={e.topicId} className="text-[11px] text-rose-600 truncate">
+                      • {e.title} — {e.error}
+                    </li>
+                  ))}
+                  {batchErrors.length > 5 ? (
+                    <li className="text-[11px] text-rose-500">
+                      …and {batchErrors.length - 5} more
+                    </li>
+                  ) : null}
+                </ul>
+                <button
+                  type="button"
+                  onClick={() => setBatchErrors([])}
+                  className="mt-1.5 text-[11px] text-rose-700 underline-offset-2 hover:underline"
+                >
+                  Dismiss
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
         <div className="p-3 sm:p-4">
           <div className="overflow-auto border border-[#c8cfdb]">
             <table className="min-w-[980px] w-full">
               <thead className="bg-[#EDEDED] border-b border-[#c8cfdb]">
                 <tr className="h-10">
                   <th className="w-10 border-r border-[#c8cfdb] px-3 text-left">
-                    <input type="checkbox" className="h-3.5 w-3.5 rounded border-[#8e99ad]" />
+                    <input
+                      type="checkbox"
+                      aria-label="Select all visible rows"
+                      checked={headerCheckboxState === 'checked'}
+                      ref={(el) => {
+                        if (el) el.indeterminate = headerCheckboxState === 'indeterminate';
+                      }}
+                      onChange={toggleSelectAll}
+                      className="h-3.5 w-3.5 rounded border-[#8e99ad]"
+                    />
                   </th>
                   {(['topic', 'keywords', 'status', 'action', 'more'] as WorksheetColumnKey[])
                     .filter((k) => columnVisibility[k])
@@ -699,7 +1182,13 @@ export default function Worksheet({
                       className={`min-h-[86px] border-b border-[#c8cfdb] ${idx % 2 ? 'bg-[#F2F6FF]' : 'bg-white'} ${isBusy ? 'opacity-70' : ''}`}
                     >
                       <td className="border-r border-[#c8cfdb] px-3 align-middle">
-                        <input type="checkbox" className="h-3.5 w-3.5 rounded border-[#8e99ad]" />
+                        <input
+                          type="checkbox"
+                          aria-label={`Select ${topic.title}`}
+                          checked={selectedTopicIds.has(topic.id)}
+                          onChange={() => toggleRowSelection(topic.id)}
+                          className="h-3.5 w-3.5 rounded border-[#8e99ad]"
+                        />
                       </td>
 
                       {columnVisibility.topic && (
@@ -1000,10 +1489,10 @@ export default function Worksheet({
         </Modal>
       )}
 
-      {/* Generate drawer */}
+      {/* Generate drawer — single-row mode. */}
       <WorksheetGenerateDrawer
         topic={topicForGenerate}
-        open={topicForGenerate !== null}
+        open={topicForGenerate !== null && batchTopicsForGenerate === null}
         onClose={() => setTopicForGenerate(null)}
         onSuccess={(job) => {
           // The job is now in flight on the server. Optimistically merge the
@@ -1015,6 +1504,33 @@ export default function Worksheet({
           setTopicForGenerate(null);
         }}
       />
+
+      {/* Generate drawer — batch mode.
+          When the user clicks Generate(N) in the batch bar, we open the
+          drawer seeded with the FIRST eligible topic (so the form's
+          per-topic context like primary keyword still renders), but on
+          submit we re-fire generateTopic for EVERY topic in
+          batchTopicsForGenerate using the same payload. The drawer
+          closes immediately; the batch bar takes over as the
+          foreground UI for the run. */}
+      {batchTopicsForGenerate && batchTopicsForGenerate.length > 0 && (
+        <WorksheetGenerateDrawer
+          topic={batchTopicsForGenerate[0]}
+          open={true}
+          batchTopics={batchTopicsForGenerate}
+          onClose={() => setBatchTopicsForGenerate(null)}
+          onBatchSubmit={async (generateOne) => {
+            const topics = batchTopicsForGenerate;
+            setBatchTopicsForGenerate(null);
+            await runBatchGenerate(topics, generateOne);
+          }}
+          // Required by the drawer's prop contract but never called in
+          // batch mode (the drawer takes the onBatchSubmit branch).
+          onSuccess={() => {
+            /* no-op for batch mode */
+          }}
+        />
+      )}
 
     </>
   );

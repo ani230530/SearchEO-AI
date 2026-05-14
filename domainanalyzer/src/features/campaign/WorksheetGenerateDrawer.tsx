@@ -217,6 +217,14 @@ export interface WorksheetGenerateDrawerProps {
   /** Fired with the initial job snapshot returned by the async route.
    *  The caller is responsible for SSE follow-up. */
   onSuccess: (job: GenerationJob) => void;
+  /** Optional batch mode. When set, the drawer renders header copy
+   *  reflecting the batch ("Generate N drafts") and Submit fires
+   *  onBatchSubmit instead of onSuccess. The submit callback receives
+   *  a curried `generateOne` that fires `generateTopic` for a single
+   *  topic with the user-chosen payload; the parent uses it inside its
+   *  sequential queue. */
+  batchTopics?: WorksheetTopic[];
+  onBatchSubmit?: (generateOne: (topic: WorksheetTopic) => Promise<void>) => Promise<void> | void;
 }
 
 export default function WorksheetGenerateDrawer({
@@ -224,7 +232,10 @@ export default function WorksheetGenerateDrawer({
   open,
   onClose,
   onSuccess,
+  batchTopics,
+  onBatchSubmit,
 }: WorksheetGenerateDrawerProps) {
+  const isBatch = Array.isArray(batchTopics) && batchTopics.length > 0;
   const cached = useMemo(loadDefaults, []);
   const [templateType, setTemplateType] = useState<TemplateType>(cached.templateType);
   const [projectGoal, setProjectGoal] = useState(cached.projectGoal);
@@ -299,8 +310,7 @@ export default function WorksheetGenerateDrawer({
     setError(null);
 
     try {
-      const result = await generateTopic(topic.id, payload);
-      // Persist for next time
+      // Persist for next time — applies to both single-row and batch paths.
       persistDefaults({
         templateType,
         projectGoal,
@@ -315,7 +325,28 @@ export default function WorksheetGenerateDrawer({
         featuredImage,
         templateFields,
       });
-      onSuccess(result);
+
+      if (isBatch && onBatchSubmit) {
+        // Batch path. We hand a curried `generateOne` to the parent so
+        // it can sequence the calls inside its progress loop. Each call
+        // re-injects the row-specific topic.title into the blog
+        // template's `topic` field; everything else stays constant.
+        await onBatchSubmit(async (t: WorksheetTopic) => {
+          const perRowFields = { ...trimmedFields };
+          if (templateType === 'blog' && !perRowFields.topic) {
+            perRowFields.topic = t.title;
+          }
+          const perRowPayload: GenerateTopicPayload = {
+            ...payload,
+            template_fields: perRowFields,
+          };
+          await generateTopic(t.id, perRowPayload);
+        });
+        onClose();
+      } else {
+        const result = await generateTopic(topic.id, payload);
+        onSuccess(result);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Generation failed');
     } finally {
@@ -329,24 +360,48 @@ export default function WorksheetGenerateDrawer({
       <div className="relative ml-auto flex h-full w-full max-w-2xl flex-col bg-white shadow-2xl">
         {/* Header */}
         <div className="flex items-start justify-between border-b border-gray-100 px-8 py-6">
-          <div>
+          <div className="min-w-0">
             <div className="inline-flex items-center gap-2 rounded-full border border-black/10 px-3 py-1 text-[10px] uppercase tracking-[0.3em] text-gray-500">
               <Wand2 className="h-3 w-3" />
-              Generate
+              {isBatch ? `Generate × ${batchTopics!.length}` : 'Generate'}
             </div>
-            <h2 className="mt-3 text-2xl font-light tracking-tight text-gray-900">
-              {topic.title}
-            </h2>
-            <p className="mt-1 text-sm text-gray-500">
-              Primary: <span className="font-medium text-gray-800">{primary?.term ?? '—'}</span>
-              {longtails.length > 0 && (
-                <>
-                  {' '}
-                  · Longtails:{' '}
-                  <span className="text-gray-700">{longtails.map((k) => k.term).join(', ')}</span>
-                </>
-              )}
-            </p>
+            {isBatch ? (
+              <>
+                <h2 className="mt-3 text-2xl font-light tracking-tight text-gray-900">
+                  Generate {batchTopics!.length} draft{batchTopics!.length === 1 ? '' : 's'}
+                </h2>
+                <p className="mt-1 text-sm text-gray-500">
+                  Same template &amp; tone applied to every selected row. Each row keeps its
+                  own primary keyword and title.
+                </p>
+                <div className="mt-2 max-h-24 overflow-y-auto rounded-md border border-gray-100 bg-gray-50/60 px-3 py-2 text-[12px] text-gray-600">
+                  {batchTopics!.slice(0, 6).map((t) => (
+                    <div key={t.id} className="truncate">
+                      · {t.title}
+                    </div>
+                  ))}
+                  {batchTopics!.length > 6 ? (
+                    <div className="text-gray-400">…and {batchTopics!.length - 6} more</div>
+                  ) : null}
+                </div>
+              </>
+            ) : (
+              <>
+                <h2 className="mt-3 text-2xl font-light tracking-tight text-gray-900">
+                  {topic.title}
+                </h2>
+                <p className="mt-1 text-sm text-gray-500">
+                  Primary: <span className="font-medium text-gray-800">{primary?.term ?? '—'}</span>
+                  {longtails.length > 0 && (
+                    <>
+                      {' '}
+                      · Longtails:{' '}
+                      <span className="text-gray-700">{longtails.map((k) => k.term).join(', ')}</span>
+                    </>
+                  )}
+                </p>
+              </>
+            )}
           </div>
           <button
             type="button"
