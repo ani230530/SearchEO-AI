@@ -159,8 +159,21 @@ export const authenticateOrSession = (
 
   return async (req: Request, res: Response, next: NextFunction) => {
     // 1) Try Bearer first.
+    //
+    // Defensive parsing: a not-quite-deployed frontend (or a buggy client)
+    // can send literal strings "null", "undefined", or whitespace as the
+    // token portion of "Authorization: Bearer <x>". Treat those as
+    // "no token at all" rather than as "present but invalid" — the
+    // latter triggers the silent-downgrade-protection 401 below and
+    // blocks the entire anon-cookie path for callers that didn't even
+    // mean to authenticate. Real malformed tokens (non-empty strings
+    // that look like tokens but fail signature verification) still 401.
     const authHeader = req.headers.authorization;
-    const token = authHeader && authHeader.split(' ')[1];
+    const rawToken = authHeader && authHeader.split(' ')[1];
+    const token =
+      rawToken && rawToken.trim() && rawToken !== 'null' && rawToken !== 'undefined'
+        ? rawToken
+        : '';
     if (token) {
       try {
         const decoded: JWTPayload = await authService.verifyToken(token);

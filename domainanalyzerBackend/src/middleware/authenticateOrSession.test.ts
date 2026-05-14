@@ -117,6 +117,30 @@ describe('authenticateOrSession — JWT path', () => {
     expect(res._status).toBe(401);
     expect(res._json?.code).toBe('TOKEN_EXPIRED');
   });
+
+  /**
+   * Regression for the deploy-staggered 401: an older frontend bundle
+   * sends "Authorization: Bearer null" (or "Bearer undefined") on every
+   * request because its apiClient stringifies localStorage.getItem(...).
+   * Pre-defensive-parse code interpreted those literal strings as a
+   * "present but malformed" token and 401'd, blocking the cookie path
+   * entirely. These tests pin the new behavior: such headers are
+   * treated as "no token" and the middleware falls through to anon.
+   */
+  it.each([
+    ['Bearer null'],
+    ['Bearer undefined'],
+    ['Bearer '],
+    ['Bearer   '],
+  ])('falls through to anon when Authorization is %s', async (header) => {
+    const prisma = createPrismaMock();
+    const { req, res, next } = makeReqRes({ authorization: header });
+    const mw = authenticateOrSession({ prisma });
+    await mw(req, res, next);
+    expect(next).toHaveBeenCalledOnce();
+    expect(req.identity?.kind).toBe('anon');
+    expect(res._headers['Set-Cookie']).toContain(WIZARD_COOKIE_NAME);
+  });
 });
 
 describe('authenticateOrSession — anonymous cookie path', () => {
