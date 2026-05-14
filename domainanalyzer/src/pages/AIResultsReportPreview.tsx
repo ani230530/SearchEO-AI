@@ -2372,7 +2372,28 @@ const AIResultsReportPreview = () => {
     const selectedRows = selectedItemIds
       .map((id) => rowsById.get(id))
       .filter(Boolean)
-      .map((row: any) => ({ id: String(row.id), prompt: row.phrase ?? row.prompt ?? '' }));
+      .map((row: any) => {
+        // Pass through the source keyword (when the row is a prompt with a
+        // parent keyword, or when the row IS a keyword) so the worksheet
+        // importer can seed the topic's primary keyword. This stops the
+        // worksheet from regenerating long phrase-style keywords from the
+        // prompt text alone.
+        const primaryKeyword =
+          row.type === 'keyword'
+            ? (row.phrase ?? row.text ?? null)
+            : (row.keyword ?? null);
+        const primaryIntent =
+          row.type === 'keyword'
+            ? (row.intent ?? null)
+            : (row.keywordIntent ?? row.intent ?? null);
+        return {
+          id: String(row.id),
+          prompt: row.phrase ?? row.prompt ?? '',
+          type: row.type ?? null,
+          primaryKeyword: primaryKeyword || null,
+          primaryIntent: primaryIntent || null,
+        };
+      });
 
     const payload = { activeWorksheetId, selectedItemIds, selectedRows };
     sessionStorage.setItem(WORKSHEET_TARGET_KEY, activeWorksheetId);
@@ -2435,7 +2456,23 @@ const AIResultsReportPreview = () => {
       const selectedRows = selectedItemIds
         .map((id) => rowsById.get(id))
         .filter(Boolean)
-        .map((row: any) => ({ id: String(row.id), prompt: row.phrase ?? row.prompt ?? '' }));
+        .map((row: any) => {
+          const primaryKeyword =
+            row.type === 'keyword'
+              ? (row.phrase ?? row.text ?? null)
+              : (row.keyword ?? null);
+          const primaryIntent =
+            row.type === 'keyword'
+              ? (row.intent ?? null)
+              : (row.keywordIntent ?? row.intent ?? null);
+          return {
+            id: String(row.id),
+            prompt: row.phrase ?? row.prompt ?? '',
+            type: row.type ?? null,
+            primaryKeyword: primaryKeyword || null,
+            primaryIntent: primaryIntent || null,
+          };
+        });
 
       const payload = {
         activeWorksheetId: newWorksheetId,

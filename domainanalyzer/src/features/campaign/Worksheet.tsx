@@ -190,7 +190,16 @@ export default function Worksheet({
     type PendingWorksheetImport = {
       activeWorksheetId: string;
       selectedItemIds: string[];
-      selectedRows: Array<{ id: string; prompt: string }>;
+      selectedRows: Array<{
+        id: string;
+        prompt: string;
+        type?: string | null;
+        /** Source keyword surfaced by AI Checker tables. When present, the
+         *  worksheet creates the topic with this as the primary keyword
+         *  instead of letting AI Suggest fabricate phrase-style ones. */
+        primaryKeyword?: string | null;
+        primaryIntent?: string | null;
+      }>;
     };
 
     let payload: PendingWorksheetImport | null = null;
@@ -229,8 +238,20 @@ export default function Worksheet({
       let latestTopics = topics;
 
       for (const row of [...payload!.selectedRows].reverse()) {
+        const seedTerm = row.primaryKeyword?.trim();
+        const seedKeywords = seedTerm
+          ? [
+              {
+                term: seedTerm,
+                isPrimary: true,
+                intent: row.primaryIntent?.trim() || null,
+              },
+            ]
+          : undefined;
         latestTopics = await createTopic(campaignId, {
           title: row.prompt?.trim() || 'Untitled prompt',
+          keywords: seedKeywords,
+          source: seedKeywords ? 'AI' : 'MANUAL',
         });
 
         const createdTopic =

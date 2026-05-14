@@ -133,7 +133,22 @@ export async function fetchCampaignTopics(campaignId: number): Promise<Worksheet
 
 export async function createTopic(
   campaignId: number,
-  payload: { title: string; description?: string | null }
+  payload: {
+    title: string;
+    description?: string | null;
+    /** Optional seed keywords — the AI Checker import flow passes the
+     *  source keyword here so the worksheet doesn't regenerate one
+     *  from the prompt phrase. The first entry becomes primary. */
+    keywords?: Array<{
+      term: string;
+      isPrimary?: boolean;
+      intent?: string | null;
+      volume?: number | null;
+      difficulty?: string | null;
+    }>;
+    /** Origin marker — 'AI' when the topic was imported from AI Checker. */
+    source?: 'AI' | 'MANUAL';
+  }
 ): Promise<WorksheetTopic[]> {
   const res = await fetch(`${API_BASE_URL}/api/campaigns/${campaignId}/topics`, {
     method: 'POST',
@@ -141,6 +156,8 @@ export async function createTopic(
     body: JSON.stringify({
       title: payload.title,
       description: payload.description ?? null,
+      keywords: payload.keywords,
+      source: payload.source,
     }),
   });
   const data = await handle<StructureResponse>(res);
