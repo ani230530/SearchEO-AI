@@ -59,6 +59,7 @@ import { DashboardHeader } from "@/features/sidebar-dashboard/components/Dashboa
 import { DashboardSidebar } from "@/features/sidebar-dashboard/components/DashboardSidebar";
 import { AnalyticsCompanySection } from "@/features/sidebar-dashboard/sections/AnalyticsCompanySection";
 import { DomainInfoContent } from "@/features/sidebar-dashboard/sections/DomainInfoContent";
+import { DomainInfoEmpty } from "@/features/sidebar-dashboard/sections/DomainInfoEmpty";
 import { ProjectsSection } from "@/features/sidebar-dashboard/sections/ProjectsSection";
 import WorksheetDraftOverlay from "@/features/campaign/WorksheetDraftOverlay";
 import { DASHBOARD_TABS } from "@/features/sidebar-dashboard/constants";
@@ -2578,7 +2579,7 @@ useEffect(() => {
           onRetry={() => fetchCompanyDomain(true)}
         />
       ),
-      setupContent: null,
+      setupContent: <DomainInfoEmpty onGoToAudit={() => setActiveTab("audit")} />,
       showResults,
     },
     audit: {
@@ -2586,6 +2587,7 @@ useEffect(() => {
       auditLoading,
       auditResult,
       companyDomain,
+      companyDomainLoading,
       n8nResults,
       n8nStatus,
       overallScore,
@@ -2593,6 +2595,17 @@ useEffect(() => {
       selectedMetric,
       onActiveChartTabChange: setActiveChartTab,
       onRunAudit: () => handleRunAudit(companyDomain),
+      onSetupComplete: ({ domainId, normalizedUrl }) => {
+        // The wizard flow already persisted the new domain server-side.
+        // Surface it locally without waiting for the next /company-domain
+        // round-trip so the audit chrome flips over immediately, then
+        // kick off Lighthouse against the fresh URL.
+        setCompanyDomain(normalizedUrl);
+        setCreatedDomainId(domainId);
+        setShowResults(true);
+        void fetchCompanyDomain(true);
+        void handleRunAudit(normalizedUrl);
+      },
       onSelectedMetricChange: setSelectedMetric,
     },
     analyticsReport: {
@@ -2601,6 +2614,7 @@ useEffect(() => {
     },
     gscAnalytics: {
       activeGscSubTab,
+      onConnectGsc: () => setActiveTab("integration"),
     },
     settings: {
       confirmUpdateOpen,
@@ -3103,17 +3117,11 @@ useEffect(() => {
               wpIntegrationSaving={wpIntegrationSaving}
               handleDisconnectWordpress={handleDisconnectWordpress}
               wpIntegrationDeleting={wpIntegrationDeleting}
-              handleSubmit={handleSubmit}
-              domainError={domainError}
-              isSubmitting={isSubmitting}
-              loadingSteps={loadingSteps}
-              currentTaskIndex={currentTaskIndex}
-              handleDomainChange={handleDomainChange}
-              openWordpressConnectionView={openWordpressConnectionView}
               createdDomainId={createdDomainId}
               keywords={keywords as any}
               companyDomainFetchError={companyDomainFetchError}
               onRetryCompanyDomain={() => fetchCompanyDomain(true)}
+              onGoToAudit={() => setActiveTab("audit")}
             />
           ) : activeTab === "projects" ? (
             <ProjectsSection

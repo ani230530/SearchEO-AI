@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { RefreshCw, Calendar, Plug, AlertCircle, Loader2, ExternalLink } from "lucide-react";
+import { RefreshCw, Calendar, Plug, AlertCircle, Loader2, ExternalLink, ArrowRight } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import PagesTable from "./PagesTable";
 import PageQueriesTable from "./PageQueriesTable";
@@ -67,8 +67,10 @@ const BlogPerformancePanel = ({ days }: { days: string }) => {
   if (!data.connected) {
     return (
       <div className="text-center py-16">
-        <Plug className="h-8 w-8 mx-auto mb-3 text-gray-400" />
-        <p className="text-sm text-slate-600">
+        <div className="w-12 h-12 rounded-xl bg-gray-100 flex items-center justify-center mx-auto mb-3">
+          <Plug className="h-6 w-6 text-gray-400" />
+        </div>
+        <p className="text-sm font-light text-gray-600">
           Connect Google Search Console to see how your published blogs are performing.
         </p>
       </div>
@@ -167,7 +169,11 @@ const getAuthHeaders = () => {
   };
 };
 
-const GSCAnalyticsView = () => {
+interface GSCAnalyticsViewProps {
+  onConnectGsc?: () => void;
+}
+
+const GSCAnalyticsView = ({ onConnectGsc }: GSCAnalyticsViewProps = {}) => {
   const { toast } = useToast();
   const [selectedPage, setSelectedPage] = useState<string | null>(null);
   const [days, setDays] = useState("28");
@@ -332,7 +338,11 @@ const GSCAnalyticsView = () => {
   };
 
   const handleConnectGSC = () => {
-    window.location.href = '/newdashboard?tab=analytics&subtab=integration';
+    if (onConnectGsc) {
+      onConnectGsc();
+      return;
+    }
+    window.location.href = '/newdashboard?tab=integration';
   };
 
   // Loading state
@@ -350,23 +360,32 @@ const GSCAnalyticsView = () => {
   // Not connected state
   if (!gscConnected) {
     return (
-      <div className="min-h-[60vh] flex items-center justify-center px-4">
-        <div className="text-center space-y-6 max-w-md">
-          <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto">
-            <Plug className="h-8 w-8 text-gray-400" />
+      <div className="min-w-7xl">
+        <div className="bg-white rounded-3xl p-6 sm:p-8 border border-gray-100 min-w-0">
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-xl bg-gray-100 flex items-center justify-center">
+                <Plug className="h-6 w-6 text-gray-400" />
+              </div>
+              <div>
+                <h3 className="text-xl font-light text-black tracking-tight">Google Search Console</h3>
+                <p className="text-sm font-light text-gray-600">Not connected</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-1.5 bg-red-50 text-red-700 px-3 py-1 rounded-full text-[10px] font-medium border border-red-100 uppercase tracking-wider">
+              Not Connected
+            </div>
           </div>
-          <div>
-            <h3 className="text-2xl font-light text-gray-900 mb-2 tracking-tight">Google Search Console Not Connected</h3>
-            <p className="text-sm font-light text-gray-600 leading-relaxed">
-              Connect your Google Search Console account to view analytics data.
-            </p>
-          </div>
+          <p className="text-sm text-neutral-400 font-light max-w-xl mb-6">
+            Connect Google Search Console to view search performance, indexed pages, and per-query
+            analytics for your verified properties.
+          </p>
           <button
             onClick={handleConnectGSC}
-            className="inline-flex items-center gap-2 px-6 py-3 bg-black text-white rounded-full text-sm font-medium hover:bg-gray-600  disabled:opacity-60 transition"
+            className="h-12 px-6 w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-md bg-[#2D4059] text-md font-medium text-white shadow-md hover:shadow-lg active:scale-95 transition"
           >
-            <Plug className="h-4 w-4" />
             Connect Google Search Console
+            <ArrowRight className="h-4 w-4" />
           </button>
         </div>
       </div>
@@ -379,32 +398,40 @@ const GSCAnalyticsView = () => {
 
   if (hasDomainError && !isLoadingPages) {
     return (
-      <div className="min-h-[60vh] flex items-center justify-center px-4">
-        <div className="text-center space-y-6 max-w-md">
-          <div className="w-16 h-16 bg-amber-50 rounded-full flex items-center justify-center mx-auto">
-            <AlertCircle className="h-8 w-8 text-amber-500" />
+      <div className="min-w-7xl">
+        <div className="bg-white rounded-3xl p-6 sm:p-8 border border-gray-100 min-w-0">
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-xl bg-amber-50 flex items-center justify-center">
+                <AlertCircle className="h-6 w-6 text-amber-500" />
+              </div>
+              <div>
+                <h3 className="text-xl font-light text-black tracking-tight">Company Domain Not Found</h3>
+                <p className="text-sm font-light text-gray-600">Property mismatch</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-1.5 bg-amber-50 text-amber-700 px-3 py-1 rounded-full text-[10px] font-medium border border-amber-100 uppercase tracking-wider">
+              Action Required
+            </div>
           </div>
-          <div>
-            <h3 className="text-2xl font-light text-gray-900 mb-2 tracking-tight">Company Domain Not Found</h3>
-            <p className="text-sm font-light text-gray-600 leading-relaxed">
-              {pagesData?.error || 'Your company domain is not found in your Google Search Console account.'}
-            </p>
-          </div>
-          <div className="flex gap-3 justify-center">
+          <p className="text-sm text-neutral-400 font-light max-w-xl mb-6">
+            {pagesData?.error || 'Your company domain is not found in your Google Search Console account.'}
+          </p>
+          <div className="flex flex-wrap gap-3">
+            <button
+              onClick={handleConnectGSC}
+              className="h-12 px-6 inline-flex items-center justify-center gap-2 rounded-md bg-[#2D4059] text-md font-medium text-white shadow-md hover:shadow-lg active:scale-95 transition"
+            >
+              Check Settings
+              <ArrowRight className="h-4 w-4" />
+            </button>
             <button
               onClick={() => refetchPages()}
               disabled={isRefreshing}
-              className="h-10 px-5 border border-gray-200 text-gray-700 rounded-full hover:bg-gray-50 text-sm font-normal tracking-tight inline-flex items-center gap-2 disabled:opacity-50"
+              className="h-12 px-6 rounded-md border border-gray-300 text-gray-700 bg-white text-sm font-medium hover:bg-gray-100 transition inline-flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isRefreshing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
               Retry
-            </button>
-            <button
-              onClick={handleConnectGSC}
-              className="h-10 px-5 bg-gray-900 text-white rounded-full hover:bg-gray-800 transition-all duration-200 text-sm font-normal tracking-tight inline-flex items-center gap-2"
-            >
-              <Plug className="h-4 w-4" />
-              Check Settings
             </button>
           </div>
         </div>

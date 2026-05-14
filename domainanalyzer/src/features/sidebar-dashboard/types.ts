@@ -89,8 +89,14 @@ export interface CompanySectionProps {
   showResults: boolean;
 }
 
+export interface DomainInfoEmptyProps {
+  /** Switch the dashboard to the Website Audit tab. */
+  onGoToAudit: () => void;
+}
+
 export interface GscAnalyticsSectionProps {
   activeGscSubTab: GscSubTabId;
+  onConnectGsc?: () => void;
 }
 
 export interface AuditSectionProps {
@@ -98,6 +104,10 @@ export interface AuditSectionProps {
   auditLoading: boolean;
   auditResult: any;
   companyDomain: string;
+  /** True while we're still resolving whether the user has a company
+   *  domain set. Without this we'd briefly show the setup flow even for
+   *  users who already have a domain. */
+  companyDomainLoading: boolean;
   n8nResults: { sheetsUrl?: string; slidesUrl?: string } | null;
   n8nStatus: "processing" | "completed" | "failed" | null;
   overallScore: number;
@@ -105,6 +115,9 @@ export interface AuditSectionProps {
   selectedMetric?: string;
   onActiveChartTabChange: (tab: "overview" | "comparison" | "distribution") => void;
   onRunAudit: () => void;
+  /** Called when the inline setup flow finishes — parent refreshes the
+   *  company-domain state and kicks off the Lighthouse audit. */
+  onSetupComplete: (args: { domainId: number; normalizedUrl: string }) => void;
   onSelectedMetricChange: (metric: string) => void;
 }
 
