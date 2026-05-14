@@ -418,7 +418,16 @@ export default function AICheckerV2() {
             // token is now in AuthContext / tokenManager, so the next
             // Step 5 request will carry it and the /run gate will pass.
             setSignupWallOpen(false);
-            advanceTo(5);
+            // Pass the domainId so advanceTo pins ?domain=N into the URL.
+            // Without this, the URL stays bare (/audit) and a refresh
+            // loses the resume target. The user thinks the wizard "lost
+            // where I left off". With the id pinned, the existing
+            // resume effect picks them back up at the right step.
+            if (domainId) {
+              advanceTo(5, domainId);
+            } else {
+              advanceTo(5);
+            }
           }}
         />
       )}
