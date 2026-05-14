@@ -488,6 +488,14 @@ router.get('/domain/:id/report', authenticateToken, async (req: Request, res: Re
   for (const p of queriedPrompts) if (p.keywordId) queriedKeywordIds.add(p.keywordId);
   const queriedKeywords = keywords.filter((k) => queriedKeywordIds.has(k.id));
 
+  // Map keyword.id → { term, intent } so each prompt row can carry its source
+  // keyword. The worksheet importer needs this to seed the topic's primary
+  // keyword instead of regenerating one from the prompt phrase.
+  const keywordById = new Map<number, { term: string; intent: string | null }>();
+  for (const k of keywords) {
+    keywordById.set(k.id, { term: k.term, intent: k.intent ?? null });
+  }
+
   // Convert raw -10..10 sentiment into the 0..10 scale the page expects:
   //   raw  -10 →  0    (Negative)
   //   raw    0 →  5    (Neutral)
@@ -598,6 +606,9 @@ router.get('/domain/:id/report', authenticateToken, async (req: Request, res: Re
         ? Number((built.reduce((s, r) => s + r.overall, 0) / total).toFixed(2))
         : 0;
       const competitors = rollupCompetitors(built);
+      // Source keyword that produced this prompt — passed through so the
+      // worksheet importer can seed the topic's primary keyword.
+      const parentKw = p.keywordId ? keywordById.get(p.keywordId) ?? null : null;
       return {
         id: `pr-${p.id}`,
         rawId: p.id,
@@ -607,6 +618,8 @@ router.get('/domain/:id/report', authenticateToken, async (req: Request, res: Re
         intent: p.intent,
         source: p.source,
         keywordId: p.keywordId,
+        keyword: parentKw?.term ?? null,
+        keywordIntent: parentKw?.intent ?? null,
         sov: `${sovPct}%`,
         mentions,
         bestRank: mentions,

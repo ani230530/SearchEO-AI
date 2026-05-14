@@ -61,6 +61,45 @@ const sanitizeDifficulty = (value: unknown): string => {
   return DEFAULT_DIFFICULTY;
 };
 
+/**
+ * Keyword vs phrase classifier. Returns true when the candidate looks
+ * like a real SEO keyword (what a user types in a search box), false
+ * when it looks like a marketing phrase or a full sentence.
+ *
+ * Rules — all must hold for a candidate to pass:
+ *   • Total length ≤ 50 chars (real keywords are short)
+ *   • Word count ≤ 7 (long-tails top out around 6 words; 7+ reads as phrase)
+ *   • No terminating punctuation other than nothing (no '.', '!', '?')
+ *   • Does NOT start with a question word in lowercase ("what", "how",
+ *     "why", "when", "where", "which", "who"). FAQ-style "what is X"
+ *     queries belong on the prompt side of the schema, not as keywords.
+ *   • Does NOT contain superlative marketing phrasing
+ *     ("best ... for", "top ... for", "ultimate guide to"). These are
+ *     content angles, not keywords.
+ *
+ * This is a CHEAP heuristic on top of the LLM output — the LLM is told
+ * the rules in its prompt, and most of the time it complies. This
+ * catches the remaining ~10% of bad outputs.
+ */
+export function isKeywordShaped(candidate: string): boolean {
+  const term = candidate.trim();
+  if (!term) return false;
+  if (term.length > 50) return false;
+  const wordCount = term.split(/\s+/).filter(Boolean).length;
+  if (wordCount > 7) return false;
+  if (/[.!?]/.test(term)) return false;
+  const lower = term.toLowerCase();
+  if (/^(what|how|why|when|where|which|who)\b/.test(lower)) return false;
+  if (
+    /\b(best\s+\S+\s+for|top\s+\S+\s+for|ultimate\s+guide|complete\s+guide|step[-\s]?by[-\s]?step)\b/.test(
+      lower
+    )
+  ) {
+    return false;
+  }
+  return true;
+}
+
 const extractJsonFromResponse = (response: string): any => {
   const trimmed = response.trim();
   if (!trimmed) return null;
@@ -71,16 +110,37 @@ const extractJsonFromResponse = (response: string): any => {
   return JSON.parse(candidate);
 };
 
-const callOpenAiJson = async <T>(prompt: string, fallback: () => T): Promise<T> => {
+interface OpenAiJsonOptions {
+  /** Override the default content-strategist system prompt. Used by the
+   *  keyword-suggest path which needs an SEO-analyst persona instead.
+   *  When omitted, the default creative-strategist persona is used. */
+  systemPrompt?: string;
+  /** Temperature override. Defaults to 0.8 for the strategist persona;
+   *  the keyword path drops this to 0.3 for more structured output. */
+  temperature?: number;
+  /** Cap output length. Defaults to OpenAI's model default. Lower
+   *  values are useful for short structured outputs (keywords) where
+   *  verbosity is failure. */
+  maxTokens?: number;
+}
+
+const callOpenAiJson = async <T>(
+  prompt: string,
+  fallback: () => T,
+  options: OpenAiJsonOptions = {}
+): Promise<T> => {
   if (!openai) return fallback();
   try {
     const completion = await openai.chat.completions.create({
       model: CAMPAIGN_AI_MODEL,
-      temperature: 0.8,
+      temperature: options.temperature ?? 0.8,
+      max_tokens: options.maxTokens,
+      response_format: { type: 'json_object' },
       messages: [
         {
           role: 'system',
           content:
+            options.systemPrompt ??
             'You are an expert content marketing strategist. Generate creative, diverse, and unique ideas. Always return valid JSON that matches the requested schema.',
         },
         { role: 'user', content: prompt },
@@ -187,7 +247,15 @@ GUIDELINES for VARIETY:
 - Explore different content angles: Technical/Deep-Dive, Strategic/Management, Trend/Future-focused, Beginners Guide, or Contrarian/Opinion.
 - Don't only do "How to" guides. Mix in "Why X is the future", "The state of Y", or "Strategic approach to Z".
 - Each topic must have a distinct angle — no overlapping themes.
-- For every topic, return 4–6 keywords. The first keyword should be the primary search term; the rest are longtails.
+
+KEYWORD RULES (every keyword on every topic):
+- Return 4–6 keywords per topic. First keyword = primary head term (1–3 words); rest are midtail/longtail variants (2–5 words).
+- A keyword is what a user types in a search box. NEVER a question, NEVER a sentence, NEVER a marketing phrase.
+- Each keyword MUST be 1–5 words and 3–50 chars. NO trailing punctuation.
+- Do NOT start a keyword with question words ("what", "how", "why", "when", "where", "which", "who").
+- Do NOT use marketing patterns like "best X for Y", "top X for Y", "ultimate guide to X" — those are content angles, not keywords.
+- GOOD: "version control", "git for distributed teams", "self-hosted git", "private git hosting".
+- BAD:  "best version control platform for remote teams" (phrase), "what is git" (question), "ultimate guide to git" (marketing).
 
 Random Seed: ${Date.now()}
 
@@ -317,6 +385,30 @@ Only return JSON.`;
   return { title, summary };
 }
 
+/**
+ * Suggest crisp short SEO keywords for a worksheet topic.
+ *
+ * Quality bar
+ * -----------
+ * The previous prompt asked for "longtail variants" and the LLM
+ * obediently produced 7-10 word phrases ("best version control
+ * platform for remote collaboration"). We now:
+ *
+ *   1. Use an SEO-analyst system persona (not creative strategist).
+ *      Drops temperature from 0.8 → 0.3 — keywords are not creative
+ *      writing, they're structured data.
+ *   2. Give explicit GOOD/BAD examples in the user prompt, including
+ *      character counts and word counts for each tier (head / midtail
+ *      / longtail).
+ *   3. Cap max_tokens at 400 to discourage rambling output.
+ *   4. Use response_format: json_object (defined in callOpenAiJson).
+ *   5. Apply a server-side validator (isKeywordShaped) that drops
+ *      candidates that still look like phrases or questions. On
+ *      shortfall, ask once more with the rejects called out.
+ *   6. Respect existingTerms — never suggest a term the row already
+ *      has. The caller (the route) is also responsible for never
+ *      demoting an existing primary on the same import.
+ */
 export async function generateKeywordsSuggestion(
   context: BaseAiContext & {
     topicTitle: string;
@@ -355,55 +447,141 @@ export async function generateKeywordsSuggestion(
     ? `\nProject Name: ${campaignTitle}\nProject Goal: ${campaignDescription || 'Not provided'}`
     : '';
   const exclusion = existingTerms.length
-    ? `\nDO NOT suggest any of these (already on the row): ${existingTerms.slice(0, 16).join(', ')}.`
+    ? `\nALREADY ON THIS ROW (do not propose any of these): ${existingTerms.slice(0, 16).join(', ')}.`
     : '';
 
-  const prompt = `
-Suggest ${count} SEO keywords for the worksheet topic "${topicTitle}" on ${domainUrl}.
+  const buildPrompt = (extraRejects: string[] = []) => `
+You are doing keyword research for the worksheet topic: "${topicTitle}" on ${domainUrl}.
 Company context: ${domainContext || 'Not provided'}${geoContext}${voiceContext}${audienceContext}${campaignContext}
-Domain priority keywords (for tone/space alignment): ${domainKeywords.slice(0, 8).join(', ') || 'none'}.${exclusion}
-- The first keyword you return MUST be the strongest primary search term for this topic.
-- The rest should be supporting longtail variants (more specific, lower volume).
-- Each keyword must be a real search-intent phrase, not a category label.
+Domain priority terms (for space/intent alignment): ${domainKeywords.slice(0, 8).join(', ') || 'none'}.${exclusion}${
+    extraRejects.length
+      ? `\nRecent REJECTED suggestions (do NOT repeat these — they read as phrases, not keywords): ${extraRejects.join(', ')}.`
+      : ''
+  }
+
+Output ${count} SEO KEYWORDS. A keyword is what a user types in a search box.
+
+STRICT RULES — every keyword you return MUST satisfy ALL of these:
+  • 1 to 5 words. Never more than 5.
+  • 3 to 50 characters total.
+  • NO trailing punctuation (no '.', '!', '?').
+  • NO question words at the start ("what", "how", "why", "when", "where", "which", "who").
+    Those are PROMPTS, not keywords.
+  • NO marketing phrases ("best ___ for ___", "top ___ for ___",
+    "ultimate guide to ___"). Those are CONTENT ANGLES, not keywords.
+  • Each keyword should be SEARCHABLE by a real user with intent —
+    not a category label, not a sentence, not a slogan.
+
+Distribution: one HEAD keyword (the strongest primary, 1-3 words),
+then ${Math.max(0, count - 1)} MIDTAIL / LONGTAIL variants (2-5 words each,
+qualified by intent or audience).
+
+EXAMPLES — for a topic about "version control for software teams":
+  ✅ GOOD KEYWORDS (return shape like these):
+       "version control"               (head, 2 words)
+       "git for distributed teams"     (midtail, 4 words)
+       "self-hosted git"               (midtail, 2 words)
+       "git vs mercurial"              (midtail, 3 words)
+       "private git hosting"           (midtail, 3 words)
+  ❌ BAD — DO NOT return things like:
+       "best version control platform for remote collaboration"  (phrase, 7 words, marketing)
+       "what is the best git alternative"                        (question, starts with "what")
+       "How to set up version control for remote teams"          (sentence, starts with "How")
+       "ultimate guide to version control"                       (marketing phrase)
 
 Random Seed: ${Date.now()}
 
-Return JSON:
+Return JSON only:
 {
   "keywords": [
-    { "term": "string", "volume": 1200, "difficulty": "Medium", "intent": "informational" }
+    { "term": "string", "tier": "head"|"midtail"|"longtail", "volume": 1200, "difficulty": "Low"|"Medium"|"High", "intent": "informational"|"commercial"|"transactional"|"navigational" }
   ]
 }
-Only return JSON.`;
+`;
 
   const fallback = () => ({
-    keywords: Array.from({ length: count }).map((_, index) =>
-      buildKeyword(
+    keywords: Array.from({ length: count }).map((_, index) => {
+      // Fallback keeps it short — title + at most one qualifier word.
+      const term =
+        index === 0
+          ? topicTitle.split(/\s+/).slice(0, 3).join(' ').toLowerCase()
+          : `${topicTitle.split(/\s+/).slice(0, 2).join(' ').toLowerCase()} ${
+              ['guide', 'tools', 'tips', 'examples'][index % 4]
+            }`;
+      return buildKeyword(
         {
-          term: `${topicTitle} ${index === 0 ? 'guide' : `angle ${index}`}`,
+          term,
           volume: Math.floor(800 + Math.random() * 1400),
           difficulty: difficultyBuckets[index % difficultyBuckets.length],
         },
-        `${topicTitle} ${index}`
-      )
-    ),
+        term
+      );
+    }),
   });
 
-  const aiResponse = await callOpenAiJson<{ keywords: any[] }>(prompt, fallback);
-  const list =
-    Array.isArray(aiResponse?.keywords) && aiResponse.keywords.length > 0
-      ? aiResponse.keywords
-      : fallback().keywords;
+  const seoSystemPrompt =
+    'You are an SEO keyword research analyst. Output crisp, structured keywords — what a user types in a search box. NOT marketing phrases, NOT questions, NOT full sentences. Return valid JSON exactly matching the requested schema.';
 
-  // De-dupe against existing terms (case-insensitive).
+  // First pass.
+  const firstPass = await callOpenAiJson<{ keywords: any[] }>(
+    buildPrompt(),
+    fallback,
+    { systemPrompt: seoSystemPrompt, temperature: 0.3, maxTokens: 400 }
+  );
+
+  // Validate + de-dupe against existing.
   const seen = new Set(existingTerms.map((t) => t.toLowerCase()));
-  const result: GeneratedKeyword[] = [];
-  for (const kw of list) {
-    const built = buildKeyword(kw, topicTitle);
-    const key = built.term.toLowerCase();
-    if (!key || seen.has(key)) continue;
-    seen.add(key);
-    result.push(built);
+  const accepted: GeneratedKeyword[] = [];
+  const rejected: string[] = [];
+  const consider = (rawList: any[]) => {
+    for (const kw of rawList) {
+      const built = buildKeyword(kw, topicTitle);
+      const term = built.term.trim();
+      const key = term.toLowerCase();
+      if (!key || seen.has(key)) continue;
+      if (!isKeywordShaped(term)) {
+        rejected.push(term);
+        continue;
+      }
+      seen.add(key);
+      accepted.push({ ...built, term });
+      if (accepted.length >= count) break;
+    }
+  };
+  consider(
+    Array.isArray(firstPass?.keywords) && firstPass.keywords.length > 0
+      ? firstPass.keywords
+      : []
+  );
+
+  // If we don't have enough after validation, run ONE follow-up pass
+  // that calls out the rejected candidates so the LLM doesn't repeat
+  // them. Bounded to one retry to keep token spend predictable.
+  if (accepted.length < count && rejected.length > 0) {
+    const secondPass = await callOpenAiJson<{ keywords: any[] }>(
+      buildPrompt(rejected.slice(0, 8)),
+      () => ({ keywords: [] }),
+      { systemPrompt: seoSystemPrompt, temperature: 0.2, maxTokens: 400 }
+    );
+    consider(
+      Array.isArray(secondPass?.keywords) && secondPass.keywords.length > 0
+        ? secondPass.keywords
+        : []
+    );
   }
-  return result.slice(0, count);
+
+  // Final pad-with-fallback if the LLM still fell short.
+  if (accepted.length < count) {
+    for (const f of fallback().keywords) {
+      const term = f.term.trim();
+      const key = term.toLowerCase();
+      if (!key || seen.has(key)) continue;
+      if (!isKeywordShaped(term)) continue;
+      seen.add(key);
+      accepted.push({ ...f, term });
+      if (accepted.length >= count) break;
+    }
+  }
+
+  return accepted.slice(0, count);
 }

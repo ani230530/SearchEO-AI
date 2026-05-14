@@ -561,7 +561,7 @@ router.post(
   asyncHandler(async (req: Request, res: Response) => {
     const userId = (req as AuthenticatedRequest).user.userId;
     const campaignId = parseInt(req.params.id, 10);
-    const { title, description, summary } = req.body;
+    const { title, description, summary, keywords, source: bodySource } = req.body || {};
 
     if (isNaN(campaignId)) {
       return res.status(400).json({ success: false, error: 'Invalid campaign ID' });
@@ -575,20 +575,95 @@ router.post(
       return res.status(404).json({ success: false, error: 'Campaign not found' });
     }
 
-    const maxOrder = await prisma.campaignTopic.aggregate({
-      where: { campaignId },
-      _max: { order: true },
+    // Normalize the optional keyword seed. Callers (e.g. AI-Checker → Worksheet
+    // import) pass the source keyword that produced the prompt so the worksheet
+    // doesn't need to regenerate it from scratch. The first entry is the
+    // primary; any extras come along as longtails.
+    const seedKeywords: Array<{
+      term: string;
+      volume?: number | null;
+      difficulty?: string | null;
+      intent?: string | null;
+      isPrimary?: boolean;
+    }> = Array.isArray(keywords)
+      ? keywords
+          .map((kw: any) => {
+            const term = typeof kw?.term === 'string' ? kw.term.trim() : '';
+            if (!term) return null;
+            return {
+              term,
+              volume:
+                typeof kw?.volume === 'number' && Number.isFinite(kw.volume)
+                  ? kw.volume
+                  : null,
+              difficulty:
+                typeof kw?.difficulty === 'string' && kw.difficulty.trim()
+                  ? kw.difficulty.trim()
+                  : null,
+              intent:
+                typeof kw?.intent === 'string' && kw.intent.trim()
+                  ? kw.intent.trim()
+                  : null,
+              isPrimary: Boolean(kw?.isPrimary),
+            };
+          })
+          .filter((kw): kw is NonNullable<typeof kw> => kw !== null)
+      : [];
+
+    // Dedupe seed keywords case-insensitively, keep first occurrence.
+    const seenTerms = new Set<string>();
+    const dedupedSeeds = seedKeywords.filter((kw) => {
+      const key = kw.term.toLowerCase();
+      if (seenTerms.has(key)) return false;
+      seenTerms.add(key);
+      return true;
     });
 
-    await prisma.campaignTopic.create({
-      data: {
-        campaignId,
-        title: String(title).trim(),
-        description: description?.trim() || null,
-        summary: summary?.trim() || null,
-        order: (maxOrder._max.order ?? 0) + 1,
-        source: CampaignNodeSource.MANUAL,
-      },
+    // Ensure exactly one primary — if none flagged, the first becomes primary.
+    if (dedupedSeeds.length > 0 && !dedupedSeeds.some((kw) => kw.isPrimary)) {
+      dedupedSeeds[0].isPrimary = true;
+    }
+
+    // Topic source — AI when keywords came from an AI-Checker import, else MANUAL.
+    const topicSource: CampaignNodeSource =
+      bodySource === 'AI' || (dedupedSeeds.length > 0 && bodySource !== 'MANUAL')
+        ? CampaignNodeSource.AI
+        : CampaignNodeSource.MANUAL;
+
+    await prisma.$transaction(async (tx) => {
+      const maxOrder = await tx.campaignTopic.aggregate({
+        where: { campaignId },
+        _max: { order: true },
+      });
+
+      const topic = await tx.campaignTopic.create({
+        data: {
+          campaignId,
+          title: String(title).trim(),
+          description: description?.trim() || null,
+          summary: summary?.trim() || null,
+          order: (maxOrder._max.order ?? 0) + 1,
+          source: topicSource,
+        },
+      });
+
+      if (dedupedSeeds.length > 0) {
+        await tx.campaignKeyword.createMany({
+          data: dedupedSeeds.map((kw) => ({
+            topicId: topic.id,
+            term: kw.term,
+            volume: kw.volume ?? null,
+            difficulty: kw.difficulty || DEFAULT_KEYWORD_DIFFICULTY,
+            intent: kw.intent || null,
+            source: topicSource,
+            aiMetadata: {
+              isPrimary: Boolean(kw.isPrimary),
+              isLongtail: !kw.isPrimary,
+              origin: topicSource === CampaignNodeSource.AI ? 'imported' : 'manual',
+            },
+          })),
+        });
+      }
     });
 
     return respondWithStructure(res, campaignId, userId, 201);
