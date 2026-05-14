@@ -25,6 +25,7 @@ type DashboardDomain = {
   context?: string;
   lastAnalyzed?: string;
   currentStep?: number;
+  isCompanyDomain?: boolean;
   metrics?: {
     visibilityScore?: number;
     keywordCount?: number;
@@ -46,6 +47,8 @@ type DomainItem = {
   status: "success" | "inprogress" | "retry";
   /** Wizard step the user left off at (1..5). Used for the resume label. */
   currentStep: number;
+  /** The single user-owned domain marked as the brand's primary site. */
+  isCompanyDomain: boolean;
   visibility?: number;
   topKeywords?: number;
   topPrompts?: number;
@@ -96,6 +99,7 @@ const toItem = (d: DashboardDomain): DomainItem => {
     url: d.url,
     status,
     currentStep: step,
+    isCompanyDomain: Boolean(d.isCompanyDomain),
     visibility: typeof d.metrics?.visibilityScore === "number"
       ? Math.round((d.metrics.visibilityScore as number) * 10) // 0..10 → 0..100 for the bar
       : undefined,
@@ -209,17 +213,14 @@ export function DomainHistorySection({ onMenuItemClick }: DomainHistorySectionPr
 
   const hasDomains = items.length > 0;
 
-  const handleViewReport = (domain: DomainItem) => {
-    navigate(`/ai-results/${maskDomainId(domain.id)}`);
-  };
-
-  const domainMenuItems = [
-    "View AI Dashboard",
-    "View Report",
-    "Track Prompts",
-    "Top Keywords",
-    "Competitors",
-    "Inspect",
+  // AI Dashboard sidebar tabs — these mirror the rail in AIResultsLayout so
+  // a domain card's dropdown lands the user on the same screens they'd reach
+  // by clicking the sidebar inside the AI Dashboard.
+  const aiDashboardTabs: Array<{ label: string; path: (masked: string) => string }> = [
+    { label: "AI Results", path: (m) => `/ai-results/${m}` },
+    { label: "Competitors", path: () => `/airesults-competitors-preview` },
+    { label: "Track Prompts", path: (m) => `/ai-results/${m}/track-prompts` },
+    { label: "Track Keywords", path: (m) => `/ai-results/${m}/track-keywords` },
   ];
 
   return (
@@ -362,46 +363,43 @@ export function DomainHistorySection({ onMenuItemClick }: DomainHistorySectionPr
                         <img src={getLogoUrl(domain.url)} alt={`${domain.name} icon`} className="h-11 w-11 object-contain"/>
                       </span>
                       <div className="min-w-0 flex flex-col items-start">
-                        <button
-                          type="button"
-                          onClick={() => setOpenMenuId((prev) => (prev === domain.id ? null : domain.id))}
-                          className="inline-flex items-center gap-1 text-sm font-semibold text-[#252b33]"
-                        >
-                          {domain.name}
-                          <ChevronDown className="h-3.5 w-3.5" />
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setOpenMenuId((prev) => (prev === domain.id ? null : domain.id))}
+                            className="inline-flex items-center gap-1 text-sm font-semibold text-[#252b33]"
+                          >
+                            {domain.name}
+                            <ChevronDown className="h-3.5 w-3.5" />
+                          </button>
+                          {domain.isCompanyDomain && (
+                            <span
+                              title="Your company's primary domain"
+                              className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-emerald-700"
+                            >
+                              <Check className="h-2.5 w-2.5" />
+                              Company
+                            </span>
+                          )}
+                        </div>
                         <div className="mt-1 block rounded bg-[#eef3fb] px-2 py-0.5 text-[10px] text-[#4e76c7]">
                           {domain.url}
                         </div>
                       </div>
                     </div>
                     {openMenuId === domain.id && (
-                      <div className="absolute z-20 mt-2 w-44 rounded-md border border-[#d7dbe3] bg-white py-1 shadow-lg">
-                        {domainMenuItems.map((item) => (
+                      <div className="absolute z-20 mt-2 w-48 rounded-md border border-[#d7dbe3] bg-white py-1 shadow-lg">
+                        {aiDashboardTabs.map((tab) => (
                           <button
-                            key={item}
+                            key={tab.label}
                             type="button"
                             onClick={() => {
-                              if (item === "Competitors") {
-                                onMenuItemClick?.("competitor-intelligence", domain.id);
-                              } else if (
-                                item === "View AI Dashboard" ||
-                                item === "View Report" ||
-                                item === "Track Prompts" ||
-                                item === "Top Prompts" ||
-                                item === "Top Keywords"
-                              ) {
-                                if (onMenuItemClick) {
-                                  onMenuItemClick("analytics", domain.id);
-                                } else {
-                                  handleViewReport(domain);
-                                }
-                              }
+                              navigate(tab.path(maskDomainId(domain.id)));
                               setOpenMenuId(null);
                             }}
                             className="block w-full px-3 py-2 text-left text-xs text-[#374252] hover:bg-[#f4f6fa]"
                           >
-                            {item}
+                            {tab.label}
                           </button>
                         ))}
                       </div>
