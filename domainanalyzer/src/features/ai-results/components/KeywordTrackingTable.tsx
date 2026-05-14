@@ -498,6 +498,10 @@ export const KeywordTrackingTable = ({
 }) => {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [tableMetric, setTableMetric] = useState<string | null>(null);
+  // showAll toggles between the default truncated view (10 rows) and
+  // the full list. Without this, any keyword past row 10 was permanently
+  // unreachable. See the "View all" / "Show less" button in the footer.
+  const [showAll, setShowAll] = useState(false);
 
   const displayData = useMemo(() => {
     let items = [...data];
@@ -513,8 +517,8 @@ export const KeywordTrackingTable = ({
       });
     }
 
-    return items.slice(0, 10);
-  }, [data, tableMetric]);
+    return showAll ? items : items.slice(0, 10);
+  }, [data, tableMetric, showAll]);
 
   return (
     <Card className="border-none bg-transparent shadow-none">
@@ -760,15 +764,17 @@ export const KeywordTrackingTable = ({
         </div>
         <div className="mt-2 flex items-center gap-3 border-t border-slate-200 px-6 py-3">
           <span className="text-[11px] font-medium tracking-tight text-[#64748b]">
-            Showing {displayData.length} of 80 prompts
+            Showing {displayData.length} of {data.length} keywords
           </span>
           <div className="h-4 w-[1px] bg-slate-200" />
-          <Button
-            variant="outline"
-            className="h-8 rounded-[8px] border-[#e2e8f0] bg-[#f8fafc] px-3 text-[11px] font-semibold text-[#334155] shadow-none hover:bg-slate-100"
+          <button
+            type="button"
+            onClick={() => setShowAll((v) => !v)}
+            disabled={showAll ? false : displayData.length >= data.length}
+            className="rounded-lg bg-gray-50/80 px-2.5 py-1 text-[11px] font-bold text-[#3B82F6] transition-all hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            View Prompt Library
-          </Button>
+            {showAll ? "Show less" : "View all"}
+          </button>
         </div>
       </CardContent>
     </Card>
