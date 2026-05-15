@@ -252,7 +252,7 @@ export function DashboardSidebar({
           <div className="sidebar-header-inner">
             {isSidebarExpanded ? (
               <div className="sidebar-brand">
-                <h1 className="sidebar-title">SearchEO.ai</h1>
+                <h1 className="sidebar-title">SearchEO AI</h1>
               </div>
             ) : (
               <div className="sidebar-brand-spacer" aria-hidden="true" />

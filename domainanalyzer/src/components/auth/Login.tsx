@@ -469,7 +469,7 @@ const Login: React.FC<LoginProps> = ({ onSwitchToRegister, onStepChange }) => {
           </div>
 
           <p className="mt-auto pb-2 text-center text-[11px] leading-5 text-[#7b8491]">
-            &copy; 2026 SearchEO.AI. All rights reserved.
+            &copy; 2026 SearchEO AI. All rights reserved.
           </p>
         </div>
       </div>
