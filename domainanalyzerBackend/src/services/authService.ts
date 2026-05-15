@@ -138,11 +138,6 @@ export class AuthService {
       throw new Error('Invalid email or password');
     }
 
-    // Require verified email
-    if (!user.emailVerified) {
-      throw new Error('Please verify your email before logging in');
-    }
-
     // Generate tokens
     const token = this.generateToken(user.id, user.email);
     const refreshToken = this.generateRefreshToken(user.id, user.email);
