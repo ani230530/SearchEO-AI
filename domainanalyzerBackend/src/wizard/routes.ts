@@ -36,6 +36,7 @@ import { runOnePrompt, runQueries } from './runService';
 import { computePhraseVisibility, computeOpportunities, computeCompetitorAnalysis } from './analyticsService';
 import { enrichOpportunities, type EnrichedOpportunity } from './opportunityEnrichment';
 import { enrichCompetitorInsights, type CompetitorInsight } from './competitorInsightEnrichment';
+import { scoreResponse as llmScoreResponse } from './scoreService';
 
 const prisma = new PrismaClient();
 const router = Router();
@@ -1574,6 +1575,163 @@ router.post('/domain/:id/competitors/select', authenticateOrSession(), async (re
   // in-progress and resumes the user back to it on refresh.
   await setPhase(prisma, domain.id, 'competitors', 'completed');
   return res.json({ domainId: domain.id, selectedHosts: cleaned });
+});
+
+// ── POST /domain/:id/competitors/add ───────────────────────────────────────
+//
+// Inline "Add competitor" from the AI Checker Competitors page.
+//
+//   1. Upserts the Competitor row (isSelected=true, source='manual' for new
+//      rows; preserves existing source for already-known rows so the next
+//      pipeline run doesn't demote them).
+//   2. Re-scores every AiQueryResult from the latest completed AiRun against
+//      this single new competitor — reusing the saved response text, so we
+//      don't pay for fresh ChatGPT/Claude/Gemini calls. Only the cheap
+//      scorer LLM (gpt-4o-mini) runs.
+//   3. Merges the new mentions back into each row's competitorMentions JSON
+//      and adds the host to competitorHosts.
+//   4. Invalidates the per-AiRun competitorInsights cache so the next
+//      /competitor-analysis call re-enriches with the new competitor in the
+//      mix.
+//
+// Cost: ~$0.0001 per AiQueryResult row. p95 ≈ 10s for a 90-row run with
+// concurrency of 6.
+
+router.post('/domain/:id/competitors/add', authenticateToken, async (req: Request, res: Response) => {
+  const got = await ensureDomain(req, req.params.id);
+  if (!got.ok) return res.status(got.status).json({ error: got.error });
+  const { domain } = got;
+
+  const rawHost = typeof (req.body ?? {}).host === 'string' ? (req.body as { host: string }).host : '';
+  const newHost = extractHost(rawHost);
+  if (!newHost) return res.status(400).json({ error: 'host must be a valid domain' });
+
+  // ── 1. Upsert the Competitor row ──────────────────────────────────────
+  const existing = await prisma.competitor.findUnique({
+    where: { domainId_competitorHost: { domainId: domain.id, competitorHost: newHost } },
+  });
+  if (existing) {
+    if (!existing.isSelected) {
+      await prisma.competitor.update({ where: { id: existing.id }, data: { isSelected: true } });
+    }
+  } else {
+    await prisma.competitor.create({
+      data: {
+        domainId: domain.id,
+        competitorHost: newHost,
+        source: 'manual',
+        isSelected: true,
+        verified: false,
+        rawSignals: { sources: ['manual'] } as any,
+      },
+    });
+  }
+
+  // ── 2. Find the latest completed run ──────────────────────────────────
+  const latestRun = await prisma.aiRun.findFirst({
+    where: { domainId: domain.id, status: 'completed' },
+    orderBy: { startedAt: 'desc' },
+  });
+  if (!latestRun) {
+    return res.json({ host: newHost, scoredRows: 0, totalRows: 0, skipped: 'no-run' });
+  }
+
+  // ── 3. Load rows + prompt text for scoring ─────────────────────────────
+  const allResults = await prisma.aiQueryResult.findMany({
+    where: { runId: latestRun.id },
+    select: {
+      id: true,
+      promptId: true,
+      model: true,
+      response: true,
+      competitorMentions: true,
+      competitorHosts: true,
+    },
+  });
+  const scoreable = allResults.filter((r) => typeof r.response === 'string' && r.response.trim().length > 0);
+
+  const promptIds = Array.from(new Set(scoreable.map((r) => r.promptId)));
+  const prompts = await prisma.prompt.findMany({
+    where: { id: { in: promptIds } },
+    select: { id: true, text: true },
+  });
+  const promptText = new Map(prompts.map((p) => [p.id, p.text]));
+
+  const brandName = domain.inferred?.companyName ?? domain.host;
+  const brandFacts = domain.inferred?.summary ?? '';
+
+  // ── 4. Concurrent batched re-scoring against ONLY the new competitor ──
+  const CONCURRENCY = 6;
+  let scoredRows = 0;
+  for (let i = 0; i < scoreable.length; i += CONCURRENCY) {
+    const batch = scoreable.slice(i, i + CONCURRENCY);
+    await Promise.all(batch.map(async (row) => {
+      const text = promptText.get(row.promptId);
+      if (!text) return;
+      const result = await llmScoreResponse({
+        prompt: text,
+        response: row.response as string,
+        brand: { name: brandName, aliases: [], host: domain.host },
+        competitors: [{ name: newHost, host: newHost }],
+        brandFacts,
+      }).catch(() => null);
+      if (!result) return;
+
+      // Filter the result to mentions for the new host (LLM may also surface
+      // others it "spots in the response" — we discard those here so we don't
+      // pollute the row with un-tracked competitors).
+      const matched = (result.competitorMentions ?? []).filter((m) => {
+        const h = (m.host ?? m.name ?? '').toLowerCase();
+        return h === newHost || h.endsWith(`.${newHost}`);
+      });
+      if (matched.length === 0) {
+        // Even with no mention, ensure the row's competitorHosts array
+        // doesn't need an update — short-circuit.
+        return;
+      }
+
+      const newMention = {
+        host: newHost,
+        count: matched.reduce((s, m) => s + (m.mentionCount ?? 1), 0),
+        sentiment: matched.find((m) => typeof m.sentiment === 'number')?.sentiment ?? null,
+        rankPosition: matched.find((m) => typeof m.rankPosition === 'number')?.rankPosition ?? null,
+      };
+
+      const existingMentions = Array.isArray(row.competitorMentions) ? (row.competitorMentions as Array<{ host?: string }>) : [];
+      const mergedMentions = [
+        ...existingMentions.filter((m) => (m.host ?? '').toLowerCase() !== newHost),
+        newMention,
+      ];
+      const existingHosts = Array.isArray(row.competitorHosts) ? (row.competitorHosts as string[]) : [];
+      const mergedHosts = existingHosts.includes(newHost) ? existingHosts : [...existingHosts, newHost];
+
+      await prisma.aiQueryResult.update({
+        where: { id: row.id },
+        data: {
+          competitorMentions: mergedMentions as any,
+          competitorHosts: mergedHosts as any,
+        },
+      });
+      scoredRows += 1;
+    }));
+  }
+
+  // ── 5. Invalidate the per-run insight cache ───────────────────────────
+  const summary = (latestRun.summary as Record<string, unknown> | null) ?? null;
+  if (summary && ('competitorInsights' in summary || 'competitorInsightsKeys' in summary)) {
+    const { competitorInsights: _ci, competitorInsightsKeys: _ck, competitorInsightsAt: _ca, ...rest } = summary as any;
+    await prisma.aiRun.update({
+      where: { id: latestRun.id },
+      data: { summary: rest as any },
+    }).catch((err) => console.warn('[competitors/add] cache invalidation failed', err));
+  }
+
+  return res.json({
+    host: newHost,
+    scoredRows,
+    totalRows: scoreable.length,
+    skipped: null,
+  });
 });
 
 // ── POST /domain/:id/topics ────────────────────────────────────────────────

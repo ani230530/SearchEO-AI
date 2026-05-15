@@ -4,8 +4,11 @@ import {
   ChevronDown,
   ChevronRight,
   Info,
+  Loader2,
+  Plus,
   Search,
   Sparkles,
+  X,
 } from 'lucide-react';
 import {
   CartesianGrid,
@@ -32,7 +35,7 @@ import type {
   AiResponseAnalysisData,
   PromptGapContext,
 } from '@/components/competitors/aiResponseAnalysisData';
-import { apiGet } from '../services/apiClient';
+import { apiGet, apiPost } from '../services/apiClient';
 import { AIResultsLayout } from '@/features/ai-results/components/AIResultsLayout';
 import { maskDomainId } from '@/lib/domainUtils';
 import { useNavigate } from 'react-router-dom';
@@ -80,6 +83,8 @@ interface SelectedCompetitor {
   logoUrl: string;
   rank: number | null;
   threatLevel: string | null;
+  /** True while an inline-add re-scoring pass is in flight for this competitor. */
+  loading?: boolean;
 }
 
 interface ReportOpportunity {
@@ -377,13 +382,68 @@ function InsightCard({ title, items }: { title: string; items: string[] }) {
 
 // ── Competitor selector pills ──────────────────────────────────────────────
 
-function CompetitorSelector({ competitors, onAdd }: { competitors: SelectedCompetitor[]; onAdd: () => void }) {
+function normalizeHostInput(raw: string): string | null {
+  const trimmed = raw.trim().toLowerCase();
+  if (!trimmed) return null;
+  // Strip protocol + www + trailing path/slash.
+  const cleaned = trimmed
+    .replace(/^https?:\/\//, '')
+    .replace(/^www\./, '')
+    .replace(/\/.*$/, '')
+    .replace(/:\d+$/, '');
+  // Basic shape check — at least one dot, no spaces, valid chars.
+  if (!/^[a-z0-9][a-z0-9.-]*\.[a-z]{2,}$/i.test(cleaned)) return null;
+  return cleaned;
+}
+
+function CompetitorSelector({
+  competitors,
+  onAdd,
+}: {
+  competitors: SelectedCompetitor[];
+  onAdd: (host: string) => Promise<void>;
+}) {
   const [search, setSearch] = useState('');
+  const [adding, setAdding] = useState(false);
+  const [draft, setDraft] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [localError, setLocalError] = useState<string | null>(null);
+
   const filtered = useMemo(() => {
     if (!search.trim()) return competitors;
     const q = search.toLowerCase();
     return competitors.filter((c) => c.host.toLowerCase().includes(q));
   }, [competitors, search]);
+
+  const cancelAdd = () => {
+    setAdding(false);
+    setDraft('');
+    setLocalError(null);
+  };
+
+  const submitAdd = async () => {
+    const host = normalizeHostInput(draft);
+    if (!host) {
+      setLocalError('Enter a valid domain (e.g. example.com).');
+      return;
+    }
+    if (competitors.some((c) => c.host.toLowerCase() === host)) {
+      setLocalError('Already tracked.');
+      return;
+    }
+    setLocalError(null);
+    setSubmitting(true);
+    try {
+      await onAdd(host);
+      setAdding(false);
+      setDraft('');
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to add competitor.';
+      setLocalError(msg);
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
     <section className="flex flex-col gap-3">
@@ -399,19 +459,61 @@ function CompetitorSelector({ competitors, onAdd }: { competitors: SelectedCompe
             placeholder="Filter tracked competitors"
           />
         </div>
-        <button
-          type="button"
-          onClick={onAdd}
-          className="inline-flex h-9 items-center gap-2 rounded bg-[#243B5A] px-4 text-xs font-semibold text-white shadow-sm transition hover:bg-[#1F334D]"
-        >
-          Manage list
-        </button>
+
+        {adding ? (
+          <div className="flex w-full items-center gap-2 sm:w-auto">
+            <input
+              autoFocus
+              aria-label="New competitor domain"
+              value={draft}
+              onChange={(e) => { setDraft(e.target.value); if (localError) setLocalError(null); }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') { e.preventDefault(); void submitAdd(); }
+                else if (e.key === 'Escape') { e.preventDefault(); cancelAdd(); }
+              }}
+              disabled={submitting}
+              placeholder="e.g. stripe.com"
+              className="h-9 w-full rounded border border-slate-300 bg-white px-3 text-xs text-[#2D4059] outline-none placeholder:text-[#A0A7B2] focus:border-[#1E9BFF] sm:w-[240px]"
+            />
+            <button
+              type="button"
+              onClick={() => void submitAdd()}
+              disabled={submitting}
+              className="inline-flex h-9 items-center gap-2 rounded bg-[#243B5A] px-4 text-xs font-semibold text-white shadow-sm transition hover:bg-[#1F334D] disabled:opacity-60"
+            >
+              {submitting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+              Add
+            </button>
+            <button
+              type="button"
+              onClick={cancelAdd}
+              disabled={submitting}
+              className="inline-flex h-9 items-center gap-1 rounded border border-slate-200 bg-white px-3 text-xs font-semibold text-[#5F6877] transition hover:bg-slate-50 disabled:opacity-60"
+            >
+              <X className="h-3.5 w-3.5" />
+              Cancel
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setAdding(true)}
+            className="inline-flex h-9 items-center gap-2 rounded bg-[#243B5A] px-4 text-xs font-semibold text-white shadow-sm transition hover:bg-[#1F334D]"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Add competitor
+          </button>
+        )}
       </div>
+
+      {localError ? (
+        <p className="text-xs font-medium text-[#D83A3A]">{localError}</p>
+      ) : null}
 
       {filtered.length === 0 ? (
         <p className="rounded-md border border-dashed border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-500">
           {competitors.length === 0
-            ? 'No competitors selected yet. Run the audit wizard to discover competitors for this domain.'
+            ? 'No competitors selected yet. Add one above or run the audit wizard to discover competitors for this domain.'
             : 'No competitors match the current search.'}
         </p>
       ) : (
@@ -419,12 +521,18 @@ function CompetitorSelector({ competitors, onAdd }: { competitors: SelectedCompe
           {filtered.map((c, idx) => (
             <span
               key={c.host}
-              className="inline-flex h-9 items-center gap-2 rounded border border-slate-200 bg-white px-3 text-xs font-semibold text-[#2D4059] shadow-sm"
+              title={c.loading ? 'Scoring against saved AI responses…' : c.host}
+              className={`inline-flex h-9 items-center gap-2 rounded border border-slate-200 bg-white px-3 text-xs font-semibold shadow-sm ${c.loading ? 'text-[#7B8494]' : 'text-[#2D4059]'}`}
             >
-              <span className="grid h-6 w-6 place-items-center overflow-hidden rounded" style={{ backgroundColor: `${colorForHost(c.host, idx)}22` }}>
-                <img src={c.logoUrl} alt="" className="h-5 w-5 object-contain" />
+              <span className="relative grid h-6 w-6 place-items-center overflow-hidden rounded" style={{ backgroundColor: `${colorForHost(c.host, idx)}22` }}>
+                {c.loading ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin text-[#5F6877]" />
+                ) : (
+                  <img src={c.logoUrl} alt="" className="h-5 w-5 object-contain" />
+                )}
               </span>
               {c.host}
+              {c.loading ? <span className="ml-1 text-[10px] font-normal text-[#7B8494]">Scoring…</span> : null}
             </span>
           ))}
         </div>
@@ -1123,6 +1231,41 @@ export default function CompetitorsPage() {
     return { value: `${diff >= 0 ? '+' : ''}${diff.toFixed(1)}%`, positive: diff >= 0 };
   }, [state.trends]);
 
+  // Inline add: optimistically push a "loading" pill, POST to the backend
+  // (which re-scores every saved AiQueryResult against the new competitor),
+  // then refetch /competitors and /competitor-analysis so the cards / bubble
+  // chart / detail drawer all pick up the freshly-extracted data.
+  const handleAddCompetitor = async (host: string): Promise<void> => {
+    if (!currentDomain?.id) {
+      throw new Error('No domain selected.');
+    }
+    const optimistic: SelectedCompetitor = {
+      host,
+      url: `https://${host}`,
+      logoUrl: competitorLogo(host, 32),
+      rank: null,
+      threatLevel: null,
+      loading: true,
+    };
+    setState((s) => ({ ...s, selected: [...s.selected, optimistic] }));
+    try {
+      await apiPost(`/wizard/domain/${currentDomain.id}/competitors/add`, { host });
+      const [analysis, sel] = await Promise.all([
+        apiGet<CompetitorAnalysisResponse>(`/wizard/domain/${currentDomain.id}/competitor-analysis`).catch(() => state.analysis),
+        apiGet<{ competitors: SelectedCompetitor[] }>(`/wizard/domain/${currentDomain.id}/competitors`).catch(() => ({ competitors: state.selected.filter((c) => !c.loading) })),
+      ]);
+      setState((s) => ({
+        ...s,
+        analysis: analysis ?? s.analysis,
+        selected: sel?.competitors ?? s.selected.filter((c) => !c.loading),
+      }));
+    } catch (err) {
+      // Remove the optimistic pill and rethrow so the selector shows the error.
+      setState((s) => ({ ...s, selected: s.selected.filter((c) => !(c.host === host && c.loading)) }));
+      throw err;
+    }
+  };
+
   const closeDrawer = () => {
     setActiveDrawer(null);
     setSelectedCompetitor(null);
@@ -1203,7 +1346,7 @@ export default function CompetitorsPage() {
                 </div>
               </section>
 
-              <CompetitorSelector competitors={state.selected} onAdd={() => navigate('/ai-checker-v2')} />
+              <CompetitorSelector competitors={state.selected} onAdd={handleAddCompetitor} />
 
               <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.45fr)_minmax(360px,0.85fr)]">
                 <TrendComparisonPanel trends={state.trends} />
