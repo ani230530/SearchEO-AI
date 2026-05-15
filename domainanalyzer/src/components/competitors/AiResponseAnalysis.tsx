@@ -1,10 +1,11 @@
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import { MOCK_AI_RESPONSE_ANALYSIS, type AiResponseAnalysisData, type PromptGapContext } from './aiResponseAnalysisData';
+import type { AiResponseAnalysisData, PromptGapContext } from './aiResponseAnalysisData';
 
 interface AiResponseAnalysisProps {
-  data?: AiResponseAnalysisData;
+  data: AiResponseAnalysisData | null;
   prompt?: PromptGapContext | null;
+  loading?: boolean;
 }
 
 function StatCard({
@@ -117,8 +118,8 @@ function AnalysisHeader({
   );
 }
 
-function PromptContextLine({ prompt }: { prompt?: PromptGapContext | null }) {
-  const text = prompt?.title ?? MOCK_AI_RESPONSE_ANALYSIS.promptLabel;
+function PromptContextLine({ prompt, fallback }: { prompt?: PromptGapContext | null; fallback: string }) {
+  const text = prompt?.title ?? fallback;
   return (
     <p className="text-sm text-slate-600">
       Prompt : <span className="italic text-slate-900">{text}</span>
@@ -126,13 +127,34 @@ function PromptContextLine({ prompt }: { prompt?: PromptGapContext | null }) {
   );
 }
 
-export function AiResponseAnalysis({ data = MOCK_AI_RESPONSE_ANALYSIS, prompt }: AiResponseAnalysisProps) {
+export function AiResponseAnalysis({ data, prompt, loading }: AiResponseAnalysisProps) {
+  if (loading || !data) {
+    return (
+      <div className="flex min-h-full flex-col px-4 py-4 sm:px-5">
+        <AnalysisHeader
+          title={loading ? 'Loading AI Response Analysis…' : 'AI Response Analysis'}
+          subtitle={loading ? 'Aggregating mentions, sentiment, and ranking across this prompt.' : 'No response data available for this opportunity yet.'}
+        />
+        {prompt ? (
+          <div className="mt-3">
+            <PromptContextLine prompt={prompt} fallback="" />
+          </div>
+        ) : null}
+        <div className="mt-6 grid gap-3 sm:grid-cols-4">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="h-20 rounded-lg bg-slate-100" />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex min-h-full flex-col px-4 py-4 sm:px-5">
       <AnalysisHeader title={data.title} subtitle={data.subtitle} />
 
       <div className="mt-3">
-        <PromptContextLine prompt={prompt} />
+        <PromptContextLine prompt={prompt} fallback={data.promptLabel} />
       </div>
 
       <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">

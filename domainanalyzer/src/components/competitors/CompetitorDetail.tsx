@@ -2,14 +2,13 @@ import { ArrowRight, Calendar, Sparkles, Users, BadgeCheck } from 'lucide-react'
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import {
-  AHREFS_COMPETITOR_DETAIL,
   competitorPriorityStyles,
   type CompetitorDetailData,
   type CompetitorInsightPriority,
 } from './competitorDetailData';
 
 interface CompetitorDetailProps {
-  competitor?: CompetitorDetailData;
+  competitor: CompetitorDetailData;
 }
 
 function DetailHeader({ competitor }: { competitor: CompetitorDetailData }) {
@@ -184,7 +183,8 @@ function StrategyCallCard({ competitor }: { competitor: CompetitorDetailData }) 
   );
 }
 
-export function CompetitorDetail({ competitor = AHREFS_COMPETITOR_DETAIL }: CompetitorDetailProps) {
+export function CompetitorDetail({ competitor }: CompetitorDetailProps) {
+  const hasInsights = competitor.insights.length > 0;
   return (
     <div className="flex min-h-full flex-col">
       <DetailHeader competitor={competitor} />
@@ -209,7 +209,13 @@ export function CompetitorDetail({ competitor = AHREFS_COMPETITOR_DETAIL }: Comp
 
         <section className="space-y-3">
           <h3 className="text-base font-semibold text-slate-900">Competitive Insights</h3>
-          <InsightsTable competitor={competitor} />
+          {hasInsights ? (
+            <InsightsTable competitor={competitor} />
+          ) : (
+            <p className="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-center text-sm text-slate-500">
+              No insights yet — re-run the audit to generate strength / weakness analysis for this competitor.
+            </p>
+          )}
         </section>
 
         <section>

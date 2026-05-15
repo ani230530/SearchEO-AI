@@ -588,6 +588,238 @@ export function computeOpportunities(
   return filtered.slice(0, 12);
 }
 
+// ── Competitor Analysis ────────────────────────────────────────────────────
+//
+// Per-competitor rollup powering the AI Checker "Competitors" page (cards
+// grid, bubble chart, detail drawer). Uses the same input shape as
+// computePhraseVisibility / computeOpportunities — single pass over the
+// already-loaded results, no extra DB hits.
+
+export type CompetitorSourceType = 'blog' | 'docs' | 'case_study' | 'comparison' | 'product' | 'other';
+
+export interface CompetitorAnalysisRow {
+  host: string;
+  /** Competitor table metadata (carries through unchanged from DB). */
+  rank: number | null;
+  threatLevel: 'High' | 'Medium' | 'Low' | null;
+  similarityScore: number | null;
+  reasoning: string | null;
+  industry: string | null;
+  companySize: string | null;
+  /** Aggregates derived from AiQueryResult.competitorMentions / citations. */
+  mentions: number;             // total mention count across all results
+  promptCoverage: number;       // distinct prompts the competitor appeared in
+  coveragePct: number;          // promptCoverage / totalQueriedPrompts (0..1)
+  avgSentiment: number | null;  // -10..10 raw; null when no sentiment samples
+  avgRankPosition: number | null;
+  marketShare: number;          // 0..1 of all competitor mentions in run
+  /** Most-common prompt category the competitor wins on. */
+  strongestPromptCluster: { category: string; count: number } | null;
+  /** Citation breakdown filtered to the competitor's own host. */
+  topCitedSourceTypes: Array<{ type: CompetitorSourceType; count: number }>;
+  /** Prompts where this competitor is mentioned — feeds the LLM insight pass. */
+  examplePromptIds: number[];
+}
+
+export interface CompetitorAnalysisOwnBrand {
+  host: string;
+  mentions: number;
+  marketShare: number;
+  avgSentiment: number | null;
+}
+
+export interface CompetitorAnalysisOutput {
+  competitors: CompetitorAnalysisRow[];
+  ownBrand: CompetitorAnalysisOwnBrand;
+  totals: {
+    prompts: number;             // distinct queried prompts
+    results: number;             // total AiQueryResult rows
+    competitorMentions: number;  // sum of mentions across all competitors
+  };
+}
+
+/** Classify a citation URL into a coarse content type. */
+function classifyCitationUrl(url: string): CompetitorSourceType {
+  const path = (() => {
+    try { return new URL(url).pathname.toLowerCase(); } catch { return url.toLowerCase(); }
+  })();
+  if (/\/(blog|articles?|insights?|news|posts?|guides?)\b/.test(path)) return 'blog';
+  if (/\/(docs?|documentation|developer|api|reference|help|support)\b/.test(path)) return 'docs';
+  if (/\/(case-?stud(y|ies)|customers?|success-?stor(y|ies))\b/.test(path)) return 'case_study';
+  if (/\/(compare|comparison|vs|alternatives?|reviews?)\b/.test(path)) return 'comparison';
+  if (/\/(products?|features?|platform|solutions?|pricing)\b/.test(path)) return 'product';
+  return 'other';
+}
+
+export function computeCompetitorAnalysis(input: AnalyticsInput): CompetitorAnalysisOutput {
+  const selectedSet = new Set(input.selectedCompetitorHosts.map((h) => h.toLowerCase()));
+  const promptById = new Map(input.prompts.map((p) => [p.id, p]));
+
+  // Per-competitor accumulators.
+  type Acc = {
+    mentions: number;
+    promptIds: Set<number>;
+    sentimentSum: number;
+    sentimentCount: number;
+    rankSum: number;
+    rankCount: number;
+    categoryCounts: Map<string, number>;
+    sourceTypeCounts: Map<CompetitorSourceType, number>;
+  };
+  const accByHost = new Map<string, Acc>();
+  const ensureAcc = (host: string): Acc => {
+    let a = accByHost.get(host);
+    if (!a) {
+      a = {
+        mentions: 0,
+        promptIds: new Set(),
+        sentimentSum: 0,
+        sentimentCount: 0,
+        rankSum: 0,
+        rankCount: 0,
+        categoryCounts: new Map(),
+        sourceTypeCounts: new Map(),
+      };
+      accByHost.set(host, a);
+    }
+    return a;
+  };
+
+  // Own-brand accumulators.
+  let ownBrandMentions = 0;
+  let ownSentimentSum = 0;
+  let ownSentimentCount = 0;
+
+  // Single pass over results.
+  for (const r of input.results) {
+    ownBrandMentions += r.presence;
+    if (r.presence === 1 && r.sentiment !== null && r.sentiment !== undefined) {
+      ownSentimentSum += r.sentiment;
+      ownSentimentCount += 1;
+    }
+
+    const prompt = promptById.get(r.promptId);
+    const category = prompt?.category ?? 'uncategorized';
+
+    const compMentions = Array.isArray(r.competitorMentions)
+      ? (r.competitorMentions as Array<{ host?: string; count?: number; sentiment?: number | null; rankPosition?: number | null }>)
+      : [];
+    for (const m of compMentions) {
+      const host = (m.host ?? '').toLowerCase();
+      if (!host || !selectedSet.has(host)) continue;
+      const a = ensureAcc(host);
+      const count = typeof m.count === 'number' && m.count > 0 ? m.count : 1;
+      a.mentions += count;
+      a.promptIds.add(r.promptId);
+      if (typeof m.sentiment === 'number') {
+        a.sentimentSum += m.sentiment;
+        a.sentimentCount += 1;
+      }
+      if (typeof m.rankPosition === 'number' && m.rankPosition > 0) {
+        a.rankSum += m.rankPosition;
+        a.rankCount += 1;
+      }
+      a.categoryCounts.set(category, (a.categoryCounts.get(category) ?? 0) + count);
+    }
+
+    // Fallback for legacy competitorHosts array (no count/sentiment).
+    const fallbackHosts = Array.isArray(r.competitorHosts) ? (r.competitorHosts as unknown[]) : [];
+    for (const raw of fallbackHosts) {
+      const host = typeof raw === 'string' ? raw.toLowerCase() : '';
+      if (!host || !selectedSet.has(host)) continue;
+      const a = ensureAcc(host);
+      if (!a.promptIds.has(r.promptId)) {
+        a.mentions += 1;
+        a.promptIds.add(r.promptId);
+        a.categoryCounts.set(category, (a.categoryCounts.get(category) ?? 0) + 1);
+      }
+    }
+
+    // Citation classification — only for hosts in selectedSet.
+    const citations = Array.isArray(r.citations) ? (r.citations as Array<{ host?: string; url?: string }>) : [];
+    for (const c of citations) {
+      const host = (c.host ?? '').toLowerCase();
+      if (!host || !selectedSet.has(host)) continue;
+      const a = ensureAcc(host);
+      const url = typeof c.url === 'string' ? c.url : '';
+      const type = url ? classifyCitationUrl(url) : 'other';
+      a.sourceTypeCounts.set(type, (a.sourceTypeCounts.get(type) ?? 0) + 1);
+    }
+  }
+
+  const totalCompetitorMentions = [...accByHost.values()].reduce((s, a) => s + a.mentions, 0);
+  const totalQueriedPrompts = new Set(input.results.map((r) => r.promptId)).size;
+  const totalMentionsForSov = ownBrandMentions + totalCompetitorMentions;
+
+  const competitors: CompetitorAnalysisRow[] = [...accByHost.entries()].map(([host, a]) => {
+    const strongest = [...a.categoryCounts.entries()].sort((x, y) => y[1] - x[1])[0] ?? null;
+    const topCitedSourceTypes = [...a.sourceTypeCounts.entries()]
+      .map(([type, count]) => ({ type, count }))
+      .sort((x, y) => y.count - x.count)
+      .slice(0, 3);
+    return {
+      host,
+      // metadata is filled in by the route handler from the Competitor table
+      rank: null,
+      threatLevel: null,
+      similarityScore: null,
+      reasoning: null,
+      industry: null,
+      companySize: null,
+      mentions: a.mentions,
+      promptCoverage: a.promptIds.size,
+      coveragePct: totalQueriedPrompts > 0 ? a.promptIds.size / totalQueriedPrompts : 0,
+      avgSentiment: a.sentimentCount > 0 ? Number((a.sentimentSum / a.sentimentCount).toFixed(2)) : null,
+      avgRankPosition: a.rankCount > 0 ? Number((a.rankSum / a.rankCount).toFixed(2)) : null,
+      marketShare: totalCompetitorMentions > 0 ? a.mentions / totalCompetitorMentions : 0,
+      strongestPromptCluster: strongest ? { category: strongest[0], count: strongest[1] } : null,
+      topCitedSourceTypes,
+      examplePromptIds: [...a.promptIds].slice(0, 5),
+    };
+  });
+
+  // Ensure every selected competitor appears even if not yet mentioned in
+  // any response — the cards grid should still render an empty-state row.
+  for (const host of selectedSet) {
+    if (competitors.find((c) => c.host === host)) continue;
+    competitors.push({
+      host,
+      rank: null,
+      threatLevel: null,
+      similarityScore: null,
+      reasoning: null,
+      industry: null,
+      companySize: null,
+      mentions: 0,
+      promptCoverage: 0,
+      coveragePct: 0,
+      avgSentiment: null,
+      avgRankPosition: null,
+      marketShare: 0,
+      strongestPromptCluster: null,
+      topCitedSourceTypes: [],
+      examplePromptIds: [],
+    });
+  }
+
+  competitors.sort((a, b) => b.mentions - a.mentions);
+
+  return {
+    competitors,
+    ownBrand: {
+      host: input.ownDomainHost,
+      mentions: ownBrandMentions,
+      marketShare: totalMentionsForSov > 0 ? ownBrandMentions / totalMentionsForSov : 0,
+      avgSentiment: ownSentimentCount > 0 ? Number((ownSentimentSum / ownSentimentCount).toFixed(2)) : null,
+    },
+    totals: {
+      prompts: totalQueriedPrompts,
+      results: input.results.length,
+      competitorMentions: totalCompetitorMentions,
+    },
+  };
+}
+
 // ── tiny helpers ───────────────────────────────────────────────────────────
 
 function unique<T>(arr: T[]): T[] {
