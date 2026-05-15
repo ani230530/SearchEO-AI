@@ -9,6 +9,10 @@ import {
   lookupSession,
   parseCookieHeader,
 } from '../services/wizardSessionService';
+import {
+  exchangeGoogleAuthCode,
+  getGoogleAuthLoginUrl,
+} from '../services/googleAuthLoginService';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -252,6 +256,79 @@ router.get('/verify-email', asyncHandler(async (req: Request, res: Response) => 
       }
     }
     throw error;
+  }
+}));
+
+// ── Google OAuth ───────────────────────────────────────────────────────────
+
+// GET /api/auth/google/login - Return Google auth URL for login
+router.get('/google/login', (req: Request, res: Response) => {
+  const state = (req.query.state as string) || 'login';
+  try {
+    const url = getGoogleAuthLoginUrl(state);
+    // Return JSON because the frontend uses fetch() to get this URL
+    res.json({ authUrl: url });
+  } catch (error) {
+    console.error('[auth/google/login] failed', error);
+    res.status(500).json({ error: 'Google Auth not configured' });
+  }
+});
+
+// GET /api/auth/google/signup - Return Google auth URL for signup
+router.get('/google/signup', (req: Request, res: Response) => {
+  const state = (req.query.state as string) || 'signup';
+  try {
+    const url = getGoogleAuthLoginUrl(state);
+    res.json({ authUrl: url });
+  } catch (error) {
+    console.error('[auth/google/signup] failed', error);
+    res.status(500).json({ error: 'Google Auth not configured' });
+  }
+});
+
+// GET /api/auth/google/auth-callback - Catch Google redirect and send to frontend
+router.get('/google/auth-callback', (req: Request, res: Response) => {
+  const { code, state, error } = req.query;
+  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+
+  if (error) {
+    console.error('[auth/google/callback] Google returned error:', error);
+    return res.redirect(`${frontendUrl}/auth?google=failed&reason=${error}`);
+  }
+
+  console.log('[auth/google/callback] Success, redirecting to frontend with code');
+  // Redirect back to frontend Auth page with the code
+  res.redirect(`${frontendUrl}/auth?googleCode=${code}&state=${state}`);
+});
+
+// POST /api/auth/google/exchange - Exchange short-lived code for app auth tokens
+router.post('/google/exchange', asyncHandler(async (req: Request, res: Response) => {
+  const { code } = (req.body ?? {}) as { code?: string };
+  if (!code) {
+    res.status(400).json({ error: 'Code is required' });
+    return;
+  }
+
+  try {
+    // 1. Get profile from Google
+    const profile = await exchangeGoogleAuthCode(code);
+
+    // 2. Login or Create user in our DB
+    const result = await authService.loginOrCreateWithGoogleEmail(
+      profile.email,
+      profile.name
+    );
+
+    // 3. Link any in-flight wizard session (shadow user -> real user)
+    let wizardLink = null;
+    if (result.user?.id) {
+      wizardLink = await maybeLinkWizardSession(req, res, result.user.id);
+    }
+
+    res.json({ ...result, wizardLink });
+  } catch (error) {
+    console.error('[auth/google/exchange] failed', error);
+    res.status(500).json({ error: 'Google code exchange failed' });
   }
 }));
 

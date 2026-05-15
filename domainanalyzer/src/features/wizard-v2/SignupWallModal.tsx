@@ -43,7 +43,7 @@ interface SignupWallModalProps {
 }
 
 export function SignupWallModal({ host, onClose, onRegistered }: SignupWallModalProps) {
-  const { register, loading } = useAuth();
+  const { register, startGoogleAuth, loading } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
@@ -84,6 +84,15 @@ export function SignupWallModal({ host, onClose, onRegistered }: SignupWallModal
     }
   };
 
+  const onGoogleSignup = async () => {
+    setError(null);
+    try {
+      await startGoogleAuth('signup');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Google sign up failed.');
+    }
+  };
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4"
@@ -116,6 +125,22 @@ export function SignupWallModal({ host, onClose, onRegistered }: SignupWallModal
         </div>
 
         <form onSubmit={onSubmit} className="space-y-4">
+          <button
+            type="button"
+            onClick={onGoogleSignup}
+            disabled={loading}
+            className="h-12 px-6 w-full inline-flex items-center justify-center gap-2 rounded-md border border-neutral-200 bg-white text-sm font-medium text-neutral-700 shadow-sm hover:bg-neutral-50 active:scale-[0.99] transition disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            <img src="/google.svg" alt="" aria-hidden="true" className="h-4 w-4" />
+            Continue with Google
+          </button>
+
+          <div className="flex items-center gap-2">
+            <div className="h-px flex-1 bg-neutral-200" />
+            <span className="text-xs font-light text-neutral-400">or</span>
+            <div className="h-px flex-1 bg-neutral-200" />
+          </div>
+
           <div>
             <label className="text-sm font-medium text-gray-900 mb-2 block">
               Full name <span className="text-gray-400 font-light">(optional)</span>
