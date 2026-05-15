@@ -35,10 +35,17 @@ import type {
   AiResponseAnalysisData,
   PromptGapContext,
 } from '@/components/competitors/aiResponseAnalysisData';
-import { apiGet, apiPost } from '../services/apiClient';
-import { AIResultsLayout } from '@/features/ai-results/components/AIResultsLayout';
-import { maskDomainId } from '@/lib/domainUtils';
+import { apiPost } from '../services/apiClient';
 import { useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
+import { useShellContext } from '@/features/ai-results/AIResultsShell';
+import {
+  aiResultsKeys,
+  useCompetitorAnalysis,
+  useCompetitors,
+  useReport,
+  useTrends,
+} from '@/features/ai-results/queries';
 
 // ── API shapes ─────────────────────────────────────────────────────────────
 
@@ -1099,96 +1106,54 @@ function buildAiResponseAnalysis(opp: ReportOpportunity, report: ReportPayload |
 
 // ── Page component ─────────────────────────────────────────────────────────
 
-interface PageState {
-  report: ReportPayload | null;
-  analysis: CompetitorAnalysisResponse | null;
-  trends: TrendsResponse | null;
-  selected: SelectedCompetitor[];
-}
-
 export default function CompetitorsPage() {
   const navigate = useNavigate();
-  const storedSlug = localStorage.getItem('ai-visibility:lastDomainSlug');
-  const [allDomains, setAllDomains] = useState<any[]>([]);
-  const [currentDomain, setCurrentDomain] = useState<any | null>(null);
-  const [state, setState] = useState<PageState>({ report: null, analysis: null, trends: null, selected: [] });
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+  const { currentDomain, domainsLoading } = useShellContext();
+  const domainId = currentDomain?.id ?? null;
+
+  // All four data sources hit React Query — sibling tabs hit the same cache.
+  const reportQuery = useReport<ReportPayload>(domainId);
+  const analysisQuery = useCompetitorAnalysis<CompetitorAnalysisResponse>(domainId);
+  const trendsQuery = useTrends<TrendsResponse>(domainId);
+  const competitorsQuery = useCompetitors<{ competitors: SelectedCompetitor[] }>(domainId);
+
+  const report = reportQuery.data ?? null;
+  const analysis = analysisQuery.data ?? null;
+  const trends = trendsQuery.data ?? null;
+  const remoteSelected = competitorsQuery.data?.competitors ?? [];
+
+  // Optimistic pills (loading=true) are stored locally; they merge with the
+  // server-confirmed list from React Query. As soon as a refetch lands and
+  // includes the new host, the optimistic copy is dropped.
+  const [optimisticPills, setOptimisticPills] = useState<SelectedCompetitor[]>([]);
+  const selected = useMemo<SelectedCompetitor[]>(() => {
+    const remoteHosts = new Set(remoteSelected.map((c) => c.host.toLowerCase()));
+    const pending = optimisticPills.filter((c) => !remoteHosts.has(c.host.toLowerCase()));
+    return [...remoteSelected, ...pending];
+  }, [remoteSelected, optimisticPills]);
+
+  const loading = domainsLoading || reportQuery.isLoading || analysisQuery.isLoading;
+  const error = reportQuery.error || analysisQuery.error || trendsQuery.error || competitorsQuery.error;
 
   const [selectedCompetitor, setSelectedCompetitor] = useState<CompetitorDetailData | null>(null);
   const [selectedPromptGap, setSelectedPromptGap] = useState<PromptGapContext | null>(null);
   const [selectedAnalysisData, setSelectedAnalysisData] = useState<AiResponseAnalysisData | null>(null);
   const [activeDrawer, setActiveDrawer] = useState<'competitor' | 'prompt-gap' | null>(null);
 
-  // Load domain list + pick current.
-  useEffect(() => {
-    let alive = true;
-    (async () => {
-      try {
-        const resp = await apiGet<any>('/wizard/domains');
-        const domains: any[] = Array.isArray(resp?.domains) ? resp.domains : [];
-        if (!alive) return;
-        setAllDomains(domains);
-        let selected = storedSlug ? domains.find((d) => maskDomainId(d.id) === storedSlug) : null;
-        if (!selected && domains.length > 0) {
-          selected = [...domains].sort((a, b) => {
-            const aT = a.lastAnalyzed ? new Date(a.lastAnalyzed).getTime() : 0;
-            const bT = b.lastAnalyzed ? new Date(b.lastAnalyzed).getTime() : 0;
-            return bT - aT;
-          })[0];
-        }
-        if (selected && alive) {
-          setCurrentDomain(selected);
-          localStorage.setItem('ai-visibility:lastDomainSlug', maskDomainId(selected.id));
-        }
-      } catch (err) {
-        console.error('[Competitors] Failed to load domains:', err);
-        if (alive) setError('Failed to load domains.');
-      }
-    })();
-    return () => { alive = false; };
-  }, [storedSlug]);
-
-  // Load report + competitor-analysis + trends + selected competitors in parallel.
-  useEffect(() => {
-    if (!currentDomain?.id) return;
-    let alive = true;
-    setLoading(true);
-    setError(null);
-
-    const id = currentDomain.id;
-    Promise.all([
-      apiGet<ReportPayload>(`/wizard/domain/${id}/report`).catch((e) => { console.warn('[Competitors] /report failed', e); return null; }),
-      apiGet<CompetitorAnalysisResponse>(`/wizard/domain/${id}/competitor-analysis`).catch((e) => { console.warn('[Competitors] /competitor-analysis failed', e); return null; }),
-      apiGet<TrendsResponse>(`/wizard/domain/${id}/trends`).catch((e) => { console.warn('[Competitors] /trends failed', e); return null; }),
-      apiGet<{ competitors: SelectedCompetitor[] }>(`/wizard/domain/${id}/competitors`).catch((e) => { console.warn('[Competitors] /competitors failed', e); return null; }),
-    ]).then(([report, analysis, trends, sel]) => {
-      if (!alive) return;
-      setState({
-        report,
-        analysis,
-        trends,
-        selected: sel?.competitors ?? [],
-      });
-      setLoading(false);
-    });
-
-    return () => { alive = false; };
-  }, [currentDomain?.id]);
-
   // Derived metrics for the top cards.
   const headerMetrics = useMemo(() => {
-    const visibility = state.report?.metrics.visibilityScore ?? 0;
-    const competitorSOV = state.report ? Math.max(0, 100 - state.report.metrics.mentionRate) : 0;
+    const visibility = report?.metrics.visibilityScore ?? 0;
+    const competitorSOV = report ? Math.max(0, 100 - report.metrics.mentionRate) : 0;
 
-    const analysisCompetitors = state.analysis?.competitors ?? [];
+    const analysisCompetitors = analysis?.competitors ?? [];
     const bestCompetitor = analysisCompetitors[0] ?? null;
     const bestScore = bestCompetitor ? Math.round(bestCompetitor.coveragePct * 100) : 0;
 
     let largestGapPct = 0;
     let largestGapPrompt = '';
-    if (state.report?.topPrompts) {
-      for (const p of state.report.topPrompts) {
+    if (report?.topPrompts) {
+      for (const p of report.topPrompts) {
         if (p.type !== 'prompt') continue;
         const total = p.results.length;
         if (total === 0) continue;
@@ -1209,7 +1174,7 @@ export default function CompetitorsPage() {
       }
     }
 
-    const topInsights: string[] = (state.report?.opportunities ?? []).slice(0, 3).map((o) => o.title);
+    const topInsights: string[] = (report?.opportunities ?? []).slice(0, 3).map((o) => o.title);
 
     return {
       visibility,
@@ -1220,11 +1185,11 @@ export default function CompetitorsPage() {
       largestGapPrompt,
       topInsights,
     };
-  }, [state.report, state.analysis]);
+  }, [report, analysis]);
 
   const visibilityTrend = useMemo(() => {
-    if (!state.trends || state.trends.runs.length < 2) return null;
-    const runs = state.trends.runs;
+    if (!trends || trends.runs.length < 2) return null;
+    const runs = trends.runs;
     const totalPromptsFor = (r: TrendsResponse['runs'][number]) =>
       Object.values(r.perModel).reduce((s, x) => s + (x?.presenceCount ?? 0), 0);
     const prev = totalPromptsFor(runs[runs.length - 2]);
@@ -1232,39 +1197,29 @@ export default function CompetitorsPage() {
     if (prev === 0) return null;
     const diff = ((curr - prev) / prev) * 100;
     return { value: `${diff >= 0 ? '+' : ''}${diff.toFixed(1)}%`, positive: diff >= 0 };
-  }, [state.trends]);
+  }, [trends]);
 
-  // Inline add: optimistically push a "loading" pill, POST to the backend
+  // Inline add: push an optimistic "loading" pill, POST to the backend
   // (which re-scores every saved AiQueryResult against the new competitor),
-  // then refetch /competitors and /competitor-analysis so the cards / bubble
-  // chart / detail drawer all pick up the freshly-extracted data.
+  // then invalidate the React Query caches for this domain so the cards /
+  // bubble chart / detail drawer refetch the freshly-extracted data. The
+  // optimistic pill is dropped as soon as the new selected-competitors
+  // list lands.
   const handleAddCompetitor = async (host: string): Promise<void> => {
-    if (!currentDomain?.id) {
-      throw new Error('No domain selected.');
-    }
-    const optimistic: SelectedCompetitor = {
-      host,
-      url: `https://${host}`,
-      logoUrl: competitorLogo(host, 32),
-      rank: null,
-      threatLevel: null,
-      loading: true,
-    };
-    setState((s) => ({ ...s, selected: [...s.selected, optimistic] }));
+    if (!domainId) throw new Error('No domain selected.');
+    setOptimisticPills((p) => [
+      ...p,
+      { host, url: `https://${host}`, logoUrl: competitorLogo(host, 32), rank: null, threatLevel: null, loading: true },
+    ]);
     try {
-      await apiPost(`/wizard/domain/${currentDomain.id}/competitors/add`, { host });
-      const [analysis, sel] = await Promise.all([
-        apiGet<CompetitorAnalysisResponse>(`/wizard/domain/${currentDomain.id}/competitor-analysis`).catch(() => state.analysis),
-        apiGet<{ competitors: SelectedCompetitor[] }>(`/wizard/domain/${currentDomain.id}/competitors`).catch(() => ({ competitors: state.selected.filter((c) => !c.loading) })),
+      await apiPost(`/wizard/domain/${domainId}/competitors/add`, { host });
+      // Invalidate exactly the two queries that change when a competitor is added.
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: aiResultsKeys.competitors(domainId) }),
+        queryClient.invalidateQueries({ queryKey: aiResultsKeys.competitorAnalysis(domainId) }),
       ]);
-      setState((s) => ({
-        ...s,
-        analysis: analysis ?? s.analysis,
-        selected: sel?.competitors ?? s.selected.filter((c) => !c.loading),
-      }));
     } catch (err) {
-      // Remove the optimistic pill and rethrow so the selector shows the error.
-      setState((s) => ({ ...s, selected: s.selected.filter((c) => !(c.host === host && c.loading)) }));
+      setOptimisticPills((p) => p.filter((c) => c.host !== host));
       throw err;
     }
   };
@@ -1286,31 +1241,24 @@ export default function CompetitorsPage() {
   const openPromptGapDrawer = (o: ReportOpportunity) => {
     setSelectedCompetitor(null);
     setSelectedPromptGap(buildPromptGapContext(o));
-    setSelectedAnalysisData(buildAiResponseAnalysis(o, state.report));
+    setSelectedAnalysisData(buildAiResponseAnalysis(o, report));
     setActiveDrawer('prompt-gap');
   };
 
   const openPromptGapsReport = () => navigate('/ai-results-prompt-gaps');
 
-  const hasRun = state.report?.runStatus === 'completed' && (state.analysis?.runId ?? null) !== null;
+  const hasRun = report?.runStatus === 'completed' && (analysis?.runId ?? null) !== null;
 
   return (
-    <AIResultsLayout
-      activeItem="competitors"
-      allDomains={allDomains}
-      currentDomainId={currentDomain?.id}
-      currentDomainUrl={currentDomain?.url}
-      currentDomainHost={currentDomain?.host}
-      currentDomainName={currentDomain?.companyName ?? currentDomain?.host}
-      maskedDomainId={currentDomain ? maskDomainId(currentDomain.id) : storedSlug ?? undefined}
-      title="Competitors"
-    >
+    <>
       <div className="min-h-0 w-full flex-1 overflow-y-auto bg-white">
         <div className="mx-auto flex w-full max-w-[1530px] flex-col gap-5 px-5 py-3">
           {loading ? (
             <LoadingSkeleton />
           ) : error ? (
-            <p className="rounded-md border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">{error}</p>
+            <p className="rounded-md border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
+              {error instanceof Error ? error.message : 'Failed to load competitor data.'}
+            </p>
           ) : !hasRun ? (
             <EmptyState onRun={() => navigate('/ai-checker-v2')} />
           ) : (
@@ -1349,25 +1297,25 @@ export default function CompetitorsPage() {
                 </div>
               </section>
 
-              <CompetitorSelector competitors={state.selected} onAdd={handleAddCompetitor} />
+              <CompetitorSelector competitors={selected} onAdd={handleAddCompetitor} />
 
               <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.45fr)_minmax(360px,0.85fr)]">
-                <TrendComparisonPanel trends={state.trends} />
+                <TrendComparisonPanel trends={trends} />
                 <PromptGapPanel
-                  opportunities={state.report?.opportunities ?? []}
+                  opportunities={report?.opportunities ?? []}
                   onAiResponse={openPromptGapDrawer}
                   onViewAll={openPromptGapsReport}
                 />
               </div>
 
               <AICompetitorAnalysisResults
-                competitors={state.analysis?.competitors ?? []}
+                competitors={analysis?.competitors ?? []}
                 onOpenDetail={openCompetitorDrawer}
               />
 
               <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-                <PositioningComparison analysis={state.analysis} />
-                <ContentOpportunitiesToCreate opportunities={state.report?.opportunities ?? []} />
+                <PositioningComparison analysis={analysis} />
+                <ContentOpportunitiesToCreate opportunities={report?.opportunities ?? []} />
               </div>
             </>
           )}
@@ -1382,7 +1330,7 @@ export default function CompetitorsPage() {
           <AiResponseAnalysis data={selectedAnalysisData} prompt={selectedPromptGap} />
         ) : null}
       </Drawer>
-    </AIResultsLayout>
+    </>
   );
 }
 
