@@ -110,10 +110,6 @@ router.post('/login', asyncHandler(async (req: Request, res: Response) => {
         res.status(401).json({ error: error.message });
         return;
       }
-      if (error.message.includes('Please verify your email')) {
-        res.status(403).json({ error: error.message });
-        return;
-      }
     }
     throw error;
   }
