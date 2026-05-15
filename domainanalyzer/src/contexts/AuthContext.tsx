@@ -2,6 +2,35 @@ import React, { createContext, useContext, useState, useEffect, useRef, ReactNod
 import { isTokenExpired, getTimeUntilExpiration } from '@/services/tokenService';
 import { tokenManager, apiRequest } from '@/services/apiClient';
 
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3002';
+
+type AuthResponseBody = Record<string, any>;
+
+const readAuthResponse = async (response: Response): Promise<AuthResponseBody> => {
+  const text = await response.text();
+  if (!text) return {};
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    return {
+      message: text,
+    };
+  }
+};
+
+const getAuthErrorMessage = (data: AuthResponseBody, fallback: string) => {
+  return data.error || data.message || fallback;
+};
+
+const getLoginErrorMessage = (response: Response, data: AuthResponseBody) => {
+  if (response.status >= 500) {
+    return 'Login service is unavailable. Please try again after the backend is healthy.';
+  }
+
+  return getAuthErrorMessage(data, 'Login failed. Please try again.');
+};
+
 export interface User {
   id: number;
   email: string;
@@ -98,7 +127,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
 
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/auth/refresh`, {
+      const response = await fetch(`${API_BASE_URL}/api/auth/refresh`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -106,10 +135,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         body: JSON.stringify({ refreshToken: refreshTokenValue }),
       });
 
-      const data = await response.json();
+      const data = await readAuthResponse(response);
 
       if (!response.ok) {
-        throw new Error(data.error || 'Token refresh failed');
+        throw new Error(getAuthErrorMessage(data, 'Token refresh failed'));
       }
 
       tokenManager.setTokens(data.token, data.refreshToken);
@@ -153,7 +182,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         }
       }
 
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/auth/verify`, {
+      const response = await fetch(`${API_BASE_URL}/api/auth/verify`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -161,7 +190,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         body: JSON.stringify({ token: tokenToVerify }),
       });
 
-      const data = await response.json();
+      const data = await readAuthResponse(response);
 
       if (data.valid && data.user) {
         setUser(data.user);
@@ -176,14 +205,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             const newToken = tokenManager.getAuthToken();
             if (newToken) {
               // Retry verification with new token
-              const retryResponse = await fetch(`${import.meta.env.VITE_API_URL}/api/auth/verify`, {
+              const retryResponse = await fetch(`${API_BASE_URL}/api/auth/verify`, {
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({ token: newToken }),
               });
-              const retryData = await retryResponse.json();
+              const retryData = await readAuthResponse(retryResponse);
               if (retryData.valid && retryData.user) {
                 setUser(retryData.user);
                 setToken(newToken);
@@ -216,7 +245,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setLoading(true);
     
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/auth/login`, {
+      const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -224,10 +253,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         body: JSON.stringify({ email, password }),
       });
 
-      const data = await response.json();
+      const data = await readAuthResponse(response);
 
       if (!response.ok) {
-        throw new Error(data.error || 'Login failed');
+        throw new Error(getLoginErrorMessage(response, data));
+      }
+
+      if (!data.user || !data.token) {
+        throw new Error('Login failed. Please try again.');
       }
 
       setUser(data.user);
@@ -256,7 +289,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       // backend's register handler reads it to materialize the in-flight
       // session into a Domain for this new user. Without the include,
       // signup-from-the-funnel works but the wizard work is orphaned.
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/auth/register`, {
+      const response = await fetch(`${API_BASE_URL}/api/auth/register`, {
         method: 'POST',
         credentials: 'include',
         headers: {
@@ -265,10 +298,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         body: JSON.stringify({ email, password, name }),
       });
 
-      const data = await response.json();
+      const data = await readAuthResponse(response);
 
       if (!response.ok) {
-        throw new Error(data.error || 'Registration failed');
+        throw new Error(getAuthErrorMessage(data, 'Registration failed'));
       }
 
       if (data.token && data.user) {
@@ -296,7 +329,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const currentToken = tokenManager.getAuthToken();
       if (currentToken) {
         try {
-          await fetch(`${import.meta.env.VITE_API_URL}/api/auth/logout`, {
+          await fetch(`${API_BASE_URL}/api/auth/logout`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',

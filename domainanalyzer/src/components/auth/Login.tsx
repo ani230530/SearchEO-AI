@@ -1,236 +1,474 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-// removed unused Card imports
+import {
+  InputOTP,
+  InputOTPGroup,
+  InputOTPSlot,
+} from '@/components/ui/input-otp';
 import { Label } from '@/components/ui/label';
-// removed unused Alert imports
-import { Eye, EyeOff, Mail, Loader2 } from 'lucide-react';
-// removed unused Link import
+import { Loader2, X } from 'lucide-react';
+
+const EMAIL_REGEX = /\S+@\S+\.\S+/;
+const MOCK_DELAY_MS = 900;
+const MESSAGE_TIMEOUT_MS = 3000;
+const OTP_LENGTH = 6;
+const VALID_TEST_EMAIL = 'test@email.com';
+const ACTION_BUTTON_STYLE = {
+  background: 'linear-gradient(90deg, #2D4059 0%, #4C74C2 100%)',
+  boxShadow: '0px 1px 2px 0px #0A0D120D',
+};
+
+type LoginStep = 'email' | 'otp' | 'forgot-password';
 
 interface LoginProps {
   onSwitchToRegister: () => void;
+  onStepChange?: (step: LoginStep) => void;
 }
 
-const Login: React.FC<LoginProps> = ({ onSwitchToRegister }) => {
-  const { login, loading, error } = useAuth();
-  const [email, setEmail] = useState(() => localStorage.getItem('lastLoginEmail') || '');
-  const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [formError, setFormError] = useState<string | null>(null);
-  const [verifiedMessage, setVerifiedMessage] = useState<string | null>(null);
-  const [lastAttemptEmail, setLastAttemptEmail] = useState<string>('');
-  const [resendLoading, setResendLoading] = useState(false);
-  const [resendSent, setResendSent] = useState(false);
-  const emailInputRef = useRef<HTMLInputElement>(null);
+const Login: React.FC<LoginProps> = ({ onSwitchToRegister, onStepChange }) => {
+  const [step, setStep] = useState<LoginStep>('email');
+  const [email, setEmail] = useState('');
+  const [otp, setOtp] = useState('');
+  const [isSendingCode, setIsSendingCode] = useState(false);
+  const [isSubmittingOtp, setIsSubmittingOtp] = useState(false);
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const successTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setFormError(null);
-
-    if (!email || !password) {
-      setFormError('Please fill in all fields');
-      return;
-    }
-
-    try {
-      setLastAttemptEmail(email);
-      try {
-        localStorage.setItem('lastLoginEmail', email);
-      } catch {}
-      await login(email, password);
-    } catch (error) {
-      setFormError(error instanceof Error ? error.message : 'Login failed');
-    }
-  };
-
-  const displayError = formError || error;
+  const trimmedEmail = email.trim();
+  const isEmailValid = useMemo(() => EMAIL_REGEX.test(trimmedEmail), [trimmedEmail]);
+  const isOtpComplete = otp.length === OTP_LENGTH;
+  const isBusy = isSendingCode || isSubmittingOtp || isGoogleLoading || isResetting;
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const verified = params.get('verified');
-    const registered = params.get('registered');
-    const registeredEmail = params.get('email');
-    if (verified === '1') {
-      setVerifiedMessage('Your email has been verified. You can now sign in.');
-    } else if (verified === 'expired') {
-      setVerifiedMessage('Verification link has expired. Please sign up again.');
-    } else if (verified === 'invalid') {
-      setVerifiedMessage('Invalid verification link.');
-    } else if (registered === '1') {
-      const msg = registeredEmail ? `Verification email sent to ${registeredEmail}. Please check your inbox.` : 'Verification email sent. Please check your inbox.';
-      setVerifiedMessage(msg);
-      if (registeredEmail) {
-        try {
-          localStorage.setItem('lastLoginEmail', registeredEmail);
-        } catch {}
-        setEmail(registeredEmail);
+    onStepChange?.(step);
+  }, [step, onStepChange]);
+
+  useEffect(() => {
+    return () => {
+      if (successTimerRef.current) {
+        clearTimeout(successTimerRef.current);
       }
-    }
+      if (toastTimerRef.current) {
+        clearTimeout(toastTimerRef.current);
+      }
+    };
   }, []);
 
-  const resendVerification = async () => {
-    const targetEmail = (email || lastAttemptEmail || '').trim();
-    if (!targetEmail) return;
-    setResendLoading(true);
-    try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/auth/resend-verification`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: targetEmail })
-      });
-      if (!response.ok) {
-        throw new Error('Failed to resend email');
-      }
-      setVerifiedMessage('Verification email sent. Please check your inbox.');
-      setFormError(null);
-      setResendSent(true);
-    } catch (e) {
-      setFormError('Failed to resend email. Try again later.');
-    } finally {
-      setResendLoading(false);
+  const showTemporarySuccess = (message: string) => {
+    setSuccessMessage(message);
+    setErrorMessage(null);
+
+    if (successTimerRef.current) {
+      clearTimeout(successTimerRef.current);
     }
+
+    successTimerRef.current = setTimeout(() => {
+      setSuccessMessage(null);
+    }, MESSAGE_TIMEOUT_MS);
   };
 
-  return (
-    <div className="w-full px-6">
-      <div className="w-full max-w-sm mx-auto rounded-2xl border border-gray-200 bg-white/80 supports-[backdrop-filter]:bg-white/60 backdrop-blur p-6 sm:p-8 shadow-sm">
-        {/* Apple-style clean header */}
-        <div className="text-center mb-8">
-          <div className="mb-6">
-            {/* Simple, clean logo area - replace with your logo */}
-            <div className="w-16 h-16 mx-auto bg-black rounded-2xl flex items-center justify-center mb-4">
-              <Mail className="h-8 w-8 text-white" />
-            </div>
-          </div>
-          
-          <h1 className="text-2xl font-semibold text-gray-900 mb-2">
-            Sign In
-          </h1>
-          <p className="text-base text-gray-600">
-            Enter your credentials to continue
-          </p>
+  const showEmailNotFoundToast = () => {
+    setToastMessage("Seems this email doesn’t exist in our server");
+
+    if (toastTimerRef.current) {
+      clearTimeout(toastTimerRef.current);
+    }
+
+    toastTimerRef.current = setTimeout(() => {
+      setToastMessage(null);
+    }, MESSAGE_TIMEOUT_MS);
+  };
+
+  const isMockDatabaseEmailMissing = (value: string) => value.toLowerCase() !== VALID_TEST_EMAIL;
+
+  const handleSendCode = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    if (!isEmailValid || isBusy) return;
+
+    setIsSendingCode(true);
+    setErrorMessage(null);
+
+    window.setTimeout(() => {
+      if (isMockDatabaseEmailMissing(trimmedEmail)) {
+        showEmailNotFoundToast();
+        setIsSendingCode(false);
+        return;
+      }
+
+      setStep('otp');
+      setOtp('');
+      setSuccessMessage(null);
+      setIsSendingCode(false);
+    }, MOCK_DELAY_MS);
+  };
+
+  const handleSubmitOtp = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    if (!isOtpComplete || isBusy) return;
+
+    setIsSubmittingOtp(true);
+    setErrorMessage(null);
+
+    window.setTimeout(() => {
+      showTemporarySuccess('Verification code accepted.');
+      setIsSubmittingOtp(false);
+    }, MOCK_DELAY_MS);
+  };
+
+  const handleGoogleLogin = () => {
+    if (isBusy) return;
+
+    setIsGoogleLoading(true);
+    setErrorMessage(null);
+
+    window.setTimeout(() => {
+      showTemporarySuccess('Google login mocked successfully.');
+      setIsGoogleLoading(false);
+    }, MOCK_DELAY_MS);
+  };
+
+  const handleBackToEmail = () => {
+    if (isBusy) return;
+
+    setStep('email');
+    setOtp('');
+    setSuccessMessage(null);
+    setErrorMessage(null);
+  };
+
+  const getActionButtonClass = (enabled: boolean) =>
+    `h-8 w-full rounded-[5px] text-xs font-medium text-white shadow-none transition-opacity ${
+      enabled ? 'hover:opacity-95' : 'cursor-not-allowed bg-[#cfd2d6] opacity-100 hover:bg-[#cfd2d6]'
+    }`;
+
+  const renderHeader = () => (
+    <div className="mb-5">
+      <h1 className="text-[26px] font-semibold leading-tight text-[#444853]">
+        {step === 'email' ? 'Great to see you again!' : 
+         step === 'otp' ? 'Almost there!' : 
+         'Sorry to hear that :('}
+      </h1>
+      <p className="mt-2 text-[13px] leading-5 text-[#717885]">
+        {step === 'email'
+          ? 'Access your dashboard in seconds with a quick email code.'
+          : step === 'otp'
+          ? 'Enter the code we sent to your email to continue.'
+          : "We'll help you fix that. Enter your email to receive a password recovery key and regain access to your dashboard."}
+      </p>
+    </div>
+  );
+
+  const renderGoogleButton = () => {
+    return (
+      <Button
+        type="button"
+        variant="outline"
+        onClick={handleGoogleLogin}
+        disabled={isBusy}
+        className={`h-8 w-full rounded-[5px] border-0 bg-[#f4f4f5] text-[13px] font-medium text-[#6b7280] shadow-none hover:bg-[#eeeeef] hover:text-[#4b5563] ${
+          isBusy ? 'cursor-not-allowed opacity-60' : ''
+        }`}
+      >
+        {isGoogleLoading ? (
+          <>
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
+            Connecting...
+          </>
+        ) : (
+          <>
+            <img src="/google.svg" alt="" aria-hidden="true" className="mr-2 h-4 w-4" />
+            Continue with Google
+          </>
+        )}
+      </Button>
+    );
+  };
+
+  const renderMessages = () => (
+    <>
+      {successMessage && (
+        <div className="rounded-md border border-green-200 bg-green-50 px-3 py-2">
+          <p className="text-xs font-medium text-green-700">{successMessage}</p>
+        </div>
+      )}
+
+      {errorMessage && (
+        <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2">
+          <p className="text-xs font-medium text-red-600">{errorMessage}</p>
+        </div>
+      )}
+    </>
+  );
+
+  const renderFooterLinks = () => {
+    return (
+      <>
+        <div className="my-5 flex w-full items-center gap-2">
+          <div className="h-px flex-1 bg-[#d9dce1]" />
+          <span className="shrink-0 text-[11px] font-normal leading-none text-[#9ca3af]">or</span>
+          <div className="h-px flex-1 bg-[#d9dce1]" />
         </div>
 
-        {/* Apple-style form */}
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {verifiedMessage && (
-            <div className="bg-green-50 border border-green-200 rounded-xl p-4">
-              <p className="text-sm text-green-700">{verifiedMessage}</p>
-            </div>
-          )}
-          {displayError && (
-            <div className="bg-red-50 border border-red-200 rounded-xl p-4">
-              <p className="text-sm text-red-600">{displayError}</p>
-              {String(displayError).includes('verify your email') && !resendSent && (
-                <div className="mt-3 space-y-2">
-                  <div className="text-sm text-gray-700">
-                    {`Send verification to ${(email || lastAttemptEmail || localStorage.getItem('lastLoginEmail') || '').trim() || 'your email'}`}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={resendVerification}
-                    className="text-blue-600 hover:text-blue-800 font-medium text-sm"
-                    disabled={loading || resendLoading || !(email || lastAttemptEmail)}
-                  >
-                    {resendLoading ? 'Sending…' : 'Resend verification email'}
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
-          
-          {/* Email field with Apple's floating label style */}
-          <div className="relative">
-            <Input
-              id="email"
-              type="email"
-              placeholder=" "
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="peer w-full h-14 px-4 pt-6 pb-2 text-base border border-gray-300 rounded-xl focus:border-blue-500 focus:ring-0 focus:outline-none bg-white transition-colors"
-              disabled={loading}
-              ref={emailInputRef}
-            />
-            <Label 
-              htmlFor="email" 
-              className="absolute left-4 top-4 text-gray-500 text-base transition-all duration-200 
-                         peer-placeholder-shown:top-4 peer-placeholder-shown:text-base peer-placeholder-shown:text-gray-500
-                         peer-focus:top-2 peer-focus:text-xs peer-focus:text-blue-500
-                         peer-[:not(:placeholder-shown)]:top-2 peer-[:not(:placeholder-shown)]:text-xs peer-[:not(:placeholder-shown)]:text-gray-700"
-            >
-              Email Address
-            </Label>
-          </div>
-  
-          {/* Password field with Apple's floating label style */}
-          <div className="relative">
-            <Input
-              id="password"
-              type={showPassword ? 'text' : 'password'}
-              placeholder=" "
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="peer w-full h-14 px-4 pt-6 pb-2 pr-12 text-base border border-gray-300 rounded-xl focus:border-blue-500 focus:ring-0 focus:outline-none bg-white transition-colors"
-              disabled={loading}
-            />
-            <Label 
-              htmlFor="password" 
-              className="absolute left-4 top-4 text-gray-500 text-base transition-all duration-200
-                         peer-placeholder-shown:top-4 peer-placeholder-shown:text-base peer-placeholder-shown:text-gray-500
-                         peer-focus:top-2 peer-focus:text-xs peer-focus:text-blue-500
-                         peer-[:not(:placeholder-shown)]:top-2 peer-[:not(:placeholder-shown)]:text-xs peer-[:not(:placeholder-shown)]:text-gray-700"
-            >
-              Password
+        <div className="text-center text-[11px] leading-5 text-[#7b8491]">
+          <span>Need an account? </span>
+          <button
+            type="button"
+            onClick={onSwitchToRegister}
+            className="font-medium text-[#7fa6e6] transition-colors hover:text-[#4f7fd2]"
+            disabled={isBusy}
+          >
+            Join the Team
+          </button>
+        </div>
+      </>
+    );
+  };
+
+  const renderEmailStep = () => {
+    const canSendCode = isEmailValid && !isBusy;
+
+    return (
+      <form onSubmit={handleSendCode} className="mt-4 space-y-3">
+        {renderMessages()}
+
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between">
+            <Label htmlFor="email" className="text-[11px] font-semibold text-[#4b5563]">
+              Enter email <span className="text-red-500">*</span>
             </Label>
             <button
               type="button"
-              onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
-              disabled={loading}
+              className="text-[10px] font-medium text-[#7fa6e6] transition-colors hover:text-[#4f7fd2]"
+              onClick={() => {
+                setStep('forgot-password');
+                setErrorMessage(null);
+                setSuccessMessage(null);
+              }}
             >
-              {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+              Reset password?
             </button>
           </div>
-  
-          {/* Apple-style primary button */}
-          <Button
-            type="submit"
-            className="w-full h-14 bg-black hover:bg-gray-800 text-white font-medium text-base rounded-xl transition-colors duration-200 shadow-sm"
-            disabled={loading}
+          <Input
+            id="email"
+            type="email"
+            value={email}
+            onChange={(event) => {
+              setEmail(event.target.value);
+              setErrorMessage(null);
+              setSuccessMessage(null);
+              setToastMessage(null);
+            }}
+            placeholder="you@example.com"
+            className="h-8 rounded-[5px] border-[#d9dce1] bg-white px-3 text-xs text-[#4b5563] shadow-none placeholder:text-[#c7cbd1] focus-visible:ring-1 focus-visible:ring-[#c8ccd2]"
+            disabled={isBusy}
+            autoComplete="email"
+          />
+        </div>
+
+        <Button
+          type="submit"
+          disabled={!canSendCode}
+          className={getActionButtonClass(canSendCode)}
+          style={canSendCode ? ACTION_BUTTON_STYLE : undefined}
+        >
+          {isSendingCode ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
+              Sending code...
+            </>
+          ) : (
+            'Send Verification code'
+          )}
+        </Button>
+      </form>
+    );
+  };
+
+  const renderForgotPasswordStep = () => {
+    const canReset = isEmailValid && !isBusy;
+
+    const handleResetSubmit = async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!canReset) return;
+
+      setIsResetting(true);
+      setErrorMessage(null);
+
+      window.setTimeout(() => {
+        if (isMockDatabaseEmailMissing(trimmedEmail)) {
+          showEmailNotFoundToast();
+          setIsResetting(false);
+          return;
+        }
+
+        showTemporarySuccess("Success! We have sent you an email to reset your password");
+        setIsResetting(false);
+      }, MOCK_DELAY_MS);
+    };
+
+    return (
+      <form onSubmit={handleResetSubmit} className="mt-4 space-y-4">
+        {renderMessages()}
+
+        <div className="space-y-1.5">
+          <Label htmlFor="reset-email" className="text-[11px] font-semibold text-[#4b5563]">
+            Enter email <span className="text-red-500">*</span>
+          </Label>
+          <Input
+            id="reset-email"
+            type="email"
+            value={email}
+            onChange={(event) => {
+              setEmail(event.target.value);
+              setErrorMessage(null);
+              setSuccessMessage(null);
+            }}
+            placeholder="John@gmail.com"
+            className="h-8 rounded-[5px] border-[#d9dce1] bg-white px-3 text-xs text-[#4b5563] shadow-none placeholder:text-[#c7cbd1] focus-visible:ring-1 focus-visible:ring-[#c8ccd2]"
+            disabled={isBusy}
+            autoComplete="email"
+          />
+        </div>
+
+        <Button
+          type="submit"
+          disabled={!canReset}
+          className={getActionButtonClass(canReset)}
+          style={canReset ? ACTION_BUTTON_STYLE : undefined}
+        >
+          {isResetting ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
+              Processing...
+            </>
+          ) : (
+            'Reset Password'
+          )}
+        </Button>
+
+        <div className="text-center">
+          <button
+            type="button"
+            onClick={() => setStep('email')}
+            className="text-[11px] font-medium text-[#7fa6e6] transition-colors hover:text-[#4f7fd2]"
+            disabled={isBusy}
           >
-            {loading ? (
-              <>
-                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                Signing In...
-              </>
-            ) : (
-              'Sign In'
-            )}
-          </Button>
-        </form>
-  
-        {/* Apple-style secondary actions */}
-        <div className="mt-8 space-y-2">
-          <div className="text-center">
-            <button
-              onClick={onSwitchToRegister}
-              className="text-blue-600 hover:text-blue-800 font-medium text-base transition-colors"
-              disabled={loading}
-            >
-              Sign Up
-            </button>
+            Back to Login
+          </button>
+        </div>
+      </form>
+    );
+  };
+  const renderOtpStep = () => {
+    const canSubmitOtp = isOtpComplete && !isBusy;
+
+    return (
+      <form onSubmit={handleSubmitOtp} className="mt-4 space-y-3">
+        {renderMessages()}
+
+        <div className="space-y-1.5">
+          <Label htmlFor="otp" className="text-[11px] font-semibold text-[#4b5563]">
+            Enter OTP <span className="text-red-500">*</span>
+          </Label>
+          <InputOTP
+            id="otp"
+            maxLength={OTP_LENGTH}
+            value={otp}
+            onChange={(value) => {
+              setOtp(value);
+              setErrorMessage(null);
+              setSuccessMessage(null);
+            }}
+            disabled={isBusy}
+            containerClassName="gap-2"
+          >
+            <InputOTPGroup className="gap-2">
+              {Array.from({ length: OTP_LENGTH }).map((_, index) => (
+                <InputOTPSlot
+                  key={index}
+                  index={index}
+                  className="h-8 w-8 rounded-[5px] border border-[#d9dce1] text-xs text-[#4b5563] shadow-none first:rounded-[5px] first:border last:rounded-[5px]"
+                />
+              ))}
+            </InputOTPGroup>
+          </InputOTP>
+        </div>
+
+        <Button
+          type="submit"
+          disabled={!canSubmitOtp}
+          className={getActionButtonClass(canSubmitOtp)}
+          style={canSubmitOtp ? ACTION_BUTTON_STYLE : undefined}
+        >
+          {isSubmittingOtp ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
+              Submitting...
+            </>
+          ) : (
+            'Submit'
+          )}
+        </Button>
+
+        <div className="text-center">
+          <button
+            type="button"
+            onClick={handleBackToEmail}
+            disabled={isBusy}
+            className="text-[11px] font-medium text-[#7fa6e6] transition-colors hover:text-[#4f7fd2] disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            Use a different email
+          </button>
+        </div>
+      </form>
+    );
+  };
+
+  return (
+    <>
+      {toastMessage && step === 'email' && (
+        <div className="fixed right-4 top-6 z-50 flex min-h-[72px] w-[calc(100vw-2rem)] max-w-[368px] items-center gap-3 rounded-[6px] bg-[#b92318] p-4 text-white shadow-[0_12px_30px_rgba(15,23,42,0.16)] sm:right-6">
+          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white text-[#b92318]">
+            <X className="h-4 w-4 stroke-[3]" aria-hidden="true" />
           </div>
-          <p className="text-xs text-gray-500 text-center">
-            By continuing, you agree to our Terms and Privacy Policy.
+          <p className="min-w-0 flex-1 text-sm font-medium leading-5 tracking-normal">
+            {toastMessage}
+          </p>
+          <button
+            type="button"
+            onClick={() => setToastMessage(null)}
+            className="flex h-6 w-6 shrink-0 items-center justify-center text-white transition-opacity hover:opacity-80"
+            aria-label="Dismiss notification"
+          >
+            <X className="h-5 w-5" aria-hidden="true" />
+          </button>
+        </div>
+      )}
+
+      <div className="flex w-full flex-col px-6 py-9 sm:px-8 lg:px-10">
+        <div className="mx-auto flex h-full w-full max-w-[428px] flex-col">
+          <div>
+            {renderHeader()}
+            {renderGoogleButton()}
+            {step === 'email' ? renderEmailStep() : step === 'otp' ? renderOtpStep() : renderForgotPasswordStep()}
+            {renderFooterLinks()}
+          </div>
+
+          <p className="mt-auto pb-2 text-center text-[11px] leading-5 text-[#7b8491]">
+            &copy; 2026 SearchEO.AI. All rights reserved.
           </p>
         </div>
       </div>
-
-      {/* Apple-style footer */}
-
-    </div>
+    </>
   );
 };
 
-export default Login; 
+export default Login;
