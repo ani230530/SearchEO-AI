@@ -11,10 +11,7 @@ import {
   X,
 } from 'lucide-react';
 import {
-  Bar,
-  BarChart,
   CartesianGrid,
-  Cell,
   Legend as RLegend,
   Line,
   LineChart,
@@ -549,25 +546,14 @@ function CompetitorSelector({
 type TrendChartPoint = { label: string } & Record<string, number | string>;
 
 function TrendComparisonPanel({ trends }: { trends: TrendsResponse | null }) {
-  // Two modes:
-  //   - runs ≥ 2  → trend lines across the run history
-  //   - runs = 1  → "Latest snapshot" bar charts (per-model visibility/citations + per-host SoV)
-  //   - runs = 0  → empty state directing to run an audit
-  const mode: 'trend' | 'snapshot' | 'empty' =
-    !trends || trends.runs.length === 0 ? 'empty' : trends.runs.length === 1 ? 'snapshot' : 'trend';
+  // Render the line charts as soon as we have a single completed run —
+  // recharts plots a single point per series when there's only one data
+  // point, which is still more useful than an empty state on day one.
+  const hasData = trends && trends.runs.length >= 1;
 
-  const { visibilityData, citationData, sovData, models, topCompetitors, snapshotVisibility, snapshotCitations, snapshotSov } = useMemo(() => {
+  const { visibilityData, citationData, sovData, models, topCompetitors } = useMemo(() => {
     if (!trends || trends.runs.length === 0) {
-      return {
-        visibilityData: [] as TrendChartPoint[],
-        citationData: [] as TrendChartPoint[],
-        sovData: [] as TrendChartPoint[],
-        models: [] as string[],
-        topCompetitors: [] as string[],
-        snapshotVisibility: [] as Array<{ model: string; presence: number }>,
-        snapshotCitations: [] as Array<{ model: string; cites: number }>,
-        snapshotSov: [] as Array<{ name: string; share: number; isOwn: boolean }>,
-      };
+      return { visibilityData: [] as TrendChartPoint[], citationData: [] as TrendChartPoint[], sovData: [] as TrendChartPoint[], models: [] as string[], topCompetitors: [] as string[] };
     }
     const modelsSet = new Set<string>();
     for (const r of trends.runs) for (const m of Object.keys(r.perModel)) modelsSet.add(m);
@@ -575,7 +561,12 @@ function TrendComparisonPanel({ trends }: { trends: TrendsResponse | null }) {
 
     const visibility: TrendChartPoint[] = trends.runs.map((r) => {
       const point: TrendChartPoint = { label: new Date(r.startedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) };
-      for (const m of modelList) point[m] = r.perModel[m]?.presenceCount ?? 0;
+      for (const m of modelList) {
+        const cell = r.perModel[m];
+        // presenceCount / queries is a rough visibility %; runs without a model emit 0
+        const queries = cell ? Object.values(r.perModel).reduce((s, x) => s + (x?.presenceCount ?? 0), 0) : 0;
+        point[m] = cell ? cell.presenceCount : 0;
+      }
       return point;
     });
 
@@ -595,103 +586,20 @@ function TrendComparisonPanel({ trends }: { trends: TrendsResponse | null }) {
       return point;
     });
 
-    // Snapshot views — pivot the latest run so each bar is per-model or per-host.
-    const latest = trends.runs[trends.runs.length - 1];
-    const snapVis = modelList.map((m) => ({
-      model: prettyModelName(m),
-      presence: latest.perModel[m]?.presenceCount ?? 0,
-    }));
-    const snapCites = modelList.map((m) => ({
-      model: prettyModelName(m),
-      cites: latest.perModel[m]?.cites ?? 0,
-    }));
-    const totalLatest = latest.brandMentions + latest.competitorMentions;
-    const snapSov: Array<{ name: string; share: number; isOwn: boolean }> = [
-      { name: 'You', share: totalLatest > 0 ? Math.round((latest.brandMentions / totalLatest) * 100) : 0, isOwn: true },
-      ...trends.topCompetitors.map((host) => ({
-        name: host,
-        share: totalLatest > 0 ? Math.round(((latest.perCompetitor[host] ?? 0) / totalLatest) * 100) : 0,
-        isOwn: false,
-      })),
-    ].filter((row) => row.share > 0 || row.isOwn);
-
-    return {
-      visibilityData: visibility,
-      citationData: citation,
-      sovData: sov,
-      models: modelList,
-      topCompetitors: trends.topCompetitors,
-      snapshotVisibility: snapVis,
-      snapshotCitations: snapCites,
-      snapshotSov: snapSov,
-    };
+    return { visibilityData: visibility, citationData: citation, sovData: sov, models: modelList, topCompetitors: trends.topCompetitors };
   }, [trends]);
-
-  const runCount = trends?.runs.length ?? 0;
-  const headline = mode === 'snapshot' ? 'Latest Snapshot' : 'Competitor Trend Comparison';
-  const meta = mode === 'snapshot' ? 'First completed run · trends appear after the next audit' : `Last ${runCount} run${runCount === 1 ? '' : 's'}`;
 
   return (
     <section className="min-w-0 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <h3 className="text-base font-semibold text-[#2D4059]">{headline}</h3>
-        <span className="text-xs text-[#7B8494]">{meta}</span>
+        <h3 className="text-base font-semibold text-[#2D4059]">Competitor Trend Comparison</h3>
+        <span className="text-xs text-[#7B8494]">Last {trends?.runs.length ?? 0} runs</span>
       </div>
 
-      {mode === 'empty' ? (
+      {!hasData ? (
         <p className="mt-6 rounded-md border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
           Run an audit on this domain to start seeing competitor visibility data here.
         </p>
-      ) : mode === 'snapshot' ? (
-        <div className="mt-3 space-y-6">
-          <ChartBlock title="AI Visibility by Model" subtitle="How many prompts mentioned you, per AI model.">
-            <ResponsiveContainer width="100%" height={180}>
-              <BarChart data={snapshotVisibility} margin={{ top: 10, right: 10, bottom: 0, left: -20 }}>
-                <CartesianGrid stroke="#EEF1F5" strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="model" tick={{ fontSize: 10, fill: '#667085' }} interval={0} />
-                <YAxis tick={{ fontSize: 10, fill: '#98A2B3' }} allowDecimals={false} />
-                <Tooltip cursor={{ fill: '#F4F7FB' }} />
-                <Bar dataKey="presence" radius={[4, 4, 0, 0]}>
-                  {snapshotVisibility.map((_, i) => (
-                    <Cell key={i} fill={COMPETITOR_COLORS[i % COMPETITOR_COLORS.length]} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </ChartBlock>
-
-          <ChartBlock title="Citations by Model" subtitle="Total sources cited in each AI's responses.">
-            <ResponsiveContainer width="100%" height={180}>
-              <BarChart data={snapshotCitations} margin={{ top: 10, right: 10, bottom: 0, left: -20 }}>
-                <CartesianGrid stroke="#EEF1F5" strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="model" tick={{ fontSize: 10, fill: '#667085' }} interval={0} />
-                <YAxis tick={{ fontSize: 10, fill: '#98A2B3' }} allowDecimals={false} />
-                <Tooltip cursor={{ fill: '#F4F7FB' }} />
-                <Bar dataKey="cites" radius={[4, 4, 0, 0]}>
-                  {snapshotCitations.map((_, i) => (
-                    <Cell key={i} fill={COMPETITOR_COLORS[i % COMPETITOR_COLORS.length]} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </ChartBlock>
-
-          <ChartBlock title="Share of Voice" subtitle="Mention share — you vs your tracked competitors.">
-            <ResponsiveContainer width="100%" height={Math.max(140, snapshotSov.length * 36 + 40)}>
-              <BarChart data={snapshotSov} layout="vertical" margin={{ top: 5, right: 30, bottom: 5, left: 10 }}>
-                <CartesianGrid stroke="#EEF1F5" strokeDasharray="3 3" horizontal={false} />
-                <XAxis type="number" domain={[0, 100]} unit="%" tick={{ fontSize: 10, fill: '#98A2B3' }} />
-                <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: '#2D4059' }} width={120} />
-                <Tooltip cursor={{ fill: '#F4F7FB' }} formatter={(v: number) => `${v}%`} />
-                <Bar dataKey="share" radius={[0, 4, 4, 0]}>
-                  {snapshotSov.map((row, i) => (
-                    <Cell key={i} fill={row.isOwn ? '#2D4059' : COMPETITOR_COLORS[i % COMPETITOR_COLORS.length]} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </ChartBlock>
-        </div>
       ) : (
         <div className="mt-3 space-y-6">
           <ChartBlock title="AI Visibility Trend" subtitle="Brand mentions by model across the last runs.">
@@ -745,18 +653,6 @@ function TrendComparisonPanel({ trends }: { trends: TrendsResponse | null }) {
   );
 }
 
-/** Friendly model names for chart axes (openai/gpt-4o-mini → ChatGPT, etc.). */
-function prettyModelName(model: string): string {
-  const m = model.toLowerCase();
-  if (m.includes('gpt') || m.includes('openai') || m.includes('chatgpt')) return 'ChatGPT';
-  if (m.includes('claude')) return 'Claude';
-  if (m.includes('gemini')) return 'Gemini';
-  if (m.includes('deepseek')) return 'Deepseek';
-  if (m.includes('mistral')) return 'Mistral';
-  if (m.includes('llama')) return 'Llama';
-  return model.split('/').pop() ?? model;
-}
-
 function ChartBlock({ title, subtitle, children }: { title: string; subtitle: string; children: React.ReactNode }) {
   return (
     <div className="min-w-0">
@@ -779,8 +675,7 @@ function OpportunityCard({ item, onAiResponse }: { item: ReportOpportunity; onAi
   return (
     <article className="relative overflow-hidden rounded-xl border border-[#E8ECF2] bg-white py-5 pl-6 pr-5 shadow-[0_10px_24px_rgba(15,23,42,0.08)]">
       <div className="absolute inset-y-0 left-0 w-1.5 bg-[#7EA6FF]" />
-      {/* Stack on small/medium, side-by-side from lg+ where there's room for the 220px action column. */}
-      <div className="flex flex-col gap-5 lg:grid lg:grid-cols-[minmax(0,1fr)_220px] lg:items-start lg:gap-6">
+      <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_128px] sm:items-start">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-3">
             <span className="inline-flex h-5 items-center rounded-full bg-[#FFE9E9] px-2.5 text-[10px] font-medium text-[#F05F5F]">
@@ -788,11 +683,11 @@ function OpportunityCard({ item, onAiResponse }: { item: ReportOpportunity; onAi
             </span>
             <span className="text-sm font-medium text-[#7B8494]">Importance: {importanceScore}/100</span>
           </div>
-          <h4 className="mt-3 text-base font-medium italic leading-6 text-[#2D4059] break-words">
+          <h4 className="mt-4 max-w-[480px] text-base font-medium italic leading-6 text-[#2D4059]">
             {item.title}
           </h4>
           {item.competitors.length > 0 ? (
-            <p className="mt-4 text-sm font-medium leading-5 text-[#426185] break-words">
+            <p className="mt-5 text-sm font-medium leading-5 text-[#426185]">
               Appearing:{' '}
               <span className="font-bold text-[#2D4059]">
                 {item.competitors.map((competitor, index) => (
@@ -804,16 +699,16 @@ function OpportunityCard({ item, onAiResponse }: { item: ReportOpportunity; onAi
               </span>
             </p>
           ) : (
-            <p className="mt-4 text-sm font-medium leading-5 text-[#426185] break-words">{item.rationale}</p>
+            <p className="mt-5 text-sm font-medium leading-5 text-[#426185]">{item.rationale}</p>
           )}
         </div>
 
-        <div className="flex w-full flex-col items-stretch gap-3 lg:items-end">
-          <div className="whitespace-nowrap text-left lg:text-right">
+        <div className="flex shrink-0 flex-col items-start gap-4 sm:items-end">
+          <div className="whitespace-nowrap text-left sm:text-right">
             <span className="text-2xl font-semibold leading-none text-[#D49A00]">{opportunityPct}%</span>
             <span className="ml-1 text-sm font-medium text-[#58657A]">Opportunity</span>
           </div>
-          <div className="flex w-full flex-col gap-3 lg:max-w-[208px]">
+          <div className="flex w-full flex-col gap-3 sm:min-w-[176px] sm:max-w-[208px]">
             <button
               type="button"
               onClick={() => onAiResponse(item)}
@@ -1059,82 +954,41 @@ function ContentOpportunityCard({ item }: { item: ReportOpportunity }) {
   const impact = item.trafficPotential === 'very_high' ? 'Very High' : item.trafficPotential === 'high' ? 'High' : item.trafficPotential === 'medium' ? 'Medium' : 'Low';
   const priority = item.severity === 'critical' ? 'Critical' : item.severity === 'high' ? 'High' : item.severity === 'medium' ? 'Medium' : 'Low';
   const relatedTo = item.competitors[0] ?? item.keyword ?? '—';
-  const brief = item.brief;
-  // Up to three key points keeps cards comparable in height while still
-  // surfacing the LLM-generated "what to actually write" guidance.
-  const keyPoints = brief?.keyPoints?.slice(0, 3) ?? [];
 
   return (
-    <article className="relative overflow-hidden rounded-lg border border-[#E8ECF2] bg-white px-5 py-5 shadow-[0_8px_18px_rgba(15,23,42,0.06)] sm:px-6">
+    <article className="relative overflow-hidden rounded-lg border border-[#E8ECF2] bg-white px-6 py-5 shadow-[0_8px_18px_rgba(15,23,42,0.06)]">
       <div className="absolute inset-y-0 left-0 w-1.5 bg-[#7EA6FF]" />
-      <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between lg:gap-6">
-        <div className="min-w-0 lg:flex-1">
-          <h4 className="line-clamp-2 text-base font-semibold text-[#2D4059] break-words">{item.title}</h4>
-
-          <div className="mt-3 flex flex-wrap items-center gap-2">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <h4 className="line-clamp-2 text-base font-semibold text-[#2D4059]">{item.title}</h4>
+          <div className="mt-4 flex flex-wrap items-center gap-2">
             <span className="inline-flex h-5 items-center rounded-full bg-[#FFE9E9] px-2.5 text-[10px] font-medium text-[#F05F5F]">
               {priority}
             </span>
-            <span className="text-xs font-semibold text-[#2DA855]">↗ {impact}</span>
-            {brief?.structure ? (
-              <span className="inline-flex h-5 items-center rounded-full border border-slate-200 bg-slate-50 px-2.5 text-[10px] font-medium text-[#5F6877]">
-                {brief.structure}
-              </span>
-            ) : null}
-            {brief?.wordCount ? (
-              <span className="text-[10px] font-medium text-[#7B8494]">~{brief.wordCount} words</span>
-            ) : null}
+            <span className="text-sm font-semibold text-[#2DA855]">↗ {impact}</span>
           </div>
-
-          {brief?.audience ? (
-            <p className="mt-3 text-xs font-medium text-[#7B8494]">
-              For: <span className="text-[#2D4059]">{brief.audience}</span>
-            </p>
-          ) : null}
-
-          {keyPoints.length > 0 ? (
-            <ul className="mt-3 space-y-1.5 text-xs leading-5 text-[#40516A]">
-              {keyPoints.map((point) => (
-                <li key={point} className="flex gap-2">
-                  <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-[#7EA6FF]" />
-                  <span className="break-words">{point}</span>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="mt-3 text-xs leading-5 text-[#40516A] break-words">{item.rationale}</p>
-          )}
-
-          <p className="mt-4 text-xs font-medium text-[#7B8494]">
-            Related to: <span className="ml-1 font-semibold text-[#2D4059]">{relatedTo}</span>
+          <p className="mt-5 text-sm font-medium text-[#7B8494]">
+            Related to: <span className="ml-5 text-[#2D4059]">{relatedTo}</span>
           </p>
         </div>
-
-        <div className="w-full lg:w-auto lg:shrink-0 lg:self-center">
-          <GenerateContentButton className="w-full lg:w-[208px]" />
-        </div>
+        <GenerateContentButton className="w-full sm:w-auto sm:self-center" />
       </div>
     </article>
   );
 }
 
 function ContentOpportunitiesToCreate({ opportunities }: { opportunities: ReportOpportunity[] }) {
-  // Show top 5 by severity. Some overlap with the Prompt Gaps panel is
-  // intentional: that panel is "where you're losing", this one is "what to
-  // write" — same source data, complementary actions.
-  const list = opportunities.slice(0, 5);
+  // Use bottom-half (after the 4 surfaced in Prompt Gaps) — same pool, no duplicates.
+  const list = opportunities.slice(4, 9);
   return (
     <section className="min-w-0 rounded-xl border border-slate-200 bg-white p-6">
       <div className="flex items-start justify-between gap-4">
-        <div>
-          <h3 className="text-xl font-semibold leading-none text-[#2D4059]">Content Opportunities to Create</h3>
-          <p className="mt-2 text-sm text-[#7B8494]">Concrete content briefs ranked by opportunity score.</p>
-        </div>
+        <h3 className="text-xl font-semibold leading-none text-[#2D4059]">Content Opportunities to Create</h3>
       </div>
       <div className="mt-6 space-y-4">
         {list.length === 0 ? (
           <p className="rounded-md border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-center text-sm text-slate-500">
-            No content opportunities yet — re-run the audit once more prompts have been scored.
+            No additional content opportunities right now.
           </p>
         ) : (
           list.map((item) => <ContentOpportunityCard key={item.key} item={item} />)
@@ -1466,7 +1320,7 @@ export default function CompetitorsPage() {
                   <h2 className="text-base font-semibold leading-none text-[#2D4059]">Competitor Analysis</h2>
                 </div>
 
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5">
                   <ScoreCard
                     title="AI Visibility Score"
                     score={headerMetrics.visibility}
@@ -1497,9 +1351,7 @@ export default function CompetitorsPage() {
 
               <CompetitorSelector competitors={state.selected} onAdd={handleAddCompetitor} />
 
-              {/* Side-by-side only at 2xl+ — below that the prompt-gap cards
-                  need the full width to fit the action column without cramping. */}
-              <div className="grid grid-cols-1 gap-5 2xl:grid-cols-[minmax(0,1.3fr)_minmax(440px,1fr)]">
+              <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.45fr)_minmax(360px,0.85fr)]">
                 <TrendComparisonPanel trends={state.trends} />
                 <PromptGapPanel
                   opportunities={state.report?.opportunities ?? []}
@@ -1513,7 +1365,7 @@ export default function CompetitorsPage() {
                 onOpenDetail={openCompetitorDrawer}
               />
 
-              <div className="grid grid-cols-1 gap-6 2xl:grid-cols-2">
+              <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
                 <PositioningComparison analysis={state.analysis} />
                 <ContentOpportunitiesToCreate opportunities={state.report?.opportunities ?? []} />
               </div>
@@ -1541,12 +1393,12 @@ function LoadingSkeleton() {
         {[1, 2, 3, 4, 5].map((i) => <div key={i} className="h-[106px] rounded-lg bg-slate-100" />)}
       </div>
       <div className="h-12 rounded-lg bg-slate-100" />
-      <div className="grid grid-cols-1 gap-5 2xl:grid-cols-[minmax(0,1.3fr)_minmax(440px,1fr)]">
+      <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.45fr)_minmax(360px,0.85fr)]">
         <div className="h-[540px] rounded-lg bg-slate-100" />
         <div className="h-[540px] rounded-lg bg-slate-100" />
       </div>
       <div className="h-[280px] rounded-lg bg-slate-100" />
-      <div className="grid grid-cols-1 gap-6 2xl:grid-cols-2">
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
         <div className="h-[360px] rounded-lg bg-slate-100" />
         <div className="h-[360px] rounded-lg bg-slate-100" />
       </div>
