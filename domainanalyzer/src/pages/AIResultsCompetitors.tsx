@@ -546,7 +546,10 @@ function CompetitorSelector({
 type TrendChartPoint = { label: string } & Record<string, number | string>;
 
 function TrendComparisonPanel({ trends }: { trends: TrendsResponse | null }) {
-  const hasData = trends && trends.runs.length >= 2;
+  // Render the line charts as soon as we have a single completed run —
+  // recharts plots a single point per series when there's only one data
+  // point, which is still more useful than an empty state on day one.
+  const hasData = trends && trends.runs.length >= 1;
 
   const { visibilityData, citationData, sovData, models, topCompetitors } = useMemo(() => {
     if (!trends || trends.runs.length === 0) {
@@ -595,7 +598,7 @@ function TrendComparisonPanel({ trends }: { trends: TrendsResponse | null }) {
 
       {!hasData ? (
         <p className="mt-6 rounded-md border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
-          Need at least two completed audits to plot trends. Re-run the audit to start building history.
+          Run an audit on this domain to start seeing competitor visibility data here.
         </p>
       ) : (
         <div className="mt-3 space-y-6">
