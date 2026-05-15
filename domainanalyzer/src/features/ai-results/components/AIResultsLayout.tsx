@@ -36,6 +36,7 @@ type DomainOption = {
   id: number;
   url: string;
   createdAt: string;
+   lastAnalyzed?: string | Date | null;
   /** Optional — backend supplies these via /wizard/domains for display. */
   host?: string;
   companyName?: string | null;
@@ -55,7 +56,14 @@ type AIResultsLayoutProps = {
 };
 
 /** Friendly display name for a domain row — falls back gracefully. */
-const displayDomainName = (d: { companyName?: string | null; host?: string; url: string }): string => {
+const displayDomainName = (
+  d: {
+    companyName?: string | null;
+    host?: string;
+    url: string;
+    createdAt?: string | Date | null;
+  }
+): string => {
   if (d.companyName && d.companyName.trim()) return d.companyName.trim();
   if (d.host && d.host.trim()) return d.host.trim();
   // Last-resort: strip protocol + www + path off the url.
@@ -443,10 +451,17 @@ export function AIResultsLayout({
                             {isCurrent ? <Sparkles className="h-3 w-3 shrink-0 text-emerald-600" /> : null}
                           </div>
                           <span className="block truncate text-[10px] text-gray-500">
-                            {domain.host ?? domain.url.replace(/^https?:\/\//, '')}
-                            {' · '}
-                            {new Date(domain.createdAt).toLocaleDateString()}
-                          </span>
+  {domain.host ?? domain.url.replace(/^https?:\/\//, '')}
+  {' · '}
+
+  {domain.lastAnalyzed
+    ? new Date(domain.lastAnalyzed).toLocaleString('en-IN', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric'
+      })
+    : 'No date'}
+</span>
                         </div>
                       </DropdownMenuItem>
                     );
