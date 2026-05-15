@@ -1,5 +1,5 @@
 import React from 'react';
-import { Eye, FileText, Loader2, Send } from 'lucide-react';
+import { Eye, FileText, Info, Loader2, Send } from 'lucide-react';
 import { RowState } from './api';
 
 /* ----------------------------------------------------------------------------
@@ -12,13 +12,19 @@ import { RowState } from './api';
 export function RowStatus({ state }: { state: RowState }) {
   switch (state.kind) {
     case 'not-started':
-      return <Plain label="Not Started" />;
+      return (
+        <InfoHint message="The status of your article will show here once generation starts." />
+      );
 
     case 'in-progress':
-      return <Plain label="In Progress" />;
+      return (
+        <InfoHint message="The status of your article will show here once generation starts." />
+      );
 
     case 'ready':
-      return <Plain label="Ready" />;
+      return (
+        <InfoHint message="The status of your article will show here once generation starts." />
+      );
 
     case 'generating':
       return (
@@ -48,6 +54,20 @@ export function RowStatus({ state }: { state: RowState }) {
     case 'published':
       return <ProgressLine percent={100} label="Published" color="bg-emerald-600" />;
   }
+}
+
+function InfoHint({ message }: { message: string }) {
+  return (
+    <div className="flex w-full justify-center">
+      <span
+        className="inline-flex items-center justify-center p-1"
+        title={message}
+        aria-label={message}
+      >
+        <Info className="h-4 w-4" />
+      </span>
+    </div>
+  );
 }
 
 function Plain({ label }: { label: string }) {
@@ -92,8 +112,8 @@ function ProgressLine({
  * Mirrors the screenshots:
  *   not-started / in-progress  → "Generate" disabled
  *   ready                      → "Generate" enabled (opens drawer)
- *   generating                 → "Draft Blog" disabled, spinner
- *   completed                  → "Draft Blog" enabled
+ *   generating                 → generation spinner
+ *   completed                  → "Publish" enabled
  *   failed                     → "Retry" enabled (re-opens drawer)
  *   published                  → "Publish" / "Live" — keeping "Publish" until
  *                                a publish-flow is wired (next phase)
@@ -143,7 +163,7 @@ export function RowAction({
     case 'generating':
       return (
         <ActionPill
-          label="Draft Blog"
+          label="Generating…"
           disabled
           icon={<Loader2 className="h-4 w-4 animate-spin" />}
         />
@@ -151,44 +171,23 @@ export function RowAction({
 
     case 'completed':
       return (
-        <div className="inline-flex flex-col items-stretch gap-2">
-          <ActionPill
-            label="Draft Blog"
-            onClick={() => handlers.onOpenDraft(state.draftId)}
-            disabled={draftSpinner}
-            icon={
-              draftSpinner ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <FileText className="h-4 w-4" />
-              )
-            }
-          />
-          <ActionPill
-            label="Publish"
-            onClick={() => handlers.onPublishDirectly(state.draftId)}
-            disabled={draftSpinner}
-            variant="primary"
-            icon={<Send className="h-4 w-4" />}
-          />
-        </div>
+        <ActionPill
+          label="Publish"
+          onClick={() => handlers.onPublishDirectly(state.draftId)}
+          disabled={draftSpinner}
+          variant="primary"
+          icon={<Send className="h-4 w-4" />}
+        />
       );
 
     case 'publishing':
       return (
-        <div className="inline-flex flex-col items-stretch gap-2">
-          <ActionPill
-            label="Draft Blog"
-            disabled
-            icon={<FileText className="h-4 w-4" />}
-          />
-          <ActionPill
-            label="Publishing…"
-            disabled
-            variant="primary"
-            icon={<Loader2 className="h-4 w-4 animate-spin" />}
-          />
-        </div>
+        <ActionPill
+          label="Publishing…"
+          disabled
+          variant="primary"
+          icon={<Loader2 className="h-4 w-4 animate-spin" />}
+        />
       );
 
     case 'failed':

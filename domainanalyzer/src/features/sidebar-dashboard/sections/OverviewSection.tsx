@@ -553,7 +553,7 @@ useEffect(() => {
             Run an audit to view performance metrics.
           </p>
         ) : (
-        <div className="flex flex-col 2xl:flex-row gap-4 sm:gap-6 min-w-0">
+        <div className="flex flex-col 2xl:flex-row gap-4 sm:gap-6 min-w-0 pt-6">
           {/* LEFT: 4 metric cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 flex-1 min-w-0">
             {[
@@ -607,8 +607,19 @@ useEffect(() => {
         )}
         </div>
         {/* Performance over Time - Blog Analytics */}
-{isLoadingBlogData ? (
-  <div className="lg:col-span-1 rounded-xl bg-white border border-gray-200 p-6 shadow-sm">
+<div className="lg:col-span-1 rounded-xl bg-white border border-gray-200 p-6 shadow-sm transition-shadow duration-300">
+  <div className="flex items-center justify-between mb-4">
+    <div>
+      <h3 className="text-3xl font-medium text-gray-900"> Performance</h3>
+      <p className="text-xs text-gray-400">
+        {blogAggregateData && blogAggregateData.totalBlogsAnalyzed > 0
+          ? `Tracking ${blogAggregateData.totalBlogsAnalyzed} published blogs`
+          : "No blogs published yet"}
+      </p>
+    </div>
+  </div>
+
+  {isLoadingBlogData ? (
     <div className="space-y-4">
       <div className="flex items-center justify-center h-64">
         <div className="text-center space-y-3">
@@ -617,29 +628,24 @@ useEffect(() => {
         </div>
       </div>
     </div>
-  </div>
-) : (
-  blogAggregateData && blogAggregateData.dateBreakdown.length > 0 && (
-    <div className="lg:col-span-1 rounded-xl bg-white border border-gray-200 p-6 shadow-sm transition-shadow duration-300">
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <h3 className="text-3xl font-medium text-gray-900"> Performance</h3>
-          <p className="text-xs text-gray-400">
-            Tracking {blogAggregateData.totalBlogsAnalyzed} published blogs
-          </p>
-        </div>
-      </div>
-
-      <D3LineChart
-        data={blogClicksData}
-        secondaryData={blogImpressionsData}
-        width={500}
-        height={180}
-        primaryColor="#111111"
-        secondaryColor="#4E76C7"
-        primaryLabel="Clicks"
-        secondaryLabel="Impressions"
-      />
+  ) : blogAggregateData && blogAggregateData.dateBreakdown.length > 0 ? (
+    <D3LineChart
+      data={blogClicksData}
+      secondaryData={blogImpressionsData}
+      width={500}
+      height={180}
+      primaryColor="#111111"
+      secondaryColor="#4E76C7"
+      primaryLabel="Clicks"
+      secondaryLabel="Impressions"
+    />
+  ) : (
+    <div className="flex h-64 items-center justify-center">
+      <p className="text-sm text-gray-500">
+        No performance data yet. Publish few blogs to start tracking trends.
+      </p>
+    </div>
+  )}
 
       {/* Mini stats below the chart */}
       {/* <div className="mt-4 pt-4 border-t border-gray-100 grid grid-cols-3 gap-4">
@@ -662,9 +668,7 @@ useEffect(() => {
           </p>
         </div>
       </div> */}
-    </div>
-  )
-)}
+</div>
 </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

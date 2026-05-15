@@ -12,6 +12,7 @@ import n8nErrorRouter from './routes/n8nError';
 import wizardRouter from './wizard/routes';
 import userRouter from './routes/user';
 import blogAnalyticsRouter from './routes/blogAnalytics';
+import domainCompatRouter from './routes/domainCompat';
 
 import { PrismaClient } from '../generated/prisma';
 import { authenticateToken, AuthenticatedRequest } from './middleware/auth';
@@ -92,6 +93,7 @@ app.get('/api/debug/domains', authenticateToken, async (req: Request, res: Respo
 // API routes — clean surface.
 app.use('/api/auth', authRouter);
 app.use('/api/user', userRouter);
+app.use('/api/domain', domainCompatRouter);
 app.use('/api/wizard', wizardRouter);
 app.use('/api/blog-analytics', blogAnalyticsRouter);
 app.use('/api/gsc', googleSearchConsoleRouter);

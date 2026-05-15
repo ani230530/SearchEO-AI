@@ -233,8 +233,49 @@ router.post('/send', authenticateToken, async (req: Request, res: Response) => {
 // POST /api/audit/n8n/callback - Receive callback from n8n
 router.post('/callback', async (req: Request, res: Response) => {
     try {
-        const { id, googleSheetsUrl, googleSlidesUrl, ...otherData } = req.body;
-        console.log(req.body);
+        const body = (req.body || {}) as Record<string, any>;
+        const id = body.id || body.requestId || body.request_id;
+
+        const firstString = (...values: any[]): string | undefined => {
+            for (const v of values) {
+                if (typeof v === 'string' && v.trim()) return v.trim();
+            }
+            return undefined;
+        };
+
+        // n8n payloads vary across workflows (camelCase/snake_case/spaces/nested).
+        const googleSheetsUrl = firstString(
+            body.googleSheetsUrl,
+            body.google_sheets_url,
+            body.googleSheetUrl,
+            body.sheetUrl,
+            body.sheetsUrl,
+            body?.data?.googleSheetsUrl,
+            body?.data?.google_sheets_url,
+            body?.results?.googleSheetsUrl,
+            body?.results?.google_sheets_url
+        );
+        const googleSlidesUrl = firstString(
+            body.googleSlidesUrl,
+            body.google_slides_url,
+            body.googleSlideUrl,
+            body.slideUrl,
+            body.slidesUrl,
+            body?.data?.googleSlidesUrl,
+            body?.data?.google_slides_url,
+            body?.results?.googleSlidesUrl,
+            body?.results?.google_slides_url
+        );
+        const callbackError = firstString(
+            body.error,
+            body.errorMessage,
+            body.error_message,
+            body?.data?.error,
+            body?.results?.error
+        );
+
+        const { id: _id, requestId: _requestId, request_id: _request_id, ...otherData } = body;
+        console.log(body);
         if (!id) {
             return res.status(400).json({
                 success: false,
@@ -266,7 +307,7 @@ router.post('/callback', async (req: Request, res: Response) => {
         }
 
         // Determine if this is a success or error callback
-        const hasError = otherData.error || (!googleSheetsUrl && !googleSlidesUrl);
+        const hasError = Boolean(callbackError) || (!googleSheetsUrl && !googleSlidesUrl);
         const newStatus = hasError ? 'failed' : 'completed';
 
         // Update the request with callback data
@@ -294,7 +335,7 @@ router.post('/callback', async (req: Request, res: Response) => {
                     status: newStatus,
                     googleSheetsUrl,
                     googleSlidesUrl,
-                    error: otherData.error
+                    error: callbackError
                 }
             });
         }

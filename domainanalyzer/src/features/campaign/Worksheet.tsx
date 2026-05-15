@@ -7,13 +7,17 @@ import {
   ChevronLeft,
   Command,
   Download,
-  Feather,
+  Eye,
   Filter,
   FolderOpen,
   Loader2,
   Plus,
   Radio,
+  RefreshCw,
+  RotateCw,
   Search,
+  Send,
+  SquarePen,
   Sparkles,
   Trash2,
   Upload,
@@ -818,6 +822,35 @@ export default function Worksheet({
     await withBusy(id, () => deleteTopic(id));
   };
 
+  const handlePublishFromMore = async (topicId: number, draftId: number) => {
+    setOptimisticPublishingTopicIds((prev) => {
+      if (prev.has(topicId)) return prev;
+      const next = new Set(prev);
+      next.add(topicId);
+      return next;
+    });
+    try {
+      const result = await publishDraft(draftId);
+      if (result.status === 'failed') {
+        setOptimisticPublishingTopicIds((prev) => {
+          if (!prev.has(topicId)) return prev;
+          const next = new Set(prev);
+          next.delete(topicId);
+          return next;
+        });
+        setError(result.error || 'Publish failed.');
+      }
+    } catch (err) {
+      setOptimisticPublishingTopicIds((prev) => {
+        if (!prev.has(topicId)) return prev;
+        const next = new Set(prev);
+        next.delete(topicId);
+        return next;
+      });
+      setError(err instanceof Error ? err.message : 'Publish failed.');
+    }
+  };
+
   /* ---------- Import / Export ---------- */
 
   const handleImportClick = () => importInputRef.current?.click();
@@ -1381,14 +1414,70 @@ export default function Worksheet({
 
                       {columnVisibility.more && (
                         <td className="px-4 align-middle text-center">
-                          <button
-                            type="button"
-                            onClick={() => setDeleteRowId(topic.id)}
-                            className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[#d14f4f] hover:bg-[#ffecec]"
-                            aria-label="Delete row"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
+                          <div className="inline-flex items-center gap-1.5">
+                            {rowState.kind === 'published' && rowState.liveUrl ? (
+                              <a
+                                href={rowState.liveUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[#5b6578] hover:bg-[#eef2f8]"
+                                aria-label="View live"
+                                title="View live"
+                              >
+                                <Eye className="h-4 w-4" />
+                              </a>
+                            ) : null}
+
+                            {(rowState.kind === 'completed' || rowState.kind === 'published') && onOpenDraftInPublish ? (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setOpeningDraftRowId(topic.id);
+                                  onOpenDraftInPublish(rowState.draftId);
+                                  setTimeout(() => setOpeningDraftRowId(null), 350);
+                                }}
+                                className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[#5b6578] hover:bg-[#eef2f8]"
+                                aria-label="Edit draft"
+                                title="Edit draft"
+                              >
+                                <SquarePen className="h-4 w-4" />
+                              </button>
+                            ) : null}
+
+                            {(rowState.kind === 'completed' || rowState.kind === 'published') ? (
+                              <button
+                                type="button"
+                                onClick={() => setTopicForGenerate(topic)}
+                                className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[#5b6578] hover:bg-[#eef2f8]"
+                                aria-label="Regenerate"
+                                title="Regenerate"
+                              >
+                                <RotateCw className="h-4 w-4" />
+                              </button>
+                            ) : null}
+
+                            {/* {rowState.kind === 'completed' ? (
+                              <button
+                                type="button"
+                                onClick={() => void handlePublishFromMore(topic.id, rowState.draftId)}
+                                className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[#5b6578] hover:bg-[#eef2f8]"
+                                aria-label="Publish"
+                                title="Publish"
+                              >
+                                <Send className="h-4 w-4" />
+                              </button>
+                            ) : null} */}
+
+                            <button
+                              type="button"
+                              onClick={() => setDeleteRowId(topic.id)}
+                              className="inline-flex items-center justify-center h-8 w-8 rounded-md text-[#d14f4f] hover:bg-[#ffecec]"
+                              aria-label="Delete row"
+                              title="Delete"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
                         </td>
                       )}
                     </tr>
@@ -1574,7 +1663,7 @@ function columnIcon(key: WorksheetColumnKey) {
     case 'status':
       return <Radio className="h-4 w-4 text-[#2D4059]" />;
     case 'action':
-      return <Feather className="h-4 w-4 text-[#2D4059]" />;
+      return <SquarePen className="h-4 w-4 text-[#2D4059]" />;
     case 'more':
       return <FolderOpen className="h-4 w-4 text-[#2D4059]" />;
   }
@@ -1598,6 +1687,37 @@ function KeywordChip({
   /** Commit a renamed term. */
   onRename: (next: string) => void | Promise<void>;
 }) {
+  const chipRef = React.useRef<HTMLSpanElement | null>(null);
+  const [menuPos, setMenuPos] = React.useState<{ left: number; top: number } | null>(null);
+
+  React.useEffect(() => {
+    if (!isPopoverOpen) return;
+
+    const updatePosition = () => {
+      const rect = chipRef.current?.getBoundingClientRect();
+      if (!rect) return;
+
+      const menuWidth = 170;
+      const viewportPadding = 8;
+      const preferredLeft = rect.right + 8;
+      const clampedLeft = Math.min(
+        preferredLeft,
+        window.innerWidth - menuWidth - viewportPadding,
+      );
+      const clampedTop = Math.max(viewportPadding, rect.top);
+
+      setMenuPos({ left: clampedLeft, top: clampedTop });
+    };
+
+    updatePosition();
+    window.addEventListener('resize', updatePosition);
+    window.addEventListener('scroll', updatePosition, true);
+    return () => {
+      window.removeEventListener('resize', updatePosition);
+      window.removeEventListener('scroll', updatePosition, true);
+    };
+  }, [isPopoverOpen]);
+
   // Worksheet invariant: every keyword is Primary or Longtail.
   // Primary uses a saturated lavender; Longtail uses a soft tint of the same
   // hue. The chevron is the affordance for the actions popover; the term
@@ -1608,6 +1728,7 @@ function KeywordChip({
 
   return (
     <span
+      ref={chipRef}
       className={`relative inline-flex items-center gap-2 rounded-md border px-3 py-1 text-[12px] font-medium transition-colors ${variantClass}`}
     >
       <InlineEditable
@@ -1632,7 +1753,12 @@ function KeywordChip({
 
       {isPopoverOpen && (
         <span
-          className="absolute left-0 top-full mt-1 z-30 min-w-[160px] rounded-md border border-gray-200 bg-white shadow-lg text-left"
+          className="fixed z-[120] min-w-[160px] rounded-md border border-gray-200 bg-white shadow-lg text-left"
+          style={
+            menuPos
+              ? { left: `${menuPos.left}px`, top: `${menuPos.top}px` }
+              : undefined
+          }
           onClick={(e) => e.stopPropagation()}
         >
           {!keyword.isPrimary && (
