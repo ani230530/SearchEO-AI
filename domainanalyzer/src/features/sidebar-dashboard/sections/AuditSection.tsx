@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { PDFDownloadLink } from "@react-pdf/renderer";
 import { Loader2 } from "lucide-react";
 
@@ -70,6 +71,19 @@ export function AuditSection({
   }));
   const best = scored.length > 0 ? scored.reduce((a, b) => (b.score > a.score ? b : a)) : null;
   const worst = scored.length > 0 ? scored.reduce((a, b) => (b.score < a.score ? b : a)) : null;
+  const autoRunDomainRef = useRef<string | null>(null);
+
+  // Auto-run once per domain when a domain exists but no audit result has
+  // been loaded yet. Guarded to avoid looped re-triggers on re-render.
+  useEffect(() => {
+    if (companyDomainLoading) return;
+    if (!companyDomain) return;
+    if (auditLoading) return;
+    if (auditResult) return;
+    if (autoRunDomainRef.current === companyDomain) return;
+    autoRunDomainRef.current = companyDomain;
+    onRunAudit();
+  }, [companyDomainLoading, companyDomain, auditLoading, auditResult, onRunAudit]);
 
   // Resolve which view to render before painting anything. We branch
   // upstream so the audit chrome never flashes for a user who has no

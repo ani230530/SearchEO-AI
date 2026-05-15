@@ -519,11 +519,11 @@ const ModelComparisonGrid = ({ results }: { results: any[] }) => {
 
   return (
     <div className="flex flex-col gap-2 lg:px-4 lg:pt-3 lg:pb-4">
-      <div className="flex items-center h-9 px-1">
-        <h4 className="text-[18px] font-medium text-slate-900">Compare Model response</h4>
+      <div className="flex items-center min-h-9 px-1">
+        <h4 className="text-[16px] sm:text-[18px] font-medium text-slate-900">Compare Model response</h4>
       </div>
-      <div className="overflow-hidden rounded-none border border-slate-300 bg-white shadow-sm h-[320px]">
-        <div className="overflow-x-auto">
+      <div className="overflow-hidden rounded-none border border-slate-300 bg-white shadow-sm min-h-[280px] h-auto lg:h-[320px]">
+        <div className="overflow-x-auto lg:h-full">
           <table className="w-full border-collapse">
             <thead>
               <tr className="border-b border-slate-300">
@@ -592,13 +592,13 @@ const AIResponseViewer = ({
 
   return (
     <div className="flex flex-col gap-2 lg:px-4 lg:pt-3 lg:pb-4">
-      <div className="flex items-center justify-between h-9 px-1">
-        <h4 className="text-[18px] font-medium text-slate-900">AI Response</h4>
-        <div className="flex items-center gap-3">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between min-h-9 px-1">
+        <h4 className="text-[16px] sm:text-[18px] font-medium text-slate-900">AI Response</h4>
+        <div className="flex items-center gap-2 sm:gap-3">
           <span className="text-[11px] text-gray-400 font-medium">Select Model</span>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" className="h-9 min-w-[150px] justify-between gap-2 rounded-lg border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-gray-700 shadow-sm transition hover:bg-gray-50">
+              <Button variant="outline" className="h-9 min-w-[138px] sm:min-w-[150px] justify-between gap-2 rounded-lg border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-gray-700 shadow-sm transition hover:bg-gray-50">
                 <span className="flex items-center gap-2">
                   {getModelIconNode(selectedModel, 'sm')}
                   {getModelLabel(selectedModel)}
@@ -623,9 +623,9 @@ const AIResponseViewer = ({
         </div>
       </div>
 
-      <Card className="flex flex-col rounded-none border border-slate-300 bg-white shadow-sm h-[320px] overflow-hidden">
+      <Card className="flex flex-col rounded-none border border-slate-300 bg-white shadow-sm min-h-[320px] h-auto lg:h-[320px] overflow-hidden">
 
-        <div className="flex-1 grid grid-cols-1 lg:grid-cols-[1.4fr_0.6fr] divide-x divide-slate-100 min-h-0">
+        <div className="flex-1 grid grid-cols-1 lg:grid-cols-[1.25fr_0.75fr] divide-y lg:divide-y-0 lg:divide-x divide-slate-100 min-h-0">
           {/* Left Column: Response Content (INTERNAL SCROLL HERE) */}
           <div className="flex flex-col min-h-0 bg-slate-50/50 overflow-hidden">
             <div className="flex-1 overflow-y-auto px-8 py-7 scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent">
@@ -821,7 +821,7 @@ const ExpandedDetails = ({ results }: { results: any[] }) => {
   const [selectedModel, setSelectedModel] = useState(processedResults[0]?.model || '');
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-[0.7fr_1.3fr] lg:divide-x lg:divide-slate-300">
+    <div className="grid grid-cols-1 lg:grid-cols-[0.62fr_1.38fr] lg:divide-x lg:divide-slate-300">
       <ModelComparisonGrid results={processedResults} />
       <AIResponseViewer
         results={processedResults}
@@ -994,6 +994,7 @@ type PromptTableProps = {
   data: any[];
   selectedRowIds: Set<string>;
   onToggleRow: (id: string) => void;
+  onSetSelectedRows: (ids: Set<string>) => void;
   onOpenWorksheetModal: (singleRowId?: string) => void;
   title?: string;
   /** Real Domain.id. Required for the Add & Analyze button to call
@@ -1006,6 +1007,7 @@ export const PromptTable = ({
   data,
   selectedRowIds,
   onToggleRow,
+  onSetSelectedRows,
   onOpenWorksheetModal,
   title = 'Top searched Prompts',
   domainId,
@@ -1042,20 +1044,38 @@ export const PromptTable = ({
       });
       return;
     }
-    const optimisticId = `pending-${Date.now()}`;
+    const phrases = text
+      .split(',')
+      .map((p) => p.trim())
+      .filter(Boolean);
+    if (phrases.length === 0) return;
+
+    const optimisticRows = phrases.map((phrase, idx) => ({
+      id: `pending-${Date.now()}-${idx}`,
+      phrase,
+    }));
     setAnalyzing(true);
-    setPendingRows((prev) => [{ id: optimisticId, phrase: text }, ...prev]);
+    setPendingRows((prev) => [...optimisticRows, ...prev]);
     try {
-      const res = await apiPost<{
-        runId: number;
-        prompt: { id: number; keywordId: number | null; text: string };
-        row: any;
-      }>(`/wizard/domain/${domainId}/prompts/analyze`, { text });
-      setNewlyAnalyzedRows((prev) => [res.row, ...prev]);
+      const addedRows: any[] = [];
+      for (const phrase of phrases) {
+        const res = await apiPost<{
+          runId: number;
+          prompt: { id: number; keywordId: number | null; text: string };
+          row: any;
+        }>(`/wizard/domain/${domainId}/prompts/analyze`, { text: phrase });
+        addedRows.push(res.row);
+      }
+      if (addedRows.length > 0) {
+        setNewlyAnalyzedRows((prev) => [...addedRows.reverse(), ...prev]);
+      }
       setAnalyzeText('');
       toast({
         title: 'Prompt analyzed',
-        description: `Tracked across ${res.row?.results?.length ?? 3} model${(res.row?.results?.length ?? 3) === 1 ? '' : 's'}.`,
+        description:
+          phrases.length === 1
+            ? `Tracked across ${addedRows[0]?.results?.length ?? 3} model${(addedRows[0]?.results?.length ?? 3) === 1 ? '' : 's'}.`
+            : `${addedRows.length} phrases analyzed successfully.`,
       });
     } catch (err) {
       const message =
@@ -1066,7 +1086,8 @@ export const PromptTable = ({
         variant: 'destructive',
       });
     } finally {
-      setPendingRows((prev) => prev.filter((p) => p.id !== optimisticId));
+      const pendingIds = new Set(optimisticRows.map((p) => p.id));
+      setPendingRows((prev) => prev.filter((p) => !pendingIds.has(p.id)));
       setAnalyzing(false);
     }
   };
@@ -1150,6 +1171,12 @@ export const PromptTable = ({
     const start = (currentPage - 1) * PAGE_SIZE;
     return fullSortedData.slice(start, start + PAGE_SIZE);
   }, [fullSortedData, currentPage]);
+  const visibleRowIds = useMemo(
+    () => displayData.map((row) => String(row.id)),
+    [displayData]
+  );
+  const allVisibleSelected =
+    visibleRowIds.length > 0 && visibleRowIds.every((id) => selectedRowIds.has(id));
   // Reference unused legacy state so the lint stays clean — showAllQueries
   // / setShowAllQueries are kept for now in case other branches rely on
   // them; once this PR ships they can be removed entirely.
@@ -1176,6 +1203,7 @@ export const PromptTable = ({
                 value={analyzeText}
                 onChange={(e) => setAnalyzeText(e.target.value)}
                 disabled={analyzing}
+                title="Add one or more prompts. Use commas to analyze multiple prompts at once."
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault();
@@ -1279,7 +1307,21 @@ export const PromptTable = ({
             <TableHeader>
               <TableRow className="border-b border-slate-200 hover:bg-transparent">
                 <TableHead className="w-8 px-4">
-                  <input type="checkbox" className="h-3.5 w-3.5 rounded border-gray-300 accent-blue-600" />
+                  <input
+                    type="checkbox"
+                    checked={allVisibleSelected}
+                    onChange={() => {
+                      const next = new Set(selectedRowIds);
+                      if (allVisibleSelected) {
+                        visibleRowIds.forEach((id) => next.delete(id));
+                      } else {
+                        visibleRowIds.forEach((id) => next.add(id));
+                      }
+                      onSetSelectedRows(next);
+                    }}
+                    aria-label="Select all visible prompts and keywords"
+                    className="h-3.5 w-3.5 rounded border-gray-300 accent-blue-600"
+                  />
                 </TableHead>
                 <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500 px-2">Prompts & Keywords</TableHead>
                 <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500 px-2">Sentiment</TableHead>
@@ -1364,7 +1406,12 @@ export const PromptTable = ({
                             <Badge variant="outline" className="rounded-full bg-emerald-50/80 px-2 py-0 text-[9px] text-emerald-600 border-emerald-200">
                               Keyword
                             </Badge>
-                            <span className="truncate text-xs font-medium text-gray-900 tracking-tight">{row.phrase}</span>
+                            <span
+                              title={row.phrase}
+                              className="truncate text-xs font-medium text-gray-900 tracking-tight"
+                            >
+                              {row.phrase}
+                            </span>
                           </div>
                         ) : (
                           <>
@@ -1372,7 +1419,9 @@ export const PromptTable = ({
                               <Badge variant="outline" className="rounded-full bg-blue-50/50 px-2 py-0 text-[9px] text-blue-600 border-blue-200">
                                 Prompt
                               </Badge>
-                              <span className="truncate text-xs font-medium text-gray-800">{row.phrase}</span>
+                              <span title={row.phrase} className="truncate text-xs font-medium text-gray-800">
+                                {row.phrase}
+                              </span>
                             </div>
                           </>
                         )}
@@ -2152,6 +2201,7 @@ const AIResultsReportPreview = () => {
   const [loading, setLoading] = useState(true);
   const [reportData, setReportData] = useState<any>(null);
   const [allDomains, setAllDomains] = useState<any[]>([]);
+  const [gscConnected, setGscConnected] = useState(false);
   const [filterType, setFilterType] = useState<'all' | 'prompt' | 'keyword'>('all');
 
   // Filter state — drives header dropdowns + per-card / table scoping.
@@ -2224,6 +2274,25 @@ const AIResultsReportPreview = () => {
       else next.add(id);
       return next;
     });
+  }, []);
+
+  useEffect(() => {
+    let alive = true;
+    apiGet<{ connected?: boolean }>('/gsc/status')
+      .then((res) => {
+        if (!alive) return;
+        setGscConnected(Boolean(res?.connected));
+      })
+      .catch(() => {
+        if (!alive) return;
+        setGscConnected(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
+  const handleSetSelectedRows = useCallback((ids: Set<string>) => {
+    setSelectedRowIds(ids);
   }, []);
 
   const handleOpenWorksheetModal = useCallback(
@@ -2994,20 +3063,25 @@ const AIResultsReportPreview = () => {
       title="AI Results"
     >
       <section className="flex w-full flex-col bg-white px-4 py-3 sm:px-6">
-        <div className="flex w-full flex-col gap-4 rounded-xl bg-[#F1F6FF] px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-          <div className="min-w-0">
-            <h2 className="text-lg font-semibold leading-[1.35] tracking-normal text-[#7BA0E8] sm:text-xl">
-              Connect your site
-            </h2>
-            <p className="mt-1 text-sm font-normal leading-normal text-[#535862] sm:text-base">
-              Connect your site integration for unlock access direct blog implementation.
-            </p>
+        {!gscConnected && (
+          <div className="flex w-full flex-col gap-4 rounded-xl bg-[#F1F6FF] px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+            <div className="min-w-0">
+              <h2 className="text-lg font-semibold leading-[1.35] tracking-normal text-[#7BA0E8] sm:text-xl">
+                Connect your site
+              </h2>
+              <p className="mt-1 text-sm font-normal leading-normal text-[#535862] sm:text-base">
+                Connect your site integration for unlock access direct blog implementation.
+              </p>
+            </div>
+            <Button
+              onClick={() => navigate('/dashboard?tab=integration')}
+              className="h-[37px] w-full shrink-0 rounded-lg bg-[#2D4059] px-4 text-sm font-semibold text-white shadow-[0_1px_2px_0_#1018280D] hover:bg-[#24364d] sm:w-auto"
+            >
+              <IntegrateSiteIcon />
+              <span className="ml-2">Integrate Site</span>
+            </Button>
           </div>
-          <Button className="h-[37px] w-full shrink-0 rounded-lg bg-[#2D4059] px-4 text-sm font-semibold text-white shadow-[0_1px_2px_0_#1018280D] hover:bg-[#24364d] sm:w-auto">
-            <IntegrateSiteIcon />
-            <span className="ml-2">Integrate Site</span>
-          </Button>
-        </div>
+        )}
 
         <div className="flex w-full flex-col gap-6 px-0 py-6">
           <div className="flex w-full flex-col gap-4 lg:flex-row lg:flex-nowrap lg:items-start lg:justify-between">
@@ -3281,6 +3355,7 @@ const AIResultsReportPreview = () => {
                 data={filteredPrompts}
                 selectedRowIds={selectedRowIds}
                 onToggleRow={handleToggleRow}
+                onSetSelectedRows={handleSetSelectedRows}
                 onOpenWorksheetModal={handleOpenWorksheetModal}
                 domainId={reportData?.domainInfo?.id ?? null}
               />
