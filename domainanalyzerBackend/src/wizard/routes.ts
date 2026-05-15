@@ -33,8 +33,9 @@ import { generateKeywordsForDomain, persistKeywords } from './keywordsService';
 import { enrichDomainContext } from './enrichmentService';
 import { setPhase, readState } from './wizardState';
 import { runOnePrompt, runQueries } from './runService';
-import { computePhraseVisibility, computeOpportunities } from './analyticsService';
+import { computePhraseVisibility, computeOpportunities, computeCompetitorAnalysis } from './analyticsService';
 import { enrichOpportunities, type EnrichedOpportunity } from './opportunityEnrichment';
+import { enrichCompetitorInsights, type CompetitorInsight } from './competitorInsightEnrichment';
 
 const prisma = new PrismaClient();
 const router = Router();
@@ -1292,6 +1293,201 @@ router.post('/domain/:id/restart', authenticateToken, async (req: Request, res: 
 
   return res.json({ domainId: domain.id, restartedFrom: from });
 });
+
+// ── GET /domain/:id/competitors ────────────────────────────────────────────
+//
+// Cheap read of the currently-selected competitors. Used by the AI Checker
+// "Competitors" page to populate the selector pills without triggering a
+// fresh discovery pipeline (which is the POST sibling below).
+
+router.get('/domain/:id/competitors', authenticateToken, async (req: Request, res: Response) => {
+  const got = await ensureDomain(req, req.params.id);
+  if (!got.ok) return res.status(got.status).json({ error: got.error });
+  const { domain } = got;
+
+  const rows = await prisma.competitor.findMany({
+    where: { domainId: domain.id, isSelected: true },
+    orderBy: [{ rank: 'asc' }, { similarityScore: 'desc' }, { id: 'asc' }],
+  });
+
+  return res.json({
+    domainId: domain.id,
+    competitors: rows.map((c) => ({
+      host: c.competitorHost,
+      url: `https://${c.competitorHost}`,
+      logoUrl: `https://img.logo.dev/${c.competitorHost}?token=pk_DTdFFG1JT9WOCjATvZEzIA&size=64`,
+      rank: c.rank,
+      threatLevel: c.threatLevel,
+      similarityScore: c.similarityScore,
+      reasoning: c.reasoning,
+      industry: c.industry,
+      location: c.location,
+      companySize: c.companySize,
+      source: c.source,
+    })),
+  });
+});
+
+// ── GET /domain/:id/competitor-analysis ────────────────────────────────────
+//
+// Competitor-centric rollup powering the AI Checker "Competitors" page.
+// Aggregates AiQueryResult.competitorMentions / citations into per-host
+// metrics (mentions, market share, sentiment, prompt coverage, source mix)
+// and joins the Competitor table for rank/threat/reasoning metadata.
+// LLM-derived Strength / Weakness / Competitive-Edge insights are enriched
+// once per AiRun and cached on AiRun.summary.competitorInsights.
+
+router.get('/domain/:id/competitor-analysis', authenticateToken, async (req: Request, res: Response) => {
+  const got = await ensureDomain(req, req.params.id);
+  if (!got.ok) return res.status(got.status).json({ error: got.error });
+  const { domain } = got;
+
+  const runIdParam = typeof req.query.runId === 'string' ? Number(req.query.runId) : NaN;
+  const useSpecificRun = Number.isFinite(runIdParam) && runIdParam > 0;
+
+  const [latestRun, selectedCompetitors, prompts, keywords] = await Promise.all([
+    useSpecificRun
+      ? prisma.aiRun.findFirst({ where: { id: runIdParam, domainId: domain.id, status: 'completed' } })
+      : prisma.aiRun.findFirst({ where: { domainId: domain.id, status: 'completed' }, orderBy: { startedAt: 'desc' } }),
+    prisma.competitor.findMany({
+      where: { domainId: domain.id, isSelected: true },
+      orderBy: [{ rank: 'asc' }, { similarityScore: 'desc' }],
+    }),
+    prisma.prompt.findMany({ where: { domainId: domain.id, isSelected: true } }),
+    prisma.keyword.findMany({ where: { domainId: domain.id } }),
+  ]);
+
+  if (!latestRun) {
+    return res.json({
+      runId: null,
+      runStartedAt: null,
+      competitors: selectedCompetitors.map((c) => emptyCompetitorRow(c)),
+      ownBrand: { host: domain.host, mentions: 0, marketShare: 0, avgSentiment: null },
+      totals: { prompts: 0, results: 0, competitorMentions: 0 },
+    });
+  }
+
+  const allResults = await prisma.aiQueryResult.findMany({
+    where: { runId: latestRun.id },
+    select: {
+      id: true,
+      promptId: true,
+      model: true,
+      presence: true,
+      overall: true,
+      sentiment: true,
+      rankPosition: true,
+      competitorMentions: true,
+      competitorHosts: true,
+      citations: true,
+    },
+  });
+
+  const analytics = computeCompetitorAnalysis({
+    ownDomainHost: domain.host,
+    ownBrandName: domain.inferred?.companyName ?? null,
+    selectedCompetitorHosts: selectedCompetitors.map((c) => c.competitorHost),
+    keywords: keywords.map((k) => ({ id: k.id, term: k.term, intent: k.intent })),
+    prompts: prompts.map((p) => ({
+      id: p.id,
+      text: p.text,
+      intent: p.intent,
+      keywordId: p.keywordId,
+      category: p.category,
+      intentStage: p.intentStage,
+      persona: p.persona,
+      useCase: p.useCase,
+      isBranded: p.isBranded,
+      competitorMentioned: p.competitorMentioned,
+    })),
+    results: allResults,
+  });
+
+  // Join Competitor-table metadata onto the analytics rows.
+  const metaByHost = new Map(selectedCompetitors.map((c) => [c.competitorHost.toLowerCase(), c]));
+  const hydrated = analytics.competitors.map((row) => {
+    const meta = metaByHost.get(row.host);
+    if (!meta) return row;
+    return {
+      ...row,
+      rank: meta.rank,
+      threatLevel: (meta.threatLevel as 'High' | 'Medium' | 'Low' | null) ?? null,
+      similarityScore: meta.similarityScore,
+      reasoning: meta.reasoning,
+      industry: meta.industry,
+      companySize: meta.companySize,
+    };
+  });
+
+  // ── LLM enrichment with per-AiRun cache (mirrors opportunities pattern). ──
+  const summary = (latestRun.summary as Record<string, unknown> | null) ?? null;
+  const cached = (summary?.competitorInsights as Record<string, CompetitorInsight[]> | undefined) ?? null;
+  const cachedKeys = (summary?.competitorInsightsKeys as string[] | undefined) ?? null;
+  const currentKeys = hydrated.map((c) => c.host).sort();
+  const cacheValid =
+    cached &&
+    cachedKeys &&
+    cachedKeys.length === currentKeys.length &&
+    cachedKeys.every((k, i) => k === currentKeys[i]);
+
+  let insightsByHost: Record<string, CompetitorInsight[]>;
+  if (cacheValid) {
+    insightsByHost = cached;
+  } else {
+    const promptsById = new Map(prompts.map((p) => [p.id, { text: p.text, category: p.category }]));
+    insightsByHost = await enrichCompetitorInsights(hydrated, {
+      brandName: domain.inferred?.companyName ?? domain.host,
+      brandHost: domain.host,
+      industry: domain.profile?.industry ?? null,
+      promptsById,
+    });
+    const existingSummary = (summary as Record<string, unknown> | null) ?? {};
+    const updatedSummary = {
+      ...existingSummary,
+      competitorInsights: insightsByHost,
+      competitorInsightsKeys: currentKeys,
+      competitorInsightsAt: new Date().toISOString(),
+    };
+    prisma.aiRun
+      .update({ where: { id: latestRun.id }, data: { summary: updatedSummary as any } })
+      .catch((err) => console.warn('[competitor-insights] cache write failed', err));
+  }
+
+  const competitorsWithInsights = hydrated.map((c) => ({
+    ...c,
+    insights: insightsByHost[c.host] ?? [],
+  }));
+
+  return res.json({
+    runId: latestRun.id,
+    runStartedAt: latestRun.startedAt,
+    competitors: competitorsWithInsights,
+    ownBrand: analytics.ownBrand,
+    totals: analytics.totals,
+  });
+});
+
+function emptyCompetitorRow(c: { competitorHost: string; rank: number | null; threatLevel: string | null; similarityScore: number | null; reasoning: string | null; industry: string | null; companySize: string | null }) {
+  return {
+    host: c.competitorHost,
+    rank: c.rank,
+    threatLevel: (c.threatLevel as 'High' | 'Medium' | 'Low' | null) ?? null,
+    similarityScore: c.similarityScore,
+    reasoning: c.reasoning,
+    industry: c.industry,
+    companySize: c.companySize,
+    mentions: 0,
+    promptCoverage: 0,
+    coveragePct: 0,
+    avgSentiment: null as number | null,
+    avgRankPosition: null as number | null,
+    marketShare: 0,
+    strongestPromptCluster: null,
+    topCitedSourceTypes: [],
+    examplePromptIds: [],
+    insights: [],
+  };
+}
 
 // ── POST /domain/:id/competitors ───────────────────────────────────────────
 
