@@ -435,7 +435,7 @@ const MetricInfoTooltip = ({ tip }: { tip: string }) => (
  * already familiar to a marketer (SOV, AI Overview, etc.).
  */
 const CARD_TOOLTIPS: Record<string, string> = {
-  'AI Citations':
+  'AI Prompts Citations':
     'How many web sources each AI assistant cited when answering your prompts. A higher count means the model is grounding its answer in real research — and the unique-host count tells you how diverse those sources are.',
   'Top Keywords':
     'Total keywords we generated for your audit, and how many actually got tested in this run. Visibility is the share of model responses that mentioned your brand across those tested keywords.',
@@ -2636,7 +2636,7 @@ const AIResultsReportPreview = () => {
 
     return [
       {
-        title: 'AI Citations',
+        title: 'AI Prompts Citations',
         kind: 'citations',
         details: [
           // AI Overview removed — we never query Google's SGE separately.
