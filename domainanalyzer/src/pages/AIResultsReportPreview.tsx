@@ -1,7 +1,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { apiGet, apiPost } from '../services/apiClient';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { apiPost } from '../services/apiClient';
 import { cn } from '@/lib/utils';
 import {
   Area,
@@ -76,8 +76,11 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { useToast } from '@/components/ui/use-toast';
-import { AIResultsLayout } from '@/features/ai-results/components/AIResultsLayout';
 import { maskDomainId, unmaskDomainId } from '../lib/domainUtils';
+import { useShellContext } from '@/features/ai-results/AIResultsShell';
+import { useCampaigns, useGscStatus, useReport, useRuns, useTrends } from '@/features/ai-results/queries';
+import { useQueryClient } from '@tanstack/react-query';
+import { aiResultsKeys } from '@/features/ai-results/queries';
 
 const getDomainHost = (rawUrl: string | undefined): string => {
   if (!rawUrl) return '';
@@ -2190,24 +2193,15 @@ const CreateWorksheetModal = ({
 
 const AIResultsReportPreview = () => {
   const navigate = useNavigate();
-  const { domain: maskedDomainId } = useParams();
+  const queryClient = useQueryClient();
+  const { currentDomain, allDomains, maskedDomainId } = useShellContext();
+  const domainId = currentDomain?.id ?? null;
 
-  useEffect(() => {
-    if (maskedDomainId) {
-      localStorage.setItem("ai-visibility:lastDomainSlug", maskedDomainId);
-    }
-  }, [maskedDomainId]);
-
-  const [loading, setLoading] = useState(true);
-  const [reportData, setReportData] = useState<any>(null);
-  const [allDomains, setAllDomains] = useState<any[]>([]);
-  const [gscConnected, setGscConnected] = useState(false);
   const [filterType, setFilterType] = useState<'all' | 'prompt' | 'keyword'>('all');
 
   // Filter state — drives header dropdowns + per-card / table scoping.
   // pastRuns = list for the run picker; selectedRunId = which one we're viewing
   // (null = latest). modelFilter / categoryFilter are client-side scopers.
-  const [pastRuns, setPastRuns] = useState<Array<{ id: number; startedAt: string; visibilityScore: number | null; totalQueries: number | null }>>([]);
   const [selectedRunId, setSelectedRunId] = useState<number | null>(null);
   const [modelFilter, setModelFilter] = useState<Set<string>>(new Set()); // empty = all
   const [categoryFilter, setCategoryFilter] = useState<Set<string>>(new Set()); // empty = all
@@ -2224,11 +2218,9 @@ const AIResultsReportPreview = () => {
     competitorMentions: number;
     perCompetitor: Record<string, number>;
   };
-  const [trendsData, setTrendsData] = useState<{ runs: TrendRun[]; topCompetitors: string[] }>({ runs: [], topCompetitors: [] });
+  // trendsData is now derived from the useTrends hook below.
 
   const [selectedRowIds, setSelectedRowIds] = useState<Set<string>>(new Set());
-  const [worksheetOptions, setWorksheetOptions] = useState<WorksheetOption[]>([]);
-  const [worksheetOptionsLoading, setWorksheetOptionsLoading] = useState(false);
   const [activeWorksheetId, setActiveWorksheetId] = useState<string | null>(null);
   const [isWorksheetModalOpen, setIsWorksheetModalOpen] = useState(false);
   const [isCreateWorksheetModalOpen, setIsCreateWorksheetModalOpen] = useState(false);
@@ -2236,34 +2228,46 @@ const AIResultsReportPreview = () => {
   const [createWorksheetError, setCreateWorksheetError] = useState<string | null>(null);
   const [isCreatingWorksheet, setIsCreatingWorksheet] = useState(false);
 
-  useEffect(() => {
-    let alive = true;
-    setWorksheetOptionsLoading(true);
-    apiGet<{ campaigns: Array<{ id: number; title: string; description?: string | null }> }>(
-      '/campaigns'
-    )
-      .then((data) => {
-        if (!alive) return;
-        const campaigns = Array.isArray(data?.campaigns) ? data.campaigns : [];
-        setWorksheetOptions(
-          campaigns.map((c) => ({
-            id: String(c.id),
-            name: c.title,
-            description: c.description?.trim() ? c.description.trim() : null,
-          }))
-        );
-      })
-      .catch(() => {
-        if (!alive) return;
-        setWorksheetOptions([]);
-      })
-      .finally(() => {
-        if (alive) setWorksheetOptionsLoading(false);
-      });
-    return () => {
-      alive = false;
-    };
-  }, []);
+  // Campaigns + GSC status are both session-scoped (not domain-scoped) and
+  // cached for 10 min via the queries module — moving here means we don't
+  // refetch them when the user switches tabs.
+  const campaignsQuery = useCampaigns<{ campaigns: Array<{ id: number; title: string; description?: string | null }> }>();
+  const worksheetOptions: WorksheetOption[] = useMemo(() => {
+    const campaigns = Array.isArray(campaignsQuery.data?.campaigns) ? campaignsQuery.data!.campaigns : [];
+    return campaigns.map((c) => ({
+      id: String(c.id),
+      name: c.title,
+      description: c.description?.trim() ? c.description.trim() : null,
+    }));
+  }, [campaignsQuery.data]);
+  const worksheetOptionsLoading = campaignsQuery.isLoading;
+
+  const gscQuery = useGscStatus<{ connected?: boolean }>();
+  const gscConnected = Boolean(gscQuery.data?.connected);
+
+  // Report / runs / trends flow through React Query — switching tabs hits
+  // the cache instead of refetching, and other AI Checker pages that
+  // request the same (domainId, runId) tuple reuse this data.
+  const reportQuery = useReport<any>(domainId, selectedRunId);
+  const runsQuery = useRuns<{ runs: Array<{ id: number; status: string; startedAt: string; visibilityScore: number | null; totalQueries: number | null }> }>(domainId);
+  const trendsQuery = useTrends<{ runs: TrendRun[]; topCompetitors: string[] }>(domainId);
+
+  const reportData: any = reportQuery.data ?? null;
+  const loading = reportQuery.isLoading;
+  const pastRuns = useMemo(
+    () =>
+      (runsQuery.data?.runs ?? [])
+        .filter((r) => r.status === 'completed')
+        .map((r) => ({ id: r.id, startedAt: r.startedAt, visibilityScore: r.visibilityScore, totalQueries: r.totalQueries })),
+    [runsQuery.data],
+  );
+  const trendsData = useMemo(
+    () => ({
+      runs: trendsQuery.data?.runs ?? [],
+      topCompetitors: trendsQuery.data?.topCompetitors ?? [],
+    }),
+    [trendsQuery.data],
+  );
 
   const selectedCount = selectedRowIds.size;
 
@@ -2276,21 +2280,6 @@ const AIResultsReportPreview = () => {
     });
   }, []);
 
-  useEffect(() => {
-    let alive = true;
-    apiGet<{ connected?: boolean }>('/gsc/status')
-      .then((res) => {
-        if (!alive) return;
-        setGscConnected(Boolean(res?.connected));
-      })
-      .catch(() => {
-        if (!alive) return;
-        setGscConnected(false);
-      });
-    return () => {
-      alive = false;
-    };
-  }, []);
   const handleSetSelectedRows = useCallback((ids: Set<string>) => {
     setSelectedRowIds(ids);
   }, []);
@@ -2502,8 +2491,9 @@ const AIResultsReportPreview = () => {
       const newTitle = created?.campaign?.title?.trim() || name;
       if (!newId) return;
       const newWorksheetId = String(newId);
-      const newOption: WorksheetOption = { id: newWorksheetId, name: newTitle, description: null };
-      setWorksheetOptions((prev) => [newOption, ...prev]);
+      // Refetch /campaigns so worksheetOptions picks up the new entry. The
+      // new worksheet remains the active one via setActiveWorksheetId below.
+      await queryClient.invalidateQueries({ queryKey: aiResultsKeys.campaigns() });
       setIsCreateWorksheetModalOpen(false);
       setNewWorksheetName('');
 
@@ -2880,142 +2870,28 @@ const AIResultsReportPreview = () => {
     return items;
   }, [reportData, filterType, categoryFilter, modelFilter]);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      if (!maskedDomainId) {
-        console.warn('[AIResults] No maskedDomainId found in URL params');
-        return;
-      }
-
-      console.log('[AIResults] Starting data fetch for:', maskedDomainId);
-      setLoading(true);
-
-      try {
-        let realId = unmaskDomainId(maskedDomainId);
-
-        // Fallback: If mapping is missing (e.g. fresh page reload on deep link),
-        // fetch all domains and find which one matches this mask.
-        if (!realId) {
-          console.log('[AIResults] realId mapping missing, fetching domains to resolve...');
-          const domainsResp = await apiGet<any>('/wizard/domains');
-          const domains = domainsResp?.domains || [];
-          setAllDomains(domains);
-
-          const found = domains.find((d: any) => maskDomainId(d.id) === maskedDomainId);
-          if (found) {
-            realId = found.id;
-            console.log('[AIResults] Resolved realId from fallback:', realId);
-          } else {
-            console.error('[AIResults] Could not resolve maskedDomainId even after fetching all domains');
-            setLoading(false);
-            return;
-          }
-        }
-
-        console.log('[AIResults] Fetching data for realId:', realId);
-        // Three things in parallel: the report (scoped to selectedRunId if
-        // the user picked a past run), the user's domain list, and the past
-        // runs for *this* domain so the run-picker dropdown can populate.
-        const reportPath = selectedRunId
-          ? `/wizard/domain/${realId}/report?runId=${selectedRunId}`
-          : `/wizard/domain/${realId}/report`;
-        const [data, domainsResponse, runsResponse, trendsResponse] = await Promise.all([
-          apiGet<any>(reportPath),
-          allDomains.length === 0 ? apiGet<any>('/wizard/domains') : Promise.resolve({ domains: allDomains }),
-          apiGet<any>(`/wizard/domain/${realId}/runs`).catch(() => ({ runs: [] })),
-          apiGet<any>(`/wizard/domain/${realId}/trends`).catch(() => ({ runs: [], topCompetitors: [] })),
-        ]);
-
-        if (data) {
-          console.log('[AIResults] Report data received:', data.id);
-          setReportData(data);
-        } else {
-          console.warn('[AIResults] No data returned for realId:', realId);
-        }
-
-        if (domainsResponse?.domains) {
-          setAllDomains(domainsResponse.domains);
-        }
-
-        if (Array.isArray(runsResponse?.runs)) {
-          setPastRuns(
-            runsResponse.runs
-              .filter((r: any) => r.status === 'completed')
-              .map((r: any) => ({
-                id: r.id,
-                startedAt: r.startedAt,
-                visibilityScore: r.visibilityScore,
-                totalQueries: r.totalQueries,
-              }))
-          );
-        }
-
-        if (trendsResponse && Array.isArray(trendsResponse.runs)) {
-          setTrendsData({
-            runs: trendsResponse.runs as TrendRun[],
-            topCompetitors: Array.isArray(trendsResponse.topCompetitors) ? trendsResponse.topCompetitors : [],
-          });
-        }
-      } catch (err) {
-        console.error('[AIResults] Failed to fetch dashboard data:', err);
-      } finally {
-        setLoading(false);
-        console.log('[AIResults] Loading finished');
-      }
-    };
-
-    fetchData();
-    // selectedRunId is included so the picker re-fetches the report scoped
-    // to the chosen past run. eslint disable kept for the same reason.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [maskedDomainId, selectedRunId]);
-
   // Manual refetch for the "Retry" affordance on the opportunities card —
   // hits /report again so the LLM enrichment cache is exercised (or rebuilt
   // if the run summary was cleared).
   const [opportunitiesRetrying, setOpportunitiesRetrying] = useState(false);
   const [retryError, setRetryError] = useState<string | null>(null);
   const handleRetryOpportunities = useCallback(async () => {
-    console.log('[AIResults] Retry clicked', { maskedDomainId, selectedRunId });
-    if (!maskedDomainId) {
+    if (!domainId) {
       setRetryError('No domain selected.');
       return;
     }
     setOpportunitiesRetrying(true);
     setRetryError(null);
     try {
-      let realId = unmaskDomainId(maskedDomainId);
-      if (!realId) {
-        // Fallback to the same recovery path as initial load — the mask map
-        // can be empty after a hard reload before the domains list is fetched.
-        const domainsResp = await apiGet<any>('/wizard/domains');
-        const domains = domainsResp?.domains || [];
-        setAllDomains(domains);
-        const found = domains.find((d: any) => maskDomainId(d.id) === maskedDomainId);
-        realId = found?.id ?? null;
-      }
-      if (!realId) {
-        setRetryError('Could not resolve domain.');
-        return;
-      }
-      const path = selectedRunId
-        ? `/wizard/domain/${realId}/report?runId=${selectedRunId}`
-        : `/wizard/domain/${realId}/report`;
-      console.log('[AIResults] Retry fetching', path);
-      const data = await apiGet<any>(path);
-      console.log('[AIResults] Retry got data', {
-        phraseVisibility: (data?.phraseVisibility ?? []).length,
-        opportunities: (data?.opportunities ?? []).length,
-      });
-      if (data) setReportData(data);
-      else setRetryError('No data returned.');
+      // Invalidate the cached /report for this domain+run; the useReport
+      // hook above refetches automatically and updates reportData.
+      await queryClient.invalidateQueries({ queryKey: aiResultsKeys.report(domainId, selectedRunId) });
     } catch (err: any) {
-      console.error('[AIResults] Retry failed:', err);
       setRetryError(err?.message ?? 'Retry failed');
     } finally {
       setOpportunitiesRetrying(false);
     }
-  }, [maskedDomainId, selectedRunId]);
+  }, [domainId, selectedRunId, queryClient]);
 
   // SSE listener — flips running rows to done/failed when n8n pings back.
   useEffect(() => {
@@ -3052,16 +2928,7 @@ const AIResultsReportPreview = () => {
   }, [generationByKey]);
 
   return (
-    <AIResultsLayout
-      activeItem="ai-results"
-      allDomains={allDomains}
-      currentDomainId={reportData?.domainInfo?.id}
-      currentDomainUrl={reportData?.domainInfo?.url}
-      currentDomainHost={reportData?.domainInfo?.host}
-      currentDomainName={reportData?.domainInfo?.companyName ?? reportData?.domainInfo?.host}
-      maskedDomainId={maskedDomainId}
-      title="AI Results"
-    >
+    <>
       <section className="flex w-full flex-col bg-white px-4 py-3 sm:px-6">
         {!gscConnected && (
           <div className="flex w-full flex-col gap-4 rounded-xl bg-[#F1F6FF] px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
@@ -3599,7 +3466,7 @@ const AIResultsReportPreview = () => {
     onNameChange={setNewWorksheetName}
     onSubmit={handleConfirmCreateWorksheet}
   />
-    </AIResultsLayout>
+    </>
   );
 };
 

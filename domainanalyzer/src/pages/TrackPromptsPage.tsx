@@ -13,7 +13,7 @@
  *     audit → CTA to pick prompts; <2 runs in window → flat line + pill.
  *   • Selected-but-never-run prompts are filtered out (mirrors dashboard).
  */
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Area,
   AreaChart,
@@ -24,7 +24,7 @@ import {
   YAxis,
 } from "recharts";
 import { Calendar, ChevronDown, Info, Plus, RefreshCw } from "lucide-react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -33,13 +33,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { AIResultsLayout } from "@/features/ai-results/components/AIResultsLayout";
-import { apiGet } from "@/services/apiClient";
 import { PromptTable, type PromptTableRow } from "@/features/ai-results/components/PromptTrackingTable";
-import { maskDomainId, unmaskDomainId } from "@/lib/domainUtils";
-
-type DashboardDomain = { createdAt: string; id: number; url: string };
-type DashboardAllResponse = { domains?: DashboardDomain[] };
+import { useShellContext } from "@/features/ai-results/AIResultsShell";
+import { useReport, useRuns, useTrends } from "@/features/ai-results/queries";
 
 type ReportPrompt = {
   id: string;
@@ -219,68 +215,27 @@ const PromptVisibilityTrendsChart = ({
 
 const TrackPromptsPage = () => {
   const navigate = useNavigate();
-  const { domain: maskedDomainId } = useParams();
+  const { currentDomain } = useShellContext();
+  const domainId = currentDomain?.id ?? null;
+  const domainInfo = currentDomain;
 
-  const [allDomains, setAllDomains] = useState<DashboardDomain[]>([]);
-  const [domainInfo, setDomainInfo] = useState<DashboardDomain | null>(null);
-  const [reportData, setReportData] = useState<ReportResponse | null>(null);
-  const [pastRuns, setPastRuns] = useState<RunListItem[]>([]);
   const [selectedRunId, setSelectedRunId] = useState<number | null>(null);
-  const [trendsRuns, setTrendsRuns] = useState<TrendsRun[]>([]);
   const [timeWindow, setTimeWindow] = useState<string>("All time");
-  const [loading, setLoading] = useState(false);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // Persist last visited slug for the global "open last" affordance.
-  useEffect(() => {
-    if (maskedDomainId) localStorage.setItem("ai-visibility:lastDomainSlug", maskedDomainId);
-  }, [maskedDomainId]);
+  // Three queries from the shared cache. Sibling tabs that fetch the same
+  // (domain, runId) tuple reuse this data instantly.
+  const reportQuery = useReport<ReportResponse>(domainId, selectedRunId);
+  const runsQuery = useRuns<{ runs: RunListItem[] }>(domainId);
+  const trendsQuery = useTrends<TrendsResponse>(domainId);
 
-  // Fetch domain context, runs list, trends, and the (run-scoped) report.
-  // Refetches whenever the user picks a different past run.
-  useEffect(() => {
-    let alive = true;
-    const run = async () => {
-      if (!maskedDomainId) return;
-      setLoading(true);
-      setErrorMsg(null);
-      try {
-        let realId = unmaskDomainId(maskedDomainId);
-        const domainsResp = await apiGet<DashboardAllResponse>("/wizard/domains");
-        const domains = domainsResp?.domains ?? [];
-        if (!alive) return;
-        setAllDomains(domains);
-        if (!realId) {
-          const matched = domains.find((d) => maskDomainId(d.id) === maskedDomainId);
-          realId = matched?.id ?? null;
-        }
-        if (!realId) {
-          setLoading(false);
-          return;
-        }
-
-        const reportPath = selectedRunId
-          ? `/wizard/domain/${realId}/report?runId=${selectedRunId}`
-          : `/wizard/domain/${realId}/report`;
-        const [report, runsResp, trendsResp] = await Promise.all([
-          apiGet<ReportResponse>(reportPath),
-          apiGet<{ runs: RunListItem[] }>(`/wizard/domain/${realId}/runs`).catch(() => ({ runs: [] })),
-          apiGet<TrendsResponse>(`/wizard/domain/${realId}/trends`).catch(() => ({ runs: [] })),
-        ]);
-        if (!alive) return;
-        setReportData(report);
-        setDomainInfo({ id: report.domainInfo.id, url: report.domainInfo.url, createdAt: "" });
-        setPastRuns((runsResp?.runs ?? []).filter((r) => r.status === "completed"));
-        setTrendsRuns(trendsResp?.runs ?? []);
-      } catch (err) {
-        if (alive) setErrorMsg(err instanceof Error ? err.message : "Failed to load");
-      } finally {
-        if (alive) setLoading(false);
-      }
-    };
-    run();
-    return () => { alive = false; };
-  }, [maskedDomainId, selectedRunId]);
+  const reportData = reportQuery.data ?? null;
+  const pastRuns = useMemo(
+    () => (runsQuery.data?.runs ?? []).filter((r) => r.status === "completed"),
+    [runsQuery.data],
+  );
+  const trendsRuns = trendsQuery.data?.runs ?? [];
+  const loading = reportQuery.isLoading;
+  const errorMsg = reportQuery.error instanceof Error ? reportQuery.error.message : null;
 
   // Apply the time-window filter to the trend chart data.
   const filteredTrendRuns = useMemo(() => {
@@ -334,15 +289,7 @@ const TrackPromptsPage = () => {
   const showZeroPromptsState = !loading && reportData !== null && pastRuns.length > 0 && promptRows.length === 0;
 
   return (
-    <AIResultsLayout
-      activeItem="track-prompts"
-      allDomains={allDomains}
-      currentDomainId={domainInfo?.id}
-      currentDomainUrl={domainInfo?.url}
-      maskedDomainId={maskedDomainId}
-      title="Track Prompts"
-    >
-      <section className="flex w-full flex-col gap-6 bg-white px-6 py-3">
+    <section className="flex w-full flex-col gap-6 bg-white px-6 py-3">
         {/* Run picker — header-level. Defaults to Latest, lists every past run. */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 text-[12px] text-[#475569]">
@@ -420,8 +367,7 @@ const TrackPromptsPage = () => {
             )}
           </>
         )}
-      </section>
-    </AIResultsLayout>
+    </section>
   );
 };
 

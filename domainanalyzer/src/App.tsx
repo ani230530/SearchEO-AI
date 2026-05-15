@@ -18,8 +18,23 @@ import AIResultsPromptGaps from "./pages/AIResultsPromptGaps";
 import AIResultsCompetitors from "./pages/AIResultsCompetitors";
 import TrackPromptsPage from "./pages/TrackPromptsPage";
 import TrackKeywordsPage from "./pages/TrackKeywordsPage";
+import { AIResultsShell } from "./features/ai-results/AIResultsShell";
 
-const queryClient = new QueryClient();
+// Tab-switching inside the AI Checker reuses cached query data for ~5 min
+// instead of refetching on every mount. gcTime=30min keeps results around
+// for back-navigation; refetchOnWindowFocus is disabled so the user doesn't
+// see surprise spinners when alt-tabbing back to the page.
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5 * 60 * 1000,
+      gcTime: 30 * 60 * 1000,
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: 'always',
+      retry: 1,
+    },
+  },
+});
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -64,26 +79,21 @@ const App = () => (
             } />
             {/* Legacy /ai-checker-page → redirect to the new wizard for any old bookmarks */}
             <Route path="/ai-checker-page" element={<Navigate to="/ai-checker-v2" replace />} />
-            <Route path="/ai-results/:domain/track-prompts" element={
-              <ProtectedRoute>
-                <TrackPromptsPage />
-              </ProtectedRoute>
-            } />
-            <Route path="/ai-results/:domain/track-keywords" element={
-              <ProtectedRoute>
-                <TrackKeywordsPage />
-              </ProtectedRoute>
-            } />
-            <Route path="/ai-results/:domain" element={
-              <ProtectedRoute>
-                <AIResultsReportPreview />
-              </ProtectedRoute>
-            } />
-            <Route path="/ai-results-prompt-gaps" element={
-              <ProtectedRoute>
-                <AIResultsPromptGaps />
-              </ProtectedRoute>
-            } />
+            {/* AI Checker tabs share AIResultsShell as a parent route so the
+                sidebar + header don't remount on tab switches. Children read
+                domain context via useShellContext(). */}
+            <Route element={<ProtectedRoute><AIResultsShell activeItem="track-prompts" title="Track Prompts" /></ProtectedRoute>}>
+              <Route path="/ai-results/:domain/track-prompts" element={<TrackPromptsPage />} />
+            </Route>
+            <Route element={<ProtectedRoute><AIResultsShell activeItem="top-keywords" title="Track Keywords" /></ProtectedRoute>}>
+              <Route path="/ai-results/:domain/track-keywords" element={<TrackKeywordsPage />} />
+            </Route>
+            <Route element={<ProtectedRoute><AIResultsShell activeItem="ai-results" title="AI Results" /></ProtectedRoute>}>
+              <Route path="/ai-results/:domain" element={<AIResultsReportPreview />} />
+            </Route>
+            <Route element={<ProtectedRoute><AIResultsShell activeItem="analytics" title="Prompt Gaps" /></ProtectedRoute>}>
+              <Route path="/ai-results-prompt-gaps" element={<AIResultsPromptGaps />} />
+            </Route>
             <Route path="/profile" element={
               <ProtectedRoute>
                 <Profile />
@@ -106,9 +116,9 @@ const App = () => (
             } />
             <Route path="/ai-results-report-preview" element={<AIVisibilityRedirect />} />
             <Route path="/ai-results-report" element={<AIVisibilityRedirect />} />
-            <Route path="/airesults-competitors-preview" element={
-               <AIResultsCompetitors />
-            } />
+            <Route element={<AIResultsShell activeItem="competitors" title="Competitors" />}>
+              <Route path="/airesults-competitors-preview" element={<AIResultsCompetitors />} />
+            </Route>
             
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />

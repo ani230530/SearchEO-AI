@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { apiGet, apiPost } from '../services/apiClient';
-import { maskDomainId } from '@/lib/domainUtils';
-import { AIResultsLayout } from '@/features/ai-results/components/AIResultsLayout';
+import { apiPost } from '../services/apiClient';
+import { useShellContext } from '@/features/ai-results/AIResultsShell';
+import { aiResultsKeys, useCampaigns } from '@/features/ai-results/queries';
+import { useQueryClient } from '@tanstack/react-query';
 import { PromptTable, WorksheetPickerModal } from './AIResultsReportPreview';
 
 const WORKSHEET_IMPORT_KEY = 'ai-results/pending-worksheet-import';
@@ -191,46 +192,24 @@ function StaticAiResponseAnalysis() {
 
 const AIResultsPromptGaps = () => {
   const navigate = useNavigate();
-  const [allDomains, setAllDomains] = useState<DomainOption[]>([]);
+  const { currentDomain } = useShellContext();
   const [selectedRowIds, setSelectedRowIds] = useState<Set<string>>(new Set());
-  const [worksheetOptions, setWorksheetOptions] = useState<WorksheetOption[]>([]);
-  const [worksheetOptionsLoading, setWorksheetOptionsLoading] = useState(false);
   const [activeWorksheetId, setActiveWorksheetId] = useState<string | null>(null);
   const [isWorksheetModalOpen, setIsWorksheetModalOpen] = useState(false);
 
-  useEffect(() => {
-    let alive = true;
-
-    const run = async () => {
-      setWorksheetOptionsLoading(true);
-      try {
-        const domainsResp = await apiGet<{ domains: DomainOption[] }>('/wizard/domains');
-        const domains = Array.isArray(domainsResp?.domains) ? domainsResp.domains : [];
-        if (!alive) return;
-        setAllDomains(domains);
-        const campaignsResp = await apiGet<{ campaigns: Array<{ id: number; title: string; description?: string | null }> }>('/campaigns').catch(
-          () => ({ campaigns: [] })
-        );
-        if (!alive) return;
-        setWorksheetOptions(
-          (campaignsResp?.campaigns ?? []).map((campaign) => ({
-            id: String(campaign.id),
-            name: campaign.title,
-            description: campaign.description ?? null,
-          }))
-        );
-      } catch (err) {
-        console.error('[PromptGaps] Failed to load page data:', err);
-      } finally {
-        if (alive) setWorksheetOptionsLoading(false);
-      }
-    };
-
-    void run();
-    return () => {
-      alive = false;
-    };
-  }, []);
+  // Campaigns + domain context come from the shared cache so this page
+  // doesn't duplicate fetches the sibling tabs already made.
+  const campaignsQuery = useCampaigns<{ campaigns: Array<{ id: number; title: string; description?: string | null }> }>();
+  const worksheetOptions: WorksheetOption[] = useMemo(
+    () =>
+      (campaignsQuery.data?.campaigns ?? []).map((campaign) => ({
+        id: String(campaign.id),
+        name: campaign.title,
+        description: campaign.description ?? null,
+      })),
+    [campaignsQuery.data],
+  );
+  const worksheetOptionsLoading = campaignsQuery.isLoading;
 
   const promptRows = useMemo(() => STATIC_PROMPT_ROWS, []);
 
@@ -281,6 +260,7 @@ const AIResultsPromptGaps = () => {
     navigate('/dashboard');
   }, [activeWorksheetId, navigate, promptRows, selectedRowIds]);
 
+  const queryClient = useQueryClient();
   const handleCreateNewWorksheet = useCallback(async () => {
     const name = window.prompt('Worksheet name?')?.trim();
     if (!name) return;
@@ -288,8 +268,7 @@ const AIResultsPromptGaps = () => {
       const created = await apiPost<{ campaign?: { id: number; title: string } }>('/campaigns', { title: name });
       const newId = created?.campaign?.id;
       if (!newId) return;
-      const newOption: WorksheetOption = { id: String(newId), name, description: null };
-      setWorksheetOptions((prev) => [newOption, ...prev]);
+      await queryClient.invalidateQueries({ queryKey: aiResultsKeys.campaigns() });
       setActiveWorksheetId(null);
       setIsWorksheetModalOpen(false);
       sessionStorage.setItem(WORKSHEET_TARGET_KEY, String(newId));
@@ -299,22 +278,10 @@ const AIResultsPromptGaps = () => {
       console.error('[PromptGaps] Create worksheet failed:', err);
       alert('Failed to create worksheet. Please try again.');
     }
-  }, [navigate]);
-
-  const currentDomainSlug = localStorage.getItem(AI_VISIBILITY_LAST_DOMAIN_SLUG) ?? undefined;
-  const currentDomain = allDomains.find((domain) => maskDomainId(domain.id) === currentDomainSlug);
+  }, [navigate, queryClient]);
 
   return (
-    <AIResultsLayout
-      activeItem="competitors"
-      allDomains={allDomains}
-      currentDomainId={currentDomain?.id}
-      currentDomainUrl={currentDomain?.url}
-      currentDomainHost={currentDomain?.host}
-      currentDomainName={currentDomain?.companyName ?? currentDomain?.host}
-      maskedDomainId={currentDomainSlug}
-      title="Competitors"
-    >
+    <>
       <section className="flex w-full flex-col bg-white px-4 py-3 sm:px-6">
         <div className="rounded-xl border border-slate-200 bg-white">
           <PromptTable
@@ -344,7 +311,7 @@ const AIResultsPromptGaps = () => {
         onAddToWorksheet={handleAddToWorksheet}
         onCreateNewWorksheet={handleCreateNewWorksheet}
       />
-    </AIResultsLayout>
+    </>
   );
 };
 
