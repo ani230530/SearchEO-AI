@@ -11,7 +11,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { fetchEventSource } from '@microsoft/fetch-event-source';
-import { Check, Loader2, AlertCircle } from 'lucide-react';
+import { Check, Loader2, AlertCircle, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { apiGet } from '@/services/apiClient';
 import { maskDomainId } from '@/lib/domainUtils';
@@ -247,33 +247,18 @@ export function Step5RunQueries({ domainId, onError }: Props) {
                         <div className="flex flex-col items-center gap-0.5">
                           {status === 'done' ? (
                             (() => {
-                              // Three states, not two — separates "named in
-                              // passing" from "actually recommended":
-                              //   - presence=0:  "not in"  (slate)
-                              //   - presence=1, overall<3:  "mentioned" (amber — in the answer but not endorsed)
-                              //   - presence=1, overall≥3:  score badge (emerald — real visibility)
                               const presence = result?.presence ?? 0;
-                              const overall = result?.overall ?? 0;
-                              const tier = presence === 0 ? 'absent' : overall >= 3 ? 'recommended' : 'mentioned';
-                              const ringClass =
-                                tier === 'absent'      ? 'bg-slate-100 text-slate-400' :
-                                tier === 'mentioned'   ? 'bg-amber-50 text-amber-600' :
-                                                         'bg-emerald-100 text-emerald-600';
+                              const present = presence > 0;
                               return (
-                                <>
-                                  <span className={`inline-flex h-5 w-5 items-center justify-center rounded-full ${ringClass}`}>
-                                    <Check className="h-3 w-3" />
-                                  </span>
-                                  {tier === 'absent' ? (
-                                    <span className="text-[10px] text-slate-400 mt-0.5 italic">not in</span>
-                                  ) : tier === 'mentioned' ? (
-                                    <span className="text-[10px] text-amber-700 mt-0.5 italic">mentioned</span>
-                                  ) : (
-                                    <span className="text-[10px] font-medium text-emerald-700 mt-0.5">
-                                      {overall.toFixed(1)}
-                                    </span>
-                                  )}
-                                </>
+                                <span
+                                  className={`inline-flex h-5 w-5 items-center justify-center rounded-full ${
+                                    present
+                                      ? 'bg-emerald-100 text-emerald-600'
+                                      : 'bg-rose-100 text-rose-600'
+                                  }`}
+                                >
+                                  {present ? <Check className="h-3 w-3" /> : <X className="h-3 w-3" />}
+                                </span>
                               );
                             })()
                           ) : status === 'pending' ? (
