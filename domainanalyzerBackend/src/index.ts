@@ -13,6 +13,7 @@ import wizardRouter from './wizard/routes';
 import userRouter from './routes/user';
 import blogAnalyticsRouter from './routes/blogAnalytics';
 import domainCompatRouter from './routes/domainCompat';
+import logoProxyRouter from './routes/logoProxy';
 
 import { PrismaClient } from '../generated/prisma';
 import { authenticateToken, AuthenticatedRequest } from './middleware/auth';
@@ -102,6 +103,9 @@ app.use('/api/publish', publishRouter);
 app.use('/api/audit', auditRoutes);
 app.use('/api/audit/n8n', auditN8nRouter);
 app.use('/api/webhooks/n8n', n8nErrorRouter);
+// Logo proxy — hides the img.logo.dev token, caches bytes in Redis, and
+// sets long Cache-Control so the browser/CDN cache aggressively too.
+app.use('/api/logo', logoProxyRouter);
 
 // Google OAuth callback (must live at this exact path).
 app.get('/api/auth/google/callback', handleOAuthCallback);

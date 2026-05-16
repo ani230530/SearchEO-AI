@@ -9,9 +9,9 @@
  * by the SSE stream and exits automatically when every cell is filled.
  */
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { fetchEventSource } from '@microsoft/fetch-event-source';
-import { Check, Loader2, AlertCircle, X } from 'lucide-react';
+import { Check, Loader2, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { apiGet } from '@/services/apiClient';
 import { maskDomainId } from '@/lib/domainUtils';
@@ -51,6 +51,43 @@ const MODEL_LABELS: Record<string, string> = {
   'gemini-2.0-flash': 'Gemini',
 };
 const MODEL_ORDER = ['gpt-4o-mini', 'claude-sonnet-4-5', 'gemini-2.0-flash'];
+
+/**
+ * Memoized cell so we don't re-render the entire 90-cell grid on every SSE
+ * result event. Each cell re-renders only when its own (status, presence)
+ * actually changes — cuts render work from O(prompts × models × events) to
+ * O(events).
+ */
+type CellPresence = 0 | 1 | null; // null = pending / not yet known
+const StatusCell = memo(function StatusCell({
+  status,
+  presence,
+}: {
+  status: CellStatus;
+  presence: CellPresence;
+}) {
+  return (
+    <td className="px-2 py-2.5 align-top">
+      <div className="flex flex-col items-center gap-0.5">
+        {status === 'done' ? (
+          (presence ?? 0) > 0 ? (
+            <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
+              <Check className="h-3 w-3" />
+            </span>
+          ) : (
+            <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-rose-100 text-rose-600">
+              <X className="h-3 w-3" />
+            </span>
+          )
+        ) : (
+          <span className="inline-flex h-5 w-5 items-center justify-center">
+            <Loader2 className="h-3.5 w-3.5 animate-spin text-slate-300" />
+          </span>
+        )}
+      </div>
+    </td>
+  );
+});
 
 export function Step5RunQueries({ domainId, onError }: Props) {
   const navigate = useNavigate();
@@ -241,38 +278,9 @@ export function Step5RunQueries({ domainId, onError }: Props) {
                   </td>
                   {MODEL_ORDER.map((m) => {
                     const status = statusMatrix[p.id]?.[m] ?? 'pending';
-                    const result = resultMap[p.id]?.[m];
-                    return (
-                      <td key={m} className="px-2 py-2.5 align-top">
-                        <div className="flex flex-col items-center gap-0.5">
-                          {status === 'done' ? (
-                            (() => {
-                              const presence = result?.presence ?? 0;
-                              const present = presence > 0;
-                              return (
-                                <span
-                                  className={`inline-flex h-5 w-5 items-center justify-center rounded-full ${
-                                    present
-                                      ? 'bg-emerald-100 text-emerald-600'
-                                      : 'bg-rose-100 text-rose-600'
-                                  }`}
-                                >
-                                  {present ? <Check className="h-3 w-3" /> : <X className="h-3 w-3" />}
-                                </span>
-                              );
-                            })()
-                          ) : status === 'pending' ? (
-                            <span className="inline-flex h-5 w-5 items-center justify-center">
-                              <Loader2 className="h-3.5 w-3.5 animate-spin text-slate-300" />
-                            </span>
-                          ) : (
-                            <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-rose-50 text-rose-500">
-                              <AlertCircle className="h-3 w-3" />
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                    );
+                    const presence: CellPresence =
+                      status === 'done' ? ((resultMap[p.id]?.[m]?.presence ?? 0) > 0 ? 1 : 0) : null;
+                    return <StatusCell key={m} status={status} presence={presence} />;
                   })}
                 </tr>
               ))

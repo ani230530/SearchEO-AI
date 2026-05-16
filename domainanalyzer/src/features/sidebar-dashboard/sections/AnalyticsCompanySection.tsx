@@ -14,6 +14,7 @@ import {
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { cn } from '@/lib/utils';
+import { logoUrl as logoUrlHelper } from '@/lib/logoUrl';
 import { AnalyticsIntegrationSection } from '@/features/sidebar-dashboard/sections/AnalyticsIntegrationSection';
 import { CompanySection } from '@/features/sidebar-dashboard/sections/CompanySection';
 import { DomainInfoContent } from '@/features/sidebar-dashboard/sections/DomainInfoContent';
@@ -348,7 +349,7 @@ const allSections = [...leftSections, ...rightSections];
           <div className="flex w-full items-center gap-3 lg:w-auto">
             <div className="inline-flex w-full items-center justify-center gap-3 bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded-xl shadow-sm sm:justify-start sm:gap-5 sm:px-5 lg:w-auto">
                    <img
-  src={`https://img.logo.dev/${normalizedDomain}?token=pk_DTdFFG1JT9WOCjATvZEzIA&size=128`}
+  src={logoUrlHelper(normalizedDomain, 128) ?? ""}
   alt="Company logo"
   width={32}
   height={32}

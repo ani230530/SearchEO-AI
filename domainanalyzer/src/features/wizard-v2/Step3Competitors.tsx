@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { ArrowUpRight, Check, Loader2, Plus } from "lucide-react";
 
 import { apiGet, apiPost } from "@/services/apiClient";
+import { logoUrl as logoUrlHelper } from "@/lib/logoUrl";
 import { WizardStatusRow } from "./WizardShell";
 import type { WizardCompetitor } from "./types";
 
@@ -46,7 +47,7 @@ export function Step3Competitors({ domainId, initialSelected = [], onContinue, f
       name: host,
       domain: host,
       url: `https://${host}`,
-      logoUrl: `https://img.logo.dev/${host}?token=pk_DTdFFG1JT9WOCjATvZEzIA&size=64`,
+      logoUrl: logoUrlHelper(host, 64) ?? "",
       reasoning: c.reasoning ?? undefined,
       threatLevel: (c.threatLevel as WizardCompetitor["threatLevel"]) ?? undefined,
       selected: !!c.isSelected,
@@ -136,7 +137,7 @@ export function Step3Competitors({ domainId, initialSelected = [], onContinue, f
           name: host,
           domain: host,
           url,
-          logoUrl: `https://img.logo.dev/${host}?token=pk_DTdFFG1JT9WOCjATvZEzIA&size=64`,
+          logoUrl: logoUrlHelper(host, 64) ?? "",
           selected: true,
         },
       ];

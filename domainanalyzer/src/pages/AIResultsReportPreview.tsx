@@ -2,6 +2,7 @@ import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { apiPost } from '../services/apiClient';
+import { logoUrl as logoUrlHelper } from '@/lib/logoUrl';
 import { cn } from '@/lib/utils';
 import {
   Area,
@@ -89,8 +90,7 @@ const getDomainHost = (rawUrl: string | undefined): string => {
 
 const getDomainLogo = (rawUrl: string | undefined): string | null => {
   const host = getDomainHost(rawUrl);
-  if (!host) return null;
-  return `https://img.logo.dev/${host}?token=pk_DTdFFG1JT9WOCjATvZEzIA&size=64`;
+  return logoUrlHelper(host, 64);
 };
 
 const getHostFromAnyUrl = (value?: string): string | null => {
@@ -106,8 +106,7 @@ const getHostFromAnyUrl = (value?: string): string | null => {
 
 const getFaviconUrl = (value?: string): string | null => {
   const host = getHostFromAnyUrl(value);
-  if (!host) return null;
-  return `https://img.logo.dev/${host}?token=pk_DTdFFG1JT9WOCjATvZEzIA&size=64`;
+  return logoUrlHelper(host, 64);
 };
 
 const MODEL_ICON_SRC: Array<{ match: RegExp; src: string; label: string }> = [

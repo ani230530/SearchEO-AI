@@ -14,6 +14,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
+import { logoUrl as logoUrlHelper } from "@/lib/logoUrl";
 import GSCAnalyticsView from "@/components/gsc/GSCAnalyticsView";
 import { AlertDialogHeader } from "@/components/ui/alert-dialog";
 import { OverallScoreGauge } from "@/components/audit/AuditCharts";
@@ -26,7 +27,8 @@ import { TabId, CompanySubTabId } from "@/features/sidebar-dashboard/types";
 import TrendsChart from "@/components/gsc/TrendsChart";
 import { useQuery } from "@tanstack/react-query";
 import { Loader2, Plug } from "lucide-react";
-import { useMemo } from "react"; 
+import { useMemo } from "react";
+import { useBlogAnalyticsAggregate, useGscStatus } from "@/features/sidebar-dashboard/queries";
 
 interface BlogPerformance {
   id: number;
@@ -119,26 +121,12 @@ const impressionsData = aggregateData?.dateBreakdown.map(d => ({
   value: d.impressions
 })) ?? [];
 
-const [gscConnected, setGscConnected] = useState(false);
 const [topPageUrl, setTopPageUrl] = useState<string | null>(null);
 
-// Check GSC status
-useEffect(() => {
-  const checkGSCStatus = async () => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/gsc/status`, {
-        headers: getAuthHeaders(),
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setGscConnected(data.connected || false);
-      }
-    } catch (error) {
-      console.error('Error checking GSC status:', error);
-    }
-  };
-  checkGSCStatus();
-}, []);
+// GSC connection check goes through the shared cache so it doesn't refetch
+// every time the user pops back into Overview.
+const gscStatusQuery = useGscStatus();
+const gscConnected = Boolean(gscStatusQuery.data?.connected);
 
 // Fetch top page
 const { data: pagesData } = useQuery({
@@ -195,45 +183,26 @@ const formattedTrendsData = useMemo(() => {
   return result;
 }, [trendsData, topQueries]);
 
-// Add this state
-const [blogAggregateData, setBlogAggregateData] = useState<AggregateData | null>(null);
-const [isLoadingBlogData, setIsLoadingBlogData] = useState(false);
+// Blog analytics aggregate goes through the shared cache — Overview is hit
+// on most dashboard sessions so a 5-min cached payload keeps the
+// over-tab-switch experience instant.
+const blogAnalyticsQuery = useBlogAnalyticsAggregate(28);
+const blogAggregateData: AggregateData | null =
+  blogAnalyticsQuery.data && blogAnalyticsQuery.data.success ? blogAnalyticsQuery.data : null;
+const isLoadingBlogData = blogAnalyticsQuery.isLoading;
 
-// Add this useEffect to fetch blog analytics data
-useEffect(() => {
-  const fetchBlogAnalytics = async () => {
-    try {
-      setIsLoadingBlogData(true);
-      const response = await fetch(`${API_BASE_URL}/api/blog-analytics/aggregate?days=28`, {
-        headers: getAuthHeaders(),
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        if (data.success) {
-          setBlogAggregateData(data);
-        }
-      }
-    } catch (error) {
-      console.error('Error fetching blog analytics:', error);
-    } finally {
-      setIsLoadingBlogData(false);
-    }
-  };
+// Prepare blog chart data. Memoized so unrelated parent re-renders don't
+// hand the chart components a new array identity and force a fresh layout
+// pass over up to 28 data points.
+const blogClicksData = useMemo(
+  () => blogAggregateData?.dateBreakdown.map((d) => ({ date: d.date, value: d.clicks })) ?? [],
+  [blogAggregateData],
+);
 
-  fetchBlogAnalytics();
-}, []);
-
-// Prepare blog chart data
-const blogClicksData = blogAggregateData?.dateBreakdown.map(d => ({
-  date: d.date,
-  value: d.clicks
-})) ?? [];
-
-const blogImpressionsData = blogAggregateData?.dateBreakdown.map(d => ({
-  date: d.date,
-  value: d.impressions
-})) ?? [];
+const blogImpressionsData = useMemo(
+  () => blogAggregateData?.dateBreakdown.map((d) => ({ date: d.date, value: d.impressions })) ?? [],
+  [blogAggregateData],
+);
 
 const recentActivities = [
   { title: 'Published "Ultimate Guide to SEO"', time: "less than a minute ago" },
@@ -330,7 +299,7 @@ useEffect(() => {
               {companyDomain && (
                 <div className="flex items-center gap-3 border border-gray-200 text-blue-700 px-4 sm:px-5 py-3 rounded-xl w-full min-w-0">
                   <img
-                    src={`https://img.logo.dev/${normalizedDomain}?token=pk_DTdFFG1JT9WOCjATvZEzIA&size=128`}
+                    src={logoUrlHelper(normalizedDomain, 128) ?? ""}
                     alt="Company logo"
                     width={32}
                     height={32}
