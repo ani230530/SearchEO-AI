@@ -358,7 +358,7 @@ export function DomainHistorySection({ onMenuItemClick }: DomainHistorySectionPr
                   <div className="relative min-w-0">
                     <div className="flex items-start gap-4">
                       <span className="inline-flex h-19 w-19 items-center justify-center rounded-md">
-                        <img src={getLogoUrl(domain.url)} alt={`${domain.name} icon`} className="h-11 w-11 object-contain"/>
+                        <img src={getLogoUrl(domain.url)} alt={`${domain.name} icon`} className="h-11 w-11 object-contain" loading="lazy"/>
                       </span>
                       <div className="min-w-0 flex flex-col items-start">
                         <div className="flex items-center gap-2">

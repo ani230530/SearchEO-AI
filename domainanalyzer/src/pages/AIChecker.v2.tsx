@@ -17,16 +17,27 @@
  *    never sees raw stack traces / status codes.
  */
 
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { apiGet, apiPost } from "@/services/apiClient";
 import { useAuth } from "@/contexts/AuthContext";
 import { WizardShell } from "@/features/wizard-v2/WizardShell";
+// Step 1 stays eager — it's the wizard entry point and always renders first.
 import { Step1AddDomain } from "@/features/wizard-v2/Step1AddDomain";
-import { Step2Crawling } from "@/features/wizard-v2/Step2Crawling";
-import { Step3Competitors } from "@/features/wizard-v2/Step3Competitors";
-import { Step4SelectTopics } from "@/features/wizard-v2/Step4SelectTopics";
-import { Step5RunQueries } from "@/features/wizard-v2/Step5RunQueries";
+// Steps 2–5 lazy-load so the cold wizard bundle stays small. Each step
+// becomes its own chunk fetched only when the user advances to it.
+const Step2Crawling = lazy(() =>
+  import("@/features/wizard-v2/Step2Crawling").then((m) => ({ default: m.Step2Crawling })),
+);
+const Step3Competitors = lazy(() =>
+  import("@/features/wizard-v2/Step3Competitors").then((m) => ({ default: m.Step3Competitors })),
+);
+const Step4SelectTopics = lazy(() =>
+  import("@/features/wizard-v2/Step4SelectTopics").then((m) => ({ default: m.Step4SelectTopics })),
+);
+const Step5RunQueries = lazy(() =>
+  import("@/features/wizard-v2/Step5RunQueries").then((m) => ({ default: m.Step5RunQueries })),
+);
 import { SignupWallModal } from "@/features/wizard-v2/SignupWallModal";
 import { PHASE_TO_STEP, type WizardProfile, type WizardStateResponse, type WizardStep } from "@/features/wizard-v2/types";
 import { classifyError, isSilentError } from "@/features/wizard-v2/wizardErrors";
@@ -363,50 +374,52 @@ export default function AICheckerV2() {
             navigate(`/ai-results/${id}`);
           }}
         />
-      ) : step === 2 ? (
-        <Step2Crawling
-          key={`s2-${retryNonce}`}
-          url={normalizedUrl}
-          profile={profile}
-          onComplete={(id) => advanceTo(3, id)}
-          onError={(err) => handleStepError(err, 1)}
-        />
-      ) : step === 3 && domainId ? (
-        <Step3Competitors
-          key={`s3-${retryNonce}`}
-          domainId={domainId}
-          initialSelected={restoredCompetitors}
-          // Only force a full re-run when the user explicitly hit Retry.
-          // First mount (nonce 0) prefers the cached read so refresh is fast.
-          forceRefresh={retryNonce > 0}
-          onContinue={() => advanceTo(4)}
-        />
-      ) : step === 4 && domainId ? (
-        <Step4SelectTopics
-          key={`s4-${retryNonce}`}
-          domainId={domainId}
-          initialDraft={restoredDraft}
-          // Cached read on first mount (instant resume), force a fresh
-          // topics generation only when the user explicitly hit Retry.
-          forceRefresh={retryNonce > 0}
-          onContinue={() => {
-            // Anonymous callers can browse Steps 1-4 freely but Step 5
-            // (the paid AI run) requires signup. Pop the wall here so
-            // the user never sees the server-side 402 SIGNUP_REQUIRED
-            // — they hit a friendly modal instead.
-            if (!user) {
-              setSignupWallOpen(true);
-              return;
-            }
-            advanceTo(5);
-          }}
-        />
-      ) : step === 5 && domainId ? (
-        <Step5RunQueries
-          key={`s5-${retryNonce}`}
-          domainId={domainId}
-          onError={(err) => handleStepError(err, 4)}
-        />
+      ) : step >= 2 ? (
+        // Suspense boundary for the lazy Step 2–5 chunks. The fallback
+        // mirrors the small "picking up where you left off" copy so the
+        // user sees motion, not a flash of nothing.
+        <Suspense fallback={<p className="text-sm text-slate-500">Loading step…</p>}>
+          {step === 2 ? (
+            <Step2Crawling
+              key={`s2-${retryNonce}`}
+              url={normalizedUrl}
+              profile={profile}
+              onComplete={(id) => advanceTo(3, id)}
+              onError={(err) => handleStepError(err, 1)}
+            />
+          ) : step === 3 && domainId ? (
+            <Step3Competitors
+              key={`s3-${retryNonce}`}
+              domainId={domainId}
+              initialSelected={restoredCompetitors}
+              forceRefresh={retryNonce > 0}
+              onContinue={() => advanceTo(4)}
+            />
+          ) : step === 4 && domainId ? (
+            <Step4SelectTopics
+              key={`s4-${retryNonce}`}
+              domainId={domainId}
+              initialDraft={restoredDraft}
+              forceRefresh={retryNonce > 0}
+              onContinue={() => {
+                // Anonymous callers can browse Steps 1-4 freely but Step 5
+                // (the paid AI run) requires signup. Pop the wall here so
+                // the user never sees the server-side 402 SIGNUP_REQUIRED.
+                if (!user) {
+                  setSignupWallOpen(true);
+                  return;
+                }
+                advanceTo(5);
+              }}
+            />
+          ) : step === 5 && domainId ? (
+            <Step5RunQueries
+              key={`s5-${retryNonce}`}
+              domainId={domainId}
+              onError={(err) => handleStepError(err, 4)}
+            />
+          ) : null}
+        </Suspense>
       ) : null}
       {signupWallOpen && (
         <SignupWallModal

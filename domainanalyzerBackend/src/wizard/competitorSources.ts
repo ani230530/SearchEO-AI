@@ -22,6 +22,7 @@ import OpenAI from 'openai';
 import type { PrismaClient } from '../../generated/prisma';
 import type { CompetitorCandidate } from './types';
 import { extractHost } from './urlNormalize';
+import { redisService } from '../services/RedisService';
 
 // Accept either SERP_API_KEY (existing project convention) or SERPAPI_KEY.
 const SERPAPI_KEY = process.env.SERP_API_KEY || process.env.SERPAPI_KEY;
@@ -55,7 +56,15 @@ function isBlocked(host: string): boolean {
  * just the LLM-proposed candidates.
  *
  * Caller composes the queries; we don't try to invent them here.
+ *
+ * Each (query, location) tuple is cached in Redis for 7 days. SerpAPI bills
+ * per request (~$0.005 each), and "Retry" / re-run cycles ask the same
+ * questions verbatim. The cache holds the raw `organic_results` array; the
+ * candidate mapping logic runs locally on hit.
  */
+const SERPAPI_CACHE_TTL_SECONDS = 7 * 24 * 60 * 60; // 7 days
+type SerpOrganicResult = { link?: string; title?: string; snippet?: string };
+
 export async function fromSerpApi(
   ownDomainHost: string,
   queries: string[],
@@ -64,34 +73,63 @@ export async function fromSerpApi(
   if (!SERPAPI_KEY || queries.length === 0) return [];
   const out = new Map<string, CompetitorCandidate>();
   for (const q of queries.slice(0, 5)) {
+    let organic: SerpOrganicResult[] | null = null;
+    const cacheKey = `serp:${location ?? 'global'}:${q}`;
+
+    // Fast path: Redis hit. We cache the raw organic array, not the
+    // mapped candidates — that way an own-domain-host change doesn't
+    // poison cross-domain reuse.
     try {
-      const res = await axios.get('https://serpapi.com/search', {
-        params: {
-          api_key: SERPAPI_KEY,
-          engine: 'google',
-          q,
-          num: 10,
-          location: location ?? undefined,
-        },
-        timeout: 15_000,
-      });
-      const organic: Array<{ link?: string; title?: string; snippet?: string }> = res.data?.organic_results ?? [];
-      for (const r of organic) {
-        const host = r.link ? extractHost(r.link) : null;
-        if (!host || host === ownDomainHost || isBlocked(host)) continue;
-        const existing = out.get(host);
-        if (existing) {
-          (existing.rawSignals.serpQueries as string[]).push(q);
-        } else {
-          out.set(host, {
-            competitorHost: host,
-            source: 'serp',
-            rawSignals: { serpQueries: [q], firstSeenTitle: r.title ?? null, firstSeenSnippet: r.snippet ?? null },
-          });
-        }
+      const cached = await redisService.get(cacheKey);
+      if (cached) {
+        organic = JSON.parse(cached) as SerpOrganicResult[];
       }
     } catch {
-      /* silent — try next query */
+      /* fall through to live fetch */
+    }
+
+    if (organic === null) {
+      try {
+        const res = await axios.get('https://serpapi.com/search', {
+          params: {
+            api_key: SERPAPI_KEY,
+            engine: 'google',
+            q,
+            num: 10,
+            location: location ?? undefined,
+          },
+          timeout: 15_000,
+        });
+        organic = res.data?.organic_results ?? [];
+        // Persist the response shape we actually consume (drops the heavy
+        // ad/snippet/answer-box fields SerpAPI returns alongside).
+        const slim: SerpOrganicResult[] = (organic ?? []).map((r) => ({
+          link: r.link,
+          title: r.title,
+          snippet: r.snippet,
+        }));
+        redisService
+          .set(cacheKey, JSON.stringify(slim), SERPAPI_CACHE_TTL_SECONDS)
+          .catch((err) => console.warn('[SerpAPI cache] write failed', err));
+      } catch {
+        /* silent — try next query */
+        continue;
+      }
+    }
+
+    for (const r of organic ?? []) {
+      const host = r.link ? extractHost(r.link) : null;
+      if (!host || host === ownDomainHost || isBlocked(host)) continue;
+      const existing = out.get(host);
+      if (existing) {
+        (existing.rawSignals.serpQueries as string[]).push(q);
+      } else {
+        out.set(host, {
+          competitorHost: host,
+          source: 'serp',
+          rawSignals: { serpQueries: [q], firstSeenTitle: r.title ?? null, firstSeenSnippet: r.snippet ?? null },
+        });
+      }
     }
   }
   return Array.from(out.values());

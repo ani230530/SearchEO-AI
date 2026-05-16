@@ -28,12 +28,19 @@ export function Features() {
                         <div className="[transform:skewY(-2deg)skewX(-2deg)rotateX(6deg)]">
                             <div className="aspect-[88/36] relative">
                                 <div className="[background-image:radial-gradient(var(--tw-gradient-stops,at_75%_25%))] to-background z-1 -inset-[4.25rem] absolute from-transparent to-75%"></div>
-                                <video 
-                                    className="absolute inset-0 z-10 w-full h-full object-cover rounded-2xl" 
-                                    autoPlay 
-                                    loop 
-                                    muted 
+                                {/* preload=metadata defers the 1.4 MB body
+                                    download until the autoplay actually
+                                    starts (and lets the browser skip the
+                                    download entirely if the user navigates
+                                    away before the section comes into
+                                    view). */}
+                                <video
+                                    className="absolute inset-0 z-10 w-full h-full object-cover rounded-2xl"
+                                    autoPlay
+                                    loop
+                                    muted
                                     playsInline
+                                    preload="metadata"
                                 >
                                     <source src="/features2.mp4" type="video/mp4" />
                                     Your browser does not support the video tag.

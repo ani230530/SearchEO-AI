@@ -28,7 +28,9 @@ function LandingPage() {
       {/* Content Layer */}
       <div className="content-layer">
       <style>{`
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@100;200;300;400;500;600;700;800;900&display=swap');
+/* Inter is loaded once via <link> in index.html — no duplicate CSS @import.
+   The CSS-level @import is a render-blocking sequential fetch, while the
+   <link> in the document head parallelizes with the rest of the page. */
 
 .minimal-root, .minimal-root * {
   box-sizing: border-box;

@@ -17,6 +17,7 @@
  * Mounted at /api/wizard.
  */
 
+import crypto from 'crypto';
 import { Router, Request, Response } from 'express';
 import { Prisma, PrismaClient } from '../../generated/prisma';
 import { authenticateToken, AuthenticatedRequest } from '../middleware/auth';
@@ -38,6 +39,7 @@ import { enrichOpportunities, type EnrichedOpportunity } from './opportunityEnri
 import { enrichCompetitorInsights, type CompetitorInsight } from './competitorInsightEnrichment';
 import { scoreResponse as llmScoreResponse } from './scoreService';
 import { redisService } from '../services/RedisService';
+import { timed } from '../lib/timed';
 
 const prisma = new PrismaClient();
 const router = Router();
@@ -99,7 +101,7 @@ const PHASE_STEP: Record<string, number> = {
 const domainsCacheKey = (userId: number) => `wizard:domains:${userId}`;
 const DOMAINS_CACHE_TTL_SECONDS = 60;
 
-router.get('/domains', authenticateToken, async (req: Request, res: Response) => {
+router.get('/domains', timed('GET /domains', 300), authenticateToken, async (req: Request, res: Response) => {
   const userId = authReq(req).user.userId;
 
   // Fast path: Redis hit. The cache TTL is short (60s) so a newly created
@@ -386,7 +388,27 @@ router.post('/domain', authenticateOrSession(), async (req: Request, res: Respon
     // Phase: profile (compute embedding + companySize, persist DomainInferred).
     await setPhase(prisma, domain.id, 'profile', 'running');
     send({ type: 'progress', phase: 'profile', progress: 85, step: 'Inferring profile…' });
-    const embedding = await embedText(crawl.rawText.slice(0, 8000));
+
+    // Skip the embedding call when the crawl text is byte-identical to the
+    // previous run for this domain — saves an OpenAI request and ~1–2 s.
+    // Hash only the slice we actually feed into the embedder so a noisy
+    // tail (e.g. a date footer) doesn't bust the cache.
+    const embedSource = crawl.rawText.slice(0, 8000);
+    const crawlHash = crypto.createHash('sha256').update(embedSource).digest('hex');
+    const existingInferred = await prisma.domainInferred.findUnique({
+      where: { domainId: domain.id },
+      select: { embedding: true, crawlHash: true },
+    });
+    let embedding: number[] | null;
+    const cachedEmbedding = Array.isArray(existingInferred?.embedding)
+      ? (existingInferred!.embedding as number[])
+      : null;
+    if (cachedEmbedding && existingInferred?.crawlHash === crawlHash) {
+      embedding = cachedEmbedding;
+    } else {
+      embedding = await embedText(embedSource);
+    }
+
     const companySize = inferCompanySize(crawl.rawText);
     await prisma.domainInferred.upsert({
       where: { domainId: domain.id },
@@ -396,6 +418,7 @@ router.post('/domain', authenticateOrSession(), async (req: Request, res: Respon
         productsJson: (crawl.contextJson?.products ?? []) as any,
         schemaOrgJson: (crawl.contextJson?.schemaOrg ?? null) as any,
         embedding: embedding as any,
+        crawlHash,
         summary: crawl.contextJson?.summary ?? null,
         inferredAt: new Date(),
       },
@@ -406,6 +429,7 @@ router.post('/domain', authenticateOrSession(), async (req: Request, res: Respon
         productsJson: (crawl.contextJson?.products ?? []) as any,
         schemaOrgJson: (crawl.contextJson?.schemaOrg ?? null) as any,
         embedding: embedding as any,
+        crawlHash,
         summary: crawl.contextJson?.summary ?? null,
       },
     });
@@ -447,7 +471,7 @@ router.get('/domain/:id', authenticateOrSession(), async (req: Request, res: Res
 // Returns flat metrics + topPrompts list derived from the latest completed
 // AiRun and the user's selected keywords/prompts.
 
-router.get('/domain/:id/report', authenticateToken, async (req: Request, res: Response) => {
+router.get('/domain/:id/report', timed('GET /report', 800), authenticateToken, async (req: Request, res: Response) => {
   const got = await ensureDomain(req, req.params.id);
   if (!got.ok) return res.status(got.status).json({ error: got.error });
   const { domain } = got;
@@ -1412,7 +1436,7 @@ router.get('/domain/:id/competitors', authenticateToken, async (req: Request, re
 // LLM-derived Strength / Weakness / Competitive-Edge insights are enriched
 // once per AiRun and cached on AiRun.summary.competitorInsights.
 
-router.get('/domain/:id/competitor-analysis', authenticateToken, async (req: Request, res: Response) => {
+router.get('/domain/:id/competitor-analysis', timed('GET /competitor-analysis', 1500), authenticateToken, async (req: Request, res: Response) => {
   const got = await ensureDomain(req, req.params.id);
   if (!got.ok) return res.status(got.status).json({ error: got.error });
   const { domain } = got;
@@ -1566,7 +1590,7 @@ function emptyCompetitorRow(c: { competitorHost: string; rank: number | null; th
 
 // ── POST /domain/:id/competitors ───────────────────────────────────────────
 
-router.post('/domain/:id/competitors', authenticateOrSession(), async (req: Request, res: Response) => {
+router.post('/domain/:id/competitors', timed('POST /competitors', 5000), authenticateOrSession(), async (req: Request, res: Response) => {
   const got = await ensureDomain(req, req.params.id);
   if (!got.ok) return res.status(got.status).json({ error: got.error });
   const { domain } = got;
@@ -1671,7 +1695,7 @@ router.post('/domain/:id/competitors/select', authenticateOrSession(), async (re
 // Cost: ~$0.0001 per AiQueryResult row. p95 ≈ 10s for a 90-row run with
 // concurrency of 6.
 
-router.post('/domain/:id/competitors/add', authenticateToken, async (req: Request, res: Response) => {
+router.post('/domain/:id/competitors/add', timed('POST /competitors/add', 5000), authenticateToken, async (req: Request, res: Response) => {
   const got = await ensureDomain(req, req.params.id);
   if (!got.ok) return res.status(got.status).json({ error: got.error });
   const { domain } = got;
@@ -1810,7 +1834,7 @@ router.post('/domain/:id/competitors/add', authenticateToken, async (req: Reques
 
 // ── POST /domain/:id/topics ────────────────────────────────────────────────
 
-router.post('/domain/:id/topics', authenticateOrSession(), async (req: Request, res: Response) => {
+router.post('/domain/:id/topics', timed('POST /topics', 4000), authenticateOrSession(), async (req: Request, res: Response) => {
   const got = await ensureDomain(req, req.params.id);
   if (!got.ok) return res.status(got.status).json({ error: got.error });
   const { domain } = got;

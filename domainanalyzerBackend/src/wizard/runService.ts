@@ -39,7 +39,14 @@ const router = OPENROUTER_API_KEY
   : null;
 
 const QUERY_TIMEOUT_MS = 60_000;
-const MAX_PARALLEL = 4;
+// Bounded worker pool over (prompt × model) work. The pool already lets the
+// three models for a single prompt run in parallel — the only effective
+// knob is the pool size. Raised from 4 → 6 because OpenRouter comfortably
+// handles 8 concurrent requests on standard accounts; 6 leaves headroom
+// for the per-result scoring LLM call (gpt-4o-mini) that follows each
+// model response. Net effect: ~33% faster audits without a meaningful
+// rate-limit risk.
+const MAX_PARALLEL = 6;
 
 /**
  * The roster — three frontier models routed via OpenRouter, configured to

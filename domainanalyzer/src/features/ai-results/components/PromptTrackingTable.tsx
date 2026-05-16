@@ -391,6 +391,7 @@ const CitationCard = ({ citation }: { citation: CitationLike }) => {
             src={logo}
             alt=""
             aria-hidden
+            loading="lazy"
             className="h-7 w-7 shrink-0 rounded-md object-contain bg-slate-50"
             onError={(e) => ((e.currentTarget as HTMLImageElement).style.display = "none")}
           />
@@ -450,6 +451,7 @@ const CompetitorPill = ({ host, name, sentiment }: { host: string; name?: string
           src={logo}
           alt=""
           aria-hidden
+          loading="lazy"
           className="h-3.5 w-3.5 rounded-full object-contain"
           onError={(e) => ((e.currentTarget as HTMLImageElement).style.display = "none")}
         />
