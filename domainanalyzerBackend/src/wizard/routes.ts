@@ -433,20 +433,61 @@ router.get('/domain/:id/report', authenticateToken, async (req: Request, res: Re
           where: { domainId: domain.id, status: 'completed' },
           orderBy: { startedAt: 'desc' },
         }),
+    // Explicit select — every field listed is consumed below. Omits
+    // costUsd / createdAt / runId which the report doesn't need (the query
+    // planner skips reading them; in particular costUsd is only used by the
+    // billing summary on AiRun, not per-row). Keeps the response/JSONB
+    // columns we need (they're surfaced verbatim in the API response).
     prisma.aiQueryResult.findMany({
       where: useSpecificRun
         ? { runId: runIdParam, run: { domainId: domain.id } }
         : { run: { domainId: domain.id, status: 'completed' } },
       orderBy: { createdAt: 'desc' },
       take: 1000,
+      select: {
+        id: true,
+        promptId: true,
+        model: true,
+        response: true,
+        presence: true,
+        relevance: true,
+        sentiment: true,
+        accuracy: true,
+        rankPosition: true,
+        overall: true,
+        scorerSummary: true,
+        factualClaims: true,
+        competitorHosts: true,
+        citations: true,
+        competitorMentions: true,
+        latencyMs: true,
+      },
     }),
     // Load ALL keywords for this domain (not just isSelected). Many AI-generated
     // keywords have isSelected=false because the user picked the child prompts
     // rather than the keyword itself, but we still need the keyword rows so the
     // rollup at line ~398 can render parent rows for queried prompts. Filtering
     // by `queriedKeywordIds.has(k.id)` further down keeps the result set tight.
-    prisma.keyword.findMany({ where: { domainId: domain.id } }),
-    prisma.prompt.findMany({ where: { domainId: domain.id, isSelected: true } }),
+    prisma.keyword.findMany({
+      where: { domainId: domain.id },
+      select: { id: true, term: true, intent: true, source: true },
+    }),
+    prisma.prompt.findMany({
+      where: { domainId: domain.id, isSelected: true },
+      select: {
+        id: true,
+        text: true,
+        intent: true,
+        source: true,
+        keywordId: true,
+        category: true,
+        intentStage: true,
+        persona: true,
+        useCase: true,
+        isBranded: true,
+        competitorMentioned: true,
+      },
+    }),
   ]);
 
   const summary = (latestRun?.summary as Record<string, unknown> | null) ?? null;
