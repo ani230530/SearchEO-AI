@@ -54,11 +54,11 @@ model User {
   publishLogs          WordpressPublishLog[]
   generationJobs       GenerationJob[]
   // Wizard sessions where this user signed up from an anonymous funnel.
-  wizardSessionsLinked WizardSession[] @relation("WizardSessionLinkedUser")
+  wizardSessionsLinked WizardSession[]                @relation("WizardSessionLinkedUser")
   // Wizard sessions where this user IS the anonymous shadow identity.
   // Shadow users have email = anon-{sessionId}@system.local and an
   // unusable password hash. They never log in via the normal auth path.
-  wizardSessionsAnon   WizardSession[] @relation("WizardSessionAnonUser")
+  wizardSessionsAnon   WizardSession[]                @relation("WizardSessionAnonUser")
 }
 
 // -----------------------------------------------------------------------------
@@ -200,6 +200,10 @@ model Keyword {
 
   @@unique([domainId, term])
   @@index([domainId, isSelected])
+  // Soft-reset deletes AI-generated keywords via (domainId, source='ai').
+  // Without this index, the planner did a sequential scan on source after
+  // narrowing by domainId.
+  @@index([domainId, source])
 }
 
 // Prompts. Each prompt is a discrete query we send to the LLM roster.
@@ -238,6 +242,8 @@ model Prompt {
   @@index([domainId, isSelected])
   @@index([domainId, category])
   @@index([keywordId])
+  // Soft-reset deletes AI-generated prompts via (domainId, source='ai').
+  @@index([domainId, source])
 }
 
 // One run = one execution of the user's selected prompts × selected models.
@@ -254,6 +260,10 @@ model AiRun {
   results   AiQueryResult[]
 
   @@index([domainId, startedAt])
+  // The hot query is "latest completed run for domain": where { domainId,
+  // status: 'completed' } orderBy startedAt desc. Without this compound index
+  // the planner narrows by domainId then sequentially scans on status.
+  @@index([domainId, status, startedAt])
 }
 
 model AiQueryResult {

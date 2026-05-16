@@ -20,7 +20,7 @@
  *     here, not in every page.
  */
 
-import { useEffect, useMemo } from 'react';
+import { Suspense, useEffect, useMemo } from 'react';
 import { Outlet, useLocation, useOutletContext, useParams } from 'react-router-dom';
 import { AIResultsLayout } from './components/AIResultsLayout';
 import { useDomains, type DomainRow } from './queries';
@@ -116,8 +116,22 @@ export function AIResultsShell({ activeItem, title }: ShellProps) {
       maskedDomainId={ctx.maskedDomainId}
       title={title}
     >
-      <Outlet context={ctx} />
+      {/* Inner Suspense — children are lazy-loaded in App.tsx. Keeping the
+          boundary INSIDE the layout means only the outlet content shows a
+          spinner while a tab's chunk downloads; the sidebar + header stay
+          mounted, preserving the "tab switch is instant" UX promise. */}
+      <Suspense fallback={<OutletFallback />}>
+        <Outlet context={ctx} />
+      </Suspense>
     </AIResultsLayout>
+  );
+}
+
+function OutletFallback() {
+  return (
+    <div className="flex h-[60vh] w-full items-center justify-center">
+      <div className="h-6 w-6 animate-spin rounded-full border-2 border-slate-200 border-t-[#2D4059]" aria-label="Loading tab…" />
+    </div>
   );
 }
 
