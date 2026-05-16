@@ -73,13 +73,10 @@ const displayDomainName = (
     .split('/')[0];
 };
 
-/** logo.dev URL for a host. Returns null if host is missing. */
-const logoUrlFor = (host: string | null | undefined): string | null => {
-  if (!host) return null;
-  const clean = host.replace(/^https?:\/\//i, '').replace(/^www\./i, '').split('/')[0].toLowerCase();
-  if (!clean) return null;
-  return `https://img.logo.dev/${clean}?token=pk_DTdFFG1JT9WOCjATvZEzIA&size=64`;
-};
+import { logoUrl as logoUrlHelper } from "@/lib/logoUrl";
+
+/** Backend-proxied logo URL for a host. Returns null if host is missing. */
+const logoUrlFor = (host: string | null | undefined): string | null => logoUrlHelper(host, 64);
 
 const sidebarItems: Array<{
   id: AIResultsNavItemId;

@@ -13,6 +13,7 @@ import {
   ShieldAlert,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { logoUrl as logoUrlHelper } from "@/lib/logoUrl";
 import { useNavigate } from "react-router-dom";
 import { apiGet } from "../../../services/apiClient";
 import { maskDomainId } from "../../../lib/domainUtils";
@@ -74,10 +75,7 @@ type FetchState =
   | { status: "ready"; domains: DashboardDomain[] }
   | { status: "error"; message: string };
 
-const getLogoUrl = (domainUrl: string) => {
-  const host = domainUrl.replace(/^https?:\/\//, "").replace(/^www\./, "");
-  return `https://img.logo.dev/${host}?token=pk_DTdFFG1JT9WOCjATvZEzIA&size=64`;
-};
+const getLogoUrl = (domainUrl: string) => logoUrlHelper(domainUrl, 64) ?? "";
 
 const getDisplayName = (domain: DashboardDomain) => {
   return domain.url.replace(/^https?:\/\//, "").replace(/^www\./, "");

@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { apiGet, apiPost } from "@/services/apiClient";
 import { useToast } from "@/components/ui/use-toast";
 import { maskDomainId } from "@/lib/domainUtils";
+import { logoUrl as logoUrlHelper } from "@/lib/logoUrl";
 import ReactMarkdown from "react-markdown";
 import {
   AlignLeft,
@@ -374,7 +375,7 @@ const hostFromCitation = (c: CitationLike): string => {
 
 const CitationCard = ({ citation }: { citation: CitationLike }) => {
   const host = hostFromCitation(citation);
-  const logo = host ? `https://img.logo.dev/${host}?token=pk_DTdFFG1JT9WOCjATvZEzIA&size=64` : null;
+  const logo = logoUrlHelper(host, 64);
   const title = citation.title?.trim() || host || "Source";
   const blurb = (citation.snippet || citation.citedText || "")?.toString().trim();
   return (
@@ -428,7 +429,7 @@ const CitationCard = ({ citation }: { citation: CitationLike }) => {
  * like one composed list rather than two stacked feeds.
  */
 const CompetitorPill = ({ host, name, sentiment }: { host: string; name?: string | null; sentiment?: number | null }) => {
-  const logo = host ? `https://img.logo.dev/${host}?token=pk_DTdFFG1JT9WOCjATvZEzIA&size=64` : null;
+  const logo = logoUrlHelper(host, 64);
   const tone =
     typeof sentiment === "number"
       ? sentiment > 2

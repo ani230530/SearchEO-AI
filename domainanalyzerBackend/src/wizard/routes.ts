@@ -37,6 +37,7 @@ import { computePhraseVisibility, computeOpportunities, computeCompetitorAnalysi
 import { enrichOpportunities, type EnrichedOpportunity } from './opportunityEnrichment';
 import { enrichCompetitorInsights, type CompetitorInsight } from './competitorInsightEnrichment';
 import { scoreResponse as llmScoreResponse } from './scoreService';
+import { redisService } from '../services/RedisService';
 
 const prisma = new PrismaClient();
 const router = Router();
@@ -94,8 +95,30 @@ const PHASE_STEP: Record<string, number> = {
   run: 5,
 };
 
+/** Cache key for the user's domain list. Invalidated on POST /domain and DELETE /domain/:id. */
+const domainsCacheKey = (userId: number) => `wizard:domains:${userId}`;
+const DOMAINS_CACHE_TTL_SECONDS = 60;
+
 router.get('/domains', authenticateToken, async (req: Request, res: Response) => {
   const userId = authReq(req).user.userId;
+
+  // Fast path: Redis hit. The cache TTL is short (60s) so a newly created
+  // domain shows up within a minute even if we miss an invalidation; the
+  // explicit invalidations on POST /domain and DELETE /domain/:id keep the
+  // common case (user adds a domain, then loads the dashboard) instant.
+  try {
+    const cached = await redisService.get(domainsCacheKey(userId));
+    if (cached) {
+      res.setHeader('X-Domains-Cache', 'hit');
+      return res.json(JSON.parse(cached));
+    }
+  } catch (err) {
+    // Don't fail the request just because Redis is down — fall through to the
+    // real query. RedisService's graceful-degradation also short-circuits
+    // here, but we belt-and-suspender it.
+    console.warn('[wizard/domains] Redis read failed', err);
+  }
+
   const domains = await prisma.domain.findMany({
     where: { userId },
     include: {
@@ -153,7 +176,13 @@ router.get('/domains', authenticateToken, async (req: Request, res: Response) =>
     })
   );
 
-  return res.json({ domains: rows });
+  const payload = { domains: rows };
+  // Best-effort write — don't block the response if Redis is degraded.
+  redisService
+    .set(domainsCacheKey(userId), JSON.stringify(payload), DOMAINS_CACHE_TTL_SECONDS)
+    .catch((err) => console.warn('[wizard/domains] Redis write failed', err));
+  res.setHeader('X-Domains-Cache', 'miss');
+  return res.json(payload);
 });
 
 // ── POST /validate ─────────────────────────────────────────────────────────
@@ -318,6 +347,10 @@ router.post('/domain', authenticateOrSession(), async (req: Request, res: Respon
         });
     }
     send({ type: 'domain_created', domainId: domain.id });
+
+    // Bust the user's domain-list cache so the new row appears on the
+    // next /domains call without waiting for the 60s TTL.
+    redisService.del(domainsCacheKey(ownerId)).catch(() => {});
 
     // Persist user-supplied profile.
     const seeds = {
@@ -2543,7 +2576,11 @@ router.post('/domain/:id/run', authenticateOrSession(), async (req: Request, res
 router.delete('/domain/:id', authenticateToken, async (req: Request, res: Response) => {
   const got = await ensureDomain(req, req.params.id);
   if (!got.ok) return res.status(got.status).json({ error: got.error });
+  const userId = authReq(req).user.userId;
   await prisma.domain.delete({ where: { id: got.domain.id } });
+  // Bust the user's domain-list cache so the next /domains call reflects the
+  // delete immediately instead of waiting 60s for the TTL.
+  redisService.del(domainsCacheKey(userId)).catch(() => {});
   return res.json({ ok: true });
 });
 

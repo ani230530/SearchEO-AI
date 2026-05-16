@@ -36,6 +36,7 @@ import type {
   PromptGapContext,
 } from '@/components/competitors/aiResponseAnalysisData';
 import { apiPost } from '../services/apiClient';
+import { logoUrl as logoUrlHelper } from '@/lib/logoUrl';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { useShellContext } from '@/features/ai-results/AIResultsShell';
@@ -162,9 +163,7 @@ interface TrendsResponse {
 
 // ── helpers ────────────────────────────────────────────────────────────────
 
-const LOGO_TOKEN = 'pk_DTdFFG1JT9WOCjATvZEzIA';
-const competitorLogo = (host: string, size = 32) =>
-  `https://img.logo.dev/${host}?token=${LOGO_TOKEN}&size=${size}`;
+const competitorLogo = (host: string, size = 32) => logoUrlHelper(host, size) ?? '';
 
 const COMPETITOR_COLORS = ['#2F86D3', '#33485E', '#F26B57', '#2BB673', '#7BC7ED', '#9F7AEA', '#F59E0B', '#EC4899'];
 const colorForHost = (host: string, idx: number) => COMPETITOR_COLORS[idx % COMPETITOR_COLORS.length];
