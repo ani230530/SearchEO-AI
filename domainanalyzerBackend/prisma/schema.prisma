@@ -119,6 +119,10 @@ model DomainInferred {
   schemaOrgJson  Json?
   // float[] embedding stored as Json — used for competitor + prompt similarity.
   embedding      Json?
+  // sha256 of the crawl text the embedding was computed from. When a fresh
+  // crawl produces identical content, we skip the embedText call and reuse
+  // the stored embedding (saves ~$0.0001 + 1–2 s per wizard re-run).
+  crawlHash      String?
   // Free-form text summary for downstream content generation.
   summary        String?
   inferredAt     DateTime @default(now())

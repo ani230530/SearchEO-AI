@@ -202,6 +202,7 @@ export function Step3Competitors({ domainId, initialSelected = [], onContinue, f
                       <img
                         src={competitor.logoUrl}
                         alt=""
+                        loading="lazy"
                         className="h-6 w-6 object-contain"
                         onError={(e) => ((e.currentTarget as HTMLImageElement).style.display = "none")}
                       />
