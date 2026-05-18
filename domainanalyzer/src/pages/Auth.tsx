@@ -82,16 +82,16 @@ const Auth: React.FC = () => {
                     <div className="h-10 w-10 animate-spin rounded-full border-4 border-[#f4f4f5] border-t-[#2D4059]"></div>
                     <p className="text-[13px] font-medium text-[#717885]">Logging in with Google...</p>
                   </div>
-                  
+
                   {/* Skeleton that mimics the Login component */}
                   <div className="space-y-6 w-full opacity-60">
                     <div className="mb-5 space-y-3">
                       <div className="h-8 w-2/3 animate-pulse rounded bg-[#f4f4f5]"></div>
                       <div className="h-4 w-full animate-pulse rounded bg-[#f4f4f5]"></div>
                     </div>
-                    
+
                     <div className="h-8 w-full animate-pulse rounded-[5px] bg-[#f4f4f5]"></div>
-                    
+
                     <div className="my-5 flex w-full items-center gap-2">
                       <div className="h-px flex-1 bg-[#d9dce1]" />
                       <span className="shrink-0 text-[11px] font-normal leading-none text-[#9ca3af]">or</span>
@@ -126,8 +126,8 @@ const Auth: React.FC = () => {
           </div>
 
           <div className="flex min-h-[560px] items-stretch lg:min-h-[638px]">
-            <Login 
-              onSwitchToRegister={() => navigate('/audit')} 
+            <Login
+              onSwitchToRegister={() => navigate('/audit')}
               externalError={
                 googleError === 'not_found'
                   ? 'No account exists for that Google email. Start from the report signup flow to create one.'
