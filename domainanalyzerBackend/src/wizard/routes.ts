@@ -26,7 +26,7 @@ import {
   getOwnerUserId,
 } from '../middleware/authenticateOrSession';
 import { extractHost, normalizeUrl } from './urlNormalize';
-import { crawlDomain, inferCompanySize, synthesizeContext } from './crawlService';
+import { crawlDomain, inferCompanySize, inferDomainFromHomepage, synthesizeContext } from './crawlService';
 import { embedText } from './llmClient';
 import { runCompetitorPipeline, persistCompetitors } from './competitorService';
 import { generateAuditPrompts, persistAuditPrompts, type PromptCategory } from './topicsService';
@@ -368,8 +368,21 @@ router.post('/domain', authenticateOrSession(), async (req: Request, res: Respon
     // Phase: crawl.
     await setPhase(prisma, domain.id, 'crawl', 'running');
     send({ type: 'progress', phase: 'crawl', progress: 5, step: 'Discovering pages…' });
-    const crawl = await crawlDomain(norm.canonicalUrl);
-    send({ type: 'progress', phase: 'crawl', progress: 70, step: `Scanned ${crawl.pagesScanned} pages` });
+    // LLM-first fast path: fetch only the homepage and let synthesizeContext
+    // produce the full 8-section profile. Falls back to the multi-page
+    // crawler when the adequacy gate fails (thin homepage, missing sections,
+    // unknown company). Produces an identical CrawlOutput shape either way.
+    const crawlStart = Date.now();
+    let crawl = await inferDomainFromHomepage(norm.canonicalUrl);
+    if (crawl) {
+      console.log(`[PERF] crawl.total ${Date.now() - crawlStart}ms via=fastpath`);
+      send({ type: 'progress', phase: 'crawl', progress: 70, step: 'Inferred company profile from homepage' });
+    } else {
+      send({ type: 'progress', phase: 'crawl', progress: 25, step: 'Homepage too thin — scanning full site…' });
+      crawl = await crawlDomain(norm.canonicalUrl);
+      console.log(`[PERF] crawl.total ${Date.now() - crawlStart}ms via=fullcrawl pages=${crawl.pagesScanned}`);
+      send({ type: 'progress', phase: 'crawl', progress: 70, step: `Scanned ${crawl.pagesScanned} pages` });
+    }
 
     await prisma.crawlSnapshot.create({
       data: {
