@@ -429,6 +429,41 @@ export class AuthService {
       }
     });
   }
+
+  // Google login - look up or create a shadow-password user
+  async loginOrCreateWithGoogleEmail(email: string, name?: string | null): Promise<AuthResponse> {
+    const normalizedEmail = email.trim().toLowerCase();
+    let user = await prisma.user.findUnique({ where: { email: normalizedEmail } });
+
+    if (!user) {
+      // Create a password-less user for Google
+      const saltRounds = 12;
+      const placeholderPassword = await bcrypt.hash('__google_auth_no_password__' + Math.random(), saltRounds);
+      user = await prisma.user.create({
+        data: {
+          email: normalizedEmail,
+          password: placeholderPassword,
+          name: name ?? undefined,
+          emailVerified: true,
+        }
+      });
+    }
+
+    const token = this.generateToken(user.id, user.email);
+    const refreshToken = this.generateRefreshToken(user.id, user.email);
+    const refreshTokenExpiry = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { refreshToken, refreshTokenExpiry }
+    });
+
+    return {
+      user: { id: user.id, email: user.email, name: user.name ?? undefined },
+      token,
+      refreshToken
+    };
+  }
 }
 
 export const authService = new AuthService(); 
