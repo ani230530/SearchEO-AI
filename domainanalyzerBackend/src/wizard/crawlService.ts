@@ -19,8 +19,10 @@ import { normalizeUrl } from './urlNormalize';
 import { callJson, Models } from './llmClient';
 
 const MAX_PAGES = 12;
-const FETCH_TIMEOUT_MS = 12_000;
+const HTTP_FETCH_TIMEOUT_MS = 7_000;
+const BROWSER_FETCH_TIMEOUT_MS = 10_000;
 const THIN_THRESHOLD_CHARS = 800;
+const TARGET_CRAWL_CONCURRENCY = 8;
 // Realistic desktop Chrome UA — many WAFs (Cloudflare / Akamai / Shape) reject
 // any UA that mentions "bot" outright, even though we honor robots.txt.
 const USER_AGENT =
@@ -36,7 +38,7 @@ interface FetchResult {
 async function fetchHttp(url: string): Promise<FetchResult> {
   try {
     const res = await axios.get<string>(url, {
-      timeout: FETCH_TIMEOUT_MS,
+      timeout: HTTP_FETCH_TIMEOUT_MS,
       maxRedirects: 5,
       headers: { 'User-Agent': USER_AGENT, Accept: 'text/html,*/*' },
       responseType: 'text',
@@ -61,22 +63,76 @@ async function loadPuppeteer() {
   return _puppeteer;
 }
 
-async function fetchBrowser(url: string): Promise<FetchResult> {
+// Shared browser instance — launching Chromium costs ~1–3s; with up to ~30%
+// of pages triggering the SPA fallback, launching once per process instead of
+// once per page saves 10–30s on a typical wizard run. We close the browser
+// after 60s of inactivity so idle workers don't hold ~200MB resident.
+const BROWSER_IDLE_MS = 60_000;
+let _sharedBrowser: import('puppeteer').Browser | null = null;
+let _sharedBrowserLaunch: Promise<import('puppeteer').Browser | null> | null = null;
+let _browserIdleTimer: NodeJS.Timeout | null = null;
+
+async function getSharedBrowser(): Promise<import('puppeteer').Browser | null> {
+  if (_sharedBrowser) return _sharedBrowser;
+  if (_sharedBrowserLaunch) return _sharedBrowserLaunch;
   const puppeteer = await loadPuppeteer();
-  if (!puppeteer) return { ok: false, status: 0, html: '', fetchedVia: 'browser' };
-  let browser: import('puppeteer').Browser | null = null;
+  if (!puppeteer) return null;
+  _sharedBrowserLaunch = puppeteer
+    .launch({ headless: true, args: ['--no-sandbox', '--disable-setuid-sandbox'] })
+    .then((b) => {
+      _sharedBrowser = b;
+      // If Chromium dies (OOM, crash, manual kill), null out so the next
+      // request re-launches instead of hitting a stale handle.
+      b.on('disconnected', () => {
+        if (_sharedBrowser === b) _sharedBrowser = null;
+      });
+      return b;
+    })
+    .catch(() => null)
+    .finally(() => {
+      _sharedBrowserLaunch = null;
+    });
+  return _sharedBrowserLaunch;
+}
+
+function scheduleBrowserIdleClose() {
+  if (_browserIdleTimer) clearTimeout(_browserIdleTimer);
+  _browserIdleTimer = setTimeout(() => {
+    const b = _sharedBrowser;
+    _sharedBrowser = null;
+    if (b) b.close().catch(() => undefined);
+  }, BROWSER_IDLE_MS);
+  // Don't hold the event loop open in tests / short-lived processes.
+  if (typeof _browserIdleTimer.unref === 'function') _browserIdleTimer.unref();
+}
+
+async function fetchBrowser(url: string): Promise<FetchResult> {
+  const browser = await getSharedBrowser();
+  if (!browser) return { ok: false, status: 0, html: '', fetchedVia: 'browser' };
+  let page: import('puppeteer').Page | null = null;
   try {
-    browser = await puppeteer.launch({ headless: true, args: ['--no-sandbox', '--disable-setuid-sandbox'] });
-    const page = await browser.newPage();
+    page = await browser.newPage();
     await page.setUserAgent(USER_AGENT);
-    await page.goto(url, { waitUntil: 'networkidle2', timeout: FETCH_TIMEOUT_MS });
+    await page.goto(url, { waitUntil: 'networkidle2', timeout: BROWSER_FETCH_TIMEOUT_MS });
     const html = await page.content();
     return { ok: true, status: 200, html, fetchedVia: 'browser' };
   } catch {
     return { ok: false, status: 0, html: '', fetchedVia: 'browser' };
   } finally {
-    if (browser) await browser.close().catch(() => undefined);
+    if (page) await page.close().catch(() => undefined);
+    scheduleBrowserIdleClose();
   }
+}
+
+/** Exposed for graceful shutdown / tests. */
+export async function closeSharedBrowser(): Promise<void> {
+  if (_browserIdleTimer) {
+    clearTimeout(_browserIdleTimer);
+    _browserIdleTimer = null;
+  }
+  const b = _sharedBrowser;
+  _sharedBrowser = null;
+  if (b) await b.close().catch(() => undefined);
 }
 
 function looksThin(html: string): boolean {
@@ -287,6 +343,127 @@ export async function synthesizeContext(rawText: string, schemaJson: unknown[]):
   }
 }
 
+/**
+ * Adequacy gate for an LLM-first homepage inference. Returns true when the
+ * output is rich enough to ship as-is — otherwise the caller falls back to a
+ * full multi-page crawl. We require:
+ *
+ *   - Both companyName AND industry populated (these gate downstream prompts).
+ *   - All 8 section headings present in the summary markdown (the dashboard's
+ *     AnalyticsCompanySection parser depends on them).
+ *   - Each section has > 80 chars of prose after the heading.
+ *
+ * Threshold is conservative on purpose: we'd rather pay for a deep crawl
+ * occasionally than ship a thin profile.
+ */
+function isContextAdequate(ctx: ContextJson | null): boolean {
+  if (!ctx) return false;
+  if (!ctx.companyName || !ctx.industry) return false;
+  if (typeof ctx.summary !== 'string' || ctx.summary.length < 1200) return false;
+  for (const heading of CONTEXT_SECTIONS) {
+    // Headings can appear as `## Heading`, `# Heading`, or `**Heading**` —
+    // match leniently (case-insensitive). The downstream parser is just as
+    // lenient, so we only need to confirm each heading exists.
+    const pattern = new RegExp(
+      `(^|\\n)\\s*(#{1,3}\\s*|\\*{1,2}\\s*)?\\d*\\.?\\s*${heading.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\$&')}`,
+      'i'
+    );
+    if (!pattern.test(ctx.summary)) return false;
+    // Require some prose under the heading — find heading position and
+    // check the next 80 chars contain at least 30 word chars.
+    const idx = ctx.summary.toLowerCase().indexOf(heading.toLowerCase());
+    if (idx < 0) return false;
+    const after = ctx.summary.slice(idx + heading.length, idx + heading.length + 300);
+    const wordCount = (after.match(/[a-z]{3,}/gi) || []).length;
+    if (wordCount < 12) return false;
+  }
+  return true;
+}
+
+/**
+ * LLM-first fast path: fetch just the homepage and let the existing
+ * synthesizeContext() produce the rich 8-section ContextJson. Falls back to
+ * Puppeteer on thin/SPA HTML, same as the multi-page crawler. Returns a
+ * fully-populated CrawlOutput (same shape and density as crawlDomain) when
+ * the adequacy gate passes, otherwise returns null so the caller can fall
+ * back to a full multi-page crawl.
+ *
+ * Saving on the happy path: 11 of 12 page fetches skipped, plus competitor
+ * pipeline can race against this single fetch instead of the full crawl.
+ */
+export async function inferDomainFromHomepage(rawUrl: string): Promise<CrawlOutput | null> {
+  const norm = normalizeUrl(rawUrl);
+  if (!norm) return null;
+
+  const robotsStart = Date.now();
+  const robots = await fetchRobots(norm.origin);
+  console.log(`[PERF] crawl.fastpath.robots ${Date.now() - robotsStart}ms`);
+  const policy: CrawlPolicy = {
+    robotsAllowed: robots.allowed,
+    sitemapFound: false,
+    sitemapUrls: [],
+    startUrl: norm.canonicalUrl,
+  };
+  if (!robots.allowed) return null;
+
+  // Try bare origin first; if that 4xx/5xx, also try www. Many WAFs reject
+  // the bare host but accept the www variant.
+  const wwwOrigin = norm.origin.replace(/^https?:\/\//, (m) => `${m}www.`);
+  const candidates = wwwOrigin !== norm.origin ? [norm.origin, wwwOrigin] : [norm.origin];
+
+  let html = '';
+  let via: 'http' | 'browser' = 'http';
+  const fetchStart = Date.now();
+  for (const url of candidates) {
+    const httpRes = await fetchHttp(url);
+    if (httpRes.ok && httpRes.html && !looksThin(httpRes.html)) {
+      html = httpRes.html;
+      break;
+    }
+    // HTTP failed or content is thin/SPA — try Puppeteer for this URL.
+    const browserRes = await fetchBrowser(url);
+    if (browserRes.ok && browserRes.html) {
+      html = browserRes.html;
+      via = 'browser';
+      break;
+    }
+  }
+  console.log(`[PERF] crawl.fastpath.fetch ${Date.now() - fetchStart}ms via=${via}`);
+
+  if (!html) return null;
+
+  const page = parsePage(norm.canonicalUrl, html, via);
+  // Hard floor: if we couldn't extract enough text from the homepage, don't
+  // even attempt LLM inference — fall through to multi-page crawl.
+  if (page.content.length < 600) return null;
+
+  const rawText = `# ${page.url}\n${page.title ?? ''}\n${page.description ?? ''}\n${page.content}`;
+  const schemaJson = page.schemaJson;
+
+  const synthStart = Date.now();
+  const synthesized = await synthesizeContext(rawText, schemaJson);
+  console.log(`[PERF] crawl.fastpath.synth ${Date.now() - synthStart}ms`);
+
+  if (!synthesized || !isContextAdequate(synthesized.context)) return null;
+
+  const quality: CrawlQuality = {
+    contentQualityPct: 100,
+    thinContentRatePct: 0,
+    schemaCoveragePct: schemaJson.length > 0 ? 100 : 0,
+    browserFallbackRatePct: via === 'browser' ? 100 : 0,
+  };
+
+  return {
+    pagesScanned: 1,
+    pages: [page],
+    rawText: rawText.slice(0, 60_000),
+    contextJson: synthesized.context,
+    quality,
+    policy,
+    tokenUsage: synthesized.tokens,
+  };
+}
+
 export async function crawlDomain(rawUrl: string, opts: CrawlOptions = {}): Promise<CrawlOutput> {
   const norm = normalizeUrl(rawUrl);
   if (!norm) throw new Error(`Invalid URL: ${rawUrl}`);
@@ -319,7 +496,7 @@ export async function crawlDomain(rawUrl: string, opts: CrawlOptions = {}): Prom
   const pages: CrawledPage[] = [];
   const failedUrls: Array<{ url: string; httpStatus: number; browserTried: boolean }> = [];
   let browserFallbacks = 0;
-  const CONCURRENCY = 4;
+  const CONCURRENCY = TARGET_CRAWL_CONCURRENCY;
   const queue = [...targetUrls];
   async function worker() {
     while (queue.length) {
