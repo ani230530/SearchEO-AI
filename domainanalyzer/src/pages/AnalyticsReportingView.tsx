@@ -1,4 +1,4 @@
-import React,{ useState , useEffect} from "react";
+import React,{ useState , useEffect, useRef, useCallback} from "react";
 import { createPortal } from "react-dom";
 import {
   Calendar,
@@ -172,15 +172,162 @@ const AnalyticsReportingSetup = ({ initialGaId = "", initialOrgName = "" }: Anal
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const sseRef = useRef<EventSource | null>(null);
+  const pollingRef = useRef<number | null>(null);
+  const finalToastShownRef = useRef<{ requestId: string; status: "completed" | "failed" } | null>(null);
+
+  const readReportUrls = (row: any) => {
+    const results = row?.results ?? {};
+    const payload = row?.payload ?? {};
+    const output = row?.output ?? {};
+    return {
+      sheetsUrl:
+        results.googleSheetsUrl ||
+        results.sheetsUrl ||
+        results.google_sheets_url ||
+        output.googleSheetsUrl ||
+        output.sheetsUrl ||
+        output.google_sheets_url ||
+        output["Sheet URL"] ||
+        payload.googleSheetsUrl ||
+        payload.sheetsUrl ||
+        payload.google_sheets_url ||
+        payload["Sheet URL"] ||
+        row?.googleSheetsUrl ||
+        row?.sheetsUrl ||
+        row?.google_sheets_url ||
+        results["Sheet URL"] ||
+        row?.["Sheet URL"],
+      slidesUrl:
+        results.googleSlidesUrl ||
+        results.slidesUrl ||
+        results.google_slides_url ||
+        output.googleSlidesUrl ||
+        output.slidesUrl ||
+        output.google_slides_url ||
+        output["Presentation URL"] ||
+        payload.googleSlidesUrl ||
+        payload.slidesUrl ||
+        payload.google_slides_url ||
+        payload["Presentation URL"] ||
+        row?.googleSlidesUrl ||
+        row?.slidesUrl ||
+        row?.google_slides_url ||
+        results["Presentation URL"] ||
+        row?.["Presentation URL"],
+    };
+  };
+  const resolveReportStatus = (row: any): "processing" | "completed" | "failed" => {
+    const base = row?.status as "processing" | "completed" | "failed" | undefined;
+    const urls = readReportUrls(row);
+    if (base === "failed") return "failed";
+    if (base === "completed") return "completed";
+    if (urls.sheetsUrl || urls.slidesUrl) return "completed";
+    return "processing";
+  };
 
 // Filtered reports
 const filteredReports = reportHistory.filter((report) =>
-  report.payload?.name?.toLowerCase().includes(searchQuery.toLowerCase())
+  (report.payload?.name || report.name || "")
+    .toLowerCase()
+    .includes(searchQuery.toLowerCase())
 );
 
   const handleChange = (key: keyof typeof form, value: string) => {
     setForm((prev) => ({ ...prev, [key]: value }));
   };
+
+  const fetchHistory = useCallback(async () => {
+    const token = localStorage.getItem("authToken");
+    if (!token) return;
+
+    setIsLoadingHistory(true);
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL || "http://localhost:3002"}/api/audit/n8n/history`,
+        {
+          headers: {
+            "Authorization": `Bearer ${token}`
+          }
+        }
+      );
+      if (response.ok) {
+        const data = await response.json();
+        const history = data.history || [];
+        setReportHistory(history);
+
+        // Keep the live status in sync even when this page didn't trigger the run.
+        if (reportId) {
+          const row = history.find((item: any) => {
+            const candidateId = item.requestId ?? item.id ?? item.payload?.requestId ?? item.payload?.id;
+            return String(candidateId) === String(reportId);
+          });
+          if (row) {
+            const nextStatus = resolveReportStatus(row);
+            setReportStatus(nextStatus);
+            if (nextStatus === "completed") {
+              setReportResults(readReportUrls(row));
+              setIsGenerating(false);
+              if (
+                !finalToastShownRef.current ||
+                finalToastShownRef.current.requestId !== String(reportId) ||
+                finalToastShownRef.current.status !== "completed"
+              ) {
+                toast({
+                  title: "Report ready",
+                  description: "Your analytics report is ready to view.",
+                });
+                finalToastShownRef.current = { requestId: String(reportId), status: "completed" };
+              }
+            } else if (nextStatus === "failed") {
+              setIsGenerating(false);
+              if (
+                !finalToastShownRef.current ||
+                finalToastShownRef.current.requestId !== String(reportId) ||
+                finalToastShownRef.current.status !== "failed"
+              ) {
+                toast({
+                  title: "Report failed",
+                  description: row?.error || row?.payload?.error || "Failed to generate report",
+                  variant: "destructive",
+                });
+                finalToastShownRef.current = { requestId: String(reportId), status: "failed" };
+              }
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching history:", error);
+    } finally {
+      setIsLoadingHistory(false);
+    }
+  }, [reportId, toast]);
+
+  const stopPolling = () => {
+    if (pollingRef.current) {
+      window.clearInterval(pollingRef.current);
+      pollingRef.current = null;
+    }
+  };
+
+  const startPolling = useCallback((activeRequestId: string) => {
+    stopPolling();
+    pollingRef.current = window.setInterval(async () => {
+      await fetchHistory();
+      setReportHistory((prev) => {
+        const row = prev.find((item: any) => {
+          const candidateId = item.requestId ?? item.id ?? item.payload?.requestId ?? item.payload?.id;
+          return String(candidateId) === String(activeRequestId);
+        });
+        if (!row) return prev;
+        if (row.status === "completed" || row.status === "failed") {
+          stopPolling();
+        }
+        return prev;
+      });
+    }, 3000);
+  }, [fetchHistory]);
 
   const handleSubmit = async () => {
     const token = localStorage.getItem("authToken");
@@ -212,10 +359,22 @@ const filteredReports = reportHistory.filter((report) =>
     }
 
     setIsGenerating(true);
-    setReportStatus(null);
+    setReportStatus("processing");
     setReportResults(null);
+    setIsModalOpen(false);
+    toast({
+      title: "Report generation started",
+      description: "Generating in background. You can continue using the page.",
+    });
 
     try {
+      const configuredApiBase = import.meta.env.VITE_API_URL;
+      const runtimeApiBase =
+        configuredApiBase && configuredApiBase.trim().length > 0
+          ? configuredApiBase
+          : window.location.origin;
+      const callbackUrl = `${runtimeApiBase.replace(/\/+$/, "")}/api/audit/n8n/callback`;
+
       const response = await fetch(
         `${import.meta.env.VITE_API_URL || "http://localhost:3002"}/api/audit/n8n/send`,
         {
@@ -228,7 +387,12 @@ const filteredReports = reportHistory.filter((report) =>
             name: form.name,
             reportMonth: form.reportMonth,
             analyticsProperty: form.analyticsPropertyId,
-            orgName: form.orgName
+            orgName: form.orgName,
+            // n8n field aliases (kept alongside canonical keys).
+            "Report Month": form.reportMonth,
+            "analytics property": form.analyticsPropertyId,
+            "Org Name": form.orgName,
+            callbackUrl,
           }),
         }
       );
@@ -240,14 +404,10 @@ const filteredReports = reportHistory.filter((report) =>
 
       const data = await response.json();
       setReportId(data.requestId);
-      setReportStatus("processing");
-
-      toast({
-        title: "Processing",
-        description: "Analytics report generation has been triggered. You'll be notified when it's ready.",
-      });
+      finalToastShownRef.current = null;
 
       connectSSE(token, data.requestId);
+      startPolling(data.requestId);
       fetchHistory(); // Refresh history table
       setIsDrawerOpen(false); // Close drawer on success
     } catch (error) {
@@ -262,34 +422,60 @@ const filteredReports = reportHistory.filter((report) =>
 
   // Connect to SSE for real-time n8n updates
   const connectSSE = (token: string, requestId: string) => {
+    if (sseRef.current) {
+      sseRef.current.close();
+      sseRef.current = null;
+    }
     const url = `${import.meta.env.VITE_API_URL || "http://localhost:3002"}/api/sse?token=${encodeURIComponent(token)}`;
     const eventSource = new EventSource(url);
+    sseRef.current = eventSource;
 
     eventSource.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
-        if (data.type === "n8n_update" && data.data?.requestId === requestId) {
-          setReportStatus(data.data.status);
+        const payload = data?.data ?? data;
+        const eventRequestId = payload?.requestId ?? payload?.id;
+        const isN8nUpdate = data?.type === "n8n_update" || !!payload?.requestId || !!payload?.id;
+        if (isN8nUpdate && String(eventRequestId) === String(requestId)) {
+          const resolvedFromEvent = resolveReportStatus(payload);
+          setReportStatus(resolvedFromEvent);
+          // Pull latest persisted state quickly so the table updates sooner.
+          fetchHistory();
 
-          if (data.data.status === "completed") {
-            setReportResults({
-              sheetsUrl: data.data.googleSheetsUrl,
-              slidesUrl: data.data.googleSlidesUrl,
-            });
-            toast({
-              title: "Report ready",
-              description: "Your analytics report is ready to view.",
-            });
+          if (resolvedFromEvent === "completed") {
+            setReportResults(readReportUrls(payload));
+            if (
+              !finalToastShownRef.current ||
+              finalToastShownRef.current.requestId !== String(requestId) ||
+              finalToastShownRef.current.status !== "completed"
+            ) {
+              toast({
+                title: "Report ready",
+                description: "Your analytics report is ready to view.",
+              });
+              finalToastShownRef.current = { requestId: String(requestId), status: "completed" };
+            }
             eventSource.close();
+            sseRef.current = null;
+            stopPolling();
             setIsGenerating(false);
             fetchHistory(); // Refresh history table
-          } else if (data.data.status === "failed") {
-            toast({
-              title: "Report failed",
-              description: data.data.error || "Failed to generate report",
-              variant: "destructive",
-            });
+          } else if (resolvedFromEvent === "failed") {
+            if (
+              !finalToastShownRef.current ||
+              finalToastShownRef.current.requestId !== String(requestId) ||
+              finalToastShownRef.current.status !== "failed"
+            ) {
+              toast({
+                title: "Report failed",
+                description: payload.error || "Failed to generate report",
+                variant: "destructive",
+              });
+              finalToastShownRef.current = { requestId: String(requestId), status: "failed" };
+            }
             eventSource.close();
+            sseRef.current = null;
+            stopPolling();
             setIsGenerating(false);
             fetchHistory(); // Refresh history table
           }
@@ -301,36 +487,24 @@ const filteredReports = reportHistory.filter((report) =>
 
     eventSource.onerror = () => {
       eventSource.close();
+      sseRef.current = null;
+      // SSE can be flaky on hosted infra; polling keeps status fresh.
+      startPolling(requestId);
     };
-  };
-
-  const fetchHistory = async () => {
-    const token = localStorage.getItem("authToken");
-    if (!token) return;
-
-    setIsLoadingHistory(true);
-    try {
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL || "http://localhost:3002"}/api/audit/n8n/history`,
-        {
-          headers: {
-            "Authorization": `Bearer ${token}`
-          }
-        }
-      );
-      if (response.ok) {
-        const data = await response.json();
-        setReportHistory(data.history || []);
-      }
-    } catch (error) {
-      console.error("Error fetching history:", error);
-    } finally {
-      setIsLoadingHistory(false);
-    }
   };
 
   useEffect(() => {
     fetchHistory();
+  }, [fetchHistory]);
+
+  useEffect(() => {
+    return () => {
+      if (sseRef.current) {
+        sseRef.current.close();
+        sseRef.current = null;
+      }
+      stopPolling();
+    };
   }, []);
 
   useEffect(() => {
@@ -636,24 +810,24 @@ const filteredReports = reportHistory.filter((report) =>
       <tr key={report.id} className="group hover:bg-neutral-50/50 transition-colors">
         <td className="px-8 py-5">
           <div className="text-sm font-medium text-neutral-600">
-            {report.payload?.name || "Unnamed Report"}
+            {report.payload?.name || report.name || "Unnamed Report"}
           </div>
         </td>
         <td className="px-8 py-5">
           <div className="text-sm font-light text-neutral-500">
-            {report.payload?.['Report Month'] || "N/A"}
+            {report.payload?.['Report Month'] || report.payload?.reportMonth || report.reportMonth || "N/A"}
           </div>
         </td>
         <td className="px-8 py-5">
           <div
             className={cn(
               "inline-flex px-3 py-1 rounded-full text-[10px] uppercase tracking-wider font-light",
-              report.status === "completed" && "bg-green-50 text-green-700 border border-green-400",
-              report.status === "processing" && "bg-blue-50 text-blue-700 border border-blue-400",
-              report.status === "failed" && "bg-red-50 text-red-700 border border-red-400"
+              resolveReportStatus(report) === "completed" && "bg-green-50 text-green-700 border border-green-400",
+              resolveReportStatus(report) === "processing" && "bg-blue-50 text-blue-700 border border-blue-400",
+              resolveReportStatus(report) === "failed" && "bg-red-50 text-red-700 border border-red-400"
             )}
           >
-            {report.status}
+            {resolveReportStatus(report)}
           </div>
         </td>
         <td className="px-8 py-5 text-sm font-light text-neutral-400">
@@ -661,9 +835,9 @@ const filteredReports = reportHistory.filter((report) =>
         </td>
         <td className="px-8 py-3 text-right">
           <div className="flex items-center justify-end gap-3 transition-opacity">
-            {report.results?.googleSheetsUrl && (
+            {readReportUrls(report).sheetsUrl && (
               <a
-                href={report.results.googleSheetsUrl}
+                href={readReportUrls(report).sheetsUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-gray-100 text-gray-600 bg-[#F9F9F9] text-sm font-light transition shadow-sm hover:shadow-md"
@@ -675,9 +849,9 @@ const filteredReports = reportHistory.filter((report) =>
                 Sheets
               </a>
             )}
-            {report.results?.googleSlidesUrl && (
+            {readReportUrls(report).slidesUrl && (
               <a
-                href={report.results.googleSlidesUrl}
+                href={readReportUrls(report).slidesUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-gray-100 text-gray-600 bg-[#F9F9F9] text-sm font-light transition shadow-sm hover:shadow-md"

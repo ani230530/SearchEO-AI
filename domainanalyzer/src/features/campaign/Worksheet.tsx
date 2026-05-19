@@ -21,6 +21,7 @@ import {
   Sparkles,
   Trash2,
   Upload,
+  X,
 } from 'lucide-react';
 import {
   WorksheetTopic,
@@ -134,6 +135,18 @@ export default function Worksheet({
   >(null);
 
   const [search, setSearch] = useState('');
+  const [sortOrder, setSortOrder] = useState<'latest' | 'oldest'>('latest');
+  const [statusFilter, setStatusFilter] = useState<
+    | 'all'
+    | 'not-started'
+    | 'in-progress'
+    | 'ready'
+    | 'generating'
+    | 'completed'
+    | 'publishing'
+    | 'published'
+    | 'failed'
+  >('all');
   const [openColumnMenu, setOpenColumnMenu] = useState<WorksheetColumnKey | null>(null);
   const [columnLabels, setColumnLabels] = useState<Record<WorksheetColumnKey, string>>({
     topic: 'Prompt',
@@ -151,6 +164,25 @@ export default function Worksheet({
   });
   const [renameColumnKey, setRenameColumnKey] = useState<WorksheetColumnKey | null>(null);
   const [renameColumnValue, setRenameColumnValue] = useState('');
+  const [columnSettingsKey, setColumnSettingsKey] = useState<WorksheetColumnKey | null>(null);
+  const [promptSettings, setPromptSettings] = useState({
+    model: 'SearchEO.AI (Recommended)',
+    language: 'English (Widely used)',
+    imageOutputPerBlog: '1',
+    wordCountPerBlog: '500 - 800 words',
+    promptLogic: '',
+    userPromptTemplate: '',
+  });
+  const [keywordSettings, setKeywordSettings] = useState({
+    model: 'SearchEO.AI (Recommended)',
+    maxKeywordsPerCell: '5',
+    language: 'English (Widely used)',
+    keywordLogic: '',
+  });
+  const selectShellClass =
+    'relative rounded-md border border-[#c5ccd9] bg-white';
+  const selectClass =
+    'h-10 w-full appearance-none rounded-md bg-white px-3 pr-9 text-sm text-[#2f3d55] focus:outline-none focus:ring-2 focus:ring-[#8fa1bf]';
 
   // Modal state
   // Topic title is edited inline via <InlineEditable>; no modal state needed.
@@ -168,21 +200,29 @@ export default function Worksheet({
 
   /* ---------- Load ---------- */
 
-  const reload = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const fetched = await fetchCampaignTopics(campaignId);
-      setTopics(fetched);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load worksheet');
-    } finally {
-      setLoading(false);
-    }
-  }, [campaignId]);
+  const reload = useCallback(
+    async (options?: { silent?: boolean }) => {
+      const silent = Boolean(options?.silent);
+      if (!silent) {
+        setLoading(true);
+      }
+      setError(null);
+      try {
+        const fetched = await fetchCampaignTopics(campaignId);
+        setTopics(fetched);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load worksheet');
+      } finally {
+        if (!silent) {
+          setLoading(false);
+        }
+      }
+    },
+    [campaignId]
+  );
 
   useEffect(() => {
-    reload();
+    reload({ silent: false });
   }, [reload]);
 
   useEffect(() => {
@@ -236,43 +276,64 @@ export default function Worksheet({
     }
     importSignatureRef.current = signature;
 
-    const importedIds = new Set(topics.map((topic) => topic.id));
-
     const runImport = async () => {
-      let latestTopics = topics;
+      setLoading(true);
+      setError(null);
+      setNotice('Adding selected prompts and keywords to worksheet...');
+      try {
+        const rows = [...payload!.selectedRows].reverse();
+        const failures: string[] = [];
+        let finalTopicsSnapshot: WorksheetTopic[] | null = null;
 
-      for (const row of [...payload!.selectedRows].reverse()) {
-        const seedTerm = row.primaryKeyword?.trim();
-        const seedKeywords = seedTerm
-          ? [
-              {
-                term: seedTerm,
-                isPrimary: true,
-                intent: row.primaryIntent?.trim() || null,
-              },
-            ]
-          : undefined;
-        latestTopics = await createTopic(campaignId, {
-          title: row.prompt?.trim() || 'Untitled prompt',
-          keywords: seedKeywords,
-          source: seedKeywords ? 'AI' : 'MANUAL',
-        });
+        const settled = await Promise.allSettled(
+          rows.map(async (row) => {
+            const seedTerm = row.primaryKeyword?.trim();
+            const seedKeywords = seedTerm
+              ? [
+                  {
+                    term: seedTerm,
+                    isPrimary: true,
+                    intent: row.primaryIntent?.trim() || null,
+                  },
+                ]
+              : undefined;
+            const nextTopics = await createTopic(campaignId, {
+              title: row.prompt?.trim() || 'Untitled prompt',
+              keywords: seedKeywords,
+              source: seedKeywords ? 'AI' : 'MANUAL',
+            });
+            if (
+              !finalTopicsSnapshot ||
+              nextTopics.length >= finalTopicsSnapshot.length
+            ) {
+              finalTopicsSnapshot = nextTopics;
+            }
+          })
+        );
 
-        const createdTopic =
-          latestTopics.find((topic) => !importedIds.has(topic.id)) ??
-          latestTopics[latestTopics.length - 1];
-
-        if (createdTopic) {
-          importedIds.add(createdTopic.id);
-          setTopics((current) => [
-            createdTopic,
-            ...current.filter((topic) => topic.id !== createdTopic.id),
-          ]);
+        for (const result of settled) {
+          if (result.status === 'rejected') {
+            failures.push(
+              result.reason instanceof Error ? result.reason.message : 'Unknown import error'
+            );
+          }
         }
-      }
 
-      sessionStorage.removeItem(PENDING_WORKSHEET_IMPORT_KEY);
-      setNotice(`${payload!.selectedRows.length} row${payload!.selectedRows.length === 1 ? '' : 's'} added to the worksheet.`);
+        // Apply all imported rows together to avoid one-by-one rendering.
+        if (finalTopicsSnapshot) {
+          setTopics(finalTopicsSnapshot);
+        } else {
+          const fallbackTopics = await fetchCampaignTopics(campaignId);
+          setTopics(fallbackTopics);
+        }
+        sessionStorage.removeItem(PENDING_WORKSHEET_IMPORT_KEY);
+        if (failures.length > 0) {
+          setError(`Imported with ${failures.length} failure${failures.length === 1 ? '' : 's'}.`);
+        }
+        setNotice(`${payload!.selectedRows.length} row${payload!.selectedRows.length === 1 ? '' : 's'} added to the worksheet.`);
+      } finally {
+        setLoading(false);
+      }
     };
 
     void runImport().catch((err) => {
@@ -339,7 +400,7 @@ export default function Worksheet({
       // Terminal states need a structure refetch so the row reflects the
       // newly persisted draft (latestDraft / publishStatus / draftId).
       if (job.status === 'completed' || job.status === 'failed') {
-        reload();
+        reload({ silent: true });
       }
     };
 
@@ -349,7 +410,7 @@ export default function Worksheet({
         if (!alive) return;
         // Events during the disconnect window are unrecoverable from SSE;
         // refetch the structure so per-topic `job` snapshots converge.
-        reload();
+        reload({ silent: true });
       },
       onError: (err) => {
         if (process.env.NODE_ENV !== 'production') {
@@ -399,7 +460,7 @@ export default function Worksheet({
     });
 
     if (needsReload) {
-      reload();
+      reload({ silent: true });
     }
   }, [topics, sharedPublishStatuses, reload]);
 
@@ -413,6 +474,34 @@ export default function Worksheet({
       return t.keywords.some((k) => k.term.toLowerCase().includes(query));
     });
   }, [topics, search]);
+
+  const filteredAndSortedTopics = useMemo(() => {
+    const withStatus = filteredTopics.filter((topic) => {
+      if (statusFilter === 'all') return true;
+      const liveSnapshot = topic.draftId
+        ? sharedPublishStatuses?.get(topic.draftId)
+        : undefined;
+      const liveStatus = liveSnapshot?.status;
+      const isPublishing =
+        optimisticPublishingTopicIds.has(topic.id) || liveStatus === 'generating';
+      const state = resolveRowState(topic, {
+        isPublishing,
+        livePublishStatus: liveStatus,
+        livePublishedUrl: liveSnapshot?.publishedUrl,
+      });
+      return state.kind === statusFilter;
+    });
+
+    return [...withStatus].sort((a, b) =>
+      sortOrder === 'latest' ? b.id - a.id : a.id - b.id
+    );
+  }, [
+    filteredTopics,
+    statusFilter,
+    sortOrder,
+    sharedPublishStatuses,
+    optimisticPublishingTopicIds,
+  ]);
 
   /* ---------- Selection + eligibility ---------- */
   //
@@ -433,7 +522,7 @@ export default function Worksheet({
       number,
       { canGenerate: boolean; canPublish: boolean; topic: WorksheetTopic }
     >();
-    for (const topic of filteredTopics) {
+    for (const topic of filteredAndSortedTopics) {
       const liveSnapshot = topic.draftId
         ? sharedPublishStatuses?.get(topic.draftId)
         : undefined;
@@ -456,7 +545,7 @@ export default function Worksheet({
       });
     }
     return map;
-  }, [filteredTopics, sharedPublishStatuses, optimisticPublishingTopicIds]);
+  }, [filteredAndSortedTopics, sharedPublishStatuses, optimisticPublishingTopicIds]);
 
   /** All selected topic ids that are currently visible (after filtering)
    *  AND still exist in the topics list. */
@@ -485,8 +574,8 @@ export default function Worksheet({
   // Header checkbox: indeterminate when SOME (but not all) filtered rows
   // are selected; checked when all are.
   const allFilteredIds = useMemo(
-    () => filteredTopics.map((t) => t.id),
-    [filteredTopics],
+    () => filteredAndSortedTopics.map((t) => t.id),
+    [filteredAndSortedTopics],
   );
   const headerCheckboxState: 'checked' | 'unchecked' | 'indeterminate' = useMemo(() => {
     if (allFilteredIds.length === 0) return 'unchecked';
@@ -657,7 +746,7 @@ export default function Worksheet({
     }
     // Force a structure refetch so the rows reflect the new published state
     // even if some SSE events were missed.
-    reload();
+    reload({ silent: true });
   }, [publishCandidates, reload, waitForPublishTerminal]);
 
   /**
@@ -724,7 +813,7 @@ export default function Worksheet({
           `Generated ${queue.length - errors.length} of ${queue.length}; ${errors.length} failed.`,
         );
       }
-      reload();
+      reload({ silent: true });
     },
     [reload, waitForGenerationTerminal],
   );
@@ -962,6 +1051,14 @@ export default function Worksheet({
     setOpenColumnMenu(null);
   };
 
+  const handleOpenColumnSettings = (columnKey: WorksheetColumnKey) => {
+    setOpenColumnMenu(null);
+    if (columnKey === 'topic' || columnKey === 'keywords') {
+      setColumnSettingsKey(columnKey);
+      return;
+    }
+  };
+
   /* ---------- Render ---------- */
 
   return (
@@ -988,12 +1085,52 @@ export default function Worksheet({
             </div>
 
             <div className="flex items-center gap-3">
-              <button type="button" title="Filter" aria-label="Filter" className="inline-flex items-center gap-2 text-[#4a5568] text-sm font-medium">
+              <div className="inline-flex items-center gap-2 rounded-md border border-[#bfc6d2] px-2.5 h-9 bg-white text-[#4a5568] text-sm">
                 <Filter className="h-4 w-4" />
-              </button>
-              <button type="button" title="Sort" aria-label="Sort" className="inline-flex items-center gap-2 text-[#4a5568] text-sm font-medium">
+                <select
+                  value={statusFilter}
+                  onChange={(e) =>
+                    setStatusFilter(
+                      e.target.value as
+                        | 'all'
+                        | 'not-started'
+                        | 'in-progress'
+                        | 'ready'
+                        | 'generating'
+                        | 'completed'
+                        | 'publishing'
+                        | 'published'
+                        | 'failed'
+                    )
+                  }
+                  className="bg-transparent text-sm focus:outline-none"
+                  aria-label="Filter by status"
+                  title="Filter by status"
+                >
+                  <option value="all">All Status</option>
+                  <option value="not-started">Not Started</option>
+                  <option value="in-progress">In Progress</option>
+                  <option value="ready">Ready</option>
+                  <option value="generating">Generating</option>
+                  <option value="completed">Completed</option>
+                  <option value="publishing">Publishing</option>
+                  <option value="published">Published</option>
+                  <option value="failed">Failed</option>
+                </select>
+              </div>
+              <div className="inline-flex items-center gap-2 rounded-md border border-[#bfc6d2] px-2.5 h-9 bg-white text-[#4a5568] text-sm">
                 <ArrowUpDown className="h-4 w-4" />
-              </button>
+                <select
+                  value={sortOrder}
+                  onChange={(e) => setSortOrder(e.target.value as 'latest' | 'oldest')}
+                  className="bg-transparent text-sm focus:outline-none"
+                  aria-label="Sort by time"
+                  title="Sort by time"
+                >
+                  <option value="latest">Latest First</option>
+                  <option value="oldest">Oldest First</option>
+                </select>
+              </div>
               <button
                 type="button"
                 onClick={handleAiSuggestNewTopic}
@@ -1199,6 +1336,15 @@ export default function Worksheet({
                         </div>
                         {openColumnMenu === k && (
                           <div className="absolute right-2 top-10 z-20 w-40 rounded-md border border-gray-200 bg-white shadow-lg">
+                            {(k === 'topic' || k === 'keywords') && (
+                              <button
+                                type="button"
+                                onClick={() => handleOpenColumnSettings(k)}
+                                className="block w-full px-3 py-2 text-left text-xs hover:bg-gray-50"
+                              >
+                                Column settings
+                              </button>
+                            )}
                             <button type="button" onClick={() => handleOpenRenameColumn(k)} className="block w-full px-3 py-2 text-left text-xs hover:bg-gray-50">Rename</button>
                             <button type="button" onClick={() => handleHideColumn(k)} className="block w-full px-3 py-2 text-left text-xs text-red-600 hover:bg-gray-50">Hide column</button>
                           </div>
@@ -1208,14 +1354,24 @@ export default function Worksheet({
                 </tr>
               </thead>
               <tbody>
-                {!loading && filteredTopics.length === 0 && (
+                {loading && (
+                  <tr>
+                    <td colSpan={6} className="p-10 text-center text-sm text-gray-500">
+                      <div className="inline-flex items-center gap-2">
+                        <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
+                        <span>Adding selected prompts and keywords...</span>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+                {!loading && filteredAndSortedTopics.length === 0 && (
                   <tr>
                     <td colSpan={6} className="p-10 text-center text-sm text-gray-500">
                       No prompts yet. Click <span className="font-medium">+ Add Row</span> below or <span className="font-medium">AI Suggest Prompt</span> above to get started.
                     </td>
                   </tr>
                 )}
-                {filteredTopics.map((topic, idx) => {
+                {!loading && filteredAndSortedTopics.map((topic, idx) => {
                   const liveSnapshot = topic.draftId
                     ? sharedPublishStatuses?.get(topic.draftId)
                     : undefined;
@@ -1254,8 +1410,8 @@ export default function Worksheet({
                               onCommit={(next) =>
                                 withBusy(topic.id, () => updateTopicTitle(topic.id, next))
                               }
-                              className="block text-left text-[15px] leading-[1.3] text-[#2b3548] hover:text-[#1e2f4f] cursor-text whitespace-pre-wrap break-words rounded-sm focus:outline-none focus:ring-2 focus:ring-[#9cb0d9]"
-                              inputClassName="w-full rounded-md border border-[#9cb0d9] bg-white px-2 py-1 text-[15px] leading-[1.3] text-[#2b3548] focus:outline-none focus:ring-2 focus:ring-[#4E76C7]"
+                              className="block text-left text-[14px] font-normal  leading-[150%] tracking-[0px] text-[#2b3548] hover:text-[#1e2f4f] cursor-text whitespace-pre-wrap break-words rounded-sm focus:outline-none focus:ring-2 focus:ring-[#9cb0d9]"
+                              inputClassName="w-full rounded-md border border-[#9cb0d9] bg-white px-2 py-1 text-[14px] font-normal italic leading-[150%] tracking-[0px] text-[#2b3548] focus:outline-none focus:ring-2 focus:ring-[#4E76C7]"
                             >
                               {(display) =>
                                 topic.title ? (
@@ -1265,7 +1421,7 @@ export default function Worksheet({
                                 )
                               }
                             </InlineEditable>
-                            <button
+                            {/* <button
                               type="button"
                               onClick={() => handleAiSuggestTopicForRow(topic)}
                               disabled={aiSuggestingTopicForRow === topic.id}
@@ -1277,7 +1433,7 @@ export default function Worksheet({
                                 <Sparkles className="h-3 w-3" />
                               )}
                               AI Suggest
-                            </button>
+                            </button> */}
                           </div>
                         </td>
                       )}
@@ -1574,6 +1730,251 @@ export default function Worksheet({
         </Modal>
       )}
 
+      {columnSettingsKey === 'topic' && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setColumnSettingsKey(null)} />
+          <div className="relative mx-4 w-full max-w-4xl rounded-xl border border-[#d9dde4] bg-[#f7f7f8] p-6 shadow-2xl">
+            <button
+              type="button"
+              onClick={() => setColumnSettingsKey(null)}
+              className="absolute right-4 top-4 text-[#8b93a3] hover:text-[#4f586b]"
+              aria-label="Close settings"
+            >
+              <X className="h-4 w-4" />
+            </button>
+            <h3 className="text-[30px] font-medium text-[#2f3d55]">Content Settings</h3>
+            <p className="mt-1 text-xs text-[#7f8794]">
+              To upload it directly to your website, please connect your WordPress account. Once connected,
+              we&apos;ll be able to publish your content with the correct formatting, and SEO settings.
+              You remain in full control of what goes live.
+            </p>
+
+            <div className="mt-4 space-y-3 text-sm text-[#465066]">
+              <div>
+                <label className="mb-1 block text-xs font-medium">Column Name</label>
+                <input
+                  value="Prompts"
+                  readOnly
+                  className="h-10 w-full rounded-md border border-[#c5ccd9] bg-[#f2f4f8] px-3 text-sm text-[#677184]"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-medium">Select Model</label>
+                <div className={selectShellClass}>
+                  <select
+                    value={promptSettings.model}
+                    onChange={(e) => setPromptSettings((prev) => ({ ...prev, model: e.target.value }))}
+                    className={selectClass}
+                  >
+                    <option>SearchEO.AI (Recommended)</option>
+                    <option>GPT-4.1</option>
+                    <option>Claude 3.7 Sonnet</option>
+                    <option>Gemini 2.5 Pro</option>
+                  </select>
+                  <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#7f8794]" />
+                </div>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-medium">Select Content Language *</label>
+                <div className={selectShellClass}>
+                  <select
+                    value={promptSettings.language}
+                    onChange={(e) => setPromptSettings((prev) => ({ ...prev, language: e.target.value }))}
+                    className={selectClass}
+                  >
+                    <option>English (Widely used)</option>
+                    <option>Hindi</option>
+                    <option>Spanish</option>
+                    <option>French</option>
+                    <option>German</option>
+                  </select>
+                  <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#7f8794]" />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                <div>
+                  <label className="mb-1 block text-xs font-medium">Image Output per blog</label>
+                  <div className={selectShellClass}>
+                    <select
+                      value={promptSettings.imageOutputPerBlog}
+                      onChange={(e) => setPromptSettings((prev) => ({ ...prev, imageOutputPerBlog: e.target.value }))}
+                      className={selectClass}
+                    >
+                      {Array.from({ length: 10 }, (_, idx) => String(idx + 1)).map((count) => (
+                        <option key={count} value={count}>
+                          {count}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#7f8794]" />
+                  </div>
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium">Word count per blog</label>
+                  <div className={selectShellClass}>
+                    <select
+                      value={promptSettings.wordCountPerBlog}
+                      onChange={(e) => setPromptSettings((prev) => ({ ...prev, wordCountPerBlog: e.target.value }))}
+                      className={selectClass}
+                    >
+                      <option>300 - 500 words</option>
+                      <option>500 - 800 words</option>
+                      <option>800 - 1200 words</option>
+                      <option>1200 - 1800 words</option>
+                      <option>1800 - 2500 words</option>
+                    </select>
+                    <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#7f8794]" />
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-medium">Set Prompt Logic *</label>
+                <textarea
+                  value={promptSettings.promptLogic}
+                  onChange={(e) => setPromptSettings((prev) => ({ ...prev, promptLogic: e.target.value }))}
+                  placeholder={
+                    'You are an SEO & GEO expert and content strategist. Generate compelling, optimized article prompts based on the provided context.\n\nRequirements:\n1. The prompt should be valuable to readers\n2. Include keywords naturally\n3. Keep it concise and focused\n4. Make it specific and actionable\n5. Consider the company context and knowledge base information'
+                  }
+                  className="min-h-[170px] w-full rounded-md border border-[#c5ccd9] bg-white px-3 py-2 text-xs leading-5 text-[#2f3d55] placeholder:text-[#a5adba]"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-medium">User Prompt Template *</label>
+                <textarea
+                  value={promptSettings.userPromptTemplate}
+                  onChange={(e) => setPromptSettings((prev) => ({ ...prev, userPromptTemplate: e.target.value }))}
+                  placeholder="Generate one SEO-optimized article prompt for this keyword {keyword} and campaign info {campaign_context} that appeals to the target audience and ranks well in search engines."
+                  className="min-h-[80px] w-full rounded-md border border-[#c5ccd9] bg-white px-3 py-2 text-xs leading-5 text-[#2f3d55] placeholder:text-[#a5adba]"
+                />
+              </div>
+            </div>
+
+            <div className="mt-6 flex justify-center">
+              <button
+                type="button"
+                onClick={() => setColumnSettingsKey(null)}
+                className="rounded-md bg-[#2d4059] px-6 py-2 text-sm font-medium text-white hover:bg-[#27384e]"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {columnSettingsKey === 'keywords' && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setColumnSettingsKey(null)} />
+          <div className="relative mx-4 w-full max-w-4xl rounded-xl border border-[#d9dde4] bg-[#f7f7f8] p-6 shadow-2xl">
+            <button
+              type="button"
+              onClick={() => setColumnSettingsKey(null)}
+              className="absolute right-4 top-4 text-[#8b93a3] hover:text-[#4f586b]"
+              aria-label="Close settings"
+            >
+              <X className="h-4 w-4" />
+            </button>
+            <h3 className="text-[30px] font-medium text-[#2f3d55]">Keywords Settings</h3>
+            <p className="mt-1 text-xs text-[#7f8794]">
+              To upload it directly to your website, please connect your WordPress account. Once connected,
+              we&apos;ll be able to publish your content with the correct formatting, and SEO settings.
+              You remain in full control of what goes live.
+            </p>
+
+            <div className="mt-4 space-y-3 text-sm text-[#465066]">
+              <div>
+                <label className="mb-1 block text-xs font-medium">Column Name</label>
+                <input
+                  value="Keywords"
+                  readOnly
+                  className="h-10 w-full rounded-md border border-[#c5ccd9] bg-[#f2f4f8] px-3 text-sm text-[#677184]"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-medium">Select Model</label>
+                <div className={selectShellClass}>
+                  <select
+                    value={keywordSettings.model}
+                    onChange={(e) => setKeywordSettings((prev) => ({ ...prev, model: e.target.value }))}
+                    className={selectClass}
+                  >
+                    <option>SearchEO.AI (Recommended)</option>
+                    <option>GPT-4.1</option>
+                    <option>Claude 3.7 Sonnet</option>
+                    <option>Gemini 2.5 Pro</option>
+                  </select>
+                  <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#7f8794]" />
+                </div>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-medium">Max Keywords per cell *</label>
+                <div className={selectShellClass}>
+                  <select
+                    value={keywordSettings.maxKeywordsPerCell}
+                    onChange={(e) => setKeywordSettings((prev) => ({ ...prev, maxKeywordsPerCell: e.target.value }))}
+                    className={selectClass}
+                  >
+                    {Array.from({ length: 10 }, (_, idx) => String(idx + 1)).map((count) => (
+                      <option key={count} value={count}>
+                        {count}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#7f8794]" />
+                </div>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-medium">Select Content Language *</label>
+                <div className={selectShellClass}>
+                  <select
+                    value={keywordSettings.language}
+                    onChange={(e) => setKeywordSettings((prev) => ({ ...prev, language: e.target.value }))}
+                    className={selectClass}
+                  >
+                    <option>English (Widely used)</option>
+                    <option>Hindi</option>
+                    <option>Spanish</option>
+                    <option>French</option>
+                    <option>German</option>
+                  </select>
+                  <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#7f8794]" />
+                </div>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-medium">Set Keyword Logic *</label>
+                <textarea
+                  value={keywordSettings.keywordLogic}
+                  onChange={(e) => setKeywordSettings((prev) => ({ ...prev, keywordLogic: e.target.value }))}
+                  placeholder={
+                    'You are an SEO & GEO expert and content strategist. Generate compelling, optimized keywords based on the provided context.\n\nRequirements:\n1. Keywords should be relevant\n2. Include terms useful for content generation\n3. Prefer high-intent and semantically related keywords\n4. Avoid duplicates and vague terms'
+                  }
+                  className="min-h-[170px] w-full rounded-md border border-[#c5ccd9] bg-white px-3 py-2 text-xs leading-5 text-[#2f3d55] placeholder:text-[#a5adba]"
+                />
+              </div>
+            </div>
+
+            <div className="mt-6 flex justify-center">
+              <button
+                type="button"
+                onClick={() => setColumnSettingsKey(null)}
+                className="rounded-md bg-[#2d4059] px-6 py-2 text-sm font-medium text-white hover:bg-[#27384e]"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Delete row confirm modal */}
       {deleteRowId !== null && (
         <Modal title="Delete prompt" onClose={() => setDeleteRowId(null)}>
@@ -1729,14 +2130,14 @@ function KeywordChip({
   return (
     <span
       ref={chipRef}
-      className={`relative inline-flex items-center gap-2 rounded-md border px-3 py-1 text-[12px] font-medium transition-colors ${variantClass}`}
+      className={`relative inline-flex items-center gap-1 rounded-md border px-3 py-1 text-[12px] font-normal not-italic leading-[22.53px] tracking-[0px] transition-colors ${variantClass}`}
     >
       <InlineEditable
         value={keyword.term}
         onCommit={onRename}
         placeholder="keyword"
         className="cursor-text whitespace-nowrap focus:outline-none"
-        inputClassName={`min-w-[60px] max-w-[260px] rounded-sm bg-transparent text-[12px] font-medium focus:outline-none ${
+        inputClassName={`min-w-[60px] max-w-[260px] rounded-sm bg-transparent text-[12px] font-normal not-italic leading-[22.53px] tracking-[0px] focus:outline-none ${
           keyword.isPrimary ? 'placeholder:text-white/50' : 'placeholder:text-[#7d87a7]'
         }`}
       />
