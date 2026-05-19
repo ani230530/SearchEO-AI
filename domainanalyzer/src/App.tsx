@@ -25,6 +25,8 @@ const AIResultsPromptGaps = lazy(() => import("./pages/AIResultsPromptGaps"));
 const AIResultsCompetitors = lazy(() => import("./pages/AIResultsCompetitors"));
 const TrackPromptsPage = lazy(() => import("./pages/TrackPromptsPage"));
 const TrackKeywordsPage = lazy(() => import("./pages/TrackKeywordsPage"));
+const ResetPassword = lazy(() => import("./pages/ResetPassword"));
+const VerifyEmailPending = lazy(() => import("./pages/VerifyEmailPending"));
 
 // Tab-switching inside the AI Checker reuses cached query data for ~5 min
 // instead of refetching on every mount. gcTime=30min keeps results around
@@ -73,6 +75,12 @@ const App = () => (
               <Route path="/auth" element={<Auth />} />
               {/* /login is a shortcut for existing users; /auth handles the form. */}
               <Route path="/login" element={<Navigate to="/auth" replace />} />
+              <Route path="/auth/reset-password" element={<ResetPassword />} />
+              <Route path="/auth/verify-email-pending" element={
+                <ProtectedRoute requireVerified={false}>
+                  <VerifyEmailPending />
+                </ProtectedRoute>
+              } />
 
               {/* Protected routes */}
               <Route path="/dashboard" element={

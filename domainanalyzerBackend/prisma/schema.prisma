@@ -25,13 +25,28 @@ datasource db {
 model User {
   id                           Int       @id @default(autoincrement())
   email                        String    @unique
-  password                     String
+  // Nullable for Google-only accounts that never set a local password.
+  password                     String?
   name                         String?
-  refreshToken                 String?
-  refreshTokenExpiry           DateTime?
+  // Google "sub" / stable user id from OIDC. Set when the user signs in via
+  // Google OAuth; matches happen by googleId first, then fall back to email.
+  googleId                     String?   @unique
   emailVerified                Boolean   @default(false)
   emailVerificationToken       String?
   emailVerificationTokenExpiry DateTime?
+  // Forgot-password flow: SHA-256 hash of the raw token sent in the email
+  // (so a DB leak alone cannot mint reset tokens). Cleared on use.
+  passwordResetTokenHash       String?
+  passwordResetTokenExpiry     DateTime?
+  // Brute-force defenses for /api/auth/login.
+  loginFailureCount            Int       @default(0)
+  lockedUntil                  DateTime?
+  lastLoginAt                  DateTime?
+  passwordChangedAt            DateTime?
+  // Bumped on password change / reset / "log out everywhere" to invalidate
+  // every outstanding access token without a Redis blacklist. The JWT
+  // middleware compares this against the value baked into the token.
+  tokenVersion                 Int       @default(0)
   createdAt                    DateTime  @default(now())
   updatedAt                    DateTime  @updatedAt
 
@@ -53,12 +68,39 @@ model User {
   wordpressIntegration WordpressIntegration?
   publishLogs          WordpressPublishLog[]
   generationJobs       GenerationJob[]
+  refreshTokens        RefreshToken[]
   // Wizard sessions where this user signed up from an anonymous funnel.
   wizardSessionsLinked WizardSession[]                @relation("WizardSessionLinkedUser")
   // Wizard sessions where this user IS the anonymous shadow identity.
   // Shadow users have email = anon-{sessionId}@system.local and an
   // unusable password hash. They never log in via the normal auth path.
   wizardSessionsAnon   WizardSession[]                @relation("WizardSessionAnonUser")
+}
+
+// Opaque, rotating refresh tokens.
+//
+// Stored as SHA-256(token) so a DB leak alone cannot mint sessions. Every
+// successful refresh issues a new token (rotation) and revokes the
+// previous one (same familyId, parentId = previous.id). Presenting an
+// already-revoked token in the same family is treated as theft: the
+// entire family is revoked, forcing the legitimate user to re-login.
+model RefreshToken {
+  id        Int       @id @default(autoincrement())
+  userId    Int
+  tokenHash String    @unique
+  familyId  String
+  parentId  Int?
+  userAgent String?
+  ip        String?
+  expiresAt DateTime
+  revokedAt DateTime?
+  reusedAt  DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([familyId])
 }
 
 // -----------------------------------------------------------------------------

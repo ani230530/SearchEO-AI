@@ -1,7 +1,11 @@
-import React, { useEffect, useRef } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import React, { useEffect, useMemo, useRef } from 'react';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import Login from '@/components/auth/Login';
+
+interface FromLocation {
+  from?: { pathname?: string; search?: string; hash?: string };
+}
 
 /**
  * /auth - sign-in page for existing users. Signup is still handled by the
@@ -10,11 +14,33 @@ import Login from '@/components/auth/Login';
 const Auth: React.FC = () => {
   const { user, loading, exchangeGoogleCode } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const handledGoogleCodeRef = useRef<string | null>(null);
 
   const googleError = searchParams.get('google');
+  const googleReason = searchParams.get('reason');
+  const verifiedStatus = searchParams.get('verified');
+  const resetStatus = searchParams.get('reset');
   const isGoogleCallback = searchParams.has('googleCode');
+
+  // Where to send the user after login completes. ProtectedRoute populates
+  // `location.state.from` when a deep-link redirected here. Fall back to
+  // the older localStorage flag, then /dashboard.
+  const computeRedirect = useMemo(() => {
+    return (): string => {
+      const fromState = (location.state as FromLocation | null)?.from;
+      if (fromState?.pathname && fromState.pathname !== '/auth') {
+        return `${fromState.pathname}${fromState.search ?? ''}${fromState.hash ?? ''}`;
+      }
+      const stored = localStorage.getItem('postAuthRedirect');
+      if (stored) {
+        localStorage.removeItem('postAuthRedirect');
+        return stored;
+      }
+      return '/dashboard';
+    };
+  }, [location.state]);
 
   useEffect(() => {
     const code = searchParams.get('googleCode');
@@ -27,13 +53,7 @@ const Auth: React.FC = () => {
       try {
         await exchangeGoogleCode(code);
         if (cancelled) return;
-        const postAuthRedirect = localStorage.getItem('postAuthRedirect');
-        if (postAuthRedirect) {
-          localStorage.removeItem('postAuthRedirect');
-          navigate(postAuthRedirect, { replace: true });
-          return;
-        }
-        navigate('/dashboard', { replace: true });
+        navigate(computeRedirect(), { replace: true });
       } catch {
         if (cancelled) return;
         setSearchParams({ google: 'failed' }, { replace: true });
@@ -43,19 +63,34 @@ const Auth: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [exchangeGoogleCode, navigate, searchParams, setSearchParams]);
+  }, [exchangeGoogleCode, navigate, searchParams, setSearchParams, computeRedirect]);
 
   useEffect(() => {
-    if (user && !loading) {
-      const postAuthRedirect = localStorage.getItem('postAuthRedirect');
-      if (postAuthRedirect) {
-        localStorage.removeItem('postAuthRedirect');
-        navigate(postAuthRedirect);
-        return;
-      }
-      navigate('/dashboard');
+    if (user && !loading && !isGoogleCallback) {
+      navigate(computeRedirect(), { replace: true });
     }
-  }, [user, loading, navigate]);
+  }, [user, loading, navigate, computeRedirect, isGoogleCallback]);
+
+  // Short-lived banners — translation of the redirect query-string flags.
+  const statusBanner = useMemo(() => {
+    if (verifiedStatus === '1') return { kind: 'success' as const, text: 'Email verified. You can now sign in.' };
+    if (verifiedStatus === 'expired') return { kind: 'error' as const, text: 'Verification link has expired. Request a new one after signing in.' };
+    if (verifiedStatus === 'invalid') return { kind: 'error' as const, text: 'Verification link is invalid.' };
+    if (resetStatus === 'success') return { kind: 'success' as const, text: 'Password reset. Sign in with your new password.' };
+    return null;
+  }, [verifiedStatus, resetStatus]);
+
+  // Translate Google error reasons into something the user can act on.
+  const googleErrorText = useMemo(() => {
+    if (!googleError) return undefined;
+    if (googleReason === 'state_mismatch') {
+      return 'Sign-in could not be verified. Please try again from this device.';
+    }
+    if (googleReason === 'access_denied') {
+      return 'You cancelled the Google sign-in. Try again when you\'re ready.';
+    }
+    return 'Google sign-in failed. Please try again.';
+  }, [googleError, googleReason]);
 
   if (user) {
     return null;
@@ -125,16 +160,21 @@ const Auth: React.FC = () => {
             />
           </div>
 
-          <div className="flex min-h-[560px] items-stretch lg:min-h-[638px]">
+          <div className="flex min-h-[560px] flex-col items-stretch lg:min-h-[638px]">
+            {statusBanner && (
+              <div
+                className={`mx-6 mt-6 rounded-md px-3 py-2 text-sm ${
+                  statusBanner.kind === 'success'
+                    ? 'bg-emerald-50 text-emerald-700'
+                    : 'bg-amber-50 text-amber-800'
+                }`}
+              >
+                {statusBanner.text}
+              </div>
+            )}
             <Login
               onSwitchToRegister={() => navigate('/audit')}
-              externalError={
-                googleError === 'not_found'
-                  ? 'No account exists for that Google email. Start from the report signup flow to create one.'
-                  : googleError
-                    ? 'Google sign-in failed. Please try again.'
-                    : undefined
-              }
+              externalError={googleErrorText}
             />
           </div>
         </section>

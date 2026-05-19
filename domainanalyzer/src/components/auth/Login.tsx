@@ -24,7 +24,7 @@ interface LoginProps {
 }
 
 const Login: React.FC<LoginProps> = ({ onSwitchToRegister, onStepChange, externalError }) => {
-  const { login, startGoogleAuth } = useAuth();
+  const { login, startGoogleAuth, requestPasswordReset } = useAuth();
   const [step, setStep] = useState<LoginStep>('email');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -311,10 +311,18 @@ const Login: React.FC<LoginProps> = ({ onSwitchToRegister, onStepChange, externa
       setIsResetting(true);
       setErrorMessage(null);
 
-      window.setTimeout(() => {
-        showTemporarySuccess("Success! If your email exists in our system, you will receive a reset link shortly.");
+      try {
+        await requestPasswordReset(trimmedEmail);
+        showTemporarySuccess(
+          'Success! If your email exists in our system, you will receive a reset link shortly.',
+        );
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Could not send reset email';
+        setErrorMessage(message);
+        showErrorToast(message);
+      } finally {
         setIsResetting(false);
-      }, MOCK_DELAY_MS);
+      }
     };
 
     return (

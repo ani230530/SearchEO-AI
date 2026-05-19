@@ -35,6 +35,8 @@ export interface User {
   id: number;
   email: string;
   name?: string;
+  emailVerified?: boolean;
+  googleId?: string | null;
 }
 
 /**
@@ -62,6 +64,9 @@ export interface AuthContextType {
   logout: () => void;
   updateProfile: (name: string) => Promise<void>;
   changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
+  requestPasswordReset: (email: string) => Promise<void>;
+  resetPassword: (token: string, newPassword: string) => Promise<void>;
+  resendVerificationEmail: (email: string) => Promise<void>;
   loading: boolean;
   error: string | null;
 }
@@ -386,8 +391,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const logout = async () => {
     try {
-      // Call backend logout to invalidate refresh token
       const currentToken = tokenManager.getAuthToken();
+      const currentRefreshToken = tokenManager.getRefreshToken();
       if (currentToken) {
         try {
           await fetch(`${API_BASE_URL}/api/auth/logout`, {
@@ -396,9 +401,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
               'Content-Type': 'application/json',
               'Authorization': `Bearer ${currentToken}`,
             },
+            // Sending the refresh token scopes revocation to this device's
+            // token family. Without it the backend revokes all families
+            // (a "log out everywhere" — usually not what a single logout means).
+            body: JSON.stringify({ refreshToken: currentRefreshToken }),
           });
         } catch (error) {
-          // Ignore logout errors, still clear local state
           console.error('Logout API call failed:', error);
         }
       }
@@ -411,6 +419,44 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       if (refreshIntervalRef.current) {
         clearTimeout(refreshIntervalRef.current);
       }
+    }
+  };
+
+  const requestPasswordReset = async (email: string) => {
+    setError(null);
+    const response = await fetch(`${API_BASE_URL}/api/auth/forgot-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    });
+    const data = await readAuthResponse(response);
+    if (!response.ok) {
+      throw new Error(getAuthErrorMessage(data, 'Could not send reset email'));
+    }
+  };
+
+  const resetPassword = async (token: string, newPassword: string) => {
+    setError(null);
+    const response = await fetch(`${API_BASE_URL}/api/auth/reset-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token, newPassword }),
+    });
+    const data = await readAuthResponse(response);
+    if (!response.ok) {
+      throw new Error(getAuthErrorMessage(data, 'Could not reset password'));
+    }
+  };
+
+  const resendVerificationEmail = async (email: string) => {
+    const response = await fetch(`${API_BASE_URL}/api/auth/resend-verification`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    });
+    const data = await readAuthResponse(response);
+    if (!response.ok) {
+      throw new Error(getAuthErrorMessage(data, 'Could not resend verification email'));
     }
   };
 
@@ -455,6 +501,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     logout,
     updateProfile,
     changePassword,
+    requestPasswordReset,
+    resetPassword,
+    resendVerificationEmail,
     loading,
     error,
   };
