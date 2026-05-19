@@ -80,29 +80,22 @@ export class AuthService {
     }
 
     const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
-    const verificationToken = crypto.randomBytes(32).toString('hex');
-    const verificationTokenExpiry = new Date(Date.now() + VERIFY_TOKEN_TTL_MS);
 
+    // Email verification is temporarily disabled — accounts are auto-verified
+    // on signup. To re-enable: set `emailVerified: false`, generate +
+    // persist a token, and call `sendVerificationEmail()` (the
+    // verify-email / resend / pending-page surface is still wired and
+    // works the moment you flip these two lines back).
     const user = await prisma.user.create({
       data: {
         email: normalizedEmail,
         password: hashedPassword,
         name,
-        emailVerified: false,
-        emailVerificationToken: verificationToken,
-        emailVerificationTokenExpiry: verificationTokenExpiry,
+        emailVerified: true,
         passwordChangedAt: new Date(),
       },
       select: { id: true, email: true, name: true, emailVerified: true, tokenVersion: true },
     });
-
-    // Send verification email. Failures here don't block the signup —
-    // the user can request a resend from the verify-pending page.
-    try {
-      await this.sendVerificationEmail(user.email, verificationToken, user.name || undefined);
-    } catch (err) {
-      console.error('[authService.register] sendVerificationEmail failed', err);
-    }
 
     const accessToken = this.generateAccessToken(user.id, user.email, user.tokenVersion);
     const refreshToken = await this.issueRefreshToken(user.id, null, ctx);
