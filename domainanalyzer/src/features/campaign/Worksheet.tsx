@@ -46,6 +46,7 @@ import {
 import WorksheetGenerateDrawer from './WorksheetGenerateDrawer';
 import InlineEditable from './InlineEditable';
 import { RowStatus, RowAction } from './WorksheetRowState';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const PENDING_WORKSHEET_IMPORT_KEY = 'ai-results/pending-worksheet-import';
 
@@ -1354,16 +1355,49 @@ export default function Worksheet({
                 </tr>
               </thead>
               <tbody>
-                {loading && (
-                  <tr>
-                    <td colSpan={6} className="p-10 text-center text-sm text-gray-500">
-                      <div className="inline-flex items-center gap-2">
-                        <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
-                        <span>Adding selected prompts and keywords...</span>
-                      </div>
+                {loading && Array.from({ length: 5 }).map((_, idx) => (
+                  <tr
+                    key={`worksheet-skeleton-${idx}`}
+                    className={`min-h-[86px] border-b border-[#c8cfdb] ${idx % 2 ? 'bg-[#F2F6FF]' : 'bg-white'}`}
+                  >
+                    <td className="border-r border-[#c8cfdb] px-3 py-4 align-middle">
+                      <Skeleton className="h-3.5 w-3.5 rounded-sm" />
                     </td>
+                    {columnVisibility.topic && (
+                      <td className="border-r border-[#c8cfdb] px-4 py-4 align-middle">
+                        <div className="flex flex-col gap-2">
+                          <Skeleton className="h-4 w-3/4" />
+                          <Skeleton className="h-3 w-1/2" />
+                        </div>
+                      </td>
+                    )}
+                    {columnVisibility.keywords && (
+                      <td className="border-r border-[#c8cfdb] px-4 py-4 align-middle">
+                        <div className="flex flex-wrap gap-2">
+                          <Skeleton className="h-6 w-20 rounded-full" />
+                          <Skeleton className="h-6 w-24 rounded-full" />
+                          <Skeleton className="h-6 w-16 rounded-full" />
+                          <Skeleton className="h-6 w-20 rounded-full" />
+                        </div>
+                      </td>
+                    )}
+                    {columnVisibility.status && (
+                      <td className="border-r border-[#c8cfdb] px-4 py-4 align-middle">
+                        <Skeleton className="h-6 w-24 rounded-full" />
+                      </td>
+                    )}
+                    {columnVisibility.action && (
+                      <td className="border-r border-[#c8cfdb] px-4 py-4 align-middle">
+                        <Skeleton className="h-8 w-28 rounded-md" />
+                      </td>
+                    )}
+                    {columnVisibility.more && (
+                      <td className="border-l border-[#c8cfdb] px-4 py-4 align-middle">
+                        <Skeleton className="h-5 w-5 rounded-sm" />
+                      </td>
+                    )}
                   </tr>
-                )}
+                ))}
                 {!loading && filteredAndSortedTopics.length === 0 && (
                   <tr>
                     <td colSpan={6} className="p-10 text-center text-sm text-gray-500">
