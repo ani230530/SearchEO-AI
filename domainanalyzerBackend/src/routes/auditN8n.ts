@@ -96,7 +96,6 @@ router.post('/send', authenticateToken, async (req: Request, res: Response) => {
         // Get backend URL from environment or construct it
         const backendUrl = process.env.BACKEND_URL || `${req.protocol}://${req.get('host')}`;
         const callbackUrl = `${backendUrl}/api/audit/n8n/callback`;
-
         // Prepare the payload for n8n
         const n8nPayload = {
             name: name, // User provided name or formatted domain
@@ -164,30 +163,6 @@ router.post('/send', authenticateToken, async (req: Request, res: Response) => {
         });
 
         if (!n8nResponse.ok) {
-            // Update status to failed
-            await prisma.n8nRequest.update({
-                where: { id: n8nRequest.id },
-                data: {
-                    status: 'failed',
-                    responseData: {
-                        error: `N8n webhook returned ${n8nResponse.status}`,
-                        statusText: n8nResponse.statusText,
-                        body: responseData
-                    } as any
-                }
-            });
-
-            // Emit failure event
-            const { broadcastToUser } = await import('../services/sseService');
-            broadcastToUser(userId, {
-                type: 'n8n_update',
-                data: {
-                    requestId: n8nRequest.requestId,
-                    status: 'failed',
-                    error: `N8n webhook returned ${n8nResponse.status}`
-                }
-            });
-
             return res.status(500).json({
                 success: false,
                 error: 'Failed to send data to n8n webhook',
@@ -197,19 +172,44 @@ router.post('/send', authenticateToken, async (req: Request, res: Response) => {
             });
         }
 
-        // Update status to processing
+        const googleSheetsUrl =
+            (responseData as any)['Sheet URL'] ||
+            (responseData as any).sheetUrl ||
+            (responseData as any).googleSheetsUrl ||
+            null;
+
+        const googleSlidesUrl =
+            (responseData as any)['Presentation URL'] ||
+            (responseData as any).presentationUrl ||
+            (responseData as any).googleSlidesUrl ||
+            null;
+
+        const isCompleted = !!(googleSheetsUrl || googleSlidesUrl);
+
+        // Persist synchronous n8n output immediately when available
         await prisma.n8nRequest.update({
             where: { id: n8nRequest.id },
-            data: { status: 'processing' }
+            data: {
+                status: isCompleted ? 'completed' : 'processing',
+                responseData: {
+                    googleSheetsUrl,
+                    googleSlidesUrl,
+                    sheetUrl: googleSheetsUrl,
+                    reportUrl: googleSlidesUrl,
+                    raw: responseData,
+                } as any
+            }
         });
 
-        // Emit processing event
+        // Emit status event reflecting synchronous completion when URLs exist
         const { broadcastToUser } = await import('../services/sseService');
         broadcastToUser(userId, {
             type: 'n8n_update',
             data: {
                 requestId: n8nRequest.requestId,
-                status: 'processing'
+                status: isCompleted ? 'completed' : 'processing',
+                googleSheetsUrl,
+                googleSlidesUrl,
             }
         });
 
@@ -233,7 +233,10 @@ router.post('/send', authenticateToken, async (req: Request, res: Response) => {
 // POST /api/audit/n8n/callback - Receive callback from n8n
 router.post('/callback', async (req: Request, res: Response) => {
     try {
-        const body = (req.body || {}) as Record<string, any>;
+        const rawBody = req.body;
+        const body = (
+            Array.isArray(rawBody) ? (rawBody[0] || {}) : (rawBody || {})
+        ) as Record<string, any>;
         const id = body.id || body.requestId || body.request_id;
 
         const firstString = (...values: any[]): string | undefined => {
@@ -250,22 +253,42 @@ router.post('/callback', async (req: Request, res: Response) => {
             body.googleSheetUrl,
             body.sheetUrl,
             body.sheetsUrl,
+            body['Google Sheets URL'],
+            body['google sheets url'],
             body?.data?.googleSheetsUrl,
             body?.data?.google_sheets_url,
+            body?.data?.sheetUrl,
+            body?.data?.sheetsUrl,
             body?.results?.googleSheetsUrl,
-            body?.results?.google_sheets_url
+            body?.results?.google_sheets_url,
+            body?.results?.sheetUrl,
+            body?.results?.sheetsUrl
         );
         const googleSlidesUrl = firstString(
             body.googleSlidesUrl,
             body.google_slides_url,
             body.googleSlideUrl,
+            body.reportUrl,
+            body.report_url,
             body.slideUrl,
             body.slidesUrl,
+            body['Google Slides URL'],
+            body['google slides url'],
             body?.data?.googleSlidesUrl,
             body?.data?.google_slides_url,
+            body?.data?.reportUrl,
+            body?.data?.report_url,
+            body?.data?.slideUrl,
+            body?.data?.slidesUrl,
             body?.results?.googleSlidesUrl,
-            body?.results?.google_slides_url
+            body?.results?.google_slides_url,
+            body?.results?.reportUrl,
+            body?.results?.report_url,
+            body?.results?.slideUrl,
+            body?.results?.slidesUrl
         );
+        const reportUrl = googleSlidesUrl;
+        const sheetUrl = googleSheetsUrl;
         const callbackError = firstString(
             body.error,
             body.errorMessage,
@@ -318,6 +341,8 @@ router.post('/callback', async (req: Request, res: Response) => {
                 responseData: {
                     googleSheetsUrl,
                     googleSlidesUrl,
+                    sheetUrl,
+                    reportUrl,
                     ...otherData,
                     receivedAt: new Date().toISOString()
                 } as any
@@ -335,6 +360,8 @@ router.post('/callback', async (req: Request, res: Response) => {
                     status: newStatus,
                     googleSheetsUrl,
                     googleSlidesUrl,
+                    sheetUrl,
+                    reportUrl,
                     error: callbackError
                 }
             });
@@ -395,7 +422,13 @@ router.get('/status/:requestId', authenticateToken, async (req: Request, res: Re
         return res.json({
             success: true,
             status: n8nRequest.status,
-            data: n8nRequest.responseData || null,
+            data: {
+                ...((n8nRequest.responseData as Record<string, any>) || {}),
+                googleSheetsUrl: (n8nRequest.responseData as any)?.googleSheetsUrl || (n8nRequest.responseData as any)?.sheetUrl || null,
+                googleSlidesUrl: (n8nRequest.responseData as any)?.googleSlidesUrl || (n8nRequest.responseData as any)?.reportUrl || null,
+                sheetUrl: (n8nRequest.responseData as any)?.sheetUrl || (n8nRequest.responseData as any)?.googleSheetsUrl || null,
+                reportUrl: (n8nRequest.responseData as any)?.reportUrl || (n8nRequest.responseData as any)?.googleSlidesUrl || null,
+            },
             createdAt: n8nRequest.createdAt,
             updatedAt: n8nRequest.updatedAt
         });
@@ -446,7 +479,13 @@ router.get('/history', authenticateToken, async (req: Request, res: Response) =>
             status: req.status,
             createdAt: req.createdAt,
             payload: req.requestPayload,
-            results: req.responseData,
+            results: {
+                ...(req.responseData || {}),
+                googleSheetsUrl: req.responseData?.googleSheetsUrl || req.responseData?.sheetUrl || null,
+                googleSlidesUrl: req.responseData?.googleSlidesUrl || req.responseData?.reportUrl || null,
+                sheetUrl: req.responseData?.sheetUrl || req.responseData?.googleSheetsUrl || null,
+                reportUrl: req.responseData?.reportUrl || req.responseData?.googleSlidesUrl || null,
+            },
             domainUrl: req.auditResult?.domain?.url
         }));
 
