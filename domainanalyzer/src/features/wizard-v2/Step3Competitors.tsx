@@ -122,6 +122,13 @@ export function Step3Competitors({ domainId, initialSelected = [], onContinue, f
     );
   };
 
+  const selectedCount = competitors.filter((c) => c.selected).length;
+  const allSelected = competitors.length > 0 && selectedCount === competitors.length;
+
+  const toggleSelectAll = () => {
+    setCompetitors((prev) => prev.map((c) => ({ ...c, selected: !allSelected })));
+  };
+
   const handleAddCompetitor = () => {
     const trimmed = newCompetitor.trim();
     if (!trimmed) return;
@@ -175,6 +182,20 @@ export function Step3Competitors({ domainId, initialSelected = [], onContinue, f
               <p className="text-sm text-slate-500">
                 We couldn't surface any competitors automatically. Add a domain manually below to continue.
               </p>
+            )}
+            {!loading && competitors.length > 0 && (
+              <div className="flex items-center justify-between px-1 pb-1">
+                <span className="text-xs text-slate-500">
+                  {selectedCount} of {competitors.length} selected
+                </span>
+                <button
+                  type="button"
+                  onClick={toggleSelectAll}
+                  className="text-xs font-medium text-blue-600 hover:text-blue-700 hover:underline"
+                >
+                  {allSelected ? "Deselect all" : "Select all"}
+                </button>
+              </div>
             )}
             {!loading &&
               competitors.map((competitor) => (
