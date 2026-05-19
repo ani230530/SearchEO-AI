@@ -2441,8 +2441,13 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
   }, [newImageUrl, newImageAlt, publishResult, isEditMode, currentHtmlContent, handleHtmlEditorChange, toast]);
 
   const handleDeviceImageSelect = useCallback(
-    (event: React.ChangeEvent<HTMLInputElement>) => {
+    async (event: React.ChangeEvent<HTMLInputElement>) => {
       const file = event.target.files?.[0];
+      // Reset the input early so the same file can be re-selected after a failure.
+      const resetInput = () => {
+        event.target.value = '';
+      };
+
       if (!file) {
         return;
       }
@@ -2453,31 +2458,71 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
           description: 'Please choose an image file.',
           variant: 'destructive',
         });
-        event.target.value = '';
+        resetInput();
+        return;
+      }
+
+      // 15MB hard cap mirrors the backend limit. Reject early so the user
+      // doesn't sit through a slow base64 round-trip just to get a 413.
+      if (file.size > 15 * 1024 * 1024) {
+        toast({
+          title: 'Image Too Large',
+          description: 'Please choose an image under 15MB.',
+          variant: 'destructive',
+        });
+        resetInput();
         return;
       }
 
       if (!publishResult) {
-        event.target.value = '';
+        resetInput();
         return;
       }
 
-      const reader = new FileReader();
-      reader.onload = () => {
-        const imageSrc = typeof reader.result === 'string' ? reader.result : '';
-        if (!imageSrc) {
-          toast({
-            title: 'Image Upload Failed',
-            description: 'We could not read that image from your device.',
-            variant: 'destructive',
-          });
-          return;
+      // Read file as base64 data URL — we send this to the backend which
+      // decodes and uploads to Cloudinary. We can't embed the data URL into
+      // the HTML directly: WordPress strips inline base64 <img> tags on
+      // publish, so the image would disappear from the published post even
+      // though it renders fine in the local preview.
+      const readAsDataUrl = (): Promise<string> =>
+        new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () =>
+            typeof reader.result === 'string'
+              ? resolve(reader.result)
+              : reject(new Error('Could not read image'));
+          reader.onerror = () => reject(new Error('Could not read image'));
+          reader.readAsDataURL(file);
+        });
+
+      toast({
+        title: 'Uploading Image',
+        description: 'Hold on while we host your image…',
+      });
+
+      try {
+        const dataUrl = await readAsDataUrl();
+        const response = await fetch(
+          `${import.meta.env.VITE_API_URL}/api/publish/upload-image`,
+          {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem('authToken')}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ imageData: dataUrl }),
+          }
+        );
+
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || !data?.success || !data?.url) {
+          throw new Error(data?.error || 'Image upload failed');
         }
 
-        const currentHtml = currentHtmlContent;
+        const hostedUrl: string = data.url;
         const fallbackAlt = file.name.replace(/\.[^.]+$/, '') || 'Article image';
-        const imgTag = `<img src="${imageSrc}" alt="${fallbackAlt}" />`;
-        const updatedHtml = currentHtml + '\n' + imgTag;
+        const imgTag = `<img src="${hostedUrl}" alt="${fallbackAlt}" />`;
+        const updatedHtml = currentHtmlContent + '\n' + imgTag;
 
         setEditedHtmlContent(updatedHtml);
         if (isEditMode) {
@@ -2488,18 +2533,15 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
           title: 'Image Added',
           description: 'The image has been added. Click Save to persist changes.',
         });
-      };
-
-      reader.onerror = () => {
+      } catch (error: any) {
         toast({
           title: 'Image Upload Failed',
-          description: 'We could not read that image from your device.',
+          description: error?.message || 'We could not upload that image.',
           variant: 'destructive',
         });
-      };
-
-      reader.readAsDataURL(file);
-      event.target.value = '';
+      } finally {
+        resetInput();
+      }
     },
     [currentHtmlContent, handleHtmlEditorChange, isEditMode, publishResult, toast]
   );

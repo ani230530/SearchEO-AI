@@ -44,6 +44,43 @@ export async function uploadScreenshot(buffer: Buffer): Promise<string> {
 }
 
 /**
+ * Upload an arbitrary image buffer to a named Cloudinary folder.
+ * Used for user-added draft images that need a real hosted URL (WordPress
+ * rejects inline base64 data URIs in post HTML).
+ */
+export async function uploadImage(
+  buffer: Buffer,
+  folder: string
+): Promise<{ secureUrl: string; publicId: string }> {
+  return new Promise((resolve, reject) => {
+    cloudinary.uploader
+      .upload_stream(
+        {
+          folder,
+          resource_type: 'image' as const,
+          transformation: [
+            { quality: 'auto:good' },
+            { fetch_format: 'auto' },
+          ],
+        },
+        (error, result) => {
+          if (error) {
+            console.error('Cloudinary upload error:', error);
+            reject(new Error(`Failed to upload image: ${error.message}`));
+            return;
+          }
+          if (!result || !result.secure_url) {
+            reject(new Error('Cloudinary upload succeeded but no URL returned'));
+            return;
+          }
+          resolve({ secureUrl: result.secure_url, publicId: result.public_id });
+        }
+      )
+      .end(buffer);
+  });
+}
+
+/**
  * Delete image from Cloudinary by URL
  * @param url - Cloudinary URL to delete
  */

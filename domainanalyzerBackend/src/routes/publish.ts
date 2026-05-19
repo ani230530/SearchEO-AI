@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import express from 'express';
 import axios from 'axios';
 import { PrismaClient } from '../../generated/prisma';
 import { authenticateToken, AuthenticatedRequest } from '../middleware/auth';
@@ -10,6 +11,7 @@ import {
   serializeDraftContent,
 } from '../services/contentFlowService';
 import { parseSiteUrlInput } from '../utils/domainValidation';
+import { uploadImage } from '../utils/cloudinary';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -311,6 +313,62 @@ router.post(
         success: false,
         error: reason,
         details: error?.response?.data,
+      });
+    }
+  })
+);
+
+// Accept up to 20MB so a user can attach a high-res photo. Route-scoped
+// body parser — the global express.json limit is 5MB, which is fine for
+// regular JSON but too tight for an inlined base64 image.
+const imageUploadJsonParser = express.json({ limit: '20mb' });
+
+const DATA_URL_REGEX = /^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/;
+
+router.post(
+  '/upload-image',
+  imageUploadJsonParser,
+  authenticateToken,
+  asyncHandler(async (req: Request, res: Response) => {
+    const { imageData } = req.body as { imageData?: string };
+
+    if (!imageData || typeof imageData !== 'string') {
+      return res.status(400).json({
+        success: false,
+        error: 'imageData (base64 data URL) is required',
+      });
+    }
+
+    const match = imageData.match(DATA_URL_REGEX);
+    if (!match) {
+      return res.status(400).json({
+        success: false,
+        error: 'imageData must be a base64 data URL (data:image/...;base64,...)',
+      });
+    }
+
+    const buffer = Buffer.from(match[2], 'base64');
+    if (buffer.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Decoded image is empty',
+      });
+    }
+    if (buffer.length > 15 * 1024 * 1024) {
+      return res.status(413).json({
+        success: false,
+        error: 'Image exceeds 15MB limit',
+      });
+    }
+
+    try {
+      const { secureUrl } = await uploadImage(buffer, 'draft-images');
+      return res.json({ success: true, url: secureUrl });
+    } catch (error: any) {
+      console.error('[publish] upload-image failed', error);
+      return res.status(502).json({
+        success: false,
+        error: error?.message || 'Failed to upload image',
       });
     }
   })
