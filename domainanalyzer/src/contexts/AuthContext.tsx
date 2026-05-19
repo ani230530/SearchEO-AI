@@ -57,6 +57,8 @@ export interface AuthContextType {
   token: string | null;
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string, name?: string) => Promise<RegisterResult>;
+  startGoogleAuth: (mode: 'login' | 'signup') => Promise<void>;
+  exchangeGoogleCode: (code: string) => Promise<RegisterResult>;
   logout: () => void;
   updateProfile: (name: string) => Promise<void>;
   changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
@@ -323,6 +325,65 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
+  const startGoogleAuth = async (mode: 'login' | 'signup') => {
+    setError(null);
+    setLoading(true);
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/auth/google/${mode}`, {
+        method: 'GET',
+        credentials: 'include',
+      });
+      const data = await readAuthResponse(response);
+
+      if (!response.ok || !data.authUrl) {
+        throw new Error(getAuthErrorMessage(data, 'Google sign-in failed'));
+      }
+
+      window.location.href = data.authUrl;
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Google sign-in failed';
+      setError(errorMessage);
+      setLoading(false);
+      throw error;
+    }
+  };
+
+  const exchangeGoogleCode = async (code: string): Promise<RegisterResult> => {
+    setError(null);
+    setLoading(true);
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/auth/google/exchange`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ code }),
+      });
+      const data = await readAuthResponse(response);
+
+      if (!response.ok) {
+        throw new Error(getAuthErrorMessage(data, 'Google sign-in failed'));
+      }
+      if (!data.user || !data.token) {
+        throw new Error('Google sign-in failed');
+      }
+
+      setUser(data.user);
+      setToken(data.token);
+      tokenManager.setTokens(data.token, data.refreshToken);
+      return { wizardLink: data.wizardLink ?? null };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Google sign-in failed';
+      setError(errorMessage);
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const logout = async () => {
     try {
       // Call backend logout to invalidate refresh token
@@ -389,6 +450,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     token,
     login,
     register,
+    startGoogleAuth,
+    exchangeGoogleCode,
     logout,
     updateProfile,
     changePassword,
