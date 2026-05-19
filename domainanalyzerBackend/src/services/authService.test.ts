@@ -36,11 +36,11 @@ const createUser = async (input: {
       email: input.email,
       password: hashedPassword,
       name: null,
-      refreshToken: null,
-      refreshTokenExpiry: null,
       emailVerified: input.emailVerified,
       emailVerificationToken: null,
       emailVerificationTokenExpiry: null,
+      tokenVersion: 0,
+      loginFailureCount: 0,
     },
   });
 };
@@ -69,10 +69,6 @@ describe('authService.login', () => {
     });
     expect(result.token).toBeTruthy();
     expect(result.refreshToken).toBeTruthy();
-
-    const updated = await state.prisma!.user.findUnique({ where: { id: user.id } });
-    expect(updated?.refreshToken).toBe(result.refreshToken);
-    expect(updated?.refreshTokenExpiry).toBeInstanceOf(Date);
   });
 
   it('logs in an unverified existing user with a valid password', async () => {
@@ -90,10 +86,6 @@ describe('authService.login', () => {
     expect(result.user?.id).toBe(user.id);
     expect(result.token).toBeTruthy();
     expect(result.refreshToken).toBeTruthy();
-
-    const updated = await state.prisma!.user.findUnique({ where: { id: user.id } });
-    expect(updated?.refreshToken).toBe(result.refreshToken);
-    expect(updated?.refreshTokenExpiry).toBeInstanceOf(Date);
   });
 
   it('rejects an existing user with a wrong password', async () => {

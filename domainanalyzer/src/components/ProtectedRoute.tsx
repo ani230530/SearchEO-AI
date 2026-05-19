@@ -6,6 +6,10 @@ import { tokenManager } from '@/services/apiClient';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
+  // Default true. Set false for routes that should render even when the
+  // signed-in user hasn't confirmed their email yet (the verify-pending
+  // page itself, primarily — otherwise the user would be ping-ponged).
+  requireVerified?: boolean;
 }
 
 /**
@@ -13,7 +17,7 @@ interface ProtectedRouteProps {
  * before rendering protected content. Verifies token validity and redirects
  * to login if authentication fails.
  */
-export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
+export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, requireVerified = true }) => {
   const { user, loading, token } = useAuth();
   const location = useLocation();
 
@@ -48,6 +52,12 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   if (!user || !token) {
     // Save the attempted location for redirect after login
     return <Navigate to="/auth" state={{ from: location }} replace />;
+  }
+
+  // Block protected feature pages until email is verified.
+  // The verify-pending route opts out by passing requireVerified={false}.
+  if (requireVerified && user.emailVerified === false) {
+    return <Navigate to="/auth/verify-email-pending" replace />;
   }
 
   // Check if token is expired

@@ -35,6 +35,8 @@ export interface User {
   id: number;
   email: string;
   name?: string;
+  emailVerified?: boolean;
+  googleId?: string | null;
 }
 
 /**
@@ -57,9 +59,14 @@ export interface AuthContextType {
   token: string | null;
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string, name?: string) => Promise<RegisterResult>;
+  startGoogleAuth: (mode: 'login' | 'signup') => Promise<void>;
+  exchangeGoogleCode: (code: string) => Promise<RegisterResult>;
   logout: () => void;
   updateProfile: (name: string) => Promise<void>;
   changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
+  requestPasswordReset: (email: string) => Promise<void>;
+  resetPassword: (token: string, newPassword: string) => Promise<void>;
+  resendVerificationEmail: (email: string) => Promise<void>;
   loading: boolean;
   error: string | null;
 }
@@ -323,10 +330,69 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
+  const startGoogleAuth = async (mode: 'login' | 'signup') => {
+    setError(null);
+    setLoading(true);
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/auth/google/${mode}`, {
+        method: 'GET',
+        credentials: 'include',
+      });
+      const data = await readAuthResponse(response);
+
+      if (!response.ok || !data.authUrl) {
+        throw new Error(getAuthErrorMessage(data, 'Google sign-in failed'));
+      }
+
+      window.location.href = data.authUrl;
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Google sign-in failed';
+      setError(errorMessage);
+      setLoading(false);
+      throw error;
+    }
+  };
+
+  const exchangeGoogleCode = async (code: string): Promise<RegisterResult> => {
+    setError(null);
+    setLoading(true);
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/auth/google/exchange`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ code }),
+      });
+      const data = await readAuthResponse(response);
+
+      if (!response.ok) {
+        throw new Error(getAuthErrorMessage(data, 'Google sign-in failed'));
+      }
+      if (!data.user || !data.token) {
+        throw new Error('Google sign-in failed');
+      }
+
+      setUser(data.user);
+      setToken(data.token);
+      tokenManager.setTokens(data.token, data.refreshToken);
+      return { wizardLink: data.wizardLink ?? null };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Google sign-in failed';
+      setError(errorMessage);
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const logout = async () => {
     try {
-      // Call backend logout to invalidate refresh token
       const currentToken = tokenManager.getAuthToken();
+      const currentRefreshToken = tokenManager.getRefreshToken();
       if (currentToken) {
         try {
           await fetch(`${API_BASE_URL}/api/auth/logout`, {
@@ -335,9 +401,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
               'Content-Type': 'application/json',
               'Authorization': `Bearer ${currentToken}`,
             },
+            // Sending the refresh token scopes revocation to this device's
+            // token family. Without it the backend revokes all families
+            // (a "log out everywhere" — usually not what a single logout means).
+            body: JSON.stringify({ refreshToken: currentRefreshToken }),
           });
         } catch (error) {
-          // Ignore logout errors, still clear local state
           console.error('Logout API call failed:', error);
         }
       }
@@ -350,6 +419,44 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       if (refreshIntervalRef.current) {
         clearTimeout(refreshIntervalRef.current);
       }
+    }
+  };
+
+  const requestPasswordReset = async (email: string) => {
+    setError(null);
+    const response = await fetch(`${API_BASE_URL}/api/auth/forgot-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    });
+    const data = await readAuthResponse(response);
+    if (!response.ok) {
+      throw new Error(getAuthErrorMessage(data, 'Could not send reset email'));
+    }
+  };
+
+  const resetPassword = async (token: string, newPassword: string) => {
+    setError(null);
+    const response = await fetch(`${API_BASE_URL}/api/auth/reset-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token, newPassword }),
+    });
+    const data = await readAuthResponse(response);
+    if (!response.ok) {
+      throw new Error(getAuthErrorMessage(data, 'Could not reset password'));
+    }
+  };
+
+  const resendVerificationEmail = async (email: string) => {
+    const response = await fetch(`${API_BASE_URL}/api/auth/resend-verification`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    });
+    const data = await readAuthResponse(response);
+    if (!response.ok) {
+      throw new Error(getAuthErrorMessage(data, 'Could not resend verification email'));
     }
   };
 
@@ -389,9 +496,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     token,
     login,
     register,
+    startGoogleAuth,
+    exchangeGoogleCode,
     logout,
     updateProfile,
     changePassword,
+    requestPasswordReset,
+    resetPassword,
+    resendVerificationEmail,
     loading,
     error,
   };

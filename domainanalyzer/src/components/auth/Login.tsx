@@ -20,10 +20,11 @@ type LoginStep = 'email' | 'password' | 'forgot-password';
 interface LoginProps {
   onSwitchToRegister: () => void;
   onStepChange?: (step: LoginStep) => void;
+  externalError?: string;
 }
 
-const Login: React.FC<LoginProps> = ({ onSwitchToRegister, onStepChange }) => {
-  const { login } = useAuth();
+const Login: React.FC<LoginProps> = ({ onSwitchToRegister, onStepChange, externalError }) => {
+  const { login, startGoogleAuth, requestPasswordReset } = useAuth();
   const [step, setStep] = useState<LoginStep>('email');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -57,6 +58,13 @@ const Login: React.FC<LoginProps> = ({ onSwitchToRegister, onStepChange }) => {
       }
     };
   }, []);
+
+  useEffect(() => {
+    if (!externalError) return;
+    setErrorMessage(externalError);
+    showErrorToast(externalError);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [externalError]);
 
   const showTemporarySuccess = (message: string) => {
     setSuccessMessage(message);
@@ -129,14 +137,21 @@ const Login: React.FC<LoginProps> = ({ onSwitchToRegister, onStepChange }) => {
   const handleGoogleLogin = () => {
     if (isBusy) return;
 
-    setIsGoogleLoading(true);
-    setErrorMessage(null);
-    setToastMessage(null);
-
-    window.setTimeout(() => {
-      showTemporarySuccess('Google login mocked successfully.');
-      setIsGoogleLoading(false);
-    }, MOCK_DELAY_MS);
+    const run = async () => {
+      setIsGoogleLoading(true);
+      setErrorMessage(null);
+      setToastMessage(null);
+      try {
+        await startGoogleAuth('login');
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Google sign-in failed';
+        setErrorMessage(message);
+        showErrorToast(message);
+      } finally {
+        setIsGoogleLoading(false);
+      }
+    };
+    run();
   };
 
   const handleBackToEmail = () => {
@@ -296,10 +311,18 @@ const Login: React.FC<LoginProps> = ({ onSwitchToRegister, onStepChange }) => {
       setIsResetting(true);
       setErrorMessage(null);
 
-      window.setTimeout(() => {
-        showTemporarySuccess("Success! If your email exists in our system, you will receive a reset link shortly.");
+      try {
+        await requestPasswordReset(trimmedEmail);
+        showTemporarySuccess(
+          'Success! If your email exists in our system, you will receive a reset link shortly.',
+        );
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Could not send reset email';
+        setErrorMessage(message);
+        showErrorToast(message);
+      } finally {
         setIsResetting(false);
-      }, MOCK_DELAY_MS);
+      }
     };
 
     return (

@@ -17,7 +17,7 @@
  *    never sees raw stack traces / status codes.
  */
 
-import { lazy, Suspense, useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { apiGet, apiPost } from "@/services/apiClient";
 import { useAuth } from "@/contexts/AuthContext";
@@ -94,7 +94,7 @@ function loadPersistedForm(): PersistedStep1 | null {
 export default function AICheckerV2() {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, exchangeGoogleCode } = useAuth();
   const [step, setStep] = useState<WizardStep>(1);
   const [domainId, setDomainId] = useState<number | null>(null);
   // Anonymous callers hit a signup wall when they try to start Step 5.
@@ -113,6 +113,7 @@ export default function AICheckerV2() {
   const [restoredCompetitors, setRestoredCompetitors] = useState<string[]>([]);
   const [loadingState, setLoadingState] = useState(false);
   const [globalError, setGlobalError] = useState<string | null>(null);
+  const handledGoogleCodeRef = useRef<string | null>(null);
 
   // Hydrate Step 1 form from sessionStorage on first mount. Resume from
   // ?domain=:id overrides this if it succeeds.
@@ -208,9 +209,9 @@ export default function AICheckerV2() {
 
         // Land at the explicit target if restart was used; else use canResumeAt.
         const target: WizardStep =
-          restart === 'crawl'  ? 2 :
-          restart === 'topics' ? 4 :
-          (res.canResumeAt ? (PHASE_TO_STEP[res.canResumeAt] ?? 1) : 1);
+          restart === 'crawl' ? 2 :
+            restart === 'topics' ? 4 :
+              (res.canResumeAt ? (PHASE_TO_STEP[res.canResumeAt] ?? 1) : 1);
         setStep(target);
       } catch (err) {
         const e = classifyError(err);
@@ -241,6 +242,9 @@ export default function AICheckerV2() {
       (prev) => {
         const next = new URLSearchParams(prev);
         if (id) next.set("domain", String(id));
+        next.delete("googleCode");
+        next.delete("googleMode");
+        next.delete("google");
         if (target > 1) {
           next.delete("fromSignup");
           next.delete("prefillHost");
@@ -252,6 +256,69 @@ export default function AICheckerV2() {
     setGlobalError(null);
     setStep(target);
   };
+
+  useEffect(() => {
+    const code = searchParams.get("googleCode");
+    const mode = searchParams.get("googleMode");
+    const error = searchParams.get("google");
+    if (error) {
+      setGlobalError(
+        error === "not_found"
+          ? "No account exists for that Google email."
+          : "Google sign up failed. Please try again."
+      );
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          next.delete("google");
+          return next;
+        },
+        { replace: true }
+      );
+      return;
+    }
+    if (!code || mode !== "signup") return;
+    if (handledGoogleCodeRef.current === code) return;
+    handledGoogleCodeRef.current = code;
+
+    let cancelled = false;
+    const run = async () => {
+      try {
+        const result = await exchangeGoogleCode(code);
+        if (cancelled) return;
+        const primaryDomainId = result.wizardLink?.primaryDomainId ?? domainId ?? undefined;
+        setSignupWallOpen(false);
+        setSearchParams(
+          (prev) => {
+            const next = new URLSearchParams(prev);
+            next.delete("googleCode");
+            next.delete("googleMode");
+            if (primaryDomainId) next.set("domain", String(primaryDomainId));
+            return next;
+          },
+          { replace: true }
+        );
+        advanceTo(5, primaryDomainId);
+      } catch {
+        if (cancelled) return;
+        setGlobalError("Google sign up failed. Please try again.");
+        setSearchParams(
+          (prev) => {
+            const next = new URLSearchParams(prev);
+            next.delete("googleCode");
+            next.delete("googleMode");
+            return next;
+          },
+          { replace: true }
+        );
+      }
+    };
+    run();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [advanceTo, domainId, exchangeGoogleCode, searchParams, setSearchParams]);
 
   // Step-internal back navigation. We skip Step 2 (auto-only crawl page —
   // there's nothing to "go back to" on it) and route Step 3's Back to

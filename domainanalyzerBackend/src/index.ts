@@ -1,6 +1,10 @@
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
+import cookieParser from 'cookie-parser';
 import 'dotenv/config';
+
+// Validate auth secrets at boot — refuse to start with default/missing values.
+import { authEnv } from './config/authEnv';
 
 import authRouter from './routes/auth';
 import googleSearchConsoleRouter, { handleOAuthCallback } from './routes/googleSearchConsole';
@@ -52,6 +56,7 @@ const corsOptions: cors.CorsOptions = {
 
 app.use(cors(corsOptions));
 app.use(express.json({ limit: '5mb' }));
+app.use(cookieParser());
 
 // Lightweight request logger (dev only) — surfaces 4xx/5xx so we don't have
 // to guess which endpoint a browser console error came from.
@@ -115,13 +120,8 @@ app.get('/api/sse', async (req: Request, res: Response) => {
   const token = req.query.token as string | undefined;
   if (!token) return res.status(401).json({ error: 'Missing auth token' });
   const jwt = await import('jsonwebtoken');
-  // Match the fallback in services/authService.ts so SSE works in dev when
-  // JWT_SECRET isn't set in .env. Without the fallback, jwt.verify(token,
-  // undefined) throws and SSE returns 401 even with a valid token signed
-  // by the auth service against the same default secret.
-  const SECRET = process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-in-production';
   try {
-    const decoded = jwt.verify(token, SECRET) as { userId: number };
+    const decoded = jwt.verify(token, authEnv.JWT_SECRET) as { userId: number };
     const userId = decoded.userId;
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
