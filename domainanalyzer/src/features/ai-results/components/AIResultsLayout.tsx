@@ -21,10 +21,13 @@ import {
   User,
 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/contexts/AuthContext";
 import { maskDomainId } from "@/lib/domainUtils";
+import { DashboardSidebar } from "@/features/sidebar-dashboard/components/DashboardSidebar";
+import { DASHBOARD_TABS } from "@/features/sidebar-dashboard/constants";
+import type { TabId } from "@/features/sidebar-dashboard/types";
 
 type AIResultsNavItemId =
   | "ai-results"
@@ -135,7 +138,9 @@ export function AIResultsLayout({
   const triggerLogo = logoUrlFor(triggerHost);
   const navigate = useNavigate();
   const resolvedMaskedDomainId = maskedDomainId ?? (currentDomainId ? maskDomainId(currentDomainId) : undefined);
-  const activeRailItem = "projects";
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [isSidebarHovered, setIsSidebarHovered] = useState(false);
+  const isSidebarExpanded = sidebarOpen || isSidebarHovered;
 
   const navigateToItem = (itemId: AIResultsNavItemId, nextMaskedId = resolvedMaskedDomainId) => {
     if (!nextMaskedId) return;
@@ -163,215 +168,58 @@ export function AIResultsLayout({
     navigate(`/dashboard?tab=analytics&domain=${nextMaskedId}`);
   };
 
-  const railSections = useMemo<RailSection[]>(() => {
-    return [
-      {
-        title: "",
-        items: [
-          {
-            id: "dashboard",
-            label: "Dashboard",
-            icon: LayoutDashboard,
-            onClick: () => navigate("/dashboard"),
-            isActive: activeRailItem === "dashboard",
-          },
-          {
-            id: "ai-visibility",
-            label: "AI Visibility",
-            icon: Sparkles,
-            onClick: () => navigate("/ai-visibility"),
-            isActive: activeRailItem === "ai-visibility",
-          },
-        ],
-      },
-      {
-        title: "Projects",
-        items: [
-          {
-            id: "all-projects",
-            label: "All Projects",
-            icon: Send,
-            onClick: () => navigate("/dashboard?tab=projects"),
-            isActive: activeRailItem === "projects",
-          },
-        ],
-      },
-      {
-        title: "Company Tools",
-        items: [
-          {
-            id: "domain-info",
-            label: "Domain Info",
-            icon: Globe,
-            onClick: () => navigate("/dashboard?tab=analytics"),
-          },
-          {
-            id: "website-audit",
-            label: "Website Audit",
-            icon: Globe2,
-            onClick: () => navigate("/dashboard?tab=audit"),
-          },
-          {
-            id: "domain-history",
-            label: "Domain History",
-            icon: History,
-            onClick: () => navigate("/dashboard?tab=domain-history"),
-          },
-          {
-            id: "competitor-analysis",
-            label: "Competitor analysis",
-            icon: ClipboardList,
-            onClick: () => navigate("/dashboard?tab=competitor-intelligence"),
-            isActive: location.pathname === "/airesults-competitors-preview",
-          },
-          {
-            id: "gsc-analytics",
-            label: "GSC Analytics",
-            icon: PieChart,
-            onClick: () => navigate("/dashboard?tab=gsc-analytics"),
-          },
-          {
-            id: "performance-reports",
-            label: "Performance Reports",
-            icon: BarChart3,
-            onClick: () => navigate("/dashboard?tab=analytics-report"),
-          },
-          {
-            id: "integration",
-            label: "Integration",
-            icon: Link,
-            onClick: () => navigate("/dashboard?tab=integration"),
-          },
-        ],
-      },
-      {
-        title: "Drive & Data",
-        items: [
-          {
-            id: "knowledge-base",
-            label: "Knowledge Base",
-            icon: Lightbulb,
-            onClick: () => navigate("/knowledge-base"),
-          },
-        ],
-      },
-      {
-        title: "Billing",
-        items: [
-          {
-            id: "pricing",
-            label: "Pricing",
-            icon: Tag,
-            onClick: () => navigate("/dashboard?tab=settings"),
-          },
-          {
-            id: "settings",
-            label: "Settings",
-            icon: Settings,
-            onClick: () => navigate("/dashboard?tab=settings"),
-          },
-        ],
-      },
-    ];
-  }, [activeRailItem, location.pathname, navigate]);
+  const dashboardSidebarTabs = useMemo(() => {
+    return DASHBOARD_TABS.map((tab) => ({
+      ...tab,
+      icon: <tab.icon className="h-5 w-5" />,
+    }));
+  }, []);
+
+  const handleSelectTab = (tabId: TabId) => {
+    if (tabId === "overview") {
+      navigate("/dashboard");
+    } else if (tabId === "ai-visibility") {
+      navigate("/ai-visibility");
+    } else if (tabId === "analytics") {
+      navigate("/dashboard?tab=analytics");
+    } else if (tabId === "integration") {
+      navigate("/dashboard?tab=integration");
+    } else {
+      navigate(`/dashboard?tab=${tabId}`);
+    }
+  };
 
   return (
     <div className="flex min-h-screen w-full flex-col bg-[#f5f5f7] text-slate-900 lg:flex-row">
-      {/* Collapsible icon rail. The outer <aside> reserves a fixed 72px slot
+      {/* Collapsible icon rail. The outer <aside> reserves a fixed 78px/280px slot
        *  so the rest of the layout never reflows. The inner panel is
-       *  absolutely positioned and widens on hover, so the expanded rail
-       *  overlays the next column instead of pushing it. */}
+       *  absolutely/fixed positioned and transitions width on hover. */}
       <aside 
-        className="group relative z-40 hidden min-h-[220px] w-[72px] shrink-0 basis-auto overflow-visible border-b border-slate-300 bg-transparent lg:sticky lg:top-0 lg:flex lg:h-screen lg:max-h-screen lg:border-b-0 lg:self-start"
-        style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Inter", "Helvetica Neue", Helvetica, Arial, sans-serif' }}
+        className="group relative z-40 hidden min-h-[220px] shrink-0 basis-auto overflow-visible border-b border-slate-300 bg-transparent lg:sticky lg:top-0 lg:flex lg:h-screen lg:max-h-screen lg:border-b-0 lg:self-start"
+        style={{
+          fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Inter", "Helvetica Neue", Helvetica, Arial, sans-serif',
+          width: sidebarOpen ? "280px" : "78px",
+          transition: "width 0.26s ease",
+        }}
       >
-        <div className="absolute inset-y-0 left-0 z-50 flex h-full w-[72px] flex-col overflow-hidden border-b border-slate-300 bg-[rgba(255,255,255,0.9)] px-0 py-0 shadow-sm transition-[width] duration-200 ease-out group-hover:w-[280px] group-hover:shadow-lg lg:border-b-0 lg:border-r border-[#d9dde3]">
-          <div className="flex h-full w-full flex-col overflow-hidden">
-            <div className="flex w-full items-center justify-center px-[14px] py-[18px] pb-2 group-hover:justify-start group-hover:px-[16px]">
-              <span className="hidden group-hover:block min-w-0 flex-1">
-                <h1 className="m-0 text-[28px] font-medium leading-none tracking-[-0.03em] text-[#141414]">
-                  SearchEO AI
-                </h1>
-              </span>
-              <span className="grid h-9 w-9 shrink-0 place-items-center group-hover:hidden">
-                {/* Collapsed icon for brand */}
-                <span className="font-bold text-xl text-[#141414]">S</span>
-              </span>
-              <ChevronRight className="hidden group-hover:block h-5 w-5 text-gray-500 shrink-0" />
-            </div>
-
-            <nav className="mt-2 flex flex-1 flex-col overflow-y-auto px-[6px] group-hover:px-[10px] pb-3">
-              {railSections.map((section) => (
-                <div key={section.title || "primary"} className="mb-[14px]">
-                  {section.title ? (
-                    <h2 className="hidden group-hover:block m-0 mb-[6px] px-[10px] text-[12px] font-medium leading-[1.3] tracking-[0.01em] text-[#7b828d] normal-case">
-                      {section.title}
-                    </h2>
-                  ) : null}
-
-                  <div className="space-y-[3px]">
-                    {section.items.map((item) => {
-                      const ItemIcon = item.icon;
-                      const isActive = Boolean(item.isActive);
-                      const isPremium = item.id === "ai-visibility";
-
-                      return (
-                        <button
-                          key={item.id}
-                          type="button"
-                          onClick={item.onClick}
-                          className={`flex w-full items-center gap-[10px] rounded-lg px-0 py-[10px] group-hover:px-[10px] group-hover:py-[9px] transition-colors justify-center group-hover:justify-start ${
-                            isActive
-                              ? "bg-[#2f4462] text-[#ffffff]"
-                              : "text-[#020202] hover:bg-[#e6e9ee]"
-                          }`}
-                          aria-label={item.ariaLabel ?? item.label}
-                          title={item.label}
-                        >
-                          <ItemIcon 
-                            className={`h-[20px] w-[20px] shrink-0 inline-flex transition-colors ${
-                              isActive ? "text-[#ffffff]" : isPremium ? "text-[#3f62ab]" : "text-[#6d7480]"
-                            }`} 
-                            strokeWidth={isPremium ? 2.4 : 2} 
-                          />
-                          <span 
-                            className={`hidden whitespace-nowrap text-[14px] group-hover:inline ${
-                              isActive
-                                ? "font-medium"
-                                : isPremium
-                                  ? "font-bold bg-gradient-to-r from-[#2D4059] to-[#4C74C2] bg-clip-text text-transparent"
-                                  : "font-medium"
-                            }`}
-                          >
-                            {item.label}
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              ))}
-            </nav>
-
-            <div className="mt-auto flex w-full flex-col pt-3 border-t border-[#d9dde3] px-[6px] group-hover:px-[10px] pb-3">
-              <button
-                type="button"
-                onClick={() => {
-                  logout();
-                  navigate("/auth");
-                }}
-                className="flex w-full items-center gap-[10px] rounded-lg px-0 py-[10px] group-hover:px-[10px] group-hover:py-[9px] transition-colors justify-center group-hover:justify-start text-[#b83030] hover:bg-[#e6e9ee]"
-                aria-label="Logout"
-                title="Logout"
-              >
-                <LogOut className="h-[20px] w-[20px] shrink-0 text-[#b83030] inline-flex" strokeWidth={2} />
-                <span className="hidden whitespace-nowrap text-[14px] font-medium text-[#b83030] group-hover:inline">
-                  Logout
-                </span>
-              </button>
-            </div>
-          </div>
-        </div>
+        <DashboardSidebar
+          activeCompanySubTab="company-info"
+          activeTab="ai-visibility"
+          isSidebarExpanded={isSidebarExpanded}
+          onHoverChange={setIsSidebarHovered}
+          onToggleSidebar={setSidebarOpen}
+          onLogout={() => {
+            logout();
+            navigate("/auth");
+          }}
+          onSelectCompanySubTab={() => {}}
+          onSelectCreateProject={() => navigate("/dashboard?tab=projects&create=true")}
+          onSelectTab={handleSelectTab}
+          showResults={true}
+          sidebarOpen={sidebarOpen}
+          tabs={dashboardSidebarTabs}
+          defaultCollapsedOnDesktop={true}
+        />
       </aside>
 
       <aside className="min-h-[220px] w-full shrink-0 basis-auto border-b border-slate-300 bg-white p-4 lg:sticky lg:top-0 lg:h-screen lg:max-h-screen lg:basis-[18%] lg:min-w-[260px] lg:max-w-[342px] lg:border-b-0 lg:border-r lg:self-start">

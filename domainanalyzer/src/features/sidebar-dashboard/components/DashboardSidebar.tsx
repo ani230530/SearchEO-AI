@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, useRef, type ReactNode } from "react";
 import {
   BarChart3,
   ChevronRight,
@@ -8,7 +8,6 @@ import {
   Lightbulb,
   Link,
   LogOut,
-  Menu,
   Send,
   Sparkles,
   Tag,
@@ -44,6 +43,7 @@ interface DashboardSidebarProps {
   showResults: boolean;
   sidebarOpen: boolean;
   tabs: DashboardSidebarTab[];
+  defaultCollapsedOnDesktop?: boolean;
 }
 
 type SidebarActionItem = {
@@ -73,11 +73,14 @@ export function DashboardSidebar({
   showResults: _showResults,
   sidebarOpen,
   tabs: _tabs,
+  defaultCollapsedOnDesktop = false,
 }: DashboardSidebarProps) {
   const [isCompactViewport, setIsCompactViewport] = useState(false);
   void _tabs;
   void _activeCompanySubTab;
   void _showResults;
+
+  const isFirstRender = useRef(true);
 
   useEffect(() => {
     const check = () => {
@@ -90,14 +93,19 @@ export function DashboardSidebar({
         return;
       }
 
+      if (isFirstRender.current) {
+        isFirstRender.current = false;
+        return;
+      }
+
       onHoverChange(false);
-      onToggleSidebar(true);
+      onToggleSidebar(!defaultCollapsedOnDesktop);
     };
 
     check();
     window.addEventListener("resize", check);
     return () => window.removeEventListener("resize", check);
-  }, [onHoverChange, onToggleSidebar]);
+  }, [onHoverChange, onToggleSidebar, defaultCollapsedOnDesktop]);
 
   const sidebarClass = isCompactViewport
     ? "sidebar closed compact"
@@ -247,7 +255,11 @@ export function DashboardSidebar({
 
   return (
     <TooltipProvider delayDuration={180}>
-      <aside className={sidebarClass}>
+      <aside 
+        className={sidebarClass}
+        onMouseEnter={() => onHoverChange(true)}
+        onMouseLeave={() => onHoverChange(false)}
+      >
         <div className="sidebar-header">
           <div className="sidebar-header-inner">
             {isSidebarExpanded ? (
@@ -255,7 +267,9 @@ export function DashboardSidebar({
                 <h1 className="sidebar-title">SearchEO AI</h1>
               </div>
             ) : (
-              <div className="sidebar-brand-spacer" aria-hidden="true" />
+              <div className="sidebar-brand flex items-center justify-center" style={{ width: "40px" }}>
+                <span className="font-bold text-xl text-[#141414]">S</span>
+              </div>
             )}
 
             {!isCompactViewport && (
@@ -273,7 +287,7 @@ export function DashboardSidebar({
                     {isSidebarExpanded ? (
                       <ChevronRight className="h-6 w-6" />
                     ) : (
-                      <Menu className="h-6 w-6" />
+                      <ChevronRight className="h-6 w-6" />
                     )}
                   </button>
                 </TooltipTrigger>
