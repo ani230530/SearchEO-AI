@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Navigate, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/contexts/AuthContext";
 import { maskDomainId } from "@/lib/domainUtils";
 import { apiGet } from "../services/apiClient";
@@ -24,11 +25,11 @@ const AIVisibilityRedirect = () => {
 
     const resolveDomain = async () => {
       try {
-        // We always fetch the domains list to ensure we have fresh data and 
+        // We always fetch the domains list to ensure we have fresh data and
         // to populate the sessionStorage mapping via maskDomainId.
-        const data = await apiGet<any>('/wizard/domains');
+        const data = await apiGet<any>("/wizard/domains");
         const domains = data.domains ?? [];
-        
+
         if (cancelled) return;
 
         if (domains.length === 0) {
@@ -42,7 +43,7 @@ const AIVisibilityRedirect = () => {
 
         if (storedSlug) {
           // Try to find the domain that matches the stored slug
-          targetDomain = domains.find(d => maskDomainId(d.id) === storedSlug);
+          targetDomain = domains.find((d) => maskDomainId(d.id) === storedSlug);
         }
 
         if (!targetDomain) {
@@ -77,9 +78,15 @@ const AIVisibilityRedirect = () => {
     };
   }, [authLoading, token]);
 
-  if (state.status === "redirect") {
-    return <Navigate to={`/ai-results/${state.slug}`} replace />;
-  }
+  useEffect(() => {
+    if (state.status !== "redirect") return;
+
+    const timer = window.setTimeout(() => {
+      navigate(`/ai-results/${state.slug}`, { replace: true });
+    }, 220);
+
+    return () => window.clearTimeout(timer);
+  }, [navigate, state]);
 
   if (state.status === "empty") {
     return (
@@ -118,10 +125,75 @@ const AIVisibilityRedirect = () => {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-white">
-      <div className="text-center">
-        <div className="w-8 h-8 border-2 border-black border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-        <p className="text-gray-600 font-medium">Loading…</p>
+    <div className="min-h-screen bg-[#f5f5f7] text-slate-900">
+      <div className="flex min-h-screen">
+        <aside className="hidden w-[280px] shrink-0 border-r border-slate-200 bg-white/95 p-4 lg:block">
+          <div className="space-y-4">
+            <Skeleton className="h-10 w-36 rounded-lg" />
+            <div className="space-y-2">
+              {Array.from({ length: 7 }).map((_, idx) => (
+                <div key={idx} className="flex items-center gap-3 rounded-lg px-2 py-2">
+                  <Skeleton className="h-4 w-4 rounded-sm" />
+                  <Skeleton className="h-4 w-32" />
+                </div>
+              ))}
+            </div>
+          </div>
+        </aside>
+
+        <main className="flex-1">
+          <div className="border-b border-slate-200 bg-white/90 px-6 py-4">
+            <div className="flex items-center justify-between gap-4">
+              <div className="space-y-2">
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="h-8 w-56" />
+              </div>
+              <Skeleton className="h-10 w-36 rounded-full" />
+            </div>
+          </div>
+
+          <div className="p-6">
+            <div className="space-y-6">
+              <div className="grid gap-4 lg:grid-cols-3">
+                <Skeleton className="h-32 rounded-2xl" />
+                <Skeleton className="h-32 rounded-2xl" />
+                <Skeleton className="h-32 rounded-2xl" />
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                <div className="mb-4 flex items-center justify-between">
+                  <Skeleton className="h-5 w-40" />
+                  <Skeleton className="h-9 w-28 rounded-full" />
+                </div>
+                <Skeleton className="h-[280px] w-full rounded-xl" />
+              </div>
+
+              <div className="grid gap-4 xl:grid-cols-[1.4fr_0.9fr]">
+                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                  <Skeleton className="mb-4 h-5 w-48" />
+                  <div className="space-y-3">
+                    {Array.from({ length: 5 }).map((_, idx) => (
+                      <div key={idx} className="flex items-center gap-3">
+                        <Skeleton className="h-4 w-20" />
+                        <Skeleton className="h-4 flex-1" />
+                        <Skeleton className="h-4 w-16" />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                  <Skeleton className="mb-4 h-5 w-36" />
+                  <div className="space-y-3">
+                    {Array.from({ length: 4 }).map((_, idx) => (
+                      <Skeleton key={idx} className="h-16 rounded-xl" />
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </main>
       </div>
     </div>
   );
