@@ -3,6 +3,7 @@ import {
   BarChart3,
   Bell,
   ChevronDown,
+  ChevronRight,
   ClipboardList,
   Globe,
   Globe2,
@@ -36,7 +37,7 @@ type DomainOption = {
   id: number;
   url: string;
   createdAt: string;
-   lastAnalyzed?: string | Date | null;
+  lastAnalyzed?: string | Date | null;
   /** Optional — backend supplies these via /wizard/domains for display. */
   host?: string;
   companyName?: string | null;
@@ -83,12 +84,12 @@ const sidebarItems: Array<{
   iconSrc: string;
   label: string;
 }> = [
-  { id: "ai-results", label: "AI Results", iconSrc: "/sidebar-icons/ai-results.svg" },
-  { id: "competitors", label: "Competitors", iconSrc: "/sidebar-icons/competitors.svg" },
-  { id: "track-prompts", label: "Track Prompts", iconSrc: "/sidebar-icons/track-prompts.svg" },
-  { id: "top-keywords", label: "Track Keyword", iconSrc: "/sidebar-icons/track-keyword.svg" },
-  { id: "analytics", label: "Opportunities", iconSrc: "/sidebar-icons/analytics.svg" },
-];
+    { id: "ai-results", label: "AI Results", iconSrc: "/sidebar-icons/ai-results.svg" },
+    { id: "competitors", label: "Competitors", iconSrc: "/sidebar-icons/competitors.svg" },
+    { id: "track-prompts", label: "Track Prompts", iconSrc: "/sidebar-icons/track-prompts.svg" },
+    { id: "top-keywords", label: "Track Keyword", iconSrc: "/sidebar-icons/track-keyword.svg" },
+    { id: "analytics", label: "Opportunities", iconSrc: "/sidebar-icons/analytics.svg" },
+  ];
 
 type RailSectionItem = {
   id: string;
@@ -280,56 +281,68 @@ export function AIResultsLayout({
        *  so the rest of the layout never reflows. The inner panel is
        *  absolutely positioned and widens on hover, so the expanded rail
        *  overlays the next column instead of pushing it. */}
-      <aside className="group relative z-40 hidden min-h-[220px] w-[72px] shrink-0 basis-auto overflow-visible border-b border-slate-300 bg-transparent lg:sticky lg:top-0 lg:flex lg:h-screen lg:max-h-screen lg:border-b-0 lg:self-start">
-        <div className="absolute inset-y-0 left-0 z-50 flex h-full w-[72px] flex-col overflow-hidden border-b border-slate-300 bg-white px-2 py-4 shadow-sm transition-[width] duration-200 ease-out group-hover:w-60 group-hover:shadow-lg lg:border-b-0 lg:border-r">
+      <aside 
+        className="group relative z-40 hidden min-h-[220px] w-[72px] shrink-0 basis-auto overflow-visible border-b border-slate-300 bg-transparent lg:sticky lg:top-0 lg:flex lg:h-screen lg:max-h-screen lg:border-b-0 lg:self-start"
+        style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Inter", "Helvetica Neue", Helvetica, Arial, sans-serif' }}
+      >
+        <div className="absolute inset-y-0 left-0 z-50 flex h-full w-[72px] flex-col overflow-hidden border-b border-slate-300 bg-[rgba(255,255,255,0.9)] px-0 py-0 shadow-sm transition-[width] duration-200 ease-out group-hover:w-[280px] group-hover:shadow-lg lg:border-b-0 lg:border-r border-[#d9dde3]">
           <div className="flex h-full w-full flex-col overflow-hidden">
-            <div className="flex w-full items-center justify-center group-hover:justify-start group-hover:px-1">
-              <span className="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-lg bg-slate-50 ring-1 ring-slate-200">
-                {triggerLogo ? (
-                  <img
-                    src={triggerLogo}
-                    alt={triggerName}
-                    className="h-7 w-7 object-contain"
-                    onError={(e) => ((e.currentTarget as HTMLImageElement).style.display = "none")}
-                  />
-                ) : (
-                  <Globe2 className="h-4 w-4 text-slate-400" />
-                )}
+            <div className="flex w-full items-center justify-center px-[14px] py-[18px] pb-2 group-hover:justify-start group-hover:px-[16px]">
+              <span className="hidden group-hover:block min-w-0 flex-1">
+                <h1 className="m-0 text-[28px] font-medium leading-none tracking-[-0.03em] text-[#141414]">
+                  SearchEO AI
+                </h1>
               </span>
-              <span className="ml-2 hidden truncate text-sm font-semibold text-slate-800 group-hover:inline">
-                {triggerName}
+              <span className="grid h-9 w-9 shrink-0 place-items-center group-hover:hidden">
+                {/* Collapsed icon for brand */}
+                <span className="font-bold text-xl text-[#141414]">S</span>
               </span>
+              <ChevronRight className="hidden group-hover:block h-5 w-5 text-gray-500 shrink-0" />
             </div>
 
-            <nav className="mt-4 flex flex-1 flex-col gap-3 overflow-y-auto pr-1">
+            <nav className="mt-2 flex flex-1 flex-col overflow-y-auto px-[6px] group-hover:px-[10px] pb-3">
               {railSections.map((section) => (
-                <div key={section.title || "primary"} className="space-y-1">
+                <div key={section.title || "primary"} className="mb-[14px]">
                   {section.title ? (
-                    <p className="hidden px-3 pt-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400 group-hover:block">
+                    <h2 className="hidden group-hover:block m-0 mb-[6px] px-[10px] text-[12px] font-medium leading-[1.3] tracking-[0.01em] text-[#7b828d] normal-case">
                       {section.title}
-                    </p>
+                    </h2>
                   ) : null}
 
-                  <div className="space-y-1.5">
+                  <div className="space-y-[3px]">
                     {section.items.map((item) => {
                       const ItemIcon = item.icon;
                       const isActive = Boolean(item.isActive);
+                      const isPremium = item.id === "ai-visibility";
 
                       return (
                         <button
                           key={item.id}
                           type="button"
                           onClick={item.onClick}
-                          className={`flex h-9 w-full items-center gap-3 rounded-lg px-0 transition justify-center group-hover:justify-start group-hover:px-3 ${
+                          className={`flex w-full items-center gap-[10px] rounded-lg px-0 py-[10px] group-hover:px-[10px] group-hover:py-[9px] transition-colors justify-center group-hover:justify-start ${
                             isActive
-                              ? "bg-[#2f4462] text-white shadow-sm"
-                              : "text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+                              ? "bg-[#2f4462] text-[#ffffff]"
+                              : "text-[#020202] hover:bg-[#e6e9ee]"
                           }`}
                           aria-label={item.ariaLabel ?? item.label}
                           title={item.label}
                         >
-                          <ItemIcon className="h-4 w-4 shrink-0" strokeWidth={1.8} />
-                          <span className="hidden truncate text-xs font-medium group-hover:inline">
+                          <ItemIcon 
+                            className={`h-[20px] w-[20px] shrink-0 inline-flex transition-colors ${
+                              isActive ? "text-[#ffffff]" : isPremium ? "text-[#3f62ab]" : "text-[#6d7480]"
+                            }`} 
+                            strokeWidth={isPremium ? 2.4 : 2} 
+                          />
+                          <span 
+                            className={`hidden whitespace-nowrap text-[14px] group-hover:inline ${
+                              isActive
+                                ? "font-medium"
+                                : isPremium
+                                  ? "font-bold bg-gradient-to-r from-[#2D4059] to-[#4C74C2] bg-clip-text text-transparent"
+                                  : "font-medium"
+                            }`}
+                          >
                             {item.label}
                           </span>
                         </button>
@@ -340,19 +353,19 @@ export function AIResultsLayout({
               ))}
             </nav>
 
-            <div className="mt-auto flex w-full flex-col gap-2 pb-1">
+            <div className="mt-auto flex w-full flex-col pt-3 border-t border-[#d9dde3] px-[6px] group-hover:px-[10px] pb-3">
               <button
                 type="button"
                 onClick={() => {
                   logout();
                   navigate("/auth");
                 }}
-                className="flex h-9 w-full items-center justify-center gap-3 rounded-lg px-0 text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 group-hover:justify-start group-hover:px-3"
+                className="flex w-full items-center gap-[10px] rounded-lg px-0 py-[10px] group-hover:px-[10px] group-hover:py-[9px] transition-colors justify-center group-hover:justify-start text-[#b83030] hover:bg-[#e6e9ee]"
                 aria-label="Logout"
                 title="Logout"
               >
-                <LogOut className="h-4 w-4 shrink-0" strokeWidth={1.8} />
-                <span className="hidden truncate text-xs font-medium group-hover:inline">
+                <LogOut className="h-[20px] w-[20px] shrink-0 text-[#b83030] inline-flex" strokeWidth={2} />
+                <span className="hidden whitespace-nowrap text-[14px] font-medium text-[#b83030] group-hover:inline">
                   Logout
                 </span>
               </button>
@@ -448,17 +461,17 @@ export function AIResultsLayout({
                             {isCurrent ? <Sparkles className="h-3 w-3 shrink-0 text-emerald-600" /> : null}
                           </div>
                           <span className="block truncate text-[10px] text-gray-500">
-  {domain.host ?? domain.url.replace(/^https?:\/\//, '')}
-  {' · '}
+                            {domain.host ?? domain.url.replace(/^https?:\/\//, '')}
+                            {' · '}
 
-  {domain.lastAnalyzed
-    ? new Date(domain.lastAnalyzed).toLocaleString('en-IN', {
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric'
-      })
-    : 'No date'}
-</span>
+                            {domain.lastAnalyzed
+                              ? new Date(domain.lastAnalyzed).toLocaleString('en-IN', {
+                                day: '2-digit',
+                                month: 'short',
+                                year: 'numeric'
+                              })
+                              : 'No date'}
+                          </span>
                         </div>
                       </DropdownMenuItem>
                     );
@@ -485,15 +498,14 @@ export function AIResultsLayout({
                     src={item.iconSrc}
                     alt=""
                     aria-hidden="true"
-                    className={`h-4 w-4 shrink-0 ${
-                      item.id === "ai-results"
-                        ? isActive
-                          ? "opacity-100"
-                          : "brightness-0 opacity-80"
-                        : isActive
-                          ? "brightness-0 invert"
-                          : "opacity-80"
-                    }`}
+                    className={`h-4 w-4 shrink-0 ${item.id === "ai-results"
+                      ? isActive
+                        ? "opacity-100"
+                        : "brightness-0 opacity-80"
+                      : isActive
+                        ? "brightness-0 invert"
+                        : "opacity-80"
+                      }`}
                   />
                   {item.label}
                 </button>
