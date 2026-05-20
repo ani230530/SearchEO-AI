@@ -1266,12 +1266,14 @@ router.get('/domain/:id/trends', authenticateToken, async (req: Request, res: Re
 
 // ── POST /domain/:id/restart  (Re-audit + Pick prompts again from dashboard) ──
 //
-// Two modes:
-//   from='crawl'  — wipe everything downstream of the URL/profile (crawl,
-//                   competitors, topics, prompts, runs) and reset phases so
-//                   the wizard runs fresh from Step 2 with the same profile.
-//   from='topics' — wipe only topics+select+run; keep crawl + competitors so
-//                   the user re-picks prompts on top of the existing context.
+// Three modes:
+//   from='crawl'       — wipe everything downstream of the URL/profile
+//                        (crawl, competitors, topics, prompts, runs) and
+//                        reset phases so the wizard runs fresh from Step 2.
+//   from='competitors' — keep crawl/profile, but wipe competitors + topics
+//                        + prompts + runs so the user restarts at Step 3.
+//   from='topics'      — wipe only topics+select+run; keep crawl + competitors
+//                        so the user re-picks prompts on top of existing data.
 //
 // User-supplied selections (Competitor.isSelected, custom prompts/keywords)
 // are preserved on a 'topics' restart; both kinds are wiped on 'crawl'.
@@ -1341,24 +1343,38 @@ router.post('/domain/:id/restart', authenticateToken, async (req: Request, res: 
   if (!got.ok) return res.status(got.status).json({ error: got.error });
   const { domain } = got;
   const from = ((req.body ?? {}) as { from?: string }).from;
-  if (from !== 'crawl' && from !== 'topics') {
-    return res.status(400).json({ error: "from must be 'crawl' or 'topics'" });
+  if (from !== 'crawl' && from !== 'competitors' && from !== 'topics') {
+    return res.status(400).json({ error: "from must be 'crawl', 'competitors', or 'topics'" });
   }
 
-  if (from === 'crawl') {
+  if (from === 'crawl' || from === 'competitors') {
     // Hard reset — keep Domain + DomainProfile, wipe everything generated.
-    await prisma.$transaction([
+    // 'competitors' keeps the crawl snapshot intact, but otherwise clears
+    // the wizard back to a fresh competitor-selection restart.
+    const destructiveOps = [
       prisma.aiQueryResult.deleteMany({ where: { run: { domainId: domain.id } } }),
       prisma.aiRun.deleteMany({ where: { domainId: domain.id } }),
       prisma.prompt.deleteMany({ where: { domainId: domain.id } }),
       prisma.keyword.deleteMany({ where: { domainId: domain.id } }),
       prisma.competitor.deleteMany({ where: { domainId: domain.id } }),
-      prisma.crawlSnapshot.deleteMany({ where: { domainId: domain.id } }),
-      // Reset wizard phases to "nothing done".
+      ...(from === 'crawl' ? [prisma.crawlSnapshot.deleteMany({ where: { domainId: domain.id } })] : []),
+    ];
+    await prisma.$transaction([
+      ...destructiveOps,
+      // Reset wizard phases to the appropriate resume point.
       prisma.wizardState.upsert({
         where: { domainId: domain.id },
-        update: { phases: {} as any, selectionDraft: { set: undefined } as any },
-        create: { domainId: domain.id, phases: {} as any },
+        update: {
+          phases:
+            from === 'crawl'
+              ? ({} as any)
+              : ({ crawl: 'completed', profile: 'completed' } as any),
+          selectionDraft: { set: undefined } as any,
+        },
+        create: {
+          domainId: domain.id,
+          phases: from === 'crawl' ? ({} as any) : ({ crawl: 'completed', profile: 'completed' } as any),
+        },
       }),
     ]);
   } else {
