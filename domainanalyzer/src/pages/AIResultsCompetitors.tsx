@@ -609,7 +609,7 @@ function TrendComparisonPanel({ trends }: { trends: TrendsResponse | null }) {
       ) : (
         <div className="mt-3 space-y-6">
           <ChartBlock title="AI Visibility Trend" subtitle="Brand mentions by model across the last runs.">
-            <ResponsiveContainer width="100%" height={170}>
+            <ResponsiveContainer width="100%" height={240}>
               <LineChart data={visibilityData} margin={{ top: 10, right: 10, bottom: 0, left: -20 }}>
                 <CartesianGrid stroke="#EEF1F5" strokeDasharray="3 3" />
                 <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#98A2B3' }} />
@@ -624,7 +624,7 @@ function TrendComparisonPanel({ trends }: { trends: TrendsResponse | null }) {
           </ChartBlock>
 
           <ChartBlock title="Citation Volume" subtitle="Citation count per AI model across runs.">
-            <ResponsiveContainer width="100%" height={170}>
+            <ResponsiveContainer width="100%" height={240}>
               <LineChart data={citationData} margin={{ top: 10, right: 10, bottom: 0, left: -20 }}>
                 <CartesianGrid stroke="#EEF1F5" strokeDasharray="3 3" />
                 <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#98A2B3' }} />
@@ -639,7 +639,7 @@ function TrendComparisonPanel({ trends }: { trends: TrendsResponse | null }) {
           </ChartBlock>
 
           <ChartBlock title="Share of Voice" subtitle="Mention share — you vs your tracked competitors.">
-            <ResponsiveContainer width="100%" height={170}>
+            <ResponsiveContainer width="100%" height={240}>
               <LineChart data={sovData} margin={{ top: 10, right: 10, bottom: 0, left: -20 }}>
                 <CartesianGrid stroke="#EEF1F5" strokeDasharray="3 3" />
                 <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#98A2B3' }} />
@@ -681,7 +681,7 @@ function OpportunityCard({ item, onAiResponse }: { item: ReportOpportunity; onAi
   return (
     <article className="relative overflow-hidden rounded-xl border border-[#E8ECF2] bg-white py-5 pl-6 pr-5 shadow-[0_10px_24px_rgba(15,23,42,0.08)]">
       <div className="absolute inset-y-0 left-0 w-1.5 bg-[#7EA6FF]" />
-      <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_128px] sm:items-start">
+      <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-3">
             <span className="inline-flex h-5 items-center rounded-full bg-[#FFE9E9] px-2.5 text-[10px] font-medium text-[#F05F5F]">
@@ -689,11 +689,11 @@ function OpportunityCard({ item, onAiResponse }: { item: ReportOpportunity; onAi
             </span>
             <span className="text-sm font-medium text-[#7B8494]">Importance: {importanceScore}/100</span>
           </div>
-          <h4 className="mt-4 max-w-[480px] text-base font-medium italic leading-6 text-[#2D4059]">
+          <h4 className="mt-4 max-w-[480px] text-base font-normal italic leading-6 text-[#2D4059] break-words">
             {item.title}
           </h4>
           {item.competitors.length > 0 ? (
-            <p className="mt-5 text-sm font-medium leading-5 text-[#426185]">
+            <p className="mt-5 text-sm font-medium leading-5 text-[#426185] break-words">
               Appearing:{' '}
               <span className="font-bold text-[#2D4059]">
                 {item.competitors.map((competitor, index) => (
@@ -705,7 +705,7 @@ function OpportunityCard({ item, onAiResponse }: { item: ReportOpportunity; onAi
               </span>
             </p>
           ) : (
-            <p className="mt-5 text-sm font-medium leading-5 text-[#426185]">{item.rationale}</p>
+            <p className="mt-5 text-sm font-medium leading-5 text-[#426185] break-words">{item.rationale}</p>
           )}
         </div>
 
@@ -965,8 +965,8 @@ function ContentOpportunityCard({ item }: { item: ReportOpportunity }) {
     <article className="relative overflow-hidden rounded-lg border border-[#E8ECF2] bg-white px-6 py-5 shadow-[0_8px_18px_rgba(15,23,42,0.06)]">
       <div className="absolute inset-y-0 left-0 w-1.5 bg-[#7EA6FF]" />
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="min-w-0">
-          <h4 className="line-clamp-2 text-base font-semibold text-[#2D4059]">{item.title}</h4>
+        <div className="min-w-0 flex-1">
+          <h4 className="line-clamp-2 text-base font-semibold text-[#2D4059] break-words">{item.title}</h4>
           <div className="mt-4 flex flex-wrap items-center gap-2">
             <span className="inline-flex h-5 items-center rounded-full bg-[#FFE9E9] px-2.5 text-[10px] font-medium text-[#F05F5F]">
               {priority}

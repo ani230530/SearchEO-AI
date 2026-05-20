@@ -1598,7 +1598,7 @@ const VisibilityRow = ({
   return (
     <div className={cn('rounded-lg px-5 py-4', wrapperClass)}>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2.5">
             <StatusIcon className={cn('h-4 w-4 shrink-0', statusIconColor)} strokeWidth={2} />
             <p className={cn('truncate text-[14px] italic leading-[150%]', titleColor)}>{title}</p>
@@ -1660,9 +1660,9 @@ const OpportunityRow = ({
     <div className="rounded-lg border-l-[3px] border-l-[#7E9BD7] bg-white px-3 py-3 shadow-[0_1px_4px_0_#0000000D]">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0 flex-1">
-          <p className="text-[12px] font-medium leading-[150%] text-[#2D4059]">{title}</p>
+          <p className="text-[12px] font-medium leading-[150%] text-[#2D4059] break-words">{title}</p>
           {rationale ? (
-            <p className="mt-0.5 text-[11px] leading-[150%] text-[#717680]">{rationale}</p>
+            <p className="mt-0.5 text-[11px] leading-[150%] text-[#717680] break-words">{rationale}</p>
           ) : null}
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <span className={cn('inline-flex items-center rounded-full border px-2.5 py-0.5 text-[11px]', sevClass)}>
@@ -1899,7 +1899,7 @@ export const AreaChartCard = ({
         </div>
       </div>
 
-      <div className="relative mt-2 h-[170px] w-full overflow-x-auto">
+      <div className="relative mt-2 h-[240px] w-full overflow-x-auto">
         {emptyMessage ? (
           <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
             <span className="rounded-full bg-white/90 border border-slate-200 px-3 py-1.5 text-[11px] text-slate-500 shadow-sm">
