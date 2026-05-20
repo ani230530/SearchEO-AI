@@ -95,7 +95,8 @@ export default function AICheckerV2() {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const { user, exchangeGoogleCode } = useAuth();
-  const [step, setStep] = useState<WizardStep>(1);
+  const initialStep: WizardStep = searchParams.get("restart") === "crawl" ? 2 : searchParams.get("restart") === "competitors" ? 3 : searchParams.get("restart") === "topics" ? 4 : 1;
+  const [step, setStep] = useState<WizardStep>(initialStep);
   const [domainId, setDomainId] = useState<number | null>(null);
   // Anonymous callers hit a signup wall when they try to start Step 5.
   // The wall is opened by intercepting the Step 4 onContinue callback;
@@ -166,7 +167,7 @@ export default function AICheckerV2() {
     if (!idParam) return;
     const id = Number(idParam);
     if (!Number.isFinite(id)) return;
-    const restart = searchParams.get("restart"); // 'crawl' | 'topics' | null
+    const restart = searchParams.get("restart"); // 'crawl' | 'competitors' | 'topics' | null
     setDomainId(id);
     setLoadingState(true);
 
@@ -176,7 +177,7 @@ export default function AICheckerV2() {
         // restart endpoint first so the next state read reflects the wiped
         // phases. Without this we'd still see the old run's state and
         // canResumeAt would land us at the wrong step.
-        if (restart === 'crawl' || restart === 'topics') {
+        if (restart === 'crawl' || restart === 'competitors' || restart === 'topics') {
           await apiPost(`/wizard/domain/${id}/restart`, { from: restart });
           // Strip the param from the URL so a refresh doesn't re-restart.
           setSearchParams(
@@ -210,6 +211,7 @@ export default function AICheckerV2() {
         // Land at the explicit target if restart was used; else use canResumeAt.
         const target: WizardStep =
           restart === 'crawl' ? 2 :
+            restart === 'competitors' ? 3 :
             restart === 'topics' ? 4 :
               (res.canResumeAt ? (PHASE_TO_STEP[res.canResumeAt] ?? 1) : 1);
         setStep(target);
@@ -514,3 +516,8 @@ export default function AICheckerV2() {
     </WizardShell>
   );
 }
+
+
+
+
+

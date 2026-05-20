@@ -3149,12 +3149,12 @@ const AIResultsReportPreview = () => {
                     className="flex flex-col items-start gap-0.5 rounded-md px-3 py-2.5 cursor-pointer"
                     onClick={() => {
                       const id = reportData?.domainInfo?.id;
-                      if (id) navigate(`/ai-checker-v2?domain=${id}&restart=crawl`);
+                      if (id) navigate(`/ai-checker-v2?domain=${id}&restart=competitors`);
                     }}
                   >
                     <span className="text-[12px] font-semibold text-slate-900">Re-audit from start</span>
                     <span className="text-[11px] text-slate-500 leading-snug">
-                      Re-crawl the site, find competitors fresh, and run new prompts. Keeps your country / industry profile.
+                      Skip the crawl. Refresh competitors and land on the competitor selection step.
                     </span>
                   </DropdownMenuItem>
                   <DropdownMenuItem
@@ -3470,3 +3470,4 @@ const AIResultsReportPreview = () => {
 };
 
 export default AIResultsReportPreview;
+
