@@ -235,6 +235,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
   const [featuredImageEditNote, setFeaturedImageEditNote] = useState('');
   const [featuredImageEditing, setFeaturedImageEditing] = useState(false);
   const [showAddImageModal, setShowAddImageModal] = useState(false);
+  const [showBackConfirmModal, setShowBackConfirmModal] = useState(false);
   const [originalHtmlContent, setOriginalHtmlContent] = useState('');
   const quillRef = useRef<ReactQuill>(null);
    const [previewPageId, setPreviewPageId] = useState<number | null>(null);
@@ -1065,7 +1066,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
     if (currentDraftStatus === 'generating' && isPublishing) return 'queued';
     if (isPublishing) return 'publishing';
     if (currentDraftStatus === 'failed') return 'failed';
-    if (publishResult.wordpressUrl?.startsWith('http')) return 'idle-republish';
+    if (currentDraftStatus === 'published') return 'idle-republish';
     return 'idle-fresh';
   };
 
@@ -2346,6 +2347,20 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
     }
   }, [isEditMode, publishResult, currentHtmlContent]);
 
+  const handleBackClick = useCallback(() => {
+    if (!onBack) return;
+    if (hasUnsavedChanges) {
+      setShowBackConfirmModal(true);
+      return;
+    }
+    onBack();
+  }, [hasUnsavedChanges, onBack]);
+
+  const handleConfirmBack = useCallback(() => {
+    setShowBackConfirmModal(false);
+    onBack?.();
+  }, [onBack]);
+
 
   const handleRemoveImage = useCallback((imageSrc: string) => {
     if (!publishResult) return;
@@ -2620,7 +2635,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
                     <div className="flex items-center gap-2 mb-1">
   {onBack && (
     <button
-      onClick={onBack}
+      onClick={handleBackClick}
       className="flex items-center gap-2 py-1  text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all group"
     >
       <ChevronLeft className="h-4 w-4 text-gray-400 group-hover:text-gray-900 transition-colors" />
@@ -3261,6 +3276,35 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
                     Add Image
                   </button>
                 </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showBackConfirmModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-2xl w-full max-w-md mx-4">
+            <div className="p-6">
+              <h3 className="text-lg font-semibold text-gray-900">Discard unsaved changes?</h3>
+              <p className="mt-2 text-sm text-gray-600">
+              You have unsaved edits. If you go back now, your changes will be lost.
+              </p>
+              <div className="mt-6 flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowBackConfirmModal(false)}
+                  className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 bg-white text-gray-900 text-sm font-medium hover:bg-gray-50"
+                >
+                  Keep Editing
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmBack}
+                  className="flex-1 px-4 py-2.5 rounded-xl bg-[#2D4059] text-white text-sm font-medium hover:bg-[#243449]"
+                >
+                  Discard 
+                </button>
               </div>
             </div>
           </div>
