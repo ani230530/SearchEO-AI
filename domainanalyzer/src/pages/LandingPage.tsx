@@ -526,7 +526,7 @@ footer {
             <a className="brand" href="#" target="_blank" rel="noopener noreferrer">
               AI Brand Analyzer
             </a>
-          <button className="cta" type="button" onClick={() => navigate('/audit')}>
+          <button className="cta" type="button" onClick={() => navigate('/auth')}>
             login/signup
           </button>
         </header>
