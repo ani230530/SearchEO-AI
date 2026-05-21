@@ -272,142 +272,33 @@ export function AnalyticsIntegrationSection({
           )}
         </div>
 
-        {gscConnected ? (
-          !gscSelectedProperty ? (
-            <div className="bg-white rounded-3xl p-6 sm:p-8 border border-gray-100 shadow-sm min-w-0">
-              <h3 className="text-xl font-light text-black tracking-tight mb-4">Select Property</h3>
-              <p className="text-sm font-light text-gray-600 mb-6">
-                Choose which Search Console property to use
-              </p>
-              {gscLoading ? (
-                <div className="text-center py-8">
-                  <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-                  <p className="text-sm font-light text-gray-600 mt-4">Loading properties...</p>
-                </div>
-              ) : gscProperties.length > 0 ? (
-                <div className="space-y-3">
-                  {gscProperties.map((property) => (
-                    <button
-                      key={property.siteUrl}
-                      onClick={() => handleSelectProperty(property.siteUrl)}
-                      className="w-full text-left p-4 rounded-2xl border border-gray-100 hover:border-gray-200 hover:bg-gray-50 transition-all duration-200"
-                    >
-                      <div className="flex items-center justify-between ">
-                        <div>
-                          <p className="text-base font-light text-black">{property.siteUrl}</p>
-                          <p className="text-xs font-light text-gray-500 mt-1">
-                            {property.permissionLevel}
-                          </p>
-                        </div>
-                        <Globe className="h-5 w-5 text-gray-400" />
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-8">
-                  <p className="text-sm font-light text-gray-600">
-                    No properties found. Make sure your site is verified in Google Search Console.
-                  </p>
-                  <button
-                    onClick={fetchGscProperties}
-                    className="mt-4 px-4 py-2 text-sm font-light text-blue-600 hover:text-blue-700"
-                  >
-                    Refresh Properties
-                  </button>
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="bg-white rounded-3xl p-6 sm:p-8 border border-gray-100 min-w-0">
-              <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
-                <div>
-                  <div className="flex items-center gap-3">
-                    <img src="/gsc-icon.png" alt="" srcSet="" />
-                    <h3 className="text-xl font-light text-black tracking-tight mb-1">
-                      Selected Property
-                    </h3>
-                  </div>
-                  <p className="text-sm font-light text-gray-600">{gscSelectedProperty}</p>
-                </div>
-                <button
-                  onClick={() => {
-                    setGscSelectedProperty("");
-                    fetchGscProperties();
-                  }}
-                  className="px-4 py-2 text-sm font-light text-gray-600 hover:text-gray-900"
-                >
-                  Change
-                </button>
-              </div>
-              <p className="text-sm text-neutral-400 font-light mb-4">
-                Search Console data will be available for this property, and the same Google
-                connection now includes Analytics read access for reporting.
-              </p>
-              <div className="relative w-full aspect-video rounded-2xl overflow-hidden border border-gray-100 mb-4">
-                <iframe
-                  className="w-full h-full"
-                  src="https://www.youtube.com/embed/JnX6_YAflt8?si=EvfXp_9hEyyCSI0m"
-                  title="Google Search Console Tutorial"
-                  frameBorder="0"
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                  allowFullScreen
-                ></iframe>
-              </div>
-            </div>
-          )
-        ) : (
-          <div className="bg-white rounded-3xl p-6 sm:p-8 border border-gray-100 shadow-sm min-w-0">
-            <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-              <div className="flex items-center gap-3">
-                <img src="/gsc-icon.png" alt="" />
-                <h3 className="text-xl font-light text-black tracking-tight">Select Property</h3>
-              </div>
-              <div className="flex items-center gap-1.5 bg-red-50 text-red-700 px-3 py-1 rounded-full text-[10px] font-medium border border-red-100 uppercase tracking-wider">
-                Not Connected
-              </div>
-            </div>
-            <p className="text-sm font-light text-gray-600 mb-6">
-              Connect Google Search Console to choose a property for reporting.
-            </p>
-            <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50/60 p-6 text-center">
-              <Globe className="h-6 w-6 mx-auto mb-3 text-gray-300" />
-              <p className="text-sm font-light text-gray-500">
-                Your verified Search Console properties will appear here once connected.
-              </p>
-            </div>
-          </div>
-        )}
-
         <div className="bg-white rounded-3xl p-6 sm:p-8 border border-gray-100 min-w-0">
-          <div>
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <img src="icons8-google-analytics-24.png" alt="" srcSet="" />
-                <h3 className="text-xl sm:text-2xl font-light text-black tracking-tight">Google Analytics</h3>
-              </div>
-              <div
-                className={cn(
-                  "flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-medium border uppercase tracking-wider",
-                  googleAnalyticsId
-                    ? "bg-green-50 text-green-700 border-green-100"
-                    : "bg-red-50 text-red-700 border-red-100"
-                )}
-              >
-                {googleAnalyticsId ? "Connected" : "Not Connected"}
-              </div>
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+            <div className="flex items-center gap-3">
+              <img src="icons8-google-analytics-24.png" alt="" srcSet="" />
+              <h3 className="text-xl sm:text-2xl font-light text-black tracking-tight">Google Analytics</h3>
             </div>
-
-            <p className="text-sm text-neutral-400 font-light max-w-xl mb-4 mt-2">
-              Connect Google for Search Console, then add your GA4 ID for reporting.
-            </p>
+            <div
+              className={cn(
+                "flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-medium border uppercase tracking-wider",
+                googleAnalyticsId
+                  ? "bg-green-50 text-green-700 border-green-100"
+                  : "bg-red-50 text-red-700 border-red-100"
+              )}
+            >
+              {googleAnalyticsId ? "Connected" : "Not Connected"}
+            </div>
           </div>
+
+          <p className="text-sm text-neutral-400 font-light max-w-xl mb-4 mt-2">
+            Connect Google Analytics, then add your GA4 ID for reporting.
+          </p>
 
           <div className="w-full aspect-video rounded-2xl overflow-hidden border border-gray-100">
             <iframe
               className="w-full h-full"
               src="https://www.youtube.com/embed/pJxNPfwQfHs"
-              title="Google Search Console Tutorial"
+              title="Google Analytics Tutorial"
               frameBorder="0"
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
               allowFullScreen
@@ -451,6 +342,7 @@ export function AnalyticsIntegrationSection({
             </button>
           </div>
         </div>
+
         <div className="bg-white rounded-3xl p-6 sm:p-8 border border-gray-100 min-w-0">
           <div className="flex flex-wrap items-center justify-between gap-4 ">
             <div>
@@ -488,7 +380,7 @@ export function AnalyticsIntegrationSection({
                 <iframe
                   className="w-full h-full"
                   src="https://www.youtube.com/embed/pJxNPfwQfHs?si=DmLV-gdgqw9TJUdZ"
-                  title="Google Search Console Tutorial"
+                  title="WordPress Publishing Tutorial"
                   frameBorder="0"
                   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                   allowFullScreen
