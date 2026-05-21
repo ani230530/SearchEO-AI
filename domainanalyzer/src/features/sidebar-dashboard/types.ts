@@ -52,7 +52,11 @@ export interface DashboardSearchState {
 export interface DashboardHeaderProps {
   activeTab: TabId;
   tabs: DashboardSidebarTab[];
+  companyDomain?: string;
   userEmail?: string | null;
+  userName?: string | null;
+  lastSyncedAt?: Date | null;
+  onAddDomain?: () => void;
   onTabChange?: (tab: TabId) => void;
 }
 
@@ -68,16 +72,33 @@ export interface OverviewSectionProps {
   campaignsCount: number;
   companyDomain: string;
   hasWordpressIntegration: boolean;
+  competitorOverview: CompetitorOverviewState;
   keywordsTableData: KeywordTableItem[];
   normalizedDomain: string;
+  onAddDomain: () => void;
   onAuditModalOpenChange: (open: boolean) => void;
   onOpenAnalytics: () => void;
   onOpenAuditDetails: () => void;
+  onOpenProjects: () => void;
+  onOpenIntegration: () => void;
   onRunAudit: () => void;
   onViewReport: () => void;
   onVisitSite: () => void;
   overallScore: number;
   showAuditModal: boolean;
+}
+
+export interface CompetitorOverviewRow {
+  domain: string;
+  keywords: string;
+  overlap: string;
+  traffic: string;
+}
+
+export interface CompetitorOverviewState {
+  loading: boolean;
+  error?: string | null;
+  rows: CompetitorOverviewRow[];
 }
 
 export interface CompanySectionProps {

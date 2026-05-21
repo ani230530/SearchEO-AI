@@ -679,8 +679,8 @@ select.floating-input:not([value=""])+.floating-label {
 }
 
 .content-body {
-  padding: 24px;
-  background: rgba(255, 255, 255, 0.6);
+  padding: 2px;
+  background: #ffffff;
   min-height: calc(100vh - 80px);
 }
 

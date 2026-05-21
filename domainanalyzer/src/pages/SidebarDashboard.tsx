@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -88,11 +88,38 @@ import {
 } from "@/features/sidebar-dashboard/utils";
 import type { ParsedDomainInput } from "@/lib/domainValidation";
 import { validateDomainInput } from "@/lib/domainValidation";
+import { useCompetitorAnalysis } from "@/features/ai-results/queries";
 
 
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3002";
 const WORKSHEET_TARGET_KEY = 'ai-results/pending-worksheet-target';
+
+const formatDashboardCount = (value: number | null | undefined) => {
+  if (typeof value !== "number" || Number.isNaN(value)) {
+    return "—";
+  }
+
+  return Math.round(value).toLocaleString();
+};
+
+const formatDashboardPercent = (value: number | null | undefined) => {
+  if (typeof value !== "number" || Number.isNaN(value)) {
+    return "—";
+  }
+
+  const normalized = value > 1 ? value : value * 100;
+  return `${Math.round(normalized)}%`;
+};
+
+const formatDashboardTraffic = (value: number | null | undefined) => {
+  if (typeof value !== "number" || Number.isNaN(value)) {
+    return "—";
+  }
+
+  const normalized = value > 0 && value <= 1 ? value * 1000000 : value;
+  return Math.round(normalized).toLocaleString();
+};
 
 
 
@@ -572,6 +599,40 @@ const handleAnalyze = async () => {
 
 
 const normalizedDomain = normalizeDomain(companyDomain);
+
+const competitorAnalysisQuery = useCompetitorAnalysis<any>(createdDomainId);
+
+const competitorOverview = useMemo(() => {
+  const competitorRows = Array.isArray(competitorAnalysisQuery.data?.competitors)
+    ? competitorAnalysisQuery.data.competitors
+    : [];
+
+  const rows = competitorRows.slice(0, 4).map((competitor: any) => ({
+    domain: String(competitor?.host ?? competitor?.domain ?? "Unknown"),
+    keywords: formatDashboardCount(
+      competitor?.promptCoverage ?? competitor?.mentions ?? competitor?.keywordCount ?? competitor?.frequency
+    ),
+    overlap: formatDashboardPercent(
+      competitor?.coveragePct ?? competitor?.similarityScore ?? competitor?.overlap
+    ),
+    traffic: formatDashboardTraffic(
+      competitor?.marketShare ?? competitor?.trafficShare ?? competitor?.traffic
+    ),
+  }));
+
+  return {
+    loading: createdDomainId != null && competitorAnalysisQuery.isLoading,
+    error: competitorAnalysisQuery.isError
+      ? "Unable to load competitor overview right now."
+      : null,
+    rows,
+  };
+}, [
+  competitorAnalysisQuery.data,
+  competitorAnalysisQuery.isError,
+  competitorAnalysisQuery.isLoading,
+  createdDomainId,
+]);
 
 
 // Fetch existing audit for company domain
@@ -2541,6 +2602,7 @@ useEffect(() => {
       campaignsCount: campaigns.length,
       companyDomain,
       hasWordpressIntegration,
+      competitorOverview,
       keywordsTableData,
       normalizedDomain,
       onAuditModalOpenChange: setShowAuditModal,
@@ -2551,6 +2613,13 @@ useEffect(() => {
       onOpenAuditDetails: () => {
         setActiveTab("audit");
         setTimeout(() => setShowAuditModal(true), 120);
+      },
+      onOpenProjects: () => {
+        setActiveTab("projects");
+      },
+      onOpenIntegration: () => {
+        setActiveTab("integration");
+        setActiveCompanySubTab("integration");
       },
       onRunAudit: () => handleRunAudit(companyDomain),
       onViewReport: handleViewReport,
@@ -2700,7 +2769,11 @@ useEffect(() => {
         <DashboardHeader
           activeTab={activeTab}
           tabs={tabs}
+          companyDomain={companyDomain}
           userEmail={user?.email}
+          userName={user?.name}
+          lastSyncedAt={gscLastSynced}
+          onAddDomain={() => navigate("/ai-checker-v2")}
           onTabChange={setActiveTab}
         />
 
@@ -2775,6 +2848,7 @@ useEffect(() => {
               keywords={keywords as any}
               companyDomainFetchError={companyDomainFetchError}
               onRetryCompanyDomain={() => fetchCompanyDomain(true)}
+              onAddDomain={() => navigate("/ai-checker-v2")}
               onGoToAudit={() => setActiveTab("audit")}
             />
           ) : activeTab === "projects" ? (

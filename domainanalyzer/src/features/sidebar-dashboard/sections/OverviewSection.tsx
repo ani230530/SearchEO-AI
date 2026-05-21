@@ -14,6 +14,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { logoUrl as logoUrlHelper } from "@/lib/logoUrl";
 import GSCAnalyticsView from "@/components/gsc/GSCAnalyticsView";
 import { AlertDialogHeader } from "@/components/ui/alert-dialog";
@@ -26,7 +27,8 @@ import { getStoredActiveTab } from "@/features/sidebar-dashboard/utils";
 import { TabId, CompanySubTabId } from "@/features/sidebar-dashboard/types";
 import TrendsChart from "@/components/gsc/TrendsChart";
 import { useQuery } from "@tanstack/react-query";
-import { Loader2, Plug } from "lucide-react";
+import { Loader2 } from "lucide-react";
+import { Plug } from "lucide-react";
 import { useMemo } from "react";
 import { useBlogAnalyticsAggregate, useGscStatus } from "@/features/sidebar-dashboard/queries";
 
@@ -67,26 +69,30 @@ export function OverviewSection({
   campaignsCount,
   companyDomain,
   hasWordpressIntegration,
+  competitorOverview,
   keywordsTableData,
   normalizedDomain,
+  onAddDomain,
   onAuditModalOpenChange,
   onOpenAnalytics,
   onOpenAuditDetails,
+  onOpenProjects,
+  onOpenIntegration,
   onRunAudit,
   onViewReport,
   onVisitSite,
   overallScore,
 }: OverviewSectionProps) {
-
   const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3002';
+  const navigate = useNavigate();
 
-const getAuthHeaders = () => {
-  const token = localStorage.getItem('authToken');
-  return {
-    'Authorization': `Bearer ${token}`,
-    'Content-Type': 'application/json',
+  const getAuthHeaders = () => {
+    const token = localStorage.getItem('authToken');
+    return {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    };
   };
-};
 
   const [aggregateData, setAggregateData] = useState<AggregateData | null>(null);
   const [showAuditModal, setShowAuditModal] = useState(false);
@@ -183,9 +189,6 @@ const formattedTrendsData = useMemo(() => {
   return result;
 }, [trendsData, topQueries]);
 
-// Blog analytics aggregate goes through the shared cache — Overview is hit
-// on most dashboard sessions so a 5-min cached payload keeps the
-// over-tab-switch experience instant.
 const blogAnalyticsQuery = useBlogAnalyticsAggregate(28);
 const blogAggregateData: AggregateData | null =
   blogAnalyticsQuery.data && blogAnalyticsQuery.data.success ? blogAnalyticsQuery.data : null;
@@ -216,32 +219,37 @@ const suggestedActions = [
   {
     title: "Publish-Ready Blog",
     subtitle: "These blogs have been reviewed and are ready to go live",
-    icon: "https://www.figma.com/api/mcp/asset/0562e448-0ae6-4aa5-9d72-041196f56236",
+    icon: "/suggested-actions/send-01.svg",
     tone: "warning" as const,
+    onClick: onOpenProjects,
   },
   {
     title: "Integrate your website",
     subtitle: "Enable one-click publishing to your site",
-    icon: "https://www.figma.com/api/mcp/asset/3a8bdd17-0bd9-42f6-abf5-c5293cbd8f89",
+    icon: "/suggested-actions/wordpress.svg",
     tone: "danger" as const,
+    onClick: onOpenIntegration,
   },
   {
     title: "Connect Google Search Console",
-    subtitle: "Enable your google search console to fetch data",
-    icon: "https://www.figma.com/api/mcp/asset/47d925ce-d57e-42d9-9071-24e3613430db",
+    subtitle: "Enable Google Search Console to fetch data",
+    icon: "/suggested-actions/google-search-console.svg",
     tone: "danger" as const,
+    onClick: onOpenIntegration,
   },
   {
     title: "Optimize 2 Blogs",
     subtitle: "Optimize content to improve search rankings",
-    icon: "https://www.figma.com/api/mcp/asset/b21afc72-459a-43fa-a890-200998b97d2f",
+    icon: "/suggested-actions/improve-relevance.svg",
     tone: "default" as const,
+    onClick: onOpenProjects,
   },
   {
     title: "Create Pages from Top Keywords",
     subtitle: "Create supporting content to boost your pillar pages",
-    icon: "https://www.figma.com/api/mcp/asset/e8fe94aa-2477-4211-bfac-ce2fc01e0064",
+    icon: "/suggested-actions/open-file-folder.svg",
     tone: "default" as const,
+    onClick: onOpenProjects,
   },
 ];
 
@@ -276,28 +284,23 @@ useEffect(() => {
       </div>
     ) : (
     <div className="w-full min-w-7xl mx-auto px-4 sm:px-6 py-4 space-y-6">
-      <div className="relative overflow-hidden rounded-xl border border-gray-200 ">
+      <div className="relative overflow-hidden rounded-xl border border-gray-200 bg-[#f9f9f9]">
         <div className="absolute -top-24 -left-24 w-96 h-96 rounded-full blur-3xl" />
         <p className="pl-4 pt-4 text-base text-[#717680]">Free website audit</p>
-        <div className="relative p-4 sm:p-4 gap-10 justify-between">
+        <div className="relative p-4 sm:p-4">
           <div className="w-full min-w-0">
-            <h1 className="text-3xl sm:text-3xl font-bold text-gray-900 leading-tight">
-              Analyze Your Site&apos;s SEO, Performance, and Visibility in Seconds
+            <h1 className="text-3xl sm:text-3xl font-bold text-[#2D4058] leading-tight">
+              Deep scan your site for SEO, speed and visibility gaps in seconds.
             </h1>
             <p className="pt-4 text-base text-[#717680]">
-              Get a clear view of how your website is performing across key metrics. Identify
-              technical issues, uncover optimization opportunities, and understand what&apos;s
-              holding your rankings back. We&apos;ll scan your site and deliver actionable insights to
-              improve search visibility, speed, and overall performance.
+              Scan your website to uncover SEO issues, improve performance, and boost search visibility with actionable insights.
             </p>
           </div>
 
-          <div className="hidden lg:block w-px h-54 bg-gray-200" />
-
-          <div className="items-start gap-6">
-            <div className="mt-6 flex flex-wrap items-center gap-3">
-              {companyDomain && (
-                <div className="flex items-center gap-3 border border-gray-200 text-blue-700 px-4 sm:px-5 py-3 rounded-xl w-full min-w-0">
+          <div className="mt-6 flex flex-col gap-3 lg:flex-row lg:items-center">
+            <div className="flex min-w-0 flex-1 items-center gap-3 border border-gray-200 bg-white px-4 sm:px-5 py-3 rounded-xl">
+              {companyDomain ? (
+                <>
                   <img
                     src={logoUrlHelper(normalizedDomain, 128) ?? ""}
                     alt="Company logo"
@@ -306,21 +309,35 @@ useEffect(() => {
                     className="w-8 h-8 rounded-md"
                     loading="lazy"
                   />
-                  <span className="font-medium text-base sm:text-lg tracking-tight break-all">
+                  <span className="font-medium text-base sm:text-lg tracking-tight break-all text-blue-600">
                     <a
                       href={companyDomain.startsWith("http") ? companyDomain : `https://${companyDomain}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-blue-600 hover:underline"
+                      className="hover:underline"
                     >
                       {companyDomain.replace(/^https?:\/\//, "").replace(/^www\./, "")}
                     </a>
                   </span>
-                </div>
+                </>
+              ) : (
+                <span className="font-medium text-base sm:text-lg tracking-tight text-blue-600">
+                  https://domain.com/
+                </span>
               )}
-
-              
             </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                onAddDomain?.();
+                navigate("/ai-checker-v2");
+              }}
+              className="inline-flex shrink-0 items-center gap-2 rounded-[10px] bg-[#334155] px-4 py-3 text-[13px] font-medium text-white transition-colors hover:bg-[#1f2937]"
+            >
+              <span className="text-base leading-none">+</span>
+              Add New Domain
+            </button>
           </div>
         </div>
       </div>
@@ -693,7 +710,7 @@ useEffect(() => {
               ))}
           </div>
         </div>
-       <div className="lg:col-span-1 rounded-xl bg-white border border-gray-200 p-6 shadow-sm transition-shadow duration-300">
+        <div className="rounded-xl bg-white border border-gray-200 p-6 shadow-sm transition-shadow duration-300 h-full">
   <div className="flex items-center justify-between mb-4">
     <div>
       <h3 className="text-3xl font-medium text-gray-900">GSC Analytics</h3>
@@ -701,16 +718,6 @@ useEffect(() => {
         {gscConnected ? 'Top 5 queries performance trends' : 'Connect GSC to view analytics'}
       </p>
     </div>
-    {/* <button
-      onClick={onOpenAnalytics}
-      className="group text-sm font-medium text-black transition-colors duration-200 flex items-center gap-1 hover:underline"
-    >
-      View Details
-      <span className="relative flex items-center w-4 h-4">
-        <ChevronRight className="absolute inset-0 w-4 h-4 transition-all duration-200 ease-in-out group-hover:opacity-0 group-hover:translate-x-1" />
-        <ArrowRight className="absolute inset-0 w-4 h-4 opacity-0 transition-all duration-200 ease-in-out group-hover:opacity-100 group-hover:translate-x-0" />
-      </span>
-    </button> */}
   </div>
 
   <div className="w-full h-[400px]">
@@ -744,23 +751,8 @@ useEffect(() => {
 />
     )}
   </div>
-
-  {/* {gscConnected && !isLoadingTrends && formattedTrendsData.length > 0 && (
-    <div className="mt-4 pt-4 border-t border-gray-100">
-      <p className="text-xs text-gray-500 mb-2">Showing trends for top queries:</p>
-      <div className="flex flex-wrap gap-2">
-        {topQueries.map((query, idx) => (
-          <span key={idx} className="px-3 py-1.5 text-xs rounded-full bg-blue-50 text-blue-700 font-medium">
-            {query}
-          </span>
-        ))}
-      </div>
-    </div>
-  )} */}
 </div>
-        
         </div>
-        
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <div className="rounded-xl bg-white border border-gray-200 p-4">
             <div className="flex items-start justify-between mb-4">
@@ -805,8 +797,17 @@ useEffect(() => {
                 return (
                   <div
                     key={`${action.title}-${idx}`}
+                    role="button"
+                    tabIndex={0}
+                    onClick={action.onClick}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        action.onClick();
+                      }
+                    }}
                     className={cn(
-                      "rounded-lg px-5 py-3 border-l-[3px] shadow-sm flex items-center gap-3",
+                      "rounded-lg px-5 py-3 border-l-[3px] shadow-sm flex items-center gap-3 cursor-pointer transition-transform duration-200 hover:-translate-y-0.5 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#2D4059]",
                       rowTone
                     )}
                   >
@@ -821,6 +822,65 @@ useEffect(() => {
                   </div>
                 );
               })}
+            </div>
+          </div>
+        </div>
+
+        <div className="rounded-xl bg-white border border-gray-200 p-6 shadow-sm transition-shadow duration-300">
+          <div className="flex items-start justify-between gap-4 mb-4">
+            <div>
+              <h3 className="text-[18px] leading-normal font-semibold text-[#414651]">Competitor overview</h3>
+            </div>
+            <div className="relative w-full max-w-[260px]">
+              <input
+                type="text"
+                placeholder="Find Keyword..."
+                className="h-9 w-full rounded-lg border border-[#D0D5DD] bg-white pl-3 pr-3 text-sm text-[#344054] outline-none placeholder:text-[#98A2B3]"
+                readOnly
+              />
+            </div>
+          </div>
+
+          <div className="overflow-hidden rounded-lg border border-[#EAECF0]">
+            <div className="grid grid-cols-[1.7fr_1fr_.8fr_1fr] bg-[#F2F4F7] px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.06em] text-[#475467]">
+              <div>Domain</div>
+              <div>Key words</div>
+              <div>Overlap</div>
+              <div>Est. Traffic</div>
+            </div>
+
+            <div className="divide-y divide-[#EAECF0] bg-white">
+              {competitorOverview.loading && competitorOverview.rows.length === 0 ? (
+                [0, 1, 2, 3].map((idx) => (
+                  <div key={idx} className="grid grid-cols-[1.7fr_1fr_.8fr_1fr] items-center px-4 py-5 text-sm">
+                    <div className="h-4 w-32 animate-pulse rounded bg-[#EAECF0]" />
+                    <div className="h-4 w-20 animate-pulse rounded bg-[#EAECF0]" />
+                    <div className="h-5 w-12 animate-pulse rounded-full bg-[#EAECF0]" />
+                    <div className="h-4 w-24 animate-pulse rounded bg-[#EAECF0]" />
+                  </div>
+                ))
+              ) : competitorOverview.error && competitorOverview.rows.length === 0 ? (
+                <div className="px-4 py-8 text-sm text-[#667085]">
+                  {competitorOverview.error}
+                </div>
+              ) : competitorOverview.rows.length === 0 ? (
+                <div className="px-4 py-8 text-sm text-[#667085]">
+                  No competitor overview data available yet.
+                </div>
+              ) : (
+                competitorOverview.rows.map((row) => (
+                  <div key={row.domain} className="grid grid-cols-[1.7fr_1fr_.8fr_1fr] items-center px-4 py-5 text-sm">
+                    <div className="font-semibold text-[#344054]">{row.domain}</div>
+                    <div className="font-medium text-[#344054]">{row.keywords}</div>
+                    <div>
+                      <span className="inline-flex items-center rounded-full border border-[#9EB5FF] bg-[#F5F8FF] px-2 py-0.5 text-[11px] font-medium text-[#5B7CFF]">
+                        {row.overlap}
+                      </span>
+                    </div>
+                    <div className="font-semibold text-[#344054]">{row.traffic}</div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>
@@ -891,16 +951,12 @@ useEffect(() => {
 </div>
 )}
 
+    
       
 
-      <div className="grid grid-cols-1 lg:grid-cols-1 gap-6">
-
-        <div className="px-4 py-6 grid-cols-1 lg:grid-cols-1 rounded-3xl bg-white border border-gray-100 p-6 transition">
-          <GSCAnalyticsView />
-        </div>
-      </div>
     </div>
-     )}
+     )} 
   </>
 );
 }
+
