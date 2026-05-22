@@ -2,6 +2,7 @@ import type { Dispatch, ReactNode, RefObject, SetStateAction } from "react";
 import type { LucideIcon } from "lucide-react";
 import type { KeywordTableItem } from "@/types";
 import type { WordpressIntegration } from "@/types/publish";
+import type { SettingsSubTab } from "@/features/sidebar-dashboard/sections/settings/types";
 
 export type TabId =
   | "overview"
@@ -46,6 +47,7 @@ export interface DashboardSearchState {
   redirectToAiVisibility: boolean;
   activeTab?: TabId;
   activeCompanySubTab?: CompanySubTabId;
+  activeSettingsSubTab?: SettingsSubTab;
   openWordpressConnection?: boolean;
 }
 
@@ -180,6 +182,7 @@ export interface SettingsSectionProps {
   onCloseConfirm: () => void;
   onConfirmUpdate: () => void | Promise<void>;
   onOpenConfirm: () => void;
+  activeSubTab?: SettingsSubTab;
 }
 
 export interface DashboardContentRouterProps {

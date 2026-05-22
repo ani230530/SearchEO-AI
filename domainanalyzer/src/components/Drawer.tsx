@@ -66,12 +66,12 @@ export function Drawer({
         onClick={() => onOpenChange(false)}
       />
 
-      <div className="absolute inset-y-0 right-0 flex w-full justify-end">
+      <div className="absolute inset-y-0 right-0 flex w-full justify-end pointer-events-none">
         <div
           role="dialog"
           aria-modal="true"
           className={cn(
-            'relative flex h-full w-full max-w-[812px] flex-col overflow-hidden border-l border-slate-200 bg-white shadow-[0_24px_80px_rgba(15,23,42,0.24)]',
+            'pointer-events-auto relative flex h-full w-full max-w-[812px] flex-col overflow-hidden border-l border-slate-200 bg-white shadow-[0_24px_80px_rgba(15,23,42,0.24)]',
             panelClassName,
           )}
           onClick={(event) => event.stopPropagation()}

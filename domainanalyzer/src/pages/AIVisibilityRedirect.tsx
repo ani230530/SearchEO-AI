@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Loader2 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { maskDomainId } from "@/lib/domainUtils";
 import { apiGet } from "../services/apiClient";
@@ -125,75 +125,13 @@ const AIVisibilityRedirect = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#f5f5f7] text-slate-900">
-      <div className="flex min-h-screen">
-        <aside className="hidden w-[280px] shrink-0 border-r border-slate-200 bg-white/95 p-4 lg:block">
-          <div className="space-y-4">
-            <Skeleton className="h-10 w-36 rounded-lg" />
-            <div className="space-y-2">
-              {Array.from({ length: 7 }).map((_, idx) => (
-                <div key={idx} className="flex items-center gap-3 rounded-lg px-2 py-2">
-                  <Skeleton className="h-4 w-4 rounded-sm" />
-                  <Skeleton className="h-4 w-32" />
-                </div>
-              ))}
-            </div>
-          </div>
-        </aside>
-
-        <main className="flex-1">
-          <div className="border-b border-slate-200 bg-white/90 px-6 py-4">
-            <div className="flex items-center justify-between gap-4">
-              <div className="space-y-2">
-                <Skeleton className="h-4 w-24" />
-                <Skeleton className="h-8 w-56" />
-              </div>
-              <Skeleton className="h-10 w-36 rounded-full" />
-            </div>
-          </div>
-
-          <div className="p-6">
-            <div className="space-y-6">
-              <div className="grid gap-4 lg:grid-cols-3">
-                <Skeleton className="h-32 rounded-2xl" />
-                <Skeleton className="h-32 rounded-2xl" />
-                <Skeleton className="h-32 rounded-2xl" />
-              </div>
-
-              <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                <div className="mb-4 flex items-center justify-between">
-                  <Skeleton className="h-5 w-40" />
-                  <Skeleton className="h-9 w-28 rounded-full" />
-                </div>
-                <Skeleton className="h-[280px] w-full rounded-xl" />
-              </div>
-
-              <div className="grid gap-4 xl:grid-cols-[1.4fr_0.9fr]">
-                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                  <Skeleton className="mb-4 h-5 w-48" />
-                  <div className="space-y-3">
-                    {Array.from({ length: 5 }).map((_, idx) => (
-                      <div key={idx} className="flex items-center gap-3">
-                        <Skeleton className="h-4 w-20" />
-                        <Skeleton className="h-4 flex-1" />
-                        <Skeleton className="h-4 w-16" />
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                  <Skeleton className="mb-4 h-5 w-36" />
-                  <div className="space-y-3">
-                    {Array.from({ length: 4 }).map((_, idx) => (
-                      <Skeleton key={idx} className="h-16 rounded-xl" />
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </main>
+    <div className="flex min-h-screen w-full items-center justify-center bg-white px-6">
+      <div className="flex flex-col items-center gap-3 text-center">
+        <Loader2 className="h-8 w-8 animate-spin text-[#2D4059]" />
+        <div>
+          <p className="text-base font-medium text-slate-900">Loading AI Visibility</p>
+          <p className="mt-1 text-sm text-slate-500">Opening your latest AI visibility report...</p>
+        </div>
       </div>
     </div>
   );
