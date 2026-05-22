@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { logoUrl as logoUrlHelper } from "@/lib/logoUrl";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { apiGet } from "../../../services/apiClient";
 import { maskDomainId } from "../../../lib/domainUtils";
 import { AddDomainModal } from "../components/AddDomainModal";
@@ -111,6 +111,7 @@ interface DomainHistorySectionProps {
 }
 
 export function DomainHistorySection({ onMenuItemClick }: DomainHistorySectionProps) {
+  const location = useLocation();
   const navigate = useNavigate();
   const [openMenuId, setOpenMenuId] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -210,6 +211,7 @@ export function DomainHistorySection({ onMenuItemClick }: DomainHistorySectionPr
   }, [items, searchQuery]);
 
   const hasDomains = items.length > 0;
+  const dashboardBasePath = location.pathname.startsWith("/newdashboard") ? "/newdashboard" : "/dashboard";
 
   // AI Dashboard sidebar tabs — these mirror the rail in AIResultsLayout so
   // a domain card's dropdown lands the user on the same screens they'd reach
@@ -300,7 +302,7 @@ export function DomainHistorySection({ onMenuItemClick }: DomainHistorySectionPr
             </p>
             <button
               type="button"
-              onClick={() => navigate("/ai-checker-v2")}
+              onClick={() => navigate(`${dashboardBasePath}?tab=settings&subtab=integrations`)}
               className="mt-5 inline-flex h-10 items-center gap-2 rounded-md px-5 text-sm font-medium text-white"
               style={{ background: "linear-gradient(90deg, #2D4059 0%, #4E76C7 100%)" }}
             >

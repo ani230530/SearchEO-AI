@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ButtonSpinner } from "@/components/ui/button-spinner";
 import { SettingsNotificationSection } from "@/features/sidebar-dashboard/sections/settings/SettingsNotificationSection";
 import { SettingsPlaceholderSection } from "@/features/sidebar-dashboard/sections/settings/SettingsPlaceholderSection";
@@ -14,11 +14,18 @@ export function SettingsSection({
   onCloseConfirm,
   onConfirmUpdate,
   onOpenConfirm,
+  activeSubTab,
 }: SettingsSectionProps) {
-  const [activeSubTab, setActiveSubTab] = useState<SettingsSubTab>("profile");
+  const [currentSubTab, setCurrentSubTab] = useState<SettingsSubTab>(activeSubTab ?? "profile");
+
+  useEffect(() => {
+    if (activeSubTab) {
+      setCurrentSubTab(activeSubTab);
+    }
+  }, [activeSubTab]);
 
   const renderContent = () => {
-    switch (activeSubTab) {
+    switch (currentSubTab) {
       case "profile":
         return <Profile compact />;
       case "integrations":
@@ -62,9 +69,9 @@ export function SettingsSection({
     <div className="w-full py-4">
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-[300px_minmax(0,1fr)]">
         <SettingsSubSidebar
-          activeSubTab={activeSubTab}
+          activeSubTab={currentSubTab}
           items={SETTINGS_ITEMS}
-          onSelect={setActiveSubTab}
+          onSelect={setCurrentSubTab}
         />
         <div className="rounded-xl border border-gray-200 bg-[#f8f8f9] p-4">{renderContent()}</div>
       </div>

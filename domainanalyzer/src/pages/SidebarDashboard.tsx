@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
   ChevronRight,
@@ -125,6 +125,11 @@ const formatDashboardTraffic = (value: number | null | undefined) => {
 
 
 const SidebarDashboard = () => {
+  const location = useLocation();
+  const searchState = useMemo(
+    () => parseDashboardSearchState(location.search),
+    [location.search]
+  );
 const [activeTab, setActiveTab] = useState<TabId>(() =>
   getStoredActiveTab(localStorage.getItem("activeTab"))
 );
@@ -928,8 +933,6 @@ useEffect(() => {
 
   // Handle URL query parameters for tab navigation (e.g., from OAuth callback)
   useEffect(() => {
-    const searchState = parseDashboardSearchState(window.location.search);
-
     if (searchState.redirectToAiVisibility) {
       navigate('/ai-visibility');
     } else if (searchState.activeTab) {
@@ -945,7 +948,7 @@ useEffect(() => {
       setActiveCompanySubTab('integration');
       setOpenWordpressConnectionView(true);
     }
-  }, [navigate]);
+  }, [navigate, searchState]);
 
 
   // Auto-advance carousel to show running task
@@ -2687,6 +2690,7 @@ useEffect(() => {
     settings: {
       confirmUpdateOpen,
       updateLoading,
+      activeSubTab: searchState.activeSettingsSubTab,
       onCloseConfirm: () => {
         if (!updateLoading) {
           setConfirmUpdateOpen(false);
@@ -2773,7 +2777,10 @@ useEffect(() => {
           userEmail={user?.email}
           userName={user?.name}
           lastSyncedAt={gscLastSynced}
-          onAddDomain={() => navigate("/ai-checker-v2")}
+          onAddDomain={() => {
+            const basePath = location.pathname.startsWith("/newdashboard") ? "/newdashboard" : "/dashboard";
+            navigate(`${basePath}?tab=settings&subtab=integrations`);
+          }}
           onTabChange={setActiveTab}
         />
 
@@ -2848,7 +2855,10 @@ useEffect(() => {
               keywords={keywords as any}
               companyDomainFetchError={companyDomainFetchError}
               onRetryCompanyDomain={() => fetchCompanyDomain(true)}
-              onAddDomain={() => navigate("/ai-checker-v2")}
+              onAddDomain={() => {
+                const basePath = location.pathname.startsWith("/newdashboard") ? "/newdashboard" : "/dashboard";
+                navigate(`${basePath}?tab=settings&subtab=integrations`);
+              }}
               onGoToAudit={() => setActiveTab("audit")}
             />
           ) : activeTab === "projects" ? (

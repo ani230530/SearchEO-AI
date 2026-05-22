@@ -3,6 +3,7 @@ import type {
   DashboardSearchState,
   TabId,
 } from "@/features/sidebar-dashboard/types";
+import type { SettingsSubTab } from "@/features/sidebar-dashboard/sections/settings/types";
 import type { Keyword, KeywordTableItem } from "@/types";
 
 const VALID_TABS: readonly TabId[] = [
@@ -31,6 +32,15 @@ const VALID_QUERY_TABS: readonly TabId[] = [
 const VALID_COMPANY_SUB_TABS: readonly CompanySubTabId[] = [
   "company-info",
   "integration",
+];
+
+const VALID_SETTINGS_SUB_TABS: readonly SettingsSubTab[] = [
+  "profile",
+  "knowledge-base",
+  "privacy-security",
+  "notifications",
+  "subscription",
+  "integrations",
 ];
 
 export function summarizeDomainContext(
@@ -77,6 +87,10 @@ export function parseDashboardSearchState(search: string): DashboardSearchState 
     activeCompanySubTab:
       subtabParam && VALID_COMPANY_SUB_TABS.includes(subtabParam as CompanySubTabId)
         ? (subtabParam as CompanySubTabId)
+        : undefined,
+    activeSettingsSubTab:
+      tabParam === "settings" && subtabParam && VALID_SETTINGS_SUB_TABS.includes(subtabParam as SettingsSubTab)
+        ? (subtabParam as SettingsSubTab)
         : undefined,
     openWordpressConnection: wordpressParam === "1" || wordpressParam === "true",
   };
