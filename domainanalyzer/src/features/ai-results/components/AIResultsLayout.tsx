@@ -165,7 +165,7 @@ export function AIResultsLayout({
       return;
     }
 
-    navigate(`/dashboard?tab=analytics&domain=${nextMaskedId}`);
+    navigate(`/ai-results-prompt-gaps`);
   };
 
   const dashboardSidebarTabs = useMemo(() => {
