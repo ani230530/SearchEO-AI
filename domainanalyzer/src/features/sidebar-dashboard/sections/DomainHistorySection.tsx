@@ -222,7 +222,7 @@ export function DomainHistorySection({ onMenuItemClick }: DomainHistorySectionPr
   ];
 
   return (
-    <div className="w-full">
+    <div className="w-full p-8">
       <div className="mb-4 flex items-center justify-between">
         <h2 className="text-xl font-medium text-[#252b33]">Search History</h2>
         <div className="flex items-center gap-2">
