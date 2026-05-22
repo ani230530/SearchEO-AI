@@ -1,28 +1,31 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiPost } from '../services/apiClient';
 import { useShellContext } from '@/features/ai-results/AIResultsShell';
-import { aiResultsKeys, useCampaigns } from '@/features/ai-results/queries';
+import { aiResultsKeys, useCampaigns, useReport } from '@/features/ai-results/queries';
 import { useQueryClient } from '@tanstack/react-query';
 import { PromptTable, WorksheetPickerModal } from './AIResultsReportPreview';
 
 const WORKSHEET_IMPORT_KEY = 'ai-results/pending-worksheet-import';
 const WORKSHEET_TARGET_KEY = 'ai-results/pending-worksheet-target';
-const AI_VISIBILITY_LAST_DOMAIN_SLUG = 'ai-visibility:lastDomainSlug';
-
-type DomainOption = {
-  id: number;
-  url: string;
-  createdAt: string;
-  host?: string;
-  companyName?: string | null;
-};
 
 type WorksheetOption = {
   id: string;
   name: string;
   description: string | null;
 };
+
+interface ReportOpportunity {
+  key: string;
+  severityScore: number;
+  title: string;
+  competitors: string[];
+  promptIds: number[];
+}
+
+interface ReportPayload {
+  opportunities: ReportOpportunity[];
+}
 
 type PromptGapRow = {
   id: string;
@@ -63,69 +66,6 @@ const STATIC_ANALYSIS_INSIGHTS = [
     detail: 'DA metric frequently cited; link freshness flagged as weakness',
   },
 ] as const;
-
-const STATIC_PROMPT_ROWS: PromptGapRow[] = [
-  {
-    id: 'prompt-gap-1',
-    type: 'prompt',
-    phrase: 'How to track competitor backlinks prompts effectively?',
-    avgSentiment: 8.4,
-    mentions: 47,
-    bestRank: 1,
-    sov: '88%',
-    competitors: ['semrush.com', 'ahrefs.com', 'moz.com'],
-    competitorCount: 3,
-    results: [],
-  },
-  {
-    id: 'prompt-gap-2',
-    type: 'prompt',
-    phrase: 'How do AI tools compare for backlink monitoring?',
-    avgSentiment: 7.6,
-    mentions: 41,
-    bestRank: 2,
-    sov: '82%',
-    competitors: ['semrush.com', 'serpstat.com'],
-    competitorCount: 2,
-    results: [],
-  },
-  {
-    id: 'prompt-gap-3',
-    type: 'prompt',
-    phrase: 'Which SEO platform has the strongest prompt coverage?',
-    avgSentiment: 7.1,
-    mentions: 35,
-    bestRank: 3,
-    sov: '79%',
-    competitors: ['ahrefs.com', 'moz.com'],
-    competitorCount: 2,
-    results: [],
-  },
-  {
-    id: 'prompt-gap-4',
-    type: 'prompt',
-    phrase: 'Best workflow for tracking AI citations across competitors',
-    avgSentiment: 6.8,
-    mentions: 29,
-    bestRank: 4,
-    sov: '73%',
-    competitors: ['spyfu.com', 'semrush.com'],
-    competitorCount: 2,
-    results: [],
-  },
-  {
-    id: 'prompt-gap-5',
-    type: 'prompt',
-    phrase: 'How to turn prompt gaps into content opportunities',
-    avgSentiment: 6.4,
-    mentions: 21,
-    bestRank: 5,
-    sov: '68%',
-    competitors: ['ahrefs.com', 'spyfu.com'],
-    competitorCount: 2,
-    results: [],
-  },
-];
 
 function StaticAiResponseAnalysis() {
   return (
@@ -192,10 +132,11 @@ function StaticAiResponseAnalysis() {
 
 const AIResultsPromptGaps = () => {
   const navigate = useNavigate();
-  const { currentDomain } = useShellContext();
+  const { currentDomain, domainsLoading } = useShellContext();
   const [selectedRowIds, setSelectedRowIds] = useState<Set<string>>(new Set());
   const [activeWorksheetId, setActiveWorksheetId] = useState<string | null>(null);
   const [isWorksheetModalOpen, setIsWorksheetModalOpen] = useState(false);
+  const domainId = currentDomain?.id ?? null;
 
   // Campaigns + domain context come from the shared cache so this page
   // doesn't duplicate fetches the sibling tabs already made.
@@ -210,8 +151,37 @@ const AIResultsPromptGaps = () => {
     [campaignsQuery.data],
   );
   const worksheetOptionsLoading = campaignsQuery.isLoading;
+  const reportQuery = useReport<ReportPayload>(domainId);
 
-  const promptRows = useMemo(() => STATIC_PROMPT_ROWS, []);
+  const promptRows = useMemo<PromptGapRow[]>(() => {
+    const opportunities = reportQuery.data?.opportunities ?? [];
+    return opportunities.map((item, index) => {
+      const score100 = Math.max(0, Math.min(100, Math.round(item.severityScore * 10)));
+      return {
+        id: item.key || `prompt-gap-${index + 1}`,
+        type: 'prompt',
+        phrase: item.title,
+        avgSentiment: Number((score100 / 10).toFixed(1)),
+        mentions: Array.isArray(item.promptIds) ? item.promptIds.length : 0,
+        bestRank: index + 1,
+        sov: `${score100}%`,
+        competitors: Array.isArray(item.competitors) ? item.competitors : [],
+        competitorCount: Array.isArray(item.competitors) ? item.competitors.length : 0,
+        results: [],
+      };
+    });
+  }, [reportQuery.data]);
+
+  useEffect(() => {
+    setSelectedRowIds((current) => {
+      const validIds = new Set(promptRows.map((row) => row.id));
+      const next = new Set<string>();
+      for (const id of current) {
+        if (validIds.has(id)) next.add(id);
+      }
+      return next;
+    });
+  }, [promptRows]);
 
   const selectedCount = selectedRowIds.size;
 
@@ -280,24 +250,43 @@ const AIResultsPromptGaps = () => {
     }
   }, [navigate, queryClient]);
 
+  const loading = domainsLoading || reportQuery.isLoading;
+  const error = reportQuery.error;
+
   return (
     <>
       <section className="flex w-full flex-col bg-white px-4 py-3 sm:px-6">
-        <div className="rounded-xl border border-slate-200 bg-white">
-          <PromptTable
-            data={promptRows}
-            selectedRowIds={selectedRowIds}
-            onToggleRow={handleToggleRow}
-            onOpenWorksheetModal={handleOpenWorksheetModal}
-            title="Prompt Gaps Opportunities"
-            defaultExpandedId={promptRows[0]?.id ?? null}
-            renderExpandedDetails={() => <StaticAiResponseAnalysis />}
-            footerActionLabel="View Library"
-            footerActionIconSrc="/icons/book-open-01.svg"
-            footerActionClassName="bg-[#F9F9F9] text-[#3393F2] hover:bg-[#F3F6FB]"
-            footerActionIconClassName="text-[#3393F2]"
-          />
-        </div>
+        {loading ? (
+          <div className="rounded-xl border border-slate-200 bg-white px-6 py-10 text-sm text-slate-500">
+            Loading prompt gaps...
+          </div>
+        ) : error ? (
+          <div className="rounded-xl border border-rose-200 bg-rose-50 px-6 py-10 text-sm text-rose-700">
+            {error instanceof Error ? error.message : 'Failed to load prompt gaps.'}
+          </div>
+        ) : promptRows.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50/60 px-6 py-10 text-center text-sm text-slate-500">
+            No prompt gap opportunities yet. Run or refresh the audit to generate them.
+          </div>
+        ) : (
+          <div className="rounded-xl border border-slate-200 bg-white">
+            <PromptTable
+              data={promptRows}
+              selectedRowIds={selectedRowIds}
+              onToggleRow={handleToggleRow}
+              onSetSelectedRows={setSelectedRowIds}
+              onOpenWorksheetModal={handleOpenWorksheetModal}
+              title="Prompt Gaps Opportunities"
+              domainId={domainId}
+              defaultExpandedId={promptRows[0]?.id ?? null}
+              renderExpandedDetails={() => <StaticAiResponseAnalysis />}
+              footerActionLabel="View Library"
+              footerActionIconSrc="/icons/book-open-01.svg"
+              footerActionClassName="bg-[#F9F9F9] text-[#3393F2] hover:bg-[#F3F6FB]"
+              footerActionIconClassName="text-[#3393F2]"
+            />
+          </div>
+        )}
       </section>
 
       <WorksheetPickerModal
