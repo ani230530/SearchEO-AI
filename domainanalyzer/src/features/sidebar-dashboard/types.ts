@@ -159,6 +159,9 @@ export interface CompetitorIntelligenceProps {
     domain: string;
     keywords: number;
     overlap: number;
+    mentions?: number;
+    marketShare?: number;
+    estimatedTraffic?: number;
     traffic: number | string;
   }[];
 

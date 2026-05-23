@@ -5,6 +5,7 @@ import { GscAnalyticsSection } from "@/features/sidebar-dashboard/sections/GscAn
 import KnowledgeBaseSection from "@/features/sidebar-dashboard/sections/KnowledgeBaseSection";
 import { DomainHistorySection } from "@/features/sidebar-dashboard/sections/DomainHistorySection";
 import { ProfileSection } from "@/features/sidebar-dashboard/sections/ProfileSection";
+import CompetitorPage from "@/features/sidebar-dashboard/sections/CompetitorPage";
 import { OverviewSection } from "@/features/sidebar-dashboard/sections/OverviewSection";
 import { SettingsSection } from "@/features/sidebar-dashboard/sections/SettingsSection";
 import type { DashboardContentRouterProps } from "@/features/sidebar-dashboard/types";
@@ -35,13 +36,7 @@ export function DashboardContentRouter({
     case "gsc-analytics":
       return <GscAnalyticsSection {...gscAnalytics} />;
     case "competitor-intelligence":
-      // Pending rebuild against /api/wizard/domain/:id (returns ranked Competitor[]).
-      void competitorIntelligence;
-      return (
-        <div className="p-6 text-sm text-slate-500">
-          Competitor view is being rebuilt against the new wizard pipeline.
-        </div>
-      );
+      return <CompetitorPage {...competitorIntelligence} />;
     case "knowledge-base":
       return <KnowledgeBaseSection />;
     case "domain-history":
