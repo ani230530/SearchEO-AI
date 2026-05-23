@@ -606,6 +606,7 @@ export interface CompetitorAnalysisRow {
   reasoning: string | null;
   industry: string | null;
   companySize: string | null;
+  estimatedTraffic: number;
   /** Aggregates derived from AiQueryResult.competitorMentions / citations. */
   mentions: number;             // total mention count across all results
   promptCoverage: number;       // distinct prompts the competitor appeared in
@@ -766,6 +767,7 @@ export function computeCompetitorAnalysis(input: AnalyticsInput): CompetitorAnal
       reasoning: null,
       industry: null,
       companySize: null,
+      estimatedTraffic: Math.round((totalCompetitorMentions > 0 ? a.mentions / totalCompetitorMentions : 0) * 1_000_000),
       mentions: a.mentions,
       promptCoverage: a.promptIds.size,
       coveragePct: totalQueriedPrompts > 0 ? a.promptIds.size / totalQueriedPrompts : 0,
@@ -790,6 +792,7 @@ export function computeCompetitorAnalysis(input: AnalyticsInput): CompetitorAnal
       reasoning: null,
       industry: null,
       companySize: null,
+      estimatedTraffic: 0,
       mentions: 0,
       promptCoverage: 0,
       coveragePct: 0,

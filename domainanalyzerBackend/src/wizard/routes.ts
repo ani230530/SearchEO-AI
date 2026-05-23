@@ -1604,6 +1604,7 @@ function emptyCompetitorRow(c: { competitorHost: string; rank: number | null; th
     reasoning: c.reasoning,
     industry: c.industry,
     companySize: c.companySize,
+    estimatedTraffic: 0,
     mentions: 0,
     promptCoverage: 0,
     coveragePct: 0,

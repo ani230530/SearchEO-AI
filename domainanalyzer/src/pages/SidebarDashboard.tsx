@@ -126,6 +126,7 @@ const formatDashboardTraffic = (value: number | null | undefined) => {
 
 const SidebarDashboard = () => {
   const location = useLocation();
+  const navigate = useNavigate();
   const searchState = useMemo(
     () => parseDashboardSearchState(location.search),
     [location.search]
@@ -167,13 +168,13 @@ const [auditComplete, setAuditComplete] = useState(false);
 const [selectedMetric, setSelectedMetric] = useState<string | undefined>();
 const [showAuditModal, setShowAuditModal] = useState(false);
 const resultsRef = useRef<HTMLDivElement | null>(null);
-const [activeChartTab, setActiveChartTab] = useState<'overview' | 'comparison' | 'distribution'>('overview');
-const [n8nSending, setN8nSending] = useState(false);
+  const [activeChartTab, setActiveChartTab] = useState<'overview' | 'comparison' | 'distribution'>('overview');
+  const [n8nSending, setN8nSending] = useState(false);
 const [n8nRequestId, setN8nRequestId] = useState<string | null>(null);
 const [n8nStatus, setN8nStatus] = useState<'processing' | 'completed' | 'failed' | null>(null);
 const [n8nResults, setN8nResults] = useState<{sheetsUrl?: string; slidesUrl?: string} | null>(null);
 const sseRef = useRef<EventSource | null>(null);
-const autoAuditTriggeredRef = useRef(false);
+  const autoAuditTriggeredRef = useRef(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loadingSteps, setLoadingSteps] = useState([
     {
@@ -245,6 +246,14 @@ const autoAuditTriggeredRef = useRef(false);
   });
   const [gscConnected, setGscConnected] = useState(false);
   const [gscAnalysis, setGscAnalysis] = useState(null);
+
+  const openSettingsIntegrations = useCallback(() => {
+    setActiveTab("settings");
+    setActiveCompanySubTab("integration");
+    const basePath = location.pathname.startsWith("/newdashboard") ? "/newdashboard" : "/dashboard";
+    navigate(`${basePath}?tab=settings&subtab=integrations`);
+  }, [location.pathname, navigate]);
+
   // Track pages currently being published (waiting for SSE confirmation)
   const [publishingPageIds, setPublishingPageIds] = useState<Set<number>>(new Set());
   // Map draftId to pageId so SSE handler knows which page to update
@@ -258,6 +267,7 @@ const autoAuditTriggeredRef = useRef(false);
     error?: string;
     updatedAt?: string;
   }>>(new Map());
+
   // Track generation job statuses
   const [generationJobs, setGenerationJobs] = useState<Map<number, GenerationPageStatus>>(new Map());
   const notifiedReadyPageIdsRef = useRef<Set<number>>(new Set());
@@ -377,7 +387,6 @@ const toggleSection = (idx: number) => {
     };
   }, []);
   const { user, logout } = useAuth();
-  const navigate = useNavigate();
   const { toast } = useToast();
   const isSidebarExpanded = sidebarOpen || isSidebarHovered;
 
@@ -607,22 +616,51 @@ const normalizedDomain = normalizeDomain(companyDomain);
 
 const competitorAnalysisQuery = useCompetitorAnalysis<any>(createdDomainId);
 
-const competitorOverview = useMemo(() => {
+const competitorIntelligenceRows = useMemo(() => {
   const competitorRows = Array.isArray(competitorAnalysisQuery.data?.competitors)
     ? competitorAnalysisQuery.data.competitors
     : [];
 
-  const rows = competitorRows.slice(0, 4).map((competitor: any) => ({
-    domain: String(competitor?.host ?? competitor?.domain ?? "Unknown"),
-    keywords: formatDashboardCount(
-      competitor?.promptCoverage ?? competitor?.mentions ?? competitor?.keywordCount ?? competitor?.frequency
-    ),
-    overlap: formatDashboardPercent(
-      competitor?.coveragePct ?? competitor?.similarityScore ?? competitor?.overlap
-    ),
-    traffic: formatDashboardTraffic(
-      competitor?.marketShare ?? competitor?.trafficShare ?? competitor?.traffic
-    ),
+  return competitorRows
+    .map((competitor: any) => {
+      const estimatedTraffic =
+        typeof competitor?.estimatedTraffic === "number"
+          ? competitor.estimatedTraffic
+          : Math.round(
+              (typeof competitor?.marketShare === "number" ? competitor.marketShare : 0) * 1_000_000
+            );
+
+      return {
+        domain: String(competitor?.host ?? competitor?.domain ?? "Unknown"),
+        keywords: Number(
+          competitor?.promptCoverage ?? competitor?.mentions ?? competitor?.keywordCount ?? competitor?.frequency ?? 0
+        ),
+        overlap: Number(
+          competitor?.coveragePct ?? competitor?.similarityScore ?? competitor?.overlap ?? 0
+        ),
+        mentions: Number(competitor?.mentions ?? 0),
+        marketShare: Number(competitor?.marketShare ?? 0),
+        estimatedTraffic,
+        traffic: estimatedTraffic,
+        rank: typeof competitor?.rank === "number" ? competitor.rank : null,
+        threatLevel: competitor?.threatLevel ?? null,
+        reasoning: competitor?.reasoning ?? null,
+      };
+    })
+    .sort((a, b) => {
+      const aRank = typeof a.rank === "number" ? a.rank : Number.MAX_SAFE_INTEGER;
+      const bRank = typeof b.rank === "number" ? b.rank : Number.MAX_SAFE_INTEGER;
+      if (aRank !== bRank) return aRank - bRank;
+      return b.estimatedTraffic - a.estimatedTraffic;
+    });
+}, [competitorAnalysisQuery.data]);
+
+const competitorOverview = useMemo(() => {
+  const rows = competitorIntelligenceRows.slice(0, 4).map((competitor) => ({
+    domain: competitor.domain,
+    keywords: formatDashboardCount(competitor.keywords),
+    overlap: formatDashboardPercent(competitor.overlap),
+    traffic: formatDashboardTraffic(competitor.estimatedTraffic ?? competitor.traffic),
   }));
 
   return {
@@ -636,6 +674,7 @@ const competitorOverview = useMemo(() => {
   competitorAnalysisQuery.data,
   competitorAnalysisQuery.isError,
   competitorAnalysisQuery.isLoading,
+  competitorIntelligenceRows,
   createdDomainId,
 ]);
 
@@ -2701,13 +2740,15 @@ useEffect(() => {
     },
     competitorIntelligence: {
       domainId: createdDomainId?.toString() || "",
-      loading: false,
+      loading: createdDomainId != null && competitorAnalysisQuery.isLoading,
       progress: 0,
-      competitors: [],
-      data: [],
+      competitors: competitorIntelligenceRows.map((row) => row.domain),
+      data: competitorIntelligenceRows,
       onRunAnalysis: (competitorDomain: string) => {
-        // TODO: implement
         console.log("Run analysis for", competitorDomain);
+      },
+      onRefresh: () => {
+        void competitorAnalysisQuery.refetch();
       },
     },
     onMenuItemClick: (tabId: TabId, domainId?: string | number) => {
@@ -2777,10 +2818,7 @@ useEffect(() => {
           userEmail={user?.email}
           userName={user?.name}
           lastSyncedAt={gscLastSynced}
-          onAddDomain={() => {
-            const basePath = location.pathname.startsWith("/newdashboard") ? "/newdashboard" : "/dashboard";
-            navigate(`${basePath}?tab=settings&subtab=integrations`);
-          }}
+          onAddDomain={openSettingsIntegrations}
           onTabChange={setActiveTab}
         />
 
@@ -2855,10 +2893,7 @@ useEffect(() => {
               keywords={keywords as any}
               companyDomainFetchError={companyDomainFetchError}
               onRetryCompanyDomain={() => fetchCompanyDomain(true)}
-              onAddDomain={() => {
-                const basePath = location.pathname.startsWith("/newdashboard") ? "/newdashboard" : "/dashboard";
-                navigate(`${basePath}?tab=settings&subtab=integrations`);
-              }}
+              onAddDomain={openSettingsIntegrations}
               onGoToAudit={() => setActiveTab("audit")}
             />
           ) : activeTab === "projects" ? (
