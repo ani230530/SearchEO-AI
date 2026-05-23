@@ -41,6 +41,7 @@ const allowedOrigins = [
   'https://phrase-score-insight-lxkj.vercel.app',
   'https://domainanalyzer-rosy.vercel.app',
   'https://seo-gpt-teal.vercel.app',
+  'https://search-eo-ai.vercel.app',
 ];
 
 const corsOptions: cors.CorsOptions = {
