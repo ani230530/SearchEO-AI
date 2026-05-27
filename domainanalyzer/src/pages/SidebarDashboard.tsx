@@ -63,6 +63,7 @@ import { ProjectsSection } from "@/features/sidebar-dashboard/sections/ProjectsS
 import WorksheetDraftOverlay from "@/features/campaign/WorksheetDraftOverlay";
 import { DASHBOARD_TABS } from "@/features/sidebar-dashboard/constants";
 import CompetitorPage from '@/features/sidebar-dashboard/sections/CompetitorPage';
+import { resolveSidebarNavigation } from "@/features/sidebar-dashboard/navigation";
 
 import type {
   CompanySubTabId,
@@ -988,6 +989,16 @@ useEffect(() => {
       setOpenWordpressConnectionView(true);
     }
   }, [navigate, searchState]);
+
+  useEffect(() => {
+    if (
+      (location.pathname === "/dashboard" || location.pathname === "/newdashboard") &&
+      !location.search
+    ) {
+      const basePath = location.pathname.startsWith("/newdashboard") ? "/newdashboard" : "/dashboard";
+      navigate(`${basePath}?tab=overview`, { replace: true });
+    }
+  }, [location.pathname, location.search, navigate]);
 
 
   // Auto-advance carousel to show running task
@@ -2773,6 +2784,7 @@ useEffect(() => {
       {/* Sidebar */}
       <DashboardSidebar
         activeCompanySubTab={activeCompanySubTab}
+        activeSettingsSubTab={searchState.activeSettingsSubTab}
         activeTab={activeTab}
         isSidebarExpanded={isSidebarExpanded}
         onHoverChange={setIsSidebarHovered}
@@ -2787,13 +2799,16 @@ useEffect(() => {
           setActiveTab("projects");
           setShowCreateCampaign(true);
         }}
+        onSelectPricing={() => {
+          const route = resolveSidebarNavigation("pricing");
+          setActiveTab(route.activeTab);
+          navigate(route.path);
+        }}
         onSelectTab={(tabId) => {
-          if (tabId === "ai-visibility") {
-            navigate("/ai-visibility");
-            return;
-          }
           setOpenWordpressConnectionView(false);
-          setActiveTab(tabId);
+          const route = resolveSidebarNavigation(tabId);
+          setActiveTab(route.activeTab);
+          navigate(route.path);
           if (tabId === "integration") {
             setActiveCompanySubTab("integration");
           }

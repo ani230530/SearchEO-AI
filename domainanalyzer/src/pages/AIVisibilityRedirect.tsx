@@ -97,7 +97,7 @@ const AIVisibilityRedirect = () => {
             Analyze a domain first to see your AI visibility report.
           </p>
           <button
-            onClick={() => navigate("/dashboard")}
+            onClick={() => navigate("/dashboard?tab=overview")}
             className="px-4 py-2 rounded-full bg-black text-white hover:bg-black/90 transition"
           >
             Back to dashboard
@@ -114,7 +114,7 @@ const AIVisibilityRedirect = () => {
           <h2 className="text-xl font-semibold text-gray-900 mb-2">Something went wrong</h2>
           <p className="text-gray-600 mb-6">{state.message}</p>
           <button
-            onClick={() => navigate("/dashboard")}
+            onClick={() => navigate("/dashboard?tab=overview")}
             className="px-4 py-2 rounded-full bg-black text-white hover:bg-black/90 transition"
           >
             Back to dashboard

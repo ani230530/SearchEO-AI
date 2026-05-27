@@ -5,6 +5,7 @@ import type {
 } from "@/features/sidebar-dashboard/types";
 import type { SettingsSubTab } from "@/features/sidebar-dashboard/sections/settings/types";
 import type { Keyword, KeywordTableItem } from "@/types";
+import { DASHBOARD_QUERY_TABS } from "@/features/sidebar-dashboard/navigation";
 
 const VALID_TABS: readonly TabId[] = [
   "overview",
@@ -15,18 +16,12 @@ const VALID_TABS: readonly TabId[] = [
   "profile",
   "ai-visibility",
   "gsc-analytics",
+  "attribution",
   "audit",
   "analytics-report",
-];
-
-const VALID_QUERY_TABS: readonly TabId[] = [
-  "overview",
-  "analytics",
-  "integration",
-  "projects",
-  "settings",
-  "profile",
-  "gsc-analytics",
+  "knowledge-base",
+  "domain-history",
+  "competitor-intelligence",
 ];
 
 const VALID_COMPANY_SUB_TABS: readonly CompanySubTabId[] = [
@@ -81,7 +76,7 @@ export function parseDashboardSearchState(search: string): DashboardSearchState 
   return {
     redirectToAiVisibility: false,
     activeTab:
-      tabParam && VALID_QUERY_TABS.includes(tabParam as TabId)
+      tabParam && DASHBOARD_QUERY_TABS.includes(tabParam as TabId)
         ? (tabParam as TabId)
         : undefined,
     activeCompanySubTab:

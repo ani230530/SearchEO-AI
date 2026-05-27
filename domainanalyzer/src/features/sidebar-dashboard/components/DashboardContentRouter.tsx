@@ -2,6 +2,7 @@ import { AnalyticsReportSection } from "@/features/sidebar-dashboard/sections/An
 import { AuditSection } from "@/features/sidebar-dashboard/sections/AuditSection";
 import { CompanySection } from "@/features/sidebar-dashboard/sections/CompanySection";
 import { GscAnalyticsSection } from "@/features/sidebar-dashboard/sections/GscAnalyticsSection";
+import AttributionSection from "@/features/sidebar-dashboard/sections/AttributionSection";
 import KnowledgeBaseSection from "@/features/sidebar-dashboard/sections/KnowledgeBaseSection";
 import { DomainHistorySection } from "@/features/sidebar-dashboard/sections/DomainHistorySection";
 import { ProfileSection } from "@/features/sidebar-dashboard/sections/ProfileSection";
@@ -35,6 +36,8 @@ export function DashboardContentRouter({
       return <AnalyticsReportSection {...analyticsReport} />;
     case "gsc-analytics":
       return <GscAnalyticsSection {...gscAnalytics} />;
+    case "attribution":
+      return <AttributionSection />;
     case "competitor-intelligence":
       return <CompetitorPage {...competitorIntelligence} />;
     case "knowledge-base":
