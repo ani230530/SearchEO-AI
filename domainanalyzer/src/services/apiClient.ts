@@ -201,12 +201,30 @@ export async function apiRequest<T>(
     if (window.location.pathname !== '/auth' && window.location.pathname !== '/') {
       window.location.href = '/auth';
     }
-    const error = await response.json().catch(() => ({}));
+    const errorText = await response.clone().text().catch(() => '');
+    const error = errorText
+      ? (() => {
+          try {
+            return JSON.parse(errorText);
+          } catch {
+            return { error: errorText };
+          }
+        })()
+      : {};
     throw new Error(error.error || 'Authentication failed');
   }
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({}));
+    const errorText = await response.clone().text().catch(() => '');
+    const error = errorText
+      ? (() => {
+          try {
+            return JSON.parse(errorText);
+          } catch {
+            return { error: errorText };
+          }
+        })()
+      : {};
     // Preserve the server's code in the thrown Error so callers can
     // discriminate (e.g. SIGNUP_REQUIRED → open the wall instead of
     // surfacing a generic toast).
