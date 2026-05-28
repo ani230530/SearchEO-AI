@@ -250,7 +250,7 @@ export function DashboardSidebar({
             key: "settings",
             label: "Settings",
             icon: <Settings className="h-4 w-4" />,
-            isActive: activeTab === "settings",
+            isActive: activeTab === "settings"&& activeSettingsSubTab !== "subscription",
             onClick: () => onSelectTab("settings"),
           },
         ],
