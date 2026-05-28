@@ -14,6 +14,7 @@ export type TabId =
   | "profile"
   | "ai-visibility"
   | "gsc-analytics"
+  | "attribution"
   | "audit"
   | "analytics-report"
   | "competitor-intelligence"

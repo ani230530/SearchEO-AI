@@ -7,12 +7,13 @@ import {
   Eye,
   Globe,
   Grid2x2,
+  Loader2,
   Plus,
   RefreshCw,
   Search,
   ShieldAlert,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { logoUrl as logoUrlHelper } from "@/lib/logoUrl";
 import { useLocation, useNavigate } from "react-router-dom";
 import { apiGet } from "../../../services/apiClient";
@@ -81,6 +82,32 @@ const getDisplayName = (domain: DashboardDomain) => {
   return domain.url.replace(/^https?:\/\//, "").replace(/^www\./, "");
 };
 
+const MAX_DOMAIN_HISTORY_RETRIES = 6;
+const DOMAIN_HISTORY_RETRY_DELAY_MS = 450;
+
+const hasRenderableDomainDetails = (domain: DashboardDomain) => {
+  return (
+    typeof domain.currentStep === "number" ||
+    typeof domain.metrics?.visibilityScore === "number" ||
+    typeof domain.metrics?.keywordCount === "number" ||
+    typeof domain.metrics?.phraseCount === "number" ||
+    typeof domain.metrics?.totalQueries === "number" ||
+    typeof domain.lastAnalyzed === "string" ||
+    Boolean(domain.context) ||
+    domain.isCompanyDomain === true
+  );
+};
+
+const isRenderableDomainHistoryResponse = (domains: DashboardDomain[]) => {
+  if (!Array.isArray(domains)) return false;
+  if (domains.length === 0) return true;
+
+  // The endpoint can briefly return a bare domain list while the analysis
+  // fields are still hydrating. Keep the loader up until at least one domain
+  // includes analysis-ready data.
+  return domains.some(hasRenderableDomainDetails);
+};
+
 const toItem = (d: DashboardDomain): DomainItem => {
   const step = d.currentStep ?? 0;
   const hasVisibility = typeof d.metrics?.visibilityScore === "number";
@@ -110,6 +137,22 @@ interface DomainHistorySectionProps {
   onMenuItemClick?: (tabId: TabId, domainId?: string | number) => void;
 }
 
+function DomainHistoryLoader() {
+  return (
+    <div className="w-full p-8">
+      <div className="flex min-h-[72vh] items-center justify-center rounded-2xl border border-[#e2e6ee] bg-white">
+        <div className="flex flex-col items-center gap-3 text-center">
+          <Loader2 className="h-9 w-9 animate-spin text-[#4d5d78]" />
+          <div>
+            <p className="text-sm font-medium text-[#252b33]">Loading Domain History</p>
+            <p className="mt-1 text-xs text-[#7f8795]">Preparing your history and analysis cards...</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function DomainHistorySection({ onMenuItemClick }: DomainHistorySectionProps) {
   const location = useLocation();
   const navigate = useNavigate();
@@ -117,27 +160,78 @@ export function DomainHistorySection({ onMenuItemClick }: DomainHistorySectionPr
   const [searchQuery, setSearchQuery] = useState("");
   const [state, setState] = useState<FetchState>({ status: "loading" });
   const [retryUrl, setRetryUrl] = useState<string | null>(null);
+  const requestIdRef = useRef(0);
+  const retryTimerRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
 
-  useEffect(() => {
-    let alive = true;
-    apiGet<{ domains: DashboardDomain[] }>("/wizard/domains")
-      .then((data) => {
-        if (!alive) return;
-        setState({ status: "ready", domains: data?.domains ?? [] });
-      })
-      .catch((err) => {
-        if (!alive) return;
+  const clearRetryTimer = useCallback(() => {
+    if (retryTimerRef.current !== null) {
+      window.clearTimeout(retryTimerRef.current);
+      retryTimerRef.current = null;
+    }
+  }, []);
+
+  const loadDomains = useCallback(async (attempt = 0): Promise<void> => {
+    const requestId = ++requestIdRef.current;
+
+    try {
+      const data = await apiGet<{ domains: DashboardDomain[] }>("/wizard/domains");
+      if (requestId !== requestIdRef.current) {
+        return;
+      }
+
+      const domains = data?.domains ?? [];
+      if (isRenderableDomainHistoryResponse(domains)) {
+        clearRetryTimer();
+        setState({ status: "ready", domains });
+        return;
+      }
+
+      if (attempt >= MAX_DOMAIN_HISTORY_RETRIES) {
+        clearRetryTimer();
+        setState({
+          status: "error",
+          message: "Domain history is still syncing. Please try again.",
+        });
+        return;
+      }
+
+      clearRetryTimer();
+      retryTimerRef.current = window.setTimeout(() => {
+        void loadDomains(attempt + 1);
+      }, DOMAIN_HISTORY_RETRY_DELAY_MS * (attempt + 1));
+    } catch (err) {
+      if (requestId !== requestIdRef.current) {
+        return;
+      }
+
+      if (attempt >= MAX_DOMAIN_HISTORY_RETRIES) {
+        clearRetryTimer();
         setState({
           status: "error",
           message: err instanceof Error ? err.message : "Failed to load domains",
         });
-      });
-    return () => {
-      alive = false;
-    };
-  }, []);
+        return;
+      }
 
-  const allDomains = state.status === "ready" ? state.domains : [];
+      clearRetryTimer();
+      retryTimerRef.current = window.setTimeout(() => {
+        void loadDomains(attempt + 1);
+      }, DOMAIN_HISTORY_RETRY_DELAY_MS * (attempt + 1));
+    }
+  }, [clearRetryTimer]);
+
+  useEffect(() => {
+    void loadDomains();
+    return () => {
+      requestIdRef.current += 1;
+      clearRetryTimer();
+    };
+  }, [clearRetryTimer, loadDomains]);
+
+  const allDomains = useMemo(
+    () => (state.status === "ready" ? state.domains : []),
+    [state]
+  );
 
   const stats = useMemo(() => {
     const total = allDomains.length;
@@ -212,6 +306,10 @@ export function DomainHistorySection({ onMenuItemClick }: DomainHistorySectionPr
 
   const hasDomains = items.length > 0;
   const dashboardBasePath = location.pathname.startsWith("/newdashboard") ? "/newdashboard" : "/dashboard";
+
+  if (state.status === "loading") {
+    return <DomainHistoryLoader />;
+  }
 
   // AI Dashboard sidebar tabs — these mirror the rail in AIResultsLayout so
   // a domain card's dropdown lands the user on the same screens they'd reach
@@ -338,16 +436,19 @@ export function DomainHistorySection({ onMenuItemClick }: DomainHistorySectionPr
         </div>
 
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
-          {state.status === "loading" ? (
-            Array.from({ length: 3 }).map((_, i) => (
-              <div
-                key={i}
-                className="h-[230px] animate-pulse rounded-xl border border-[#e2e6ee] bg-white"
-              />
-            ))
-          ) : state.status === "error" ? (
+          {state.status === "error" ? (
             <div className="col-span-full rounded-xl border border-[#fad4d4] bg-[#fff5f5] p-8 text-center text-sm text-[#cf3d3d]">
-              {state.message}
+              <p>{state.message}</p>
+              <button
+                type="button"
+                onClick={() => {
+                  setState({ status: "loading" });
+                  void loadDomains();
+                }}
+                className="mt-4 inline-flex h-9 items-center rounded-md bg-white px-3 text-xs font-medium text-[#cf3d3d] shadow-sm ring-1 ring-inset ring-[#fad4d4] hover:bg-[#fff9f9]"
+              >
+                Try again
+              </button>
             </div>
           ) : filteredDomains.length === 0 ? (
             <div className="col-span-full rounded-xl border border-[#e2e6ee] bg-white p-8 text-center text-sm text-[#7f8795]">

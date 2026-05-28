@@ -65,6 +65,29 @@ export const createPrismaMock = (): PrismaMock => {
     user: makeStore(),
     apiSpendLog: makeStore(),
     wizardRunCache: makeStore(),
+    folder: makeStore(),
+    file: makeStore(),
+  };
+
+  const projectRow = (row: Row, select: any) => {
+    if (!select) return row;
+    const out: any = {};
+    for (const key of Object.keys(select)) {
+      if (select[key]) out[key] = row[key];
+    }
+    return out;
+  };
+
+  const deleteFolderTree = (folderId: number) => {
+    for (const child of stores.folder.all().filter((row) => row.parentId === folderId)) {
+      deleteFolderTree(child.id);
+    }
+    for (const [id, file] of stores.file.rows) {
+      if (file.folderId === folderId) {
+        stores.file.rows.delete(id);
+      }
+    }
+    stores.folder.rows.delete(folderId);
   };
 
   const mock: any = {
@@ -253,6 +276,111 @@ export const createPrismaMock = (): PrismaMock => {
         const found = await mock.wizardRunCache.findUnique({ where });
         if (found) return stores.wizardRunCache.update(found.id, update);
         return stores.wizardRunCache.insert(create);
+      },
+    },
+
+    // -------------------------------------------------------------------------
+    // folder
+    // -------------------------------------------------------------------------
+    folder: {
+      findUnique: async ({ where, select }: any) => {
+        const rows = stores.folder.all();
+        let row = null;
+        if (where.id !== undefined) row = rows.find((r) => r.id === where.id) ?? null;
+        if (!row && where.userId_parentId_name) {
+          const k = where.userId_parentId_name;
+          row =
+            rows.find(
+              (r) =>
+                r.userId === k.userId &&
+                r.parentId === k.parentId &&
+                r.name === k.name
+            ) ?? null;
+        }
+        return row ? projectRow(row, select) : null;
+      },
+      findFirst: async ({ where, select }: any = {}) => {
+        const rows = stores.folder.all().filter((r) => matchWhere(r, where ?? {}));
+        const row = rows[0] ?? null;
+        return row ? projectRow(row, select) : null;
+      },
+      findMany: async ({ where, select }: any = {}) => {
+        const rows = stores.folder.all().filter((r) => matchWhere(r, where ?? {}));
+        return rows.map((row) => projectRow(row, select));
+      },
+      create: async ({ data }: any) =>
+        stores.folder.insert({
+          parentId: null,
+          ...data,
+        }),
+      update: async ({ where, data }: any) => {
+        const row = stores.folder.rows.get(where.id);
+        if (!row) throw new Error('folder not found');
+        return stores.folder.update(where.id, data);
+      },
+      delete: async ({ where }: any) => {
+        const row = stores.folder.rows.get(where.id);
+        if (!row) throw new Error('folder not found');
+        deleteFolderTree(where.id);
+        return row;
+      },
+      deleteMany: async ({ where }: any = {}) => {
+        let n = 0;
+        for (const row of stores.folder.all().filter((r) => matchWhere(r, where ?? {}))) {
+          deleteFolderTree(row.id);
+          n++;
+        }
+        return { count: n };
+      },
+    },
+
+    // -------------------------------------------------------------------------
+    // file
+    // -------------------------------------------------------------------------
+    file: {
+      findUnique: async ({ where, select }: any) => {
+        const rows = stores.file.all();
+        let row = null;
+        if (where.id !== undefined) row = rows.find((r) => r.id === where.id) ?? null;
+        if (!row && where.cloudinaryId !== undefined) {
+          row = rows.find((r) => r.cloudinaryId === where.cloudinaryId) ?? null;
+        }
+        return row ? projectRow(row, select) : null;
+      },
+      findFirst: async ({ where, select }: any = {}) => {
+        const rows = stores.file.all().filter((r) => matchWhere(r, where ?? {}));
+        const row = rows[0] ?? null;
+        return row ? projectRow(row, select) : null;
+      },
+      findMany: async ({ where, select }: any = {}) => {
+        const rows = stores.file.all().filter((r) => matchWhere(r, where ?? {}));
+        return rows.map((row) => projectRow(row, select));
+      },
+      create: async ({ data }: any) =>
+        stores.file.insert({
+          folderId: null,
+          ...data,
+        }),
+      update: async ({ where, data }: any) => {
+        const row = stores.file.rows.get(where.id);
+        if (!row) throw new Error('file not found');
+        return stores.file.update(where.id, data);
+      },
+      delete: async ({ where }: any) => {
+        const row = stores.file.rows.get(where.id);
+        if (!row) throw new Error('file not found');
+        stores.file.rows.delete(where.id);
+        return row;
+      },
+      deleteMany: async ({ where }: any = {}) => {
+        let n = 0;
+        for (const [id, r] of stores.file.rows) {
+          if (matchWhere(r, where ?? {})) {
+            stores.file.rows.delete(id);
+            n++;
+          }
+        }
+        return { count: n };
       },
     },
   };

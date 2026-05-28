@@ -2941,10 +2941,10 @@ const AIResultsReportPreview = () => {
             </div>
             <Button
               onClick={() => navigate('/dashboard?tab=integration')}
-              className="h-[37px] w-full shrink-0 rounded-lg bg-[#2D4059] px-4 text-sm font-semibold text-white shadow-[0_1px_2px_0_#1018280D] hover:bg-[#24364d] sm:w-auto"
+              className="h-[37px] w-full shrink-0 rounded-lg bg-[#2D4059] px-4 gap-12text-sm font-semibold text-white shadow-[0_1px_2px_0_#1018280D] hover:bg-[#24364d] sm:w-auto"
             >
               <IntegrateSiteIcon />
-              <span className="ml-2">Integrate Site</span>
+              <span>Integrate Site</span>
             </Button>
           </div>
         )}

@@ -29,6 +29,7 @@ import type {
   DashboardSidebarTab,
   TabId,
 } from "@/features/sidebar-dashboard/types";
+import type { SettingsSubTab } from "@/features/sidebar-dashboard/sections/settings/types";
 
 interface DashboardSidebarProps {
   activeCompanySubTab: CompanySubTabId;
@@ -39,7 +40,9 @@ interface DashboardSidebarProps {
   onLogout: () => void;
   onSelectCompanySubTab: (tab: CompanySubTabId) => void;
   onSelectCreateProject: () => void;
+  onSelectPricing: () => void;
   onSelectTab: (tab: TabId) => void;
+  activeSettingsSubTab?: SettingsSubTab;
   showResults: boolean;
   sidebarOpen: boolean;
   tabs: DashboardSidebarTab[];
@@ -69,7 +72,9 @@ export function DashboardSidebar({
   onLogout,
   onSelectCompanySubTab,
   onSelectCreateProject,
+  onSelectPricing,
   onSelectTab,
+  activeSettingsSubTab,
   showResults: _showResults,
   sidebarOpen,
   tabs: _tabs,
@@ -238,20 +243,20 @@ export function DashboardSidebar({
             key: "Pricing",
             label: "Pricing",
             icon: <Tag className="h-4 w-4" />,
-            isActive: activeTab === "pricing",
-            onClick: () => onSelectTab("pricing"),
+            isActive: activeTab === "settings" && activeSettingsSubTab === "subscription",
+            onClick: onSelectPricing,
           },
           {
             key: "settings",
             label: "Settings",
             icon: <Settings className="h-4 w-4" />,
-            isActive: activeTab === "settings",
+            isActive: activeTab === "settings"&& activeSettingsSubTab !== "subscription",
             onClick: () => onSelectTab("settings"),
           },
         ],
       },
     ];
-  }, [activeTab, onSelectCompanySubTab, onSelectTab]);
+  }, [activeSettingsSubTab, activeTab, onSelectCompanySubTab, onSelectPricing, onSelectTab]);
 
   return (
     <TooltipProvider delayDuration={180}>

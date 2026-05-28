@@ -75,6 +75,8 @@ model User {
   // Shadow users have email = anon-{sessionId}@system.local and an
   // unusable password hash. They never log in via the normal auth path.
   wizardSessionsAnon   WizardSession[]                @relation("WizardSessionAnonUser")
+  folders              Folder[]
+  files                File[]
 }
 
 // Opaque, rotating refresh tokens.
@@ -625,4 +627,38 @@ model ApiSpendLog {
   @@index([userId, createdAt])
   @@index([sessionId, createdAt])
   @@index([createdAt])
+}
+
+model Folder {
+  id        Int      @id @default(autoincrement())
+  name      String
+  userId    Int
+  parentId  Int?
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parent    Folder?  @relation("FolderHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
+  children  Folder[] @relation("FolderHierarchy")
+  files     File[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([parentId])
+}
+
+model File {
+   id           Int      @id @default(autoincrement())
+   name         String
+   url          String   // Cloudinary hosted URL
+   cloudinaryId String   // Public ID for Cloudinary management
+   size         Int      // Bytes
+   format       String   // e.g., "pdf", "png", "jpg"
+   userId       Int
+   folderId     Int?     // If null, file is in the root "Home"
+   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+   folder       Folder?  @relation(fields: [folderId], references: [id], onDelete: Cascade)
+   createdAt    DateTime @default(now())
+   @@index([userId])
+   @@index([folderId])
 }

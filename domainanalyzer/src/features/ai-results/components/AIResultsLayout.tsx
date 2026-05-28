@@ -27,6 +27,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { maskDomainId } from "@/lib/domainUtils";
 import { DashboardSidebar } from "@/features/sidebar-dashboard/components/DashboardSidebar";
 import { DASHBOARD_TABS } from "@/features/sidebar-dashboard/constants";
+import { resolveSidebarNavigation } from "@/features/sidebar-dashboard/navigation";
 import type { TabId } from "@/features/sidebar-dashboard/types";
 
 type AIResultsNavItemId =
@@ -176,17 +177,8 @@ export function AIResultsLayout({
   }, []);
 
   const handleSelectTab = (tabId: TabId) => {
-    if (tabId === "overview") {
-      navigate("/dashboard");
-    } else if (tabId === "ai-visibility") {
-      navigate("/ai-visibility");
-    } else if (tabId === "analytics") {
-      navigate("/dashboard?tab=analytics");
-    } else if (tabId === "integration") {
-      navigate("/dashboard?tab=integration");
-    } else {
-      navigate(`/dashboard?tab=${tabId}`);
-    }
+    const route = resolveSidebarNavigation(tabId);
+    navigate(route.path);
   };
 
   return (
@@ -212,9 +204,11 @@ export function AIResultsLayout({
             logout();
             navigate("/auth");
           }}
+          onSelectPricing={() => navigate(resolveSidebarNavigation("pricing").path)}
           onSelectCompanySubTab={() => {}}
           onSelectCreateProject={() => navigate("/dashboard?tab=projects&create=true")}
           onSelectTab={handleSelectTab}
+          activeSettingsSubTab={undefined}
           showResults={true}
           sidebarOpen={sidebarOpen}
           tabs={dashboardSidebarTabs}
@@ -244,7 +238,7 @@ export function AIResultsLayout({
             <button
               type="button"
               aria-label="Back to domain history"
-              onClick={() => navigate("/dashboard?tab=domain-history")}
+              onClick={() => navigate(resolveSidebarNavigation("domain-history").path)}
               className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-300 bg-white text-gray-500 transition hover:bg-gray-50 hover:text-gray-900"
               title="Back to domain history"
             >
@@ -370,7 +364,7 @@ export function AIResultsLayout({
               <button
                 type="button"
                 aria-label="Back"
-                onClick={() => navigate("/dashboard?tab=domain-history")}
+                onClick={() => navigate(resolveSidebarNavigation("domain-history").path)}
                 className="inline-flex h-6 w-6 shrink-0 items-center justify-center text-[#101828] transition hover:text-slate-700"
               >
                 <ArrowLeft className="h-4 w-4" />
