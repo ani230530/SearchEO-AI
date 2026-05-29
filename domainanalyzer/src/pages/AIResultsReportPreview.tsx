@@ -1972,6 +1972,8 @@ export const AreaChartCard = ({
 
 const WORKSHEET_IMPORT_KEY = 'ai-results/pending-worksheet-import';
 const WORKSHEET_TARGET_KEY = 'ai-results/pending-worksheet-target';
+const buildProjectsWorksheetPath = (campaignId: string | number) =>
+  `/dashboard?tab=projects&campaign=${encodeURIComponent(String(campaignId))}`;
 
 type WorksheetOption = {
   id: string;
@@ -2375,7 +2377,7 @@ const AIResultsReportPreview = () => {
         sessionStorage.removeItem(WORKSHEET_IMPORT_KEY);
         localStorage.setItem('activeTab', 'projects');
         setGenerationByKey((prev) => ({ ...prev, [key]: { kind: 'done', draftId: null } }));
-        navigate('/dashboard');
+        navigate(buildProjectsWorksheetPath(built.campaignId));
       } catch (err) {
         setGenerationByKey((prev) => ({
           ...prev,
@@ -2457,7 +2459,7 @@ const AIResultsReportPreview = () => {
     sessionStorage.setItem(WORKSHEET_IMPORT_KEY, JSON.stringify(payload));
     localStorage.setItem('activeTab', 'projects');
     setIsWorksheetModalOpen(false);
-    navigate('/dashboard');
+    navigate(buildProjectsWorksheetPath(activeWorksheetId));
   }, [activeWorksheetId, navigate, pendingGeneration, reportData, runGeneration, selectedRowIds]);
 
   const handleCreateNewWorksheet = useCallback(() => {
@@ -2543,7 +2545,7 @@ const AIResultsReportPreview = () => {
       localStorage.setItem('activeTab', 'projects');
       setIsWorksheetModalOpen(false);
       setActiveWorksheetId(null);
-      navigate('/dashboard');
+      navigate(buildProjectsWorksheetPath(newId));
     } catch (err) {
       console.error('[AIResults] Create worksheet failed:', err);
       setCreateWorksheetError('Failed to create worksheet. Please try again.');

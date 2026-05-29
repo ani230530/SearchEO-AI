@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState, useRef, type ReactNode } from "react";
+import { useEffect, useMemo, useState, useRef, type MouseEvent, type ReactNode } from "react";
+import { Link } from "react-router-dom";
 import {
   BarChart3,
   ChevronRight,
@@ -6,7 +7,7 @@ import {
   Globe,
   Info,
   Lightbulb,
-  Link,
+  Link as LinkIcon,
   LogOut,
   Send,
   Sparkles,
@@ -54,7 +55,8 @@ type SidebarActionItem = {
   label: string;
   icon: ReactNode;
   isActive?: boolean;
-  onClick: () => void;
+  onClick?: () => void;
+  href?: string;
   variant?: "standard" | "primary" | "premium";
 };
 
@@ -86,6 +88,9 @@ export function DashboardSidebar({
   void _showResults;
 
   const isFirstRender = useRef(true);
+
+  const isModifiedClick = (event: MouseEvent<HTMLElement>) =>
+    event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0;
 
   useEffect(() => {
     const check = () => {
@@ -127,6 +132,7 @@ export function DashboardSidebar({
             icon: <LayoutDashboard className="h-4 w-4" />,
             isActive: activeTab === "overview",
             onClick: () => onSelectTab("overview"),
+            href: "/dashboard?tab=overview",
             variant: "primary",
           },
           {
@@ -135,6 +141,7 @@ export function DashboardSidebar({
             icon: <Sparkles className="h-4 w-4" />,
             isActive: activeTab === "ai-visibility",
             onClick: () => onSelectTab("ai-visibility"),
+            href: "/ai-visibility",
             variant: "premium",
           },
         ],
@@ -147,6 +154,7 @@ export function DashboardSidebar({
             label: "Create new project",
             icon: <Plus className="h-4 w-4" />,
             onClick: onSelectCreateProject,
+            href: "/dashboard?tab=projects&action=create",
           },
           {
             key: "all-projects",
@@ -154,6 +162,7 @@ export function DashboardSidebar({
             icon: <Send className="h-4 w-4" />,
             isActive: activeTab === "projects",
             onClick: () => onSelectTab("projects"),
+            href: "/dashboard?tab=projects",
           },
         ],
       },
@@ -169,6 +178,7 @@ export function DashboardSidebar({
               onSelectTab("analytics");
               onSelectCompanySubTab("company-info");
             },
+            href: "/dashboard?tab=analytics&subtab=company-info",
           },
           {
             key: "website-audit",
@@ -176,6 +186,7 @@ export function DashboardSidebar({
             icon: <Globe className="h-4 w-4" />,
             isActive: activeTab === "audit",
             onClick: () => onSelectTab("audit"),
+            href: "/dashboard?tab=audit",
           },
            {
             key: "domain-history",
@@ -183,6 +194,7 @@ export function DashboardSidebar({
             icon: <History  className="h-4 w-4" />,
             isActive: activeTab === "domain-history",
             onClick: () => onSelectTab("domain-history"),
+            href: "/dashboard?tab=domain-history",
           },
           {
             key: "competitor-analysis",
@@ -190,6 +202,7 @@ export function DashboardSidebar({
             icon: <ClipboardList className="h-4 w-4" />,
             isActive: activeTab === "competitor-intelligence",
             onClick: () => onSelectTab("competitor-intelligence"),
+            href: "/dashboard?tab=competitor-intelligence",
           },
           {
             key: "gsc-analytics",
@@ -197,6 +210,7 @@ export function DashboardSidebar({
             icon: <PieChart className="h-4 w-4" />,
             isActive: activeTab === "gsc-analytics",
             onClick: () => onSelectTab("gsc-analytics"),
+            href: "/dashboard?tab=gsc-analytics",
           },
           {
             key: "performance-reports",
@@ -204,22 +218,25 @@ export function DashboardSidebar({
             icon: <BarChart3 className="h-4 w-4" />,
             isActive: activeTab === "analytics-report",
             onClick: () => onSelectTab("analytics-report"),
+            href: "/dashboard?tab=analytics-report",
           },
           {
             key: "integration",
             label: "Integration",
-            icon: <Link className="h-4 w-4" />,
+            icon: <LinkIcon className="h-4 w-4" />,
             isActive: activeTab === "integration",
             onClick: () => {
               onSelectTab("integration");
               onSelectCompanySubTab("integration");
             },
+            href: "/dashboard?tab=integration&subtab=integration",
           },
           {key: "attribution",
            label: "Attribution",
            icon: <Route className="h-4 w-4" />,
            isActive: activeTab === "attribution",
            onClick: () => onSelectTab("attribution"),
+           href: "/dashboard?tab=attribution",
           },
         ],
       },
@@ -232,6 +249,7 @@ export function DashboardSidebar({
             icon: <Lightbulb className="h-4 w-4" />,
             isActive: activeTab === "knowledge-base",
             onClick: () => onSelectTab("knowledge-base"),
+            href: "/dashboard?tab=knowledge-base",
           },
          
         ],
@@ -245,6 +263,7 @@ export function DashboardSidebar({
             icon: <Tag className="h-4 w-4" />,
             isActive: activeTab === "settings" && activeSettingsSubTab === "subscription",
             onClick: onSelectPricing,
+            href: "/dashboard?tab=settings&subtab=subscription",
           },
           {
             key: "settings",
@@ -252,6 +271,7 @@ export function DashboardSidebar({
             icon: <Settings className="h-4 w-4" />,
             isActive: activeTab === "settings"&& activeSettingsSubTab !== "subscription",
             onClick: () => onSelectTab("settings"),
+            href: "/dashboard?tab=settings",
           },
         ],
       },
@@ -313,26 +333,50 @@ export function DashboardSidebar({
                 ) : null}
 
                 <div className="sidebar-section-items">
-                  {section.items.map((item) => (
-                    <Tooltip key={item.key}>
-                      <TooltipTrigger asChild>
-                        <button
-                          className={`sidebar-tab ${item.isActive ? "active" : ""} ${
-                            item.variant === "primary"
-                              ? "sidebar-tab-primary"
-                              : item.variant === "premium"
-                                ? "sidebar-tab-premium"
-                                : ""
-                          }`}
-                          onClick={item.onClick}
-                        >
-                          <span className="sidebar-tab-icon">{item.icon}</span>
-                          <span className="sidebar-tab-label">{item.label}</span>
-                        </button>
-                      </TooltipTrigger>
-                      <TooltipContent side="right">{item.label}</TooltipContent>
-                    </Tooltip>
-                  ))}
+                  {section.items.map((item) => {
+                    const tabContent = (
+                      <>
+                        <span className="sidebar-tab-icon">{item.icon}</span>
+                        <span className="sidebar-tab-label">{item.label}</span>
+                      </>
+                    );
+
+                    const commonProps = {
+                      className: `sidebar-tab ${item.isActive ? "active" : ""} ${
+                        item.variant === "primary"
+                          ? "sidebar-tab-primary"
+                          : item.variant === "premium"
+                            ? "sidebar-tab-premium"
+                            : ""
+                      }`,
+                      onClick: (event: MouseEvent<HTMLElement>) => {
+                        if (isModifiedClick(event)) {
+                          return;
+                        }
+                        item.onClick?.();
+                        if (isCompactViewport) {
+                          onToggleSidebar(false);
+                        }
+                      },
+                    };
+
+                    return (
+                      <Tooltip key={item.key}>
+                        <TooltipTrigger asChild>
+                          {item.href ? (
+                            <Link to={item.href} {...commonProps}>
+                              {tabContent}
+                            </Link>
+                          ) : (
+                            <button type="button" {...commonProps}>
+                              {tabContent}
+                            </button>
+                          )}
+                        </TooltipTrigger>
+                        <TooltipContent side="right">{item.label}</TooltipContent>
+                      </Tooltip>
+                    );
+                  })}
                 </div>
               </div>
             ))}

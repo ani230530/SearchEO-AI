@@ -1,4 +1,6 @@
 import { Bell, CircleHelp } from "lucide-react";
+import { type MouseEvent } from "react";
+import { Link } from "react-router-dom";
 
 import type { DashboardHeaderProps } from "@/features/sidebar-dashboard/types";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -22,6 +24,14 @@ export function DashboardHeader({
         minute: "2-digit",
       })
     : "Not synced yet";
+  const isModifiedClick = (event: MouseEvent<HTMLAnchorElement>) =>
+    event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0;
+  const handleProfileClick = (event: MouseEvent<HTMLAnchorElement>) => {
+    if (isModifiedClick(event)) {
+      return;
+    }
+    onTabChange?.("profile");
+  };
 
   if (activeTab === "overview") {
     return (
@@ -66,9 +76,9 @@ export function DashboardHeader({
 
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <button
-                    type="button"
-                    onClick={() => onTabChange?.("profile")}
+                  <Link
+                    to="/dashboard?tab=profile"
+                    onClick={handleProfileClick}
                     className="inline-flex h-8 w-8 items-center justify-center overflow-hidden rounded-full border border-[#e5e7eb] bg-white transition-opacity hover:opacity-80"
                     aria-label="Profile"
                   >
@@ -77,7 +87,7 @@ export function DashboardHeader({
                       alt=""
                       className="h-8 w-8 object-contain"
                     />
-                  </button>
+                  </Link>
                 </TooltipTrigger>
                 <TooltipContent side="bottom">Profile</TooltipContent>
               </Tooltip>
@@ -107,13 +117,14 @@ export function DashboardHeader({
 
         {userEmail && (
           <div className="flex items-center gap-3">
-            <button
-              onClick={() => onTabChange?.("profile")}
+            <Link
+              to="/dashboard?tab=profile"
+              onClick={handleProfileClick}
               className="cursor-pointer transition-opacity hover:opacity-70"
               title="Profile"
             >
               <img src="/overview-avatar-label-group.svg" alt="" className="h-8 w-8 rounded-full object-contain" />
-            </button>
+            </Link>
             <div
               style={{
                 background: "rgba(0, 122, 255, 0.1)",

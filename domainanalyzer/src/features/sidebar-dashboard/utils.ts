@@ -68,6 +68,9 @@ export function parseDashboardSearchState(search: string): DashboardSearchState 
   const tabParam = params.get("tab");
   const subtabParam = params.get("subtab");
   const wordpressParam = params.get("wordpress");
+  const actionParam = params.get("action");
+  const campaignParam = params.get("campaign");
+  const parsedCampaignId = campaignParam ? Number(campaignParam) : undefined;
 
   if (tabParam === "ai-visibility" || tabParam === "ai-checker") {
     return { redirectToAiVisibility: true };
@@ -87,7 +90,12 @@ export function parseDashboardSearchState(search: string): DashboardSearchState 
       tabParam === "settings" && subtabParam && VALID_SETTINGS_SUB_TABS.includes(subtabParam as SettingsSubTab)
         ? (subtabParam as SettingsSubTab)
         : undefined,
+    activeCampaignId:
+      typeof parsedCampaignId === "number" && Number.isFinite(parsedCampaignId)
+        ? parsedCampaignId
+        : undefined,
     openWordpressConnection: wordpressParam === "1" || wordpressParam === "true",
+    action: actionParam || undefined,
   };
 }
 

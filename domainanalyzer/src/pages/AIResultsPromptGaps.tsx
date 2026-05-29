@@ -8,6 +8,8 @@ import { PromptTable, WorksheetPickerModal } from './AIResultsReportPreview';
 
 const WORKSHEET_IMPORT_KEY = 'ai-results/pending-worksheet-import';
 const WORKSHEET_TARGET_KEY = 'ai-results/pending-worksheet-target';
+const buildProjectsWorksheetPath = (campaignId: string | number) =>
+  `/dashboard?tab=projects&campaign=${encodeURIComponent(String(campaignId))}`;
 
 type WorksheetOption = {
   id: string;
@@ -227,7 +229,7 @@ const AIResultsPromptGaps = () => {
     sessionStorage.setItem(WORKSHEET_IMPORT_KEY, JSON.stringify(payload));
     localStorage.setItem('activeTab', 'projects');
     setIsWorksheetModalOpen(false);
-    navigate('/dashboard');
+    navigate(buildProjectsWorksheetPath(activeWorksheetId));
   }, [activeWorksheetId, navigate, promptRows, selectedRowIds]);
 
   const queryClient = useQueryClient();
@@ -243,7 +245,7 @@ const AIResultsPromptGaps = () => {
       setIsWorksheetModalOpen(false);
       sessionStorage.setItem(WORKSHEET_TARGET_KEY, String(newId));
       localStorage.setItem('activeTab', 'projects');
-      navigate('/dashboard');
+      navigate(buildProjectsWorksheetPath(newId));
     } catch (err) {
       console.error('[PromptGaps] Create worksheet failed:', err);
       alert('Failed to create worksheet. Please try again.');
