@@ -727,6 +727,49 @@ select.floating-input:not([value=""])+.floating-label {
   background: rgba(255, 255, 255, 0.9);
 }
 
+/* Sidebar hover-to-expand transition styles for closed sidebar state */
+@media (min-width: 1024px) {
+  .sidebar.closed:hover {
+    width: 280px;
+    background: rgba(255, 255, 255, 0.99);
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  }
+
+  .sidebar.closed:hover .sidebar-tab-label {
+    display: inline;
+  }
+
+  .sidebar.closed:hover .sidebar-logout-label {
+    display: inline;
+  }
+
+  .sidebar.closed:hover .sidebar-title {
+    display: block;
+  }
+
+  .sidebar.closed:hover .sidebar-section-title {
+    display: block;
+  }
+
+  .sidebar.closed:hover .sidebar-brand-spacer {
+    display: block;
+  }
+
+  .sidebar.closed:hover .sidebar-tab {
+    justify-content: flex-start;
+    gap: 10px;
+    padding: 9px 10px;
+  }
+
+  .sidebar.closed:hover .sidebar-header {
+    padding: 18px 12px 8px 16px;
+  }
+
+  .sidebar.closed:hover .sidebar-header-inner {
+    justify-content: space-between;
+  }
+}
+
 .mobile-overlay {
   display: none;
   position: fixed;
@@ -785,45 +828,3 @@ select.floating-input:not([value=""])+.floating-label {
   }
 }
 
-/* Sidebar hover-to-expand transition styles for closed sidebar state */
-@media (min-width: 1024px) {
-.sidebar.closed:hover {
-    width: 280px;
-    background: rgba(255, 255, 255, 0.99);
-    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-  }
-
-  .sidebar.closed:hover .sidebar-tab-label {
-    display: inline;
-  }
-  
-  .sidebar.closed:hover .sidebar-logout-label {
-    display: inline;
-  }
-  
-  .sidebar.closed:hover .sidebar-title {
-    display: block;
-  }
-  
-  .sidebar.closed:hover .sidebar-section-title {
-    display: block;
-  }
-
-  .sidebar.closed:hover .sidebar-brand-spacer {
-    display: block;
-  }
-
-  .sidebar.closed:hover .sidebar-tab {
-    justify-content: flex-start;
-    gap: 10px;
-    padding: 9px 10px;
-  }
-
-  .sidebar.closed:hover .sidebar-header {
-    padding: 18px 12px 8px 16px;
-  }
-
-  .sidebar.closed:hover .sidebar-header-inner {
-    justify-content: space-between;
-  }
-}

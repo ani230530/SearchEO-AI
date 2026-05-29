@@ -49,7 +49,9 @@ export interface DashboardSearchState {
   activeTab?: TabId;
   activeCompanySubTab?: CompanySubTabId;
   activeSettingsSubTab?: SettingsSubTab;
+  activeCampaignId?: number;
   openWordpressConnection?: boolean;
+  action?: string;
 }
 
 export interface DashboardHeaderProps {

@@ -132,8 +132,8 @@ const SidebarDashboard = () => {
     () => parseDashboardSearchState(location.search),
     [location.search]
   );
-const [activeTab, setActiveTab] = useState<TabId>(() =>
-  getStoredActiveTab(localStorage.getItem("activeTab"))
+  const [activeTab, setActiveTab] = useState<TabId>(() =>
+  searchState.activeTab ?? getStoredActiveTab(localStorage.getItem("activeTab"))
 );
 useEffect(() => {
   if (activeTab) {
@@ -142,7 +142,7 @@ useEffect(() => {
 }, [activeTab]);
 
   const [activeCompanySubTab, setActiveCompanySubTab] =
-    useState<CompanySubTabId>("company-info");
+    useState<CompanySubTabId>(searchState.activeCompanySubTab ?? "company-info");
   const [activeGscSubTab, setActiveGscSubTab] = useState<GscSubTabId>("whole-analytics");
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isSidebarHovered, setIsSidebarHovered] = useState(false);
@@ -297,7 +297,7 @@ const [improvedContent, setImprovedContent] = useState("");
   const [newCampaignTitle, setNewCampaignTitle] = useState("");
   const [newCampaignDescription, setNewCampaignDescription] = useState("");
   const [selectedCampaignId, setSelectedCampaignId] = useState<number | null>(
-    null
+    searchState.activeCampaignId ?? null
   );
   const [activeSection, setActiveSection] = useState<'all' | 'favourites' | 'published'>('all');
   /** Set when a worksheet row's "Draft Blog" action is clicked. The
@@ -391,18 +391,18 @@ const toggleSection = (idx: number) => {
   const { toast } = useToast();
   const isSidebarExpanded = sidebarOpen || isSidebarHovered;
 
+  useEffect(() => {
+    if (sidebarOpen) {
+      setIsSidebarHovered(false);
+    }
+  }, [sidebarOpen]);
+
 // For inline editing of campaigns
 const [showEditModal, setShowEditModal] = useState(false);
 const [editingCampaignId, setEditingCampaignId] = useState<number | null>(null);
 const [editTitle, setEditTitle] = useState('');
 const [editDescription, setEditDescription] = useState('');
 
-
-  useEffect(() => {
-    if (sidebarOpen) {
-      setIsSidebarHovered(false);
-    }
-  }, [sidebarOpen]);
 
   const handlePublishUpdate = useCallback((data: {
     draftId?: number;
@@ -971,11 +971,14 @@ useEffect(() => {
   };
 
 
-  // Handle URL query parameters for tab navigation (e.g., from OAuth callback)
+  // Sync dashboard state with URL search parameters
   useEffect(() => {
     if (searchState.redirectToAiVisibility) {
       navigate('/ai-visibility');
-    } else if (searchState.activeTab) {
+      return;
+    } 
+    
+    if (searchState.activeTab) {
       setActiveTab(searchState.activeTab);
     }
 
@@ -983,12 +986,45 @@ useEffect(() => {
       setActiveCompanySubTab(searchState.activeCompanySubTab);
     }
 
+    if (searchState.activeSettingsSubTab) {
+       // activeSettingsSubTab is handled via props in SettingsSection but we can sync if needed
+    }
+
     if (searchState.openWordpressConnection) {
       setActiveTab('integration');
       setActiveCompanySubTab('integration');
       setOpenWordpressConnectionView(true);
     }
+
+    // Handle declarative actions from URL
+    if (searchState.action === "create" && searchState.activeTab === "projects") {
+      setOpenWordpressConnectionView(false);
+      setSelectedCampaignId(null);
+      setNewCampaignTitle("");
+      setNewCampaignDescription("");
+      setShowCreateCampaign(true);
+    }
   }, [navigate, searchState]);
+
+  useEffect(() => {
+    if (activeTab !== "projects") {
+      if (selectedCampaignId !== null) {
+        setSelectedCampaignId(null);
+      }
+      return;
+    }
+
+    if (searchState.activeCampaignId !== undefined) {
+      if (selectedCampaignId !== searchState.activeCampaignId) {
+        setSelectedCampaignId(searchState.activeCampaignId);
+      }
+      return;
+    }
+
+    if (selectedCampaignId !== null) {
+      setSelectedCampaignId(null);
+    }
+  }, [activeTab, searchState.activeCampaignId, selectedCampaignId]);
 
   useEffect(() => {
     if (
@@ -2013,6 +2049,7 @@ useEffect(() => {
   useEffect(() => {
     if (activeTab !== 'projects') return;
     if (!campaigns.length) return;
+    if (searchState.activeCampaignId !== undefined) return;
     if (selectedCampaignId !== null) return;
 
     const pendingTarget = sessionStorage.getItem(WORKSHEET_TARGET_KEY);
@@ -2025,8 +2062,9 @@ useEffect(() => {
     if (!matchedCampaign) return;
 
     setSelectedCampaignId(matchedCampaign.id);
+    navigate(`${location.pathname}?tab=projects&campaign=${matchedCampaign.id}`, { replace: true });
     sessionStorage.removeItem(WORKSHEET_TARGET_KEY);
-  }, [activeTab, campaigns, selectedCampaignId]);
+  }, [activeTab, campaigns, location.pathname, navigate, searchState.activeCampaignId, selectedCampaignId]);
 
   const handleCreateCampaign = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -2802,13 +2840,11 @@ useEffect(() => {
         onSelectPricing={() => {
           const route = resolveSidebarNavigation("pricing");
           setActiveTab(route.activeTab);
-          navigate(route.path);
         }}
         onSelectTab={(tabId) => {
           setOpenWordpressConnectionView(false);
           const route = resolveSidebarNavigation(tabId);
           setActiveTab(route.activeTab);
-          navigate(route.path);
           if (tabId === "integration") {
             setActiveCompanySubTab("integration");
           }

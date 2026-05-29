@@ -1,6 +1,7 @@
 import React from 'react';
 import { ArrowUpDown, Ellipsis, Grid3X3, List, Megaphone, Plus, SquarePen, Star, Trash2 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
+import { useLocation, useNavigate } from 'react-router-dom';
 import Worksheet from '@/features/campaign/Worksheet';
 
 export function ProjectsSection(props: any) {
@@ -12,17 +13,41 @@ export function ProjectsSection(props: any) {
     setEditingCampaignId, setEditTitle, setEditDescription, setShowEditModal, confirmDelete, handleDeleteCampaign,
     showEditModal, handleUpdateCampaign, editTitle,
   } = props;
+  const location = useLocation();
+  const navigate = useNavigate();
+  const dashboardBasePath = location.pathname.startsWith('/newdashboard') ? '/newdashboard' : '/dashboard';
+  const buildProjectsPath = (campaignId?: number | null) => {
+    const params = new URLSearchParams({ tab: 'projects' });
+    if (campaignId !== undefined && campaignId !== null) {
+      params.set('campaign', String(campaignId));
+    }
+    return `${dashboardBasePath}?${params.toString()}`;
+  };
 
   if (selectedCampaignId) {
     const selectedCampaign = campaigns.find((c: any) => c.id === selectedCampaignId);
     if (!selectedCampaign) {
+      if (campaignsLoading || campaignTabDataLoading) {
+        return (
+          <div className="w-full px-4 py-12">
+            <div className="rounded-3xl border border-gray-100 bg-white px-8 py-12 text-center text-sm text-gray-500 shadow-sm">
+              Loading worksheet...
+            </div>
+          </div>
+        );
+      }
+
       return (
         <div className="max-w-4xl mx-auto px-4 sm:px-6 py-12 sm:py-16">
           <div className="bg-white rounded-3xl p-8 border border-red-100 text-center text-sm text-red-600">
             Selected campaign could not be found. Please go back and try again.
             <div className="mt-4">
               <button
-                onClick={() => setSelectedCampaignId(null)}
+                type="button"
+                onClick={() => {
+                  setSelectedCampaignId(null);
+                  navigate(buildProjectsPath(null), { replace: true });
+                }}
                 className="px-5 py-2 bg-black text-white rounded-full text-sm"
               >
                 Back
@@ -37,7 +62,11 @@ export function ProjectsSection(props: any) {
       <div className="w-full">
         <div className="flex items-center justify-between px-4 pt-4">
           <button
-            onClick={() => setSelectedCampaignId(null)}
+            type="button"
+            onClick={() => {
+              setSelectedCampaignId(null);
+              navigate(buildProjectsPath(null), { replace: true });
+            }}
             className="text-sm text-gray-700 hover:text-black"
           >
             ← Back
@@ -343,7 +372,19 @@ export function ProjectsSection(props: any) {
                         </div>
 
                         <div
-                          onClick={() => setSelectedCampaignId(campaign.id)}
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => {
+                            setSelectedCampaignId(campaign.id);
+                            navigate(buildProjectsPath(campaign.id));
+                          }}
+                          onKeyDown={(event) => {
+                            if (event.key === 'Enter' || event.key === ' ') {
+                              event.preventDefault();
+                              setSelectedCampaignId(campaign.id);
+                              navigate(buildProjectsPath(campaign.id));
+                            }
+                          }}
                           className="cursor-pointer flex-1 overflow-hidden mr-4 pt-2"
                           title={campaign.title}
                         >

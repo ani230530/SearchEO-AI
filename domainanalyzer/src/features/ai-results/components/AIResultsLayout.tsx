@@ -3,14 +3,12 @@ import {
   BarChart3,
   Bell,
   ChevronDown,
-  ChevronRight,
   ClipboardList,
   Globe,
   Globe2,
   HelpCircle,
   History,
   LayoutDashboard,
-  Link,
   Lightbulb,
   LogOut,
   PieChart,
@@ -20,7 +18,7 @@ import {
   Tag,
   User,
 } from "lucide-react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useMemo, useState, useEffect } from "react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/contexts/AuthContext";
@@ -121,7 +119,6 @@ export function AIResultsLayout({
   title,
 }: AIResultsLayoutProps) {
   const { logout } = useAuth();
-  const location = useLocation();
   // Resolve the trigger button's display name. Prefer explicit props, then
   // look up the current domain in allDomains, then fall back to the host
   // sliced out of currentDomainUrl.
@@ -143,6 +140,7 @@ export function AIResultsLayout({
   const [isSidebarHovered, setIsSidebarHovered] = useState(false);
   const isSidebarExpanded = sidebarOpen || isSidebarHovered;
 
+  const location = useLocation();
   const navigateToItem = (itemId: AIResultsNavItemId, nextMaskedId = resolvedMaskedDomainId) => {
     if (!nextMaskedId) return;
 
@@ -183,16 +181,15 @@ export function AIResultsLayout({
 
   return (
     <div className="flex min-h-screen w-full flex-col bg-[#f5f5f7] text-slate-900 lg:flex-row">
-      {/* Collapsible icon rail. The outer <aside> reserves a fixed 78px/280px slot
-       *  so the rest of the layout never reflows. The inner panel is
-       *  absolutely/fixed positioned and transitions width on hover. */}
+      {/* Collapsible icon rail. The outer <aside> reserves a fixed 84px/280px slot
+       *  on desktop so the rest of the layout never reflows. */}
       <aside 
-        className="group relative z-40 hidden min-h-[220px] shrink-0 basis-auto overflow-visible border-b border-slate-300 bg-transparent lg:sticky lg:top-0 lg:flex lg:h-screen lg:max-h-screen lg:border-b-0 lg:self-start"
+        className="group relative z-40 hidden min-h-[220px] shrink-0 basis-auto overflow-visible border-b border-slate-300 bg-transparent lg:sticky lg:top-0 lg:flex lg:h-screen lg:max-h-screen lg:border-b-0 lg:self-start lg:w-[var(--rail-width)]"
         style={{
+          ["--rail-width" as string]: sidebarOpen ? "280px" : "84px",
           fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Inter", "Helvetica Neue", Helvetica, Arial, sans-serif',
-          width: sidebarOpen ? "280px" : "78px",
           transition: "width 0.26s ease",
-        }}
+        } as CSSProperties}
       >
         <DashboardSidebar
           activeCompanySubTab="company-info"
@@ -206,7 +203,7 @@ export function AIResultsLayout({
           }}
           onSelectPricing={() => navigate(resolveSidebarNavigation("pricing").path)}
           onSelectCompanySubTab={() => {}}
-          onSelectCreateProject={() => navigate("/dashboard?tab=projects&create=true")}
+          onSelectCreateProject={() => navigate("/dashboard?tab=projects&action=create")}
           onSelectTab={handleSelectTab}
           activeSettingsSubTab={undefined}
           showResults={true}
@@ -218,10 +215,7 @@ export function AIResultsLayout({
 
       <aside className="min-h-[220px] w-full shrink-0 basis-auto border-b border-slate-300 bg-white p-4 lg:sticky lg:top-0 lg:h-screen lg:max-h-screen lg:basis-[18%] lg:min-w-[260px] lg:max-w-[342px] lg:border-b-0 lg:border-r lg:self-start">
         <div className="flex h-full flex-col overflow-hidden">
-          {/* Top of the sidebar — domain logo on the left, back button on the right.
-              The logo replaces the "logo" placeholder; the back button replaces
-              the Settings icon and goes to the user's domain history. The main
-              content header no longer has its own back arrow. */}
+          {/* Top of the sidebar — domain logo on the left and a collapse toggle on the right. */}
           <div className="flex items-center justify-between">
             <span className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-xl bg-slate-50 ring-1 ring-slate-200">
               {triggerLogo ? (
@@ -247,8 +241,8 @@ export function AIResultsLayout({
           </div>
 
           <div className="mt-6">
-            <p className="mb-2 text-xs font-semibold text-gray-700">Domain</p>
             <DropdownMenu>
+              <p className="mb-2 text-xs font-semibold text-gray-700">Domain</p>
               <DropdownMenuTrigger asChild>
                 <button className="flex w-full items-center justify-between rounded-lg border border-slate-300 bg-white px-3 py-2 text-left text-xs shadow-sm transition hover:bg-gray-50">
                   <span className="flex min-w-0 items-center gap-2">
@@ -285,36 +279,36 @@ export function AIResultsLayout({
                         onClick={() => navigateToItem(activeItem, nextMaskedId)}
                         className={`flex cursor-pointer items-center gap-2.5 px-2.5 py-2 ${isCurrent ? "bg-gray-50" : ""}`}
                       >
-                        <span className="grid h-7 w-7 shrink-0 place-items-center overflow-hidden rounded-md bg-slate-50">
-                          {logo ? (
-                            <img
-                              src={logo}
-                              alt=""
-                              className="h-6 w-6 object-contain"
-                              onError={(e) => ((e.currentTarget as HTMLImageElement).style.display = "none")}
-                            />
-                          ) : (
-                            <Globe2 className="h-3.5 w-3.5 text-slate-500" />
-                          )}
-                        </span>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="truncate text-xs font-semibold text-gray-900">{name}</span>
-                            {isCurrent ? <Sparkles className="h-3 w-3 shrink-0 text-emerald-600" /> : null}
-                          </div>
-                          <span className="block truncate text-[10px] text-gray-500">
-                            {domain.host ?? domain.url.replace(/^https?:\/\//, '')}
-                            {' · '}
-
-                            {domain.lastAnalyzed
-                              ? new Date(domain.lastAnalyzed).toLocaleString('en-IN', {
-                                day: '2-digit',
-                                month: 'short',
-                                year: 'numeric'
-                              })
-                              : 'No date'}
+                          <span className="grid h-7 w-7 shrink-0 place-items-center overflow-hidden rounded-md bg-slate-50">
+                            {logo ? (
+                              <img
+                                src={logo}
+                                alt=""
+                                className="h-6 w-6 object-contain"
+                                onError={(e) => ((e.currentTarget as HTMLImageElement).style.display = "none")}
+                              />
+                            ) : (
+                              <Globe2 className="h-3.5 w-3.5 text-slate-500" />
+                            )}
                           </span>
-                        </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="truncate text-xs font-semibold text-gray-900">{name}</span>
+                              {isCurrent ? <Sparkles className="h-3 w-3 shrink-0 text-emerald-600" /> : null}
+                            </div>
+                            <span className="block truncate text-[10px] text-gray-500">
+                              {domain.host ?? domain.url.replace(/^https?:\/\//, '')}
+                              {' · '}
+
+                              {domain.lastAnalyzed
+                                ? new Date(domain.lastAnalyzed).toLocaleString('en-IN', {
+                                  day: '2-digit',
+                                  month: 'short',
+                                  year: 'numeric'
+                                })
+                              : 'No date'}
+                            </span>
+                          </div>
                       </DropdownMenuItem>
                     );
                   })
@@ -361,14 +355,13 @@ export function AIResultsLayout({
         <header className="w-full bg-white px-6 py-4">
           <div className="flex min-h-[2.25rem] w-full items-center justify-between gap-3">
             <div className="flex min-w-0 items-center gap-3">
-              <button
-                type="button"
+              <Link
+                to={resolveSidebarNavigation("domain-history").path}
                 aria-label="Back"
-                onClick={() => navigate(resolveSidebarNavigation("domain-history").path)}
                 className="inline-flex h-6 w-6 shrink-0 items-center justify-center text-[#101828] transition hover:text-slate-700"
               >
                 <ArrowLeft className="h-4 w-4" />
-              </button>
+              </Link>
               <h1 className="truncate text-base font-semibold leading-[1.35] tracking-normal text-gray-950 sm:text-lg">
                 {title}
               </h1>
@@ -389,13 +382,13 @@ export function AIResultsLayout({
               >
                 <Bell className="h-3.5 w-3.5" />
               </button>
-              <button
-                type="button"
+              <Link
+                to="/dashboard?tab=profile"
                 aria-label="Profile"
                 className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-[#F2F4F7] text-[#667085] transition hover:text-slate-700"
               >
                 <User className="h-3.5 w-3.5" />
-              </button>
+              </Link>
             </div>
           </div>
         </header>
