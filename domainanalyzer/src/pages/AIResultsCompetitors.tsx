@@ -1244,8 +1244,6 @@ export default function CompetitorsPage() {
     setActiveDrawer('prompt-gap');
   };
 
-  const openPromptGapsReport = () => navigate('/ai-results-prompt-gaps');
-
   const hasRun = report?.runStatus === 'completed' && (analysis?.runId ?? null) !== null;
 
   return (
@@ -1303,7 +1301,6 @@ export default function CompetitorsPage() {
                 <PromptGapPanel
                   opportunities={report?.opportunities ?? []}
                   onAiResponse={openPromptGapDrawer}
-                  onViewAll={openPromptGapsReport}
                 />
               </div>
 

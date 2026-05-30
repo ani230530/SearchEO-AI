@@ -26,7 +26,7 @@ import { AIResultsLayout } from './components/AIResultsLayout';
 import { useDomains, type DomainRow } from './queries';
 import { maskDomainId, unmaskDomainId } from '@/lib/domainUtils';
 
-export type ShellActiveItem = 'ai-results' | 'competitors' | 'track-prompts' | 'top-keywords' | 'analytics';
+export type ShellActiveItem = 'ai-results' | 'competitors' | 'prompts';
 
 export interface ShellContext {
   /** All domains for the dropdown. May be empty during the very first load. */
