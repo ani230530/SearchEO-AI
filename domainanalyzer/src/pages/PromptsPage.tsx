@@ -1,4 +1,4 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import {
   ArrowDownRight,
@@ -63,6 +63,17 @@ type PerformanceConfig = {
   series: Record<PerformanceRange, PerformanceRowConfig[]>;
 };
 
+const PERFORMANCE_ROW_ICON_SRC: Record<string, string> = {
+  "AI Overview": "/overview-avatar-label-group.svg",
+  ChatGPT: "/report-icons/chat-gpt.svg",
+  Claude: "/report-icons/claude.svg",
+  Gemini: "/report-icons/gemini.svg",
+};
+
+const getPerformanceRowIconSrc = (label: string): string | null => {
+  return PERFORMANCE_ROW_ICON_SRC[label] ?? null;
+};
+
 const PROMPT_TABS: Array<{ id: PromptsTabId; label: string }> = [
   { id: "all-prompts", label: "All Prompts" },
   { id: "prompt-tracking", label: "Prompt Tracking" },
@@ -77,7 +88,7 @@ const METRIC_CARDS: MetricCardConfig[] = [
     value: "120",
     trend: "+3.2%",
     tone: "positive",
-    valueClassName: "text-[#2f6bff]",
+    valueClassName: "text-[#3393F2]",
   },
   {
     label: "Prompts Tracking",
@@ -86,7 +97,7 @@ const METRIC_CARDS: MetricCardConfig[] = [
     value: "45",
     trend: "+3.2%",
     tone: "positive",
-    valueClassName: "text-[#2f6bff]",
+    valueClassName: "text-[#3393F2]",
   },
   {
     label: "Gap Opportunities",
@@ -95,7 +106,7 @@ const METRIC_CARDS: MetricCardConfig[] = [
     value: "+12%",
     trend: "+3.2%",
     tone: "positive",
-    valueClassName: "text-[#2f6bff]",
+    valueClassName: "text-[#3393F2]",
   },
   {
     label: "Top Citations",
@@ -104,7 +115,7 @@ const METRIC_CARDS: MetricCardConfig[] = [
     value: "5",
     trend: "-0.5%",
     tone: "negative",
-    valueClassName: "text-[#c81e1e]",
+    valueClassName: "text-[#B23131]",
   },
 ];
 
@@ -123,7 +134,7 @@ const TAB_CONFIGS: Record<PromptsTabId, PromptTabConfig> = {
         value: "45",
         trend: "+3.2%",
         tone: "positive",
-        valueClassName: "text-[#2f6bff]",
+        valueClassName: "text-[#3393F2]",
       },
       {
         label: "Average Visibility",
@@ -132,7 +143,7 @@ const TAB_CONFIGS: Record<PromptsTabId, PromptTabConfig> = {
         value: "68%",
         trend: "+3.2%",
         tone: "positive",
-        valueClassName: "text-[#2f6bff]",
+        valueClassName: "text-[#3393F2]",
       },
       {
         label: "Prompts Gained",
@@ -141,7 +152,7 @@ const TAB_CONFIGS: Record<PromptsTabId, PromptTabConfig> = {
         value: "+12%",
         trend: "+3.2%",
         tone: "positive",
-        valueClassName: "text-[#2f6bff]",
+        valueClassName: "text-[#3393F2]",
       },
       {
         label: "Prompts Lost",
@@ -150,7 +161,7 @@ const TAB_CONFIGS: Record<PromptsTabId, PromptTabConfig> = {
         value: "5",
         trend: "-0.5%",
         tone: "negative",
-        valueClassName: "text-[#c81e1e]",
+        valueClassName: "text-[#B23131]",
       },
     ],
   },
@@ -164,7 +175,7 @@ const TAB_CONFIGS: Record<PromptsTabId, PromptTabConfig> = {
         value: "45",
         trend: "+8.6%",
         tone: "positive",
-        valueClassName: "text-[#2f6bff]",
+        valueClassName: "text-[#3393F2]",
         showTrend: false,
       },
       {
@@ -174,7 +185,7 @@ const TAB_CONFIGS: Record<PromptsTabId, PromptTabConfig> = {
         value: "16",
         trend: "+3.4%",
         tone: "positive",
-        valueClassName: "text-[#2f6bff]",
+        valueClassName: "text-[#3393F2]",
         showTrend: false,
       },
       {
@@ -184,7 +195,7 @@ const TAB_CONFIGS: Record<PromptsTabId, PromptTabConfig> = {
         value: "9",
         trend: "+1.2%",
         tone: "warning",
-        valueClassName: "text-[#b45309]",
+        valueClassName: "text-[#B23131]",
         showTrend: false,
       },
       {
@@ -194,7 +205,7 @@ const TAB_CONFIGS: Record<PromptsTabId, PromptTabConfig> = {
         value: "+12%",
         trend: "+0.9%",
         tone: "positive",
-        valueClassName: "text-[#2f6bff]",
+        valueClassName: "text-[#3393F2]",
         showTrend: false,
       },
     ],
@@ -215,21 +226,18 @@ const PROMPT_TRACKING_PERFORMANCE: PerformanceConfig = {
       { label: "ChatGPT", value: "12.5k", percent: 20, barClassName: "bg-[#8aa6e8]" },
       { label: "Claude", value: "4.3k", percent: 10, barClassName: "bg-[#9ab5ef]" },
       { label: "Gemini", value: "1.5k", percent: 5, barClassName: "bg-[#b0c2f2]" },
-      { label: "Deep Seek", value: "1.5k", percent: 5, barClassName: "bg-[#c2cff4]" },
     ],
     monthly: [
       { label: "AI Overview", value: "34.1k", percent: 58, barClassName: "bg-[#7395dd]" },
       { label: "ChatGPT", value: "13.8k", percent: 22, barClassName: "bg-[#8aa6e8]" },
       { label: "Claude", value: "4.8k", percent: 10, barClassName: "bg-[#9ab5ef]" },
       { label: "Gemini", value: "1.7k", percent: 5, barClassName: "bg-[#b0c2f2]" },
-      { label: "Deep Seek", value: "1.7k", percent: 5, barClassName: "bg-[#c2cff4]" },
     ],
     quarterly: [
       { label: "AI Overview", value: "31.9k", percent: 62, barClassName: "bg-[#7395dd]" },
       { label: "ChatGPT", value: "9.3k", percent: 18, barClassName: "bg-[#8aa6e8]" },
       { label: "Claude", value: "4.1k", percent: 10, barClassName: "bg-[#9ab5ef]" },
       { label: "Gemini", value: "2.0k", percent: 5, barClassName: "bg-[#b0c2f2]" },
-      { label: "Deep Seek", value: "2.0k", percent: 5, barClassName: "bg-[#c2cff4]" },
     ],
   },
 };
@@ -305,7 +313,7 @@ function MetricTooltip({ text }: { text: string }) {
       <TooltipTrigger asChild>
         <button
           type="button"
-          className="inline-flex h-4 w-4 items-center justify-center rounded-full text-slate-400 transition hover:text-slate-600"
+          className="inline-flex h-3 w-3 items-center justify-center rounded-full text-slate-400 transition hover:text-slate-600"
           aria-label={text}
         >
           <Info className="h-3.5 w-3.5" />
@@ -339,10 +347,10 @@ function MetricCard({
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5">
-            <h3 className="truncate text-[12px] font-semibold text-slate-600">{label}</h3>
+            <h3 className="truncate text-base font-semibold text-slate-600">{label}</h3>
             <MetricTooltip text={tooltip} />
           </div>
-          <p className="mt-4 text-[12px] font-medium text-slate-600">{subtitle}</p>
+          <p className="mt-2 text-xs font-medium text-slate-600">{subtitle}</p>
         </div>
         {showTrend ? (
           <span className={cn("inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium", toneClasses)}>
@@ -352,8 +360,8 @@ function MetricCard({
         ) : null}
       </div>
 
-      <div className={cn("mt-1 flex items-end justify-between gap-4", showTrend ? "" : "pt-0.5")}>
-        <div className={cn("text-[31px] font-semibold leading-none tracking-[-0.04em]", valueClassName)}>
+      <div className={cn("mt-2 flex items-end justify-between gap-4", showTrend ? "" : "pt-0.5")}>
+        <div className={cn("text-2xl font-semibold leading-none tracking-[-0.04em]", valueClassName)}>
           {value}
         </div>
       </div>
@@ -437,15 +445,25 @@ function PromptTrackingPerformanceCard({
           {rows.map((row) => (
             <div key={row.label} className="grid grid-cols-[minmax(0,132px)_minmax(0,1fr)_auto_auto] items-center gap-3">
               <div className="flex min-w-0 items-center gap-2">
-                <span className="inline-flex h-4 w-4 items-center justify-center rounded text-[10px] font-semibold text-slate-500">
-                  {row.label === "AI Overview" ? "◉" : "•"}
-                </span>
+                {getPerformanceRowIconSrc(row.label) ? (
+                  <img
+                    src={getPerformanceRowIconSrc(row.label) ?? undefined}
+                    alt={row.label}
+                    aria-hidden="true"
+                    className="h-4 w-4 shrink-0 object-contain"
+                  />
+                ) : (
+                  <span className="inline-flex h-4 w-4 items-center justify-center rounded text-[10px] font-semibold text-slate-500">
+                    •
+                  </span>
+                )
+                }
                 <span className="truncate text-[12px] font-medium text-slate-600">{row.label}</span>
               </div>
               <div className="h-2 overflow-hidden rounded-full bg-slate-200">
                 <div className={cn("h-full rounded-full", row.barClassName)} style={{ width: `${row.percent}%` }} />
               </div>
-              <span className="text-[12px] font-medium text-[#2f6bff] tabular-nums">{row.value}</span>
+              <span className="text-[12px] font-medium text-[#3393f2] tabular-nums">{row.value}</span>
               <span className="text-[11px] font-medium text-slate-500 tabular-nums">{row.percent}%</span>
             </div>
           ))}
@@ -585,7 +603,7 @@ const PromptsPage = () => {
                   className={cn(
                     "rounded-[10px] px-4 py-2 text-[13px] font-medium transition",
                     isActive 
-                      ? "bg-[#eef4ff] text-[#2f5fd1] shadow-[inset_0_0_0_1px_rgba(79,110,200,0.18)]" 
+                      ? "bg-[#F1F6FF] border-b-2 border-[#7E9BD7]" 
                       : "text-slate-500 hover:bg-slate-50 hover:text-slate-700"
                   )}
                 >
@@ -605,3 +623,4 @@ const PromptsPage = () => {
 };
 
 export default PromptsPage;
+
