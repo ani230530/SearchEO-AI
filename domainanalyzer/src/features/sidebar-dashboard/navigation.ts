@@ -46,3 +46,22 @@ export function resolveSidebarNavigation(
       };
   }
 }
+
+export function resolveAIResultsNavigation(
+  itemId: "ai-results" | "competitors" | "prompts",
+  maskedDomainId: string,
+  subTab?: string
+): string {
+  switch (itemId) {
+    case "ai-results":
+      return `/ai-results/${maskedDomainId}`;
+    case "prompts":
+      const base = `/ai-results/${maskedDomainId}/prompts`;
+      return subTab ? `${base}?tab=${subTab}` : base;
+    case "competitors":
+      // Competitors page expects domain in query string when navigating from shell
+      return `/airesults-competitors-preview?domain=${maskedDomainId}`;
+    default:
+      return "/dashboard";
+  }
+}

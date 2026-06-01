@@ -1,9 +1,11 @@
 import { useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import {
   ArrowDownRight,
   ArrowUpRight,
   Info,
 } from "lucide-react";
+import { resolveAIResultsNavigation } from "@/features/sidebar-dashboard/navigation";
 
 import {
   Tabs,
@@ -554,9 +556,12 @@ function PromptsTabBody({
 }
 
 const PromptsPage = () => {
-  const { currentDomain } = useShellContext();
+  const { currentDomain, maskedDomainId } = useShellContext();
   const domainId = currentDomain?.id ?? null;
-  const [activeTab, setActiveTab] = useState<PromptsTabId>("all-prompts");
+  const [searchParams] = useSearchParams();
+  
+  // URL-driven tab state
+  const activeTab = (searchParams.get("tab") as PromptsTabId) || "all-prompts";
 
   // Dummy-data first. Keep the loading branch in place so real data wiring
   // can drop in later without reshaping the component tree.
@@ -564,29 +569,37 @@ const PromptsPage = () => {
 
   return (
     <section className="w-full bg-white px-6 pb-6 pt-2">
-      <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as PromptsTabId)} className="space-y-6">
+      <div className="space-y-6">
         <div className="flex flex-wrap items-center justify-between gap-4">
-          <TabsList className="h-auto gap-1 rounded-[14px] bg-transparent p-0">
-            {PROMPT_TABS.map((tab) => (
-              <TabsTrigger
-                key={tab.id}
-                value={tab.id}
-                className={cn(
-                  "rounded-[10px] px-4 py-2 text-[13px] font-medium text-slate-500 shadow-none transition data-[state=active]:bg-[#eef4ff] data-[state=active]:text-[#2f5fd1] data-[state=active]:shadow-[inset_0_0_0_1px_rgba(79,110,200,0.18)]"
-                )}
-              >
-                {tab.label}
-              </TabsTrigger>
-            ))}
-          </TabsList>
+          <div className="flex h-auto gap-1 rounded-[14px] bg-transparent p-0">
+            {PROMPT_TABS.map((tab) => {
+              const isActive = activeTab === tab.id;
+              const targetPath = maskedDomainId 
+                ? resolveAIResultsNavigation("prompts", maskedDomainId, tab.id)
+                : "#";
+
+              return (
+                <Link
+                  key={tab.id}
+                  to={targetPath}
+                  className={cn(
+                    "rounded-[10px] px-4 py-2 text-[13px] font-medium transition",
+                    isActive 
+                      ? "bg-[#eef4ff] text-[#2f5fd1] shadow-[inset_0_0_0_1px_rgba(79,110,200,0.18)]" 
+                      : "text-slate-500 hover:bg-slate-50 hover:text-slate-700"
+                  )}
+                >
+                  {tab.label}
+                </Link>
+              );
+            })}
+          </div>
         </div>
 
-        {PROMPT_TABS.map((tab) => (
-          <TabsContent key={tab.id} value={tab.id} className="mt-0">
-            <PromptsTabBody tabId={tab.id} domainId={domainId} loading={loading} />
-          </TabsContent>
-        ))}
-      </Tabs>
+        <div className="mt-0">
+          <PromptsTabBody tabId={activeTab} domainId={domainId} loading={loading} />
+        </div>
+      </div>
     </section>
   );
 };
