@@ -57,6 +57,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { cn } from "@/lib/utils";
 
 export type PromptModelResult = {
   accuracy?: number | null;
@@ -836,6 +837,39 @@ export const PromptTable = ({
     return fullSortedData.slice(start, start + PAGE_SIZE);
   }, [fullSortedData, currentPage]);
 
+  const visibleRowIds = useMemo(
+    () => displayData.map((row) => String(row.id)),
+    [displayData]
+  );
+  const [selectedRowIds, setSelectedRowIds] = useState<Set<string>>(new Set());
+  const selectedCount = selectedRowIds.size;
+  const allVisibleSelected =
+    visibleRowIds.length > 0 && visibleRowIds.every((id) => selectedRowIds.has(id));
+
+  const toggleRowSelection = (rowId: string) => {
+    setSelectedRowIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(rowId)) {
+        next.delete(rowId);
+      } else {
+        next.add(rowId);
+      }
+      return next;
+    });
+  };
+
+  const toggleVisibleRows = () => {
+    setSelectedRowIds((prev) => {
+      const next = new Set(prev);
+      if (allVisibleSelected) {
+        visibleRowIds.forEach((id) => next.delete(id));
+      } else {
+        visibleRowIds.forEach((id) => next.add(id));
+      }
+      return next;
+    });
+  };
+
   const toggleRowPause = (rowId: string) => {
     setPausedRows((prev) => ({
       ...prev,
@@ -924,17 +958,25 @@ export const PromptTable = ({
             <div className="flex items-center gap-2">
               <Button
                 type="button"
+                disabled={selectedCount === 0}
                 onClick={() => navigateToWorksheet()}
-                className="h-[38px] gap-2 rounded-lg border-none bg-[#2d3748] px-4 text-white shadow-none transition-all hover:bg-[#1a202c]"
+                className={cn(
+                  "h-9 gap-2 text-white border-none rounded-lg px-4 transition-all ml-1",
+                  selectedCount === 0
+                    ? "bg-[#94a3b8] hover:bg-[#94a3b8] cursor-not-allowed"
+                    : "bg-[#2D4059] hover:bg-[#24364d]"
+                )}
               >
                 <LayoutGrid className="h-4 w-4" />
-                <span className="text-[13px] font-medium">Add to Worksheet</span>
+                <span className="text-[13px] font-medium">
+                  Add to Worksheet{selectedCount > 0 ? ` (${selectedCount})` : ""}
+                </span>
               </Button>
 
               {showMonitorAllButton ? (
                 <Button
                   type="button"
-                  className="h-[38px] gap-2 rounded-lg border-none bg-[#4b6eb8] px-4 text-white shadow-none transition-all hover:bg-[#3f5d9c]"
+                  className="w-full sm:w-[141px] h-[41px] flex items-center justify-center gap-[4px] px-[14px] py-[10px] rounded-[8px] border-[2px] border-transparent bg-origin-border [background:linear-gradient(90deg,#2D4059,#4C74C2)_padding-box,linear-gradient(90deg,#2D4059,#4C74C2)_border-box] shadow-[0px_1px_2px_rgba(16,24,40,0.05)] text-white text-sm font-medium"
                 >
                   <ShieldCheck className="h-4 w-4" />
                   <span className="text-[13px] font-medium">Monitor (All)</span>
@@ -968,7 +1010,7 @@ export const PromptTable = ({
             type="button"
             onClick={() => void handleAnalyzePrompt()}
             disabled={analyzing || !analyzeText.trim()}
-            className="h-[38px] shrink-0 gap-1.5 rounded-lg bg-[#4b6eb8] px-4 text-white transition-all hover:bg-[#3f5d9c] disabled:opacity-60 disabled:cursor-not-allowed"
+            className="w-full sm:w-[141px] h-[41px] flex items-center justify-center gap-[4px] px-[14px] py-[10px] rounded-[8px] border-[2px] border-transparent bg-origin-border [background:linear-gradient(90deg,#2D4059,#4C74C2)_padding-box,linear-gradient(90deg,#2D4059,#4C74C2)_border-box] shadow-[0px_1px_2px_rgba(16,24,40,0.05)] text-white text-sm font-medium"
           >
             {analyzing ? (
               <>
@@ -1012,44 +1054,50 @@ export const PromptTable = ({
 
       <CardContent className="px-0 pb-3">
         <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-gray-200">
-          <Table>
+            <Table>
             <TableHeader>
               <TableRow className="border-b-0 bg-[#f1f1f1] hover:bg-[#f1f1f1]">
                 <TableHead className="w-8 px-4 rounded-tl-lg">
-                  <input type="checkbox" className="h-3.5 w-3.5 rounded border-gray-300 accent-blue-600" />
+                  <input
+                    type="checkbox"
+                    checked={allVisibleSelected}
+                    onChange={toggleVisibleRows}
+                    aria-label="Select all visible prompts"
+                    className="h-3.5 w-3.5 rounded border-gray-300 accent-blue-600"
+                  />
                 </TableHead>
-                <TableHead className="px-2 text-[11px] font-semibold text-[#31415f]">
+                <TableHead className="px-2 text-[11px] font-semibold text-[#294770]">
                   <div className="flex items-center gap-1">
                     Prompts <Info className="h-[10px] w-[10px] text-slate-400" /> <ArrowUp className="h-3 w-3 text-slate-600" />
                   </div>
                 </TableHead>
-                <TableHead className="px-2 text-[11px] font-semibold text-[#31415f]">
+                <TableHead className="px-2 text-[11px] font-semibold text-[#294770]">
                   <div className="flex items-center gap-1">
                     Visibility <Info className="h-[10px] w-[10px] text-slate-400" /> <ArrowUp className="h-3 w-3 text-slate-600" />
                   </div>
                 </TableHead>
-                <TableHead className="px-2 text-[11px] font-semibold text-[#31415f]">
+                <TableHead className="px-2 text-[11px] font-semibold text-[#294770]">
                   <div className="flex items-center gap-1">
                     Coverage <Info className="h-[10px] w-[10px] text-slate-400" /> <ArrowUp className="h-3 w-3 text-slate-600" />
                   </div>
                 </TableHead>
-                <TableHead className="px-2 text-[11px] font-semibold text-[#31415f]">
+                <TableHead className="px-2 text-[11px] font-semibold text-[#294770]">
                   <div className="flex items-center gap-1">
                     Ranking <Info className="h-[10px] w-[10px] text-slate-400" /> <ArrowUp className="h-3 w-3 text-slate-600" />
                   </div>
                 </TableHead>
-                <TableHead className="px-2 text-[11px] font-semibold text-[#31415f]">
-                  <div className="flex items-center gap-1">
+                <TableHead className="px-2 text-[11px] font-semibold text-[#294770]">
+                  <div className="flex items-center justify-center gap-1">
                     Sentiment <Info className="h-[10px] w-[10px] text-slate-400" /> <ArrowUp className="h-3 w-3 text-slate-600" />
                   </div>
                 </TableHead>
-                <TableHead className="px-2 text-[11px] font-semibold text-[#31415f]">
-                  <div className="flex items-center gap-1">
+                <TableHead className="px-2 text-[11px] font-semibold text-[#294770]">
+                  <div className="flex items-center justify-center gap-1">
                     Volume <Info className="h-[10px] w-[10px] text-slate-400" /> <ArrowUp className="h-3 w-3 text-slate-600" />
                   </div>
                 </TableHead>
-                <TableHead className="px-4 text-right text-[11px] font-semibold text-[#31415f] rounded-tr-lg">
-                  <div className="flex items-center justify-end gap-1">
+                <TableHead className="px-4 text-right text-[11px] font-semibold text-[#294770] rounded-tr-lg">
+                  <div className="flex items-center justify-center gap-1">
                     Action <Info className="h-[10px] w-[10px] text-slate-400" />
                   </div>
                 </TableHead>
@@ -1099,7 +1147,16 @@ export const PromptTable = ({
                     onClick={() => setExpandedId(expandedId === row.id ? null : row.id)}
                   >
                     <TableCell className="w-8 px-4 py-3">
-                      <input type="checkbox" className="h-3.5 w-3.5 rounded border-gray-300 accent-blue-600" />
+                      <input
+                        type="checkbox"
+                        checked={selectedRowIds.has(String(row.id))}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                        }}
+                        onChange={() => toggleRowSelection(String(row.id))}
+                        aria-label={`Select ${row.phrase}`}
+                        className="h-3.5 w-3.5 rounded border-gray-300 accent-blue-600"
+                      />
                     </TableCell>
                     <TableCell className="max-w-[340px] px-2 py-2">
                       <div className="flex flex-col gap-1">
