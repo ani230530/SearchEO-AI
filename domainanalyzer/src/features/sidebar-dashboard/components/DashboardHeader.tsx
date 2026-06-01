@@ -1,4 +1,4 @@
-import { Bell, CircleHelp } from "lucide-react";
+import { Bell, CircleHelp, UserRound } from "lucide-react";
 import { type MouseEvent } from "react";
 import { Link } from "react-router-dom";
 
@@ -79,14 +79,10 @@ export function DashboardHeader({
                   <Link
                     to="/dashboard?tab=profile"
                     onClick={handleProfileClick}
-                    className="inline-flex h-8 w-8 items-center justify-center overflow-hidden rounded-full border border-[#e5e7eb] bg-white transition-opacity hover:opacity-80"
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[#e5e7eb] bg-white text-[#6b7280] transition-colors hover:text-[#1f2937]"
                     aria-label="Profile"
                   >
-                    <img
-                      src="/overview-avatar-label-group.svg"
-                      alt=""
-                      className="h-8 w-8 object-contain"
-                    />
+                    <UserRound className="h-4 w-4" />
                   </Link>
                 </TooltipTrigger>
                 <TooltipContent side="bottom">Profile</TooltipContent>
@@ -120,10 +116,10 @@ export function DashboardHeader({
             <Link
               to="/dashboard?tab=profile"
               onClick={handleProfileClick}
-              className="cursor-pointer transition-opacity hover:opacity-70"
+              className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[#e5e7eb] bg-white text-[#6b7280] transition-colors hover:text-[#1f2937]"
               title="Profile"
             >
-              <img src="/overview-avatar-label-group.svg" alt="" className="h-8 w-8 rounded-full object-contain" />
+              <UserRound className="h-4 w-4" />
             </Link>
             <div
               style={{
