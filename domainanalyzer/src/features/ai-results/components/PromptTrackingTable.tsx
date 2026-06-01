@@ -2,7 +2,6 @@ import { Fragment, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { apiGet, apiPost } from "@/services/apiClient";
 import { useToast } from "@/components/ui/use-toast";
-import { maskDomainId } from "@/lib/domainUtils";
 import { logoUrl as logoUrlHelper } from "@/lib/logoUrl";
 import ReactMarkdown from "react-markdown";
 import {
@@ -42,6 +41,13 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -700,21 +706,19 @@ export const PromptTable = ({
   // Worksheet / Draft Blog buttons in this table navigate to the
   // dashboard with ?openWorksheet=<rowId> so the existing modal there
   // handles the rest. Avoids duplicating ~200 lines of orchestration.
-  const navigateToWorksheet = (rowId?: string) => {
-    if (!domainId) {
-      toast({
-        title: "No domain context",
-        description: "Domain not loaded yet — try again in a moment.",
-        variant: "destructive",
-      });
-      return;
-    }
-    const slug = maskDomainId(domainId);
-    const url = rowId
-      ? `/ai-results/${slug}?openWorksheet=${encodeURIComponent(rowId)}`
-      : `/ai-results/${slug}?openWorksheet=1`;
-    navigate(url);
-  };
+  const WORKSHEET_IMPORT_KEY = "ai-results/pending-worksheet-import";
+  const WORKSHEET_TARGET_KEY = "ai-results/pending-worksheet-target";
+  const buildProjectsWorksheetPath = (campaignId: string | number) =>
+    `/dashboard?tab=projects&campaign=${encodeURIComponent(String(campaignId))}`;
+  const [isWorksheetModalOpen, setIsWorksheetModalOpen] = useState(false);
+  const [activeWorksheetId, setActiveWorksheetId] = useState<string | null>(null);
+  const [pendingWorksheetRows, setPendingWorksheetRows] = useState<PromptTableRow[]>([]);
+  const [worksheetOptions, setWorksheetOptions] = useState<Array<{ id: string; name: string; description: string | null }>>([]);
+  const [worksheetsLoading, setWorksheetsLoading] = useState(false);
+  const [isCreateWorksheetModalOpen, setIsCreateWorksheetModalOpen] = useState(false);
+  const [newWorksheetName, setNewWorksheetName] = useState("");
+  const [isCreatingWorksheet, setIsCreatingWorksheet] = useState(false);
+  const [createWorksheetError, setCreateWorksheetError] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [tableFilter, setTableFilter] = useState<"all" | "prompt" | "keyword">("all");
   const [tableMetric, setTableMetric] = useState<string | null>(null);
@@ -725,6 +729,7 @@ export const PromptTable = ({
   const PAGE_SIZE = 10;
   const [currentPage, setCurrentPage] = useState(1);
   const [pausedRows, setPausedRows] = useState<Record<string, boolean>>({});
+  const [selectedRowIds, setSelectedRowIds] = useState<Set<string>>(new Set());
 
   // Analyze Prompt state.
   // - `analyzeText` is the input.
@@ -741,6 +746,95 @@ export const PromptTable = ({
   const [pendingRows, setPendingRows] = useState<
     Array<{ id: string; phrase: string }>
   >([]);
+  const openWorksheetModalForRows = async (rows: PromptTableRow[]) => {
+    if (!domainId) {
+      toast({
+        title: "No domain context",
+        description: "Domain not loaded yet - try again in a moment.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (rows.length === 0) {
+      toast({
+        title: "No prompts selected",
+        description: "Select one or more prompts first.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setPendingWorksheetRows(rows);
+    setActiveWorksheetId(null);
+    setIsWorksheetModalOpen(true);
+    setWorksheetsLoading(true);
+    try {
+      const res = await apiGet<{ campaigns?: Array<{ id: number; title: string; description?: string | null }> }>("/campaigns");
+      const campaigns = Array.isArray(res?.campaigns) ? res.campaigns : [];
+      setWorksheetOptions(
+        campaigns.map((c) => ({
+          id: String(c.id),
+          name: c.title,
+          description: c.description?.trim() || null,
+        })),
+      );
+    } catch {
+      setWorksheetOptions([]);
+    } finally {
+      setWorksheetsLoading(false);
+    }
+  };
+  const handleConfirmAddToWorksheet = () => {
+    if (!activeWorksheetId || pendingWorksheetRows.length === 0) return;
+    const payload = {
+      activeWorksheetId,
+      selectedItemIds: pendingWorksheetRows.map((r) => r.id),
+      selectedRows: pendingWorksheetRows.map((r) => ({
+        id: String(r.id),
+        prompt: r.phrase ?? "",
+        type: r.type ?? null,
+        primaryKeyword: r.type === "keyword" ? (r.phrase ?? null) : null,
+        primaryIntent: null,
+      })),
+    };
+    sessionStorage.setItem(WORKSHEET_TARGET_KEY, activeWorksheetId);
+    sessionStorage.setItem(WORKSHEET_IMPORT_KEY, JSON.stringify(payload));
+    localStorage.setItem("activeTab", "projects");
+    setIsWorksheetModalOpen(false);
+    setPendingWorksheetRows([]);
+    setActiveWorksheetId(null);
+    setSelectedRowIds(new Set());
+    navigate(buildProjectsWorksheetPath(activeWorksheetId));
+  };
+  const handleCreateWorksheet = async () => {
+    const name = newWorksheetName.trim();
+    if (!name || isCreatingWorksheet) return;
+    setIsCreatingWorksheet(true);
+    setCreateWorksheetError(null);
+    try {
+      const created = await apiPost<{ campaign?: { id: number; title: string; description?: string | null } }>(
+        "/campaigns",
+        { title: name },
+      );
+      const campaign = created?.campaign;
+      if (!campaign?.id) {
+        setCreateWorksheetError("Failed to create worksheet.");
+        return;
+      }
+      const option = {
+        id: String(campaign.id),
+        name: campaign.title?.trim() || name,
+        description: campaign.description?.trim() || null,
+      };
+      setWorksheetOptions((prev) => [option, ...prev]);
+      setActiveWorksheetId(option.id);
+      setIsCreateWorksheetModalOpen(false);
+      setNewWorksheetName("");
+    } catch {
+      setCreateWorksheetError("Failed to create worksheet.");
+    } finally {
+      setIsCreatingWorksheet(false);
+    }
+  };
   const handleAnalyzePrompt = async () => {
     const text = analyzeText.trim();
     if (!text || analyzing) return;
@@ -924,7 +1018,11 @@ export const PromptTable = ({
             <div className="flex items-center gap-2">
               <Button
                 type="button"
-                onClick={() => navigateToWorksheet()}
+                onClick={() => {
+                  const rowsById = new Map(fullSortedData.map((r) => [r.id, r]));
+                  const selectedRows = Array.from(selectedRowIds).map((id) => rowsById.get(id)).filter(Boolean) as PromptTableRow[];
+                  void openWorksheetModalForRows(selectedRows);
+                }}
                 className="h-[38px] gap-2 rounded-lg border-none bg-[#2d3748] px-4 text-white shadow-none transition-all hover:bg-[#1a202c]"
               >
                 <LayoutGrid className="h-4 w-4" />
@@ -1016,7 +1114,20 @@ export const PromptTable = ({
             <TableHeader>
               <TableRow className="border-b-0 bg-[#f1f1f1] hover:bg-[#f1f1f1]">
                 <TableHead className="w-8 px-4 rounded-tl-lg">
-                  <input type="checkbox" className="h-3.5 w-3.5 rounded border-gray-300 accent-blue-600" />
+                  <input
+                    type="checkbox"
+                    checked={displayData.length > 0 && displayData.every((r) => selectedRowIds.has(r.id))}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setSelectedRowIds((prev) => {
+                        const next = new Set(prev);
+                        if (checked) displayData.forEach((r) => next.add(r.id));
+                        else displayData.forEach((r) => next.delete(r.id));
+                        return next;
+                      });
+                    }}
+                    className="h-3.5 w-3.5 rounded border-gray-300 accent-blue-600"
+                  />
                 </TableHead>
                 <TableHead className="px-2 text-[11px] font-semibold text-[#31415f]">
                   <div className="flex items-center gap-1">
@@ -1099,7 +1210,21 @@ export const PromptTable = ({
                     onClick={() => setExpandedId(expandedId === row.id ? null : row.id)}
                   >
                     <TableCell className="w-8 px-4 py-3">
-                      <input type="checkbox" className="h-3.5 w-3.5 rounded border-gray-300 accent-blue-600" />
+                      <input
+                        type="checkbox"
+                        checked={selectedRowIds.has(row.id)}
+                        onClick={(e) => e.stopPropagation()}
+                        onChange={(e) => {
+                          const checked = e.target.checked;
+                          setSelectedRowIds((prev) => {
+                            const next = new Set(prev);
+                            if (checked) next.add(row.id);
+                            else next.delete(row.id);
+                            return next;
+                          });
+                        }}
+                        className="h-3.5 w-3.5 rounded border-gray-300 accent-blue-600"
+                      />
                     </TableCell>
                     <TableCell className="max-w-[340px] px-2 py-2">
                       <div className="flex flex-col gap-1">
@@ -1223,7 +1348,7 @@ export const PromptTable = ({
                           variant="outline"
                           onClick={(e) => {
                             e.stopPropagation();
-                            navigateToWorksheet(row.id);
+                            void openWorksheetModalForRows([row]);
                           }}
                           className="h-[38px] rounded-[14px] border-[#e8eef8] bg-[#eff4ff] px-3.5 text-[11px] font-semibold text-[#3b5d9c] shadow-none hover:bg-[#e7efff]"
                         >
@@ -1280,6 +1405,142 @@ export const PromptTable = ({
           </div>
         </div>
       </CardContent>
+      <Dialog
+        open={isWorksheetModalOpen}
+        onOpenChange={(open) => {
+          setIsWorksheetModalOpen(open);
+          if (!open) {
+            setPendingWorksheetRows([]);
+            setActiveWorksheetId(null);
+            setNewWorksheetName("");
+            setCreateWorksheetError(null);
+            setIsCreateWorksheetModalOpen(false);
+          }
+        }}
+      >
+        <DialogContent className="w-[min(920px,calc(100vw-1.5rem))] max-w-none overflow-hidden rounded-[28px] border border-[#E5E7EB] bg-white p-0 shadow-[0_20px_80px_rgba(15,23,42,0.22)]">
+          <div className="flex max-h-[calc(100vh-2rem)] flex-col">
+            <DialogHeader className="shrink-0 border-b border-[#E5E7EB] px-6 py-5 text-left">
+              <DialogTitle className="text-[26px] font-semibold leading-[1.15] tracking-[-0.02em] text-[#1F2937]">
+                Select worksheet
+              </DialogTitle>
+              <DialogDescription className="mt-2 text-sm leading-[150%] text-[#6B7280]">
+                You are adding 1 item to your worksheet.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="flex-1 overflow-y-auto px-6 py-5">
+              <div className="mb-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[#2D4059]">
+                  Select a worksheet
+                </p>
+              </div>
+              {worksheetsLoading ? <div className="rounded-2xl border border-dashed border-[#CBD5E1] bg-[#FAFAFA] p-6 text-sm text-[#6B7280]">Loading worksheets...</div> : null}
+              {!worksheetsLoading && worksheetOptions.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-[#CBD5E1] bg-[#FAFAFA] p-6 text-sm text-[#6B7280]">
+                  No worksheets are available yet.
+                </div>
+              ) : null}
+              {!worksheetsLoading && worksheetOptions.length > 0 ? (
+                <div className="flex flex-col gap-3">
+                  {worksheetOptions.map((worksheet) => (
+                    <button
+                      key={worksheet.id}
+                      type="button"
+                      onClick={() => setActiveWorksheetId(worksheet.id)}
+                      className={`flex w-full items-center justify-between rounded-2xl border px-4 py-4 text-left transition-all focus:outline-none focus:ring-2 focus:ring-[#2D4059] focus:ring-offset-2 ${
+                        activeWorksheetId === worksheet.id
+                          ? "border-[#A8C4F6] bg-[#EEF4FF] shadow-[0_0_0_1px_rgba(94,129,230,0.18)]"
+                          : "border-[#E5E7EB] bg-[#FAFAFA] hover:border-[#CBD5E1] hover:bg-white"
+                      }`}
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate text-base font-semibold leading-[150%] text-[#1F2937]">{worksheet.name}</p>
+                        {worksheet.description ? <p className="mt-1 text-xs leading-[150%] text-[#6B7280]">{worksheet.description}</p> : null}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+
+            <div className="shrink-0 border-t border-[#E5E7EB] bg-white px-6 py-4">
+              <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setCreateWorksheetError(null);
+                    setNewWorksheetName("");
+                    setIsCreateWorksheetModalOpen(true);
+                  }}
+                  className="h-11 w-full rounded-xl border border-[#D5D7DA] bg-white px-5 text-sm font-medium text-[#344054] shadow-none hover:bg-[#F9FAFB] sm:w-[190px]"
+                >
+                  Create New Worksheet
+                </Button>
+                <Button
+                  type="button"
+                  onClick={handleConfirmAddToWorksheet}
+                  disabled={!activeWorksheetId || pendingWorksheetRows.length === 0}
+                  className={`h-11 w-full rounded-xl px-5 text-sm font-semibold shadow-none sm:w-[190px] ${
+                    !activeWorksheetId || pendingWorksheetRows.length === 0
+                      ? "cursor-not-allowed border border-[#9CA0A7] bg-[#9CA0A7] text-white/80 hover:bg-[#9CA0A7]"
+                      : "border border-[#2D4059] bg-[#2D4059] text-white hover:bg-[#24364d]"
+                  }`}
+                >
+                  Add to Worksheet
+                </Button>
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={isCreateWorksheetModalOpen}
+        onOpenChange={(open) => {
+          if (!isCreatingWorksheet) setIsCreateWorksheetModalOpen(open);
+          if (!open) {
+            setCreateWorksheetError(null);
+            setNewWorksheetName("");
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-[520px] rounded-2xl">
+          <DialogHeader>
+            <DialogTitle>Create New Worksheet</DialogTitle>
+            <DialogDescription>Enter the project name.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <input
+              type="text"
+              value={newWorksheetName}
+              onChange={(e) => {
+                setNewWorksheetName(e.target.value);
+                if (createWorksheetError) setCreateWorksheetError(null);
+              }}
+              placeholder="Worksheet name"
+              className="h-10 w-full rounded-md border border-slate-200 px-3 text-sm outline-none focus:border-slate-300 focus:ring-1 focus:ring-slate-300"
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !isCreatingWorksheet && newWorksheetName.trim()) {
+                  e.preventDefault();
+                  void handleCreateWorksheet();
+                }
+              }}
+            />
+            {createWorksheetError ? <p className="text-xs text-rose-600">{createWorksheetError}</p> : null}
+          </div>
+          <div className="flex items-center justify-end gap-2">
+            <Button type="button" variant="outline" onClick={() => setIsCreateWorksheetModalOpen(false)} disabled={isCreatingWorksheet}>
+              Cancel
+            </Button>
+            <Button type="button" onClick={() => void handleCreateWorksheet()} disabled={isCreatingWorksheet || !newWorksheetName.trim()}>
+              {isCreatingWorksheet ? "Creating..." : "Create Worksheet"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 };
+
