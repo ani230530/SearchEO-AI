@@ -8,7 +8,6 @@ import ReactMarkdown from "react-markdown";
 import {
   AlignLeft,
   ArrowUp,
-  BarChart3,
   Bot,
   Calendar,
   ChevronDown,
@@ -19,15 +18,16 @@ import {
   Filter,
   Globe2,
   Info,
-  Languages,
   LayoutGrid,
+  Languages,
   Link2,
   Loader2,
+  Pause,
   Plus,
   RefreshCw,
+  Sparkles,
   Search,
   ShieldCheck,
-  Sparkles,
   Zap,
 } from "lucide-react";
 import {
@@ -685,11 +685,15 @@ export const PromptTable = ({
   data,
   title = "Top searched Prompts",
   domainId,
+  showMonitorAllButton = false,
+  showPromptCategoryDropdown = false,
 }: {
   data: PromptTableRow[];
   title?: string;
   /** Real Domain.id used by the expanded row to fetch /history. */
   domainId?: number | null;
+  showMonitorAllButton?: boolean;
+  showPromptCategoryDropdown?: boolean;
 }) => {
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -720,6 +724,7 @@ export const PromptTable = ({
   // create many new rows via Analyze Prompt.
   const PAGE_SIZE = 10;
   const [currentPage, setCurrentPage] = useState(1);
+  const [pausedRows, setPausedRows] = useState<Record<string, boolean>>({});
 
   // Analyze Prompt state.
   // - `analyzeText` is the input.
@@ -736,7 +741,6 @@ export const PromptTable = ({
   const [pendingRows, setPendingRows] = useState<
     Array<{ id: string; phrase: string }>
   >([]);
-
   const handleAnalyzePrompt = async () => {
     const text = analyzeText.trim();
     if (!text || analyzing) return;
@@ -832,12 +836,19 @@ export const PromptTable = ({
     return fullSortedData.slice(start, start + PAGE_SIZE);
   }, [fullSortedData, currentPage]);
 
+  const toggleRowPause = (rowId: string) => {
+    setPausedRows((prev) => ({
+      ...prev,
+      [rowId]: !prev[rowId],
+    }));
+  };
+
   return (
     <Card className="border-none bg-transparent shadow-none">
       <CardHeader className="space-y-4 px-0 pb-6 pt-0">
-        <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="flex flex-wrap items-center justify-between gap-4 w-full">
           <div className="flex flex-col gap-1.5">
-            <CardTitle className="text-[22px] font-bold text-[#334155]">{title}</CardTitle>
+            <CardTitle className="text-[20px] font-bold text-[#334155]">{title}</CardTitle>
             <p className="text-[14px] text-[#64748b]">
               How AI actually talks and ranks content — track language patterns that drive visibility
             </p>
@@ -910,19 +921,32 @@ export const PromptTable = ({
               </DropdownMenuContent>
             </DropdownMenu>
 
-            <Button
-              type="button"
-              onClick={() => navigateToWorksheet()}
-              className="h-[38px] gap-2 rounded-lg border-none bg-[#2d3748] px-4 text-white shadow-none transition-all hover:bg-[#1a202c]"
-            >
-              <LayoutGrid className="h-4 w-4" />
-              <span className="text-[13px] font-medium">Add to Worksheet</span>
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                onClick={() => navigateToWorksheet()}
+                className="h-[38px] gap-2 rounded-lg border-none bg-[#2d3748] px-4 text-white shadow-none transition-all hover:bg-[#1a202c]"
+              >
+                <LayoutGrid className="h-4 w-4" />
+                <span className="text-[13px] font-medium">Add to Worksheet</span>
+              </Button>
+
+              {showMonitorAllButton ? (
+                <Button
+                  type="button"
+                  className="h-[38px] gap-2 rounded-lg border-none bg-[#4b6eb8] px-4 text-white shadow-none transition-all hover:bg-[#3f5d9c]"
+                >
+                  <ShieldCheck className="h-4 w-4" />
+                  <span className="text-[13px] font-medium">Monitor (All)</span>
+                </Button>
+              ) : null}
+            </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
-          <div className="relative w-[320px]">
+        <div className="grid w-full grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+          <div className="flex min-w-0 flex-wrap items-center gap-3">
+            <div className="relative w-[320px] max-w-full shrink-0">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
@@ -958,6 +982,31 @@ export const PromptTable = ({
               </>
             )}
           </Button>
+
+          </div>
+
+          {showPromptCategoryDropdown ? (
+            <div className="justify-self-start lg:justify-self-end">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="h-[38px] gap-2 rounded-lg border-slate-200 px-3 text-slate-600 shadow-none hover:bg-gray-50"
+                  >
+                    <LayoutGrid className="h-[16px] w-[16px]" />
+                    <span className="text-[13px] font-medium">Select Prompt Category</span>
+                    <ChevronDown className="ml-1 h-3.5 w-3.5 opacity-60" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-[220px]">
+                  <DropdownMenuItem>All Categories</DropdownMenuItem>
+                  <DropdownMenuItem>Brand Mentions</DropdownMenuItem>
+                  <DropdownMenuItem>Competitor Research</DropdownMenuItem>
+                  <DropdownMenuItem>Content Gaps</DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          ) : null}
         </div>
       </CardHeader>
 
@@ -1136,6 +1185,39 @@ export const PromptTable = ({
                     </TableCell>
                     <TableCell className="px-4 py-3 text-right">
                       <div className="flex justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                          }}
+                          className="flex h-[38px] w-[38px] items-center justify-center rounded-[14px] border border-slate-100 bg-white shadow-[0_4px_14px_rgba(15,23,42,0.06)] transition hover:-translate-y-0.5 hover:shadow-[0_8px_18px_rgba(15,23,42,0.08)]"
+                          aria-label="AI response"
+                          title="AI response"
+                        >
+                          <img src="/prompts/ai-response.svg" alt="" aria-hidden="true" className="h-5 w-5" />
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleRowPause(row.id);
+                          }}
+                          className={`flex h-[38px] w-[38px] items-center justify-center rounded-[14px] shadow-[0_4px_14px_rgba(15,23,42,0.06)] transition hover:-translate-y-0.5 hover:shadow-[0_8px_18px_rgba(15,23,42,0.08)] ${
+                            pausedRows[row.id]
+                              ? "border border-[#d8e8ff] bg-[#e8f1ff] text-[#6d88cc]"
+                              : "border border-[#7f9fe8] bg-[#7f9fe8] text-white"
+                          }`}
+                          aria-label={pausedRows[row.id] ? "Resume monitoring" : "Pause monitoring"}
+                          title={pausedRows[row.id] ? "Resume monitoring" : "Pause monitoring"}
+                        >
+                          {pausedRows[row.id] ? (
+                            <Pause className="h-5 w-5 stroke-[2.2]" />
+                          ) : (
+                            <img src="/prompts/icon.svg" alt="" aria-hidden="true" className="h-5 w-5" />
+                          )}
+                        </button>
+
                         <Button
                           type="button"
                           variant="outline"
@@ -1143,7 +1225,7 @@ export const PromptTable = ({
                             e.stopPropagation();
                             navigateToWorksheet(row.id);
                           }}
-                          className="h-8 rounded-[8px] border-[#e2e8f0] bg-[#f8fafc] px-3 text-[11px] font-semibold text-[#3b82f6] shadow-none hover:bg-slate-100"
+                          className="h-[38px] rounded-[14px] border-[#e8eef8] bg-[#eff4ff] px-3.5 text-[11px] font-semibold text-[#3b5d9c] shadow-none hover:bg-[#e7efff]"
                         >
                           <FileText className="mr-1.5 h-3.5 w-3.5" />
                           Draft Blog

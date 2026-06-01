@@ -317,8 +317,7 @@ export function DomainHistorySection({ onMenuItemClick }: DomainHistorySectionPr
   const aiDashboardTabs: Array<{ label: string; path: (masked: string) => string }> = [
     { label: "AI Results", path: (m) => `/ai-results/${m}` },
     { label: "Competitors", path: () => `/airesults-competitors-preview` },
-    { label: "Track Prompts", path: (m) => `/ai-results/${m}/track-prompts` },
-    { label: "Track Keywords", path: (m) => `/ai-results/${m}/track-keywords` },
+    { label: "Prompts", path: (m) => `/ai-results/${m}/prompts` },
   ];
 
   return (
@@ -584,7 +583,7 @@ export function DomainHistorySection({ onMenuItemClick }: DomainHistorySectionPr
                         <p className="text-[30px] font-medium leading-none text-[#3d83df]">{domain.topKeywords ?? 0}</p>
                       </div>
                       <div>
-                        <p className="text-[18px] font-semibold text-[#5f6878] pb-2">Track Prompts</p>
+                        <p className="text-[18px] font-semibold text-[#5f6878] pb-2">Prompts</p>
                         <p className="text-[30px] font-medium leading-none text-[#3d83df]">{domain.topPrompts ?? 0}</p>
                       </div>
                     </div>

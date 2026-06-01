@@ -21,10 +21,8 @@ const SidebarDashboard = lazy(() => import("./pages/SidebarDashboard"));
 const KnowledgeBase = lazy(() => import("./pages/KnowledgeBase"));
 const AICheckerV2 = lazy(() => import("./pages/AIChecker.v2"));
 const AIResultsReportPreview = lazy(() => import("./pages/AIResultsReportPreview"));
-const AIResultsPromptGaps = lazy(() => import("./pages/AIResultsPromptGaps"));
 const AIResultsCompetitors = lazy(() => import("./pages/AIResultsCompetitors"));
-const TrackPromptsPage = lazy(() => import("./pages/TrackPromptsPage"));
-const TrackKeywordsPage = lazy(() => import("./pages/TrackKeywordsPage"));
+const PromptsPage = lazy(() => import("./pages/PromptsPage"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const VerifyEmailPending = lazy(() => import("./pages/VerifyEmailPending"));
 
@@ -103,17 +101,11 @@ const App = () => (
               {/* AI Checker tabs share AIResultsShell as a parent route so the
                   sidebar + header don't remount on tab switches. Children read
                   domain context via useShellContext(). */}
-              <Route element={<ProtectedRoute><AIResultsShell activeItem="track-prompts" title="Track Prompts" /></ProtectedRoute>}>
-                <Route path="/ai-results/:domain/track-prompts" element={<TrackPromptsPage />} />
-              </Route>
-              <Route element={<ProtectedRoute><AIResultsShell activeItem="top-keywords" title="Track Keywords" /></ProtectedRoute>}>
-                <Route path="/ai-results/:domain/track-keywords" element={<TrackKeywordsPage />} />
+              <Route element={<ProtectedRoute><AIResultsShell activeItem="prompts" title="Top Prompts" /></ProtectedRoute>}>
+                <Route path="/ai-results/:domain/prompts" element={<PromptsPage />} />
               </Route>
               <Route element={<ProtectedRoute><AIResultsShell activeItem="ai-results" title="AI Results" /></ProtectedRoute>}>
                 <Route path="/ai-results/:domain" element={<AIResultsReportPreview />} />
-              </Route>
-              <Route element={<ProtectedRoute><AIResultsShell activeItem="analytics" title="Prompt Gaps" /></ProtectedRoute>}>
-                <Route path="/ai-results-prompt-gaps" element={<AIResultsPromptGaps />} />
               </Route>
               <Route path="/profile" element={
                 <ProtectedRoute>

@@ -2299,8 +2299,8 @@ const AIResultsReportPreview = () => {
   );
 
   // Open the worksheet modal automatically when the URL has
-  // ?openWorksheet=<rowId>. The tracking tables (TrackPromptsPage /
-  // TrackKeywordsPage) navigate here with that param so the existing
+  // ?openWorksheet=<rowId>. The tracking table (PromptsPage)
+  // navigates here with that param so the existing
   // modal handles the worksheet flow — saves ~200 lines of duplicated
   // orchestration. The param is consumed once and cleared from the
   // URL so refresh doesn't re-open the modal.

@@ -2,11 +2,11 @@ import {
   ArrowLeft,
   BarChart3,
   Bell,
+  CircleHelp,
   ChevronDown,
   ClipboardList,
   Globe,
   Globe2,
-  HelpCircle,
   History,
   LayoutDashboard,
   Lightbulb,
@@ -21,6 +21,12 @@ import {
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useMemo, useState, useEffect } from "react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { useAuth } from "@/contexts/AuthContext";
 import { maskDomainId } from "@/lib/domainUtils";
 import { DashboardSidebar } from "@/features/sidebar-dashboard/components/DashboardSidebar";
@@ -31,9 +37,7 @@ import type { TabId } from "@/features/sidebar-dashboard/types";
 type AIResultsNavItemId =
   | "ai-results"
   | "competitors"
-  | "track-prompts"
-  | "top-keywords"
-  | "analytics";
+  | "prompts";
 
 type DomainOption = {
   id: number;
@@ -88,9 +92,7 @@ const sidebarItems: Array<{
 }> = [
     { id: "ai-results", label: "AI Results", iconSrc: "/sidebar-icons/ai-results.svg" },
     { id: "competitors", label: "Competitors", iconSrc: "/sidebar-icons/competitors.svg" },
-    { id: "track-prompts", label: "Track Prompts", iconSrc: "/sidebar-icons/track-prompts.svg" },
-    { id: "top-keywords", label: "Track Keyword", iconSrc: "/sidebar-icons/track-keyword.svg" },
-    { id: "analytics", label: "Opportunities", iconSrc: "/sidebar-icons/analytics.svg" },
+    { id: "prompts", label: "Prompts", iconSrc: "/sidebar-icons/track-prompts.svg" },
   ];
 
 type RailSectionItem = {
@@ -149,13 +151,8 @@ export function AIResultsLayout({
       return;
     }
 
-    if (itemId === "top-keywords") {
-      navigate(`/ai-results/${nextMaskedId}/track-keywords`);
-      return;
-    }
-
-    if (itemId === "track-prompts") {
-      navigate(`/ai-results/${nextMaskedId}/track-prompts`);
+    if (itemId === "prompts") {
+      navigate(`/ai-results/${nextMaskedId}/prompts`);
       return;
     }
 
@@ -163,8 +160,6 @@ export function AIResultsLayout({
       navigate(`/airesults-competitors-preview`);
       return;
     }
-
-    navigate(`/ai-results-prompt-gaps`);
   };
 
   const dashboardSidebarTabs = useMemo(() => {
@@ -367,29 +362,46 @@ export function AIResultsLayout({
               </h1>
             </div>
 
-            <div className="flex items-center gap-3 text-[#98A2B3]">
-              <button
-                type="button"
-                aria-label="Help"
-                className="inline-flex h-5 w-5 items-center justify-center bg-transparent transition-colors hover:text-slate-700"
-              >
-                <HelpCircle className="h-3.5 w-3.5" />
-              </button>
-              <button
-                type="button"
-                aria-label="Notifications"
-                className="inline-flex h-5 w-5 items-center justify-center bg-transparent transition-colors hover:text-slate-700"
-              >
-                <Bell className="h-3.5 w-3.5" />
-              </button>
-              <Link
-                to="/dashboard?tab=profile"
-                aria-label="Profile"
-                className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-[#F2F4F7] text-[#667085] transition hover:text-slate-700"
-              >
-                <User className="h-3.5 w-3.5" />
-              </Link>
-            </div>
+            <TooltipProvider delayDuration={120}>
+              <div className="flex items-center gap-2 text-[#98A2B3]">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      aria-label="Help"
+                      className="inline-flex h-5 w-5 items-center justify-center bg-transparent transition-colors hover:text-slate-700"
+                    >
+                      <CircleHelp className="h-3.5 w-3.5" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">Quick tips</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      aria-label="Notifications"
+                      className="inline-flex h-5 w-5 items-center justify-center bg-transparent transition-colors hover:text-slate-700"
+                    >
+                      <Bell className="h-3.5 w-3.5" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">Notifications</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Link
+                      to="/dashboard?tab=profile"
+                      aria-label="Profile"
+                      className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-[#F2F4F7] text-[#667085] transition hover:text-slate-700"
+                    >
+                      <User className="h-3.5 w-3.5" />
+                    </Link>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">Profile</TooltipContent>
+                </Tooltip>
+              </div>
+            </TooltipProvider>
           </div>
         </header>
 
