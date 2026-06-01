@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ArrowUpRight,
   ChevronDown,
@@ -24,8 +24,11 @@ import {
   ZAxis,
 } from 'recharts';
 import { Drawer } from '@/components/Drawer';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { CompetitorDetail } from '@/components/competitors/CompetitorDetail';
 import { AiResponseAnalysis } from '@/components/competitors/AiResponseAnalysis';
+import { cn } from '@/lib/utils';
 import type {
   CompetitorDetailData,
   CompetitorInsightRow,
@@ -42,6 +45,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useShellContext } from '@/features/ai-results/AIResultsShell';
 import {
   aiResultsKeys,
+  useCampaigns,
   useCompetitorAnalysis,
   useCompetitors,
   useReport,
@@ -161,6 +165,26 @@ interface TrendsResponse {
   topCompetitors: string[];
 }
 
+type WorksheetOption = {
+  id: string;
+  name: string;
+  description: string | null;
+};
+
+type GenerationPayload = {
+  title: string;
+  rationale: string;
+  primaryKeyword: string | null;
+  suggestedTemplate: 'blog';
+  recommendedAngle?: string;
+  brief?: ReportOpportunity['brief'];
+};
+
+const WORKSHEET_IMPORT_KEY = 'ai-results/pending-worksheet-import';
+const WORKSHEET_TARGET_KEY = 'ai-results/pending-worksheet-target';
+const buildProjectsWorksheetPath = (campaignId: string | number) =>
+  `/dashboard?tab=projects&campaign=${encodeURIComponent(String(campaignId))}`;
+
 // ── helpers ────────────────────────────────────────────────────────────────
 
 const competitorLogo = (host: string, size = 32) => logoUrlHelper(host, size) ?? '';
@@ -264,10 +288,11 @@ const buildPromptGapContext = (o: ReportOpportunity): PromptGapContext => ({
 
 // ── tiny UI helpers ────────────────────────────────────────────────────────
 
-function GenerateContentButton({ className = '' }: { className?: string }) {
+function GenerateContentButton({ className = '', onClick }: { className?: string; onClick?: () => void }) {
   return (
     <button
       type="button"
+      onClick={onClick}
       className={`inline-flex h-10 min-w-0 items-center justify-center gap-2.5 rounded-md border-2 border-[#F1F6FF] bg-white px-4 text-[14px] font-semibold leading-[150%] tracking-[0%] shadow-[0_1px_2px_0_#1018280D] transition hover:bg-[#F9FBFF] ${className}`}
     >
       <img src="/icons/target-04.svg" alt="" aria-hidden="true" className="h-5 w-5 shrink-0" />
@@ -275,6 +300,154 @@ function GenerateContentButton({ className = '' }: { className?: string }) {
         Generate Content
       </span>
     </button>
+  );
+}
+
+function WorksheetPickerModal({
+  open,
+  worksheets,
+  activeWorksheetId,
+  loading,
+  onOpenChange,
+  onWorksheetSelect,
+  onAddToWorksheet,
+  onCreateNewWorksheet,
+}: {
+  open: boolean;
+  worksheets: WorksheetOption[];
+  activeWorksheetId: string | null;
+  loading: boolean;
+  onOpenChange: (open: boolean) => void;
+  onWorksheetSelect: (id: string) => void;
+  onAddToWorksheet: () => void;
+  onCreateNewWorksheet: () => void;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="w-[min(920px,calc(100vw-1.5rem))] max-w-none overflow-hidden rounded-[28px] border border-[#E5E7EB] bg-white p-0 shadow-[0_20px_80px_rgba(15,23,42,0.22)]">
+        <div className="flex max-h-[calc(100vh-2rem)] flex-col">
+          <DialogHeader className="shrink-0 border-b border-[#E5E7EB] px-6 py-5 text-left">
+            <DialogTitle className="text-[26px] font-semibold leading-[1.15] tracking-[-0.02em] text-[#1F2937]">
+              Select worksheet
+            </DialogTitle>
+            <DialogDescription className="mt-2 text-sm leading-[150%] text-[#6B7280]">
+              You are adding 1 item to your worksheet.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex-1 overflow-y-auto px-6 py-5">
+            <div className="mb-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[#2D4059]">Select a worksheet</p>
+            </div>
+            {loading ? (
+              <div className="rounded-2xl border border-dashed border-[#CBD5E1] bg-[#FAFAFA] p-6 text-sm text-[#6B7280]">
+                Loading worksheets...
+              </div>
+            ) : worksheets.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-[#CBD5E1] bg-[#FAFAFA] p-6 text-sm text-[#6B7280]">
+                No worksheets are available yet.
+              </div>
+            ) : (
+              <div className="flex flex-col gap-3">
+                {worksheets.map((worksheet) => (
+                  <button
+                    key={worksheet.id}
+                    type="button"
+                    onClick={() => onWorksheetSelect(worksheet.id)}
+                    className={cn(
+                      'flex w-full items-center justify-between rounded-2xl border px-4 py-4 text-left transition-all focus:outline-none focus:ring-2 focus:ring-[#2D4059] focus:ring-offset-2',
+                      activeWorksheetId === worksheet.id
+                        ? 'border-[#A8C4F6] bg-[#EEF4FF] shadow-[0_0_0_1px_rgba(94,129,230,0.18)]'
+                        : 'border-[#E5E7EB] bg-[#FAFAFA] hover:border-[#CBD5E1] hover:bg-white'
+                    )}
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-base font-semibold leading-[150%] text-[#1F2937]">{worksheet.name}</p>
+                      {worksheet.description ? (
+                        <p className="mt-1 text-xs leading-[150%] text-[#6B7280]">{worksheet.description}</p>
+                      ) : null}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          <div className="shrink-0 border-t border-[#E5E7EB] bg-white px-6 py-4">
+            <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={onCreateNewWorksheet}
+                className="h-11 w-full rounded-xl border border-[#D5D7DA] bg-white px-5 text-sm font-medium text-[#344054] shadow-none hover:bg-[#F9FAFB] sm:w-[190px]"
+              >
+                Create New Worksheet
+              </Button>
+              <Button
+                type="button"
+                onClick={onAddToWorksheet}
+                disabled={!activeWorksheetId}
+                className={cn(
+                  'h-11 w-full rounded-xl px-5 text-sm font-semibold shadow-none sm:w-[190px]',
+                  !activeWorksheetId
+                    ? 'cursor-not-allowed border border-[#9CA0A7] bg-[#9CA0A7] text-white/80 hover:bg-[#9CA0A7]'
+                    : 'border border-[#2D4059] bg-[#2D4059] text-white hover:bg-[#24364d]'
+                )}
+              >
+                Add to Worksheet
+              </Button>
+            </div>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function CreateWorksheetModal({
+  open,
+  name,
+  error,
+  isSubmitting,
+  onOpenChange,
+  onNameChange,
+  onSubmit,
+}: {
+  open: boolean;
+  name: string;
+  error: string | null;
+  isSubmitting: boolean;
+  onOpenChange: (open: boolean) => void;
+  onNameChange: (v: string) => void;
+  onSubmit: () => void;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-[520px] rounded-2xl">
+        <DialogHeader>
+          <DialogTitle>Create New Worksheet</DialogTitle>
+          <DialogDescription>Enter the project name.</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3">
+          <input
+            value={name}
+            onChange={(e) => onNameChange(e.target.value)}
+            placeholder="Worksheet name"
+            className="h-10 w-full rounded-md border border-slate-200 px-3 text-sm outline-none focus:border-slate-300 focus:ring-1 focus:ring-slate-300"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !isSubmitting && name.trim()) onSubmit();
+            }}
+          />
+          {error ? <p className="text-xs text-rose-600">{error}</p> : null}
+        </div>
+        <div className="flex items-center justify-end gap-2">
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
+            Cancel
+          </Button>
+          <Button type="button" onClick={onSubmit} disabled={isSubmitting || !name.trim()}>
+            {isSubmitting ? 'Creating...' : 'Create Worksheet'}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -697,7 +870,15 @@ function ChartBlock({ title, subtitle, children }: { title: string; subtitle: st
 
 // ── Opportunity / Prompt Gap card ──────────────────────────────────────────
 
-function OpportunityCard({ item, onAiResponse }: { item: ReportOpportunity; onAiResponse: (o: ReportOpportunity) => void }) {
+function OpportunityCard({
+  item,
+  onAiResponse,
+  onGenerate,
+}: {
+  item: ReportOpportunity;
+  onAiResponse: (o: ReportOpportunity) => void;
+  onGenerate: (o: ReportOpportunity) => void;
+}) {
   const importanceScore = Math.round(item.severityScore * 10);
   const badgeLabel = item.severity === 'critical' ? 'Critical' : item.severity === 'high' ? 'High Impact' : item.severity === 'medium' ? 'Medium' : 'Low';
   const opportunityPct = Math.min(100, Math.round(item.severityScore * 10));
@@ -747,7 +928,7 @@ function OpportunityCard({ item, onAiResponse }: { item: ReportOpportunity; onAi
               <Sparkles className="h-3.5 w-3.5" />
               AI Response
             </button>
-            <GenerateContentButton className="w-full" />
+            <GenerateContentButton className="w-full" onClick={() => onGenerate(item)} />
           </div>
         </div>
       </div>
@@ -758,11 +939,11 @@ function OpportunityCard({ item, onAiResponse }: { item: ReportOpportunity; onAi
 function PromptGapPanel({
   opportunities,
   onAiResponse,
-  onViewAll,
+  onGenerate,
 }: {
   opportunities: ReportOpportunity[];
   onAiResponse: (o: ReportOpportunity) => void;
-  onViewAll: () => void;
+  onGenerate: (o: ReportOpportunity) => void;
 }) {
   const shown = opportunities.slice(0, 4);
   return (
@@ -774,7 +955,6 @@ function PromptGapPanel({
         </div>
         <button
           type="button"
-          onClick={onViewAll}
           className="inline-flex h-10 shrink-0 items-center gap-3 rounded-md border border-[#D7DDE6] bg-white px-4 text-xs font-semibold text-[#7B8494] shadow-sm"
         >
           View all
@@ -788,7 +968,14 @@ function PromptGapPanel({
             No prompt gaps yet — you're holding your own across the tracked prompts.
           </p>
         ) : (
-          shown.map((item) => <OpportunityCard key={item.key} item={item} onAiResponse={onAiResponse} />)
+          shown.map((item) => (
+            <OpportunityCard
+              key={item.key}
+              item={item}
+              onAiResponse={onAiResponse}
+              onGenerate={onGenerate}
+            />
+          ))
         )}
       </div>
     </section>
@@ -980,7 +1167,7 @@ function PositioningComparison({ analysis }: { analysis: CompetitorAnalysisRespo
 
 // ── Content opportunities ─────────────────────────────────────────────────
 
-function ContentOpportunityCard({ item }: { item: ReportOpportunity }) {
+function ContentOpportunityCard({ item, onGenerate }: { item: ReportOpportunity; onGenerate: (item: ReportOpportunity) => void }) {
   const impact = item.trafficPotential === 'very_high' ? 'Very High' : item.trafficPotential === 'high' ? 'High' : item.trafficPotential === 'medium' ? 'Medium' : 'Low';
   const priority = item.severity === 'critical' ? 'Critical' : item.severity === 'high' ? 'High' : item.severity === 'medium' ? 'Medium' : 'Low';
   const relatedTo = item.competitors[0] ?? item.keyword ?? '—';
@@ -1001,13 +1188,19 @@ function ContentOpportunityCard({ item }: { item: ReportOpportunity }) {
             Related to: <span className="ml-5 text-[#2D4059]">{relatedTo}</span>
           </p>
         </div>
-        <GenerateContentButton className="w-full sm:w-auto sm:self-center" />
+        <GenerateContentButton className="w-full sm:w-auto sm:self-center" onClick={() => onGenerate(item)} />
       </div>
     </article>
   );
 }
 
-function ContentOpportunitiesToCreate({ opportunities }: { opportunities: ReportOpportunity[] }) {
+function ContentOpportunitiesToCreate({
+  opportunities,
+  onGenerate,
+}: {
+  opportunities: ReportOpportunity[];
+  onGenerate: (item: ReportOpportunity) => void;
+}) {
   // Use bottom-half (after the 4 surfaced in Prompt Gaps) — same pool, no duplicates.
   const list = opportunities.slice(4, 9);
   return (
@@ -1021,7 +1214,7 @@ function ContentOpportunitiesToCreate({ opportunities }: { opportunities: Report
             No additional content opportunities right now.
           </p>
         ) : (
-          list.map((item) => <ContentOpportunityCard key={item.key} item={item} />)
+          list.map((item) => <ContentOpportunityCard key={item.key} item={item} onGenerate={onGenerate} />)
         )}
       </div>
     </section>
@@ -1140,6 +1333,7 @@ export default function CompetitorsPage() {
   const analysisQuery = useCompetitorAnalysis<CompetitorAnalysisResponse>(domainId);
   const trendsQuery = useTrends<TrendsResponse>(domainId);
   const competitorsQuery = useCompetitors<{ competitors: SelectedCompetitor[] }>(domainId);
+  const campaignsQuery = useCampaigns<{ campaigns: Array<{ id: number; title: string; description?: string | null }> }>();
 
   const report = reportQuery.data ?? null;
   const analysis = analysisQuery.data ?? null;
@@ -1163,6 +1357,21 @@ export default function CompetitorsPage() {
   const [selectedPromptGap, setSelectedPromptGap] = useState<PromptGapContext | null>(null);
   const [selectedAnalysisData, setSelectedAnalysisData] = useState<AiResponseAnalysisData | null>(null);
   const [activeDrawer, setActiveDrawer] = useState<'competitor' | 'prompt-gap' | null>(null);
+  const [activeWorksheetId, setActiveWorksheetId] = useState<string | null>(null);
+  const [isWorksheetModalOpen, setIsWorksheetModalOpen] = useState(false);
+  const [isCreateWorksheetModalOpen, setIsCreateWorksheetModalOpen] = useState(false);
+  const [pendingGeneration, setPendingGeneration] = useState<{ key: string; payload: GenerationPayload } | null>(null);
+  const [newWorksheetName, setNewWorksheetName] = useState('');
+  const [createWorksheetError, setCreateWorksheetError] = useState<string | null>(null);
+  const [isCreatingWorksheet, setIsCreatingWorksheet] = useState(false);
+  const worksheetOptions: WorksheetOption[] = useMemo(() => {
+    const campaigns = Array.isArray(campaignsQuery.data?.campaigns) ? campaignsQuery.data.campaigns : [];
+    return campaigns.map((c) => ({
+      id: String(c.id),
+      name: c.title,
+      description: c.description?.trim() ? c.description.trim() : null,
+    }));
+  }, [campaignsQuery.data]);
 
   // Derived metrics for the top cards.
   const headerMetrics = useMemo(() => {
@@ -1268,6 +1477,87 @@ export default function CompetitorsPage() {
     setActiveDrawer('prompt-gap');
   };
 
+  const handleGenerateContent = useCallback((item: ReportOpportunity) => {
+    if (!report?.domainInfo?.id) return;
+    setPendingGeneration({
+      key: item.key,
+      payload: {
+        title: item.title,
+        rationale: item.rationale,
+        primaryKeyword: item.keyword ?? null,
+        suggestedTemplate: 'blog',
+        recommendedAngle: item.recommendedAngle,
+        brief: item.brief,
+      },
+    });
+    setActiveWorksheetId(null);
+    setIsWorksheetModalOpen(true);
+  }, [report]);
+
+  const runGeneration = useCallback(async (key: string, payload: GenerationPayload, campaignId: number | null) => {
+    if (!report?.domainInfo?.id) return;
+    try {
+      const built = await apiPost<{ campaignId: number }>('/campaigns/topics/from-opportunity', {
+        domainId: report.domainInfo.id,
+        opportunityKey: key,
+        campaignId,
+        title: payload.title,
+        rationale: payload.rationale,
+        primaryKeyword: payload.primaryKeyword,
+        longtailKeywords: [],
+        suggestedTemplate: payload.suggestedTemplate,
+        recommendedAngle: payload.recommendedAngle,
+        brief: payload.brief,
+      });
+      sessionStorage.setItem(WORKSHEET_TARGET_KEY, String(built.campaignId));
+      sessionStorage.removeItem(WORKSHEET_IMPORT_KEY);
+      localStorage.setItem('activeTab', 'projects');
+      navigate(buildProjectsWorksheetPath(built.campaignId));
+    } catch (err) {
+      console.error('[AIResults Competitors] Failed to add to worksheet:', err);
+    }
+  }, [navigate, report]);
+
+  const handleAddToWorksheet = useCallback(() => {
+    if (!activeWorksheetId || !pendingGeneration) return;
+    const campaignId = Number(activeWorksheetId);
+    const { key, payload } = pendingGeneration;
+    setIsWorksheetModalOpen(false);
+    setPendingGeneration(null);
+    setActiveWorksheetId(null);
+    void runGeneration(key, payload, Number.isFinite(campaignId) ? campaignId : null);
+  }, [activeWorksheetId, pendingGeneration, runGeneration]);
+
+  const handleCreateWorksheet = useCallback(async () => {
+    const name = newWorksheetName.trim();
+    if (!name || isCreatingWorksheet) return;
+    setIsCreatingWorksheet(true);
+    setCreateWorksheetError(null);
+    try {
+      const created = await apiPost<{ campaign?: { id: number; title: string } }>('/campaigns', { title: name });
+      const newId = created?.campaign?.id;
+      if (!newId) {
+        setCreateWorksheetError('Failed to create worksheet.');
+        return;
+      }
+      await queryClient.invalidateQueries({ queryKey: aiResultsKeys.campaigns() });
+      setIsCreateWorksheetModalOpen(false);
+      setNewWorksheetName('');
+      setActiveWorksheetId(String(newId));
+      if (pendingGeneration) {
+        const { key, payload } = pendingGeneration;
+        setIsWorksheetModalOpen(false);
+        setPendingGeneration(null);
+        setActiveWorksheetId(null);
+        void runGeneration(key, payload, newId);
+      }
+    } catch {
+      setCreateWorksheetError('Failed to create worksheet.');
+    } finally {
+      setIsCreatingWorksheet(false);
+    }
+  }, [isCreatingWorksheet, newWorksheetName, pendingGeneration, queryClient, runGeneration]);
+
   const hasRun = report?.runStatus === 'completed' && (analysis?.runId ?? null) !== null;
 
   return (
@@ -1325,12 +1615,7 @@ export default function CompetitorsPage() {
                 <PromptGapPanel
                   opportunities={report?.opportunities ?? []}
                   onAiResponse={openPromptGapDrawer}
-                  onViewAll={() => {
-                    if (domainId) {
-                      const masked = maskDomainId(domainId);
-                      navigate(resolveAIResultsNavigation("prompts", masked, "content-opportunities"));
-                    }
-                  }}
+                  onGenerate={handleGenerateContent}
                 />
               </div>
 
@@ -1341,7 +1626,10 @@ export default function CompetitorsPage() {
 
               <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
                 <PositioningComparison analysis={analysis} />
-                <ContentOpportunitiesToCreate opportunities={report?.opportunities ?? []} />
+                <ContentOpportunitiesToCreate
+                  opportunities={report?.opportunities ?? []}
+                  onGenerate={handleGenerateContent}
+                />
               </div>
             </>
           )}
@@ -1356,6 +1644,44 @@ export default function CompetitorsPage() {
           <AiResponseAnalysis data={selectedAnalysisData} prompt={selectedPromptGap} />
         ) : null}
       </Drawer>
+      <WorksheetPickerModal
+        open={isWorksheetModalOpen}
+        worksheets={worksheetOptions}
+        activeWorksheetId={activeWorksheetId}
+        loading={campaignsQuery.isLoading}
+        onOpenChange={(open) => {
+          setIsWorksheetModalOpen(open);
+          if (!open) {
+            setPendingGeneration(null);
+            setActiveWorksheetId(null);
+            setIsCreateWorksheetModalOpen(false);
+            setCreateWorksheetError(null);
+            setNewWorksheetName('');
+          }
+        }}
+        onWorksheetSelect={setActiveWorksheetId}
+        onAddToWorksheet={handleAddToWorksheet}
+        onCreateNewWorksheet={() => {
+          setCreateWorksheetError(null);
+          setNewWorksheetName('');
+          setIsCreateWorksheetModalOpen(true);
+        }}
+      />
+      <CreateWorksheetModal
+        open={isCreateWorksheetModalOpen}
+        name={newWorksheetName}
+        error={createWorksheetError}
+        isSubmitting={isCreatingWorksheet}
+        onOpenChange={(open) => {
+          if (!isCreatingWorksheet) setIsCreateWorksheetModalOpen(open);
+          if (!open) {
+            setCreateWorksheetError(null);
+            setNewWorksheetName('');
+          }
+        }}
+        onNameChange={setNewWorksheetName}
+        onSubmit={() => void handleCreateWorksheet()}
+      />
     </>
   );
 }
