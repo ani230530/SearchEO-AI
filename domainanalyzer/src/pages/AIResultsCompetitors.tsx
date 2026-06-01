@@ -614,7 +614,15 @@ function TrendComparisonPanel({ trends }: { trends: TrendsResponse | null }) {
                 <CartesianGrid stroke="#EEF1F5" strokeDasharray="3 3" />
                 <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#98A2B3' }} />
                 <YAxis tick={{ fontSize: 10, fill: '#98A2B3' }} />
-                <Tooltip />
+                <Tooltip 
+                contentStyle={{
+                  fontSize:'12px'
+                }}
+                labelStyle={{
+                  fontSize:'14px',
+                  fontWeight:'600',
+                }}
+                />
                 <RLegend wrapperStyle={{ fontSize: 10 }} />
                 {models.map((m, i) => (
                   <Line key={m} type="monotone" dataKey={m} stroke={COMPETITOR_COLORS[i % COMPETITOR_COLORS.length]} strokeWidth={2} dot={false} />
@@ -629,7 +637,15 @@ function TrendComparisonPanel({ trends }: { trends: TrendsResponse | null }) {
                 <CartesianGrid stroke="#EEF1F5" strokeDasharray="3 3" />
                 <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#98A2B3' }} />
                 <YAxis tick={{ fontSize: 10, fill: '#98A2B3' }} />
-                <Tooltip />
+                <Tooltip 
+                contentStyle={{
+                  fontSize:'12px'
+                }}
+                labelStyle={{
+                  fontSize:'14px',
+                  fontWeight:'600',
+                }}
+                />
                 <RLegend wrapperStyle={{ fontSize: 10 }} />
                 {models.map((m, i) => (
                   <Line key={m} type="monotone" dataKey={m} stroke={COMPETITOR_COLORS[i % COMPETITOR_COLORS.length]} strokeWidth={2} dot={false} />
@@ -644,7 +660,15 @@ function TrendComparisonPanel({ trends }: { trends: TrendsResponse | null }) {
                 <CartesianGrid stroke="#EEF1F5" strokeDasharray="3 3" />
                 <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#98A2B3' }} />
                 <YAxis unit="%" tick={{ fontSize: 10, fill: '#98A2B3' }} />
-                <Tooltip />
+                <Tooltip 
+                contentStyle={{
+                  fontSize:'12px'
+                }}
+                labelStyle={{
+                  fontSize:'14px',
+                  fontWeight:'600',
+                }}
+                />
                 <RLegend wrapperStyle={{ fontSize: 10 }} />
                 <Line type="monotone" dataKey="You" stroke="#2D4059" strokeWidth={2.5} dot={{ r: 3 }} />
                 {topCompetitors.map((host, i) => (
@@ -1301,6 +1325,12 @@ export default function CompetitorsPage() {
                 <PromptGapPanel
                   opportunities={report?.opportunities ?? []}
                   onAiResponse={openPromptGapDrawer}
+                  onViewAll={() => {
+                    if (domainId) {
+                      const masked = maskDomainId(domainId);
+                      navigate(resolveAIResultsNavigation("prompts", masked, "content-opportunities"));
+                    }
+                  }}
                 />
               </div>
 
