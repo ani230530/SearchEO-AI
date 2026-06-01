@@ -26,7 +26,6 @@ import {
   RefreshCw,
   Sparkles,
   Search,
-  ShieldCheck,
   Zap,
 } from "lucide-react";
 import {
@@ -1075,7 +1074,7 @@ export const PromptTable = ({
                   type="button"
                   className="w-full sm:w-[141px] h-[41px] flex items-center justify-center gap-[4px] px-[14px] py-[10px] rounded-[8px] border-[2px] border-transparent bg-origin-border [background:linear-gradient(90deg,#2D4059,#4C74C2)_padding-box,linear-gradient(90deg,#2D4059,#4C74C2)_border-box] shadow-[0px_1px_2px_rgba(16,24,40,0.05)] text-white text-sm font-medium"
                 >
-                  <ShieldCheck className="h-4 w-4" />
+                  <img src="/report-icons/target-03.svg" alt="" aria-hidden="true" className="h-4 w-4 shrink-0 object-contain" />
                   <span className="text-[13px] font-medium">Monitor (All)</span>
                 </Button>
               ) : null}
@@ -1132,7 +1131,7 @@ export const PromptTable = ({
                     variant="outline"
                     className="h-[38px] gap-2 rounded-lg border-slate-200 px-3 text-slate-600 shadow-none hover:bg-gray-50"
                   >
-                    <LayoutGrid className="h-[16px] w-[16px]" />
+                    <img src="/report-icons/group-1.svg" alt="" aria-hidden="true" className="h-[16px] w-[16px] shrink-0 object-contain" />
                     <span className="text-[13px] font-medium">Select Prompt Category</span>
                     <ChevronDown className="ml-1 h-3.5 w-3.5 opacity-60" />
                   </Button>
