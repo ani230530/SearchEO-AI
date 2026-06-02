@@ -17,12 +17,14 @@
  */
 
 import OpenAI from 'openai';
+import axios from 'axios';
 import type { PrismaClient } from '../../generated/prisma';
 import { scoreResponse as llmScoreResponse } from './scoreService';
 import { recordCompetitorMention } from './competitorService';
 import { extractHost } from './urlNormalize';
 
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
+const SERPAPI_KEY = process.env.SERP_API_KEY || process.env.SERPAPI_KEY;
 const APP_URL = process.env.OPENROUTER_REFERRER || 'http://localhost:3002';
 const APP_TITLE = 'AI Visibility Wizard';
 
@@ -67,7 +69,7 @@ const MAX_PARALLEL = 6;
  * exact slug OpenRouter understands. `useWebSearch` flips on per-provider
  * native tool injection in callModel().
  */
-type WebSearchMode = 'native_openai' | 'native_anthropic' | 'online_shim' | 'none';
+type WebSearchMode = 'native_openai' | 'native_anthropic' | 'online_shim' | 'serpapi_sge' | 'none';
 
 interface ModelDef {
   id: string;
@@ -113,6 +115,14 @@ const ROSTER: ReadonlyArray<ModelDef> = [
     webSearchMode: 'online_shim',
     productName: 'Gemini',
     knowledgeCutoff: 'early 2025',
+    maker: 'Google',
+  },
+  {
+    id: 'google-gre',
+    openrouterModel: 'serpapi', // Placeholder, not used via OpenRouter
+    webSearchMode: 'serpapi_sge',
+    productName: 'Google AI Overview',
+    knowledgeCutoff: 'real-time',
     maker: 'Google',
   },
 ];
@@ -273,6 +283,37 @@ function buildRequestPayload(
 }
 
 async function callModel(model: ModelDef, promptText: string, loc: UserLocation): Promise<CallOutcome> {
+  const startedAt = Date.now();
+
+  if (model.webSearchMode === 'serpapi_sge') {
+    if (!SERPAPI_KEY) throw new Error('SERP_API_KEY not configured for Google AI Overview');
+    const iso = isoCountry(loc.country);
+    const locationParam = iso ? COUNTRY_TO_ISO[iso.toLowerCase()] || iso : undefined;
+    
+    const res = await axios.get('https://serpapi.com/search', {
+      params: {
+        api_key: SERPAPI_KEY,
+        engine: 'google',
+        q: promptText,
+        gl: iso?.toLowerCase() || 'us',
+        hl: 'en',
+      },
+      timeout: QUERY_TIMEOUT_MS,
+    });
+
+    const aiOverview = res.data?.ai_overview?.text ?? '';
+    const organic = res.data?.organic_results?.[0]?.snippet ?? '';
+    
+    // Fallback to organic snippet if AI overview is not present
+    const responseText = aiOverview || organic;
+    
+    return {
+      response: responseText,
+      latencyMs: Date.now() - startedAt,
+      costUsd: 0.005, // Approximation of SerpAPI per-request cost
+    };
+  }
+
   if (!router) throw new Error('OPENROUTER_API_KEY not configured');
   const today = new Date().toLocaleDateString('en-US', {
     weekday: 'long',
@@ -281,7 +322,6 @@ async function callModel(model: ModelDef, promptText: string, loc: UserLocation)
     day: 'numeric',
   });
   const payload = buildRequestPayload(model, promptText, today, loc);
-  const startedAt = Date.now();
   // We deliberately use the raw client.post rather than chat.completions.create
   // because OpenRouter's `tools`/`plugins` fields don't strictly match the
   // OpenAI SDK type definitions, and we want the request shape to be

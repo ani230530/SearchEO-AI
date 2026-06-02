@@ -121,6 +121,7 @@ const MODEL_ICON_SRC: Array<{ match: RegExp; src: string; label: string }> = [
   { match: /(gpt|chatgpt|openai)/i, src: '/report-icons/chat-gpt.svg', label: 'ChatGPT' },
   { match: /claude/i, src: '/report-icons/claude.svg', label: 'Claude' },
   { match: /gemini/i, src: '/report-icons/gemini.svg', label: 'Gemini' },
+  { match: /(google|gre|overview)/i, src: '/report-icons/google.svg', label: 'Google AI Overview' },
 ];
 
 const resolveModelMeta = (model?: string) => {
@@ -2451,6 +2452,7 @@ const AIResultsReportPreview = () => {
     const gpt = cite('gpt');
     const claude = cite('claude');
     const gemini = cite('gemini');
+    const google = cite('google-gre');
 
     // Mentions: brand presence count vs competitor host count across scoped rows.
     const brandPages = presenceCount;
@@ -2466,11 +2468,12 @@ const AIResultsReportPreview = () => {
         title: 'AI Prompts Citations',
         kind: 'citations',
         details: [
-          // AI Overview removed — we never query Google's SGE separately.
+          // AI Overview added via SerpAPI
           // Per-model: real citation count + unique source hosts.
           { label: 'ChatGPT', value: gpt.cites.toString(), iconSrc: '/report-icons/chat-gpt.svg', subValue: `${gpt.uniqueHosts} unique` },
           { label: 'Claude',  value: claude.cites.toString(), iconSrc: '/report-icons/claude.svg',  subValue: `${claude.uniqueHosts} unique` },
           { label: 'Gemini',  value: gemini.cites.toString(), iconSrc: '/report-icons/gemini.svg',  subValue: `${gemini.uniqueHosts} unique` },
+          { label: 'Google AI', value: google.cites.toString(), iconSrc: '/report-icons/google.svg', subValue: `${google.uniqueHosts} unique` },
         ],
       },
       {
@@ -2601,6 +2604,7 @@ const AIResultsReportPreview = () => {
       { key: 'chatgpt', label: 'ChatGPT', stroke: '#E9897E', match: 'gpt' },
       { key: 'claude',  label: 'Claude',  stroke: '#79A7F2', match: 'claude' },
       { key: 'gemini',  label: 'Gemini',  stroke: '#8DD9E8', match: 'gemini' },
+      { key: 'google',  label: 'Google AI Overview', stroke: '#4285F4', match: 'google-gre' },
     ] as const;
     // Drop series the user has filtered out via the modelFilter pill (header).
     const visibleSeries = modelFilter.size === 0
