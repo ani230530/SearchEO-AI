@@ -62,6 +62,7 @@ export interface DashboardHeaderProps {
   userName?: string | null;
   lastSyncedAt?: Date | null;
   onAddDomain?: () => void;
+  onLogout: () => void;
   onTabChange?: (tab: TabId) => void;
 }
 

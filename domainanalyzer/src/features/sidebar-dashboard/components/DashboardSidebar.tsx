@@ -8,7 +8,8 @@ import {
   Info,
   Lightbulb,
   Link as LinkIcon,
-  LogOut,
+  CircleHelp,
+  Coins,
   Send,
   Sparkles,
   Tag,
@@ -38,7 +39,6 @@ interface DashboardSidebarProps {
   isSidebarExpanded: boolean;
   onHoverChange: (hovered: boolean) => void;
   onToggleSidebar: (open: boolean) => void;
-  onLogout: () => void;
   onSelectCompanySubTab: (tab: CompanySubTabId) => void;
   onSelectCreateProject: () => void;
   onSelectPricing: () => void;
@@ -71,7 +71,6 @@ export function DashboardSidebar({
   isSidebarExpanded,
   onHoverChange,
   onToggleSidebar,
-  onLogout,
   onSelectCompanySubTab,
   onSelectCreateProject,
   onSelectPricing,
@@ -147,18 +146,18 @@ export function DashboardSidebar({
         ],
       },
       {
-        title: "Projects",
+        title: "Planner",
         items: [
           {
             key: "create-project",
-            label: "Create new project",
+            label: "Create New Campaign",
             icon: <Plus className="h-4 w-4" />,
             onClick: onSelectCreateProject,
             href: "/dashboard?tab=projects&action=create",
           },
           {
             key: "all-projects",
-            label: "All Projects",
+            label: "Campaigns",
             icon: <Send className="h-4 w-4" />,
             isActive: activeTab === "projects",
             onClick: () => onSelectTab("projects"),
@@ -167,18 +166,18 @@ export function DashboardSidebar({
         ],
       },
       {
-        title: "Company Tools",
+        title: "Site Audit",
         items: [
           {
-            key: "domain-info",
-            label: "Domain Info",
-            icon: <Info className="h-4 w-4" />,
-            isActive: activeTab === "analytics",
+            key: "integration",
+            label: "Integration",
+            icon: <LinkIcon className="h-4 w-4" />,
+            isActive: activeTab === "integration",
             onClick: () => {
-              onSelectTab("analytics");
-              onSelectCompanySubTab("company-info");
+              onSelectTab("integration");
+              onSelectCompanySubTab("integration");
             },
-            href: "/dashboard?tab=analytics&subtab=company-info",
+            href: "/dashboard?tab=integration&subtab=integration",
           },
           {
             key: "website-audit",
@@ -188,23 +187,12 @@ export function DashboardSidebar({
             onClick: () => onSelectTab("audit"),
             href: "/dashboard?tab=audit",
           },
-           {
-            key: "domain-history",
-            label: "Domain History",
-            icon: <History  className="h-4 w-4" />,
-            isActive: activeTab === "domain-history",
-            onClick: () => onSelectTab("domain-history"),
-            href: "/dashboard?tab=domain-history",
-          },
-          {
-            key: "competitor-analysis",
-            label: "Competitor analysis",
-            icon: <ClipboardList className="h-4 w-4" />,
-            isActive: activeTab === "competitor-intelligence",
-            onClick: () => onSelectTab("competitor-intelligence"),
-            href: "/dashboard?tab=competitor-intelligence",
-          },
-          {
+        ],
+      },
+       {
+        title: "Analytics",
+        items: [
+         {
             key: "gsc-analytics",
             label: "GSC Analytics",
             icon: <PieChart className="h-4 w-4" />,
@@ -220,38 +208,107 @@ export function DashboardSidebar({
             onClick: () => onSelectTab("analytics-report"),
             href: "/dashboard?tab=analytics-report",
           },
-          {
-            key: "integration",
-            label: "Integration",
-            icon: <LinkIcon className="h-4 w-4" />,
-            isActive: activeTab === "integration",
-            onClick: () => {
-              onSelectTab("integration");
-              onSelectCompanySubTab("integration");
-            },
-            href: "/dashboard?tab=integration&subtab=integration",
-          },
-          {key: "attribution",
-           label: "Attribution",
-           icon: <Route className="h-4 w-4" />,
-           isActive: activeTab === "attribution",
-           onClick: () => onSelectTab("attribution"),
-           href: "/dashboard?tab=attribution",
-          },
         ],
       },
+      
+      // {
+      //   title: "Company Tools",
+      //   items: [
+      //     {
+      //       key: "domain-info",
+      //       label: "Domain Info",
+      //       icon: <Info className="h-4 w-4" />,
+      //       isActive: activeTab === "analytics",
+      //       onClick: () => {
+      //         onSelectTab("analytics");
+      //         onSelectCompanySubTab("company-info");
+      //       },
+      //       href: "/dashboard?tab=analytics&subtab=company-info",
+      //     },
+      //     {
+      //       key: "website-audit",
+      //       label: "Website Audit",
+      //       icon: <Globe className="h-4 w-4" />,
+      //       isActive: activeTab === "audit",
+      //       onClick: () => onSelectTab("audit"),
+      //       href: "/dashboard?tab=audit",
+      //     },
+      //      {
+      //       key: "domain-history",
+      //       label: "Domain History",
+      //       icon: <History  className="h-4 w-4" />,
+      //       isActive: activeTab === "domain-history",
+      //       onClick: () => onSelectTab("domain-history"),
+      //       href: "/dashboard?tab=domain-history",
+      //     },
+      //     {
+      //       key: "competitor-analysis",
+      //       label: "Competitor analysis",
+      //       icon: <ClipboardList className="h-4 w-4" />,
+      //       isActive: activeTab === "competitor-intelligence",
+      //       onClick: () => onSelectTab("competitor-intelligence"),
+      //       href: "/dashboard?tab=competitor-intelligence",
+      //     },
+      //     {
+      //       key: "gsc-analytics",
+      //       label: "GSC Analytics",
+      //       icon: <PieChart className="h-4 w-4" />,
+      //       isActive: activeTab === "gsc-analytics",
+      //       onClick: () => onSelectTab("gsc-analytics"),
+      //       href: "/dashboard?tab=gsc-analytics",
+      //     },
+      //     {
+      //       key: "performance-reports",
+      //       label: "Performance Reports",
+      //       icon: <BarChart3 className="h-4 w-4" />,
+      //       isActive: activeTab === "analytics-report",
+      //       onClick: () => onSelectTab("analytics-report"),
+      //       href: "/dashboard?tab=analytics-report",
+      //     },
+      //     {
+      //       key: "integration",
+      //       label: "Integration",
+      //       icon: <LinkIcon className="h-4 w-4" />,
+      //       isActive: activeTab === "integration",
+      //       onClick: () => {
+      //         onSelectTab("integration");
+      //         onSelectCompanySubTab("integration");
+      //       },
+      //       href: "/dashboard?tab=integration&subtab=integration",
+      //     },
+      //     {key: "attribution",
+      //      label: "Attribution",
+      //      icon: <Route className="h-4 w-4" />,
+      //      isActive: activeTab === "attribution",
+      //      onClick: () => onSelectTab("attribution"),
+      //      href: "/dashboard?tab=attribution",
+      //     },
+      //   ],
+      // },
       {
         title: "Drive & Data",
         items: [
           {
             key: "knowledge-base",
-            label: "Knowledge Base",
+            label: "Resources",
             icon: <Lightbulb className="h-4 w-4" />,
             isActive: activeTab === "knowledge-base",
             onClick: () => onSelectTab("knowledge-base"),
             href: "/dashboard?tab=knowledge-base",
           },
          
+        ],
+      },
+      {
+        title: "Attribution",
+        items: [
+         {key: "attribution",
+           label: "Attribution",
+           icon: <Route className="h-4 w-4" />,
+           isActive: activeTab === "attribution",
+           onClick: () => onSelectTab("attribution"),
+           href: "/dashboard?tab=attribution",
+          },
         ],
       },
       {
@@ -264,14 +321,6 @@ export function DashboardSidebar({
             isActive: activeTab === "settings" && activeSettingsSubTab === "subscription",
             onClick: onSelectPricing,
             href: "/dashboard?tab=settings&subtab=subscription",
-          },
-          {
-            key: "settings",
-            label: "Settings",
-            icon: <Settings className="h-4 w-4" />,
-            isActive: activeTab === "settings"&& activeSettingsSubTab !== "subscription",
-            onClick: () => onSelectTab("settings"),
-            href: "/dashboard?tab=settings",
           },
         ],
       },
@@ -289,7 +338,7 @@ export function DashboardSidebar({
           <div className="sidebar-header-inner">
             {isSidebarExpanded ? (
               <div className="sidebar-brand">
-                <h1 className="sidebar-title">SearchEO AI</h1>
+                <h1 className="sidebar-title">SearchEO.ai</h1>
               </div>
             ) : (
               <div className="sidebar-brand flex items-center justify-center" style={{ width: "40px" }}>
@@ -383,15 +432,48 @@ export function DashboardSidebar({
           </nav>
 
           <div className="sidebar-footer-actions">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button onClick={onLogout} className="sidebar-tab sidebar-logout-tab">
-                  <LogOut className="sidebar-tab-icon h-4 w-4" />
-                  <span className="sidebar-tab-label sidebar-logout-label">Logout</span>
-                </button>
-              </TooltipTrigger>
-              <TooltipContent side="right">Logout</TooltipContent>
-            </Tooltip>
+            <div className="space-y-1 mb-3">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <a href="mailto:support@searcheo.ai" className="sidebar-tab">
+                    <CircleHelp className="sidebar-tab-icon h-4 w-4" />
+                    <span className="sidebar-tab-label">Support</span>
+                  </a>
+                </TooltipTrigger>
+                <TooltipContent side="right">Support</TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Link
+                    to="/dashboard?tab=settings"
+                    className={`sidebar-tab ${activeTab === "settings" && activeSettingsSubTab !== "subscription" ? "active" : ""}`}
+                    onClick={(event) => {
+                      if (isModifiedClick(event)) return;
+                      onSelectTab("settings");
+                      if (isCompactViewport) onToggleSidebar(false);
+                    }}
+                  >
+                    <Settings className="sidebar-tab-icon h-4 w-4" />
+                    <span className="sidebar-tab-label">Settings</span>
+                  </Link>
+                </TooltipTrigger>
+                <TooltipContent side="right">Settings</TooltipContent>
+              </Tooltip>
+            </div>
+
+            <div className="sidebar-credit-balance rounded-xl border border-[#EBEDF0] bg-[#F7F8FA] px-3 py-2.5 mb-3">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <Coins className="h-4 w-4 text-[#5172B6] shrink-0" />
+                  <span className="sidebar-credit-balance-label text-[13px] font-semibold text-[#355A9B] truncate">Credit Balance</span>
+                </div>
+                <span className="sidebar-credit-balance-value inline-flex h-6 items-center rounded-full border border-[#9EB7E9] bg-[#EDF3FF] px-2 text-[12px] font-medium text-[#5D7EC0]">
+                  2,465
+                </span>
+              </div>
+            </div>
+
           </div>
         </div>
       </aside>

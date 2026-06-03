@@ -1,8 +1,13 @@
-import { Bell, CircleHelp } from "lucide-react";
-import { type MouseEvent } from "react";
-import { Link } from "react-router-dom";
+import { Bell, CircleHelp, LogOut, UserRound } from "lucide-react";
 
 import type { DashboardHeaderProps } from "@/features/sidebar-dashboard/types";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 export function DashboardHeader({
@@ -11,6 +16,7 @@ export function DashboardHeader({
   userEmail,
   userName,
   lastSyncedAt,
+  onLogout,
   onTabChange,
 }: DashboardHeaderProps) {
   const activeLabel = tabs.find((tab) => tab.id === activeTab)?.label || "Dashboard";
@@ -24,14 +30,33 @@ export function DashboardHeader({
         minute: "2-digit",
       })
     : "Not synced yet";
-  const isModifiedClick = (event: MouseEvent<HTMLAnchorElement>) =>
-    event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0;
-  const handleProfileClick = (event: MouseEvent<HTMLAnchorElement>) => {
-    if (isModifiedClick(event)) {
-      return;
-    }
-    onTabChange?.("profile");
-  };
+  const handleProfileClick = () => onTabChange?.("profile");
+  const handleLogoutClick = () => onLogout();
+
+  const profileMenu = (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[#e5e7eb] bg-white text-[#6b7280] transition-colors hover:text-[#1f2937]"
+          aria-label="Profile menu"
+          title="Profile"
+        >
+          <UserRound className="h-4 w-4" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-[180px] p-1">
+        <DropdownMenuItem onSelect={handleProfileClick} className="cursor-pointer">
+          Profile
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onSelect={handleLogoutClick} className="cursor-pointer text-[#b83030] focus:text-[#b83030]">
+          <LogOut className="mr-2 h-4 w-4" />
+          Logout
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
 
   if (activeTab === "overview") {
     return (
@@ -74,23 +99,7 @@ export function DashboardHeader({
                 <TooltipContent side="bottom">Quick tips</TooltipContent>
               </Tooltip>
 
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Link
-                    to="/dashboard?tab=profile"
-                    onClick={handleProfileClick}
-                    className="inline-flex h-8 w-8 items-center justify-center overflow-hidden rounded-full border border-[#e5e7eb] bg-white transition-opacity hover:opacity-80"
-                    aria-label="Profile"
-                  >
-                    <img
-                      src="/overview-avatar-label-group.svg"
-                      alt=""
-                      className="h-8 w-8 object-contain"
-                    />
-                  </Link>
-                </TooltipTrigger>
-                <TooltipContent side="bottom">Profile</TooltipContent>
-              </Tooltip>
+              {profileMenu}
             </div>
           </div>
         </TooltipProvider>
@@ -117,14 +126,7 @@ export function DashboardHeader({
 
         {userEmail && (
           <div className="flex items-center gap-3">
-            <Link
-              to="/dashboard?tab=profile"
-              onClick={handleProfileClick}
-              className="cursor-pointer transition-opacity hover:opacity-70"
-              title="Profile"
-            >
-              <img src="/overview-avatar-label-group.svg" alt="" className="h-8 w-8 rounded-full object-contain" />
-            </Link>
+            {profileMenu}
             <div
               style={{
                 background: "rgba(0, 122, 255, 0.1)",
