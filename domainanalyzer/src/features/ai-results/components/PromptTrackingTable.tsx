@@ -1,12 +1,22 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { apiGet, apiPost } from "@/services/apiClient";
+import { useQueryClient } from "@tanstack/react-query";
+import { apiPatch, apiPost } from "@/services/apiClient";
+import { aiResultsKeys, useCampaigns, usePromptHistory } from "@/features/ai-results/queries";
+import {
+  WORKSHEET_IMPORT_KEY,
+  WORKSHEET_TARGET_KEY,
+  buildProjectsWorksheetPath,
+  WorksheetPickerModal,
+  CreateWorksheetModal,
+  type WorksheetOption,
+} from "@/features/ai-results/components/WorksheetPickerModals";
 import { useToast } from "@/components/ui/use-toast";
-import { maskDomainId } from "@/lib/domainUtils";
 import { logoUrl as logoUrlHelper } from "@/lib/logoUrl";
 import ReactMarkdown from "react-markdown";
 import {
   AlignLeft,
+  ArrowDownRight,
   ArrowUp,
   Bot,
   Calendar,
@@ -22,12 +32,12 @@ import {
   Languages,
   Link2,
   Loader2,
-  Pause,
   Plus,
   RefreshCw,
   Sparkles,
   Search,
   ShieldCheck,
+  Target,
   Zap,
 } from "lucide-react";
 import {
@@ -72,6 +82,13 @@ export type PromptModelResult = {
   sources?: string[];
 };
 
+export type PromptWeekTrend = {
+  /** Week-over-week visibility change in percentage points (null if <2 weekly runs). */
+  delta: number | null;
+  lastVisibility: number;
+  points: Array<{ runId: number; startedAt: string; visibility: number }>;
+};
+
 export type PromptTableRow = {
   /** Average sentiment ON A 0..10 SCALE — null if no model in this row mentioned the brand. */
   avgSentiment: number | null;
@@ -86,6 +103,16 @@ export type PromptTableRow = {
   results: PromptModelResult[];
   sov: string;
   type: "prompt" | "keyword";
+  /** True if the user marked this prompt for weekly tracking. */
+  isTracked?: boolean;
+  /** ISO timestamp of the most recent weekly run that included this prompt. */
+  lastTestedAt?: string | null;
+  /** ISO timestamp of the next scheduled weekly run. */
+  nextTestAt?: string | null;
+  /** Week-over-week visibility trend (present on tracked-prompt rows). */
+  weekTrend?: PromptWeekTrend | null;
+  /** For keyword rows: the child prompt ids. Tracking a keyword tracks them all. */
+  childPromptIds?: number[];
 };
 
 type ProcessedPromptResult = PromptModelResult & {
@@ -229,57 +256,86 @@ const buildModelPresenceRows = (results: ProcessedPromptResult[]) => {
  *   - 1 run    → single dot + "Trend appears after your next audit"
  *   - 2+ runs  → real area chart with auto-scaled Y axis (0..100)
  */
+type HistoryRun = {
+  runId: number;
+  startedAt: string;
+  presenceRate: number;
+  mentions: number;
+  total: number;
+  byModel?: Record<string, { mentions: number; total: number; presenceRate: number }>;
+};
+
+// Options for the expanded-graph time-window dropdown ("7 days" button).
+// "All time" is the default so the full trend is always visible.
+const GRAPH_TIME_WINDOWS: Array<{ label: string; days: number | null }> = [
+  { label: "All time", days: null },
+  { label: "7 days", days: 7 },
+  { label: "30 days", days: 30 },
+  { label: "90 days", days: 90 },
+];
+
 const PromptVisibilityComparisonGraph = ({
   results,
   domainId,
   promptRawId,
   rowType,
+  trackedView = false,
+  timeWindowDays = null,
+  modelFilter = null,
 }: {
   results: ProcessedPromptResult[];
   domainId?: number | null;
   promptRawId?: number | null;
   rowType: "prompt" | "keyword";
+  /** When true, the chart shows the weekly-tracking series (kind=weekly runs). */
+  trackedView?: boolean;
+  /** Limit the chart to runs within the last N days (null = all history). */
+  timeWindowDays?: number | null;
+  /** Plot a single model's presence (raw model key) instead of the aggregate. */
+  modelFilter?: string | null;
 }) => {
-  const presenceRows = buildModelPresenceRows(results);
-  const [history, setHistory] = useState<Array<{ runId: number; startedAt: string; presenceRate: number; mentions: number; total: number }>>([]);
-  const [loadingHistory, setLoadingHistory] = useState(false);
+  // When a single model is selected, scope the per-model summary box to it too.
+  const presenceRows = buildModelPresenceRows(results).filter(
+    (r) => !modelFilter || r.model === modelFilter,
+  );
+  // History is fetched through React Query (see usePromptHistory) so collapsing
+  // and re-expanding a row is instant and shared across tabs. Same payload
+  // shape from the prompt and keyword endpoints; trackedView scopes to weekly
+  // runs so the chart is a clean week-over-week series.
+  const { data: historyData, isLoading: loadingHistory } = usePromptHistory<{
+    runs: HistoryRun[];
+  }>(domainId ?? null, promptRawId ?? null, rowType, trackedView);
+  const history = historyData?.runs ?? [];
 
-  useEffect(() => {
-    let alive = true;
-    if (!domainId || !promptRawId) {
-      setHistory([]);
-      return;
-    }
-    setLoadingHistory(true);
-    // Same payload shape from both endpoints — only the path segment changes
-    // ('prompts/:id' vs 'keywords/:id') so the component can render either.
-    const path = rowType === "keyword"
-      ? `/wizard/domain/${domainId}/keywords/${promptRawId}/history`
-      : `/wizard/domain/${domainId}/prompts/${promptRawId}/history`;
-    apiGet<{ runs: Array<{ runId: number; startedAt: string; presenceRate: number; mentions: number; total: number }> }>(path)
-      .then((res) => { if (alive) setHistory(res.runs ?? []); })
-      .catch(() => { if (alive) setHistory([]); })
-      .finally(() => { if (alive) setLoadingHistory(false); });
-    return () => { alive = false; };
-  }, [domainId, promptRawId, rowType]);
-
-  const chartData = history.map((h, i) => ({
+  // Apply the "7 days" time-window filter, then map each run's Y value to the
+  // selected model's presence (or the aggregate when no model is chosen).
+  const cutoff = timeWindowDays && timeWindowDays > 0
+    ? Date.now() - timeWindowDays * 24 * 60 * 60 * 1000
+    : null;
+  const windowed = cutoff != null
+    ? history.filter((h) => new Date(h.startedAt).getTime() >= cutoff)
+    : history;
+  const chartData = windowed.map((h, i) => ({
     x: i,
-    presence: h.presenceRate,
+    presence: modelFilter ? (h.byModel?.[modelFilter]?.presenceRate ?? 0) : h.presenceRate,
     label: new Date(h.startedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" }),
   }));
   const ticks = chartData.length > 0
     ? [0, Math.floor(chartData.length / 2), chartData.length - 1].filter((v, i, a) => a.indexOf(v) === i)
     : [];
   const lastIdx = chartData.length - 1;
+  // Only overlay a message when there's genuinely nothing to plot. A single
+  // run IS real data (one dot + the per-model breakdown below), so we render
+  // it instead of a "come back after the next audit" pill. A trend line simply
+  // needs a 2nd run, which we can't fabricate.
   const emptyMessage = !domainId || !promptRawId
     ? "Open from a tracked domain to see history"
     : loadingHistory
       ? "Loading history…"
       : history.length === 0
-        ? "No audit history for this prompt yet"
-        : history.length === 1
-          ? "Trend appears after your next audit"
+        ? (trackedView ? "No weekly history yet — runs every Monday" : "No audit history for this prompt yet")
+        : windowed.length === 0
+          ? "No runs in this time range"
           : null;
 
   return (
@@ -570,13 +626,21 @@ const PromptExpandedDetails = ({
   domainId,
   rawId,
   rowType,
+  trackedView = false,
+  lastTestedAt,
+  nextTestAt,
 }: {
   results: PromptModelResult[];
   phrase: string;
   domainId?: number | null;
   rawId?: number | null;
   rowType: "prompt" | "keyword";
+  trackedView?: boolean;
+  lastTestedAt?: string | null;
+  nextTestAt?: string | null;
 }) => {
+  const fmtDate = (iso?: string | null) =>
+    iso ? new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" }) : null;
   const processedResults = useMemo<ProcessedPromptResult[]>(() => {
     const grouped = new Map<string, ProcessedPromptResult>();
 
@@ -641,26 +705,77 @@ const PromptExpandedDetails = ({
   }, [results]);
 
   const [selectedModel, setSelectedModel] = useState(processedResults[0]?.model || "");
+  // Graph filters driven by the header dropdowns.
+  const [windowIdx, setWindowIdx] = useState(0); // default: All time
+  const [graphModel, setGraphModel] = useState<string | null>(null); // default: All models
+  const graphModelLabel = graphModel ? getModelLabel(graphModel) : "All models";
 
   return (
     <div className="bg-[#fcfcfd] px-4 py-4">
       <div className="mb-2 flex items-center justify-between">
         <h4 className="text-[15px] font-medium text-[#3f4754]">Detailed prompt analysis</h4>
         <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            className="h-8 rounded-[8px] border-[#d7dde7] bg-white px-3 text-[11px] font-medium text-[#717b8b] shadow-none"
-          >
-            7 days
-            <ChevronDown className="ml-2 h-3.5 w-3.5" />
-          </Button>
-          <Button
-            variant="outline"
-            className="h-8 rounded-[8px] border-[#d7dde7] bg-white px-3 text-[11px] font-medium text-[#717b8b] shadow-none"
-          >
-            Models
-            <ChevronDown className="ml-2 h-3.5 w-3.5" />
-          </Button>
+          {trackedView ? (
+            <span className="inline-flex items-center gap-1.5 rounded-[8px] border border-[#d7dde7] bg-white px-3 h-8 text-[11px] font-medium text-[#717b8b]">
+              <Calendar className="h-3.5 w-3.5" />
+              {fmtDate(lastTestedAt) ? `Last tested ${fmtDate(lastTestedAt)}` : "Not yet tested"}
+              {fmtDate(nextTestAt) ? ` · Next ${fmtDate(nextTestAt)}` : ""}
+            </span>
+          ) : (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  className="h-8 rounded-[8px] border-[#d7dde7] bg-white px-3 text-[11px] font-medium text-[#717b8b] shadow-none"
+                >
+                  {GRAPH_TIME_WINDOWS[windowIdx].label}
+                  <ChevronDown className="ml-2 h-3.5 w-3.5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-[140px]">
+                {GRAPH_TIME_WINDOWS.map((w, i) => (
+                  <DropdownMenuItem
+                    key={w.label}
+                    onClick={() => setWindowIdx(i)}
+                    className={i === windowIdx ? "bg-slate-50" : ""}
+                  >
+                    {w.label}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                className="h-8 rounded-[8px] border-[#d7dde7] bg-white px-3 text-[11px] font-medium text-[#717b8b] shadow-none"
+              >
+                {graphModelLabel}
+                <ChevronDown className="ml-2 h-3.5 w-3.5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-[180px] p-1">
+              <DropdownMenuItem
+                onClick={() => setGraphModel(null)}
+                className={`rounded-md px-2 py-1.5 text-[12px] font-medium ${graphModel === null ? "bg-slate-50" : ""}`}
+              >
+                All models
+              </DropdownMenuItem>
+              {processedResults.map((result) => (
+                <DropdownMenuItem
+                  key={result.model}
+                  onClick={() => setGraphModel(result.model)}
+                  className={`flex items-center gap-2 rounded-md px-2 py-1.5 text-[12px] font-medium ${
+                    result.model === graphModel ? "bg-slate-50" : ""
+                  }`}
+                >
+                  {getModelIcon(result.model, "sm")}
+                  {getModelLabel(result.model)}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
       <div className="grid grid-cols-[0.98fr_1.08fr] gap-3 border-t border-[#eef2f6] pt-4">
@@ -669,6 +784,9 @@ const PromptExpandedDetails = ({
           domainId={domainId}
           promptRawId={rawId}
           rowType={rowType}
+          trackedView={trackedView}
+          timeWindowDays={GRAPH_TIME_WINDOWS[windowIdx].days}
+          modelFilter={graphModel}
         />
         <PromptAIResponsePanel
           phrase={phrase}
@@ -687,6 +805,7 @@ export const PromptTable = ({
   domainId,
   showMonitorAllButton = false,
   showPromptCategoryDropdown = false,
+  trackedFilterOnly = false,
 }: {
   data: PromptTableRow[];
   title?: string;
@@ -694,12 +813,36 @@ export const PromptTable = ({
   domainId?: number | null;
   showMonitorAllButton?: boolean;
   showPromptCategoryDropdown?: boolean;
+  /** When true (Prompt Tracking tab), only show tracked rows + weekly trends. */
+  trackedFilterOnly?: boolean;
 }) => {
   const { toast } = useToast();
   const navigate = useNavigate();
-  // Worksheet / Draft Blog buttons in this table navigate to the
-  // dashboard with ?openWorksheet=<rowId> so the existing modal there
-  // handles the rest. Avoids duplicating ~200 lines of orchestration.
+  const queryClient = useQueryClient();
+
+  // Worksheet picker state — the "Draft Blog" (per-row) and "Add to Worksheet"
+  // (selection) actions open the picker popup inline on THIS tab instead of
+  // navigating to the dashboard. Choosing/creating a worksheet then hands the
+  // selection off to the Projects worksheet page (same end behavior as before).
+  const campaignsQuery = useCampaigns<{ campaigns: Array<{ id: number; title: string; description?: string | null }> }>();
+  const worksheetOptions: WorksheetOption[] = useMemo(
+    () =>
+      (campaignsQuery.data?.campaigns ?? []).map((c) => ({
+        id: String(c.id),
+        name: c.title,
+        description: c.description ?? null,
+      })),
+    [campaignsQuery.data],
+  );
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerRowIds, setPickerRowIds] = useState<string[]>([]);
+  const [activeWorksheetId, setActiveWorksheetId] = useState<string | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [newWorksheetName, setNewWorksheetName] = useState("");
+  const [creatingWorksheet, setCreatingWorksheet] = useState(false);
+  const [createWorksheetError, setCreateWorksheetError] = useState<string | null>(null);
+
+  // Open the picker for a single row (Draft Blog) or the current selection.
   const navigateToWorksheet = (rowId?: string) => {
     if (!domainId) {
       toast({
@@ -709,11 +852,10 @@ export const PromptTable = ({
       });
       return;
     }
-    const slug = maskDomainId(domainId);
-    const url = rowId
-      ? `/ai-results/${slug}?openWorksheet=${encodeURIComponent(rowId)}`
-      : `/ai-results/${slug}?openWorksheet=1`;
-    navigate(url);
+    const ids = rowId ? [rowId] : Array.from(selectedIds);
+    setPickerRowIds(ids);
+    setActiveWorksheetId(null);
+    setPickerOpen(true);
   };
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [tableFilter, setTableFilter] = useState<"all" | "prompt" | "keyword">("all");
@@ -724,7 +866,200 @@ export const PromptTable = ({
   // create many new rows via Analyze Prompt.
   const PAGE_SIZE = 10;
   const [currentPage, setCurrentPage] = useState(1);
-  const [pausedRows, setPausedRows] = useState<Record<string, boolean>>({});
+
+  // ── Weekly tracking ──────────────────────────────────────────────────────
+  // Source of truth is row.isTracked from the server; trackOverrides holds the
+  // optimistic value so the toggle flips instantly. trackPending disables the
+  // button mid-request. selectedIds drives the bulk "Track selected" action.
+  const [trackOverrides, setTrackOverrides] = useState<Record<string, boolean>>({});
+  const [trackPending, setTrackPending] = useState<Record<string, boolean>>({});
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const isRowTracked = (row: PromptTableRow) => trackOverrides[row.id] ?? row.isTracked ?? false;
+
+  // Clear optimistic overrides when the domain changes (fresh server data).
+  useEffect(() => {
+    setTrackOverrides({});
+    setSelectedIds(new Set());
+  }, [domainId]);
+
+  // ── Worksheet hand-off ─────────────────────────────────────────────────────
+  // Mirrors the dashboard's "Add to Worksheet" orchestration: shape the chosen
+  // rows into the importer payload, stash it for the Projects worksheet page,
+  // then navigate there. The picker popup itself now lives on this tab.
+  const buildWorksheetRows = (rows: PromptTableRow[]) =>
+    rows.map((row) => {
+      const r = row as any;
+      const primaryKeyword =
+        row.type === "keyword" ? (r.phrase ?? r.text ?? null) : (r.keyword ?? null);
+      const primaryIntent =
+        row.type === "keyword" ? (r.intent ?? null) : (r.keywordIntent ?? r.intent ?? null);
+      return {
+        id: String(row.id),
+        prompt: r.phrase ?? r.prompt ?? "",
+        type: row.type ?? null,
+        primaryKeyword: primaryKeyword || null,
+        primaryIntent: primaryIntent || null,
+      };
+    });
+
+  const pickerRows = useMemo(() => {
+    const byId = new Map(data.map((r) => [r.id, r]));
+    return pickerRowIds.map((id) => byId.get(id)).filter(Boolean) as PromptTableRow[];
+  }, [pickerRowIds, data]);
+
+  const handoffToWorksheet = (worksheetId: string) => {
+    const payload = {
+      activeWorksheetId: worksheetId,
+      selectedItemIds: pickerRowIds,
+      selectedRows: buildWorksheetRows(pickerRows),
+    };
+    sessionStorage.setItem(WORKSHEET_TARGET_KEY, worksheetId);
+    sessionStorage.setItem(WORKSHEET_IMPORT_KEY, JSON.stringify(payload));
+    localStorage.setItem("activeTab", "projects");
+    setPickerOpen(false);
+    navigate(buildProjectsWorksheetPath(worksheetId));
+  };
+
+  const handleAddToWorksheet = () => {
+    if (!activeWorksheetId) return;
+    handoffToWorksheet(activeWorksheetId);
+  };
+
+  const handleCreateNewWorksheet = () => {
+    setCreateWorksheetError(null);
+    setNewWorksheetName("");
+    setCreateOpen(true);
+  };
+
+  const handleConfirmCreateWorksheet = async () => {
+    const name = newWorksheetName.trim();
+    if (!name || creatingWorksheet) return;
+    setCreatingWorksheet(true);
+    setCreateWorksheetError(null);
+    try {
+      const created = await apiPost<{ campaign?: { id: number; title: string } }>("/campaigns", { title: name });
+      const newId = created?.campaign?.id;
+      if (!newId) return;
+      await queryClient.invalidateQueries({ queryKey: aiResultsKeys.campaigns() });
+      setCreateOpen(false);
+      setNewWorksheetName("");
+      handoffToWorksheet(String(newId));
+    } catch (err) {
+      setCreateWorksheetError("Failed to create worksheet. Please try again.");
+    } finally {
+      setCreatingWorksheet(false);
+    }
+  };
+
+  const invalidateTracking = () => {
+    if (domainId == null) return;
+    queryClient.invalidateQueries({ queryKey: aiResultsKeys.trackedPrompts(domainId) });
+    queryClient.invalidateQueries({ queryKey: aiResultsKeys.report(domainId) });
+  };
+
+  const toggleTracking = async (row: PromptTableRow, next: boolean) => {
+    // Prompt rows track themselves; keyword rows track all their child prompts.
+    const keywordChildIds = row.type === "keyword" ? row.childPromptIds ?? [] : [];
+    const canToggle = row.type === "prompt" ? row.rawId != null : keywordChildIds.length > 0;
+    if (domainId == null || !canToggle || trackPending[row.id]) return;
+    setTrackOverrides((p) => ({ ...p, [row.id]: next }));
+    setTrackPending((p) => ({ ...p, [row.id]: true }));
+    try {
+      if (row.type === "keyword") {
+        await apiPatch<{ updated: number }>(
+          `/wizard/domain/${domainId}/prompts/track`,
+          { promptIds: keywordChildIds, tracked: next },
+        );
+      } else {
+        await apiPatch<{ prompt: { id: number; isTracked: boolean } }>(
+          `/wizard/domain/${domainId}/prompts/${row.rawId}/track`,
+          { tracked: next },
+        );
+      }
+      invalidateTracking();
+      toast({
+        title: next ? "Tracking weekly" : "Tracking stopped",
+        description: next
+          ? "This prompt is re-tested automatically every week."
+          : "Removed from weekly tests.",
+      });
+    } catch (err) {
+      // Revert the optimistic flip on failure.
+      setTrackOverrides((p) => {
+        const copy = { ...p };
+        delete copy[row.id];
+        return copy;
+      });
+      toast({
+        title: "Couldn't update tracking",
+        description: err instanceof Error ? err.message : "Try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setTrackPending((p) => {
+        const copy = { ...p };
+        delete copy[row.id];
+        return copy;
+      });
+    }
+  };
+
+  const [bulkPending, setBulkPending] = useState(false);
+  const bulkTrack = async (rows: PromptTableRow[], next: boolean) => {
+    if (domainId == null || bulkPending) return;
+    // Prompt rows contribute their own id; keyword rows contribute every child.
+    const promptIds = Array.from(
+      new Set(
+        rows.flatMap((r) =>
+          r.type === "prompt"
+            ? (typeof r.rawId === "number" ? [r.rawId] : [])
+            : (r.childPromptIds ?? []),
+        ),
+      ),
+    );
+    if (promptIds.length === 0) return;
+    setBulkPending(true);
+    // Optimistic flip for every affected row.
+    setTrackOverrides((p) => {
+      const copy = { ...p };
+      for (const r of rows) copy[r.id] = next;
+      return copy;
+    });
+    try {
+      await apiPatch<{ updated: number }>(
+        `/wizard/domain/${domainId}/prompts/track`,
+        { promptIds, tracked: next },
+      );
+      invalidateTracking();
+      setSelectedIds(new Set());
+      toast({
+        title: next ? `Tracking ${promptIds.length} prompt${promptIds.length === 1 ? "" : "s"}` : "Tracking stopped",
+        description: next ? "Re-tested automatically every week." : "Removed from weekly tests.",
+      });
+    } catch (err) {
+      setTrackOverrides((p) => {
+        const copy = { ...p };
+        for (const r of rows) delete copy[r.id];
+        return copy;
+      });
+      toast({
+        title: "Couldn't update tracking",
+        description: err instanceof Error ? err.message : "Try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setBulkPending(false);
+    }
+  };
+
+  const toggleRowSelected = (rowId: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(rowId)) next.delete(rowId);
+      else next.add(rowId);
+      return next;
+    });
+  };
 
   // Analyze Prompt state.
   // - `analyzeText` is the input.
@@ -785,6 +1120,11 @@ export const PromptTable = ({
   const fullSortedData = useMemo(() => {
     let items = [...data];
 
+    // Prompt Tracking tab: only tracked rows (honor optimistic overrides).
+    if (trackedFilterOnly) {
+      items = items.filter((item) => trackOverrides[item.id] ?? item.isTracked ?? false);
+    }
+
     if (tableFilter === "prompt") {
       items = items.filter((item) => item.type === "prompt");
     } else if (tableFilter === "keyword") {
@@ -819,7 +1159,7 @@ export const PromptTable = ({
       return [...newlyAnalyzedRows, ...baseItems];
     }
     return baseItems;
-  }, [data, tableFilter, tableMetric, newlyAnalyzedRows]);
+  }, [data, tableFilter, tableMetric, newlyAnalyzedRows, trackedFilterOnly, trackOverrides]);
 
   const totalCount = fullSortedData.length;
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
@@ -836,14 +1176,14 @@ export const PromptTable = ({
     return fullSortedData.slice(start, start + PAGE_SIZE);
   }, [fullSortedData, currentPage]);
 
-  const toggleRowPause = (rowId: string) => {
-    setPausedRows((prev) => ({
-      ...prev,
-      [rowId]: !prev[rowId],
-    }));
-  };
+  // Rows on the current page that are selected (for the bulk action).
+  const selectedRows = useMemo(
+    () => fullSortedData.filter((r) => selectedIds.has(r.id)),
+    [fullSortedData, selectedIds],
+  );
 
   return (
+    <>
     <Card className="border-none bg-transparent shadow-none">
       <CardHeader className="space-y-4 px-0 pb-6 pt-0">
         <div className="flex flex-wrap items-center justify-between gap-4 w-full">
@@ -931,13 +1271,25 @@ export const PromptTable = ({
                 <span className="text-[13px] font-medium">Add to Worksheet</span>
               </Button>
 
-              {showMonitorAllButton ? (
+              {selectedRows.length > 0 ? (
                 <Button
                   type="button"
-                  className="h-[38px] gap-2 rounded-lg border-none bg-[#4b6eb8] px-4 text-white shadow-none transition-all hover:bg-[#3f5d9c]"
+                  onClick={() => void bulkTrack(selectedRows, true)}
+                  disabled={bulkPending}
+                  className="h-[38px] gap-2 rounded-lg border-none bg-[#4b6eb8] px-4 text-white shadow-none transition-all hover:bg-[#3f5d9c] disabled:opacity-60"
                 >
-                  <ShieldCheck className="h-4 w-4" />
-                  <span className="text-[13px] font-medium">Monitor (All)</span>
+                  {bulkPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                  <span className="text-[13px] font-medium">Track selected ({selectedRows.length})</span>
+                </Button>
+              ) : showMonitorAllButton ? (
+                <Button
+                  type="button"
+                  onClick={() => void bulkTrack(fullSortedData, true)}
+                  disabled={bulkPending}
+                  className="h-[38px] gap-2 rounded-lg border-none bg-[#4b6eb8] px-4 text-white shadow-none transition-all hover:bg-[#3f5d9c] disabled:opacity-60"
+                >
+                  {bulkPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
+                  <span className="text-[13px] font-medium">Track all</span>
                 </Button>
               ) : null}
             </div>
@@ -1016,7 +1368,23 @@ export const PromptTable = ({
             <TableHeader>
               <TableRow className="border-b-0 bg-[#f1f1f1] hover:bg-[#f1f1f1]">
                 <TableHead className="w-8 px-4 rounded-tl-lg">
-                  <input type="checkbox" className="h-3.5 w-3.5 rounded border-gray-300 accent-blue-600" />
+                  <input
+                    type="checkbox"
+                    className="h-3.5 w-3.5 rounded border-gray-300 accent-blue-600"
+                    aria-label="Select all on this page"
+                    checked={displayData.length > 0 && displayData.every((r) => selectedIds.has(r.id))}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setSelectedIds((prev) => {
+                        const next = new Set(prev);
+                        for (const r of displayData) {
+                          if (checked) next.add(r.id);
+                          else next.delete(r.id);
+                        }
+                        return next;
+                      });
+                    }}
+                  />
                 </TableHead>
                 <TableHead className="px-2 text-[11px] font-semibold text-[#31415f]">
                   <div className="flex items-center gap-1">
@@ -1095,11 +1463,18 @@ export const PromptTable = ({
                   <TableRow
                     className={`group cursor-pointer border-b transition-all duration-200 hover:bg-slate-50/80 ${
                       expandedId === row.id ? "border-slate-300 bg-slate-50 shadow-sm" : "border-slate-200"
-                    }`}
+                    }${isRowTracked(row) ? " border-l-[3px] border-l-[#7f9fe8]" : ""}`}
                     onClick={() => setExpandedId(expandedId === row.id ? null : row.id)}
                   >
                     <TableCell className="w-8 px-4 py-3">
-                      <input type="checkbox" className="h-3.5 w-3.5 rounded border-gray-300 accent-blue-600" />
+                      <input
+                        type="checkbox"
+                        className="h-3.5 w-3.5 rounded border-gray-300 accent-blue-600"
+                        aria-label="Select prompt"
+                        checked={selectedIds.has(row.id)}
+                        onClick={(e) => e.stopPropagation()}
+                        onChange={() => toggleRowSelected(row.id)}
+                      />
                     </TableCell>
                     <TableCell className="max-w-[340px] px-2 py-2">
                       <div className="flex flex-col gap-1">
@@ -1120,11 +1495,32 @@ export const PromptTable = ({
                           <span className="truncate text-[12px] text-[#58606f] italic">
                             {row.phrase}
                           </span>
+                          {isRowTracked(row) ? (
+                            <Badge
+                              variant="outline"
+                              className="shrink-0 rounded-full border-[#c9d8f5] bg-[#eef4ff] px-2 py-[1px] text-[10px] font-medium text-[#3b5d9c]"
+                            >
+                              Tracked
+                            </Badge>
+                          ) : null}
                         </div>
                       </div>
                     </TableCell>
                     <TableCell className="px-2 py-3 text-[11px] font-medium text-slate-600">
-                      {row.sov}
+                      <span className="inline-flex items-center gap-1">
+                        {row.sov}
+                        {(() => {
+                          const delta = row.weekTrend?.delta;
+                          if (typeof delta !== "number" || delta === 0) return null;
+                          const up = delta > 0;
+                          return (
+                            <span className={`inline-flex items-center text-[10px] font-semibold ${up ? "text-emerald-600" : "text-rose-600"}`}>
+                              {up ? <ArrowUp className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
+                              {Math.abs(delta)}%
+                            </span>
+                          );
+                        })()}
+                      </span>
                     </TableCell>
                     <TableCell className="px-2 py-3">
                       {/* Coverage = how many models out of total mentioned the brand */}
@@ -1187,34 +1583,29 @@ export const PromptTable = ({
                       <div className="flex justify-end gap-2">
                         <button
                           type="button"
+                          disabled={
+                            trackPending[row.id] ||
+                            (row.type === "prompt"
+                              ? row.rawId == null
+                              : (row.childPromptIds?.length ?? 0) === 0)
+                          }
                           onClick={(e) => {
                             e.stopPropagation();
+                            void toggleTracking(row, !isRowTracked(row));
                           }}
-                          className="flex h-[38px] w-[38px] items-center justify-center rounded-[14px] border border-slate-100 bg-white shadow-[0_4px_14px_rgba(15,23,42,0.06)] transition hover:-translate-y-0.5 hover:shadow-[0_8px_18px_rgba(15,23,42,0.08)]"
-                          aria-label="AI response"
-                          title="AI response"
-                        >
-                          <img src="/prompts/ai-response.svg" alt="" aria-hidden="true" className="h-5 w-5" />
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            toggleRowPause(row.id);
-                          }}
-                          className={`flex h-[38px] w-[38px] items-center justify-center rounded-[14px] shadow-[0_4px_14px_rgba(15,23,42,0.06)] transition hover:-translate-y-0.5 hover:shadow-[0_8px_18px_rgba(15,23,42,0.08)] ${
-                            pausedRows[row.id]
-                              ? "border border-[#d8e8ff] bg-[#e8f1ff] text-[#6d88cc]"
-                              : "border border-[#7f9fe8] bg-[#7f9fe8] text-white"
+                          className={`flex h-[38px] w-[38px] items-center justify-center rounded-[14px] shadow-[0_4px_14px_rgba(15,23,42,0.06)] transition hover:-translate-y-0.5 hover:shadow-[0_8px_18px_rgba(15,23,42,0.08)] disabled:opacity-50 ${
+                            isRowTracked(row)
+                              ? "border border-[#7f9fe8] bg-[#7f9fe8] text-white"
+                              : "border border-[#d8e8ff] bg-white text-[#6d88cc]"
                           }`}
-                          aria-label={pausedRows[row.id] ? "Resume monitoring" : "Pause monitoring"}
-                          title={pausedRows[row.id] ? "Resume monitoring" : "Pause monitoring"}
+                          aria-pressed={isRowTracked(row)}
+                          aria-label={isRowTracked(row) ? "Stop weekly tracking" : "Track weekly"}
+                          title={isRowTracked(row) ? "Tracking weekly — click to stop" : "Track weekly"}
                         >
-                          {pausedRows[row.id] ? (
-                            <Pause className="h-5 w-5 stroke-[2.2]" />
+                          {trackPending[row.id] ? (
+                            <Loader2 className="h-5 w-5 animate-spin" />
                           ) : (
-                            <img src="/prompts/icon.svg" alt="" aria-hidden="true" className="h-5 w-5" />
+                            <Target className="h-5 w-5" />
                           )}
                         </button>
 
@@ -1242,6 +1633,9 @@ export const PromptTable = ({
                           domainId={domainId}
                           rawId={row.rawId}
                           rowType={row.type}
+                          trackedView={trackedFilterOnly}
+                          lastTestedAt={row.lastTestedAt}
+                          nextTestAt={row.nextTestAt}
                         />
                       </TableCell>
                     </TableRow>
@@ -1281,5 +1675,27 @@ export const PromptTable = ({
         </div>
       </CardContent>
     </Card>
+
+    <WorksheetPickerModal
+      open={pickerOpen}
+      selectedCount={pickerRowIds.length}
+      activeWorksheetId={activeWorksheetId}
+      worksheets={worksheetOptions}
+      loading={campaignsQuery.isLoading}
+      onOpenChange={setPickerOpen}
+      onWorksheetSelect={setActiveWorksheetId}
+      onAddToWorksheet={handleAddToWorksheet}
+      onCreateNewWorksheet={handleCreateNewWorksheet}
+    />
+    <CreateWorksheetModal
+      open={createOpen}
+      name={newWorksheetName}
+      isSubmitting={creatingWorksheet}
+      error={createWorksheetError}
+      onOpenChange={setCreateOpen}
+      onNameChange={setNewWorksheetName}
+      onSubmit={handleConfirmCreateWorksheet}
+    />
+    </>
   );
 };

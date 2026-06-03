@@ -25,6 +25,11 @@ export const JOB_TYPES = {
     CAMPAIGN_GENERATION: 'campaign-generation',
 };
 
+// Weekly tracked-prompt re-test sweep. Runs on this same worker (no second
+// Redis connection); its processor lives in weeklyTrackingService and is
+// invoked via a lazy require below to avoid a circular import.
+export const WEEKLY_TRACKING_JOB = 'weekly-tracking-sweep';
+
 // Queue Instance
 export const n8nQueue = new Queue(N8N_QUEUE_NAME, { connection: connection as any });
 
@@ -33,6 +38,14 @@ const worker = new Worker(
     N8N_QUEUE_NAME,
     async (job: Job) => {
         console.log(`[Queue] Processing job ${job.id} of type ${job.name}`);
+
+        // Weekly tracked-prompt sweep — not an n8n webhook job, so it bypasses
+        // the url/payload handling below. Lazy require breaks the import cycle
+        // (weeklyTrackingService imports n8nQueue from this module).
+        if (job.name === WEEKLY_TRACKING_JOB) {
+            const { runWeeklySweep } = require('./weeklyTrackingService');
+            return runWeeklySweep();
+        }
 
         try {
             const { url, payload, headers, timeout, meta } = job.data;

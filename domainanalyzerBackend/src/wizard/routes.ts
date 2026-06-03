@@ -75,6 +75,132 @@ async function ensureDomain(req: Request, idParam: string | undefined): Promise<
   return { ok: true, domain: domain as NonNullable<DomainWithRelations> };
 }
 
+// Resolve the AiRun.kind filter for audit-facing endpoints from a `?kind=`
+// query param. Defaults to 'audit' so weekly tracked-prompt runs never leak
+// into the audit dashboard's report/trends/runs/history (this is a no-op for
+// all pre-existing data, which is kind='audit'). Pass ?kind=weekly to scope to
+// weekly runs, or ?kind=all to include both.
+function runKindFilter(req: Request): { kind?: string } {
+  const raw = typeof req.query.kind === 'string' ? req.query.kind.toLowerCase() : 'audit';
+  if (raw === 'all') return {};
+  if (raw === 'weekly') return { kind: 'weekly' };
+  return { kind: 'audit' };
+}
+
+// ── Per-prompt row builders (shared by /report and /tracked-prompts) ──────
+// AiQueryResult fields needed to render a PromptTable row's per-model results.
+type AiResultRow = {
+  id: number;
+  promptId: number;
+  model: string;
+  response: string;
+  presence: number;
+  relevance: number;
+  sentiment: number | null;
+  accuracy: number | null;
+  rankPosition: number | null;
+  overall: number;
+  scorerSummary: string | null;
+  factualClaims: unknown;
+  competitorHosts: unknown;
+  citations: unknown;
+  competitorMentions: unknown;
+  latencyMs: number | null;
+};
+
+// Convert raw -10..10 sentiment into the 0..10 scale the page expects:
+//   raw -10 → 0 (Negative), raw 0 → 5 (Neutral), raw +10 → 10 (Positive).
+// Page thresholds: ≥7 Positive, ≥4 Neutral, else Negative. NULL passes through
+// as "brand not mentioned, no sentiment to measure".
+const toDisplaySentiment = (raw: number | null): number | null =>
+  raw === null ? null : Math.max(0, Math.min(10, (raw + 10) / 2));
+
+type ResponseCitation = { title: string | null; url: string; host: string };
+
+// One entry per model for a prompt — the dashboard renders the per-model
+// breakdown without an extra round trip.
+function buildModelResults(rs: AiResultRow[]) {
+  return rs.map((r) => {
+    const cits = Array.isArray(r.citations) ? (r.citations as ResponseCitation[]) : [];
+    const compMentions = Array.isArray(r.competitorMentions)
+      ? (r.competitorMentions as Array<{ host: string; count: number; sentiment: number | null }>)
+      : [];
+    const sentimentDisplay = toDisplaySentiment(r.sentiment);
+    return {
+      id: `res-${r.id}`,
+      model: r.model,
+      presence: r.presence,
+      overall: r.overall,
+      accuracy: r.accuracy,
+      relevance: r.relevance,
+      sentiment: sentimentDisplay === null ? null : Number(sentimentDisplay.toFixed(2)),
+      sentimentRaw: r.sentiment,
+      rankPosition: r.rankPosition,
+      scorerSummary: r.scorerSummary,
+      factualClaims: r.factualClaims ?? [],
+      response: r.response,
+      citations: cits.map((c) => ({ title: c.title ?? c.host, url: c.url, snippet: c.host })),
+      sources: Array.from(new Set(cits.map((c) => c.host))).filter(Boolean),
+      competitorMentions: compMentions,
+      competitorHosts: Array.isArray(r.competitorHosts) ? (r.competitorHosts as string[]) : [],
+      latencyMs: r.latencyMs,
+    };
+  });
+}
+
+function rollupCompetitors(rs: ReturnType<typeof buildModelResults>) {
+  const set = new Set<string>();
+  for (const r of rs) {
+    for (const h of r.competitorHosts) set.add(h);
+    for (const m of r.competitorMentions) set.add(m.host);
+  }
+  return Array.from(set);
+}
+
+// Next scheduled weekly run: the upcoming Monday 03:00 UTC (matches the
+// scheduler cron in weeklyTrackingService). Returned to the UI as the "next
+// test" indicator.
+function nextWeeklyRunAt(): Date {
+  const now = new Date();
+  const next = new Date(Date.UTC(
+    now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 3, 0, 0, 0,
+  ));
+  // Advance to the next Monday (getUTCDay: 0=Sun..1=Mon). If today is Monday
+  // but past 03:00, roll to next week.
+  const day = next.getUTCDay();
+  let add = (1 - day + 7) % 7; // days until Monday
+  if (add === 0 && now.getTime() >= next.getTime()) add = 7;
+  next.setUTCDate(next.getUTCDate() + add);
+  return next;
+}
+
+// A tracked prompt that has never been through a weekly run yet — zeroed
+// metrics so the table can render "Not yet tested".
+function emptyTrackedRow(p: { id: number; text: string; intent: string | null; source: string; keywordId: number | null; lastTrackedRunAt: Date | null }) {
+  return {
+    id: `pr-${p.id}`,
+    rawId: p.id,
+    type: 'prompt' as const,
+    phrase: p.text,
+    text: p.text,
+    intent: p.intent,
+    source: p.source,
+    keywordId: p.keywordId,
+    sov: '0%',
+    mentions: 0,
+    bestRank: 0,
+    avgSentiment: null as number | null,
+    competitors: [] as string[],
+    competitorCount: 0,
+    results: [] as ReturnType<typeof buildModelResults>,
+    metrics: { visibility: 0, avgOverall: 0, runs: 0 },
+    isTracked: true,
+    lastTestedAt: p.lastTrackedRunAt,
+    nextTestAt: nextWeeklyRunAt(),
+    weekTrend: { delta: null as number | null, lastVisibility: 0, points: [] as Array<{ runId: number; startedAt: Date; visibility: number }> },
+  };
+}
+
 // ── GET /domains  (list for the user, with derived metrics + step) ────────
 //
 // Replaces the legacy GET /api/dashboard/all. Returns one row per domain
@@ -493,6 +619,9 @@ router.get('/domain/:id/report', timed('GET /report', 800), authenticateToken, a
   // the latest completed run for this domain (existing behaviour).
   const runIdParam = typeof req.query.runId === 'string' ? Number(req.query.runId) : NaN;
   const useSpecificRun = Number.isFinite(runIdParam) && runIdParam > 0;
+  // Default to audit-kind runs so weekly tracked-prompt runs don't become the
+  // "latest run" the dashboard renders. ?kind=weekly|all overrides.
+  const kindFilter = runKindFilter(req);
 
   const [latestRun, allResults, keywords, prompts] = await Promise.all([
     useSpecificRun
@@ -500,7 +629,7 @@ router.get('/domain/:id/report', timed('GET /report', 800), authenticateToken, a
           where: { id: runIdParam, domainId: domain.id, status: 'completed' },
         })
       : prisma.aiRun.findFirst({
-          where: { domainId: domain.id, status: 'completed' },
+          where: { domainId: domain.id, status: 'completed', ...kindFilter },
           orderBy: { startedAt: 'desc' },
         }),
     // Explicit select — every field listed is consumed below. Omits
@@ -511,7 +640,7 @@ router.get('/domain/:id/report', timed('GET /report', 800), authenticateToken, a
     prisma.aiQueryResult.findMany({
       where: useSpecificRun
         ? { runId: runIdParam, run: { domainId: domain.id } }
-        : { run: { domainId: domain.id, status: 'completed' } },
+        : { run: { domainId: domain.id, status: 'completed', ...kindFilter } },
       orderBy: { createdAt: 'desc' },
       take: 1000,
       select: {
@@ -556,6 +685,8 @@ router.get('/domain/:id/report', timed('GET /report', 800), authenticateToken, a
         useCase: true,
         isBranded: true,
         competitorMentioned: true,
+        isTracked: true,
+        lastTrackedRunAt: true,
       },
     }),
   ]);
@@ -609,63 +740,8 @@ router.get('/domain/:id/report', timed('GET /report', 800), authenticateToken, a
     keywordById.set(k.id, { term: k.term, intent: k.intent ?? null });
   }
 
-  // Convert raw -10..10 sentiment into the 0..10 scale the page expects:
-  //   raw  -10 →  0    (Negative)
-  //   raw    0 →  5    (Neutral)
-  //   raw  +10 → 10    (Positive)
-  // Page thresholds: ≥7 Positive, ≥4 Neutral, else Negative.
-  // NULL passes through as NULL — meaning "brand not mentioned, no sentiment to measure".
-  const toDisplaySentiment = (raw: number | null): number | null =>
-    raw === null ? null : Math.max(0, Math.min(10, (raw + 10) / 2));
-
-  type ResponseCitation = { title: string | null; url: string; host: string };
-
-  function buildModelResults(rs: typeof allResults) {
-    return rs.map((r) => {
-      const cits = Array.isArray(r.citations) ? (r.citations as ResponseCitation[]) : [];
-      const compMentions = Array.isArray(r.competitorMentions)
-        ? (r.competitorMentions as Array<{ host: string; count: number; sentiment: number | null }>)
-        : [];
-      const sentimentDisplay = toDisplaySentiment(r.sentiment);
-      return {
-        id: `res-${r.id}`,
-        model: r.model,
-        presence: r.presence,
-        // overall is always 0 when presence=0 (visibility metric)
-        overall: r.overall,
-        // accuracy is null when presence=0 (no claims to verify)
-        accuracy: r.accuracy,
-        // relevance is always meaningful (answer quality, not visibility)
-        relevance: r.relevance,
-        // sentiment is null when presence=0 — front end shows "Not mentioned"
-        // instead of fabricating Neutral/Negative
-        sentiment: sentimentDisplay === null ? null : Number(sentimentDisplay.toFixed(2)),
-        sentimentRaw: r.sentiment,
-        rankPosition: r.rankPosition,
-        scorerSummary: r.scorerSummary,
-        factualClaims: r.factualClaims ?? [],
-        response: r.response,
-        citations: cits.map((c) => ({
-          title: c.title ?? c.host,
-          url: c.url,
-          snippet: c.host,
-        })),
-        sources: Array.from(new Set(cits.map((c) => c.host))).filter(Boolean),
-        competitorMentions: compMentions,
-        competitorHosts: Array.isArray(r.competitorHosts) ? (r.competitorHosts as string[]) : [],
-        latencyMs: r.latencyMs,
-      };
-    });
-  }
-
-  function rollupCompetitors(rs: ReturnType<typeof buildModelResults>) {
-    const set = new Set<string>();
-    for (const r of rs) {
-      for (const h of r.competitorHosts) set.add(h);
-      for (const m of r.competitorMentions) set.add(m.host);
-    }
-    return Array.from(set);
-  }
+  // Per-prompt row builders (toDisplaySentiment / buildModelResults /
+  // rollupCompetitors) are module-level helpers shared with /tracked-prompts.
 
   const topPrompts = [
     ...queriedKeywords.map((k) => {
@@ -683,6 +759,10 @@ router.get('/domain/:id/report', timed('GET /report', 800), authenticateToken, a
         ? Number((sentimentMeasurements.reduce((s, n) => s + n, 0) / sentimentMeasurements.length).toFixed(2))
         : null;
       const competitors = rollupCompetitors(built);
+      // A keyword row is "tracked" when all its child prompts are tracked.
+      // Tracking the keyword toggles every child prompt (see childPromptIds).
+      const childPrompts = queriedPrompts.filter((p) => p.keywordId === k.id);
+      const keywordTracked = childPrompts.length > 0 && childPrompts.every((p) => p.isTracked);
       return {
         id: `kw-${k.id}`,
         rawId: k.id,
@@ -700,6 +780,9 @@ router.get('/domain/:id/report', timed('GET /report', 800), authenticateToken, a
         competitorCount: competitors.length,
         results: built,
         metrics: { visibility: sovPct, avgOverall: total > 0 ? Number((built.reduce((s, r) => s + r.overall, 0) / total).toFixed(2)) : 0, runs: total },
+        // Tracking a keyword tracks all its child prompts.
+        childPromptIds,
+        isTracked: keywordTracked,
       };
     }),
     ...queriedPrompts.map((p) => {
@@ -741,9 +824,34 @@ router.get('/domain/:id/report', timed('GET /report', 800), authenticateToken, a
         competitorCount: competitors.length,
         results: built,
         metrics: { visibility: sovPct, avgOverall, runs: total },
+        isTracked: p.isTracked,
+        lastTestedAt: p.lastTrackedRunAt,
       };
     }),
   ];
+
+  // "New prompts added since the previous run" — count selected prompts whose
+  // createdAt is after the SECOND-most-recent completed audit run started.
+  // With fewer than two audit runs there's no prior baseline to diff against,
+  // so the count is 0 (drives the "New Prompts" card on the All Prompts tab).
+  // Always scoped to kind='audit' so weekly tracked-prompt runs don't move the
+  // baseline, regardless of any ?kind override on this request.
+  const recentAuditRuns = await prisma.aiRun.findMany({
+    where: { domainId: domain.id, status: 'completed', kind: 'audit' },
+    orderBy: { startedAt: 'desc' },
+    take: 2,
+    select: { startedAt: true },
+  });
+  const previousAuditRunStartedAt = recentAuditRuns[1]?.startedAt ?? null;
+  const newPromptsSinceLastRun = previousAuditRunStartedAt
+    ? await prisma.prompt.count({
+        where: {
+          domainId: domain.id,
+          isSelected: true,
+          createdAt: { gt: previousAuditRunStartedAt },
+        },
+      })
+    : 0;
 
   // Brand vs competitor "share of voice" — count of presence vs competitor mentions.
   const totalQueries = (summary?.totalQueries as number | undefined) ?? allResults.length;
@@ -912,6 +1020,7 @@ router.get('/domain/:id/report', timed('GET /report', 800), authenticateToken, a
       brandPages: brandMentions,
       competitorPages: competitorMentions,
       totalQueries,
+      newPromptsSinceLastRun,
       modelPerformance,
     },
     topPrompts,
@@ -937,6 +1046,35 @@ router.get('/domain/:id/state', authenticateOrSession(), async (req: Request, re
     canResumeAt: state.canResumeAt,
     selectionDraft: state.selectionDraft,
   });
+});
+
+// ── PATCH /domain/:id/prompts/track  { promptIds: number[], tracked } ──────
+//
+// Bulk toggle weekly-tracking for several prompts at once (the "Track all" /
+// "Track selected" toolbar actions). updateMany is scoped to { id in, domainId }
+// so a caller can't flip prompts on a domain they don't own.
+//
+// MUST be registered BEFORE `/prompts/:promptId` below: Express matches in
+// order, and the literal `track` segment would otherwise be captured by the
+// `:promptId` param, hitting the edit route with promptId="track" (NaN) and
+// returning a spurious "Invalid promptId". Keep this route above that one.
+router.patch('/domain/:id/prompts/track', authenticateOrSession(), async (req: Request, res: Response) => {
+  const got = await ensureDomain(req, req.params.id);
+  if (!got.ok) return res.status(got.status).json({ error: got.error });
+  const { domain } = got;
+
+  const body = (req.body ?? {}) as { promptIds?: unknown; tracked?: unknown };
+  const promptIds = Array.isArray(body.promptIds)
+    ? body.promptIds.map((n) => Number(n)).filter((n) => Number.isFinite(n))
+    : [];
+  if (promptIds.length === 0) return res.status(400).json({ error: 'promptIds (number[]) is required' });
+  const tracked = Boolean(body.tracked);
+
+  const result = await prisma.prompt.updateMany({
+    where: { id: { in: promptIds }, domainId: domain.id },
+    data: { isTracked: tracked },
+  });
+  return res.json({ updated: result.count, tracked });
 });
 
 // ── PATCH /domain/:id/prompts/:promptId ───────────────────────────────────
@@ -988,6 +1126,184 @@ router.patch('/domain/:id/prompts/:promptId', authenticateOrSession(), async (re
   return res.json({ prompt: updated });
 });
 
+// ── PATCH /domain/:id/prompts/:promptId/track  { tracked: boolean } ────────
+//
+// Toggle a single prompt's weekly-tracking flag. Tracked prompts are re-tested
+// every week by the scheduler. Ownership scoped via ensureDomain; the prompt
+// must belong to the domain.
+router.patch('/domain/:id/prompts/:promptId/track', authenticateOrSession(), async (req: Request, res: Response) => {
+  const got = await ensureDomain(req, req.params.id);
+  if (!got.ok) return res.status(got.status).json({ error: got.error });
+  const { domain } = got;
+
+  const promptId = Number(req.params.promptId);
+  if (!Number.isFinite(promptId)) return res.status(400).json({ error: 'Invalid promptId' });
+  const tracked = Boolean((req.body ?? {}).tracked);
+
+  const existing = await prisma.prompt.findFirst({
+    where: { id: promptId, domainId: domain.id },
+    select: { id: true },
+  });
+  if (!existing) return res.status(404).json({ error: 'Prompt not found' });
+
+  const updated = await prisma.prompt.update({
+    where: { id: promptId },
+    data: { isTracked: tracked },
+    select: { id: true, isTracked: true },
+  });
+  return res.json({ prompt: updated });
+});
+
+// ── GET /domain/:id/tracked-prompts ───────────────────────────────────────
+//
+// The Prompt Tracking tab. Returns one PromptTable-shaped row per tracked
+// prompt, built from the LATEST completed weekly run, plus a week-over-week
+// delta vs the previous weekly run and a sparkline trend across recent weekly
+// runs. Shape mirrors /report's topPrompts so the existing table renders it
+// unchanged, with tracking metadata added.
+router.get('/domain/:id/tracked-prompts', authenticateToken, async (req: Request, res: Response) => {
+  const got = await ensureDomain(req, req.params.id);
+  if (!got.ok) return res.status(got.status).json({ error: got.error });
+  const { domain } = got;
+
+  const trackedPrompts = await prisma.prompt.findMany({
+    where: { domainId: domain.id, isTracked: true },
+    select: { id: true, text: true, intent: true, source: true, keywordId: true, lastTrackedRunAt: true },
+  });
+  if (trackedPrompts.length === 0) {
+    return res.json({ prompts: [], latestRunAt: null, nextTestAt: nextWeeklyRunAt() });
+  }
+  const promptIds = trackedPrompts.map((p) => p.id);
+
+  // Recent weekly runs (newest first). [0] = latest, [1] = previous (for the
+  // delta); up to 12 power the sparkline.
+  const weeklyRuns = await prisma.aiRun.findMany({
+    where: { domainId: domain.id, kind: 'weekly', status: 'completed' },
+    orderBy: { startedAt: 'desc' },
+    take: 12,
+    select: { id: true, startedAt: true },
+  });
+
+  if (weeklyRuns.length === 0) {
+    // Tracked but never run yet — return rows with no metrics so the UI can
+    // show "Not yet tested".
+    return res.json({
+      latestRunAt: null,
+      nextTestAt: nextWeeklyRunAt(),
+      prompts: trackedPrompts.map((p) => emptyTrackedRow(p)),
+    });
+  }
+
+  const latestRunId = weeklyRuns[0].id;
+  const prevRunId = weeklyRuns[1]?.id ?? null;
+  const trendRunIds = weeklyRuns.map((r) => r.id);
+  const startedAtByRun = new Map(weeklyRuns.map((r) => [r.id, r.startedAt] as const));
+
+  const results = await prisma.aiQueryResult.findMany({
+    where: { promptId: { in: promptIds }, runId: { in: trendRunIds } },
+    select: {
+      id: true, promptId: true, model: true, response: true, presence: true,
+      relevance: true, sentiment: true, accuracy: true, rankPosition: true,
+      overall: true, scorerSummary: true, factualClaims: true, competitorHosts: true,
+      citations: true, competitorMentions: true, latencyMs: true,
+      runId: true,
+    },
+  });
+
+  // Index results: promptId -> runId -> rows.
+  const byPromptRun = new Map<number, Map<number, AiResultRow[]>>();
+  for (const r of results) {
+    let perRun = byPromptRun.get(r.promptId);
+    if (!perRun) { perRun = new Map(); byPromptRun.set(r.promptId, perRun); }
+    const arr = perRun.get(r.runId) ?? [];
+    arr.push(r as AiResultRow);
+    perRun.set(r.runId, arr);
+  }
+
+  // Visibility % (presence/total) for a prompt in a given run.
+  const visibilityFor = (promptId: number, runId: number): number | null => {
+    const rows = byPromptRun.get(promptId)?.get(runId);
+    if (!rows || rows.length === 0) return null;
+    const mentions = rows.reduce((s, r) => s + r.presence, 0);
+    return Math.round((mentions / rows.length) * 100);
+  };
+
+  const latestRunAt = weeklyRuns[0].startedAt;
+
+  const prompts = trackedPrompts.map((p) => {
+    const latestRows = byPromptRun.get(p.id)?.get(latestRunId) ?? [];
+    const built = buildModelResults(latestRows);
+    const total = built.length;
+    const mentions = built.reduce((s, r) => s + r.presence, 0);
+    const sovPct = total > 0 ? Math.round((mentions / total) * 100) : 0;
+    const sentimentMeasurements = built.map((r) => r.sentiment).filter((s): s is number => s !== null);
+    const avgSentiment = sentimentMeasurements.length > 0
+      ? Number((sentimentMeasurements.reduce((s, n) => s + n, 0) / sentimentMeasurements.length).toFixed(2))
+      : null;
+    const competitors = rollupCompetitors(built);
+
+    // Week-over-week deltas vs the previous weekly run.
+    const prevVis = prevRunId != null ? visibilityFor(p.id, prevRunId) : null;
+    const visibilityDelta = prevVis != null ? sovPct - prevVis : null;
+
+    // Sparkline: one point per weekly run that has data for this prompt,
+    // oldest → newest.
+    const trend = [...weeklyRuns]
+      .reverse()
+      .map((run) => {
+        const vis = visibilityFor(p.id, run.id);
+        return vis == null ? null : { runId: run.id, startedAt: startedAtByRun.get(run.id)!, visibility: vis };
+      })
+      .filter(Boolean);
+
+    return {
+      id: `pr-${p.id}`,
+      rawId: p.id,
+      type: 'prompt' as const,
+      phrase: p.text,
+      text: p.text,
+      intent: p.intent,
+      source: p.source,
+      keywordId: p.keywordId,
+      sov: `${sovPct}%`,
+      mentions,
+      bestRank: mentions,
+      avgSentiment,
+      competitors,
+      competitorCount: competitors.length,
+      results: built,
+      metrics: { visibility: sovPct, avgOverall: total > 0 ? Number((built.reduce((s, r) => s + r.overall, 0) / total).toFixed(2)) : 0, runs: total },
+      // Tracking metadata.
+      isTracked: true,
+      lastTestedAt: p.lastTrackedRunAt ?? latestRunAt,
+      nextTestAt: nextWeeklyRunAt(),
+      weekTrend: { delta: visibilityDelta, lastVisibility: sovPct, points: trend },
+    };
+  });
+
+  return res.json({ latestRunAt, nextTestAt: nextWeeklyRunAt(), prompts });
+});
+
+// ── POST /domain/:id/tracked-prompts/run-now ──────────────────────────────
+//
+// Manual "Test tracked now" trigger. Fire-and-forget: kicks the weekly run for
+// this domain and returns immediately (the LLM sweep takes minutes). 400 if
+// there are no tracked prompts.
+router.post('/domain/:id/tracked-prompts/run-now', authenticateToken, async (req: Request, res: Response) => {
+  const got = await ensureDomain(req, req.params.id);
+  if (!got.ok) return res.status(got.status).json({ error: got.error });
+  const { domain } = got;
+
+  const count = await prisma.prompt.count({ where: { domainId: domain.id, isTracked: true } });
+  if (count === 0) return res.status(400).json({ error: 'No tracked prompts to test' });
+
+  const { runWeeklyForDomain } = require('../services/weeklyTrackingService');
+  // Don't await — the sweep streams nothing and can take minutes.
+  Promise.resolve(runWeeklyForDomain(domain.id)).catch((e: unknown) =>
+    console.error(`[tracked-prompts] run-now for domain ${domain.id} failed`, e));
+  return res.json({ started: true, trackedPrompts: count });
+});
+
 // ── GET /domain/:id/prompts/:promptId/history ─────────────────────────────
 //
 // Per-prompt time series for the Track Prompts inline detail chart. One row
@@ -1014,27 +1330,43 @@ router.get('/domain/:id/prompts/:promptId/history', authenticateToken, async (re
   const rows = await prisma.aiQueryResult.findMany({
     where: {
       promptId,
-      run: { domainId: domain.id, status: 'completed' },
+      run: { domainId: domain.id, status: 'completed', ...runKindFilter(req) },
     },
     select: {
       runId: true,
+      model: true,
       presence: true,
       sentiment: true,
       run: { select: { startedAt: true } },
     },
   });
 
-  // Bucket per run.
-  type Bucket = { runId: number; startedAt: Date; mentions: number; total: number; sentSum: number; sentCount: number };
+  // Bucket per run, tracking per-model presence so the UI can filter the
+  // visibility chart to a single model (the "Models" dropdown) or show the
+  // aggregate across all models.
+  type ModelTally = { mentions: number; total: number };
+  type Bucket = {
+    runId: number;
+    startedAt: Date;
+    mentions: number;
+    total: number;
+    sentSum: number;
+    sentCount: number;
+    byModel: Map<string, ModelTally>;
+  };
   const byRun = new Map<number, Bucket>();
   for (const r of rows) {
     let b = byRun.get(r.runId);
     if (!b) {
-      b = { runId: r.runId, startedAt: r.run.startedAt, mentions: 0, total: 0, sentSum: 0, sentCount: 0 };
+      b = { runId: r.runId, startedAt: r.run.startedAt, mentions: 0, total: 0, sentSum: 0, sentCount: 0, byModel: new Map() };
       byRun.set(r.runId, b);
     }
     b.total += 1;
     b.mentions += r.presence;
+    const tally = b.byModel.get(r.model) ?? { mentions: 0, total: 0 };
+    tally.total += 1;
+    tally.mentions += r.presence;
+    b.byModel.set(r.model, tally);
     if (r.presence === 1 && r.sentiment !== null) {
       // Convert raw -10..10 into displayed 0..10 (matches /report transform).
       b.sentSum += Math.max(0, Math.min(10, (r.sentiment + 10) / 2));
@@ -1051,6 +1383,12 @@ router.get('/domain/:id/prompts/:promptId/history', authenticateToken, async (re
       mentions: b.mentions,
       total: b.total,
       avgSentiment: b.sentCount > 0 ? Number((b.sentSum / b.sentCount).toFixed(2)) : null,
+      byModel: Object.fromEntries(
+        [...b.byModel.entries()].map(([model, t]) => [
+          model,
+          { mentions: t.mentions, total: t.total, presenceRate: t.total > 0 ? Math.round((t.mentions / t.total) * 100) : 0 },
+        ]),
+      ),
     }));
 
   return res.json({ prompt, runs });
@@ -1087,26 +1425,42 @@ router.get('/domain/:id/keywords/:keywordId/history', authenticateToken, async (
   const rows = await prisma.aiQueryResult.findMany({
     where: {
       promptId: { in: childIds },
-      run: { domainId: domain.id, status: 'completed' },
+      run: { domainId: domain.id, status: 'completed', ...runKindFilter(req) },
     },
     select: {
       runId: true,
+      model: true,
       presence: true,
       sentiment: true,
       run: { select: { startedAt: true } },
     },
   });
 
-  type Bucket = { runId: number; startedAt: Date; mentions: number; total: number; sentSum: number; sentCount: number };
+  // Per-run buckets with a per-model breakdown (mirrors the prompt endpoint) so
+  // the expanded-graph "Models" filter works on keyword rollup rows too.
+  type ModelTally = { mentions: number; total: number };
+  type Bucket = {
+    runId: number;
+    startedAt: Date;
+    mentions: number;
+    total: number;
+    sentSum: number;
+    sentCount: number;
+    byModel: Map<string, ModelTally>;
+  };
   const byRun = new Map<number, Bucket>();
   for (const r of rows) {
     let b = byRun.get(r.runId);
     if (!b) {
-      b = { runId: r.runId, startedAt: r.run.startedAt, mentions: 0, total: 0, sentSum: 0, sentCount: 0 };
+      b = { runId: r.runId, startedAt: r.run.startedAt, mentions: 0, total: 0, sentSum: 0, sentCount: 0, byModel: new Map() };
       byRun.set(r.runId, b);
     }
     b.total += 1;
     b.mentions += r.presence;
+    const tally = b.byModel.get(r.model) ?? { mentions: 0, total: 0 };
+    tally.total += 1;
+    tally.mentions += r.presence;
+    b.byModel.set(r.model, tally);
     if (r.presence === 1 && r.sentiment !== null) {
       b.sentSum += Math.max(0, Math.min(10, (r.sentiment + 10) / 2));
       b.sentCount += 1;
@@ -1122,6 +1476,12 @@ router.get('/domain/:id/keywords/:keywordId/history', authenticateToken, async (
       mentions: b.mentions,
       total: b.total,
       avgSentiment: b.sentCount > 0 ? Number((b.sentSum / b.sentCount).toFixed(2)) : null,
+      byModel: Object.fromEntries(
+        [...b.byModel.entries()].map(([model, t]) => [
+          model,
+          { mentions: t.mentions, total: t.total, presenceRate: t.total > 0 ? Math.round((t.mentions / t.total) * 100) : 0 },
+        ]),
+      ),
     }));
 
   return res.json({ keyword, runs });
@@ -1137,7 +1497,7 @@ router.get('/domain/:id/runs', authenticateToken, async (req: Request, res: Resp
   if (!got.ok) return res.status(got.status).json({ error: got.error });
   const { domain } = got;
   const runs = await prisma.aiRun.findMany({
-    where: { domainId: domain.id },
+    where: { domainId: domain.id, ...runKindFilter(req) },
     orderBy: { startedAt: 'desc' },
     take: 30,
     select: { id: true, status: true, startedAt: true, endedAt: true, summary: true },
@@ -1183,7 +1543,7 @@ router.get('/domain/:id/trends', authenticateToken, async (req: Request, res: Re
   // Latest 12 completed runs gives ~3 months of weekly history without
   // overflowing the chart card. Ordered ascending so the chart reads L→R.
   const runs = await prisma.aiRun.findMany({
-    where: { domainId: domain.id, status: 'completed' },
+    where: { domainId: domain.id, status: 'completed', ...runKindFilter(req) },
     orderBy: { startedAt: 'asc' },
     take: 12,
     select: { id: true, startedAt: true, endedAt: true },

@@ -35,6 +35,14 @@ export const aiResultsKeys = {
     ['ai-results', 'competitor-analysis', domainId, runId ?? 'latest'] as const,
   competitors: (domainId: number | string) =>
     ['ai-results', 'competitors', domainId] as const,
+  trackedPrompts: (domainId: number | string) =>
+    ['ai-results', 'tracked-prompts', domainId] as const,
+  promptHistory: (
+    domainId: number | string,
+    rowType: 'prompt' | 'keyword',
+    rawId: number | string,
+    kind: 'audit' | 'weekly',
+  ) => ['ai-results', 'prompt-history', domainId, rowType, rawId, kind] as const,
   campaigns: () => ['ai-results', 'campaigns'] as const,
   gscStatus: () => ['ai-results', 'gsc-status'] as const,
 };
@@ -83,6 +91,10 @@ export function useReport<T = any>(domainId: number | null, runId?: number | nul
       return apiGet<T>(path);
     },
     enabled: domainId != null,
+    // The report is expensive to build server-side. Keep it fresh in cache so
+    // switching between the AI dashboard tabs (which all read this) doesn't
+    // refetch, and an alt-tab away/back doesn't re-hit it.
+    staleTime: 3 * 60 * 1000,
   });
 }
 
@@ -120,6 +132,49 @@ export function useCompetitors<T = any>(domainId: number | null) {
     queryKey: aiResultsKeys.competitors(domainId ?? 'none'),
     queryFn: () => apiGet<T>(`/wizard/domain/${domainId}/competitors`),
     enabled: domainId != null,
+  });
+}
+
+/**
+ * Tracked prompts for the Prompt Tracking tab — one row per prompt the user
+ * marked for weekly re-testing, carrying the latest weekly metrics plus a
+ * week-over-week trend. Response shape mirrors /report's topPrompts (so the
+ * PromptTable renders it unchanged) with tracking metadata added:
+ *   { latestRunAt, nextTestAt, prompts: [{ ...PromptTableRow, isTracked,
+ *     lastTestedAt, nextTestAt, weekTrend: { delta, lastVisibility, points } }] }
+ */
+export function useTrackedPrompts<T = any>(domainId: number | null) {
+  return useQuery<T>({
+    queryKey: aiResultsKeys.trackedPrompts(domainId ?? 'none'),
+    queryFn: () => apiGet<T>(`/wizard/domain/${domainId}/tracked-prompts`),
+    enabled: domainId != null,
+    staleTime: 3 * 60 * 1000,
+  });
+}
+
+/**
+ * Per-prompt (or per-keyword) visibility history for the expanded-row chart.
+ * Cached so collapsing and re-expanding a row is instant. `trackedView`
+ * scopes to weekly runs (Prompt Tracking tab) vs audit runs elsewhere.
+ */
+export function usePromptHistory<T = any>(
+  domainId: number | null,
+  rawId: number | null,
+  rowType: 'prompt' | 'keyword',
+  trackedView: boolean,
+) {
+  const kind = trackedView ? 'weekly' : 'audit';
+  return useQuery<T>({
+    queryKey: aiResultsKeys.promptHistory(domainId ?? 'none', rowType, rawId ?? 'none', kind),
+    queryFn: () => {
+      const kindQuery = trackedView ? '?kind=weekly' : '';
+      const path = rowType === 'keyword'
+        ? `/wizard/domain/${domainId}/keywords/${rawId}/history${kindQuery}`
+        : `/wizard/domain/${domainId}/prompts/${rawId}/history${kindQuery}`;
+      return apiGet<T>(path);
+    },
+    enabled: domainId != null && rawId != null,
+    staleTime: 3 * 60 * 1000,
   });
 }
 
