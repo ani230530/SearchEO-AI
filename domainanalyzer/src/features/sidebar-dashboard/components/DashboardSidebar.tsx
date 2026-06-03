@@ -8,7 +8,6 @@ import {
   Info,
   Lightbulb,
   Link as LinkIcon,
-  LogOut,
   CircleHelp,
   Coins,
   Send,
@@ -40,7 +39,6 @@ interface DashboardSidebarProps {
   isSidebarExpanded: boolean;
   onHoverChange: (hovered: boolean) => void;
   onToggleSidebar: (open: boolean) => void;
-  onLogout: () => void;
   onSelectCompanySubTab: (tab: CompanySubTabId) => void;
   onSelectCreateProject: () => void;
   onSelectPricing: () => void;
@@ -73,7 +71,6 @@ export function DashboardSidebar({
   isSidebarExpanded,
   onHoverChange,
   onToggleSidebar,
-  onLogout,
   onSelectCompanySubTab,
   onSelectCreateProject,
   onSelectPricing,
@@ -477,15 +474,6 @@ export function DashboardSidebar({
               </div>
             </div>
 
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button onClick={onLogout} className="sidebar-tab sidebar-logout-tab">
-                  <LogOut className="sidebar-tab-icon h-4 w-4" />
-                  <span className="sidebar-tab-label sidebar-logout-label">Logout</span>
-                </button>
-              </TooltipTrigger>
-              <TooltipContent side="right">Logout</TooltipContent>
-            </Tooltip>
           </div>
         </div>
       </aside>

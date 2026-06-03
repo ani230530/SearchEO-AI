@@ -2827,7 +2827,6 @@ useEffect(() => {
         isSidebarExpanded={isSidebarExpanded}
         onHoverChange={setIsSidebarHovered}
         onToggleSidebar={setSidebarOpen}
-        onLogout={logout}
         onSelectCompanySubTab={setActiveCompanySubTab}
         onSelectCreateProject={() => {
           setOpenWordpressConnectionView(false);
@@ -2870,6 +2869,7 @@ useEffect(() => {
           userName={user?.name}
           lastSyncedAt={gscLastSynced}
           onAddDomain={openSettingsIntegrations}
+          onLogout={logout}
           onTabChange={setActiveTab}
         />
 
