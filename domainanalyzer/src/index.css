@@ -510,10 +510,14 @@ select.floating-input:not([value=""])+.floating-label {
 }
 
 .sidebar-content {
-  min-height: calc(100vh - 72px);
+  /* Keep content area constrained to viewport and let it scroll internally
+     so all sections remain reachable on short screens. */
+  height: calc(100dvh - 72px);
+  min-height: 0;
   padding: 8px 10px 12px;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .sidebar.closed .sidebar-content {
@@ -521,7 +525,7 @@ select.floating-input:not([value=""])+.floating-label {
 }
 
 .sidebar-section {
-  margin-bottom: 14px;
+  margin-bottom: 10px;
 }
 
 .sidebar-section-title {
@@ -602,8 +606,18 @@ select.floating-input:not([value=""])+.floating-label {
 
 .sidebar-footer-actions {
   margin-top: auto;
+  flex-shrink: 0;
   padding-top: 12px;
   border-top: 1px solid #d9dde3;
+}
+
+/* Scroll only the navigation list while keeping footer actions visible. */
+.sidebar-content > nav {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 2px;
 }
 
 .sidebar-logout-tab {
@@ -624,6 +638,27 @@ select.floating-input:not([value=""])+.floating-label {
 .sidebar.closed .sidebar-title,
 .sidebar.closed .sidebar-section-title,
 .sidebar.closed .sidebar-logout-label {
+  display: none;
+}
+
+.sidebar.closed .sidebar-credit-balance {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  margin-left: auto;
+  margin-right: auto;
+  border-radius: 12px;
+}
+
+.sidebar.closed .sidebar-credit-balance .flex.items-center.justify-between {
+  justify-content: center;
+}
+
+.sidebar.closed .sidebar-credit-balance-label,
+.sidebar.closed .sidebar-credit-balance-value {
   display: none;
 }
 
@@ -741,6 +776,25 @@ select.floating-input:not([value=""])+.floating-label {
 
   .sidebar.closed:hover .sidebar-logout-label {
     display: inline;
+  }
+
+  .sidebar.closed:hover .sidebar-credit-balance {
+    display: block;
+    width: auto;
+    height: auto;
+    padding: 10px 12px;
+    margin-left: 0;
+    margin-right: 0;
+    border-radius: 12px;
+  }
+
+  .sidebar.closed:hover .sidebar-credit-balance .flex.items-center.justify-between {
+    justify-content: space-between;
+  }
+
+  .sidebar.closed:hover .sidebar-credit-balance-label,
+  .sidebar.closed:hover .sidebar-credit-balance-value {
+    display: inline-flex;
   }
 
   .sidebar.closed:hover .sidebar-title {

@@ -98,7 +98,7 @@ export function WizardShell({
       {/* Top bar — back control on the left, segmented step pills on the
           right. Sits above the two columns so it survives any column
           scrolling without drifting. */}
-      <header className="relative z-10 px-6 pt-6 max-w-7xl mx-auto flex items-center justify-between">
+      <header className="relative z-10 mx-auto flex max-w-[96rem] items-center justify-between px-4 pt-5 sm:px-6 lg:px-10">
         {onBack ? (
           <button
             type="button"
@@ -120,19 +120,19 @@ export function WizardShell({
         <StepPills current={step} total={totalSteps} />
       </header>
 
-      <div className="relative z-10 grid grid-cols-1 lg:grid-cols-2 px-6 pt-10 pb-16 max-w-7xl mx-auto items-start gap-10 lg:gap-16">
+      <div className="relative z-10 mx-auto grid w-full max-w-[98rem] grid-cols-1 items-start gap-6 px-4 pb-10 pt-6 sm:px-6 md:grid-cols-2 md:gap-12 lg:gap-16 lg:px-10 lg:pb-14 lg:pt-8">
         {/* Left: form column. */}
         <div className="min-w-0">
-          <div className="mb-8 flex items-start justify-between gap-4">
+          <div className="mb-5 flex items-start justify-between gap-4">
             <div className="min-w-0">
-              <p className="text-[13px] font-medium text-blue-600/90 mb-2 tracking-tight">
+              <p className="mb-1.5 text-[12px] font-medium tracking-tight text-blue-600/90">
                 {eyebrow}
               </p>
-              <h1 className="text-[32px] leading-[1.15] font-semibold text-slate-900 mb-3 tracking-[-0.01em] lg:text-[36px]">
+              <h1 className="mb-2 text-[26px] font-semibold leading-[1.12] tracking-[-0.01em] text-slate-900 lg:text-[30px]">
                 {heading}
               </h1>
               {description ? (
-                <p className="text-[14px] text-slate-500 leading-relaxed max-w-md">{description}</p>
+                <p className="max-w-md text-[12px] leading-relaxed text-slate-500">{description}</p>
               ) : null}
             </div>
             {onRetry ? (
@@ -140,10 +140,10 @@ export function WizardShell({
                 type="button"
                 onClick={onRetry}
                 disabled={retryDisabled}
-                className="mt-2 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium text-slate-500 hover:text-slate-700 hover:bg-slate-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
+                className="mt-1 inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
                 title="Retry this step"
               >
-                <RefreshCw className={`h-3.5 w-3.5 ${retryDisabled ? "animate-spin" : ""}`} />
+                <RefreshCw className={`h-3 w-3 ${retryDisabled ? "animate-spin" : ""}`} />
                 Retry
               </button>
             ) : null}
@@ -154,12 +154,12 @@ export function WizardShell({
 
         {/* Right: hero image, blended into the white half via mix-blend.
             Sticky so it doesn't drift when long lists scroll on the left. */}
-        <aside className="hidden lg:block sticky top-24 self-start">
+        <aside className="hidden md:block sticky top-20 self-start">
           <img
             src="/ai-checker.png"
             alt=""
             aria-hidden
-            className="w-full h-auto select-none pointer-events-none"
+            className="h-auto w-full select-none pointer-events-none"
             style={{ mixBlendMode: "multiply" }}
           />
         </aside>
