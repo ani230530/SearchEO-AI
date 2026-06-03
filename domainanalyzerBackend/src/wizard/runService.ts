@@ -523,13 +523,38 @@ export interface RunOptions {
   prisma: PrismaClient;
   domainId: number;
   onProgress: (event: RunProgress) => void;
+  /**
+   * Which prompts to run. 'selected' (default) uses the wizard audit set
+   * (isSelected=true). 'tracked' uses the weekly-tracking set (isTracked=true).
+   */
+  selection?: 'selected' | 'tracked';
+  /**
+   * How this run is tagged on AiRun.kind. 'audit' (default) is the manual
+   * wizard run; 'weekly' is the scheduled tracked-prompt re-test. Keeping them
+   * distinct prevents weekly runs from polluting the audit trend/runs charts.
+   */
+  kind?: 'audit' | 'weekly';
 }
 
-export async function runQueries({ prisma, domainId, onProgress }: RunOptions): Promise<void> {
+export async function runQueries({
+  prisma,
+  domainId,
+  onProgress,
+  selection = 'selected',
+  kind = 'audit',
+}: RunOptions): Promise<void> {
   if (!router) {
     onProgress({ type: 'error', error: 'OPENROUTER_API_KEY not configured.' });
     return;
   }
+
+  // The only difference between an audit run and a weekly tracked run is which
+  // prompts we load — everything downstream (worker pool, scoring, summary) is
+  // identical.
+  const promptWhere =
+    selection === 'tracked'
+      ? { domainId, isTracked: true }
+      : { domainId, isSelected: true };
 
   const [domain, latestCrawl, selectedPrompts, selectedCompetitors] = await Promise.all([
     prisma.domain.findUnique({
@@ -549,7 +574,7 @@ export async function runQueries({ prisma, domainId, onProgress }: RunOptions): 
       select: { pages: true, pagesScanned: true, rawText: true },
     }),
     prisma.prompt.findMany({
-      where: { domainId, isSelected: true },
+      where: promptWhere,
       select: { id: true, text: true },
     }),
     prisma.competitor.findMany({
@@ -563,7 +588,10 @@ export async function runQueries({ prisma, domainId, onProgress }: RunOptions): 
     return;
   }
   if (selectedPrompts.length === 0) {
-    onProgress({ type: 'error', error: 'No prompts selected' });
+    onProgress({
+      type: 'error',
+      error: selection === 'tracked' ? 'No prompts tracked' : 'No prompts selected',
+    });
     return;
   }
 
@@ -599,7 +627,7 @@ export async function runQueries({ prisma, domainId, onProgress }: RunOptions): 
       })).filter((p) => p.url)
     : [];
 
-  const run = await prisma.aiRun.create({ data: { domainId, status: 'running' } });
+  const run = await prisma.aiRun.create({ data: { domainId, status: 'running', kind } });
 
   onProgress({
     type: 'progress',
@@ -883,6 +911,14 @@ export async function runQueries({ prisma, domainId, onProgress }: RunOptions): 
       where: { id: run.id },
       data: { status: 'completed', endedAt: new Date(), summary: summary as any },
     });
+    // Stamp the prompts we just re-tested so the dashboard can show
+    // "last tested" without re-deriving it from run history.
+    if (kind === 'weekly') {
+      await prisma.prompt.updateMany({
+        where: { id: { in: selectedPrompts.map((p) => p.id) } },
+        data: { lastTrackedRunAt: new Date() },
+      });
+    }
     onProgress({ type: 'complete', runId: run.id, summary });
   } catch (err) {
     await prisma.aiRun.update({
@@ -891,6 +927,20 @@ export async function runQueries({ prisma, domainId, onProgress }: RunOptions): 
     });
     onProgress({ type: 'error', error: err instanceof Error ? err.message : 'AI queries failed' });
   }
+}
+
+/**
+ * runTrackedQueries — convenience wrapper that re-tests the domain's
+ * weekly-tracked prompts (isTracked=true) and tags the resulting AiRun as
+ * kind='weekly'. Used by the weekly scheduler and the manual "Test tracked
+ * now" trigger. onProgress defaults to a no-op for the headless scheduler.
+ */
+export async function runTrackedQueries(
+  prisma: PrismaClient,
+  domainId: number,
+  onProgress: (event: RunProgress) => void = () => {},
+): Promise<void> {
+  return runQueries({ prisma, domainId, onProgress, selection: 'tracked', kind: 'weekly' });
 }
 
 /**

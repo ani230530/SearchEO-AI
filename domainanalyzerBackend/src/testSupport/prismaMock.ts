@@ -184,6 +184,14 @@ export const createPrismaMock = (): PrismaMock => {
           return out;
         });
       },
+      findFirst: async ({ where, select }: any = {}) => {
+        const row = stores.domain.all().find((r) => matchWhere(r, where ?? {}));
+        if (!row) return null;
+        if (!select) return row;
+        const out: any = {};
+        for (const key of Object.keys(select)) if (select[key]) out[key] = row[key];
+        return out;
+      },
       create: async ({ data }: any) =>
         stores.domain.insert({
           isCompanyDomain: false,

@@ -31,7 +31,7 @@
  */
 
 import * as crypto from 'crypto';
-import type { PrismaClient, WizardSession } from '../../generated/prisma';
+import type { PrismaClient, Prisma, WizardSession } from '../../generated/prisma';
 
 export const WIZARD_COOKIE_NAME = 'aiv_ws';
 export const WIZARD_SESSION_TTL_MS = 24 * 60 * 60 * 1000; // 24h sliding
@@ -185,6 +185,8 @@ export interface LinkSessionResult {
  *     new real user. Domain children (CrawlSnapshot, Competitor, Prompt,
  *     Keyword, AiRun, etc.) follow by FK; their ownership is implicit
  *     in `Domain.userId` so the single UPDATE moves the whole graph.
+ *   - Promotes the primary (wizard-target) Domain to the user's company
+ *     domain when they don't already have one — see ensureCompanyDomain.
  *   - Deletes the shadow user row (cleanup; it has no more domains).
  *   - Records linkedDomainId on the session for downstream redirect.
  *
@@ -198,6 +200,40 @@ export interface LinkSessionResult {
  * the shadow's work for that host becomes orphaned and is GCed with the
  * shadow user delete).
  */
+/**
+ * Promote `domainId` to be the user's company domain — but only when the
+ * user doesn't already have one.
+ *
+ * Rationale: the wizard target is the domain the user signed up around, so
+ * on a fresh signup it should become their company domain (the Campaign /
+ * Worksheet / Publish surface all key off `isCompanyDomain=true`). We never
+ * clobber an existing company domain — an established user who re-links a
+ * wizard session via Google login keeps the choice they already made.
+ *
+ * Maintains the app-level single-company-domain invariant: the schema permits
+ * multiple `isCompanyDomain=true` rows, but every reader uses `findFirst`, so
+ * we only ever flip the flag on when there is no company domain at all.
+ *
+ * Accepts a transaction client so the transfer path can run it atomically;
+ * the full PrismaClient (legacy path) is structurally compatible.
+ */
+async function ensureCompanyDomain(
+  tx: Prisma.TransactionClient,
+  userId: number,
+  domainId: number | null
+): Promise<void> {
+  if (domainId === null) return;
+  const existing = await tx.domain.findFirst({
+    where: { userId, isCompanyDomain: true },
+    select: { id: true },
+  });
+  if (existing) return; // user already has a company domain — respect it
+  await tx.domain.update({
+    where: { id: domainId },
+    data: { isCompanyDomain: true },
+  });
+}
+
 export async function linkSessionToUser(
   prisma: PrismaClient,
   sessionId: number,
@@ -264,6 +300,12 @@ export async function linkSessionToUser(
       await tx.domain.deleteMany({ where: { id: { in: collidedDomainIds } } });
     }
 
+    // Promote the wizard target to the user's company domain. Runs after the
+    // transfers/cleanup above so its findFirst sees the post-transfer state
+    // (transferred domains are isCompanyDomain=false; only a pre-existing
+    // real-user company domain can short-circuit it).
+    await ensureCompanyDomain(tx, userId, primaryDomainId);
+
     // Mark the session linked + record the primary domain.
     await tx.wizardSession.update({
       where: { id: sessionId },
@@ -322,6 +364,10 @@ async function legacyMaterializeFromSnapshot(
       domainsTransferred = 1;
     }
   }
+
+  // Same company-domain promotion as the transfer path. PrismaClient is
+  // structurally compatible with the TransactionClient param.
+  await ensureCompanyDomain(prisma, userId, primaryDomainId);
 
   await prisma.wizardSession.update({
     where: { id: session.id },

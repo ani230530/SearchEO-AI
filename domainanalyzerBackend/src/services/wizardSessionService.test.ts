@@ -319,6 +319,52 @@ describe('linkSessionToUser — legacy snapshot fallback', () => {
       where: { userId_host: { userId: realUser.id, host: 'legacy.example' } },
     });
     expect(dom).not.toBeNull();
-    expect(dom?.isCompanyDomain).toBe(false);
+    // The materialized wizard domain becomes the company domain on signup.
+    expect(dom?.isCompanyDomain).toBe(true);
+  });
+});
+
+describe('linkSessionToUser — company domain promotion', () => {
+  const seedAnonDomain = async (prisma: any, host: string) => {
+    const { sessionId, anonUserId } = await issueSession(prisma);
+    const domain = await prisma.domain.create({
+      data: { userId: anonUserId, host, url: `https://${host}`, isCompanyDomain: false },
+    });
+    return { sessionId, anonUserId, domain };
+  };
+
+  it('promotes the transferred wizard domain to company domain on a fresh signup', async () => {
+    const prisma = createPrismaMock();
+    const realUser = await prisma.user.create({
+      data: { email: 'fresh@x.com', password: 'hash' },
+    });
+    const { sessionId, domain } = await seedAnonDomain(prisma, 'example.com');
+
+    await linkSessionToUser(prisma, sessionId, realUser.id);
+
+    const after = await prisma.domain.findUnique({ where: { id: domain.id } });
+    expect(after?.userId).toBe(realUser.id);
+    expect(after?.isCompanyDomain).toBe(true);
+  });
+
+  it('does not clobber an existing company domain (established user re-linking)', async () => {
+    const prisma = createPrismaMock();
+    const realUser = await prisma.user.create({
+      data: { email: 'established@x.com', password: 'hash' },
+    });
+    const owned = await prisma.domain.create({
+      data: { userId: realUser.id, host: 'owned.com', url: 'https://owned.com', isCompanyDomain: true },
+    });
+    const { sessionId, domain } = await seedAnonDomain(prisma, 'wizard.com');
+
+    await linkSessionToUser(prisma, sessionId, realUser.id);
+
+    // Pre-existing company domain stays the company domain.
+    const ownedAfter = await prisma.domain.findUnique({ where: { id: owned.id } });
+    expect(ownedAfter?.isCompanyDomain).toBe(true);
+    // The newly transferred wizard domain is NOT promoted.
+    const wizardAfter = await prisma.domain.findUnique({ where: { id: domain.id } });
+    expect(wizardAfter?.userId).toBe(realUser.id);
+    expect(wizardAfter?.isCompanyDomain).toBe(false);
   });
 });
