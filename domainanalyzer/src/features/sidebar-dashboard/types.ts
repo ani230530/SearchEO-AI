@@ -11,7 +11,6 @@ export type TabId =
   | "domain-history"
   | "projects"
   | "settings"
-  | "profile"
   | "ai-visibility"
   | "gsc-analytics"
   | "attribution"
@@ -58,12 +57,12 @@ export interface DashboardHeaderProps {
   activeTab: TabId;
   tabs: DashboardSidebarTab[];
   companyDomain?: string;
-  userEmail?: string | null;
   userName?: string | null;
   lastSyncedAt?: Date | null;
   onAddDomain?: () => void;
   onLogout: () => void;
   onTabChange?: (tab: TabId) => void;
+  onLogout: () => void | Promise<void>;
 }
 
 export interface AnalyticsReportSectionProps {

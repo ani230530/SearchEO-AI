@@ -16,11 +16,11 @@ import {
   Sparkles,
   Send,
   Tag,
-  User,
+  UserRound,
   ChevronRight,
 } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { useMemo, useState, useEffect, type CSSProperties } from "react";
+import { useMemo, useState, useEffect, useCallback, type CSSProperties } from "react";
 import { cn } from "@/lib/utils";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import {
@@ -167,6 +167,11 @@ export function AIResultsLayout({
     navigate(route.path);
   };
 
+  const handleLogout = useCallback(async () => {
+    await logout();
+    navigate("/auth");
+  }, [logout, navigate]);
+
   return (
     <div className="flex min-h-screen w-full flex-col bg-[#f5f5f7] text-slate-900 lg:flex-row">
       {/* Collapsible icon rail. The outer <aside> reserves a fixed 84px/280px slot
@@ -185,10 +190,6 @@ export function AIResultsLayout({
           isSidebarExpanded={isSidebarExpanded}
           onHoverChange={setIsSidebarHovered}
           onToggleSidebar={setSidebarOpen}
-          onLogout={() => {
-            logout();
-            navigate("/auth");
-          }}
           onSelectPricing={() => navigate(resolveSidebarNavigation("pricing").path)}
           onSelectCompanySubTab={() => {}}
           onSelectCreateProject={() => navigate("/dashboard?tab=projects&action=create")}
@@ -399,43 +400,66 @@ export function AIResultsLayout({
             </div>
 
             <TooltipProvider delayDuration={120}>
-              <div className="flex items-center gap-2 text-[#98A2B3]">
+              <div className="flex items-center gap-2">
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <button
                       type="button"
-                      aria-label="Help"
-                      className="inline-flex h-5 w-5 items-center justify-center bg-transparent transition-colors hover:text-slate-700"
-                    >
-                      <CircleHelp className="h-3.5 w-3.5" />
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom">Quick tips</TooltipContent>
-                </Tooltip>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button
-                      type="button"
+                      className="inline-flex h-6 w-6 items-center justify-center text-[#6b7280] transition-colors hover:text-[#1f2937]"
                       aria-label="Notifications"
-                      className="inline-flex h-5 w-5 items-center justify-center bg-transparent transition-colors hover:text-slate-700"
                     >
                       <Bell className="h-3.5 w-3.5" />
                     </button>
                   </TooltipTrigger>
                   <TooltipContent side="bottom">Notifications</TooltipContent>
                 </Tooltip>
+
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <Link
-                      to="/dashboard?tab=profile"
-                      aria-label="Profile"
-                      className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-[#F2F4F7] text-[#667085] transition hover:text-slate-700"
+                    <button
+                      type="button"
+                      className="inline-flex h-6 w-6 items-center justify-center text-[#6b7280] transition-colors hover:text-[#1f2937]"
+                      aria-label="Help"
                     >
-                      <User className="h-3.5 w-3.5" />
-                    </Link>
+                      <CircleHelp className="h-3.5 w-3.5" />
+                    </button>
                   </TooltipTrigger>
-                  <TooltipContent side="bottom">Profile</TooltipContent>
+                  <TooltipContent side="bottom">Quick tips</TooltipContent>
                 </Tooltip>
+
+                <DropdownMenu>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <DropdownMenuTrigger asChild>
+                        <button
+                          type="button"
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[#e5e7eb] bg-white text-[#6b7280] transition-colors hover:text-[#1f2937]"
+                          aria-label="Profile"
+                        >
+                          <UserRound className="h-4 w-4" />
+                        </button>
+                      </DropdownMenuTrigger>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom">Profile</TooltipContent>
+                  </Tooltip>
+                  <DropdownMenuContent align="end" className="min-w-[14rem] p-1">
+                    <DropdownMenuItem asChild className="cursor-pointer">
+                      <Link to="/dashboard?tab=settings&subtab=profile">Profile information</Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onSelect={(event) => {
+                        event.preventDefault();
+                        void handleLogout();
+                      }}
+                      className="text-red-500 focus:text-red-500 focus:bg-red-50 cursor-pointer"
+                    >
+                      <span className="inline-flex items-center gap-2">
+                        <LogOut className="h-4 w-4" />
+                        Logout
+                      </span>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
             </TooltipProvider>
           </div>

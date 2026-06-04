@@ -970,6 +970,11 @@ useEffect(() => {
     }, 220);
   };
 
+  const handleHeaderLogout = useCallback(async () => {
+    await logout();
+    navigate("/auth");
+  }, [logout, navigate]);
+
 
   // Sync dashboard state with URL search parameters
   useEffect(() => {
@@ -1033,6 +1038,14 @@ useEffect(() => {
     ) {
       const basePath = location.pathname.startsWith("/newdashboard") ? "/newdashboard" : "/dashboard";
       navigate(`${basePath}?tab=overview`, { replace: true });
+    }
+  }, [location.pathname, location.search, navigate]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if ((location.pathname === "/dashboard" || location.pathname === "/newdashboard") && params.get("tab") === "profile") {
+      const basePath = location.pathname.startsWith("/newdashboard") ? "/newdashboard" : "/dashboard";
+      navigate(`${basePath}?tab=settings&subtab=profile`, { replace: true });
     }
   }, [location.pathname, location.search, navigate]);
 
@@ -2865,12 +2878,12 @@ useEffect(() => {
           activeTab={activeTab}
           tabs={tabs}
           companyDomain={companyDomain}
-          userEmail={user?.email}
           userName={user?.name}
           lastSyncedAt={gscLastSynced}
           onAddDomain={openSettingsIntegrations}
           onLogout={logout}
           onTabChange={setActiveTab}
+          onLogout={handleHeaderLogout}
         />
 
         {/* Content Body */}

@@ -5,7 +5,6 @@ import { GscAnalyticsSection } from "@/features/sidebar-dashboard/sections/GscAn
 import AttributionSection from "@/features/sidebar-dashboard/sections/AttributionSection";
 import KnowledgeBaseSection from "@/features/sidebar-dashboard/sections/KnowledgeBaseSection";
 import { DomainHistorySection } from "@/features/sidebar-dashboard/sections/DomainHistorySection";
-import { ProfileSection } from "@/features/sidebar-dashboard/sections/ProfileSection";
 import CompetitorPage from "@/features/sidebar-dashboard/sections/CompetitorPage";
 import { OverviewSection } from "@/features/sidebar-dashboard/sections/OverviewSection";
 import { SettingsSection } from "@/features/sidebar-dashboard/sections/SettingsSection";
@@ -44,8 +43,6 @@ export function DashboardContentRouter({
       return <KnowledgeBaseSection />;
     case "domain-history":
       return <DomainHistorySection onMenuItemClick={onMenuItemClick} />;
-    case "profile":
-      return <ProfileSection />;
     case "settings":
       return <SettingsSection {...settings} />;
     default:
