@@ -77,6 +77,36 @@ model User {
   wizardSessionsAnon   WizardSession[]                @relation("WizardSessionAnonUser")
   folders              Folder[]
   files                File[]
+  chatThreads          ChatThread[]
+}
+
+// ── Conversational agent (chat) ──────────────────────────────────────────────
+// One thread per conversation; messages persist the AI SDK UIMessage `parts`
+// array verbatim (text + tool-invocation parts) so a reloaded thread renders
+// its inline generative UI exactly as before.
+model ChatThread {
+  id        Int           @id @default(autoincrement())
+  userId    Int
+  title     String?
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages  ChatMessage[]
+
+  @@index([userId, updatedAt])
+}
+
+model ChatMessage {
+  id        Int        @id @default(autoincrement())
+  threadId  Int
+  // 'user' | 'assistant' | 'system'
+  role      String
+  // AI SDK UIMessage.parts (text + tool parts), stored verbatim.
+  parts     Json
+  createdAt DateTime   @default(now())
+  thread    ChatThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+
+  @@index([threadId, createdAt])
 }
 
 // Opaque, rotating refresh tokens.
