@@ -4,6 +4,9 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { apiPost } from '../services/apiClient';
 import { logoUrl as logoUrlHelper } from '@/lib/logoUrl';
 import { cn } from '@/lib/utils';
+import { AIResultsBreadcrumbs } from '@/features/ai-results/components/AIResultsBreadcrumbs';
+import { resolveAIResultsNavigation } from '@/features/sidebar-dashboard/navigation';
+import { useScrollSpyBreadcrumbs } from '@/features/ai-results/useScrollSpyBreadcrumbs';
 import {
   Area,
   AreaChart,
@@ -121,6 +124,7 @@ const MODEL_ICON_SRC: Array<{ match: RegExp; src: string; label: string }> = [
   { match: /(gpt|chatgpt|openai)/i, src: '/report-icons/chat-gpt.svg', label: 'ChatGPT' },
   { match: /claude/i, src: '/report-icons/claude.svg', label: 'Claude' },
   { match: /gemini/i, src: '/report-icons/gemini.svg', label: 'Gemini' },
+  { match: /(google|gre|overview)/i, src: '/report-icons/google.svg', label: 'Google AI Overview' },
 ];
 
 const resolveModelMeta = (model?: string) => {
@@ -2033,6 +2037,11 @@ const AIResultsReportPreview = () => {
   const queryClient = useQueryClient();
   const { currentDomain, allDomains, maskedDomainId } = useShellContext();
   const domainId = currentDomain?.id ?? null;
+  const {
+    currentTitle: currentReportSectionTitle,
+    previousTitle: previousReportSectionTitle,
+  } = useScrollSpyBreadcrumbs({
+  });
 
   const [filterType, setFilterType] = useState<'all' | 'prompt' | 'keyword'>('all');
 
@@ -2451,6 +2460,7 @@ const AIResultsReportPreview = () => {
     const gpt = cite('gpt');
     const claude = cite('claude');
     const gemini = cite('gemini');
+    const google = cite('google-gre');
 
     // Mentions: brand presence count vs competitor host count across scoped rows.
     const brandPages = presenceCount;
@@ -2466,11 +2476,12 @@ const AIResultsReportPreview = () => {
         title: 'AI Prompts Citations',
         kind: 'citations',
         details: [
-          // AI Overview removed — we never query Google's SGE separately.
+          // AI Overview added via SerpAPI
           // Per-model: real citation count + unique source hosts.
           { label: 'ChatGPT', value: gpt.cites.toString(), iconSrc: '/report-icons/chat-gpt.svg', subValue: `${gpt.uniqueHosts} unique` },
           { label: 'Claude',  value: claude.cites.toString(), iconSrc: '/report-icons/claude.svg',  subValue: `${claude.uniqueHosts} unique` },
           { label: 'Gemini',  value: gemini.cites.toString(), iconSrc: '/report-icons/gemini.svg',  subValue: `${gemini.uniqueHosts} unique` },
+          { label: 'Google AI', value: google.cites.toString(), iconSrc: '/report-icons/google.svg', subValue: `${google.uniqueHosts} unique` },
         ],
       },
       {
@@ -2601,6 +2612,7 @@ const AIResultsReportPreview = () => {
       { key: 'chatgpt', label: 'ChatGPT', stroke: '#E9897E', match: 'gpt' },
       { key: 'claude',  label: 'Claude',  stroke: '#79A7F2', match: 'claude' },
       { key: 'gemini',  label: 'Gemini',  stroke: '#8DD9E8', match: 'gemini' },
+      { key: 'google',  label: 'Google AI Overview', stroke: '#4285F4', match: 'google-gre' },
     ] as const;
     // Drop series the user has filtered out via the modelFilter pill (header).
     const visibleSeries = modelFilter.size === 0
@@ -2766,6 +2778,17 @@ const AIResultsReportPreview = () => {
 
   return (
     <>
+      <div className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur">
+        <div className="mx-auto flex w-full max-w-[1530px] items-center px-4 py-3 sm:px-6">
+          <AIResultsBreadcrumbs
+            mode="history"
+            prefixHref={maskedDomainId ? resolveAIResultsNavigation('ai-results', maskedDomainId) : undefined}
+            previousLabel={previousReportSectionTitle}
+            currentLabel={currentReportSectionTitle}
+          />
+        </div>
+      </div>
+
       <section className="flex w-full flex-col bg-white px-4 py-3 sm:px-6">
         {!gscConnected && (
           <div className="flex w-full flex-col gap-4 rounded-xl bg-[#F1F6FF] px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
@@ -2787,7 +2810,7 @@ const AIResultsReportPreview = () => {
           </div>
         )}
 
-        <div className="flex w-full flex-col gap-6 px-0 py-6">
+        <div id="ai-results-summary" data-title="Overview" className="flex w-full flex-col gap-6 px-0 py-6">
           <div className="flex w-full flex-col gap-4 lg:flex-row lg:flex-nowrap lg:items-start lg:justify-between">
             <div className="min-w-0 flex-1">
               <h1 className="text-xl font-semibold text-gray-950 sm:text-2xl">Your AI Visibility Report</h1>
@@ -3051,7 +3074,7 @@ const AIResultsReportPreview = () => {
             </div>
           </div>
 
-          <div>
+          <div id="ai-results-top-prompts" data-title="Top Prompts">
             {loading ? (
               <div className="h-[400px] w-full animate-pulse rounded-xl border border-slate-200 bg-gray-50" />
             ) : (
@@ -3070,7 +3093,7 @@ const AIResultsReportPreview = () => {
 
         <section className="grid w-full grid-cols-1 gap-6 bg-white px-4 py-4 sm:px-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
           <div className="min-w-0 space-y-6">
-            <Card className="rounded-xl border border-[#D5D7DA] bg-white shadow-[0_1px_2px_0_#1018280D]">
+            <Card id="ai-results-phrase-visibility" data-title="Phrase Visibility" className="rounded-xl border border-[#D5D7DA] bg-white shadow-[0_1px_2px_0_#1018280D]">
               <CardHeader className="flex flex-row items-start justify-between px-4 pb-3 pt-4">
                 <div className="min-w-0">
                   <CardTitleWithTip title="Phrase Visibility Map" />
@@ -3147,7 +3170,7 @@ const AIResultsReportPreview = () => {
               </CardContent>
             </Card>
 
-            <Card className="rounded-xl border border-[#D5D7DA] bg-white shadow-[0_1px_2px_0_#1018280D]">
+            <Card id="ai-results-opportunities" data-title="Outrank Opportunities" className="rounded-xl border border-[#D5D7DA] bg-white shadow-[0_1px_2px_0_#1018280D]">
               <CardHeader className="flex flex-row items-start justify-between px-4 pb-3 pt-4">
                 <div className="min-w-0">
                   <CardTitleWithTip title="Opportunities to Outrank Competitors" />
@@ -3228,7 +3251,7 @@ const AIResultsReportPreview = () => {
             </Card>
           </div>
 
-          <Card className="min-w-0 rounded-xl border border-[#D5D7DA] bg-white shadow-[0_1px_2px_0_#1018280D]">
+          <Card id="ai-results-visibility-coverage" data-title="Visibility & Coverage" className="min-w-0 rounded-xl border border-[#D5D7DA] bg-white shadow-[0_1px_2px_0_#1018280D]">
             <CardHeader className="flex flex-col gap-3 px-4 pb-2 pt-4 sm:flex-row sm:items-center sm:justify-between">
               <CardTitle className="text-base font-semibold text-[#2D4059]">Visibility & Coverage</CardTitle>
               <div className="flex flex-wrap items-center gap-2">
