@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { ChatWidget } from "@/features/chat/ChatWidget";
 
 // Eager — needed for first paint or are tiny / part of the auth funnel.
 import Auth from "./pages/Auth";
@@ -137,6 +138,8 @@ const App = () => (
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>
+          {/* Global conversational agent — renders only for signed-in users. */}
+          <ChatWidget />
         </BrowserRouter>
       </TooltipProvider>
     </AuthProvider>
