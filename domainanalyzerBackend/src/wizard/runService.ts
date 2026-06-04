@@ -76,7 +76,7 @@ interface ModelDef {
   openrouterModel: string;
   webSearchMode: WebSearchMode;
   /** UI label used in the chat product, prepended to the system prompt. */
-  productName: 'ChatGPT' | 'Claude' | 'Gemini';
+  productName: 'ChatGPT' | 'Claude' | 'Gemini' | 'Google AI Overview';
   /** Knowledge cutoff string the chat product surfaces — keeps the model
    *  grounded so it browses for fresher info instead of hallucinating. */
   knowledgeCutoff: string;
