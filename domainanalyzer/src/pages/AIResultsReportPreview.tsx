@@ -1025,6 +1025,14 @@ export const PromptTable = ({
   const { toast } = useToast();
   const selectedCount = selectedRowIds.size;
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  // Prompt rows whose full text is revealed (click the prompt to toggle).
+  const [openPhrases, setOpenPhrases] = useState<Set<string>>(new Set());
+  const togglePhrase = (id: string) =>
+    setOpenPhrases((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
   const [tableFilter, setTableFilter] = useState<'all' | 'prompt' | 'keyword'>('all');
   const [tableMetric, setTableMetric] = useState<string | null>(null);
   const [showAllQueries, setShowAllQueries] = useState(false);
@@ -1417,8 +1425,12 @@ export const PromptTable = ({
                               Keyword
                             </Badge>
                             <span
-                              title={row.phrase}
-                              className="truncate text-xs font-medium text-gray-900 tracking-tight"
+                              onClick={(e) => { e.stopPropagation(); togglePhrase(String(row.id)); }}
+                              title={openPhrases.has(String(row.id)) ? 'Click to collapse' : 'Click to show full prompt'}
+                              className={cn(
+                                'cursor-pointer text-xs font-medium text-gray-900 tracking-tight',
+                                openPhrases.has(String(row.id)) ? 'whitespace-normal break-words' : 'truncate'
+                              )}
                             >
                               {row.phrase}
                             </span>
@@ -1429,7 +1441,14 @@ export const PromptTable = ({
                               <Badge variant="outline" className="rounded-full bg-blue-50/50 px-2 py-0 text-[9px] text-blue-600 border-blue-200">
                                 Prompt
                               </Badge>
-                              <span title={row.phrase} className="truncate text-xs font-medium text-gray-800">
+                              <span
+                                onClick={(e) => { e.stopPropagation(); togglePhrase(String(row.id)); }}
+                                title={openPhrases.has(String(row.id)) ? 'Click to collapse' : 'Click to show full prompt'}
+                                className={cn(
+                                  'cursor-pointer text-xs font-medium text-gray-800',
+                                  openPhrases.has(String(row.id)) ? 'whitespace-normal break-words' : 'truncate'
+                                )}
+                              >
                                 {row.phrase}
                               </span>
                             </div>
