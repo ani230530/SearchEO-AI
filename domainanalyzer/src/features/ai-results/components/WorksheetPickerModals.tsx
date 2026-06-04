@@ -24,6 +24,128 @@ export const WORKSHEET_TARGET_KEY = "ai-results/pending-worksheet-target";
 export const buildProjectsWorksheetPath = (campaignId: string | number) =>
   `/dashboard?tab=projects&campaign=${encodeURIComponent(String(campaignId))}`;
 
+type WorksheetImportRow = {
+  id: string;
+  prompt: string;
+  type: string | null;
+  primaryKeyword: string | null;
+  primaryIntent: string | null;
+};
+
+export type WorksheetImportPayload = {
+  activeWorksheetId: string;
+  selectedItemIds: string[];
+  selectedRows: WorksheetImportRow[];
+};
+
+const writeStorageValue = (key: string, value: string) => {
+  sessionStorage.setItem(key, value);
+  localStorage.setItem(key, value);
+};
+
+const removeStorageValue = (key: string) => {
+  sessionStorage.removeItem(key);
+  localStorage.removeItem(key);
+};
+
+const readStorageValue = (key: string) => sessionStorage.getItem(key) ?? localStorage.getItem(key);
+
+export const writeWorksheetHandoff = ({
+  worksheetId,
+  importPayload = null,
+}: {
+  worksheetId: string | number;
+  importPayload?: WorksheetImportPayload | null;
+}) => {
+  writeStorageValue(WORKSHEET_TARGET_KEY, String(worksheetId));
+
+  if (importPayload) {
+    writeStorageValue(WORKSHEET_IMPORT_KEY, JSON.stringify(importPayload));
+  } else {
+    removeStorageValue(WORKSHEET_IMPORT_KEY);
+  }
+};
+
+export const clearWorksheetHandoff = () => {
+  removeStorageValue(WORKSHEET_TARGET_KEY);
+  removeStorageValue(WORKSHEET_IMPORT_KEY);
+};
+
+export const clearWorksheetTarget = () => {
+  removeStorageValue(WORKSHEET_TARGET_KEY);
+};
+
+export const readWorksheetTarget = () => readStorageValue(WORKSHEET_TARGET_KEY);
+
+export const readWorksheetImportPayload = () => {
+  const raw = readStorageValue(WORKSHEET_IMPORT_KEY);
+  if (!raw) return null;
+
+  try {
+    return JSON.parse(raw) as WorksheetImportPayload;
+  } catch {
+    clearWorksheetHandoff();
+    return null;
+  }
+};
+
+export const openWorksheetInNewTab = (
+  worksheetId: string | number,
+  importPayload: WorksheetImportPayload | null = null
+) => {
+  writeWorksheetHandoff({ worksheetId, importPayload });
+
+  const openedTab = window.open(buildProjectsWorksheetPath(worksheetId), "_blank");
+  if (!openedTab) {
+    clearWorksheetHandoff();
+  }
+
+  return openedTab;
+};
+
+export const openWorksheetPlaceholderTab = () => window.open("about:blank", "_blank");
+
+const DRAFT_OVERLAY_HANDOFF_KEY = "ai-results/pending-draft-overlay";
+
+export type DraftOverlayHandoffPayload = {
+  draftId: number;
+};
+
+export const writeDraftOverlayHandoff = ({ draftId }: DraftOverlayHandoffPayload) => {
+  const payload = JSON.stringify({ draftId });
+  writeStorageValue(DRAFT_OVERLAY_HANDOFF_KEY, payload);
+};
+
+export const clearDraftOverlayHandoff = () => {
+  removeStorageValue(DRAFT_OVERLAY_HANDOFF_KEY);
+};
+
+export const readDraftOverlayHandoff = () => {
+  const raw = readStorageValue(DRAFT_OVERLAY_HANDOFF_KEY);
+  if (!raw) return null;
+
+  try {
+    const payload = JSON.parse(raw) as DraftOverlayHandoffPayload;
+    if (typeof payload?.draftId !== "number" || Number.isNaN(payload.draftId)) {
+      clearDraftOverlayHandoff();
+      return null;
+    }
+    return payload;
+  } catch {
+    clearDraftOverlayHandoff();
+    return null;
+  }
+};
+
+export const openDraftOverlayInNewTab = (draftId: number) => {
+  writeDraftOverlayHandoff({ draftId });
+  const openedTab = window.open(window.location.href, "_blank");
+  if (!openedTab) {
+    clearDraftOverlayHandoff();
+  }
+  return openedTab;
+};
+
 export type WorksheetOption = {
   id: string;
   name: string;

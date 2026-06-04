@@ -4,9 +4,9 @@ import { useQueryClient } from "@tanstack/react-query";
 import { apiPatch, apiPost } from "@/services/apiClient";
 import { aiResultsKeys, useCampaigns, usePromptHistory } from "@/features/ai-results/queries";
 import {
-  WORKSHEET_IMPORT_KEY,
-  WORKSHEET_TARGET_KEY,
   buildProjectsWorksheetPath,
+  openWorksheetInNewTab,
+  writeWorksheetHandoff,
   WorksheetPickerModal,
   CreateWorksheetModal,
   type WorksheetOption,
@@ -37,7 +37,6 @@ import {
   Sparkles,
   Search,
   ShieldCheck,
-  Target,
   Zap,
 } from "lucide-react";
 import {
@@ -915,22 +914,28 @@ export const PromptTable = ({
     return pickerRowIds.map((id) => byId.get(id)).filter(Boolean) as PromptTableRow[];
   }, [pickerRowIds, data]);
 
-  const handoffToWorksheet = (worksheetId: string) => {
+  const navigateToWorksheetFromPicker = (worksheetId: string) => {
     const payload = {
       activeWorksheetId: worksheetId,
       selectedItemIds: pickerRowIds,
       selectedRows: buildWorksheetRows(pickerRows),
     };
-    sessionStorage.setItem(WORKSHEET_TARGET_KEY, worksheetId);
-    sessionStorage.setItem(WORKSHEET_IMPORT_KEY, JSON.stringify(payload));
+    writeWorksheetHandoff({ worksheetId, importPayload: payload });
     localStorage.setItem("activeTab", "projects");
-    setPickerOpen(false);
     navigate(buildProjectsWorksheetPath(worksheetId));
   };
 
   const handleAddToWorksheet = () => {
     if (!activeWorksheetId) return;
-    handoffToWorksheet(activeWorksheetId);
+    const openedTab = openWorksheetInNewTab(activeWorksheetId, {
+      activeWorksheetId,
+      selectedItemIds: pickerRowIds,
+      selectedRows: buildWorksheetRows(pickerRows),
+    });
+    if (!openedTab) return;
+    localStorage.setItem("activeTab", "projects");
+    setPickerOpen(false);
+    setActiveWorksheetId(null);
   };
 
   const handleCreateNewWorksheet = () => {
@@ -951,7 +956,7 @@ export const PromptTable = ({
       await queryClient.invalidateQueries({ queryKey: aiResultsKeys.campaigns() });
       setCreateOpen(false);
       setNewWorksheetName("");
-      handoffToWorksheet(String(newId));
+      navigateToWorksheetFromPicker(String(newId));
     } catch (err) {
       setCreateWorksheetError("Failed to create worksheet. Please try again.");
     } finally {
@@ -1606,23 +1611,31 @@ export const PromptTable = ({
                               ? row.rawId == null
                               : (row.childPromptIds?.length ?? 0) === 0)
                           }
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            void toggleTracking(row, !isRowTracked(row));
-                          }}
-                          className={`flex h-[38px] w-[38px] items-center justify-center rounded-[14px] shadow-[0_4px_14px_rgba(15,23,42,0.06)] transition hover:-translate-y-0.5 hover:shadow-[0_8px_18px_rgba(15,23,42,0.08)] disabled:opacity-50 ${
-                            isRowTracked(row)
-                              ? "border border-[#7f9fe8] bg-[#7f9fe8] text-white"
-                              : "border border-[#d8e8ff] bg-white text-[#6d88cc]"
-                          }`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          void toggleTracking(row, !isRowTracked(row));
+                        }}
+                          className="flex h-[38px] w-[38px] items-center justify-center rounded-[14px] border border-[#7f9fe8] bg-gradient-to-b from-[#9cb7e9] to-[#7f9fe8] text-white shadow-[0_4px_14px_rgba(15,23,42,0.06)] transition hover:-translate-y-0.5 hover:shadow-[0_8px_18px_rgba(15,23,42,0.08)] disabled:opacity-50"
                           aria-pressed={isRowTracked(row)}
                           aria-label={isRowTracked(row) ? "Stop weekly tracking" : "Track weekly"}
                           title={isRowTracked(row) ? "Tracking weekly — click to stop" : "Track weekly"}
                         >
                           {trackPending[row.id] ? (
                             <Loader2 className="h-5 w-5 animate-spin" />
+                          ) : isRowTracked(row) ? (
+                            <img
+                              src="/report-icons/pause-circle.svg"
+                              alt=""
+                              aria-hidden="true"
+                              className="h-5 w-5 shrink-0"
+                            />
                           ) : (
-                            <Target className="h-5 w-5" />
+                            <img
+                              src="/report-icons/target-03.svg"
+                              alt=""
+                              aria-hidden="true"
+                              className="h-5 w-5 shrink-0"
+                            />
                           )}
                         </button>
 

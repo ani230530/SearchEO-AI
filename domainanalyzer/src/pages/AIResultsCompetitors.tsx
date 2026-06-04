@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ArrowUpRight,
   ChevronDown,
@@ -54,6 +54,14 @@ import {
   useReport,
   useTrends,
 } from '@/features/ai-results/queries';
+import {
+  buildProjectsWorksheetPath,
+  openWorksheetPlaceholderTab,
+  writeWorksheetHandoff,
+  WorksheetPickerModal,
+  CreateWorksheetModal,
+  type WorksheetOption,
+} from '@/features/ai-results/components/WorksheetPickerModals';
 
 // ── API shapes ─────────────────────────────────────────────────────────────
 
@@ -168,12 +176,6 @@ interface TrendsResponse {
   topCompetitors: string[];
 }
 
-type WorksheetOption = {
-  id: string;
-  name: string;
-  description: string | null;
-};
-
 type GenerationPayload = {
   title: string;
   rationale: string;
@@ -182,11 +184,6 @@ type GenerationPayload = {
   recommendedAngle?: string;
   brief?: ReportOpportunity['brief'];
 };
-
-const WORKSHEET_IMPORT_KEY = 'ai-results/pending-worksheet-import';
-const WORKSHEET_TARGET_KEY = 'ai-results/pending-worksheet-target';
-const buildProjectsWorksheetPath = (campaignId: string | number) =>
-  `/dashboard?tab=projects&campaign=${encodeURIComponent(String(campaignId))}`;
 
 const COMPETITOR_SCROLL_SECTIONS = [
   { id: 'competitors-tracked', label: 'Tracked Competitors' },
@@ -1339,12 +1336,10 @@ export default function CompetitorsPage() {
   const queryClient = useQueryClient();
   const { currentDomain, domainsLoading } = useShellContext();
   const domainId = currentDomain?.id ?? null;
-  const competitorsScrollRef = useRef<HTMLDivElement | null>(null);
   const {
     currentTitle: currentCompetitorSectionTitle,
     previousTitle: previousCompetitorSectionTitle,
   } = useScrollSpyBreadcrumbs({
-    scrollRootRef: competitorsScrollRef,
   });
 
   // All four data sources hit React Query — sibling tabs hit the same cache.
@@ -1513,8 +1508,8 @@ export default function CompetitorsPage() {
     setIsWorksheetModalOpen(true);
   }, [report]);
 
-  const runGeneration = useCallback(async (key: string, payload: GenerationPayload, campaignId: number | null) => {
-    if (!report?.domainInfo?.id) return;
+  const runGeneration = useCallback(async (key: string, payload: GenerationPayload, campaignId: number | null, worksheetTab: Window | null = null) => {
+    if (!report?.domainInfo?.id) return false;
     try {
       const built = await apiPost<{ campaignId: number }>('/campaigns/topics/from-opportunity', {
         domainId: report.domainInfo.id,
@@ -1528,12 +1523,21 @@ export default function CompetitorsPage() {
         recommendedAngle: payload.recommendedAngle,
         brief: payload.brief,
       });
-      sessionStorage.setItem(WORKSHEET_TARGET_KEY, String(built.campaignId));
-      sessionStorage.removeItem(WORKSHEET_IMPORT_KEY);
+      writeWorksheetHandoff({ worksheetId: built.campaignId });
       localStorage.setItem('activeTab', 'projects');
-      navigate(buildProjectsWorksheetPath(built.campaignId));
+      const worksheetPath = buildProjectsWorksheetPath(built.campaignId);
+      if (worksheetTab) {
+        worksheetTab.location.href = worksheetPath;
+      } else {
+        navigate(worksheetPath);
+      }
+      return true;
     } catch (err) {
+      if (worksheetTab) {
+        worksheetTab.close();
+      }
       console.error('[AIResults Competitors] Failed to add to worksheet:', err);
+      return false;
     }
   }, [navigate, report]);
 
@@ -1541,10 +1545,19 @@ export default function CompetitorsPage() {
     if (!activeWorksheetId || !pendingGeneration) return;
     const campaignId = Number(activeWorksheetId);
     const { key, payload } = pendingGeneration;
-    setIsWorksheetModalOpen(false);
-    setPendingGeneration(null);
-    setActiveWorksheetId(null);
-    void runGeneration(key, payload, Number.isFinite(campaignId) ? campaignId : null);
+    const worksheetTab = openWorksheetPlaceholderTab();
+    if (!worksheetTab) return;
+    void runGeneration(
+      key,
+      payload,
+      Number.isFinite(campaignId) ? campaignId : null,
+      worksheetTab
+    ).then((success) => {
+      if (!success) return;
+      setIsWorksheetModalOpen(false);
+      setPendingGeneration(null);
+      setActiveWorksheetId(null);
+    });
   }, [activeWorksheetId, pendingGeneration, runGeneration]);
 
   const handleCreateWorksheet = useCallback(async () => {
@@ -1581,19 +1594,19 @@ export default function CompetitorsPage() {
 
   return (
     <>
-      <div ref={competitorsScrollRef} className="min-h-0 w-full flex-1 overflow-y-auto bg-white">
-      <div className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur">
-        <div className="mx-auto flex w-full max-w-[1530px] items-center px-5 py-3">
-          <AIResultsBreadcrumbs
-            mode="history"
-            prefixHref={domainId != null ? resolveAIResultsNavigation('ai-results', String(domainId)) : undefined}
-            previousLabel={previousCompetitorSectionTitle}
-            currentLabel={currentCompetitorSectionTitle}
-          />
+      <div className="w-full bg-white">
+        <div className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/90">
+          <div className="mx-auto flex w-full max-w-[1530px] items-center px-5 py-3">
+            <AIResultsBreadcrumbs
+              mode="history"
+              prefixHref={domainId != null ? resolveAIResultsNavigation('ai-results', String(domainId)) : undefined}
+              previousLabel={previousCompetitorSectionTitle}
+              currentLabel={currentCompetitorSectionTitle}
+            />
+          </div>
         </div>
-      </div>
 
-        <div className="mx-auto flex w-full max-w-[1530px] flex-col gap-5 px-5 py-3">
+        <div className="mx-auto flex w-full max-w-[1530px] flex-col gap-5 px-5 py-3 pb-6">
           {loading ? (
             <LoadingSkeleton />
           ) : error ? (

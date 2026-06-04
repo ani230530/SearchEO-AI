@@ -61,6 +61,14 @@ import { DomainInfoContent } from "@/features/sidebar-dashboard/sections/DomainI
 import { DomainInfoEmpty } from "@/features/sidebar-dashboard/sections/DomainInfoEmpty";
 import { ProjectsSection } from "@/features/sidebar-dashboard/sections/ProjectsSection";
 import WorksheetDraftOverlay from "@/features/campaign/WorksheetDraftOverlay";
+import {
+  clearDraftOverlayHandoff,
+  clearWorksheetHandoff,
+  clearWorksheetTarget,
+  openDraftOverlayInNewTab,
+  readDraftOverlayHandoff,
+  readWorksheetTarget,
+} from "@/features/ai-results/components/WorksheetPickerModals";
 import { DASHBOARD_TABS } from "@/features/sidebar-dashboard/constants";
 import CompetitorPage from '@/features/sidebar-dashboard/sections/CompetitorPage';
 import { resolveSidebarNavigation } from "@/features/sidebar-dashboard/navigation";
@@ -94,7 +102,6 @@ import { useCompetitorAnalysis } from "@/features/ai-results/queries";
 
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3002";
-const WORKSHEET_TARGET_KEY = 'ai-results/pending-worksheet-target';
 
 const formatDashboardCount = (value: number | null | undefined) => {
   if (typeof value !== "number" || Number.isNaN(value)) {
@@ -308,6 +315,9 @@ const [improvedContent, setImprovedContent] = useState("");
   const [draftOverlayId, setDraftOverlayId] = useState<number | null>(null);
 
   const handleOpenDraftInPublish = useCallback((draftId: number) => {
+    const openedTab = openDraftOverlayInNewTab(draftId);
+    if (openedTab) return;
+
     setDraftOverlayId(draftId);
   }, []);
 
@@ -2060,23 +2070,34 @@ useEffect(() => {
   }, [activeTab, fetchCampaigns]);
 
   useEffect(() => {
+    const pendingDraft = readDraftOverlayHandoff();
+    if (!pendingDraft) return;
+
+    setDraftOverlayId(pendingDraft.draftId);
+    clearDraftOverlayHandoff();
+  }, []);
+
+  useEffect(() => {
     if (activeTab !== 'projects') return;
     if (!campaigns.length) return;
     if (searchState.activeCampaignId !== undefined) return;
     if (selectedCampaignId !== null) return;
 
-    const pendingTarget = sessionStorage.getItem(WORKSHEET_TARGET_KEY);
+    const pendingTarget = readWorksheetTarget();
     if (!pendingTarget) return;
 
     const parsedTargetId = Number(pendingTarget);
-    if (!Number.isFinite(parsedTargetId)) return;
+    if (!Number.isFinite(parsedTargetId)) {
+      clearWorksheetHandoff();
+      return;
+    }
 
     const matchedCampaign = campaigns.find((campaign) => campaign.id === parsedTargetId);
     if (!matchedCampaign) return;
 
     setSelectedCampaignId(matchedCampaign.id);
     navigate(`${location.pathname}?tab=projects&campaign=${matchedCampaign.id}`, { replace: true });
-    sessionStorage.removeItem(WORKSHEET_TARGET_KEY);
+    clearWorksheetTarget();
   }, [activeTab, campaigns, location.pathname, navigate, searchState.activeCampaignId, selectedCampaignId]);
 
   const handleCreateCampaign = async (e: React.FormEvent) => {
@@ -2881,7 +2902,6 @@ useEffect(() => {
           userName={user?.name}
           lastSyncedAt={gscLastSynced}
           onAddDomain={openSettingsIntegrations}
-          onLogout={logout}
           onTabChange={setActiveTab}
           onLogout={handleHeaderLogout}
         />
