@@ -620,11 +620,11 @@ select.floating-input:not([value=""])+.floating-label {
 }
 
 .sidebar-logout-tab {
-  color: #b83030;
+  color: #ef4444;
 }
 
 .sidebar-logout-tab .sidebar-tab-icon {
-  color: #b83030;
+  color: #ef4444;
 }
 
 .sidebar.closed .sidebar-tab {

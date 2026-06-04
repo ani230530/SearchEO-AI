@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowUpRight,
   ChevronDown,
@@ -43,6 +43,9 @@ import { logoUrl as logoUrlHelper } from '@/lib/logoUrl';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { useShellContext } from '@/features/ai-results/AIResultsShell';
+import { AIResultsBreadcrumbs } from '@/features/ai-results/components/AIResultsBreadcrumbs';
+import { resolveAIResultsNavigation } from '@/features/sidebar-dashboard/navigation';
+import { useScrollSpyBreadcrumbs } from '@/features/ai-results/useScrollSpyBreadcrumbs';
 import {
   aiResultsKeys,
   useCampaigns,
@@ -184,6 +187,15 @@ const WORKSHEET_IMPORT_KEY = 'ai-results/pending-worksheet-import';
 const WORKSHEET_TARGET_KEY = 'ai-results/pending-worksheet-target';
 const buildProjectsWorksheetPath = (campaignId: string | number) =>
   `/dashboard?tab=projects&campaign=${encodeURIComponent(String(campaignId))}`;
+
+const COMPETITOR_SCROLL_SECTIONS = [
+  { id: 'competitors-tracked', label: 'Tracked Competitors' },
+  { id: 'competitors-trends', label: 'Trend Comparison' },
+  { id: 'competitors-gaps', label: 'Prompt Gaps' },
+  { id: 'competitors-analysis', label: 'Analysis Results' },
+  { id: 'competitors-positioning', label: 'Positioning' },
+  { id: 'competitors-content', label: 'Content Opportunities' },
+] as const;
 
 // ── helpers ────────────────────────────────────────────────────────────────
 
@@ -625,7 +637,7 @@ function CompetitorSelector({
   };
 
   return (
-    <section className="flex flex-col gap-3">
+    <section id="competitors-tracked" data-title="Tracked Competitors" className="flex flex-col gap-3">
       <h2 className="text-sm font-semibold text-[#2D4059]">Tracked Competitors</h2>
       <div className="flex flex-wrap items-center gap-3">
         <div className="relative w-full sm:w-[315px]">
@@ -769,7 +781,7 @@ function TrendComparisonPanel({ trends }: { trends: TrendsResponse | null }) {
   }, [trends]);
 
   return (
-    <section className="min-w-0 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+    <section id="competitors-trends" data-title="Trend Comparison" className="min-w-0 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <h3 className="text-base font-semibold text-[#2D4059]">Competitor Trend Comparison</h3>
         <span className="text-xs text-[#7B8494]">Last {trends?.runs.length ?? 0} runs</span>
@@ -947,7 +959,7 @@ function PromptGapPanel({
 }) {
   const shown = opportunities.slice(0, 4);
   return (
-    <section className="min-w-0 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+    <section id="competitors-gaps" data-title="Prompt Gaps" className="min-w-0 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
       <div className="flex items-start justify-between gap-4">
         <div>
           <h3 className="text-xl font-semibold leading-none text-[#2D4059]">Prompt Gaps Opportunities</h3>
@@ -1052,7 +1064,7 @@ function AICompetitorAnalysisResults({
   onOpenDetail: (c: CompetitorAnalysisRow) => void;
 }) {
   return (
-    <section className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+    <section id="competitors-analysis" data-title="Analysis Results" className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
       <div>
         <h3 className="text-xl font-semibold leading-none text-[#2D4059]">AI-Based Competitor Analysis Results</h3>
         <p className="mt-5 text-sm text-[#7B8494]">Per-competitor performance across the latest run.</p>
@@ -1098,7 +1110,7 @@ function PositioningComparison({ analysis }: { analysis: CompetitorAnalysisRespo
   }, [analysis]);
 
   return (
-    <section className="min-w-0 rounded-xl border border-slate-200 bg-white p-6">
+    <section id="competitors-positioning" data-title="Positioning Comparison" className="min-w-0 rounded-xl border border-slate-200 bg-white p-6">
       <div className="flex items-start justify-between gap-4">
         <div>
           <h3 className="text-xl font-semibold leading-none text-[#2D4059]">Positioning Comparison</h3>
@@ -1204,7 +1216,7 @@ function ContentOpportunitiesToCreate({
   // Use bottom-half (after the 4 surfaced in Prompt Gaps) — same pool, no duplicates.
   const list = opportunities.slice(4, 9);
   return (
-    <section className="min-w-0 rounded-xl border border-slate-200 bg-white p-6">
+    <section id="competitors-content" data-title="Content Opportunities" className="min-w-0 rounded-xl border border-slate-200 bg-white p-6">
       <div className="flex items-start justify-between gap-4">
         <h3 className="text-xl font-semibold leading-none text-[#2D4059]">Content Opportunities to Create</h3>
       </div>
@@ -1327,6 +1339,13 @@ export default function CompetitorsPage() {
   const queryClient = useQueryClient();
   const { currentDomain, domainsLoading } = useShellContext();
   const domainId = currentDomain?.id ?? null;
+  const competitorsScrollRef = useRef<HTMLDivElement | null>(null);
+  const {
+    currentTitle: currentCompetitorSectionTitle,
+    previousTitle: previousCompetitorSectionTitle,
+  } = useScrollSpyBreadcrumbs({
+    scrollRootRef: competitorsScrollRef,
+  });
 
   // All four data sources hit React Query — sibling tabs hit the same cache.
   const reportQuery = useReport<ReportPayload>(domainId);
@@ -1562,7 +1581,18 @@ export default function CompetitorsPage() {
 
   return (
     <>
-      <div className="min-h-0 w-full flex-1 overflow-y-auto bg-white">
+      <div ref={competitorsScrollRef} className="min-h-0 w-full flex-1 overflow-y-auto bg-white">
+      <div className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur">
+        <div className="mx-auto flex w-full max-w-[1530px] items-center px-5 py-3">
+          <AIResultsBreadcrumbs
+            mode="history"
+            prefixHref={domainId != null ? resolveAIResultsNavigation('ai-results', String(domainId)) : undefined}
+            previousLabel={previousCompetitorSectionTitle}
+            currentLabel={currentCompetitorSectionTitle}
+          />
+        </div>
+      </div>
+
         <div className="mx-auto flex w-full max-w-[1530px] flex-col gap-5 px-5 py-3">
           {loading ? (
             <LoadingSkeleton />

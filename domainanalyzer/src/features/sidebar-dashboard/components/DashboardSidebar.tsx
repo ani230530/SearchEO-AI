@@ -13,7 +13,7 @@ import {
   Send,
   Sparkles,
   Tag,
-  LayoutDashboard,
+  House,
   ClipboardList,
   PieChart,
   Settings,
@@ -128,7 +128,7 @@ export function DashboardSidebar({
           {
             key: "dashboard",
             label: "Dashboard",
-            icon: <LayoutDashboard className="h-4 w-4" />,
+            icon: <House className="h-4 w-4" />,
             isActive: activeTab === "overview",
             onClick: () => onSelectTab("overview"),
             href: "/dashboard?tab=overview",

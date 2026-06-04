@@ -7,6 +7,8 @@ import {
   Loader2,
   RefreshCw,
 } from "lucide-react";
+import { resolveAIResultsNavigation } from "@/features/sidebar-dashboard/navigation";
+import { AIResultsBreadcrumbs } from "@/features/ai-results/components/AIResultsBreadcrumbs";
 
 import {
   Tabs,

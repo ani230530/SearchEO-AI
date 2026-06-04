@@ -17,7 +17,6 @@ import { AIResultsShell } from "./features/ai-results/AIResultsShell";
 
 // Lazy — gated behind auth or under the AI Checker shell. Each becomes its
 // own chunk, downloaded only when the user navigates to it.
-const Profile = lazy(() => import("./pages/Profile"));
 const SidebarDashboard = lazy(() => import("./pages/SidebarDashboard"));
 const KnowledgeBase = lazy(() => import("./pages/KnowledgeBase"));
 const AICheckerV2 = lazy(() => import("./pages/AIChecker.v2"));
@@ -110,7 +109,7 @@ const App = () => (
               </Route>
               <Route path="/profile" element={
                 <ProtectedRoute>
-                  <Profile />
+                  <Navigate to="/dashboard?tab=settings&subtab=profile" replace />
                 </ProtectedRoute>
               } />
               <Route path="/newdashboard" element={
@@ -130,7 +129,7 @@ const App = () => (
               } />
               <Route path="/ai-results-report-preview" element={<AIVisibilityRedirect />} />
               <Route path="/ai-results-report" element={<AIVisibilityRedirect />} />
-              <Route element={<AIResultsShell activeItem="competitors" title="Competitors" />}>
+              <Route element={<AIResultsShell activeItem="competitors" title="Competitors Intelligence" />}>
                 <Route path="/airesults-competitors-preview" element={<AIResultsCompetitors />} />
               </Route>
 

@@ -15,7 +15,6 @@ export const DASHBOARD_QUERY_TABS: readonly TabId[] = [
   "integration",
   "projects",
   "settings",
-  "profile",
   "gsc-analytics",
   "attribution",
   "knowledge-base",

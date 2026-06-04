@@ -13,7 +13,6 @@ const VALID_TABS: readonly TabId[] = [
   "integration",
   "projects",
   "settings",
-  "profile",
   "ai-visibility",
   "gsc-analytics",
   "attribution",
@@ -60,6 +59,10 @@ export function summarizeDomainContext(
 }
 
 export function getStoredActiveTab(value: string | null, fallback: TabId = "overview"): TabId {
+  if (value === "profile") {
+    return "settings";
+  }
+
   return value && VALID_TABS.includes(value as TabId) ? (value as TabId) : fallback;
 }
 
@@ -71,6 +74,12 @@ export function parseDashboardSearchState(search: string): DashboardSearchState 
   const actionParam = params.get("action");
   const campaignParam = params.get("campaign");
   const parsedCampaignId = campaignParam ? Number(campaignParam) : undefined;
+  const isLegacyProfileTab = tabParam === "profile";
+  const activeSettingsSubTab = isLegacyProfileTab
+    ? "profile"
+    : tabParam === "settings" && subtabParam && VALID_SETTINGS_SUB_TABS.includes(subtabParam as SettingsSubTab)
+      ? (subtabParam as SettingsSubTab)
+      : undefined;
 
   if (tabParam === "ai-visibility" || tabParam === "ai-checker") {
     return { redirectToAiVisibility: true };
@@ -79,17 +88,16 @@ export function parseDashboardSearchState(search: string): DashboardSearchState 
   return {
     redirectToAiVisibility: false,
     activeTab:
-      tabParam && DASHBOARD_QUERY_TABS.includes(tabParam as TabId)
+      isLegacyProfileTab
+        ? "settings"
+        : tabParam && DASHBOARD_QUERY_TABS.includes(tabParam as TabId)
         ? (tabParam as TabId)
         : undefined,
     activeCompanySubTab:
       subtabParam && VALID_COMPANY_SUB_TABS.includes(subtabParam as CompanySubTabId)
         ? (subtabParam as CompanySubTabId)
         : undefined,
-    activeSettingsSubTab:
-      tabParam === "settings" && subtabParam && VALID_SETTINGS_SUB_TABS.includes(subtabParam as SettingsSubTab)
-        ? (subtabParam as SettingsSubTab)
-        : undefined,
+    activeSettingsSubTab,
     activeCampaignId:
       typeof parsedCampaignId === "number" && Number.isFinite(parsedCampaignId)
         ? parsedCampaignId
