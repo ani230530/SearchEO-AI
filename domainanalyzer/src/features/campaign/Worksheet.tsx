@@ -47,17 +47,19 @@ import WorksheetGenerateDrawer from './WorksheetGenerateDrawer';
 import InlineEditable from './InlineEditable';
 import { RowStatus, RowAction } from './WorksheetRowState';
 import { Skeleton } from '@/components/ui/skeleton';
-
-const PENDING_WORKSHEET_IMPORT_KEY = 'ai-results/pending-worksheet-import';
+import {
+  clearWorksheetHandoff,
+  readWorksheetImportPayload,
+} from '@/features/ai-results/components/WorksheetPickerModals';
 
 type WorksheetColumnKey = 'topic' | 'keywords' | 'status' | 'action' | 'more';
 
 interface WorksheetProps {
   campaignId: number;
   /** Bubbled to the dashboard so the click on a row's "Draft Blog" action
-   *  opens the dashboard-level draft overlay with the draft preloaded. The
-   *  worksheet "Publish" button doesn't route through here — it fires the
-   *  publish action directly without the overlay. */
+   *  can open the dashboard-based draft preview in a new tab with the draft
+   *  preloaded. The worksheet "Publish" button doesn't route through here —
+   *  it fires the publish action directly without the overlay. */
   onOpenDraftInPublish?: (draftId: number) => void;
   /** SSE-driven map of draftId → publish status. The dashboard already
    *  tracks this for the embedded PublishExperience; we forward it so
@@ -229,33 +231,10 @@ export default function Worksheet({
   useEffect(() => {
     if (loading) return;
 
-    const raw = sessionStorage.getItem(PENDING_WORKSHEET_IMPORT_KEY);
-    if (!raw) return;
+    const payload = readWorksheetImportPayload();
+    if (!payload) return;
 
-    type PendingWorksheetImport = {
-      activeWorksheetId: string;
-      selectedItemIds: string[];
-      selectedRows: Array<{
-        id: string;
-        prompt: string;
-        type?: string | null;
-        /** Source keyword surfaced by AI Checker tables. When present, the
-         *  worksheet creates the topic with this as the primary keyword
-         *  instead of letting AI Suggest fabricate phrase-style ones. */
-        primaryKeyword?: string | null;
-        primaryIntent?: string | null;
-      }>;
-    };
-
-    let payload: PendingWorksheetImport | null = null;
-    try {
-      payload = JSON.parse(raw) as PendingWorksheetImport;
-    } catch {
-      sessionStorage.removeItem(PENDING_WORKSHEET_IMPORT_KEY);
-      return;
-    }
-
-    if (!payload || payload.activeWorksheetId !== String(campaignId)) {
+    if (payload.activeWorksheetId !== String(campaignId)) {
       return;
     }
 
@@ -265,7 +244,7 @@ export default function Worksheet({
     // here on .map(). Drop anything that doesn't look like the table-row
     // import shape and clear it so subsequent renders don't re-trip.
     if (!Array.isArray(payload.selectedRows) || payload.selectedRows.length === 0) {
-      sessionStorage.removeItem(PENDING_WORKSHEET_IMPORT_KEY);
+      clearWorksheetHandoff();
       return;
     }
 
@@ -282,7 +261,7 @@ export default function Worksheet({
       setError(null);
       setNotice('Adding selected prompts and keywords to worksheet...');
       try {
-        const rows = [...payload!.selectedRows].reverse();
+        const rows = [...payload.selectedRows].reverse();
         const failures: string[] = [];
         let finalTopicsSnapshot: WorksheetTopic[] | null = null;
 
@@ -327,11 +306,11 @@ export default function Worksheet({
           const fallbackTopics = await fetchCampaignTopics(campaignId);
           setTopics(fallbackTopics);
         }
-        sessionStorage.removeItem(PENDING_WORKSHEET_IMPORT_KEY);
+        clearWorksheetHandoff();
         if (failures.length > 0) {
           setError(`Imported with ${failures.length} failure${failures.length === 1 ? '' : 's'}.`);
         }
-        setNotice(`${payload!.selectedRows.length} row${payload!.selectedRows.length === 1 ? '' : 's'} added to the worksheet.`);
+        setNotice(`${payload.selectedRows.length} row${payload.selectedRows.length === 1 ? '' : 's'} added to the worksheet.`);
       } finally {
         setLoading(false);
       }
@@ -340,7 +319,7 @@ export default function Worksheet({
     void runImport().catch((err) => {
       console.error('[worksheet] import failed', err);
       setError(err instanceof Error ? err.message : 'Failed to import worksheet rows');
-      sessionStorage.removeItem(PENDING_WORKSHEET_IMPORT_KEY);
+      clearWorksheetHandoff();
     });
   }, [campaignId, loading, topics]);
 

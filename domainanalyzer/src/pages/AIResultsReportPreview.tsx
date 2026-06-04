@@ -86,11 +86,12 @@ import { useCampaigns, useGscStatus, useReport, useRuns, useTrends } from '@/fea
 import { useQueryClient } from '@tanstack/react-query';
 import { aiResultsKeys } from '@/features/ai-results/queries';
 import {
-  WORKSHEET_IMPORT_KEY,
-  WORKSHEET_TARGET_KEY,
   buildProjectsWorksheetPath,
+  openWorksheetInNewTab,
+  openWorksheetPlaceholderTab,
   WorksheetPickerModal,
   CreateWorksheetModal,
+  writeWorksheetHandoff,
   type WorksheetOption,
 } from '@/features/ai-results/components/WorksheetPickerModals';
 
@@ -2189,8 +2190,13 @@ const AIResultsReportPreview = () => {
   // handle generation from the worksheet just like any other table row.
   // We DO NOT fire n8n here — generation is driven from the worksheet.
   const runGeneration = useCallback(
-    async (key: string, payload: GenerationPayload, campaignId: number | null) => {
-      if (!reportData?.domainInfo?.id) return;
+    async (
+      key: string,
+      payload: GenerationPayload,
+      campaignId: number | null,
+      worksheetTab: Window | null = null
+    ) => {
+      if (!reportData?.domainInfo?.id) return false;
       setGenerationByKey((prev) => ({ ...prev, [key]: { kind: 'submitting' } }));
       try {
         const built = await apiPost<{ topicId: number; campaignId: number }>(
@@ -2210,24 +2216,26 @@ const AIResultsReportPreview = () => {
         );
 
         // Hand off to the worksheet page. The topic + keywords are already
-        // persisted by /from-opportunity, so unlike the table-row "import
-        // selected rows" flow we DON'T set WORKSHEET_IMPORT_KEY — that
-        // payload shape requires selectedRows[] which Worksheet.tsx maps
-        // over (would crash here with "Cannot read properties of undefined
-        // (reading 'map')"). Just stash WORKSHEET_TARGET_KEY so the
-        // dashboard opens straight to the right campaign and the new topic
-        // shows up via the worksheet's normal API fetch.
-        const targetCampaignId = String(built.campaignId);
-        sessionStorage.setItem(WORKSHEET_TARGET_KEY, targetCampaignId);
-        sessionStorage.removeItem(WORKSHEET_IMPORT_KEY);
+        // persisted by /from-opportunity, so we only need the target campaign.
+        writeWorksheetHandoff({ worksheetId: built.campaignId });
         localStorage.setItem('activeTab', 'projects');
         setGenerationByKey((prev) => ({ ...prev, [key]: { kind: 'done', draftId: null } }));
-        navigate(buildProjectsWorksheetPath(built.campaignId));
+        const worksheetPath = buildProjectsWorksheetPath(built.campaignId);
+        if (worksheetTab) {
+          worksheetTab.location.href = worksheetPath;
+        } else {
+          navigate(worksheetPath);
+        }
+        return true;
       } catch (err) {
+        if (worksheetTab) {
+          worksheetTab.close();
+        }
         setGenerationByKey((prev) => ({
           ...prev,
           [key]: { kind: 'failed', error: err instanceof Error ? err.message : 'Failed to add to worksheet' },
         }));
+        return false;
       }
     },
     [navigate, reportData]
@@ -2260,10 +2268,19 @@ const AIResultsReportPreview = () => {
     if (pendingGeneration) {
       const { key, payload } = pendingGeneration;
       const campaignId = Number(activeWorksheetId);
-      setIsWorksheetModalOpen(false);
-      setPendingGeneration(null);
-      setActiveWorksheetId(null);
-      void runGeneration(key, payload, Number.isFinite(campaignId) ? campaignId : null);
+      const worksheetTab = openWorksheetPlaceholderTab();
+      if (!worksheetTab) return;
+      void runGeneration(
+        key,
+        payload,
+        Number.isFinite(campaignId) ? campaignId : null,
+        worksheetTab
+      ).then((success) => {
+        if (!success) return;
+        setIsWorksheetModalOpen(false);
+        setPendingGeneration(null);
+        setActiveWorksheetId(null);
+      });
       return;
     }
 
@@ -2300,12 +2317,12 @@ const AIResultsReportPreview = () => {
       });
 
     const payload = { activeWorksheetId, selectedItemIds, selectedRows };
-    sessionStorage.setItem(WORKSHEET_TARGET_KEY, activeWorksheetId);
-    sessionStorage.setItem(WORKSHEET_IMPORT_KEY, JSON.stringify(payload));
+    const worksheetTab = openWorksheetInNewTab(activeWorksheetId, payload);
+    if (!worksheetTab) return;
     localStorage.setItem('activeTab', 'projects');
     setIsWorksheetModalOpen(false);
-    navigate(buildProjectsWorksheetPath(activeWorksheetId));
-  }, [activeWorksheetId, navigate, pendingGeneration, reportData, runGeneration, selectedRowIds]);
+    setActiveWorksheetId(null);
+  }, [activeWorksheetId, pendingGeneration, reportData, runGeneration, selectedRowIds]);
 
   const handleCreateNewWorksheet = useCallback(() => {
     setCreateWorksheetError(null);
@@ -2385,8 +2402,7 @@ const AIResultsReportPreview = () => {
         selectedRows,
       };
 
-      sessionStorage.setItem(WORKSHEET_TARGET_KEY, newWorksheetId);
-      sessionStorage.setItem(WORKSHEET_IMPORT_KEY, JSON.stringify(payload));
+      writeWorksheetHandoff({ worksheetId: newWorksheetId, importPayload: payload });
       localStorage.setItem('activeTab', 'projects');
       setIsWorksheetModalOpen(false);
       setActiveWorksheetId(null);
