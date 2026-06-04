@@ -858,6 +858,14 @@ export const PromptTable = ({
     setPickerOpen(true);
   };
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  // Prompt rows whose full text is revealed (click the prompt to toggle).
+  const [openPhrases, setOpenPhrases] = useState<Set<string>>(new Set());
+  const togglePhrase = (id: string) =>
+    setOpenPhrases((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
   const [tableFilter, setTableFilter] = useState<"all" | "prompt" | "keyword">("all");
   const [tableMetric, setTableMetric] = useState<string | null>(null);
   // Page-based pagination (10 rows / page). Replaces the prior
@@ -1492,7 +1500,16 @@ export const PromptTable = ({
                               <ChevronRight className="h-[14px] w-[14px]" />
                             )}
                           </button>
-                          <span className="truncate text-[12px] text-[#58606f] italic">
+                          <span
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              togglePhrase(row.id);
+                            }}
+                            title={openPhrases.has(row.id) ? "Click to collapse" : "Click to show full prompt"}
+                            className={`cursor-pointer text-[12px] text-[#58606f] italic ${
+                              openPhrases.has(row.id) ? "whitespace-normal break-words" : "truncate"
+                            }`}
+                          >
                             {row.phrase}
                           </span>
                           {isRowTracked(row) ? (
