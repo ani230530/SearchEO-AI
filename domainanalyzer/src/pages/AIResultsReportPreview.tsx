@@ -393,14 +393,14 @@ const ReportSortIcon = () => (
 type MetricCardDetail = {
   label: string;
   value: string;
-  subLabel?: string;
   subValue?: string;
   iconSrc?: string;
+  barWidth?: number;
 };
 
 interface MetricCardData {
   title: string;
-  kind: 'citations' | 'summary';
+  kind: 'modelPerformance' | 'citations' | 'summary' | 'promptSummary';
   details: MetricCardDetail[];
 }
 
@@ -450,10 +450,10 @@ const MetricInfoTooltip = ({ tip }: { tip: string }) => (
  * already familiar to a marketer (SOV, AI Overview, etc.).
  */
 const CARD_TOOLTIPS: Record<string, string> = {
-  'AI Prompts Citations':
-    'How many web sources each AI assistant cited when answering your prompts. A higher count means the model is grounding its answer in real research — and the unique-host count tells you how diverse those sources are.',
-  'Top Keywords':
-    'Total keywords we generated for your audit, and how many actually got tested in this run. Visibility is the share of model responses that mentioned your brand across those tested keywords.',
+  'Performance Across AI Models':
+    'Static placeholder card for now. It will later be wired to live model performance data for each assistant.',
+  'Top AI Search Prompts':
+    'Static placeholder summary for the total AI search prompts in this run and how many were tracked.',
   'Top Prompts':
     'Total prompts the wizard wrote, and how many were run through the AI models. Visibility is the share of model responses that mentioned your brand — measured only across prompts you actually selected.',
   'Mentions':
@@ -481,11 +481,61 @@ const CardTitleWithTip = ({ title, className }: { title: string; className?: str
 );
 
 const MetricCard = ({ card }: { card: MetricCardData }) => (
-  <Card className="h-full rounded-xl border border-[#D5D7DA] bg-white shadow-[0_1px_2px_0_#1018280D]">
-    <CardContent className={cn('flex h-full flex-col p-5 sm:p-6', card.kind === 'citations' ? 'min-h-[228px] gap-5' : 'min-h-[120px] gap-4')}>
+  <Card
+    className={cn(
+      'rounded-xl border border-[#D5D7DA] bg-white shadow-[0_1px_2px_0_#1018280D]',
+      card.kind === 'modelPerformance' ? 'h-full sm:col-span-2 xl:col-span-1 xl:row-span-2 xl:min-h-[310px]' : 'h-full',
+    )}
+  >
+    <CardContent
+      className={cn(
+        'flex flex-col p-4 sm:p-6',
+        card.kind === 'modelPerformance'
+          ? 'gap-3 sm:gap-4 md:gap-5 xl:gap-[34px] p-4 sm:p-5 xl:min-h-[310px]'
+          : card.kind === 'promptSummary'
+            ? 'min-h-[130px] gap-4 p-5 sm:p-6'
+          : card.kind === 'citations'
+            ? 'min-h-[228px] gap-5'
+            : 'min-h-[112px] gap-3.5 p-4 sm:p-5',
+      )}
+    >
       <CardTitleWithTip title={card.title} />
 
-      {card.kind === 'citations' ? (
+      {card.kind === 'modelPerformance' ? (
+        <div className="flex flex-1 flex-col gap-3 sm:gap-3.5 md:gap-4 xl:gap-[45px] pt-0.5">
+          {card.details.map((item) => (
+            <div
+              key={item.label}
+              className="grid grid-cols-[minmax(0,88px)_minmax(0,1fr)_auto] items-center gap-2.5 sm:grid-cols-[minmax(0,104px)_minmax(0,1fr)_auto]"
+            >
+              <div className="flex min-w-0 items-center gap-2">
+                {item.iconSrc ? <img src={item.iconSrc} alt="" className="h-4 w-4 shrink-0 object-contain" /> : null}
+                <span className="truncate text-[12px] font-medium leading-none text-[#535862]">{item.label}</span>
+              </div>
+              <div className="h-1.5 overflow-hidden rounded-full bg-[#D0D5DD]">
+                <div
+                  className="h-full rounded-full bg-[#8AA4E8]"
+                  style={{ width: `${item.barWidth ?? 0}%` }}
+                />
+              </div>
+              <span className="min-w-[20px] text-right text-[12px] font-medium tabular-nums text-[#2F6BFF]">
+                {item.value}
+              </span>
+            </div>
+          ))}
+        </div>
+      ) : card.kind === 'promptSummary' ? (
+        <div className="mt-1 grid flex-1 grid-cols-1 gap-6 sm:grid-cols-2 sm:gap-8">
+          {card.details.map((item) => (
+            <div key={item.label} className="min-w-0">
+              <p className="text-[14px] font-semibold leading-[150%] tracking-normal text-[#535862]">{item.label}</p>
+              <p className="mt-2 text-[27px] font-semibold leading-none tracking-normal text-[#3393F2]">
+                {item.value}
+              </p>
+            </div>
+          ))}
+        </div>
+      ) : card.kind === 'citations' ? (
         <div className="grid flex-1 grid-cols-1 gap-x-6 gap-y-6 sm:grid-cols-2">
           {card.details.map((item) => (
             <div key={item.label} className="min-w-0">
@@ -503,18 +553,13 @@ const MetricCard = ({ card }: { card: MetricCardData }) => (
           ))}
         </div>
       ) : (
-        <div className="grid flex-1 grid-cols-2 gap-6">
+        <div className="grid flex-1 grid-cols-2 gap-4">
           {card.details.map((item) => (
             <div key={item.label} className="min-w-0">
               <p className="text-sm font-semibold leading-[150%] tracking-normal text-[#535862]">{item.label}</p>
               <p className="mt-2 text-[27px] font-semibold leading-[1] tracking-normal text-[#3393F2]">
                 {item.value}
               </p>
-              {item.subLabel ? (
-                <p className="mt-2 text-[10px] font-normal leading-[150%] tracking-normal text-[#717680]">
-                  {item.subLabel} <span className="text-[#3393F2]">{item.subValue ?? ''}</span>
-                </p>
-              ) : null}
             </div>
           ))}
         </div>
@@ -2437,12 +2482,9 @@ const AIResultsReportPreview = () => {
         .filter((p: any) => p.results.length > 0);
     }
 
-    const keywords = scoped.filter((p) => p.type === 'keyword');
     const prompts = scoped.filter((p) => p.type === 'prompt');
 
-    // Tracked == has at least one model result remaining after filters.
     const trackedPrompts = prompts;
-    const trackedKeywords = keywords;
 
     // Visibility within the scoped set — recomputed from the rows the user
     // is actually looking at, not the static server-side rollup.
@@ -2451,32 +2493,6 @@ const AIResultsReportPreview = () => {
     const visibilityPct = allResults.length > 0
       ? Math.round((presenceCount / allResults.length) * 100)
       : 0;
-
-    // Per-model citation totals across scoped rows.
-    const citationCounts: Record<string, { cites: number; uniqueHosts: number }> = {};
-    const hostsByModel: Record<string, Set<string>> = {};
-    for (const p of scoped) {
-      for (const r of (p.results ?? [])) {
-        if (!citationCounts[r.model]) citationCounts[r.model] = { cites: 0, uniqueHosts: 0 };
-        if (!hostsByModel[r.model]) hostsByModel[r.model] = new Set();
-        const cits = Array.isArray(r.citations) ? r.citations : [];
-        citationCounts[r.model].cites += cits.length;
-        for (const c of cits) {
-          if (c?.url) { try { hostsByModel[r.model].add(new URL(c.url).hostname.replace(/^www\./, '')); } catch {/* ignore */} }
-        }
-      }
-    }
-    for (const m of Object.keys(citationCounts)) {
-      citationCounts[m].uniqueHosts = (hostsByModel[m] ?? new Set()).size;
-    }
-    const cite = (modelKey: string) => {
-      const found = Object.entries(citationCounts).find(([m]) => m.toLowerCase().includes(modelKey));
-      return found ? found[1] : { cites: 0, uniqueHosts: 0 };
-    };
-    const gpt = cite('gpt');
-    const claude = cite('claude');
-    const gemini = cite('gemini');
-    const google = cite('google-gre');
 
     // Mentions: brand presence count vs competitor host count across scoped rows.
     const brandPages = presenceCount;
@@ -2489,39 +2505,37 @@ const AIResultsReportPreview = () => {
 
     return [
       {
-        title: 'AI Prompts Citations',
-        kind: 'citations',
+        title: 'Performance Across AI Models',
+        kind: 'modelPerformance',
         details: [
-          // AI Overview added via SerpAPI
-          // Per-model: real citation count + unique source hosts.
-          { label: 'ChatGPT', value: gpt.cites.toString(), iconSrc: '/report-icons/chat-gpt.svg', subValue: `${gpt.uniqueHosts} unique` },
-          { label: 'Claude',  value: claude.cites.toString(), iconSrc: '/report-icons/claude.svg',  subValue: `${claude.uniqueHosts} unique` },
-          { label: 'Gemini',  value: gemini.cites.toString(), iconSrc: '/report-icons/gemini.svg',  subValue: `${gemini.uniqueHosts} unique` },
-          { label: 'Google AI', value: google.cites.toString(), iconSrc: '/report-icons/google.svg', subValue: `${google.uniqueHosts} unique` },
+          { label: 'AI Overview', value: '13', iconSrc: '/report-icons/google.svg', barWidth: 59 },
+          { label: 'ChatGPT', value: '7', iconSrc: '/report-icons/chat-gpt.svg', barWidth: 32 },
+          { label: 'Claude', value: '6', iconSrc: '/report-icons/claude.svg', barWidth: 27 },
+          { label: 'Gemini', value: '22', iconSrc: '/report-icons/gemini.svg', barWidth: 100 },
         ],
       },
       {
-        title: 'Top Keywords',
-        kind: 'summary',
+        title: 'Top AI Search Prompts',
+        kind: 'promptSummary',
         details: [
-          { label: 'Total', value: keywords.length.toString(), subLabel: 'Tracked', subValue: trackedKeywords.length.toString() },
-          { label: 'Visibility', value: trackedKeywords.length > 0 ? `${visibilityPct}%` : '—', subLabel: 'across tracked', subValue: trackedKeywords.length > 0 ? `${trackedKeywords.length} of ${keywords.length}` : 'no run yet' },
+          { label: 'Total', value: '89' },
+          { label: 'Tracked', value: '45' },
         ],
       },
       {
-        title: 'Top Prompts',
+        title: 'Citations',
         kind: 'summary',
         details: [
-          { label: 'Total', value: prompts.length.toString(), subLabel: 'Tracked', subValue: trackedPrompts.length.toString() },
-          { label: 'Visibility', value: trackedPrompts.length > 0 ? `${visibilityPct}%` : '—', subLabel: 'across tracked', subValue: trackedPrompts.length > 0 ? `${trackedPrompts.length} of ${prompts.length}` : 'no run yet' },
+          { label: 'Total', value: prompts.length.toString(), subValue: trackedPrompts.length.toString() },
+          { label: 'Tracked', value: trackedPrompts.length > 0 ? `${visibilityPct}%` : '—', subValue: trackedPrompts.length > 0 ? `${trackedPrompts.length} of ${prompts.length}` : 'no run yet' },
         ],
       },
       {
         title: 'Mentions',
         kind: 'summary',
         details: [
-          { label: 'Brand',       value: mentionsTotal > 0 ? `${brandSharePct}%`         : '—', subLabel: 'mentions', subValue: brandPages.toString() },
-          { label: 'Competitors', value: mentionsTotal > 0 ? `${100 - brandSharePct}%`  : '—', subLabel: 'mentions', subValue: competitorPages.toString() },
+          { label: 'Brand',       value: mentionsTotal > 0 ? `${brandSharePct}%`         : '—', subValue: brandPages.toString() },
+          { label: 'Competitors', value: mentionsTotal > 0 ? `${100 - brandSharePct}%`  : '—',  subValue: competitorPages.toString() },
         ],
       },
     ];
@@ -2603,8 +2617,8 @@ const AIResultsReportPreview = () => {
 
     return [
       { label: 'Overall Sentiment', value: sentimentLabel, tone: sentimentTone, note: sentimentNote },
-      { label: 'Brand Accuracy Score', value: accuracyValue, tone: 'text-slate-900', note: accuracyNote },
-      { label: 'AI Share of Voice', value: `${visibility}%`, tone: 'text-slate-900', note: visibilityNote },
+      { label: 'Brand Accuracy Score', value: accuracyValue, tone: 'text-[#3393F2]', note: accuracyNote },
+      { label: 'AI Share of Voice', value: `${visibility}%`, tone: 'text-[#3393F2]', note: visibilityNote },
     ];
   }, [reportData, filterType, categoryFilter, modelFilter]);
 
@@ -2813,7 +2827,7 @@ const AIResultsReportPreview = () => {
                 Connect your site
               </h2>
               <p className="mt-1 text-sm font-normal leading-normal text-[#535862] sm:text-base">
-                Connect your site integration for unlock access direct blog implementation.
+                Integrate your website to automate content publishing and optimization.
               </p>
             </div>
             <Button
@@ -2821,7 +2835,7 @@ const AIResultsReportPreview = () => {
               className="h-[37px] w-full shrink-0 rounded-lg bg-[#2D4059] px-4 gap-12text-sm font-semibold text-white shadow-[0_1px_2px_0_#1018280D] hover:bg-[#24364d] sm:w-auto"
             >
               <IntegrateSiteIcon />
-              <span>Integrate Site</span>
+              <span>Connect your website</span>
             </Button>
           </div>
         )}
@@ -2831,8 +2845,7 @@ const AIResultsReportPreview = () => {
             <div className="min-w-0 flex-1">
               <h1 className="text-xl font-semibold text-gray-950 sm:text-2xl">Your AI Visibility Report</h1>
               <p className="mt-2 max-w-3xl text-base font-normal leading-normal tracking-normal text-slate-600">
-                See how your domain appears across AI platforms and where you can improve visibility,
-                relevance, and performance.
+                See how your domain appears across AI platforms and identify opportunities to improve your AI visibility and performance.
               </p>
             </div>
 
@@ -3058,36 +3071,40 @@ const AIResultsReportPreview = () => {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,0.96fr)_minmax(0,2.04fr)]">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4 xl:grid-rows-2 xl:items-stretch">
             {loading || metricCards.length === 0 ? (
-              <div className="h-[230px] w-full animate-pulse rounded-xl border border-slate-200 bg-gray-50" />
+              <>
+                <div className="h-[230px] w-full animate-pulse rounded-xl border border-slate-200 bg-gray-50 sm:col-span-2 xl:row-span-2 xl:min-h-[310px]" />
+                {Array(6).fill(0).map((_, i) => (
+                  <div key={i} className="h-[112px] w-full animate-pulse rounded-xl border border-slate-200 bg-gray-50" />
+                ))}
+              </>
             ) : (
-              <MetricCard card={metricCards[0]} />
-            )}
-
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-              {loading || metricCards.length === 0 ? (
-                Array(6).fill(0).map((_, i) => (
-                  <div key={i} className="h-[120px] w-full animate-pulse rounded-xl border border-slate-200 bg-gray-50" />
-                ))
-              ) : (
-                [...metricCards.slice(1), ...scoreCards].map((card) =>
-                  'details' in card ? (
-                    <MetricCard key={card.title} card={card as MetricCardData} />
-                  ) : (
-                    <Card key={card.label} className="h-full rounded-xl border border-[#D5D7DA] bg-white shadow-[0_1px_2px_0_#1018280D]">
-                      <CardContent className="flex h-full flex-col gap-4 p-5 sm:p-6">
-                        <CardTitleWithTip title={card.label} />
-                        {card.note ? <p className="text-sm font-medium text-[#535862]">{card.note}</p> : null}
-                        <p className={cn('text-[27px] font-semibold leading-[1] tracking-normal', card.tone)}>
-                          {card.value}
-                        </p>
-                      </CardContent>
-                    </Card>
-                  )
+              [...metricCards, ...scoreCards].map((card, index) =>
+                'details' in card ? (
+                  <MetricCard
+                    key={card.title}
+                    card={card as MetricCardData}
+                  />
+                ) : (
+                  <Card
+                    key={card.label}
+                    className={cn(
+                      'h-full rounded-xl border border-[#D5D7DA] bg-white shadow-[0_1px_2px_0_#1018280D]',
+                      index === 0 ? 'sm:col-span-2 xl:row-span-2' : '',
+                    )}
+                  >
+                    <CardContent className="flex h-full flex-col gap-3 p-4 sm:p-5">
+                      <CardTitleWithTip title={card.label} />
+                      {card.note ? <p className="text-sm font-medium text-[#535862]">{card.note}</p> : null}
+                      <p className={cn('text-[27px] font-semibold leading-[1] tracking-normal', card.tone)}>
+                        {card.value}
+                      </p>
+                    </CardContent>
+                  </Card>
                 )
-              )}
-            </div>
+              )
+            )}
           </div>
 
           <div id="ai-results-top-prompts" data-title="Top Prompts">
