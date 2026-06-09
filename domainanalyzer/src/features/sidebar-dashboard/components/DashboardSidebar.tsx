@@ -140,7 +140,7 @@ export function DashboardSidebar({
             icon: <Sparkles className="h-4 w-4" />,
             isActive: activeTab === "ai-visibility",
             onClick: () => onSelectTab("ai-visibility"),
-            href: "/ai-visibility",
+            href: "/dashboard?tab=ai-visibility",
             variant: "premium",
           },
         ],

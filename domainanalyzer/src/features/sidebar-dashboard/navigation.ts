@@ -22,6 +22,7 @@ export const DASHBOARD_QUERY_TABS: readonly TabId[] = [
   "competitor-intelligence",
   "audit",
   "analytics-report",
+  "ai-visibility",
 ];
 
 export function resolveSidebarNavigation(
@@ -31,7 +32,7 @@ export function resolveSidebarNavigation(
     case "overview":
       return { path: "/dashboard?tab=overview", activeTab: "overview" };
     case "ai-visibility":
-      return { path: "/ai-visibility", activeTab: "ai-visibility" };
+      return { path: "/dashboard?tab=ai-visibility", activeTab: "ai-visibility" };
     case "pricing":
       return {
         path: "/dashboard?tab=settings&subtab=subscription",

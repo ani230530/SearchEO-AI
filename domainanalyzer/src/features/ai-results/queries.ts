@@ -56,6 +56,14 @@ export interface DomainRow {
   lastAnalyzed?: string | Date | null;
   host?: string;
   companyName?: string | null;
+  metrics?: {
+    visibilityScore: number | null;
+    shareOfVoice: number | null;
+    brandAccuracy: number | null;
+    brandSentiment: number | null;
+    mentions: number;
+    overallHealth: number | null;
+  };
 }
 
 export interface DomainsResponse {

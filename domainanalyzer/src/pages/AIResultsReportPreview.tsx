@@ -1,7 +1,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { apiPost } from '../services/apiClient';
+import { apiPatch, apiPost } from '../services/apiClient';
 import { logoUrl as logoUrlHelper } from '@/lib/logoUrl';
 import { cn } from '@/lib/utils';
 import { AIResultsBreadcrumbs } from '@/features/ai-results/components/AIResultsBreadcrumbs';
@@ -82,9 +82,10 @@ import {
 import { useToast } from '@/components/ui/use-toast';
 import { maskDomainId, unmaskDomainId } from '../lib/domainUtils';
 import { useShellContext } from '@/features/ai-results/AIResultsShell';
-import { useCampaigns, useGscStatus, useReport, useRuns, useTrends } from '@/features/ai-results/queries';
+import { useCampaigns, useGscStatus, useReport, useRuns, useTrackedPrompts, useTrends } from '@/features/ai-results/queries';
 import { useQueryClient } from '@tanstack/react-query';
 import { aiResultsKeys } from '@/features/ai-results/queries';
+import type { PromptTableRow } from '@/features/ai-results/components/PromptTrackingTable';
 import {
   buildProjectsWorksheetPath,
   openWorksheetInNewTab,
@@ -393,14 +394,14 @@ const ReportSortIcon = () => (
 type MetricCardDetail = {
   label: string;
   value: string;
-  subLabel?: string;
   subValue?: string;
   iconSrc?: string;
+  barWidth?: number;
 };
 
 interface MetricCardData {
   title: string;
-  kind: 'citations' | 'summary';
+  kind: 'modelPerformance' | 'citations' | 'summary' | 'promptSummary';
   details: MetricCardDetail[];
 }
 
@@ -450,10 +451,10 @@ const MetricInfoTooltip = ({ tip }: { tip: string }) => (
  * already familiar to a marketer (SOV, AI Overview, etc.).
  */
 const CARD_TOOLTIPS: Record<string, string> = {
-  'AI Prompts Citations':
-    'How many web sources each AI assistant cited when answering your prompts. A higher count means the model is grounding its answer in real research — and the unique-host count tells you how diverse those sources are.',
-  'Top Keywords':
-    'Total keywords we generated for your audit, and how many actually got tested in this run. Visibility is the share of model responses that mentioned your brand across those tested keywords.',
+  'Performance Across AI Models':
+    'Static placeholder card for now. It will later be wired to live model performance data for each assistant.',
+  'Top AI Search Prompts':
+    'Static placeholder summary for the total AI search prompts in this run and how many were tracked.',
   'Top Prompts':
     'Total prompts the wizard wrote, and how many were run through the AI models. Visibility is the share of model responses that mentioned your brand — measured only across prompts you actually selected.',
   'Mentions':
@@ -481,11 +482,61 @@ const CardTitleWithTip = ({ title, className }: { title: string; className?: str
 );
 
 const MetricCard = ({ card }: { card: MetricCardData }) => (
-  <Card className="h-full rounded-xl border border-[#D5D7DA] bg-white shadow-[0_1px_2px_0_#1018280D]">
-    <CardContent className={cn('flex h-full flex-col p-5 sm:p-6', card.kind === 'citations' ? 'min-h-[228px] gap-5' : 'min-h-[120px] gap-4')}>
+  <Card
+    className={cn(
+      'rounded-xl border border-[#D5D7DA] bg-white shadow-[0_1px_2px_0_#1018280D]',
+      card.kind === 'modelPerformance' ? 'h-full sm:col-span-2 xl:col-span-1 xl:row-span-2 xl:min-h-[310px]' : 'h-full',
+    )}
+  >
+    <CardContent
+      className={cn(
+        'flex flex-col p-4 sm:p-6',
+        card.kind === 'modelPerformance'
+          ? 'gap-3 sm:gap-4 md:gap-5 xl:gap-[34px] p-4 sm:p-5 xl:min-h-[310px]'
+          : card.kind === 'promptSummary'
+            ? 'min-h-[130px] gap-4 p-5 sm:p-6'
+          : card.kind === 'citations'
+            ? 'min-h-[228px] gap-5'
+            : 'min-h-[112px] gap-3.5 p-4 sm:p-5',
+      )}
+    >
       <CardTitleWithTip title={card.title} />
 
-      {card.kind === 'citations' ? (
+      {card.kind === 'modelPerformance' ? (
+        <div className="flex flex-1 flex-col gap-3 sm:gap-3.5 md:gap-4 xl:gap-[45px] pt-0.5">
+          {card.details.map((item) => (
+            <div
+              key={item.label}
+              className="grid grid-cols-[minmax(0,88px)_minmax(0,1fr)_auto] items-center gap-2.5 sm:grid-cols-[minmax(0,104px)_minmax(0,1fr)_auto]"
+            >
+              <div className="flex min-w-0 items-center gap-2">
+                {item.iconSrc ? <img src={item.iconSrc} alt="" className="h-4 w-4 shrink-0 object-contain" /> : null}
+                <span className="truncate text-[12px] font-medium leading-none text-[#535862]">{item.label}</span>
+              </div>
+              <div className="h-1.5 overflow-hidden rounded-full bg-[#D0D5DD]">
+                <div
+                  className="h-full rounded-full bg-[#8AA4E8]"
+                  style={{ width: `${item.barWidth ?? 0}%` }}
+                />
+              </div>
+              <span className="min-w-[20px] text-right text-[12px] font-medium tabular-nums text-[#2F6BFF]">
+                {item.value}
+              </span>
+            </div>
+          ))}
+        </div>
+      ) : card.kind === 'promptSummary' ? (
+        <div className="mt-1 grid flex-1 grid-cols-1 gap-6 sm:grid-cols-2 sm:gap-8">
+          {card.details.map((item) => (
+            <div key={item.label} className="min-w-0">
+              <p className="text-[14px] font-semibold leading-[150%] tracking-normal text-[#535862]">{item.label}</p>
+              <p className="mt-2 text-[27px] font-semibold leading-none tracking-normal text-[#3393F2]">
+                {item.value}
+              </p>
+            </div>
+          ))}
+        </div>
+      ) : card.kind === 'citations' ? (
         <div className="grid flex-1 grid-cols-1 gap-x-6 gap-y-6 sm:grid-cols-2">
           {card.details.map((item) => (
             <div key={item.label} className="min-w-0">
@@ -503,18 +554,13 @@ const MetricCard = ({ card }: { card: MetricCardData }) => (
           ))}
         </div>
       ) : (
-        <div className="grid flex-1 grid-cols-2 gap-6">
+        <div className="grid flex-1 grid-cols-2 gap-4">
           {card.details.map((item) => (
             <div key={item.label} className="min-w-0">
               <p className="text-sm font-semibold leading-[150%] tracking-normal text-[#535862]">{item.label}</p>
               <p className="mt-2 text-[27px] font-semibold leading-[1] tracking-normal text-[#3393F2]">
                 {item.value}
               </p>
-              {item.subLabel ? (
-                <p className="mt-2 text-[10px] font-normal leading-[150%] tracking-normal text-[#717680]">
-                  {item.subLabel} <span className="text-[#3393F2]">{item.subValue ?? ''}</span>
-                </p>
-              ) : null}
             </div>
           ))}
         </div>
@@ -1012,6 +1058,7 @@ type PromptTableProps = {
   onSetSelectedRows: (ids: Set<string>) => void;
   onOpenWorksheetModal: (singleRowId?: string) => void;
   title?: string;
+  reportRunId?: number | null;
   /** Real Domain.id. Required for the Add & Analyze button to call
    *  POST /api/wizard/domain/:id/prompts/analyze. Null when the report
    *  hasn't loaded yet — in that case the button stays disabled. */
@@ -1024,10 +1071,12 @@ export const PromptTable = ({
   onToggleRow,
   onSetSelectedRows,
   onOpenWorksheetModal,
-  title = 'Top searched Prompts',
+  title = 'Your Top Performing Prompts',
+  reportRunId = null,
   domainId,
 }: PromptTableProps) => {
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const selectedCount = selectedRowIds.size;
   const [expandedId, setExpandedId] = useState<string | null>(null);
   // Prompt rows whose full text is revealed (click the prompt to toggle).
@@ -1041,6 +1090,18 @@ export const PromptTable = ({
   const [tableFilter, setTableFilter] = useState<'all' | 'prompt' | 'keyword'>('all');
   const [tableMetric, setTableMetric] = useState<string | null>(null);
   const [showAllQueries, setShowAllQueries] = useState(false);
+  const trackedPromptsQuery = useTrackedPrompts<{ prompts?: PromptTableRow[] }>(domainId ?? null);
+  const trackedPromptRows = useMemo(
+    () => (Array.isArray(trackedPromptsQuery.data?.prompts) ? trackedPromptsQuery.data!.prompts : []),
+    [trackedPromptsQuery.data],
+  );
+  const trackedRowsByRawId = useMemo(() => {
+    const map = new Map<number, PromptTableRow>();
+    for (const row of trackedPromptRows) {
+      if (typeof row.rawId === 'number') map.set(row.rawId, row);
+    }
+    return map;
+  }, [trackedPromptRows]);
 
   // Add & Analyze state.
   //   - `analyzeText`     the input value
@@ -1055,6 +1116,148 @@ export const PromptTable = ({
   const [pendingRows, setPendingRows] = useState<
     Array<{ id: string; phrase: string }>
   >([]);
+  const [trackOverrides, setTrackOverrides] = useState<Record<string, boolean>>({});
+  const [trackPending, setTrackPending] = useState<Record<string, boolean>>({});
+  const [bulkPending, setBulkPending] = useState(false);
+
+  useEffect(() => {
+    setTrackOverrides({});
+    setTrackPending({});
+    setBulkPending(false);
+  }, [domainId]);
+
+  const invalidateTracking = useCallback(() => {
+    if (domainId == null) return;
+    queryClient.invalidateQueries({ queryKey: aiResultsKeys.trackedPrompts(domainId) });
+    queryClient.invalidateQueries({ queryKey: aiResultsKeys.report(domainId, reportRunId) });
+  }, [domainId, queryClient, reportRunId]);
+
+  const mergeTrackedRow = useCallback(
+    (row: any): PromptTableRow => {
+      const tracked = typeof row?.rawId === 'number' ? trackedRowsByRawId.get(row.rawId) : undefined;
+      const merged: PromptTableRow = tracked
+        ? {
+            ...row,
+            isTracked: tracked.isTracked ?? true,
+            lastTestedAt: tracked.lastTestedAt ?? row.lastTestedAt ?? null,
+            nextTestAt: tracked.nextTestAt ?? row.nextTestAt ?? null,
+            weekTrend: tracked.weekTrend ?? row.weekTrend ?? null,
+          }
+        : row;
+
+      return {
+        ...merged,
+        isTracked: trackOverrides[merged.id] ?? merged.isTracked ?? false,
+      };
+    },
+    [trackOverrides, trackedRowsByRawId],
+  );
+
+  const isRowTracked = useCallback(
+    (row: PromptTableRow) => trackOverrides[row.id] ?? row.isTracked ?? false,
+    [trackOverrides],
+  );
+
+  const toggleTracking = useCallback(
+    async (row: PromptTableRow, next: boolean) => {
+      const keywordChildIds = row.type === 'keyword' ? row.childPromptIds ?? [] : [];
+      const canToggle = row.type === 'prompt' ? row.rawId != null : keywordChildIds.length > 0;
+      if (domainId == null || !canToggle || trackPending[row.id]) return;
+
+      setTrackOverrides((p) => ({ ...p, [row.id]: next }));
+      setTrackPending((p) => ({ ...p, [row.id]: true }));
+
+      try {
+        if (row.type === 'keyword') {
+          await apiPatch<{ updated: number }>(
+            `/wizard/domain/${domainId}/prompts/track`,
+            { promptIds: keywordChildIds, tracked: next },
+          );
+        } else {
+          await apiPatch<{ prompt: { id: number; isTracked: boolean } }>(
+            `/wizard/domain/${domainId}/prompts/${row.rawId}/track`,
+            { tracked: next },
+          );
+        }
+        invalidateTracking();
+        toast({
+          title: next ? 'Tracking weekly' : 'Tracking stopped',
+          description: next
+            ? 'This prompt is re-tested automatically every week.'
+            : 'Removed from weekly tests.',
+        });
+      } catch (err) {
+        setTrackOverrides((p) => {
+          const copy = { ...p };
+          delete copy[row.id];
+          return copy;
+        });
+        toast({
+          title: "Couldn't update tracking",
+          description: err instanceof Error ? err.message : 'Try again.',
+          variant: 'destructive',
+        });
+      } finally {
+        setTrackPending((p) => {
+          const copy = { ...p };
+          delete copy[row.id];
+          return copy;
+        });
+      }
+    },
+    [domainId, invalidateTracking, trackPending],
+  );
+
+  const bulkTrack = useCallback(
+    async (rows: PromptTableRow[], next: boolean) => {
+      if (domainId == null || bulkPending) return;
+
+      const promptIds = Array.from(
+        new Set(
+          rows.flatMap((r) =>
+            r.type === 'prompt'
+              ? (typeof r.rawId === 'number' ? [r.rawId] : [])
+              : (r.childPromptIds ?? []),
+          ),
+        ),
+      );
+      if (promptIds.length === 0) return;
+
+      setBulkPending(true);
+      setTrackOverrides((p) => {
+        const copy = { ...p };
+        for (const r of rows) copy[r.id] = next;
+        return copy;
+      });
+
+      try {
+        await apiPatch<{ updated: number }>(
+          `/wizard/domain/${domainId}/prompts/track`,
+          { promptIds, tracked: next },
+        );
+        invalidateTracking();
+        onSetSelectedRows(new Set());
+        toast({
+          title: next ? `Tracking ${promptIds.length} prompt${promptIds.length === 1 ? '' : 's'}` : 'Tracking stopped',
+          description: next ? 'Re-tested automatically every week.' : 'Removed from weekly tests.',
+        });
+      } catch (err) {
+        setTrackOverrides((p) => {
+          const copy = { ...p };
+          for (const r of rows) delete copy[r.id];
+          return copy;
+        });
+        toast({
+          title: "Couldn't update tracking",
+          description: err instanceof Error ? err.message : 'Try again.',
+          variant: 'destructive',
+        });
+      } finally {
+        setBulkPending(false);
+      }
+    },
+    [bulkPending, domainId, invalidateTracking, onSetSelectedRows],
+  );
 
   const handleAnalyzePrompt = async () => {
     const text = analyzeText.trim();
@@ -1133,7 +1336,7 @@ export const PromptTable = ({
   // Full sorted/filtered list, before pagination. We split this from the
   // paginated `displayData` so we know `totalCount` for the pager.
   const fullSortedData = useMemo(() => {
-    let items = [...data];
+    let items = [...data].map(mergeTrackedRow);
 
     // Dedupe parent rows that match a row we just analyzed — the
     // newly-analyzed copy has the fresher result data and wins.
@@ -1172,10 +1375,10 @@ export const PromptTable = ({
     // freshest data the user just produced. We DON'T pin them above
     // the metric-sort (that would lie about the sort).
     if (!tableMetric) {
-      return [...newlyAnalyzedRows, ...items];
+      return [...newlyAnalyzedRows.map(mergeTrackedRow), ...items];
     }
     return items;
-  }, [data, tableFilter, tableMetric, newlyAnalyzedRows]);
+  }, [data, tableFilter, tableMetric, newlyAnalyzedRows, mergeTrackedRow]);
 
   const totalCount = fullSortedData.length;
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
@@ -1194,6 +1397,10 @@ export const PromptTable = ({
     const start = (currentPage - 1) * PAGE_SIZE;
     return fullSortedData.slice(start, start + PAGE_SIZE);
   }, [fullSortedData, currentPage]);
+  const selectedRows = useMemo(
+    () => fullSortedData.filter((row) => selectedRowIds.has(row.id)),
+    [fullSortedData, selectedRowIds],
+  );
   const visibleRowIds = useMemo(
     () => displayData.map((row) => String(row.id)),
     [displayData]
@@ -1211,7 +1418,7 @@ export const PromptTable = ({
         <div className="flex flex-col gap-1">
           <CardTitle className="text-xl font-bold text-[#1e293b]">{title}</CardTitle>
           <p className="text-sm text-slate-500">
-            Compare how AI models respond, cite sources, and surface competitors across queries
+            Compare how AI models respond, cite sources, and identify competitors across search queries
           </p>
         </div>
 
@@ -1320,6 +1527,25 @@ export const PromptTable = ({
                 Add to Worksheet{selectedCount > 0 ? ` (${selectedCount})` : ''}
               </span>
             </Button>
+
+            <Button
+              type="button"
+              onClick={() => void bulkTrack(selectedRows.length > 0 ? selectedRows : fullSortedData, true)}
+              disabled={bulkPending || domainId == null || fullSortedData.length === 0}
+              className="h-[38px] gap-2 rounded-lg border-none bg-[#4b6eb8] px-4 text-white shadow-none transition-all hover:bg-[#3f5d9c] disabled:opacity-60"
+            >
+              {bulkPending
+                ? <Loader2 className="h-4 w-4 animate-spin" />
+                : selectedRows.length > 0
+                  ? <Sparkles className="h-4 w-4" />
+                  : <ShieldCheck className="h-4 w-4" />
+              }
+              <span className="text-[13px] font-medium">
+                {selectedRows.length > 0
+                  ? `Track selected (${selectedRows.length})`
+                  : 'Track all'}
+              </span>
+            </Button>
           </div>
         </div>
       </CardHeader>
@@ -1346,13 +1572,13 @@ export const PromptTable = ({
                     className="h-3.5 w-3.5 rounded border-gray-300 accent-blue-600"
                   />
                 </TableHead>
-                <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500 px-2">Prompts & Keywords</TableHead>
-                <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500 px-2">Sentiment</TableHead>
-                <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500 px-2">Ranking</TableHead>
-                <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500 px-2">Position</TableHead>
-                <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500 px-2">SOV</TableHead>
-                <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500 px-2">Competitors</TableHead>
-                <TableHead className="text-right text-[10px] font-bold uppercase tracking-wider text-slate-500 px-4">Action</TableHead>
+                <TableHead className="text-[10px] font-semibold uppercase tracking-wider text-[#2D4059] px-2">Prompts & Keywords</TableHead>
+                <TableHead className="text-[10px] font-semibold uppercase tracking-wider text-[#2D4059] px-2">Sentiment</TableHead>
+                <TableHead className="text-[10px] font-semibold uppercase tracking-wider text-[#2D4059] px-2">Ranking</TableHead>
+                <TableHead className="text-[10px] font-semibold uppercase tracking-wider text-[#2D4059] px-2">Position</TableHead>
+                <TableHead className="text-[10px] font-semibold uppercase tracking-wider text-[#2D4059] px-2">AI SOV</TableHead>
+                <TableHead className="text-[10px] font-semibold uppercase tracking-wider text-[#2D4059] px-2">Competitors</TableHead>
+                <TableHead className="text-center text-[10px] font-semibold uppercase tracking-wider text-[#2D4059] px-4">Action</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -1404,7 +1630,7 @@ export const PromptTable = ({
                           checked={selectedRowIds.has(String(row.id))}
                           onClick={(e) => e.stopPropagation()}
                           onChange={() => onToggleRow(String(row.id))}
-                          aria-label={`Select ${row.phrase ?? row.prompt ?? 'row'}`}
+                          aria-label={`Select ${row.phrase ?? 'row'}`}
                           className="h-3.5 w-3.5 rounded border-gray-300 accent-blue-600"
                         />
                         <button
@@ -1507,10 +1733,39 @@ export const PromptTable = ({
                     <TableCell className="py-3 px-4 text-right">
                       <div className="flex justify-end gap-2">
                         <Button
-                          variant={expandedId === row.id ? "default" : "outline"}
-                          className={`h-7 rounded-lg px-3 text-[10px] font-bold shadow-none ${expandedId === row.id ? 'bg-[#3B82F6] hover:bg-[#2563EB]' : 'border-slate-300 text-slate-600 hover:bg-gray-50'}`}
+                          type="button"
+                          disabled={
+                            trackPending[row.id] ||
+                            (row.type === 'prompt'
+                              ? row.rawId == null
+                              : (row.childPromptIds?.length ?? 0) === 0)
+                          }
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            void toggleTracking(row, !isRowTracked(row));
+                          }}
+                          className="flex h-9 w-9 items-center justify-center rounded-[8px] border border-[#7f9fe8] bg-gradient-to-b from-[#9cb7e9] to-[#7f9fe8] text-white shadow-[0_4px_14px_rgba(15,23,42,0.06)] transition hover:-translate-y-0.5 hover:shadow-[0_8px_18px_rgba(15,23,42,0.08)] disabled:opacity-50"
+                          aria-pressed={isRowTracked(row)}
+                          aria-label={isRowTracked(row) ? 'Stop weekly tracking' : 'Track weekly'}
+                          title={isRowTracked(row) ? 'Tracking weekly — click to stop' : 'Track weekly'}
                         >
-                          {expandedId === row.id ? 'Close' : 'AI Response'}
+                          {trackPending[row.id] ? (
+                            <Loader2 className="h-7 w-7 animate-spin" />
+                          ) : isRowTracked(row) ? (
+                            <img
+                              src="/report-icons/pause-circle.svg"
+                              alt=""
+                              aria-hidden="true"
+                              className="h-7 w-7 shrink-0 object-contain"
+                            />
+                          ) : (
+                            <img
+                              src="/report-icons/target-03.svg"
+                              alt=""
+                              aria-hidden="true"
+                              className="h-7 w-7 shrink-0 object-contain"
+                            />
+                          )}
                         </Button>
                         <Button
                           variant="outline"
@@ -2118,6 +2373,36 @@ const AIResultsReportPreview = () => {
 
   const selectedCount = selectedRowIds.size;
 
+  const scrollToSection = useCallback((sectionId: string) => {
+    const target = document.getElementById(sectionId);
+    if (!target) return;
+    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, []);
+
+  const suggestedNextActions = useMemo(
+    () => [
+      {
+        title: 'Connect Website',
+        description: 'Integrate your website to automate content publishing and optimization.',
+        iconSrc: '/suggested-actions/connect-website.svg',
+        onClick: () => navigate('/dashboard?tab=integration'),
+      },
+      {
+        title: 'Explore Opportunities',
+        description: 'Discover high-impact prompts, uncover content gaps, and identify opportunities to improve AI visibility.',
+        iconSrc: '/suggested-actions/explore-opportunities.svg',
+        onClick: () => scrollToSection('ai-results-opportunities'),
+      },
+      {
+        title: 'Analyze Competitors',
+        description: 'Identify the content strategies helping competitors appear more frequently in AI-generated responses.',
+        iconSrc: '/suggested-actions/analyze-competitors.svg',
+        onClick: () => scrollToSection('ai-results-visibility-coverage'),
+      },
+    ],
+    [navigate, scrollToSection],
+  );
+
   const handleToggleRow = useCallback((id: string) => {
     setSelectedRowIds((current) => {
       const next = new Set(current);
@@ -2437,12 +2722,9 @@ const AIResultsReportPreview = () => {
         .filter((p: any) => p.results.length > 0);
     }
 
-    const keywords = scoped.filter((p) => p.type === 'keyword');
     const prompts = scoped.filter((p) => p.type === 'prompt');
 
-    // Tracked == has at least one model result remaining after filters.
     const trackedPrompts = prompts;
-    const trackedKeywords = keywords;
 
     // Visibility within the scoped set — recomputed from the rows the user
     // is actually looking at, not the static server-side rollup.
@@ -2451,32 +2733,6 @@ const AIResultsReportPreview = () => {
     const visibilityPct = allResults.length > 0
       ? Math.round((presenceCount / allResults.length) * 100)
       : 0;
-
-    // Per-model citation totals across scoped rows.
-    const citationCounts: Record<string, { cites: number; uniqueHosts: number }> = {};
-    const hostsByModel: Record<string, Set<string>> = {};
-    for (const p of scoped) {
-      for (const r of (p.results ?? [])) {
-        if (!citationCounts[r.model]) citationCounts[r.model] = { cites: 0, uniqueHosts: 0 };
-        if (!hostsByModel[r.model]) hostsByModel[r.model] = new Set();
-        const cits = Array.isArray(r.citations) ? r.citations : [];
-        citationCounts[r.model].cites += cits.length;
-        for (const c of cits) {
-          if (c?.url) { try { hostsByModel[r.model].add(new URL(c.url).hostname.replace(/^www\./, '')); } catch {/* ignore */} }
-        }
-      }
-    }
-    for (const m of Object.keys(citationCounts)) {
-      citationCounts[m].uniqueHosts = (hostsByModel[m] ?? new Set()).size;
-    }
-    const cite = (modelKey: string) => {
-      const found = Object.entries(citationCounts).find(([m]) => m.toLowerCase().includes(modelKey));
-      return found ? found[1] : { cites: 0, uniqueHosts: 0 };
-    };
-    const gpt = cite('gpt');
-    const claude = cite('claude');
-    const gemini = cite('gemini');
-    const google = cite('google-gre');
 
     // Mentions: brand presence count vs competitor host count across scoped rows.
     const brandPages = presenceCount;
@@ -2489,39 +2745,37 @@ const AIResultsReportPreview = () => {
 
     return [
       {
-        title: 'AI Prompts Citations',
-        kind: 'citations',
+        title: 'Performance Across AI Models',
+        kind: 'modelPerformance',
         details: [
-          // AI Overview added via SerpAPI
-          // Per-model: real citation count + unique source hosts.
-          { label: 'ChatGPT', value: gpt.cites.toString(), iconSrc: '/report-icons/chat-gpt.svg', subValue: `${gpt.uniqueHosts} unique` },
-          { label: 'Claude',  value: claude.cites.toString(), iconSrc: '/report-icons/claude.svg',  subValue: `${claude.uniqueHosts} unique` },
-          { label: 'Gemini',  value: gemini.cites.toString(), iconSrc: '/report-icons/gemini.svg',  subValue: `${gemini.uniqueHosts} unique` },
-          { label: 'Google AI', value: google.cites.toString(), iconSrc: '/report-icons/google.svg', subValue: `${google.uniqueHosts} unique` },
+          { label: 'AI Overview', value: '13', iconSrc: '/report-icons/google.svg', barWidth: 59 },
+          { label: 'ChatGPT', value: '7', iconSrc: '/report-icons/chat-gpt.svg', barWidth: 32 },
+          { label: 'Claude', value: '6', iconSrc: '/report-icons/claude.svg', barWidth: 27 },
+          { label: 'Gemini', value: '22', iconSrc: '/report-icons/gemini.svg', barWidth: 100 },
         ],
       },
       {
-        title: 'Top Keywords',
-        kind: 'summary',
+        title: 'Top AI Search Prompts',
+        kind: 'promptSummary',
         details: [
-          { label: 'Total', value: keywords.length.toString(), subLabel: 'Tracked', subValue: trackedKeywords.length.toString() },
-          { label: 'Visibility', value: trackedKeywords.length > 0 ? `${visibilityPct}%` : '—', subLabel: 'across tracked', subValue: trackedKeywords.length > 0 ? `${trackedKeywords.length} of ${keywords.length}` : 'no run yet' },
+          { label: 'Total', value: '89' },
+          { label: 'Tracked', value: '45' },
         ],
       },
       {
-        title: 'Top Prompts',
+        title: 'Citations',
         kind: 'summary',
         details: [
-          { label: 'Total', value: prompts.length.toString(), subLabel: 'Tracked', subValue: trackedPrompts.length.toString() },
-          { label: 'Visibility', value: trackedPrompts.length > 0 ? `${visibilityPct}%` : '—', subLabel: 'across tracked', subValue: trackedPrompts.length > 0 ? `${trackedPrompts.length} of ${prompts.length}` : 'no run yet' },
+          { label: 'Total', value: prompts.length.toString(), subValue: trackedPrompts.length.toString() },
+          { label: 'Tracked', value: trackedPrompts.length > 0 ? `${visibilityPct}%` : '—', subValue: trackedPrompts.length > 0 ? `${trackedPrompts.length} of ${prompts.length}` : 'no run yet' },
         ],
       },
       {
         title: 'Mentions',
         kind: 'summary',
         details: [
-          { label: 'Brand',       value: mentionsTotal > 0 ? `${brandSharePct}%`         : '—', subLabel: 'mentions', subValue: brandPages.toString() },
-          { label: 'Competitors', value: mentionsTotal > 0 ? `${100 - brandSharePct}%`  : '—', subLabel: 'mentions', subValue: competitorPages.toString() },
+          { label: 'Brand',       value: mentionsTotal > 0 ? `${brandSharePct}%`         : '—', subValue: brandPages.toString() },
+          { label: 'Competitors', value: mentionsTotal > 0 ? `${100 - brandSharePct}%`  : '—',  subValue: competitorPages.toString() },
         ],
       },
     ];
@@ -2603,8 +2857,8 @@ const AIResultsReportPreview = () => {
 
     return [
       { label: 'Overall Sentiment', value: sentimentLabel, tone: sentimentTone, note: sentimentNote },
-      { label: 'Brand Accuracy Score', value: accuracyValue, tone: 'text-slate-900', note: accuracyNote },
-      { label: 'AI Share of Voice', value: `${visibility}%`, tone: 'text-slate-900', note: visibilityNote },
+      { label: 'Brand Accuracy Score', value: accuracyValue, tone: 'text-[#3393F2]', note: accuracyNote },
+      { label: 'AI Share of Voice', value: `${visibility}%`, tone: 'text-[#3393F2]', note: visibilityNote },
     ];
   }, [reportData, filterType, categoryFilter, modelFilter]);
 
@@ -2805,7 +3059,7 @@ const AIResultsReportPreview = () => {
         </div>
       </div>
 
-      <section className="flex w-full flex-col bg-white px-4 py-3 sm:px-6">
+      <section className="flex w-full flex-col bg-white px-4 py-2 sm:px-6">
         {!gscConnected && (
           <div className="flex w-full flex-col gap-4 rounded-xl bg-[#F1F6FF] px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
             <div className="min-w-0">
@@ -2813,7 +3067,7 @@ const AIResultsReportPreview = () => {
                 Connect your site
               </h2>
               <p className="mt-1 text-sm font-normal leading-normal text-[#535862] sm:text-base">
-                Connect your site integration for unlock access direct blog implementation.
+                Integrate your website to automate content publishing and optimization.
               </p>
             </div>
             <Button
@@ -2821,7 +3075,7 @@ const AIResultsReportPreview = () => {
               className="h-[37px] w-full shrink-0 rounded-lg bg-[#2D4059] px-4 gap-12text-sm font-semibold text-white shadow-[0_1px_2px_0_#1018280D] hover:bg-[#24364d] sm:w-auto"
             >
               <IntegrateSiteIcon />
-              <span>Integrate Site</span>
+              <span>Connect your website</span>
             </Button>
           </div>
         )}
@@ -2831,8 +3085,7 @@ const AIResultsReportPreview = () => {
             <div className="min-w-0 flex-1">
               <h1 className="text-xl font-semibold text-gray-950 sm:text-2xl">Your AI Visibility Report</h1>
               <p className="mt-2 max-w-3xl text-base font-normal leading-normal tracking-normal text-slate-600">
-                See how your domain appears across AI platforms and where you can improve visibility,
-                relevance, and performance.
+                See how your domain appears across AI platforms and identify opportunities to improve your AI visibility and performance.
               </p>
             </div>
 
@@ -3017,7 +3270,7 @@ const AIResultsReportPreview = () => {
                     className="h-[41px] rounded-lg bg-gradient-to-r from-[#2D4059] to-[#4C74C2] px-4 text-xs text-white shadow-[0_1px_2px_0_#1018280D] hover:opacity-95"
                   >
                     <Plus className="mr-1.5 h-3.5 w-3.5" />
-                    Start New Audit
+                    Audit Brand Visibility
                     <ChevronDown className="ml-1.5 h-3.5 w-3.5" strokeWidth={1.8} />
                   </Button>
                 </DropdownMenuTrigger>
@@ -3058,36 +3311,40 @@ const AIResultsReportPreview = () => {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,0.96fr)_minmax(0,2.04fr)]">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4 xl:grid-rows-2 xl:items-stretch">
             {loading || metricCards.length === 0 ? (
-              <div className="h-[230px] w-full animate-pulse rounded-xl border border-slate-200 bg-gray-50" />
+              <>
+                <div className="h-[230px] w-full animate-pulse rounded-xl border border-slate-200 bg-gray-50 sm:col-span-2 xl:row-span-2 xl:min-h-[310px]" />
+                {Array(6).fill(0).map((_, i) => (
+                  <div key={i} className="h-[112px] w-full animate-pulse rounded-xl border border-slate-200 bg-gray-50" />
+                ))}
+              </>
             ) : (
-              <MetricCard card={metricCards[0]} />
-            )}
-
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-              {loading || metricCards.length === 0 ? (
-                Array(6).fill(0).map((_, i) => (
-                  <div key={i} className="h-[120px] w-full animate-pulse rounded-xl border border-slate-200 bg-gray-50" />
-                ))
-              ) : (
-                [...metricCards.slice(1), ...scoreCards].map((card) =>
-                  'details' in card ? (
-                    <MetricCard key={card.title} card={card as MetricCardData} />
-                  ) : (
-                    <Card key={card.label} className="h-full rounded-xl border border-[#D5D7DA] bg-white shadow-[0_1px_2px_0_#1018280D]">
-                      <CardContent className="flex h-full flex-col gap-4 p-5 sm:p-6">
-                        <CardTitleWithTip title={card.label} />
-                        {card.note ? <p className="text-sm font-medium text-[#535862]">{card.note}</p> : null}
-                        <p className={cn('text-[27px] font-semibold leading-[1] tracking-normal', card.tone)}>
-                          {card.value}
-                        </p>
-                      </CardContent>
-                    </Card>
-                  )
+              [...metricCards, ...scoreCards].map((card, index) =>
+                'details' in card ? (
+                  <MetricCard
+                    key={card.title}
+                    card={card as MetricCardData}
+                  />
+                ) : (
+                  <Card
+                    key={card.label}
+                    className={cn(
+                      'h-full rounded-xl border border-[#D5D7DA] bg-white shadow-[0_1px_2px_0_#1018280D]',
+                      index === 0 ? 'sm:col-span-2 xl:row-span-2' : '',
+                    )}
+                  >
+                    <CardContent className="flex h-full flex-col gap-3 p-4 sm:p-5">
+                      <CardTitleWithTip title={card.label} />
+                      {card.note ? <p className="text-sm font-medium text-[#535862]">{card.note}</p> : null}
+                      <p className={cn('text-[27px] font-semibold leading-[1] tracking-normal', card.tone)}>
+                        {card.value}
+                      </p>
+                    </CardContent>
+                  </Card>
                 )
-              )}
-            </div>
+              )
+            )}
           </div>
 
           <div id="ai-results-top-prompts" data-title="Top Prompts">
@@ -3100,6 +3357,7 @@ const AIResultsReportPreview = () => {
                 onToggleRow={handleToggleRow}
                 onSetSelectedRows={handleSetSelectedRows}
                 onOpenWorksheetModal={handleOpenWorksheetModal}
+                reportRunId={selectedRunId}
                 domainId={reportData?.domainInfo?.id ?? null}
               />
             )}
@@ -3107,91 +3365,107 @@ const AIResultsReportPreview = () => {
         </div>
       </section>
 
-        <section className="grid w-full grid-cols-1 gap-6 bg-white px-4 py-4 sm:px-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
-          <div className="min-w-0 space-y-6">
-            <Card id="ai-results-phrase-visibility" data-title="Phrase Visibility" className="rounded-xl border border-[#D5D7DA] bg-white shadow-[0_1px_2px_0_#1018280D]">
+        <section className="grid w-full grid-cols-1 gap-6 bg-white px-4 py-0 sm:px-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
+
+          <Card id="ai-results-visibility-coverage" data-title="Visibility & Coverage" className="min-w-0 rounded-xl border border-[#D5D7DA] bg-white shadow-[0_1px_2px_0_#1018280D]">
+            <CardHeader className="flex flex-col gap-3 px-4 pb-2 pt-4 sm:flex-row sm:items-center sm:justify-between">
+              <CardTitle className="text-base font-semibold text-[#2D4059]">Visibility & Coverage</CardTitle>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  variant="outline"
+                  className="h-8 rounded-lg border border-[#D5D7DA] bg-white px-3 text-[11px] text-[#717680] shadow-[0_1px_2px_0_#1018280D] hover:bg-white"
+                >
+                  <Calendar className="mr-1.5 h-3.5 w-3.5 text-[#717680]" strokeWidth={1.8} />
+                  7 days
+                  <ChevronDown className="ml-1.5 h-3.5 w-3.5 text-[#717680]" strokeWidth={1.8} />
+                </Button>
+                <FilterPill label="Sort" icon="sort" />
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-8 px-4 pb-4">
+              <AreaChartCard
+                title="Share of Voice"
+                subtitle="Idenitfy visibility gaps and uncover opportunities to capture more AI-driven traffic."
+                data={shareOfVoiceChart.data}
+                series={shareOfVoiceChart.series}
+                tooltipTitle="AI Share of voice"
+                emptyMessage={trendEmptyMessage}
+              />
+              <AreaChartCard
+                title="Citations"
+                subtitle="Track brand citations across AI models."
+                data={citationsChart.data}
+                series={citationsChart.series}
+                tooltipTitle="Citations"
+                emptyMessage={trendEmptyMessage}
+              />
+              <AreaChartCard
+                title="Mentions rate trend"
+                subtitle="Monitor how often your brand is mentioned compared to competitors."
+                data={mentionsChart.data}
+                series={mentionsChart.series}
+                tooltipTitle="Mentions"
+                emptyMessage={trendEmptyMessage}
+              />
+            </CardContent>
+          </Card>
+
+          <div className="min-w-0 grid gap-6 xl:h-full xl:min-h-0 xl:grid-rows-[minmax(0,0.4fr)_minmax(0,0.6fr)]">
+
+            <Card className="h-full rounded-xl border border-[#DDE7F5] bg-[#F1F6FF] shadow-[0_1px_2px_0_#1018280D]">
               <CardHeader className="flex flex-row items-start justify-between px-4 pb-3 pt-4">
                 <div className="min-w-0">
-                  <CardTitleWithTip title="Phrase Visibility Map" />
-                  <p className="mt-2 text-sm leading-[150%] text-[#535862]">
-                    Data-backed actions to close visibility gaps and capture missed AI-driven traffic.
-                  </p>
-                </div>
-                <button className="text-xs font-medium text-blue-600">View all</button>
-              </CardHeader>
-              <CardContent className="space-y-2 px-4 pb-4">
-                <div className="flex flex-wrap gap-2">
-                  <FilterPill label="Sort" icon="sort" />
-                  <FilterPill label="Filters" icon="filter" />
-                </div>
-                {/* Inner scroll container — keeps the card height stable so the
-                 *  right-hand Visibility & Coverage column doesn't slide out of
-                 *  alignment when many phrase rows render. */}
-                <div className="max-h-[420px] space-y-2 overflow-y-auto pr-1">
-                {(reportData?.phraseVisibility ?? []).length === 0 ? (
-                  <div className="flex flex-col items-start gap-2 rounded-md border border-dashed border-slate-200 bg-slate-50 px-3 py-3">
-                    <p className="text-xs text-slate-600">
-                      No phrase data yet — run the wizard or retry to refresh.
-                    </p>
-                    <button
-                      type="button"
-                      onClick={handleRetryOpportunities}
-                      disabled={opportunitiesRetrying}
-                      className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm hover:bg-slate-100 disabled:opacity-50"
-                    >
-                      <RefreshCw className={cn('h-3.5 w-3.5', opportunitiesRetrying && 'animate-spin')} />
-                      {opportunitiesRetrying ? 'Retrying…' : 'Retry'}
-                    </button>
+                  <div className="flex items-center justify-between gap-3">
+                    <h3 className="text-[18px] font-semibold leading-normal text-[#414651]">
+                      Suggested Next Actions
+                    </h3>
+                    <span aria-hidden="true" className="flex items-center gap-0.5 text-[#98A2B3]">
+                      <ChevronRight className="h-3.5 w-3.5 -translate-x-0.5" />
+                      <ChevronRight className="h-3.5 w-3.5 -translate-x-1.5" />
+                    </span>
                   </div>
-                ) : null}
-                {(reportData?.phraseVisibility ?? []).slice(0, 8).map((row: any) => {
-                  const status: 'positive' | 'warn' | 'danger' =
-                    row.status === 'won' ? 'positive' : row.status === 'at_risk' ? 'warn' : 'danger';
-                  const ctaLabel = row.status === 'won' ? 'Reinforce' : 'Generate Content';
-                  const key = `phrase:${row.promptId}`;
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4 px-4 pb-4 pt-4">
+                {suggestedNextActions.map((action) => {
                   return (
-                    <VisibilityRow
-                      key={key}
-                      title={row.phrase}
-                      meta={row.subtitle}
-                      status={status}
-                      actionLabel={ctaLabel}
-                      onAction={() =>
-                        handleGenerateContent(key, {
-                          kind: 'phrase',
-                          title:
-                            row.status === 'won'
-                              ? `Reinforce coverage for ${row.keyword ?? 'this prompt'}`
-                              : `Improve coverage for ${row.keyword ?? 'this prompt'}`,
-                          rationale: row.subtitle,
-                          primaryKeyword: row.keyword ?? null,
-                          longtailKeywords: [row.phrase],
-                          suggestedTemplate:
-                            row.category === 'brand_vs_competitor'
-                              ? 'landing_page'
-                              : row.category === 'branded_trust'
-                                ? 'case_study'
-                                : row.category === 'problem_statement'
-                                  ? 'faq'
-                                  : 'blog',
-                          category: row.category ?? null,
-                          intentStage: row.intentStage ?? null,
-                        })
-                      }
-                      generation={generationByKey[key]}
-                    />
+                    <button
+                      key={action.title}
+                      type="button"
+                      onClick={action.onClick}
+                      className="group flex w-full items-center gap-3 rounded-2xl border border-[#E5EEF9] bg-white px-4 py-4 text-left shadow-[0_1px_2px_0_#1018280D] transition-all duration-200 hover:-translate-y-0.5 hover:border-[#D5D7DA] hover:shadow-[0_4px_12px_0_#10182814] focus:outline-none focus:ring-2 focus:ring-[#7BA0E8] focus:ring-offset-2"
+                    >
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#DDE7F5] bg-[#F7FAFF]">
+                        <img src={action.iconSrc} alt="" className="h-5 w-5 object-contain" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5">
+                          <span className="truncate text-[14px] font-medium leading-5 text-[#414651]">
+                            {action.title}
+                          </span>
+                          <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full border border-[#D0D5DD] text-[9px] text-[#667085]">
+                            i
+                          </span>
+                        </div>
+                        <p className="mt-1 text-sm leading-6 text-[#667085]">
+                          {action.description}
+                        </p>
+                      </div>
+                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#F8FAFD] text-[#4C74C2] transition-transform duration-200 group-hover:translate-x-0.5">
+                        <ChevronRight className="h-5 w-5" strokeWidth={2} />
+                      </span>
+                    </button>
                   );
                 })}
-                </div>
               </CardContent>
             </Card>
 
-            <Card id="ai-results-opportunities" data-title="Outrank Opportunities" className="rounded-xl border border-[#D5D7DA] bg-white shadow-[0_1px_2px_0_#1018280D]">
+            <Card id="ai-results-opportunities" data-title="Outrank Opportunities" className="h-full min-h-0 rounded-xl border border-[#D5D7DA] bg-white shadow-[0_1px_2px_0_#1018280D]">
               <CardHeader className="flex flex-row items-start justify-between px-4 pb-3 pt-4">
                 <div className="min-w-0">
                   <CardTitleWithTip title="Opportunities to Outrank Competitors" />
                   <p className="mt-2 text-sm leading-[150%] text-[#535862]">
-                    Data-backed actions to close visibility gaps and capture missed AI-driven traffic.
+                    Prioritized recommendations to improve rankings, increase citations, and outperform competitors in Al search.
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -3205,10 +3479,10 @@ const AIResultsReportPreview = () => {
                     <RefreshCw className={cn('h-3.5 w-3.5', opportunitiesRetrying && 'animate-spin')} />
                     Retry
                   </button>
-                  <button className="text-xs font-medium text-blue-600">View all</button>
+                  <button className="whitespace-nowrap text-xs font-medium text-blue-600">View all</button>
                 </div>
               </CardHeader>
-              <CardContent className="space-y-2 px-4 pb-4">
+              <CardContent className="space-y-2 px-4 pb-4 min-h-0">
                 <div className="flex flex-wrap gap-2">
                   <FilterPill label="Sort: By Models" icon="sort" />
                   <FilterPill label="Filters" icon="filter" />
@@ -3266,55 +3540,12 @@ const AIResultsReportPreview = () => {
               </CardContent>
             </Card>
           </div>
-
-          <Card id="ai-results-visibility-coverage" data-title="Visibility & Coverage" className="min-w-0 rounded-xl border border-[#D5D7DA] bg-white shadow-[0_1px_2px_0_#1018280D]">
-            <CardHeader className="flex flex-col gap-3 px-4 pb-2 pt-4 sm:flex-row sm:items-center sm:justify-between">
-              <CardTitle className="text-base font-semibold text-[#2D4059]">Visibility & Coverage</CardTitle>
-              <div className="flex flex-wrap items-center gap-2">
-                <Button
-                  variant="outline"
-                  className="h-8 rounded-lg border border-[#D5D7DA] bg-white px-3 text-[11px] text-[#717680] shadow-[0_1px_2px_0_#1018280D] hover:bg-white"
-                >
-                  <Calendar className="mr-1.5 h-3.5 w-3.5 text-[#717680]" strokeWidth={1.8} />
-                  7 days
-                  <ChevronDown className="ml-1.5 h-3.5 w-3.5 text-[#717680]" strokeWidth={1.8} />
-                </Button>
-                <FilterPill label="Sort" icon="sort" />
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-8 px-4 pb-4">
-              <AreaChartCard
-                title="Share of Voice"
-                subtitle="Brand vs top competitors — mention count per audit."
-                data={shareOfVoiceChart.data}
-                series={shareOfVoiceChart.series}
-                tooltipTitle="AI Share of voice"
-                emptyMessage={trendEmptyMessage}
-              />
-              <AreaChartCard
-                title="Citations"
-                subtitle="How often each AI assistant cited a source when answering your prompts."
-                data={citationsChart.data}
-                series={citationsChart.series}
-                tooltipTitle="Citations"
-                emptyMessage={trendEmptyMessage}
-              />
-              <AreaChartCard
-                title="Mentions rate trend"
-                subtitle="Brand mentions vs total competitor mentions per audit."
-                data={mentionsChart.data}
-                series={mentionsChart.series}
-                tooltipTitle="Mentions"
-                emptyMessage={trendEmptyMessage}
-              />
-            </CardContent>
-          </Card>
         </section>
 
-        <section className="mx-4 mb-6 flex flex-col items-center gap-[0.9375rem] rounded-xl bg-[#F9F9F9] px-6 py-10 text-center sm:mx-6 sm:px-12 lg:px-[7.9375rem] lg:py-[3.8125rem]">
+        <section className="mx-4 mb-6 flex flex-col items-center gap-[0.9375rem] rounded-xl bg-[#F9F9F9] px-6 py-12 text-center sm:mx-6 sm:px-12 lg:px-[7.9375rem] lg:py-[3.8125rem]">
           <h2 className="text-2xl font-semibold text-gray-950">Connect Google services</h2>
           <p className="max-w-3xl text-sm text-gray-500">
-            Enrich your analysis with real-time data from Google Analytics and Google Search Console to your SEO Dashboard.
+            Unlock deeper insights by connecting Google Analytics and Search Console.
           </p>
           <Button className="h-9 rounded-lg bg-[#2f4462] px-4 text-xs text-white hover:bg-[#263852]">
             <UserRound className="mr-2 h-3.5 w-3.5" />

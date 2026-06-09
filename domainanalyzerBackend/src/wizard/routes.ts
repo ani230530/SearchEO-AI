@@ -280,8 +280,17 @@ router.get('/domains', timed('GET /domains', 300), authenticateToken, async (req
         orderBy: { startedAt: 'desc' },
         select: { summary: true },
       });
-      const visibilityScore =
-        (latestRun?.summary as Record<string, unknown> | null | undefined)?.avgOverall ?? null;
+      const summary = latestRun?.summary as Record<string, unknown> | null;
+      const avgPresence = summary?.presenceRate as number | undefined;
+      const avgOverall = summary?.avgOverall as number | undefined;
+      const avgSentiment = summary?.avgSentiment as number | undefined;
+      const totalQueries = summary?.totalQueries as number | undefined;
+      
+      const visibilityScore = avgPresence !== undefined ? Math.round(avgPresence * 100) : (avgOverall ?? null);
+      const brandAccuracy = avgOverall !== undefined ? Math.round(avgOverall * 10) : null;
+      const shareOfVoice = avgPresence !== undefined ? Math.round(avgPresence * 100) : null;
+      const mentions = (avgPresence !== undefined && totalQueries !== undefined) ? Math.round(avgPresence * totalQueries) : 0;
+      const overallHealth = (visibilityScore !== null && brandAccuracy !== null) ? Math.round((visibilityScore + brandAccuracy) / 2) : visibilityScore;
 
       return {
         id: d.id,
@@ -299,6 +308,11 @@ router.get('/domains', timed('GET /domains', 300), authenticateToken, async (req
           phraseCount: d._count.prompts,
           totalQueries: d._count.runs,
           visibilityScore,
+          shareOfVoice,
+          brandAccuracy,
+          brandSentiment: avgSentiment ?? null,
+          mentions,
+          overallHealth,
         },
       };
     })

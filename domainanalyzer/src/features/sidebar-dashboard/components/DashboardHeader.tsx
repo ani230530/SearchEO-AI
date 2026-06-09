@@ -109,7 +109,7 @@ export function DashboardHeader({
   return (
     <header className="content-header">
       <TooltipProvider delayDuration={120}>
-        {activeTab === "overview" ? (
+        {activeTab === "overview" || activeTab === "ai-visibility" ? (
           /* OVERVIEW LAYOUT */
           <div className="flex items-start justify-between gap-4">
             <div>

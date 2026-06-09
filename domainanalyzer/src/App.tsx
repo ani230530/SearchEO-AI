@@ -87,9 +87,7 @@ const App = () => (
                 </ProtectedRoute>
               } />
               <Route path="/ai-visibility" element={
-                <ProtectedRoute>
-                  <AIVisibilityRedirect />
-                </ProtectedRoute>
+                <Navigate to="/dashboard?tab=ai-visibility" replace />
               } />
               <Route path="/ai-checker-v2" element={
                 <ProtectedRoute>
