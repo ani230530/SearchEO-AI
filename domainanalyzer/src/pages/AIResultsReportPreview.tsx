@@ -515,11 +515,19 @@ const MetricCard = ({ card }: { card: MetricCardData }) => (
               </div>
               <div className="h-1.5 overflow-hidden rounded-full bg-[#D0D5DD]">
                 <div
+<<<<<<< HEAD
                   className="h-full rounded-full bg-[#7E9BD7]"
                   style={{ width: `${item.barWidth ?? 0}%` }}
                 />
               </div>
               <span className="min-w-[20px] text-right text-[12px] font-medium tabular-nums text-[#3393F2]">
+=======
+                  className="h-full rounded-full bg-[#8AA4E8]"
+                  style={{ width: `${item.barWidth ?? 0}%` }}
+                />
+              </div>
+              <span className="min-w-[20px] text-right text-[12px] font-medium tabular-nums text-[#2F6BFF]">
+>>>>>>> 9245b4cecca38e59ca9ffe50bad6eee4d3793c58
                 {item.value}
               </span>
             </div>
