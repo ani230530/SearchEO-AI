@@ -81,7 +81,7 @@ export function parseDashboardSearchState(search: string): DashboardSearchState 
       ? (subtabParam as SettingsSubTab)
       : undefined;
 
-  if (tabParam === "ai-visibility" || tabParam === "ai-checker") {
+  if (tabParam === "ai-checker") {
     return { redirectToAiVisibility: true };
   }
 

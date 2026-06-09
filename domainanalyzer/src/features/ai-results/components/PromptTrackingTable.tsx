@@ -1615,26 +1615,26 @@ export const PromptTable = ({
                           e.stopPropagation();
                           void toggleTracking(row, !isRowTracked(row));
                         }}
-                          className="flex h-[38px] w-[38px] items-center justify-center rounded-[14px] border border-[#7f9fe8] bg-gradient-to-b from-[#9cb7e9] to-[#7f9fe8] text-white shadow-[0_4px_14px_rgba(15,23,42,0.06)] transition hover:-translate-y-0.5 hover:shadow-[0_8px_18px_rgba(15,23,42,0.08)] disabled:opacity-50"
+                          className="flex h-[44px] w-[44px] items-center justify-center rounded-[16px] border border-[#7f9fe8] bg-gradient-to-b from-[#9cb7e9] to-[#7f9fe8] text-white shadow-[0_4px_14px_rgba(15,23,42,0.06)] transition hover:-translate-y-0.5 hover:shadow-[0_8px_18px_rgba(15,23,42,0.08)] disabled:opacity-50"
                           aria-pressed={isRowTracked(row)}
                           aria-label={isRowTracked(row) ? "Stop weekly tracking" : "Track weekly"}
                           title={isRowTracked(row) ? "Tracking weekly — click to stop" : "Track weekly"}
                         >
                           {trackPending[row.id] ? (
-                            <Loader2 className="h-5 w-5 animate-spin" />
+                            <Loader2 className="h-7 w-7 animate-spin" />
                           ) : isRowTracked(row) ? (
                             <img
                               src="/report-icons/pause-circle.svg"
                               alt=""
                               aria-hidden="true"
-                              className="h-5 w-5 shrink-0"
+                              className="h-7 w-7 shrink-0 object-contain"
                             />
                           ) : (
                             <img
                               src="/report-icons/target-03.svg"
                               alt=""
                               aria-hidden="true"
-                              className="h-5 w-5 shrink-0"
+                              className="h-7 w-7 shrink-0 object-contain"
                             />
                           )}
                         </button>

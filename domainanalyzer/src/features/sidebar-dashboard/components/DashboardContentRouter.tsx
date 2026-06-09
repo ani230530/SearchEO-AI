@@ -8,6 +8,7 @@ import { DomainHistorySection } from "@/features/sidebar-dashboard/sections/Doma
 import CompetitorPage from "@/features/sidebar-dashboard/sections/CompetitorPage";
 import { OverviewSection } from "@/features/sidebar-dashboard/sections/OverviewSection";
 import { SettingsSection } from "@/features/sidebar-dashboard/sections/SettingsSection";
+import AIVisibilityDashboard from "@/pages/AIVisibilityDashboard";
 import type { DashboardContentRouterProps } from "@/features/sidebar-dashboard/types";
 // CompetitorPage was deleted in the foundational rewrite — competitor data
 // now lives on the wizard pipeline. Tab is hidden until rebuilt against the
@@ -25,6 +26,8 @@ export function DashboardContentRouter({
   onMenuItemClick,
 }: DashboardContentRouterProps) {
   switch (activeTab) {
+    case "ai-visibility":
+      return <AIVisibilityDashboard />;
     case "overview":
       return <OverviewSection {...overview} />;
     case "analytics":
