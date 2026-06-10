@@ -152,7 +152,6 @@ useEffect(() => {
     useState<CompanySubTabId>(searchState.activeCompanySubTab ?? "company-info");
   const [activeGscSubTab, setActiveGscSubTab] = useState<GscSubTabId>("whole-analytics");
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [isSidebarHovered, setIsSidebarHovered] = useState(false);
   const [companyDomain, setCompanyDomain] = useState("");
   const [companyDomainLoading, setCompanyDomainLoading] = useState(false);
   const [companyDomainFetchError, setCompanyDomainFetchError] = useState<string | null>(null);
@@ -399,13 +398,7 @@ const toggleSection = (idx: number) => {
   }, []);
   const { user, logout } = useAuth();
   const { toast } = useToast();
-  const isSidebarExpanded = sidebarOpen || isSidebarHovered;
-
-  useEffect(() => {
-    if (sidebarOpen) {
-      setIsSidebarHovered(false);
-    }
-  }, [sidebarOpen]);
+  const isSidebarExpanded = sidebarOpen;
 
 // For inline editing of campaigns
 const [showEditModal, setShowEditModal] = useState(false);
@@ -2859,7 +2852,6 @@ useEffect(() => {
         activeSettingsSubTab={searchState.activeSettingsSubTab}
         activeTab={activeTab}
         isSidebarExpanded={isSidebarExpanded}
-        onHoverChange={setIsSidebarHovered}
         onToggleSidebar={setSidebarOpen}
         onSelectCompanySubTab={setActiveCompanySubTab}
         onSelectCreateProject={() => {

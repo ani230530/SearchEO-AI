@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState, useRef, type MouseEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type MouseEvent, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import {
   BarChart3,
   ChevronRight,
+  ChevronLeft,
   History,
   Globe,
   Info,
@@ -37,7 +38,6 @@ interface DashboardSidebarProps {
   activeCompanySubTab: CompanySubTabId;
   activeTab: TabId;
   isSidebarExpanded: boolean;
-  onHoverChange: (hovered: boolean) => void;
   onToggleSidebar: (open: boolean) => void;
   onSelectCompanySubTab: (tab: CompanySubTabId) => void;
   onSelectCreateProject: () => void;
@@ -69,7 +69,6 @@ export function DashboardSidebar({
   activeCompanySubTab: _activeCompanySubTab,
   activeTab,
   isSidebarExpanded,
-  onHoverChange,
   onToggleSidebar,
   onSelectCompanySubTab,
   onSelectCreateProject,
@@ -86,8 +85,6 @@ export function DashboardSidebar({
   void _activeCompanySubTab;
   void _showResults;
 
-  const isFirstRender = useRef(true);
-
   const isModifiedClick = (event: MouseEvent<HTMLElement>) =>
     event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0;
 
@@ -97,24 +94,16 @@ export function DashboardSidebar({
       setIsCompactViewport(compact);
 
       if (compact) {
-        onHoverChange(false);
         onToggleSidebar(false);
-        return;
+      } else {
+        onToggleSidebar(!defaultCollapsedOnDesktop);
       }
-
-      if (isFirstRender.current) {
-        isFirstRender.current = false;
-        return;
-      }
-
-      onHoverChange(false);
-      onToggleSidebar(!defaultCollapsedOnDesktop);
     };
 
     check();
     window.addEventListener("resize", check);
     return () => window.removeEventListener("resize", check);
-  }, [onHoverChange, onToggleSidebar, defaultCollapsedOnDesktop]);
+  }, [onToggleSidebar, defaultCollapsedOnDesktop]);
 
   const sidebarClass = isCompactViewport
     ? "sidebar closed compact"
@@ -330,19 +319,17 @@ export function DashboardSidebar({
   return (
     <TooltipProvider delayDuration={180}>
       <aside 
-        className={sidebarClass}
-        onMouseEnter={() => onHoverChange(true)}
-        onMouseLeave={() => onHoverChange(false)}
+        className={`${sidebarClass} relative`}
       >
         <div className="sidebar-header">
           <div className="sidebar-header-inner">
             {isSidebarExpanded ? (
               <div className="sidebar-brand">
-                <h1 className="sidebar-title">SearchEO.ai</h1>
+                <img src="../public/searcheo-full-logo.svg" alt="Searcheo Logo" className="h-6 w-auto" />
               </div>
             ) : (
               <div className="sidebar-brand flex items-center justify-center" style={{ width: "40px" }}>
-                <span className="font-bold text-xl text-[#141414]">S</span>
+                <img src="../public/18Searcheo 2.svg" alt="Searcheo Logo" className="h-6 w-auto" />
               </div>
             )}
 
@@ -353,13 +340,12 @@ export function DashboardSidebar({
                     type="button"
                     className="sidebar-toggle"
                     onClick={() => {
-                      onHoverChange(false);
                       onToggleSidebar(!sidebarOpen);
                     }}
                     aria-label={isSidebarExpanded ? "Collapse sidebar" : "Expand sidebar"}
                   >
                     {isSidebarExpanded ? (
-                      <ChevronRight className="h-6 w-6" />
+                      <ChevronLeft className="h-6 w-6" />
                     ) : (
                       <ChevronRight className="h-6 w-6" />
                     )}

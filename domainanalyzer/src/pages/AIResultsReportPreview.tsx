@@ -453,9 +453,9 @@ const MetricInfoTooltip = ({ tip }: { tip: string }) => (
 const CARD_TOOLTIPS: Record<string, string> = {
   'Performance Across AI Models':
     'Static placeholder card for now. It will later be wired to live model performance data for each assistant.',
-  'Top AI Search Prompts':
-    'Static placeholder summary for the total AI search prompts in this run and how many were tracked.',
   'Top Prompts':
+    'Total prompts the wizard wrote, and how many were run through the AI models. Visibility is the share of model responses that mentioned your brand — measured only across prompts you actually selected.',
+  'Top AI Search Prompts':
     'Total prompts the wizard wrote, and how many were run through the AI models. Visibility is the share of model responses that mentioned your brand — measured only across prompts you actually selected.',
   'Mentions':
     'Of every brand mention in the AI responses, what share is yours vs your competitors. Brand 100% means every mention was you; high competitor % means the AIs are talking about your space but recommending others.',
@@ -2356,6 +2356,7 @@ const AIResultsReportPreview = () => {
 
   const reportData: any = reportQuery.data ?? null;
   const loading = reportQuery.isLoading;
+  const reportPrompts = (reportData?.topAiSearchPrompts ?? reportData?.topPrompts ?? []) as any[];
   const pastRuns = useMemo(
     () =>
       (runsQuery.data?.runs ?? [])
@@ -2709,7 +2710,7 @@ const AIResultsReportPreview = () => {
   const metricCards = useMemo<MetricCardData[]>(() => {
     if (!reportData) return [];
 
-    const allItems = (reportData.topPrompts ?? []) as any[];
+    const allItems = reportPrompts;
 
     // Apply the same filter chain that PromptTable uses, so the cards and
     // the table tell a consistent story.
@@ -2723,8 +2724,9 @@ const AIResultsReportPreview = () => {
     }
 
     const prompts = scoped.filter((p) => p.type === 'prompt');
-
-    const trackedPrompts = prompts;
+    const trackedPrompts = prompts.filter((p: any) => Boolean(p.isTracked));
+    const totalPromptCount = prompts.length;
+    const trackedPromptCount = trackedPrompts.length;
 
     // Visibility within the scoped set — recomputed from the rows the user
     // is actually looking at, not the static server-side rollup.
@@ -2758,8 +2760,8 @@ const AIResultsReportPreview = () => {
         title: 'Top AI Search Prompts',
         kind: 'promptSummary',
         details: [
-          { label: 'Total', value: '89' },
-          { label: 'Tracked', value: '45' },
+          { label: 'Total', value: totalPromptCount.toString() },
+          { label: 'Tracked', value: trackedPromptCount.toString() },
         ],
       },
       {
@@ -2790,7 +2792,7 @@ const AIResultsReportPreview = () => {
 
     // Apply same filter scope as metricCards so all dashboard headlines tell
     // a single consistent story when the user narrows by model / category.
-    const allItems = (reportData.topPrompts ?? []) as any[];
+    const allItems = reportPrompts;
     let scoped = allItems.filter((p: any) => Array.isArray(p?.results) && p.results.length > 0);
     if (filterType !== 'all') scoped = scoped.filter((p) => p.type?.toLowerCase() === filterType);
     if (categoryFilter.size > 0) scoped = scoped.filter((p: any) => p.category && categoryFilter.has(p.category));
@@ -2958,8 +2960,8 @@ const AIResultsReportPreview = () => {
   })();
 
   const filteredPrompts = useMemo(() => {
-    if (!reportData?.topPrompts) return [];
-    let items = [...reportData.topPrompts];
+    if (!reportPrompts.length) return [];
+    let items = [...reportPrompts];
     // Hide rows that were never queried — empty `results` array means no
     // AI calls ran for this prompt/keyword, so the metrics row is all zeros
     // and adds no signal. Only show items the user actually selected and ran.
@@ -2987,7 +2989,7 @@ const AIResultsReportPreview = () => {
     }
 
     return items;
-  }, [reportData, filterType, categoryFilter, modelFilter]);
+  }, [reportPrompts, filterType, categoryFilter, modelFilter]);
 
   // Manual refetch for the "Retry" affordance on the opportunities card —
   // hits /report again so the LLM enrichment cache is exercised (or rebuilt

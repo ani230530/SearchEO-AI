@@ -141,8 +141,7 @@ export function AIResultsLayout({
   const navigate = useNavigate();
   const resolvedMaskedDomainId = maskedDomainId ?? (currentDomainId ? maskDomainId(currentDomainId) : undefined);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [isSidebarHovered, setIsSidebarHovered] = useState(false);
-  const isSidebarExpanded = sidebarOpen || isSidebarHovered;
+  const isSidebarExpanded = sidebarOpen;
 
   const [isResultsSidebarOpen, setIsResultsSidebarOpen] = useState(() => {
     const saved = localStorage.getItem("ai-visibility:sidebarOpen");
@@ -174,12 +173,12 @@ export function AIResultsLayout({
 
   return (
     <div className="flex min-h-screen w-full flex-col bg-[#f5f5f7] text-slate-900 lg:flex-row">
-      {/* Collapsible icon rail. The outer <aside> reserves a fixed 84px/280px slot
+      {/* Collapsible icon rail. The outer <aside> reserves a fixed 72px/268px slot
        *  on desktop so the rest of the layout never reflows. */}
       <aside 
         className="group relative z-40 hidden min-h-[220px] shrink-0 basis-auto overflow-visible border-b border-slate-300 bg-transparent lg:sticky lg:top-0 lg:flex lg:h-screen lg:max-h-screen lg:border-b-0 lg:self-start lg:w-[var(--rail-width)]"
         style={{
-          ["--rail-width" as string]: sidebarOpen ? "280px" : "84px",
+          ["--rail-width" as string]: sidebarOpen ? "268px" : "72px",
           fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Inter", "Helvetica Neue", Helvetica, Arial, sans-serif',
           transition: "width 0.26s ease",
         } as CSSProperties}
@@ -188,7 +187,6 @@ export function AIResultsLayout({
           activeCompanySubTab="company-info"
           activeTab="ai-visibility"
           isSidebarExpanded={isSidebarExpanded}
-          onHoverChange={setIsSidebarHovered}
           onToggleSidebar={setSidebarOpen}
           onSelectPricing={() => navigate(resolveSidebarNavigation("pricing").path)}
           onSelectCompanySubTab={() => {}}

@@ -44,7 +44,7 @@ const AIVisibilityDashboard = () => {
       <div className="bg-[#F9F9F9] rounded-[12px] px-10 py-10 mb-6 flex flex-col items-center justify-center text-center">
         <div className="flex-shrink-0 flex items-center justify-center mb-6">
           <img
-            src="/Asset 18Searcheo 1.png"
+            src="/searcheo-logo.png"
             alt="SearchEO AI Logo"
             className="w-[120px] h-[120px] object-contain"
           />

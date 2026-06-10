@@ -191,7 +191,6 @@ const COMPETITOR_SCROLL_SECTIONS = [
   { id: 'competitors-gaps', label: 'Prompt Gaps' },
   { id: 'competitors-analysis', label: 'Analysis Results' },
   { id: 'competitors-positioning', label: 'Positioning' },
-  { id: 'competitors-content', label: 'Content Opportunities' },
 ] as const;
 
 // ── helpers ────────────────────────────────────────────────────────────────
@@ -237,6 +236,7 @@ const formatStrongestCluster = (c: CompetitorAnalysisRow): string => {
 };
 
 const priorityFromServer = (p: 'high' | 'medium' | 'low'): CompetitorInsightPriority => p;
+const INDUSTRY_AVERAGE_VISIBILITY = 68;
 
 const buildCompetitorDetail = (c: CompetitorAnalysisRow): CompetitorDetailData => {
   const visibilityScore = Math.round(c.coveragePct * 100);
@@ -278,10 +278,10 @@ const buildCompetitorDetail = (c: CompetitorAnalysisRow): CompetitorDetailData =
     ],
     insights,
     cta: {
-      title: 'Book a Free Strategy Call',
+      title: 'Book A Demo',
       description:
-        'Receive a customized, data-driven strategy designed to help you outperform this competitor in AI search.',
-      buttonLabel: 'Schedule a call',
+        'Review your Al visibility gaps with our experts and receive a customized action plan based on this competitor analysis',
+      buttonLabel: 'Schedule My Strategy Session',
     },
   };
 };
@@ -691,7 +691,7 @@ function TrendComparisonPanel({ trends }: { trends: TrendsResponse | null }) {
             </ResponsiveContainer>
           </ChartBlock>
 
-          <ChartBlock title="Share of Voice" subtitle="Mention share — you vs your tracked competitors.">
+          <ChartBlock title="Share of Voice" subtitle="Evaluate competitor visibility and market presence.">
             <ResponsiveContainer width="100%" height={240}>
               <LineChart data={sovData} margin={{ top: 10, right: 10, bottom: 0, left: -20 }}>
                 <CartesianGrid stroke="#EEF1F5" strokeDasharray="3 3" />
@@ -815,7 +815,7 @@ function PromptGapPanel({
       <div className="flex items-start justify-between gap-4">
         <div>
           <h3 className="text-xl font-semibold leading-none text-[#2D4059]">Prompt Gaps Opportunities</h3>
-          <p className="mt-3 text-base text-[#7B8494]">Turn missed prompts into content</p>
+          <p className="mt-3 text-base text-[#7B8494]">Identify missed prompts and turn them into content opportunities.</p>
         </div>
         <button
           type="button"
@@ -915,20 +915,45 @@ function AICompetitorAnalysisResults({
   competitors: CompetitorAnalysisRow[];
   onOpenDetail: (c: CompetitorAnalysisRow) => void;
 }) {
+  const visibleCompetitors = useMemo(() => {
+    const threatRank = (threatLevel: CompetitorAnalysisRow['threatLevel']) => {
+      switch (threatLevel) {
+        case 'High':
+          return 0;
+        case 'Medium':
+          return 1;
+        case 'Low':
+          return 2;
+        default:
+          return 3;
+      }
+    };
+
+    return competitors
+      .map((competitor, index) => ({ competitor, index }))
+      .sort(
+        (a, b) =>
+          threatRank(a.competitor.threatLevel) - threatRank(b.competitor.threatLevel) ||
+          a.index - b.index
+      )
+      .slice(0, 4)
+      .map(({ competitor }) => competitor);
+  }, [competitors]);
+
   return (
     <section id="competitors-analysis" data-title="Analysis Results" className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
       <div>
         <h3 className="text-xl font-semibold leading-none text-[#2D4059]">AI-Based Competitor Analysis Results</h3>
-        <p className="mt-5 text-sm text-[#7B8494]">Per-competitor performance across the latest run.</p>
+        <p className="mt-5 text-sm text-[#7B8494]">Compare AI analysis of competitor performance and visibility.</p>
       </div>
 
-      <div className="mt-7 grid grid-cols-1 gap-6 xl:grid-cols-2">
-        {competitors.length === 0 ? (
-          <p className="rounded-md border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-center text-sm text-slate-500 xl:col-span-2">
+      <div className="mt-7 flex flex-col gap-6">
+        {visibleCompetitors.length === 0 ? (
+          <p className="rounded-md border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-center text-sm text-slate-500">
             No competitors mentioned in this audit yet. Re-run the audit, or add competitors in the wizard.
           </p>
         ) : (
-          competitors.map((c) => (
+          visibleCompetitors.map((c) => (
             <AnalysisResultCard key={c.host} competitor={c} onOpenDetail={onOpenDetail} />
           ))
         )}
@@ -966,7 +991,7 @@ function PositioningComparison({ analysis }: { analysis: CompetitorAnalysisRespo
       <div className="flex items-start justify-between gap-4">
         <div>
           <h3 className="text-xl font-semibold leading-none text-[#2D4059]">Positioning Comparison</h3>
-          <p className="mt-5 text-sm text-[#7B8494]">Market share vs sentiment for your tracked competitors.</p>
+          <p className="mt-5 text-sm text-[#7B8494]">Compare competitor positioning by market share and sentiment.</p>
         </div>
       </div>
 
@@ -1246,6 +1271,12 @@ export default function CompetitorsPage() {
   const headerMetrics = useMemo(() => {
     const visibility = report?.metrics.visibilityScore ?? 0;
     const competitorSOV = report ? Math.max(0, 100 - report.metrics.mentionRate) : 0;
+    const visibilityComparison =
+      visibility > INDUSTRY_AVERAGE_VISIBILITY
+        ? `Above industry average (${INDUSTRY_AVERAGE_VISIBILITY})`
+        : visibility < INDUSTRY_AVERAGE_VISIBILITY
+          ? `Below industry average (${INDUSTRY_AVERAGE_VISIBILITY})`
+          : `At industry average (${INDUSTRY_AVERAGE_VISIBILITY})`;
 
     const analysisCompetitors = analysis?.competitors ?? [];
     const bestCompetitor = analysisCompetitors[0] ?? null;
@@ -1279,6 +1310,7 @@ export default function CompetitorsPage() {
 
     return {
       visibility,
+      visibilityComparison,
       competitorSOV,
       bestCompetitorHost: bestCompetitor?.host ?? null,
       bestScore,
@@ -1482,7 +1514,7 @@ export default function CompetitorsPage() {
                     title="AI Visibility Score"
                     score={headerMetrics.visibility}
                     maxScore={100}
-                    footer="Across all tracked prompts"
+                    footer={headerMetrics.visibilityComparison}
                     trend={visibilityTrend ?? undefined}
                   />
                   <ScoreCard
@@ -1517,16 +1549,11 @@ export default function CompetitorsPage() {
                 />
               </div>
 
-              <AICompetitorAnalysisResults
-                competitors={analysis?.competitors ?? []}
-                onOpenDetail={openCompetitorDrawer}
-              />
-
               <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
                 <PositioningComparison analysis={analysis} />
-                <ContentOpportunitiesToCreate
-                  opportunities={report?.opportunities ?? []}
-                  onGenerate={handleGenerateContent}
+                <AICompetitorAnalysisResults
+                  competitors={analysis?.competitors ?? []}
+                  onOpenDetail={openCompetitorDrawer}
                 />
               </div>
             </>
