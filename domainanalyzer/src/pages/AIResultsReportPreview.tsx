@@ -86,6 +86,7 @@ import { useCampaigns, useGscStatus, useReport, useRuns, useTrackedPrompts, useT
 import { useQueryClient } from '@tanstack/react-query';
 import { aiResultsKeys } from '@/features/ai-results/queries';
 import type { PromptTableRow } from '@/features/ai-results/components/PromptTrackingTable';
+import { TrackToggleButton } from '@/features/ai-results/components/TrackToggleButton';
 import {
   buildProjectsWorksheetPath,
   openWorksheetInNewTab,
@@ -1652,9 +1653,6 @@ export const PromptTable = ({
                       <div className="flex flex-col gap-1">
                         {row.type === 'keyword' ? (
                           <div className="flex items-center gap-2">
-                            <Badge variant="outline" className="rounded-full bg-emerald-50/80 px-2 py-0 text-[9px] text-emerald-600 border-emerald-200">
-                              Keyword
-                            </Badge>
                             <span
                               onClick={(e) => { e.stopPropagation(); togglePhrase(String(row.id)); }}
                               title={openPhrases.has(String(row.id)) ? 'Click to collapse' : 'Click to show full prompt'}
@@ -1669,9 +1667,6 @@ export const PromptTable = ({
                         ) : (
                           <>
                             <div className="flex items-center gap-2">
-                              <Badge variant="outline" className="rounded-full bg-blue-50/50 px-2 py-0 text-[9px] text-blue-600 border-blue-200">
-                                Prompt
-                              </Badge>
                               <span
                                 onClick={(e) => { e.stopPropagation(); togglePhrase(String(row.id)); }}
                                 title={openPhrases.has(String(row.id)) ? 'Click to collapse' : 'Click to show full prompt'}
@@ -1732,10 +1727,10 @@ export const PromptTable = ({
                     </TableCell>
                     <TableCell className="py-3 px-4 text-right">
                       <div className="flex justify-end gap-2">
-                        <Button
-                          type="button"
+                        <TrackToggleButton
+                          tracked={isRowTracked(row)}
+                          loading={trackPending[row.id]}
                           disabled={
-                            trackPending[row.id] ||
                             (row.type === 'prompt'
                               ? row.rawId == null
                               : (row.childPromptIds?.length ?? 0) === 0)
@@ -1744,29 +1739,7 @@ export const PromptTable = ({
                             e.stopPropagation();
                             void toggleTracking(row, !isRowTracked(row));
                           }}
-                          className="flex h-9 w-9 items-center justify-center rounded-[8px] border border-[#7f9fe8] bg-gradient-to-b from-[#9cb7e9] to-[#7f9fe8] text-white shadow-[0_4px_14px_rgba(15,23,42,0.06)] transition hover:-translate-y-0.5 hover:shadow-[0_8px_18px_rgba(15,23,42,0.08)] disabled:opacity-50"
-                          aria-pressed={isRowTracked(row)}
-                          aria-label={isRowTracked(row) ? 'Stop weekly tracking' : 'Track weekly'}
-                          title={isRowTracked(row) ? 'Tracking weekly — click to stop' : 'Track weekly'}
-                        >
-                          {trackPending[row.id] ? (
-                            <Loader2 className="h-7 w-7 animate-spin" />
-                          ) : isRowTracked(row) ? (
-                            <img
-                              src="/report-icons/pause-circle.svg"
-                              alt=""
-                              aria-hidden="true"
-                              className="h-7 w-7 shrink-0 object-contain"
-                            />
-                          ) : (
-                            <img
-                              src="/report-icons/target-03.svg"
-                              alt=""
-                              aria-hidden="true"
-                              className="h-7 w-7 shrink-0 object-contain"
-                            />
-                          )}
-                        </Button>
+                        />
                         <Button
                           variant="outline"
                           onClick={(e) => {
@@ -1775,7 +1748,7 @@ export const PromptTable = ({
                           }}
                           className="h-7 rounded-lg px-3 text-[10px] font-bold border-slate-300 text-slate-600 hover:bg-gray-50 shadow-none"
                         >
-                          Draft Blog
+                          Generate
                         </Button>
                       </div>
                     </TableCell>

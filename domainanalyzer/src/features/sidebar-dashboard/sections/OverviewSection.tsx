@@ -14,6 +14,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { logoUrl as logoUrlHelper } from "@/lib/logoUrl";
 import GSCAnalyticsView from "@/components/gsc/GSCAnalyticsView";
 import { AlertDialogHeader } from "@/components/ui/alert-dialog";
@@ -82,6 +83,7 @@ export function OverviewSection({
   onVisitSite,
   overallScore,
 }: OverviewSectionProps) {
+  const navigate = useNavigate();
   const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3002';
   const getAuthHeaders = () => {
     const token = localStorage.getItem('authToken');
@@ -327,7 +329,7 @@ useEffect(() => {
             <button
               type="button"
               onClick={() => {
-                onAddDomain?.();
+                navigate("/ai-checker-v2");
               }}
               className="inline-flex shrink-0 items-center gap-2 rounded-[10px] bg-[#334155] px-4 py-3 text-[13px] font-medium text-white transition-colors hover:bg-[#1f2937]"
             >

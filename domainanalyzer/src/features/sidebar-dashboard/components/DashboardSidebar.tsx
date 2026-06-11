@@ -135,7 +135,7 @@ export function DashboardSidebar({
         ],
       },
       {
-        title: "Planner",
+        title: "Content Planner",
         items: [
           {
             key: "create-project",
