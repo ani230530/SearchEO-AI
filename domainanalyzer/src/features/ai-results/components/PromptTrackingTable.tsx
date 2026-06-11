@@ -13,6 +13,7 @@ import {
 } from "@/features/ai-results/components/WorksheetPickerModals";
 import { useToast } from "@/components/ui/use-toast";
 import { logoUrl as logoUrlHelper } from "@/lib/logoUrl";
+import { TrackToggleButton } from "@/features/ai-results/components/TrackToggleButton";
 import ReactMarkdown from "react-markdown";
 import {
   AlignLeft,
@@ -1517,14 +1518,6 @@ export const PromptTable = ({
                           >
                             {row.phrase}
                           </span>
-                          {isRowTracked(row) ? (
-                            <Badge
-                              variant="outline"
-                              className="shrink-0 rounded-full border-[#c9d8f5] bg-[#eef4ff] px-2 py-[1px] text-[10px] font-medium text-[#3b5d9c]"
-                            >
-                              Tracked
-                            </Badge>
-                          ) : null}
                         </div>
                       </div>
                     </TableCell>
@@ -1603,41 +1596,19 @@ export const PromptTable = ({
                     </TableCell>
                     <TableCell className="px-4 py-3 text-right">
                       <div className="flex justify-end gap-2">
-                        <button
-                          type="button"
+                        <TrackToggleButton
+                          tracked={isRowTracked(row)}
+                          loading={trackPending[row.id]}
                           disabled={
-                            trackPending[row.id] ||
-                            (row.type === "prompt"
+                            row.type === "prompt"
                               ? row.rawId == null
-                              : (row.childPromptIds?.length ?? 0) === 0)
+                              : (row.childPromptIds?.length ?? 0) === 0
                           }
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          void toggleTracking(row, !isRowTracked(row));
-                        }}
-                          className="flex h-[44px] w-[44px] items-center justify-center rounded-[16px] border border-[#7f9fe8] bg-gradient-to-b from-[#9cb7e9] to-[#7f9fe8] text-white shadow-[0_4px_14px_rgba(15,23,42,0.06)] transition hover:-translate-y-0.5 hover:shadow-[0_8px_18px_rgba(15,23,42,0.08)] disabled:opacity-50"
-                          aria-pressed={isRowTracked(row)}
-                          aria-label={isRowTracked(row) ? "Stop weekly tracking" : "Track weekly"}
-                          title={isRowTracked(row) ? "Tracking weekly — click to stop" : "Track weekly"}
-                        >
-                          {trackPending[row.id] ? (
-                            <Loader2 className="h-7 w-7 animate-spin" />
-                          ) : isRowTracked(row) ? (
-                            <img
-                              src="/report-icons/pause-circle.svg"
-                              alt=""
-                              aria-hidden="true"
-                              className="h-7 w-7 shrink-0 object-contain"
-                            />
-                          ) : (
-                            <img
-                              src="/report-icons/target-03.svg"
-                              alt=""
-                              aria-hidden="true"
-                              className="h-7 w-7 shrink-0 object-contain"
-                            />
-                          )}
-                        </button>
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            void toggleTracking(row, !isRowTracked(row));
+                          }}
+                        />
 
                         <Button
                           type="button"

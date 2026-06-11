@@ -1,0 +1,382 @@
+import express from 'express';
+import type { Server } from 'http';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+
+type AnyRow = Record<string, any>;
+
+function projectRow<T extends AnyRow>(row: T, select?: Record<string, boolean>) {
+  if (!select) return row;
+  const out: AnyRow = {};
+  for (const key of Object.keys(select)) {
+    if (select[key]) out[key] = row[key];
+  }
+  return out;
+}
+
+function matchesWhere(row: AnyRow, where: AnyRow = {}): boolean {
+  for (const [key, cond] of Object.entries(where)) {
+    if (cond === null || cond === undefined) {
+      if (row[key] !== cond) return false;
+      continue;
+    }
+    if (typeof cond !== 'object' || Array.isArray(cond)) {
+      if (row[key] !== cond) return false;
+      continue;
+    }
+
+    if ('in' in cond) {
+      if (!Array.isArray(cond.in) || !cond.in.includes(row[key])) return false;
+    }
+    if ('not' in cond) {
+      if (row[key] === cond.not) return false;
+    }
+    if ('gt' in cond) {
+      if (!(row[key] > cond.gt)) return false;
+    }
+    if ('gte' in cond) {
+      if (!(row[key] >= cond.gte)) return false;
+    }
+    if ('lt' in cond) {
+      if (!(row[key] < cond.lt)) return false;
+    }
+    if ('lte' in cond) {
+      if (!(row[key] <= cond.lte)) return false;
+    }
+  }
+  return true;
+}
+
+function createReportPrismaMock() {
+  const db = {
+    domains: [] as AnyRow[],
+    runs: [] as AnyRow[],
+    results: [] as AnyRow[],
+    keywords: [] as AnyRow[],
+    prompts: [] as AnyRow[],
+    competitors: [] as AnyRow[],
+  };
+
+  const sortRows = (rows: AnyRow[], orderBy?: AnyRow) => {
+    if (!orderBy) return rows;
+    const [[field, direction]] = Object.entries(orderBy);
+    return [...rows].sort((a, b) => {
+      const av = a[field];
+      const bv = b[field];
+      const aTime = av instanceof Date ? av.getTime() : av;
+      const bTime = bv instanceof Date ? bv.getTime() : bv;
+      if (aTime === bTime) return 0;
+      const diff = aTime > bTime ? 1 : -1;
+      return direction === 'desc' ? -diff : diff;
+    });
+  };
+
+  const projectMany = (rows: AnyRow[], select?: AnyRow) => rows.map((row) => projectRow(row, select));
+
+  const runMatches = (run: AnyRow, where: AnyRow = {}) => {
+    const { domainId, status, kind, ...rest } = where;
+    if (domainId !== undefined && run.domainId !== domainId) return false;
+    if (status !== undefined && run.status !== status) return false;
+    if (kind !== undefined && run.kind !== kind) return false;
+    return matchesWhere(run, rest);
+  };
+
+  return {
+    __db: db,
+    domain: {
+      findUnique: async ({ where }: any) => db.domains.find((row) => row.id === where.id) ?? null,
+    },
+    aiRun: {
+      findFirst: async ({ where, orderBy, select }: any = {}) => {
+        const rows = sortRows(db.runs.filter((row) => runMatches(row, where)), orderBy);
+        return rows[0] ? projectRow(rows[0], select) : null;
+      },
+      findMany: async ({ where, orderBy, take, select }: any = {}) => {
+        let rows = sortRows(db.runs.filter((row) => runMatches(row, where)), orderBy);
+        if (typeof take === 'number') rows = rows.slice(0, take);
+        return projectMany(rows, select);
+      },
+      update: async ({ where, data }: any) => {
+        const idx = db.runs.findIndex((row) => row.id === where.id);
+        if (idx === -1) throw new Error('run not found');
+        db.runs[idx] = { ...db.runs[idx], ...data };
+        return db.runs[idx];
+      },
+    },
+    aiQueryResult: {
+      findMany: async ({ where, orderBy, take, select }: any = {}) => {
+        let rows = db.results.filter((row) => {
+          if (where?.runId !== undefined) {
+            const runIdCond = where.runId;
+            if (typeof runIdCond === 'object' && Array.isArray(runIdCond.in)) {
+              if (!runIdCond.in.includes(row.runId)) return false;
+            } else if (row.runId !== runIdCond) {
+              return false;
+            }
+          }
+          if (where?.promptId !== undefined) {
+            const promptCond = where.promptId;
+            if (typeof promptCond === 'object' && Array.isArray(promptCond.in)) {
+              if (!promptCond.in.includes(row.promptId)) return false;
+            } else if (row.promptId !== promptCond) {
+              return false;
+            }
+          }
+          if (where?.run) {
+            const run = db.runs.find((candidate) => candidate.id === row.runId);
+            if (!run || !runMatches(run, where.run)) return false;
+          }
+          return true;
+        });
+        rows = sortRows(rows, orderBy);
+        if (typeof take === 'number') rows = rows.slice(0, take);
+        return projectMany(rows, select);
+      },
+    },
+    keyword: {
+      findMany: async ({ where, select }: any = {}) => {
+        const rows = db.keywords.filter((row) => matchesWhere(row, where));
+        return projectMany(rows, select);
+      },
+    },
+    prompt: {
+      findMany: async ({ where, select, orderBy }: any = {}) => {
+        const rows = sortRows(db.prompts.filter((row) => matchesWhere(row, where)), orderBy);
+        return projectMany(rows, select);
+      },
+      count: async ({ where }: any = {}) => db.prompts.filter((row) => matchesWhere(row, where)).length,
+    },
+    competitor: {
+      findMany: async ({ where, select }: any = {}) => {
+        const rows = db.competitors.filter((row) => matchesWhere(row, where));
+        return projectMany(rows, select);
+      },
+    },
+  };
+}
+
+const state = vi.hoisted(() => {
+  const prisma = createReportPrismaMock();
+  return {
+    prisma,
+    auth: vi.fn((req: any, _res: any, next: any) => {
+      req.user = { userId: 1, email: 'owner@example.com' };
+      return next();
+    }),
+    timed: vi.fn((_label: string, _ms: number) => (req: any, _res: any, next: any) => next()),
+    getOwnerUserId: vi.fn((req: any) => req.user?.userId ?? null),
+    computePhraseVisibility: vi.fn(() => []),
+    computeOpportunities: vi.fn(() => []),
+    computeCompetitorAnalysis: vi.fn(() => ({
+      competitors: [],
+      ownBrand: { host: 'example.com', mentions: 0, marketShare: 0, avgSentiment: null },
+      totals: { prompts: 0, results: 0, competitorMentions: 0 },
+    })),
+    redis: {
+      get: vi.fn(async () => null),
+      set: vi.fn(async () => undefined),
+      del: vi.fn(async () => undefined),
+    },
+  };
+});
+
+vi.mock('../../generated/prisma', () => ({
+  Prisma: {},
+  PrismaClient: class {
+    constructor() {
+      return state.prisma;
+    }
+  },
+}));
+
+vi.mock('../middleware/auth', () => ({
+  authenticateToken: state.auth,
+}));
+
+vi.mock('../middleware/authenticateOrSession', () => ({
+  authenticateOrSession: () => state.auth,
+  getOwnerUserId: state.getOwnerUserId,
+}));
+
+vi.mock('../lib/timed', () => ({
+  timed: state.timed,
+}));
+
+vi.mock('../services/RedisService', () => ({
+  redisService: state.redis,
+}));
+
+vi.mock('./analyticsService', () => ({
+  computePhraseVisibility: state.computePhraseVisibility,
+  computeOpportunities: state.computeOpportunities,
+  computeCompetitorAnalysis: state.computeCompetitorAnalysis,
+}));
+
+import wizardRouter from './routes';
+
+let server: Server | null = null;
+let baseUrl = '';
+
+function buildApp() {
+  const app = express();
+  app.use(express.json());
+  app.use('/api/wizard', wizardRouter);
+  return app;
+}
+
+async function startServer() {
+  const app = buildApp();
+  server = await new Promise<Server>((resolve) => {
+    const srv = app.listen(0, '127.0.0.1', () => resolve(srv));
+  });
+  const address = server.address();
+  if (!address || typeof address === 'string') throw new Error('Failed to start test server');
+  baseUrl = `http://127.0.0.1:${address.port}`;
+}
+
+async function stopServer() {
+  if (!server) return;
+  await new Promise<void>((resolve, reject) => {
+    server!.close((err) => {
+      if (err) reject(err);
+      else resolve();
+    });
+  });
+  server = null;
+}
+
+async function request(path: string) {
+  return fetch(`${baseUrl}${path}`);
+}
+
+function resetData() {
+  const db = state.prisma.__db;
+  for (const key of Object.keys(db) as Array<keyof typeof db>) {
+    db[key].splice(0, db[key].length);
+  }
+  state.auth.mockClear();
+  state.timed.mockClear();
+  state.getOwnerUserId.mockClear();
+  state.computePhraseVisibility.mockClear();
+  state.computeOpportunities.mockClear();
+  state.computeCompetitorAnalysis.mockClear();
+}
+
+beforeAll(async () => {
+  await startServer();
+});
+
+afterAll(async () => {
+  await stopServer();
+});
+
+beforeEach(() => {
+  resetData();
+});
+
+describe('GET /api/wizard/domain/:id/report', () => {
+  it('exposes the same prompt payload under both topPrompts and topAiSearchPrompts', async () => {
+    const db = state.prisma.__db;
+    db.domains.push({
+      id: 1,
+      userId: 1,
+      url: 'https://example.com',
+      host: 'example.com',
+      profile: { industry: 'SaaS' },
+      inferred: { companyName: 'Example Co' },
+    });
+    db.runs.push({
+      id: 10,
+      domainId: 1,
+      status: 'completed',
+      kind: 'audit',
+      startedAt: new Date('2026-06-10T10:00:00.000Z'),
+      endedAt: new Date('2026-06-10T10:05:00.000Z'),
+      summary: {
+        presenceRate: 0.5,
+        avgOverall: 0.7,
+        avgSentiment: 0.2,
+        totalQueries: 1,
+        perModel: {
+          'gpt-4o-mini': { presenceRate: 0.5, avgOverall: 0.7, avgSentiment: 0.2, queries: 1 },
+        },
+      },
+    });
+    db.prompts.push({
+      id: 101,
+      domainId: 1,
+      keywordId: null,
+      text: 'best ai search tools for SaaS teams',
+      intent: 'Commercial',
+      source: 'ai',
+      isSelected: true,
+      isTracked: false,
+      lastTrackedRunAt: null,
+      category: 'unbranded_recommendation',
+      intentStage: 'consideration',
+      persona: 'SaaS manager',
+      useCase: 'tool selection',
+      constraint: null,
+      isBranded: false,
+      competitorMentioned: null,
+      createdAt: new Date('2026-06-01T00:00:00.000Z'),
+    });
+    db.results.push({
+      id: 201,
+      runId: 10,
+      promptId: 101,
+      model: 'gpt-4o-mini',
+      response: 'Example response',
+      presence: 1,
+      relevance: 8,
+      sentiment: 2,
+      accuracy: 7,
+      rankPosition: 1,
+      overall: 7.4,
+      scorerSummary: 'Brand mentioned positively',
+      factualClaims: [],
+      competitorHosts: [],
+      citations: [],
+      competitorMentions: [],
+      latencyMs: 450,
+      createdAt: new Date('2026-06-10T10:01:00.000Z'),
+    });
+
+    const response = await request('/api/wizard/domain/1/report');
+    const json = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(Array.isArray(json.topPrompts)).toBe(true);
+    expect(Array.isArray(json.topAiSearchPrompts)).toBe(true);
+    expect(json.topAiSearchPrompts).toEqual(json.topPrompts);
+    expect(json.topPrompts).toHaveLength(1);
+    expect(json.topPrompts[0]).toMatchObject({
+      id: 'pr-101',
+      rawId: 101,
+      type: 'prompt',
+      phrase: 'best ai search tools for SaaS teams',
+      sov: '100%',
+      mentions: 1,
+      avgSentiment: 6,
+    });
+  });
+
+  it('keeps both prompt arrays empty on a domain with no completed run yet', async () => {
+    const db = state.prisma.__db;
+    db.domains.push({
+      id: 2,
+      userId: 1,
+      url: 'https://empty.example',
+      host: 'empty.example',
+      profile: { industry: null },
+      inferred: { companyName: null },
+    });
+
+    const response = await request('/api/wizard/domain/2/report');
+    const json = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(json.topPrompts).toEqual([]);
+    expect(json.topAiSearchPrompts).toEqual([]);
+    expect(json.runStatus).toBe('pending');
+  });
+});

@@ -86,6 +86,7 @@ import { useCampaigns, useGscStatus, useReport, useRuns, useTrackedPrompts, useT
 import { useQueryClient } from '@tanstack/react-query';
 import { aiResultsKeys } from '@/features/ai-results/queries';
 import type { PromptTableRow } from '@/features/ai-results/components/PromptTrackingTable';
+import { TrackToggleButton } from '@/features/ai-results/components/TrackToggleButton';
 import {
   buildProjectsWorksheetPath,
   openWorksheetInNewTab,
@@ -453,9 +454,9 @@ const MetricInfoTooltip = ({ tip }: { tip: string }) => (
 const CARD_TOOLTIPS: Record<string, string> = {
   'Performance Across AI Models':
     'Static placeholder card for now. It will later be wired to live model performance data for each assistant.',
-  'Top AI Search Prompts':
-    'Static placeholder summary for the total AI search prompts in this run and how many were tracked.',
   'Top Prompts':
+    'Total prompts the wizard wrote, and how many were run through the AI models. Visibility is the share of model responses that mentioned your brand — measured only across prompts you actually selected.',
+  'Top AI Search Prompts':
     'Total prompts the wizard wrote, and how many were run through the AI models. Visibility is the share of model responses that mentioned your brand — measured only across prompts you actually selected.',
   'Mentions':
     'Of every brand mention in the AI responses, what share is yours vs your competitors. Brand 100% means every mention was you; high competitor % means the AIs are talking about your space but recommending others.',
@@ -1652,9 +1653,6 @@ export const PromptTable = ({
                       <div className="flex flex-col gap-1">
                         {row.type === 'keyword' ? (
                           <div className="flex items-center gap-2">
-                            <Badge variant="outline" className="rounded-full bg-emerald-50/80 px-2 py-0 text-[9px] text-emerald-600 border-emerald-200">
-                              Keyword
-                            </Badge>
                             <span
                               onClick={(e) => { e.stopPropagation(); togglePhrase(String(row.id)); }}
                               title={openPhrases.has(String(row.id)) ? 'Click to collapse' : 'Click to show full prompt'}
@@ -1669,9 +1667,6 @@ export const PromptTable = ({
                         ) : (
                           <>
                             <div className="flex items-center gap-2">
-                              <Badge variant="outline" className="rounded-full bg-blue-50/50 px-2 py-0 text-[9px] text-blue-600 border-blue-200">
-                                Prompt
-                              </Badge>
                               <span
                                 onClick={(e) => { e.stopPropagation(); togglePhrase(String(row.id)); }}
                                 title={openPhrases.has(String(row.id)) ? 'Click to collapse' : 'Click to show full prompt'}
@@ -1732,10 +1727,10 @@ export const PromptTable = ({
                     </TableCell>
                     <TableCell className="py-3 px-4 text-right">
                       <div className="flex justify-end gap-2">
-                        <Button
-                          type="button"
+                        <TrackToggleButton
+                          tracked={isRowTracked(row)}
+                          loading={trackPending[row.id]}
                           disabled={
-                            trackPending[row.id] ||
                             (row.type === 'prompt'
                               ? row.rawId == null
                               : (row.childPromptIds?.length ?? 0) === 0)
@@ -1744,29 +1739,7 @@ export const PromptTable = ({
                             e.stopPropagation();
                             void toggleTracking(row, !isRowTracked(row));
                           }}
-                          className="flex h-9 w-9 items-center justify-center rounded-[8px] border border-[#7f9fe8] bg-gradient-to-b from-[#9cb7e9] to-[#7f9fe8] text-white shadow-[0_4px_14px_rgba(15,23,42,0.06)] transition hover:-translate-y-0.5 hover:shadow-[0_8px_18px_rgba(15,23,42,0.08)] disabled:opacity-50"
-                          aria-pressed={isRowTracked(row)}
-                          aria-label={isRowTracked(row) ? 'Stop weekly tracking' : 'Track weekly'}
-                          title={isRowTracked(row) ? 'Tracking weekly — click to stop' : 'Track weekly'}
-                        >
-                          {trackPending[row.id] ? (
-                            <Loader2 className="h-7 w-7 animate-spin" />
-                          ) : isRowTracked(row) ? (
-                            <img
-                              src="/report-icons/pause-circle.svg"
-                              alt=""
-                              aria-hidden="true"
-                              className="h-7 w-7 shrink-0 object-contain"
-                            />
-                          ) : (
-                            <img
-                              src="/report-icons/target-03.svg"
-                              alt=""
-                              aria-hidden="true"
-                              className="h-7 w-7 shrink-0 object-contain"
-                            />
-                          )}
-                        </Button>
+                        />
                         <Button
                           variant="outline"
                           onClick={(e) => {
@@ -1775,7 +1748,7 @@ export const PromptTable = ({
                           }}
                           className="h-7 rounded-lg px-3 text-[10px] font-bold border-slate-300 text-slate-600 hover:bg-gray-50 shadow-none"
                         >
-                          Draft Blog
+                          Generate
                         </Button>
                       </div>
                     </TableCell>
@@ -2356,6 +2329,7 @@ const AIResultsReportPreview = () => {
 
   const reportData: any = reportQuery.data ?? null;
   const loading = reportQuery.isLoading;
+  const reportPrompts = (reportData?.topAiSearchPrompts ?? reportData?.topPrompts ?? []) as any[];
   const pastRuns = useMemo(
     () =>
       (runsQuery.data?.runs ?? [])
@@ -2709,7 +2683,7 @@ const AIResultsReportPreview = () => {
   const metricCards = useMemo<MetricCardData[]>(() => {
     if (!reportData) return [];
 
-    const allItems = (reportData.topPrompts ?? []) as any[];
+    const allItems = reportPrompts;
 
     // Apply the same filter chain that PromptTable uses, so the cards and
     // the table tell a consistent story.
@@ -2723,8 +2697,9 @@ const AIResultsReportPreview = () => {
     }
 
     const prompts = scoped.filter((p) => p.type === 'prompt');
-
-    const trackedPrompts = prompts;
+    const trackedPrompts = prompts.filter((p: any) => Boolean(p.isTracked));
+    const totalPromptCount = prompts.length;
+    const trackedPromptCount = trackedPrompts.length;
 
     // Visibility within the scoped set — recomputed from the rows the user
     // is actually looking at, not the static server-side rollup.
@@ -2758,8 +2733,8 @@ const AIResultsReportPreview = () => {
         title: 'Top AI Search Prompts',
         kind: 'promptSummary',
         details: [
-          { label: 'Total', value: '89' },
-          { label: 'Tracked', value: '45' },
+          { label: 'Total', value: totalPromptCount.toString() },
+          { label: 'Tracked', value: trackedPromptCount.toString() },
         ],
       },
       {
@@ -2790,7 +2765,7 @@ const AIResultsReportPreview = () => {
 
     // Apply same filter scope as metricCards so all dashboard headlines tell
     // a single consistent story when the user narrows by model / category.
-    const allItems = (reportData.topPrompts ?? []) as any[];
+    const allItems = reportPrompts;
     let scoped = allItems.filter((p: any) => Array.isArray(p?.results) && p.results.length > 0);
     if (filterType !== 'all') scoped = scoped.filter((p) => p.type?.toLowerCase() === filterType);
     if (categoryFilter.size > 0) scoped = scoped.filter((p: any) => p.category && categoryFilter.has(p.category));
@@ -2958,8 +2933,8 @@ const AIResultsReportPreview = () => {
   })();
 
   const filteredPrompts = useMemo(() => {
-    if (!reportData?.topPrompts) return [];
-    let items = [...reportData.topPrompts];
+    if (!reportPrompts.length) return [];
+    let items = [...reportPrompts];
     // Hide rows that were never queried — empty `results` array means no
     // AI calls ran for this prompt/keyword, so the metrics row is all zeros
     // and adds no signal. Only show items the user actually selected and ran.
@@ -2987,7 +2962,7 @@ const AIResultsReportPreview = () => {
     }
 
     return items;
-  }, [reportData, filterType, categoryFilter, modelFilter]);
+  }, [reportPrompts, filterType, categoryFilter, modelFilter]);
 
   // Manual refetch for the "Retry" affordance on the opportunities card —
   // hits /report again so the LLM enrichment cache is exercised (or rebuilt

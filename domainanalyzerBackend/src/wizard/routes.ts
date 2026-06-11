@@ -1038,6 +1038,7 @@ router.get('/domain/:id/report', timed('GET /report', 800), authenticateToken, a
       modelPerformance,
     },
     topPrompts,
+    topAiSearchPrompts: topPrompts,
     phraseVisibility,
     opportunities,
   });

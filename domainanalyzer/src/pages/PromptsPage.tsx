@@ -109,7 +109,7 @@ const METRIC_CARDS: MetricCardConfig[] = [
     value: "5",
     trend: "-0.5%",
     tone: "negative",
-    valueClassName: "text-[#c81e1e]",
+    valueClassName: "text-[#B23131]",
   },
 ];
 
