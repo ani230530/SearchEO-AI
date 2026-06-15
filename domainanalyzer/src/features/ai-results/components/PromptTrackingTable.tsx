@@ -1203,7 +1203,7 @@ export const PromptTable = ({
           <div className="flex flex-col gap-1.5">
             <CardTitle className="text-[20px] font-bold text-[#334155]">{title}</CardTitle>
             <p className="text-[14px] text-[#64748b]">
-              How AI actually talks and ranks content — track language patterns that drive visibility
+              Track emerging prompts and understand how AI platforms evaluate content.
             </p>
           </div>
 

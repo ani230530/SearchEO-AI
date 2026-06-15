@@ -70,13 +70,13 @@ type PerformanceConfig = {
 
 const PROMPT_TABS: Array<{ id: PromptsTabId; label: string }> = [
   { id: "all-prompts", label: "All Prompts" },
-  { id: "prompt-tracking", label: "Prompt Tracking" },
+  { id: "prompt-tracking", label: "Tracked Prompts" },
   { id: "content-opportunities", label: "Content Opportunities" },
 ];
 
 const METRIC_CARDS: MetricCardConfig[] = [
   {
-    label: "New Prompts Found",
+    label: "New Prompt Opportunities",
     tooltip: "How many new prompts were added to the current list.",
     subtitle: "New Prompts added",
     value: "120",
@@ -85,7 +85,7 @@ const METRIC_CARDS: MetricCardConfig[] = [
     valueClassName: "text-[#2f6bff]",
   },
   {
-    label: "Prompts Tracking",
+    label: "Tracked Prompts",
     tooltip: "How many prompts are currently being monitored.",
     subtitle: "Prompts tracked",
     value: "45",
@@ -94,7 +94,7 @@ const METRIC_CARDS: MetricCardConfig[] = [
     valueClassName: "text-[#2f6bff]",
   },
   {
-    label: "Gap Opportunities",
+    label: "Competitive Visibility Gaps",
     tooltip: "Prompts where coverage is weaker than expected this week.",
     subtitle: "This week",
     value: "+12%",
@@ -103,9 +103,9 @@ const METRIC_CARDS: MetricCardConfig[] = [
     valueClassName: "text-[#2f6bff]",
   },
   {
-    label: "Top Citations",
+    label: "Citations",
     tooltip: "Prompts that lost citations compared with the latest run.",
-    subtitle: "Prompts dropped from results",
+    subtitle: "Lost Citations",
     value: "5",
     trend: "-0.5%",
     tone: "negative",
@@ -681,10 +681,10 @@ const PromptsPage = () => {
     ).length;
 
     const valueByLabel: Record<string, string> = {
-      "New Prompts Found": String(newPrompts),
-      "Prompts Tracking": String(trackedCount),
-      "Gap Opportunities": String(gapCount),
-      "Top Citations": String(droppedCount),
+      "New Prompt Opportunities": String(newPrompts),
+      "Tracked Prompts": String(trackedCount),
+      "Competitive Visibility Gaps": String(gapCount),
+      "Citations": String(droppedCount),
     };
 
     return base.map((card) => ({

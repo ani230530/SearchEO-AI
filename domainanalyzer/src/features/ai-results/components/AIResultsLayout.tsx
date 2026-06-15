@@ -94,7 +94,7 @@ const sidebarItems: Array<{
 }> = [
     { id: "ai-results", label: "AI Results", iconSrc: "/sidebar-icons/ai-results.svg" },
     { id: "competitors", label: "Competitors Intelligence", iconSrc: "/sidebar-icons/track-prompts.svg" },
-    { id: "prompts", label: "Top Prompts", iconSrc: "/sidebar-icons/competitors.svg" },
+    { id: "prompts", label: "Prompts Research", iconSrc: "/sidebar-icons/competitors.svg" },
   ];
 
 type RailSectionItem = {
