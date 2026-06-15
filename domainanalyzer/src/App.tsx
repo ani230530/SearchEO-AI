@@ -113,7 +113,7 @@ const App = () => (
               {/* AI Checker tabs share AIResultsShell as a parent route so the
                   sidebar + header don't remount on tab switches. Children read
                   domain context via useShellContext(). */}
-              <Route element={<ProtectedRoute><AIResultsShell activeItem="prompts" title="Top Prompts" /></ProtectedRoute>}>
+              <Route element={<ProtectedRoute><AIResultsShell activeItem="prompts" title="Prompt Discovery & Tracking" /></ProtectedRoute>}>
                 <Route path="/ai-results/:domain/prompts" element={<PromptsPage />} />
               </Route>
               <Route element={<ProtectedRoute><AIResultsShell activeItem="ai-results" title="AI Results" /></ProtectedRoute>}>

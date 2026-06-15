@@ -45,28 +45,28 @@ import { classifyError, isSilentError } from "@/features/wizard-v2/wizardErrors"
 // Per-step UI copy. Heading + subtitle + eyebrow shown by WizardShell.
 const HEADINGS: Record<WizardStep, { eyebrow: string; heading: string; description?: string }> = {
   1: {
-    eyebrow: "Get to know us",
+    eyebrow: "Get Started!",
     heading: "Add your domain",
-    description: "Tell us a bit about your business — country, industry, anything you want us to keep in mind.",
+    description: "We scan your public pages and build your AI visibility framework.",
   },
   2: {
-    eyebrow: "Get to know us",
+    eyebrow: "Get Started!",
     heading: "Add your domain",
     description: "Hang tight — we're getting to know your site so the rest of this audit lands right.",
   },
   3: {
-    eyebrow: "Get to know us",
-    heading: "Track your competitors in AI search",
-    description: "Pick the brands you actually compete with. We'll measure your share of voice against theirs.",
+    eyebrow: "Competitor Intelligence",
+    heading: "Who are you competing against in AI answers?",
+    description: "We track how often competitors get cited by AI search engines, so you see exactly where to close the gap. List at least 3 competitors for a meaningful comparison.",
   },
   4: {
-    eyebrow: "Pick what to test",
-    heading: "Choose the prompts to run",
-    description: "These are the questions a real customer would ask ChatGPT, Claude, or Gemini.",
+    eyebrow: "Topics",
+    heading: "What does AI say about you?",
+    description: "Choose the most relevant queries and prompts to help AI understand what you want to track and optimize.",
   },
   5: {
     eyebrow: "Almost there",
-    heading: "Running your audit",
+    heading: "Generating your report from your data",
     description: "Asking each AI assistant your prompts, watching how they answer.",
   },
 };

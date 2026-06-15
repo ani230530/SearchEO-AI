@@ -204,7 +204,7 @@ const AIVisibilityDashboard = () => {
                               }}
                             >
                               <MessageSquareText className="w-4 h-4 text-gray-400" />
-                              Top Prompts
+                              Prompts Research
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>

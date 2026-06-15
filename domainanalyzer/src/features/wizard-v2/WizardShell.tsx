@@ -1,6 +1,6 @@
 import { ReactNode, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft, RefreshCw } from "lucide-react";
+import { ArrowLeft, LineChart, ListFilter, MoreVertical, RefreshCw } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import type { WizardStep } from "./types";
 
@@ -45,7 +45,7 @@ interface WizardShellProps {
 export function WizardShell({
   step,
   totalSteps = 5,
-  eyebrow = "Get to know us",
+  eyebrow = "Get Started!",
   heading,
   description,
   onRetry,
@@ -154,16 +154,161 @@ export function WizardShell({
 
         {/* Right: hero image, blended into the white half via mix-blend.
             Sticky so it doesn't drift when long lists scroll on the left. */}
-        <aside className="hidden md:block sticky top-20 self-start">
-          <img
-            src="/ai-checker.png"
-            alt=""
-            aria-hidden
-            className="h-auto w-full select-none pointer-events-none"
-            style={{ mixBlendMode: "multiply" }}
-          />
+        <aside className="hidden md:block sticky top-20 self-start pointer-events-none">
+          <WizardHeroVisual />
         </aside>
       </div>
+    </div>
+  );
+}
+
+function WizardHeroVisual() {
+  return (
+    <div
+      className="relative mx-auto aspect-[1.03/1] w-full max-w-[47rem] select-none overflow-visible [container-type:inline-size]"
+      aria-hidden
+    >
+      <div className="absolute inset-[4%] opacity-70">
+        <div className="absolute left-1/2 top-0 h-full border-l border-dashed border-slate-200" />
+        <div className="absolute left-0 top-1/2 w-full border-t border-dashed border-slate-200" />
+        <div className="absolute left-[10%] top-[30%] h-px w-[78%] bg-slate-100" />
+        <div className="absolute left-[10%] top-[42%] h-px w-[80%] bg-slate-100" />
+        <div className="absolute left-[8%] top-[18%] h-[62%] w-px bg-slate-100" />
+        <div className="absolute right-[8%] top-[20%] h-[56%] w-px bg-slate-100" />
+        {[
+          "left-[7%] top-[26%]",
+          "left-[7%] top-[48%]",
+          "left-[18%] top-[76%]",
+          "left-[47%] top-[26%]",
+          "right-[6%] top-[37%]",
+          "right-[6%] top-[76%]",
+          "left-[42%] top-[6%]",
+        ].map((position) => (
+          <span
+            key={position}
+            className={`absolute h-4 w-4 rounded-full border border-slate-200 bg-white ${position}`}
+          />
+        ))}
+      </div>
+
+      <div className="absolute left-[18%] top-[42%] aspect-[1.58/1] w-[80%] overflow-hidden rounded-[6px] border border-slate-200 bg-white shadow-[0_18px_44px_rgba(15,23,42,0.08)]">
+        <img
+          src="/ai-checker.png"
+          alt=""
+          className="h-full w-full scale-[1.72] object-cover object-[58%_61%] opacity-90"
+          style={{ mixBlendMode: "multiply" }}
+        />
+      </div>
+
+      <MetricCard
+        className="right-[1%] top-[12%] w-[43%]"
+        icon="list"
+        title="Keywords Ranking"
+        value="52"
+        delta="+2"
+      />
+      <VisitorsCard />
+      <MetricCard
+        className="left-[38%] top-[92%] w-[45%]"
+        icon="line"
+        title="Organic Traffic"
+        value="2,847"
+        delta="+12.5%"
+      />
+
+      <CursorLabel className="left-[56%] top-[33%]" name="John Doe" color="blue" />
+      <CursorLabel className="left-[2%] top-[69%]" name="Olivia Rhye" color="amber" />
+    </div>
+  );
+}
+
+function MetricCard({
+  className,
+  icon,
+  title,
+  value,
+  delta,
+}: {
+  className: string;
+  icon: "list" | "line";
+  title: string;
+  value: string;
+  delta: string;
+}) {
+  const Icon = icon === "line" ? LineChart : ListFilter;
+  const tone = icon === "line" ? "bg-emerald-100 text-emerald-700" : "bg-blue-50 text-slate-600";
+
+  return (
+    <div
+      className={`absolute flex min-h-[clamp(4rem,11cqw,5rem)] min-w-0 items-center gap-[clamp(0.6rem,1.8cqw,1rem)] rounded-[6px] border border-slate-200 bg-white px-[clamp(0.8rem,2.5cqw,1.25rem)] py-[clamp(0.75rem,2.2cqw,1rem)] shadow-[0_14px_34px_rgba(15,23,42,0.08)] ${className}`}
+    >
+      <span className={`grid h-[clamp(2.25rem,6.5cqw,3rem)] w-[clamp(2.25rem,6.5cqw,3rem)] shrink-0 place-items-center rounded-full ${tone}`}>
+        <Icon className="h-[clamp(1rem,2.8cqw,1.25rem)] w-[clamp(1rem,2.8cqw,1.25rem)] stroke-[2.2]" />
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-[clamp(0.55rem,1.55cqw,0.75rem)] leading-none text-slate-500">{title}</p>
+        <p className="mt-[clamp(0.25rem,0.8cqw,0.375rem)] text-[clamp(1.15rem,3.4cqw,1.5rem)] font-semibold leading-none text-slate-900">{value}</p>
+      </div>
+      <div className="shrink-0 text-right">
+        <p className="text-[clamp(1rem,3.1cqw,1.375rem)] font-semibold leading-none text-green-600">{delta}</p>
+        <p className="mt-[clamp(0.35rem,1.1cqw,0.5rem)] whitespace-nowrap text-[clamp(0.5rem,1.35cqw,0.6875rem)] leading-none text-slate-400">from last month</p>
+      </div>
+    </div>
+  );
+}
+
+function VisitorsCard() {
+  return (
+    <div className="absolute left-[5%] top-[36%] w-[49%] min-w-0 rounded-[6px] border border-slate-200 bg-white px-[clamp(0.8rem,2.5cqw,1.25rem)] py-[clamp(0.75rem,2.2cqw,1rem)] shadow-[0_16px_42px_rgba(15,23,42,0.12)]">
+      <div className="mb-[clamp(0.8rem,2.6cqw,1.25rem)] flex items-start justify-between">
+        <p className="text-[clamp(0.65rem,1.7cqw,0.8125rem)] font-semibold text-slate-800">Total visitors</p>
+        <MoreVertical className="h-[clamp(0.9rem,2.6cqw,1.25rem)] w-[clamp(0.9rem,2.6cqw,1.25rem)] text-slate-400" />
+      </div>
+      <div className="flex items-end justify-between gap-[clamp(0.6rem,2cqw,1rem)]">
+        <div className="min-w-0">
+          <p className="text-[clamp(1.65rem,5.1cqw,2.25rem)] font-semibold leading-none tracking-tight text-slate-900">2,420</p>
+          <p className="mt-[clamp(0.45rem,1.6cqw,0.75rem)] flex items-center gap-[clamp(0.25rem,0.9cqw,0.375rem)] whitespace-nowrap text-[clamp(0.65rem,1.85cqw,0.875rem)] text-slate-500">
+            <span className="font-semibold text-emerald-600">+ 40%</span>
+            vs last month
+          </p>
+        </div>
+        <svg viewBox="0 0 120 58" className="h-[clamp(2.5rem,8.5cqw,4rem)] w-[42%] shrink-0 overflow-visible">
+          <path
+            d="M2 55 C18 26 28 44 38 24 S56 35 63 18 S78 27 86 10 S101 20 118 14"
+            fill="none"
+            stroke="#10b981"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="3"
+          />
+          <circle cx="63" cy="18" r="4" fill="#fff" stroke="#10b981" strokeWidth="2" />
+        </svg>
+      </div>
+    </div>
+  );
+}
+
+function CursorLabel({
+  className,
+  name,
+  color,
+}: {
+  className: string;
+  name: string;
+  color: "blue" | "amber";
+}) {
+  const swatch = color === "blue" ? "bg-sky-500" : "bg-amber-500";
+
+  return (
+    <div className={`absolute ${className}`}>
+      <div
+        className={`h-0 w-0 rotate-[-42deg] border-b-[16px] border-l-[9px] border-r-[9px] border-l-transparent border-r-transparent ${
+          color === "blue" ? "border-b-sky-500" : "border-b-amber-500"
+        } drop-shadow-[0_1px_2px_rgba(15,23,42,0.35)]`}
+      />
+      <span className={`mt-2 inline-block px-1.5 py-0.5 text-[13px] leading-tight text-white ${swatch}`}>
+        {name}
+      </span>
     </div>
   );
 }
