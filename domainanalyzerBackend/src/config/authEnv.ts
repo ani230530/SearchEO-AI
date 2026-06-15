@@ -37,6 +37,18 @@ function optional(name: string, fallback: string): string {
   return process.env[name]?.trim() || fallback;
 }
 
+function optionalPositiveInteger(name: string, fallback: number): number {
+  const raw = process.env[name]?.trim();
+  if (!raw) return fallback;
+
+  const parsed = Number(raw);
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    throw new Error(`[authEnv] ${name} must be a positive integer (got ${raw})`);
+  }
+
+  return parsed;
+}
+
 const JWT_SECRET = required('JWT_SECRET', { minLength: 32 });
 const JWT_REFRESH_SECRET = required('JWT_REFRESH_SECRET', { minLength: 32 });
 if (JWT_REFRESH_SECRET === JWT_SECRET) {
@@ -47,7 +59,7 @@ export const authEnv = {
   JWT_SECRET,
   JWT_REFRESH_SECRET,
   ACCESS_TOKEN_TTL: optional('ACCESS_TOKEN_TTL', '15m'),
-  REFRESH_TOKEN_TTL_DAYS: Number(process.env.REFRESH_TOKEN_TTL_DAYS) || 30,
+  REFRESH_TOKEN_TTL_MINUTES: optionalPositiveInteger('REFRESH_TOKEN_TTL_MINUTES', 24 * 60),
 
   FRONTEND_URL: optional('FRONTEND_URL', 'http://localhost:8080'),
   BACKEND_PUBLIC_URL:

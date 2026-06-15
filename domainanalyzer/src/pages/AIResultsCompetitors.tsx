@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  ArrowDownRight,
   ArrowUpRight,
   ChevronDown,
   ChevronRight,
@@ -40,11 +41,12 @@ import type {
 } from '@/components/competitors/aiResponseAnalysisData';
 import { apiPost } from '../services/apiClient';
 import { logoUrl as logoUrlHelper } from '@/lib/logoUrl';
+import { maskDomainId } from '@/lib/domainUtils';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { useShellContext } from '@/features/ai-results/AIResultsShell';
 import { AIResultsBreadcrumbs } from '@/features/ai-results/components/AIResultsBreadcrumbs';
-import { resolveAIResultsNavigation } from '@/features/sidebar-dashboard/navigation';
+import { resolveAIResultsNavigation, resolveSidebarNavigation } from '@/features/sidebar-dashboard/navigation';
 import { useScrollSpyBreadcrumbs } from '@/features/ai-results/useScrollSpyBreadcrumbs';
 import {
   aiResultsKeys,
@@ -235,6 +237,11 @@ const formatStrongestCluster = (c: CompetitorAnalysisRow): string => {
   return `${friendlyCategory(c.strongestPromptCluster.category)} (${pct}% of mentions)`;
 };
 
+const formatDeltaLabel = (delta: number): string => {
+  const sign = delta >= 0 ? '+' : '-';
+  return `${sign}${Math.abs(delta).toFixed(1)}%`;
+};
+
 const priorityFromServer = (p: 'high' | 'medium' | 'low'): CompetitorInsightPriority => p;
 const INDUSTRY_AVERAGE_VISIBILITY = 68;
 
@@ -356,7 +363,7 @@ function ScoreCard({
   trend?: { value: string; positive: boolean };
 }) {
   return (
-    <article className="flex h-[106px] min-w-0 flex-col rounded-lg border border-slate-200 bg-white px-6 py-4">
+    <article className="flex h-full min-h-0 min-w-0 flex-col rounded-lg border border-slate-200 bg-white px-6 py-4">
       <div className="flex items-start justify-between gap-3">
         <h3 className="truncate text-sm font-medium leading-5 text-[#5F6877]">{title}</h3>
         <InfoIcon label={tooltipText ?? title} />
@@ -370,6 +377,54 @@ function ScoreCard({
         {trend ? <TrendPill value={trend.value} positive={trend.positive} /> : null}
       </div>
       {footer ? <p className="mt-auto truncate text-xs font-medium text-[#6E7480]">{footer}</p> : null}
+    </article>
+  );
+}
+
+function TopCompetitorCard({
+  title,
+  competitorHost,
+  competitorScoreDelta,
+  tooltipText,
+}: {
+  title: string;
+  competitorHost: string | null;
+  competitorScoreDelta: number;
+  tooltipText?: string;
+}) {
+  const displayHost = competitorHost?.replace(/^www\./i, '') ?? null;
+  const hasCompetitor = Boolean(displayHost);
+  const deltaLabel = formatDeltaLabel(competitorScoreDelta);
+  const deltaIcon = competitorScoreDelta >= 0 ? ArrowUpRight : ArrowDownRight;
+
+  return (
+    <article className="flex min-w-0 flex-col rounded-lg border border-slate-200 bg-white px-6 py-4 shadow-[0_1px_2px_0_#1018280D]">
+      <div className="flex items-start justify-between gap-3">
+        <h3 className="truncate text-sm font-medium leading-5 text-[#5F6877]">{title}</h3>
+        <InfoIcon label={tooltipText ?? title} />
+      </div>
+
+      <div className="mt-3 flex min-w-0 items-start justify-between gap-4">
+        <div className="min-w-0">
+          <div className="flex items-center gap-3">
+            {hasCompetitor ? (
+              <img
+                src={competitorLogo(displayHost ?? '', 64)}
+                alt=""
+                className="h-6 w-6 object-contain"
+                onError={(event) => ((event.currentTarget as HTMLImageElement).style.display = 'none')}
+              />
+            ) : null}
+            <span className="inline-flex h-7 shrink-0 items-center gap-1 rounded-full border border-[#FFC9C9] bg-[#FFE5E5] px-2.5 text-[11px] font-semibold leading-none text-[#D83A3A] shadow-none">
+              {React.createElement(deltaIcon, { className: 'h-3.5 w-3.5' })}
+              {deltaLabel}
+            </span>
+          </div>
+          <p className="mt-2 truncate text-sm font-medium text-[#7B8494]">
+            {hasCompetitor ? displayHost : 'Awaiting data'}
+          </p>
+        </div>
+      </div>
     </article>
   );
 }
@@ -388,7 +443,7 @@ function ValueCard({
   badge?: string;
 }) {
   return (
-    <article className="flex h-[106px] min-w-0 flex-col rounded-lg border border-slate-200 bg-white px-6 py-4">
+    <article className="flex h-full min-h-0 min-w-0 flex-col rounded-lg border border-slate-200 bg-white px-6 py-4">
       <div className="flex items-start justify-between gap-3">
         <h3 className="truncate text-sm font-medium leading-5 text-[#5F6877]">{title}</h3>
         <InfoIcon label={tooltipText ?? title} />
@@ -409,7 +464,7 @@ function ValueCard({
 function InsightCard({ title, items }: { title: string; items: string[] }) {
   const shown = items.slice(0, 2);
   return (
-    <article className="flex h-[106px] min-w-0 flex-col rounded-lg border border-slate-200 bg-white px-6 py-4">
+    <article className="flex h-full min-h-0 min-w-0 flex-col rounded-lg border border-slate-200 bg-white px-6 py-4">
       <div className="flex items-start justify-between gap-3">
         <h3 className="truncate text-sm font-medium leading-5 text-[#5F6877]">{title}</h3>
         <InfoIcon label={title} />
@@ -633,7 +688,7 @@ function TrendComparisonPanel({ trends }: { trends: TrendsResponse | null }) {
   }, [trends]);
 
   return (
-    <section id="competitors-trends" data-title="Trend Comparison" className="min-w-0 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+    <section id="competitors-trends" data-title="Competitor Trend Comparison" className="min-w-0 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <h3 className="text-base font-semibold text-[#2D4059]">Competitor Trend Comparison</h3>
         <span className="text-xs text-[#7B8494]">Last {trends?.runs.length ?? 0} runs</span>
@@ -720,9 +775,19 @@ function TrendComparisonPanel({ trends }: { trends: TrendsResponse | null }) {
   );
 }
 
-function ChartBlock({ title, subtitle, children }: { title: string; subtitle: string; children: React.ReactNode }) {
+function ChartBlock({
+  title,
+  subtitle,
+  children,
+  dataTitle,
+}: {
+  title: string;
+  subtitle: string;
+  children: React.ReactNode;
+  dataTitle?: string;
+}) {
   return (
-    <div className="min-w-0">
+    <div className="min-w-0" data-title={dataTitle ?? title}>
       <div className="mb-2">
         <h4 className="text-sm font-semibold text-[#2D4059]">{title}</h4>
         <p className="text-xs text-[#7B8494]">{subtitle}</p>
@@ -811,7 +876,7 @@ function PromptGapPanel({
 }) {
   const shown = opportunities.slice(0, 4);
   return (
-    <section id="competitors-gaps" data-title="Prompt Gaps" className="min-w-0 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+    <section id="competitors-gaps" data-title="Prompt Gaps Opportunities" className="min-w-0 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
       <div className="flex items-start justify-between gap-4">
         <div>
           <h3 className="text-xl font-semibold leading-none text-[#2D4059]">Prompt Gaps Opportunities</h3>
@@ -941,7 +1006,7 @@ function AICompetitorAnalysisResults({
   }, [competitors]);
 
   return (
-    <section id="competitors-analysis" data-title="Analysis Results" className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+    <section id="competitors-analysis" data-title="AI-Based Competitor Analysis Results" className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
       <div>
         <h3 className="text-xl font-semibold leading-none text-[#2D4059]">AI-Based Competitor Analysis Results</h3>
         <p className="mt-5 text-sm text-[#7B8494]">Compare AI analysis of competitor performance and visibility.</p>
@@ -1093,7 +1158,7 @@ function ContentOpportunitiesToCreate({
   // Use bottom-half (after the 4 surfaced in Prompt Gaps) — same pool, no duplicates.
   const list = opportunities.slice(4, 9);
   return (
-    <section id="competitors-content" data-title="Content Opportunities" className="min-w-0 rounded-xl border border-slate-200 bg-white p-6">
+    <section id="competitors-content" data-title="Content Opportunities to Create" className="min-w-0 rounded-xl border border-slate-200 bg-white p-6">
       <div className="flex items-start justify-between gap-4">
         <h3 className="text-xl font-semibold leading-none text-[#2D4059]">Content Opportunities to Create</h3>
       </div>
@@ -1216,11 +1281,8 @@ export default function CompetitorsPage() {
   const queryClient = useQueryClient();
   const { currentDomain, domainsLoading } = useShellContext();
   const domainId = currentDomain?.id ?? null;
-  const {
-    currentTitle: currentCompetitorSectionTitle,
-    previousTitle: previousCompetitorSectionTitle,
-  } = useScrollSpyBreadcrumbs({
-  });
+  const { currentTitle: currentCompetitorSectionTitle } = useScrollSpyBreadcrumbs({});
+  const maskedDomainId = currentDomain?.id ? maskDomainId(currentDomain.id) : undefined;
 
   // All four data sources hit React Query — sibling tabs hit the same cache.
   const reportQuery = useReport<ReportPayload>(domainId);
@@ -1279,8 +1341,11 @@ export default function CompetitorsPage() {
           : `At industry average (${INDUSTRY_AVERAGE_VISIBILITY})`;
 
     const analysisCompetitors = analysis?.competitors ?? [];
-    const bestCompetitor = analysisCompetitors[0] ?? null;
+    const bestCompetitor =
+      analysisCompetitors.find((competitor) => competitor.rank === 1) ?? analysisCompetitors[0] ?? null;
     const bestScore = bestCompetitor ? Math.round(bestCompetitor.coveragePct * 100) : 0;
+    const bestScoreRaw = bestCompetitor ? bestCompetitor.coveragePct * 100 : 0;
+    const bestScoreDelta = bestScoreRaw - visibility;
 
     let largestGapPct = 0;
     let largestGapPrompt = '';
@@ -1314,6 +1379,8 @@ export default function CompetitorsPage() {
       competitorSOV,
       bestCompetitorHost: bestCompetitor?.host ?? null,
       bestScore,
+      bestScoreRaw,
+      bestScoreDelta,
       largestGapPct: Math.round(largestGapPct * 100),
       largestGapPrompt,
       topInsights,
@@ -1485,10 +1552,12 @@ export default function CompetitorsPage() {
         <div className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/90">
           <div className="mx-auto flex w-full max-w-[1530px] items-center px-5 py-3">
             <AIResultsBreadcrumbs
-              mode="history"
-              prefixHref={domainId != null ? resolveAIResultsNavigation('ai-results', String(domainId)) : undefined}
-              previousLabel={previousCompetitorSectionTitle}
-              currentLabel={currentCompetitorSectionTitle}
+              mode="static"
+              prefixLabel="AI Visibility"
+              prefixHref={resolveSidebarNavigation('ai-visibility').path}
+              pageLabel="Competitors Intelligence"
+              pageHref={maskedDomainId ? resolveAIResultsNavigation('competitors', maskedDomainId) : undefined}
+              currentLabel={currentCompetitorSectionTitle ?? 'Tracked Competitors'}
             />
           </div>
         </div>
@@ -1517,11 +1586,10 @@ export default function CompetitorsPage() {
                     footer={headerMetrics.visibilityComparison}
                     trend={visibilityTrend ?? undefined}
                   />
-                  <ScoreCard
+                  <TopCompetitorCard
                     title="Top Competitor"
-                    score={headerMetrics.bestScore}
-                    maxScore={100}
-                    footer={headerMetrics.bestCompetitorHost ?? 'Awaiting data'}
+                    competitorHost={headerMetrics.bestCompetitorHost}
+                    competitorScoreDelta={headerMetrics.bestScoreDelta}
                   />
                   <ValueCard
                     title="Largest Prompt Gap"

@@ -27,6 +27,7 @@ import {
   Download,
   ExternalLink,
   Filter,
+  ArrowUp,
   Globe2,
   LayoutDashboard,
   LineChart,
@@ -45,8 +46,10 @@ import {
   Upload,
   UserRound,
   Users,
+  Info,
   TrendingUp,
   X,
+  FileText,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -1555,8 +1558,8 @@ export const PromptTable = ({
         <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-gray-200">
           <Table>
             <TableHeader>
-              <TableRow className="border-b border-slate-200 hover:bg-transparent">
-                <TableHead className="w-8 px-4">
+              <TableRow className="border-b-0 bg-[#f1f1f1] hover:bg-[#f1f1f1]">
+                <TableHead className="w-8 px-4 rounded-tl-lg">
                   <input
                     type="checkbox"
                     checked={allVisibleSelected}
@@ -1573,13 +1576,41 @@ export const PromptTable = ({
                     className="h-3.5 w-3.5 rounded border-gray-300 accent-blue-600"
                   />
                 </TableHead>
-                <TableHead className="text-[10px] font-semibold uppercase tracking-wider text-[#2D4059] px-2">Prompts</TableHead>
-                <TableHead className="text-[10px] font-semibold uppercase tracking-wider text-[#2D4059] px-2">Sentiment</TableHead>
-                <TableHead className="text-[10px] font-semibold uppercase tracking-wider text-[#2D4059] px-2">Ranking</TableHead>
-                <TableHead className="text-[10px] font-semibold uppercase tracking-wider text-[#2D4059] px-2">Position</TableHead>
-                <TableHead className="text-[10px] font-semibold uppercase tracking-wider text-[#2D4059] px-2">AI SOV</TableHead>
-                <TableHead className="text-[10px] font-semibold uppercase tracking-wider text-[#2D4059] px-2">Competitors</TableHead>
-                <TableHead className="text-center text-[10px] font-semibold uppercase tracking-wider text-[#2D4059] px-4">Action</TableHead>
+                <TableHead className="px-2 text-[11px] font-semibold text-[#31415f]">
+                  <div className="flex items-center gap-1">
+                    Prompts <Info className="h-[10px] w-[10px] text-slate-400" /> <ArrowUp className="h-3 w-3 text-slate-600" />
+                  </div>
+                </TableHead>
+                <TableHead className="px-2 text-[11px] font-semibold text-[#31415f]">
+                  <div className="flex items-center gap-1">
+                    Sentiment <Info className="h-[10px] w-[10px] text-slate-400" /> <ArrowUp className="h-3 w-3 text-slate-600" />
+                  </div>
+                </TableHead>
+                <TableHead className="px-2 text-[11px] font-semibold text-[#31415f]">
+                  <div className="flex items-center gap-1">
+                    Ranking <Info className="h-[10px] w-[10px] text-slate-400" /> <ArrowUp className="h-3 w-3 text-slate-600" />
+                  </div>
+                </TableHead>
+                <TableHead className="px-2 text-[11px] font-semibold text-[#31415f]">
+                  <div className="flex items-center gap-1">
+                    Position <Info className="h-[10px] w-[10px] text-slate-400" /> <ArrowUp className="h-3 w-3 text-slate-600" />
+                  </div>
+                </TableHead>
+                <TableHead className="px-2 text-[11px] font-semibold text-[#31415f]">
+                  <div className="flex items-center gap-1">
+                    AI SOV <Info className="h-[10px] w-[10px] text-slate-400" /> <ArrowUp className="h-3 w-3 text-slate-600" />
+                  </div>
+                </TableHead>
+                <TableHead className="px-2 text-[11px] font-semibold text-[#31415f]">
+                  <div className="flex items-center gap-1">
+                    Competitors <Info className="h-[10px] w-[10px] text-slate-400" /> <ArrowUp className="h-3 w-3 text-slate-600" />
+                  </div>
+                </TableHead>
+                <TableHead className="px-4 text-right text-[11px] font-semibold text-[#31415f] rounded-tr-lg">
+                  <div className="flex items-center justify-end gap-1">
+                    Action <Info className="h-[10px] w-[10px] text-slate-400" />
+                  </div>
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -1757,13 +1788,15 @@ export const PromptTable = ({
                           }}
                         />
                         <Button
+                          type="button"
                           variant="outline"
                           onClick={(e) => {
                             e.stopPropagation();
                             onOpenWorksheetModal(String(row.id));
                           }}
-                          className="h-7 rounded-lg px-3 text-[10px] font-bold border-slate-300 text-slate-600 hover:bg-gray-50 shadow-none"
+                          className="h-[38px] rounded-[14px] border-[#e8eef8] bg-[#eff4ff] px-3.5 text-[11px] font-semibold text-[#3b5d9c] shadow-none hover:bg-[#e7efff]"
                         >
+                          <FileText className="mr-1.5 h-3.5 w-3.5" />
                           Generate
                         </Button>
                       </div>

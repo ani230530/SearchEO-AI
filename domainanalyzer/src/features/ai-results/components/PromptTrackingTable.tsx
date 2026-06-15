@@ -1630,7 +1630,7 @@ export const PromptTable = ({
                           className="h-[38px] rounded-[14px] border-[#e8eef8] bg-[#eff4ff] px-3.5 text-[11px] font-semibold text-[#3b5d9c] shadow-none hover:bg-[#e7efff]"
                         >
                           <FileText className="mr-1.5 h-3.5 w-3.5" />
-                          Draft Blog
+                          Generate
                         </Button>
                       </div>
                     </TableCell>

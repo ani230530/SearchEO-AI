@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Area,
   AreaChart,
@@ -29,14 +30,13 @@ import {
   Calendar,
   ChevronRight,
   ChartNoAxesCombined,
-  Globe2,
   FileText,
   Loader2,
   Plus,
   RefreshCw,
   Search,
+  UsersRound,
 } from "lucide-react";
-import { Input } from "@/components/ui/input";
 import type { OverviewSectionProps } from "@/features/sidebar-dashboard/types";
 import { useBlogAnalyticsAggregate } from "@/features/sidebar-dashboard/queries";
 
@@ -75,7 +75,6 @@ export function OverviewSection({
   auditComplete,
   auditLoading,
   auditResult,
-  campaignsCount,
   companyDomain,
   hasWordpressIntegration,
   competitorOverview,
@@ -92,11 +91,14 @@ export function OverviewSection({
   onVisitSite,
   overallScore,
 }: OverviewSectionProps) {
+  const navigate = useNavigate();
   const blogAnalyticsQuery = useBlogAnalyticsAggregate(28);
   const blogAggregateData: AggregateData | null =
     blogAnalyticsQuery.data && blogAnalyticsQuery.data.success ? blogAnalyticsQuery.data : null;
   const isLoadingBlogData = blogAnalyticsQuery.isLoading;
 
+  const [heroDomainInput, setHeroDomainInput] = useState("");
+  const [heroDomainError, setHeroDomainError] = useState("");
   const [showAuditModal, setShowAuditModal] = useState(false);
 
   useEffect(() => {
@@ -195,7 +197,40 @@ export function OverviewSection({
     },
   ];
 
+  const recommendedActions = [
+    {
+      title: "See Where Competitors Are Winning",
+      description: "Identify competitor strengths, visibility gaps, and content opportunities.",
+      icon: "/sidebar-icons/recommended-actions-group.svg",
+      arrowIcon: "/sidebar-icons/recommended-actions-arrow.svg",
+      onClick: onOpenAnalytics,
+    },
+    {
+      title: "Discover Prompt Opportunities",
+      description: "Surface high-value prompts that can improve discovery and coverage.",
+      icon: "/sidebar-icons/discover-prompt-opportunities.svg",
+      arrowIcon: "/sidebar-icons/recommended-actions-arrow.svg",
+      onClick: onOpenProjects,
+    },
+    {
+      title: "Develop Content That AI Recommends",
+      description: "Build targeted content ideas to improve rankings and AI visibility.",
+      icon: "/sidebar-icons/develop-content-that-ai-recommends.svg",
+      arrowIcon: "/sidebar-icons/recommended-actions-arrow.svg",
+      onClick: onOpenProjects,
+    },
+  ];
+
   const isPageLoading = auditLoading && !auditResult;
+  const handleCheckDomain = () => {
+    const nextDomain = heroDomainInput.trim();
+    if (nextDomain) {
+      setHeroDomainError("");
+      navigate(`/audit?prefillHost=${encodeURIComponent(nextDomain)}`);
+      return;
+    }
+    setHeroDomainError("Please type a domain first.");
+  };
 
   return (
     <>
@@ -208,105 +243,138 @@ export function OverviewSection({
           </div>
         </div>
       ) : (
-        <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-6 px-4 py-4 sm:px-6 lg:px-8">
+        <div className="mx-auto flex w-full max-w-[1637px] flex-col gap-6 px-4 py-4 sm:px-6 lg:px-8">
           <section className="self-stretch overflow-hidden rounded-[12px] bg-[#F9F9F9] px-6 py-6 shadow-[0_1px_2px_rgba(16,24,40,0.04)] sm:px-8">
-            <div className="flex flex-col items-center justify-center gap-6 lg:flex-row lg:items-center">
-                <div className="flex justify-center lg:shrink-0">
-                  <img
-                    src="/penguin-hero.svg"
-                    alt=""
-                    aria-hidden="true"
-                    className="h-28 w-28 select-none object-contain sm:h-32 sm:w-32 lg:h-36 lg:w-36"
-                  />
+            <div className="mx-auto flex w-full max-w-[1080px] flex-col items-center justify-center gap-6 lg:flex-row lg:items-center lg:gap-8">
+              <div className="flex justify-center lg:shrink-0">
+                <img
+                  src="/penguin-hero.svg"
+                  alt=""
+                  aria-hidden="true"
+                  className="h-48 w-48 select-none object-contain sm:h-56 sm:w-56 lg:h-40 lg:w-40"
+                />
+              </div>
+
+              <div className="min-w-0 flex-1 max-w-[760px]">
+                <div className="space-y-2">
+                  <h1 className="text-4xl font-semibold tracking-tight text-[#414651] sm:text-[2.15rem]">
+                    See how AI ranks your domain
+                  </h1>
+                  <p className="max-w-3xl text-base leading-7 text-[#535862] sm:text-lg">
+                    Uncover how your content appears in AI search, which keywords you&apos;re visible for, and where you&apos;re missing opportunities.
+                  </p>
                 </div>
 
-                <div className="min-w-0 flex-1">
-                  <div className="space-y-2">
-                    <h1 className="text-3xl font-semibold tracking-tight text-[#1F2937] sm:text-[2.15rem]">
-                      See how AI ranks your domain
-                    </h1>
-                    <p className="max-w-3xl text-base leading-7 text-[#4B5563] sm:text-lg">
-                      Uncover how your content appears in AI search, which keywords you&apos;re visible for, and where you&apos;re missing opportunities.
-                    </p>
+                <div className="mt-5 flex flex-col gap-3 md:flex-row md:items-center">
+                  <label htmlFor="overview-domain-input" className="sr-only">
+                    Domain to analyze
+                  </label>
+                  <div className="relative flex-1">
+                    <img
+                      src="/sidebar-icons/vector.svg"
+                      alt=""
+                      aria-hidden="true"
+                      className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 select-none object-contain"
+                    />
+                    {heroDomainError ? (
+                      <span
+                        className="pointer-events-none absolute left-11 top-1/2 -translate-y-1/2 truncate text-base text-[#B42318]"
+                        aria-live="polite"
+                      >
+                        {heroDomainError}
+                      </span>
+                    ) : null}
+                    <Input
+                      id="overview-domain-input"
+                      value={heroDomainInput}
+                      onChange={(event) => {
+                        setHeroDomainInput(event.target.value);
+                        if (heroDomainError) setHeroDomainError("");
+                      }}
+                      placeholder={heroDomainError ? "" : "https://domain.com/"}
+                      className="h-12 rounded-xl border-slate-200 bg-white pl-11 text-base text-slate-900 shadow-sm placeholder:text-[#D5D7DA]"
+                    />
                   </div>
-
-                  <div className="mt-5 flex flex-col gap-3 md:flex-row md:items-center">
-                    <label htmlFor="overview-domain-input" className="sr-only">
-                      Domain to analyze
-                    </label>
-                    <div className="relative flex-1">
-                      <Globe2 className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                      <Input
-                        id="overview-domain-input"
-                        value={companyDomain}
-                        onChange={(event) => setCompanyDomain(event.target.value)}
-                        placeholder="https://domain.com/"
-                        className="h-12 rounded-xl border-slate-200 bg-white pl-11 text-sm shadow-sm"
-                      />
-                    </div>
-                    <button
-                      type="button"
-                      onClick={onAddDomain}
-                      className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-[linear-gradient(135deg,#3b4d8f_0%,#5c7dc0_100%)] px-5 text-sm font-semibold text-white shadow-[0_10px_20px_rgba(45,64,89,0.18)] transition hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-[#4C74C2] focus:ring-offset-2"
-                    >
-                      <Plus className="h-4 w-4" />
-                      Check your domain
-                    </button>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={handleCheckDomain}
+                    className="inline-flex h-12 items-center justify-center gap-2 rounded-xl border-0 bg-[linear-gradient(90deg,#2D4059_0%,#4C74C2_100%)] px-5 text-sm font-semibold text-white shadow-[0_1px_2px_0_#1018280D] transition hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-[#4C74C2] focus:ring-offset-2"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Check your domain
+                  </button>
                 </div>
               </div>
+            </div>
           </section>
 
-          <section aria-labelledby="dashboard-metrics" className="space-y-4">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <section aria-labelledby="recommended-actions" className="space-y-4">
+            <div className="flex items-center justify-between gap-3">
               <div>
-                <h2 id="dashboard-metrics" className="text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl">
-                  Your dashboard snapshot
-                </h2>
-                <p className="mt-1 text-sm text-slate-500">A quick pulse on visibility, coverage, and connected tooling.</p>
+                <p id="recommended-actions" className="text-xl font-semibold leading-none text-[#414651] sm:text-2xl">
+                  Recommended Actions
+                </p>
               </div>
-              <button
-                type="button"
-                onClick={onOpenAuditDetails}
-                className="inline-flex items-center gap-1 text-sm font-semibold text-[#2D4059] underline-offset-4 hover:underline focus:outline-none focus:ring-2 focus:ring-[#4C74C2] focus:ring-offset-2"
-              >
-                View full report
-                <ArrowRight className="h-4 w-4" />
-              </button>
             </div>
 
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-              {[
-                {
-                  label: "Visibility score",
-                  value: `${overallScorePercent}%`,
-                  helper: "Overall AI visibility",
-                },
-                {
-                  label: "Coverage",
-                  value: `${keywordsTableData.length}`,
-                  helper: "Tracked prompts and keywords",
-                },
-                {
-                  label: "Projects",
-                  value: `${campaignsCount}`,
-                  helper: "Active campaign workspaces",
-                },
-                {
-                  label: "Connected site",
-                  value: hasWordpressIntegration ? "Yes" : "No",
-                  helper: hasWordpressIntegration ? "Publishing enabled" : "Connect to publish",
-                },
-              ].map((card) => (
-                <article
-                  key={card.label}
-                  className="rounded-[20px] border border-slate-200 bg-white p-5 shadow-[0_1px_2px_rgba(16,24,40,0.04)]"
-                >
-                  <p className="text-sm font-medium text-slate-500">{card.label}</p>
-                  <p className="mt-3 text-3xl font-semibold tracking-tight text-slate-900">{card.value}</p>
-                  <p className="mt-2 text-sm text-slate-500">{card.helper}</p>
-                </article>
-              ))}
+            <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+              {recommendedActions.map((action) => {
+                const Icon = typeof action.icon === "string" ? null : action.icon;
+                return (
+                  <article
+                    key={action.title}
+                    className={
+                      action.title === "See Where Competitors Are Winning"
+                        ? "flex h-full min-h-[168px] flex-col rounded-[10px] border border-[#E3ECFB] bg-[#EEF4FF] px-4 py-4 shadow-[0_1px_2px_rgba(16,24,40,0.04)]"
+                        : "flex h-full min-h-[168px] flex-col rounded-[10px] border border-[#E3ECFB] bg-[#F4F8FF] px-4 py-4 shadow-[0_1px_2px_rgba(16,24,40,0.04)]"
+                    }
+                  >
+                    <div className="flex flex-1 flex-col">
+                      {action.title === "See Where Competitors Are Winning" ? (
+                        <img
+                          src="/sidebar-icons/recommended-actions-group.svg"
+                          alt=""
+                          aria-hidden="true"
+                          className="h-10 w-10 shrink-0 select-none object-contain"
+                        />
+                      ) : typeof action.icon === "string" ? (
+                        <img
+                          src={action.icon}
+                          alt=""
+                          aria-hidden="true"
+                          className="h-10 w-10 shrink-0 select-none object-contain"
+                        />
+                      ) : (
+                        <Icon className="h-10 w-10 shrink-0 text-[#7F95BD]" strokeWidth={1.7} />
+                      )}
+
+                      <h3 className="mt-3 text-base font-semibold leading-6 text-[#414651]">
+                        {action.title}
+                      </h3>
+                      <p className="mt-1 text-base font-normal leading-6 text-[#717680]">
+                        {action.description}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={action.onClick}
+                        className="mt-4 inline-flex h-9 w-9 items-center justify-center rounded-[8px] bg-[#7E94BA] text-white transition hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-[#4C74C2] focus:ring-offset-2"
+                        aria-label={action.title}
+                      >
+                        {action.title === "See Where Competitors Are Winning" ? (
+                          <img
+                            src="/sidebar-icons/recommended-actions-arrow.svg"
+                            alt=""
+                            aria-hidden="true"
+                            className="h-9 w-9 select-none object-contain"
+                          />
+                        ) : (
+                          <ArrowRight className="h-4 w-4" />
+                        )}
+                      </button>
+                    </div>
+                  </article>
+                );
+              })}
             </div>
           </section>
 
