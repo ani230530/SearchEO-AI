@@ -26,7 +26,7 @@ const Auth: React.FC = () => {
 
   // Where to send the user after login completes. ProtectedRoute populates
   // `location.state.from` when a deep-link redirected here. Fall back to
-  // the older localStorage flag, then /dashboard.
+  // the older localStorage flag, then /newdashboard.
   const computeRedirect = useMemo(() => {
     return (): string => {
       const fromState = (location.state as FromLocation | null)?.from;
@@ -38,7 +38,7 @@ const Auth: React.FC = () => {
         localStorage.removeItem('postAuthRedirect');
         return stored;
       }
-      return '/dashboard';
+      return '/newdashboard';
     };
   }, [location.state]);
 

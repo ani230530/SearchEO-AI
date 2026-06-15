@@ -37,7 +37,6 @@ import {
   RefreshCw,
   Sparkles,
   Search,
-  ShieldCheck,
   Zap,
 } from "lucide-react";
 import {
@@ -1300,9 +1299,18 @@ export const PromptTable = ({
                   type="button"
                   onClick={() => void bulkTrack(fullSortedData, true)}
                   disabled={bulkPending}
-                  className="h-[38px] gap-2 rounded-lg border-none bg-[#4b6eb8] px-4 text-white shadow-none transition-all hover:bg-[#3f5d9c] disabled:opacity-60"
+                  className="h-[38px] gap-2 rounded-[8px] border-0 bg-[linear-gradient(90deg,#2D4059_0%,#4C74C2_100%)] px-4 text-white shadow-[0_1px_2px_0_rgba(16,24,40,0.05)] transition-all hover:brightness-95 disabled:opacity-60"
                 >
-                  {bulkPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
+                  {bulkPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <img
+                      src="/report-icons/target-03.svg"
+                      alt=""
+                      aria-hidden="true"
+                      className="h-4 w-4 shrink-0 object-contain"
+                    />
+                  )}
                   <span className="text-[13px] font-medium">Track all</span>
                 </Button>
               ) : null}
@@ -1475,10 +1483,9 @@ export const PromptTable = ({
               {displayData.map((row) => (
                 <Fragment key={row.id}>
                   <TableRow
-                    className={`group cursor-pointer border-b transition-all duration-200 hover:bg-slate-50/80 ${
+                    className={`group border-b transition-all duration-200 hover:bg-slate-50/80 ${
                       expandedId === row.id ? "border-slate-300 bg-slate-50 shadow-sm" : "border-slate-200"
                     }${isRowTracked(row) ? " border-l-[3px] border-l-[#7f9fe8]" : ""}`}
-                    onClick={() => setExpandedId(expandedId === row.id ? null : row.id)}
                   >
                     <TableCell className="w-8 px-4 py-3">
                       <input
@@ -1494,6 +1501,9 @@ export const PromptTable = ({
                       <div className="flex flex-col gap-1">
                         <div className="flex items-center gap-2">
                           <button
+                            type="button"
+                            aria-label={expandedId === row.id ? "Collapse row details" : "Expand row details"}
+                            aria-expanded={expandedId === row.id}
                             onClick={(event) => {
                               event.stopPropagation();
                               setExpandedId(expandedId === row.id ? null : row.id);
