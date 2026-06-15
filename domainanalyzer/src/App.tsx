@@ -4,7 +4,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
-import { AuthProvider } from "@/contexts/AuthContext";
+import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { ChatWidget } from "@/features/chat/ChatWidget";
 
@@ -49,6 +49,20 @@ const RouteFallback = () => (
   </div>
 );
 
+const RootRoute = () => {
+  const { user, token, loading } = useAuth();
+
+  if (loading) {
+    return <RouteFallback />;
+  }
+
+  if (user && token) {
+    return <Navigate to="/newdashboard" replace />;
+  }
+
+  return <LandingPage />;
+};
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
@@ -59,7 +73,7 @@ const App = () => (
           <Suspense fallback={<RouteFallback />}>
             <Routes>
               {/* Public routes */}
-              <Route path="/" element={<LandingPage />} />
+              <Route path="/" element={<RootRoute />} />
               {/* Anonymous AI Visibility audit. Same component as the
                   authenticated dashboard wizard — runs against the wizard
                   cookie identity when no JWT is present. Steps 1-4 work
