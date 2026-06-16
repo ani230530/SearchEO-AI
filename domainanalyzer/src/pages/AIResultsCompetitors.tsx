@@ -966,7 +966,7 @@ function AnalysisResultCard({
   const threatLabel = competitor.threatLevel ? `${competitor.threatLevel} Threat` : 'Unranked';
 
   return (
-    <article className="grid min-w-0 grid-cols-[minmax(0,1fr)_56px] overflow-hidden rounded-xl border border-slate-200 bg-white">
+    <article className="shrink-0 grid min-w-0 grid-cols-[minmax(0,1fr)_56px] overflow-hidden rounded-xl border border-slate-200 bg-white">
       <div className="min-w-0 p-5">
         <div className="flex items-start justify-between gap-4">
           <div className="flex min-w-0 items-center gap-4">
@@ -1029,7 +1029,6 @@ function AICompetitorAnalysisResults({
           threatRank(a.competitor.threatLevel) - threatRank(b.competitor.threatLevel) ||
           a.index - b.index
       )
-      .slice(0, 4)
       .map(({ competitor }) => competitor);
   }, [competitors]);
 
@@ -1040,7 +1039,7 @@ function AICompetitorAnalysisResults({
         <p className="mt-5 text-sm text-[#7B8494]">Compare AI analysis of competitor performance and visibility.</p>
       </div>
 
-      <div className="mt-7 flex flex-col gap-6">
+      <div className="mt-7 flex max-h-[640px] flex-col gap-6 overflow-y-auto pr-2">
         {visibleCompetitors.length === 0 ? (
           <p className="rounded-md border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-center text-sm text-slate-500">
             No competitors mentioned in this audit yet. Re-run the audit, or add competitors in the wizard.
@@ -1088,59 +1087,68 @@ function PositioningComparison({ analysis }: { analysis: CompetitorAnalysisRespo
         </div>
       </div>
 
-      <div className="mt-6">
+      <div className="mt-8">
         {data.length === 0 ? (
           <p className="rounded-md border border-dashed border-slate-200 bg-slate-50 px-4 py-12 text-center text-sm text-slate-500">
             No competitor positioning data yet.
           </p>
         ) : (
-          <ResponsiveContainer width="100%" height={360}>
-            <ScatterChart margin={{ top: 20, right: 20, bottom: 30, left: 10 }}>
-              <CartesianGrid stroke="#EEF1F5" strokeDasharray="2 2" />
-              <XAxis
-                type="number"
-                dataKey="x"
-                domain={[0, 100]}
-                tick={{ fontSize: 11, fill: '#667085' }}
-                label={{ value: 'Market Share %', position: 'insideBottom', offset: -10, fill: '#2D5B93', fontSize: 12 }}
-              />
-              <YAxis
-                type="number"
-                dataKey="y"
-                domain={[0, 100]}
-                tick={{ fontSize: 11, fill: '#667085' }}
-                label={{ value: 'Sentiment %', angle: -90, position: 'insideLeft', fill: '#2D5B93', fontSize: 12 }}
-              />
-              <ZAxis type="number" dataKey="z" range={[60, 400]} />
-              <Tooltip
-                cursor={{ strokeDasharray: '3 3' }}
-                content={({ active, payload }) => {
-                  if (!active || !payload || payload.length === 0) return null;
-                  const p = payload[0].payload as { name: string; x: number; y: number };
-                  return (
-                    <div className="rounded-md border border-slate-200 bg-white px-3 py-2 text-xs shadow-md">
-                      <p className="font-semibold text-[#2D4059]">{p.name}</p>
-                      <p className="text-[#7B8494]">Market share: {p.x}%</p>
-                      <p className="text-[#7B8494]">Sentiment: {p.y}/100</p>
-                    </div>
-                  );
-                }}
-              />
-              <Scatter
-                data={data}
-                shape={(props: any) => {
-                  const { cx, cy, payload } = props;
-                  const radius = Math.sqrt((payload.z ?? 100) / Math.PI) * 1.2;
-                  return (
-                    <g>
+          <>
+            <ResponsiveContainer width="100%" height={560}>
+              <ScatterChart margin={{ top: 20, right: 20, bottom: 30, left: 10 }}>
+                <CartesianGrid stroke="#EEF1F5" strokeDasharray="2 2" />
+                <XAxis
+                  type="number"
+                  dataKey="x"
+                  domain={[0, 100]}
+                  ticks={[0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100]}
+                  tick={{ fontSize: 11, fill: '#667085' }}
+                  label={{ value: 'Market Share %', position: 'insideBottom', offset: -10, fill: '#2D5B93', fontSize: 12 }}
+                />
+                <YAxis
+                  type="number"
+                  dataKey="y"
+                  domain={[0, 100]}
+                  ticks={[0, 20, 40, 60, 80, 100]}
+                  tick={{ fontSize: 11, fill: '#667085' }}
+                  label={{ value: 'Sentiment %', angle: -90, position: 'insideLeft', fill: '#2D5B93', fontSize: 12 }}
+                />
+                <ZAxis type="number" dataKey="z" range={[60, 400]} />
+                <Tooltip
+                  cursor={{ strokeDasharray: '3 3' }}
+                  content={({ active, payload }) => {
+                    if (!active || !payload || payload.length === 0) return null;
+                    const p = payload[0].payload as { name: string; x: number; y: number };
+                    return (
+                      <div className="rounded-md border border-slate-200 bg-white px-3 py-2 text-xs shadow-md">
+                        <p className="font-semibold text-[#2D4059]">{p.name}</p>
+                        <p className="text-[#7B8494]">Market share: {p.x}%</p>
+                        <p className="text-[#7B8494]">Sentiment: {p.y}/100</p>
+                      </div>
+                    );
+                  }}
+                />
+                <Scatter
+                  data={data}
+                  shape={(props: any) => {
+                    const { cx, cy, payload } = props;
+                    const radius = Math.sqrt((payload.z ?? 100) / Math.PI) * 2.8;
+                    return (
                       <circle cx={cx} cy={cy} r={radius} fill={payload.color} fillOpacity={0.7} stroke={payload.color} />
-                      <text x={cx} y={cy + radius + 12} textAnchor="middle" fontSize={10} fill="#2D4059">{payload.name}</text>
-                    </g>
-                  );
-                }}
-              />
-            </ScatterChart>
-          </ResponsiveContainer>
+                    );
+                  }}
+                />
+              </ScatterChart>
+            </ResponsiveContainer>
+            <div className="mt-6 flex flex-wrap items-center justify-center gap-x-8 gap-y-4 px-4">
+              {data.map((d) => (
+                <div key={d.name} className="flex items-center gap-2">
+                  <span className="h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: d.color }} />
+                  <span className="text-sm font-medium text-[#5F6877]">{d.name}</span>
+                </div>
+              ))}
+            </div>
+          </>
         )}
       </div>
     </section>
