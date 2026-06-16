@@ -1,10 +1,18 @@
-import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, useCallback, ReactNode } from 'react';
 import { isTokenExpired, getTimeUntilExpiration } from '@/services/tokenService';
 import { tokenManager, apiRequest } from '@/services/apiClient';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3002';
 
-type AuthResponseBody = Record<string, any>;
+type AuthResponseBody = {
+  error?: string;
+  message?: string;
+  valid?: boolean;
+  user?: User;
+  token?: string;
+  refreshToken?: string;
+  [key: string]: unknown;
+};
 
 const readAuthResponse = async (response: Response): Promise<AuthResponseBody> => {
   const text = await response.text();
@@ -92,15 +100,114 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [error, setError] = useState<string | null>(null);
   const refreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Check for existing token on app load
-  useEffect(() => {
-  const storedToken = tokenManager.getAuthToken();
-    if (storedToken) {
-      verifyToken(storedToken);
-    } else {
-      setLoading(false);
+  const applyAuthResponse = useCallback((data: AuthResponseBody) => {
+    if (!data.user || !data.token) {
+      throw new Error('Authentication failed. Please sign in again.');
     }
+
+    setUser(data.user);
+    setToken(data.token);
+    tokenManager.setTokens(data.token, data.refreshToken);
   }, []);
+
+  const refreshToken = useCallback(async (): Promise<AuthResponseBody> => {
+    const refreshTokenValue = tokenManager.getRefreshToken();
+    if (!refreshTokenValue) {
+      throw new Error('No refresh token available');
+    }
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/auth/refresh`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ refreshToken: refreshTokenValue }),
+      });
+
+      const data = await readAuthResponse(response);
+
+      if (!response.ok) {
+        throw new Error(getAuthErrorMessage(data, 'Token refresh failed'));
+      }
+
+      applyAuthResponse(data);
+      return data;
+    } catch (error) {
+      console.error('Token refresh failed:', error);
+      tokenManager.clearTokens();
+      setToken(null);
+      setUser(null);
+      throw error;
+    }
+  }, [applyAuthResponse]);
+
+  // Check for existing token on app load.
+  useEffect(() => {
+    let cancelled = false;
+
+    const bootstrapAuth = async () => {
+      const storedToken = tokenManager.getAuthToken();
+      const refreshTokenValue = tokenManager.getRefreshToken();
+
+      if (!storedToken && !refreshTokenValue) {
+        if (!cancelled) setLoading(false);
+        return;
+      }
+
+      try {
+        if (storedToken && !isTokenExpired(storedToken)) {
+          const response = await fetch(`${API_BASE_URL}/api/auth/verify`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ token: storedToken }),
+          });
+
+          const data = await readAuthResponse(response);
+
+          if (data.valid && data.user) {
+            if (!cancelled) {
+              setUser(data.user);
+              setToken(storedToken);
+              tokenManager.setTokens(storedToken, refreshTokenValue ?? undefined);
+              setLoading(false);
+            }
+            return;
+          }
+        }
+
+        if (refreshTokenValue) {
+          await refreshToken();
+          return;
+        }
+
+        tokenManager.clearTokens();
+        if (!cancelled) {
+          setUser(null);
+          setToken(null);
+        }
+      } catch (error) {
+        console.error('Initial auth bootstrap failed:', error);
+        tokenManager.clearTokens();
+        if (!cancelled) {
+          setUser(null);
+          setToken(null);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    };
+
+    void bootstrapAuth();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [refreshToken]);
 
   // Set up automatic token refresh
   useEffect(() => {
@@ -125,39 +232,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         clearTimeout(refreshIntervalRef.current);
       }
     };
-  }, [token]);
-
-  const refreshToken = async (): Promise<void> => {
-    const refreshTokenValue = tokenManager.getRefreshToken();
-    if (!refreshTokenValue) {
-      throw new Error('No refresh token available');
-    }
-
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/auth/refresh`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ refreshToken: refreshTokenValue }),
-      });
-
-      const data = await readAuthResponse(response);
-
-      if (!response.ok) {
-        throw new Error(getAuthErrorMessage(data, 'Token refresh failed'));
-      }
-
-      tokenManager.setTokens(data.token, data.refreshToken);
-      setToken(data.token);
-    } catch (error) {
-      console.error('Token refresh failed:', error);
-      tokenManager.clearTokens();
-      setToken(null);
-      setUser(null);
-      throw error;
-    }
-  };
+  }, [token, refreshToken]);
 
   const verifyToken = async (tokenToVerify: string) => {
     try {
@@ -166,11 +241,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         const refreshTokenValue = tokenManager.getRefreshToken();
         if (refreshTokenValue) {
           try {
-            await refreshToken();
-            const newToken = tokenManager.getAuthToken();
-            if (newToken) {
-              tokenToVerify = newToken;
-            }
+            const refreshed = await refreshToken();
+            tokenToVerify = refreshed.token;
           } catch (error) {
             // Refresh failed, clear tokens
             tokenManager.clearTokens();
@@ -209,25 +281,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         if (refreshTokenValue) {
           try {
             await refreshToken();
-            const newToken = tokenManager.getAuthToken();
-            if (newToken) {
-              // Retry verification with new token
-              const retryResponse = await fetch(`${API_BASE_URL}/api/auth/verify`, {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ token: newToken }),
-              });
-              const retryData = await readAuthResponse(retryResponse);
-              if (retryData.valid && retryData.user) {
-                setUser(retryData.user);
-                setToken(newToken);
-                tokenManager.setTokens(newToken);
-                setLoading(false);
-                return;
-              }
-            }
+            setLoading(false);
+            return;
           } catch (error) {
             // Refresh failed
           }
