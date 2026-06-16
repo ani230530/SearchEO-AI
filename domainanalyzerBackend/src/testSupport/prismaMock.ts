@@ -63,6 +63,7 @@ export const createPrismaMock = (): PrismaMock => {
     wizardSession: makeStore(),
     domain: makeStore(),
     user: makeStore(),
+    refreshToken: makeStore(),
     apiSpendLog: makeStore(),
     wizardRunCache: makeStore(),
     folder: makeStore(),
@@ -242,6 +243,39 @@ export const createPrismaMock = (): PrismaMock => {
     },
 
     // -------------------------------------------------------------------------
+    // refreshToken
+    // -------------------------------------------------------------------------
+    refreshToken: {
+      create: async ({ data }: any) =>
+        stores.refreshToken.insert({
+          revokedAt: null,
+          reusedAt: null,
+          parentId: null,
+          userAgent: null,
+          ip: null,
+          ...data,
+        }),
+      findUnique: async ({ where, select }: any) => {
+        const rows = stores.refreshToken.all();
+        let row = null;
+        if (where.id !== undefined) row = rows.find((r) => r.id === where.id) ?? null;
+        if (!row && where.tokenHash !== undefined) {
+          row = rows.find((r) => r.tokenHash === where.tokenHash) ?? null;
+        }
+        return row ? projectRow(row, select) : null;
+      },
+      update: async ({ where, data }: any) => stores.refreshToken.update(where.id, data),
+      updateMany: async ({ where, data }: any = {}) => {
+        let count = 0;
+        for (const row of stores.refreshToken.all().filter((r) => matchWhere(r, where ?? {}))) {
+          stores.refreshToken.update(row.id, data);
+          count++;
+        }
+        return { count };
+      },
+    },
+
+    // -------------------------------------------------------------------------
     // apiSpendLog
     // -------------------------------------------------------------------------
     apiSpendLog: {
@@ -412,6 +446,11 @@ function matchWhere(row: Row, where: any): boolean {
       continue;
     }
     const c = cond as any;
+    if ('gt' in c) {
+      const rv = row[key];
+      const cv = c.gt;
+      if (!(rv instanceof Date ? rv.getTime() > cv.getTime() : rv > cv)) return false;
+    }
     if ('gte' in c) {
       const rv = row[key];
       const cv = c.gte;

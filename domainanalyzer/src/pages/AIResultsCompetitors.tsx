@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  ArrowDownRight,
   ArrowUpRight,
   ChevronDown,
   ChevronRight,
@@ -40,11 +41,12 @@ import type {
 } from '@/components/competitors/aiResponseAnalysisData';
 import { apiPost } from '../services/apiClient';
 import { logoUrl as logoUrlHelper } from '@/lib/logoUrl';
+import { maskDomainId } from '@/lib/domainUtils';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { useShellContext } from '@/features/ai-results/AIResultsShell';
 import { AIResultsBreadcrumbs } from '@/features/ai-results/components/AIResultsBreadcrumbs';
-import { resolveAIResultsNavigation } from '@/features/sidebar-dashboard/navigation';
+import { resolveAIResultsNavigation, resolveSidebarNavigation } from '@/features/sidebar-dashboard/navigation';
 import { useScrollSpyBreadcrumbs } from '@/features/ai-results/useScrollSpyBreadcrumbs';
 import {
   aiResultsKeys,
@@ -235,6 +237,11 @@ const formatStrongestCluster = (c: CompetitorAnalysisRow): string => {
   return `${friendlyCategory(c.strongestPromptCluster.category)} (${pct}% of mentions)`;
 };
 
+const formatDeltaLabel = (delta: number): string => {
+  const sign = delta >= 0 ? '+' : '-';
+  return `${sign}${Math.abs(delta).toFixed(1)}%`;
+};
+
 const priorityFromServer = (p: 'high' | 'medium' | 'low'): CompetitorInsightPriority => p;
 const INDUSTRY_AVERAGE_VISIBILITY = 68;
 
@@ -356,7 +363,7 @@ function ScoreCard({
   trend?: { value: string; positive: boolean };
 }) {
   return (
-    <article className="flex h-[106px] min-w-0 flex-col rounded-lg border border-slate-200 bg-white px-6 py-4">
+    <article className="flex h-full min-h-0 min-w-0 flex-col rounded-lg border border-slate-200 bg-white px-6 py-4">
       <div className="flex items-start justify-between gap-3">
         <h3 className="truncate text-sm font-medium leading-5 text-[#5F6877]">{title}</h3>
         <InfoIcon label={tooltipText ?? title} />
@@ -370,6 +377,54 @@ function ScoreCard({
         {trend ? <TrendPill value={trend.value} positive={trend.positive} /> : null}
       </div>
       {footer ? <p className="mt-auto truncate text-xs font-medium text-[#6E7480]">{footer}</p> : null}
+    </article>
+  );
+}
+
+function TopCompetitorCard({
+  title,
+  competitorHost,
+  competitorScoreDelta,
+  tooltipText,
+}: {
+  title: string;
+  competitorHost: string | null;
+  competitorScoreDelta: number;
+  tooltipText?: string;
+}) {
+  const displayHost = competitorHost?.replace(/^www\./i, '') ?? null;
+  const hasCompetitor = Boolean(displayHost);
+  const deltaLabel = formatDeltaLabel(competitorScoreDelta);
+  const deltaIcon = competitorScoreDelta >= 0 ? ArrowUpRight : ArrowDownRight;
+
+  return (
+    <article className="flex min-w-0 flex-col rounded-lg border border-slate-200 bg-white px-6 py-4 shadow-[0_1px_2px_0_#1018280D]">
+      <div className="flex items-start justify-between gap-3">
+        <h3 className="truncate text-sm font-medium leading-5 text-[#5F6877]">{title}</h3>
+        <InfoIcon label={tooltipText ?? title} />
+      </div>
+
+      <div className="mt-3 flex min-w-0 items-start justify-between gap-4">
+        <div className="min-w-0">
+          <div className="flex items-center gap-3">
+            {hasCompetitor ? (
+              <img
+                src={competitorLogo(displayHost ?? '', 64)}
+                alt=""
+                className="h-6 w-6 object-contain"
+                onError={(event) => ((event.currentTarget as HTMLImageElement).style.display = 'none')}
+              />
+            ) : null}
+            <span className="inline-flex h-7 shrink-0 items-center gap-1 rounded-full border border-[#FFC9C9] bg-[#FFE5E5] px-2.5 text-[11px] font-semibold leading-none text-[#D83A3A] shadow-none">
+              {React.createElement(deltaIcon, { className: 'h-3.5 w-3.5' })}
+              {deltaLabel}
+            </span>
+          </div>
+          <p className="mt-2 truncate text-sm font-medium text-[#7B8494]">
+            {hasCompetitor ? displayHost : 'Awaiting data'}
+          </p>
+        </div>
+      </div>
     </article>
   );
 }
@@ -388,7 +443,7 @@ function ValueCard({
   badge?: string;
 }) {
   return (
-    <article className="flex h-[106px] min-w-0 flex-col rounded-lg border border-slate-200 bg-white px-6 py-4">
+    <article className="flex h-full min-h-0 min-w-0 flex-col rounded-lg border border-slate-200 bg-white px-6 py-4">
       <div className="flex items-start justify-between gap-3">
         <h3 className="truncate text-sm font-medium leading-5 text-[#5F6877]">{title}</h3>
         <InfoIcon label={tooltipText ?? title} />
@@ -409,7 +464,7 @@ function ValueCard({
 function InsightCard({ title, items }: { title: string; items: string[] }) {
   const shown = items.slice(0, 2);
   return (
-    <article className="flex h-[106px] min-w-0 flex-col rounded-lg border border-slate-200 bg-white px-6 py-4">
+    <article className="flex h-full min-h-0 min-w-0 flex-col rounded-lg border border-slate-200 bg-white px-6 py-4">
       <div className="flex items-start justify-between gap-3">
         <h3 className="truncate text-sm font-medium leading-5 text-[#5F6877]">{title}</h3>
         <InfoIcon label={title} />
@@ -594,6 +649,31 @@ function TrendComparisonPanel({ trends }: { trends: TrendsResponse | null }) {
   // point, which is still more useful than an empty state on day one.
   const hasData = trends && trends.runs.length >= 1;
 
+  const formatTooltipValue = React.useCallback(
+    (dataArray: TrendChartPoint[], unit: string = '') =>
+      (value: number | string, name: string, props: { payload?: TrendChartPoint }) => {
+        const point = props.payload;
+        const numericValue = typeof value === 'number' ? value : Number(value);
+        let slopeStr = '';
+
+        if (point && dataArray) {
+          const currentIndex = dataArray.findIndex((d) => d.label === point.label);
+          if (currentIndex > 0) {
+            const prevPoint = dataArray[currentIndex - 1];
+            const prevValue = prevPoint[name];
+            if (typeof prevValue === 'number' && typeof numericValue === 'number') {
+              const slope = numericValue - prevValue;
+              const sign = slope > 0 ? '+' : '';
+              slopeStr = ` (Slope: ${sign}${slope.toFixed(1)}${unit})`;
+            }
+          }
+        }
+
+        return [`${numericValue}${unit}${slopeStr}`, name];
+      },
+    [],
+  );
+
   const { visibilityData, citationData, sovData, models, topCompetitors } = useMemo(() => {
     if (!trends || trends.runs.length === 0) {
       return { visibilityData: [] as TrendChartPoint[], citationData: [] as TrendChartPoint[], sovData: [] as TrendChartPoint[], models: [] as string[], topCompetitors: [] as string[] };
@@ -633,7 +713,7 @@ function TrendComparisonPanel({ trends }: { trends: TrendsResponse | null }) {
   }, [trends]);
 
   return (
-    <section id="competitors-trends" data-title="Trend Comparison" className="min-w-0 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+    <section id="competitors-trends" data-title="Competitor Trend Comparison" className="min-w-0 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <h3 className="text-base font-semibold text-[#2D4059]">Competitor Trend Comparison</h3>
         <span className="text-xs text-[#7B8494]">Last {trends?.runs.length ?? 0} runs</span>
@@ -647,7 +727,7 @@ function TrendComparisonPanel({ trends }: { trends: TrendsResponse | null }) {
         <div className="mt-3 space-y-6">
           <ChartBlock title="AI Visibility Trend" subtitle="Compare competitor visibility across AI prompts, citations, and responses.">
             <ResponsiveContainer width="100%" height={240}>
-              <LineChart data={visibilityData} margin={{ top: 10, right: 10, bottom: 0, left: -20 }}>
+              <LineChart syncId="competitorTrends" data={visibilityData} margin={{ top: 10, right: 10, bottom: 0, left: -20 }}>
                 <CartesianGrid stroke="#EEF1F5" strokeDasharray="3 3" />
                 <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#98A2B3' }} />
                 <YAxis tick={{ fontSize: 10, fill: '#98A2B3' }} />
@@ -659,6 +739,7 @@ function TrendComparisonPanel({ trends }: { trends: TrendsResponse | null }) {
                     fontSize: '14px',
                     fontWeight: '600',
                   }}
+                  formatter={formatTooltipValue(visibilityData)}
                 />
                 <RLegend wrapperStyle={{ fontSize: 10 }} />
                 {models.map((m, i) => (
@@ -670,7 +751,7 @@ function TrendComparisonPanel({ trends }: { trends: TrendsResponse | null }) {
 
           <ChartBlock title="Citation Share Comparison" subtitle="See where competitors are earning authority and citations.">
             <ResponsiveContainer width="100%" height={240}>
-              <LineChart data={citationData} margin={{ top: 10, right: 10, bottom: 0, left: -20 }}>
+              <LineChart syncId="competitorTrends" data={citationData} margin={{ top: 10, right: 10, bottom: 0, left: -20 }}>
                 <CartesianGrid stroke="#EEF1F5" strokeDasharray="3 3" />
                 <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#98A2B3' }} />
                 <YAxis tick={{ fontSize: 10, fill: '#98A2B3' }} />
@@ -682,6 +763,7 @@ function TrendComparisonPanel({ trends }: { trends: TrendsResponse | null }) {
                     fontSize: '14px',
                     fontWeight: '600',
                   }}
+                  formatter={formatTooltipValue(citationData)}
                 />
                 <RLegend wrapperStyle={{ fontSize: 10 }} />
                 {models.map((m, i) => (
@@ -693,7 +775,7 @@ function TrendComparisonPanel({ trends }: { trends: TrendsResponse | null }) {
 
           <ChartBlock title="Share of Voice" subtitle="Evaluate competitor visibility and market presence.">
             <ResponsiveContainer width="100%" height={240}>
-              <LineChart data={sovData} margin={{ top: 10, right: 10, bottom: 0, left: -20 }}>
+              <LineChart syncId="competitorTrends" data={sovData} margin={{ top: 10, right: 10, bottom: 0, left: -20 }}>
                 <CartesianGrid stroke="#EEF1F5" strokeDasharray="3 3" />
                 <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#98A2B3' }} />
                 <YAxis unit="%" tick={{ fontSize: 10, fill: '#98A2B3' }} />
@@ -705,6 +787,7 @@ function TrendComparisonPanel({ trends }: { trends: TrendsResponse | null }) {
                     fontSize: '14px',
                     fontWeight: '600',
                   }}
+                  formatter={formatTooltipValue(sovData, '%')}
                 />
                 <RLegend wrapperStyle={{ fontSize: 10 }} />
                 <Line type="monotone" dataKey="You" stroke="#2D4059" strokeWidth={2.5} dot={{ r: 3 }} />
@@ -720,9 +803,19 @@ function TrendComparisonPanel({ trends }: { trends: TrendsResponse | null }) {
   );
 }
 
-function ChartBlock({ title, subtitle, children }: { title: string; subtitle: string; children: React.ReactNode }) {
+function ChartBlock({
+  title,
+  subtitle,
+  children,
+  dataTitle,
+}: {
+  title: string;
+  subtitle: string;
+  children: React.ReactNode;
+  dataTitle?: string;
+}) {
   return (
-    <div className="min-w-0">
+    <div className="min-w-0" data-title={dataTitle ?? title}>
       <div className="mb-2">
         <h4 className="text-sm font-semibold text-[#2D4059]">{title}</h4>
         <p className="text-xs text-[#7B8494]">{subtitle}</p>
@@ -811,7 +904,7 @@ function PromptGapPanel({
 }) {
   const shown = opportunities.slice(0, 4);
   return (
-    <section id="competitors-gaps" data-title="Prompt Gaps" className="min-w-0 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+    <section id="competitors-gaps" data-title="Prompt Gaps Opportunities" className="min-w-0 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
       <div className="flex items-start justify-between gap-4">
         <div>
           <h3 className="text-xl font-semibold leading-none text-[#2D4059]">Prompt Gaps Opportunities</h3>
@@ -873,7 +966,7 @@ function AnalysisResultCard({
   const threatLabel = competitor.threatLevel ? `${competitor.threatLevel} Threat` : 'Unranked';
 
   return (
-    <article className="grid min-w-0 grid-cols-[minmax(0,1fr)_56px] overflow-hidden rounded-xl border border-slate-200 bg-white">
+    <article className="shrink-0 grid min-w-0 grid-cols-[minmax(0,1fr)_56px] overflow-hidden rounded-xl border border-slate-200 bg-white">
       <div className="min-w-0 p-5">
         <div className="flex items-start justify-between gap-4">
           <div className="flex min-w-0 items-center gap-4">
@@ -936,18 +1029,17 @@ function AICompetitorAnalysisResults({
           threatRank(a.competitor.threatLevel) - threatRank(b.competitor.threatLevel) ||
           a.index - b.index
       )
-      .slice(0, 4)
       .map(({ competitor }) => competitor);
   }, [competitors]);
 
   return (
-    <section id="competitors-analysis" data-title="Analysis Results" className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+    <section id="competitors-analysis" data-title="AI-Based Competitor Analysis Results" className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
       <div>
         <h3 className="text-xl font-semibold leading-none text-[#2D4059]">AI-Based Competitor Analysis Results</h3>
         <p className="mt-5 text-sm text-[#7B8494]">Compare AI analysis of competitor performance and visibility.</p>
       </div>
 
-      <div className="mt-7 flex flex-col gap-6">
+      <div className="mt-7 flex max-h-[640px] flex-col gap-6 overflow-y-auto pr-2">
         {visibleCompetitors.length === 0 ? (
           <p className="rounded-md border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-center text-sm text-slate-500">
             No competitors mentioned in this audit yet. Re-run the audit, or add competitors in the wizard.
@@ -995,59 +1087,68 @@ function PositioningComparison({ analysis }: { analysis: CompetitorAnalysisRespo
         </div>
       </div>
 
-      <div className="mt-6">
+      <div className="mt-8">
         {data.length === 0 ? (
           <p className="rounded-md border border-dashed border-slate-200 bg-slate-50 px-4 py-12 text-center text-sm text-slate-500">
             No competitor positioning data yet.
           </p>
         ) : (
-          <ResponsiveContainer width="100%" height={360}>
-            <ScatterChart margin={{ top: 20, right: 20, bottom: 30, left: 10 }}>
-              <CartesianGrid stroke="#EEF1F5" strokeDasharray="2 2" />
-              <XAxis
-                type="number"
-                dataKey="x"
-                domain={[0, 100]}
-                tick={{ fontSize: 11, fill: '#667085' }}
-                label={{ value: 'Market Share %', position: 'insideBottom', offset: -10, fill: '#2D5B93', fontSize: 12 }}
-              />
-              <YAxis
-                type="number"
-                dataKey="y"
-                domain={[0, 100]}
-                tick={{ fontSize: 11, fill: '#667085' }}
-                label={{ value: 'Sentiment %', angle: -90, position: 'insideLeft', fill: '#2D5B93', fontSize: 12 }}
-              />
-              <ZAxis type="number" dataKey="z" range={[60, 400]} />
-              <Tooltip
-                cursor={{ strokeDasharray: '3 3' }}
-                content={({ active, payload }) => {
-                  if (!active || !payload || payload.length === 0) return null;
-                  const p = payload[0].payload as { name: string; x: number; y: number };
-                  return (
-                    <div className="rounded-md border border-slate-200 bg-white px-3 py-2 text-xs shadow-md">
-                      <p className="font-semibold text-[#2D4059]">{p.name}</p>
-                      <p className="text-[#7B8494]">Market share: {p.x}%</p>
-                      <p className="text-[#7B8494]">Sentiment: {p.y}/100</p>
-                    </div>
-                  );
-                }}
-              />
-              <Scatter
-                data={data}
-                shape={(props: any) => {
-                  const { cx, cy, payload } = props;
-                  const radius = Math.sqrt((payload.z ?? 100) / Math.PI) * 1.2;
-                  return (
-                    <g>
+          <>
+            <ResponsiveContainer width="100%" height={560}>
+              <ScatterChart margin={{ top: 20, right: 20, bottom: 30, left: 10 }}>
+                <CartesianGrid stroke="#EEF1F5" strokeDasharray="2 2" />
+                <XAxis
+                  type="number"
+                  dataKey="x"
+                  domain={[0, 100]}
+                  ticks={[0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100]}
+                  tick={{ fontSize: 11, fill: '#667085' }}
+                  label={{ value: 'Market Share %', position: 'insideBottom', offset: -10, fill: '#2D5B93', fontSize: 12 }}
+                />
+                <YAxis
+                  type="number"
+                  dataKey="y"
+                  domain={[0, 100]}
+                  ticks={[0, 20, 40, 60, 80, 100]}
+                  tick={{ fontSize: 11, fill: '#667085' }}
+                  label={{ value: 'Sentiment %', angle: -90, position: 'insideLeft', fill: '#2D5B93', fontSize: 12 }}
+                />
+                <ZAxis type="number" dataKey="z" range={[60, 400]} />
+                <Tooltip
+                  cursor={{ strokeDasharray: '3 3' }}
+                  content={({ active, payload }) => {
+                    if (!active || !payload || payload.length === 0) return null;
+                    const p = payload[0].payload as { name: string; x: number; y: number };
+                    return (
+                      <div className="rounded-md border border-slate-200 bg-white px-3 py-2 text-xs shadow-md">
+                        <p className="font-semibold text-[#2D4059]">{p.name}</p>
+                        <p className="text-[#7B8494]">Market share: {p.x}%</p>
+                        <p className="text-[#7B8494]">Sentiment: {p.y}/100</p>
+                      </div>
+                    );
+                  }}
+                />
+                <Scatter
+                  data={data}
+                  shape={(props: any) => {
+                    const { cx, cy, payload } = props;
+                    const radius = Math.sqrt((payload.z ?? 100) / Math.PI) * 2.8;
+                    return (
                       <circle cx={cx} cy={cy} r={radius} fill={payload.color} fillOpacity={0.7} stroke={payload.color} />
-                      <text x={cx} y={cy + radius + 12} textAnchor="middle" fontSize={10} fill="#2D4059">{payload.name}</text>
-                    </g>
-                  );
-                }}
-              />
-            </ScatterChart>
-          </ResponsiveContainer>
+                    );
+                  }}
+                />
+              </ScatterChart>
+            </ResponsiveContainer>
+            <div className="mt-6 flex flex-wrap items-center justify-center gap-x-8 gap-y-4 px-4">
+              {data.map((d) => (
+                <div key={d.name} className="flex items-center gap-2">
+                  <span className="h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: d.color }} />
+                  <span className="text-sm font-medium text-[#5F6877]">{d.name}</span>
+                </div>
+              ))}
+            </div>
+          </>
         )}
       </div>
     </section>
@@ -1093,7 +1194,7 @@ function ContentOpportunitiesToCreate({
   // Use bottom-half (after the 4 surfaced in Prompt Gaps) — same pool, no duplicates.
   const list = opportunities.slice(4, 9);
   return (
-    <section id="competitors-content" data-title="Content Opportunities" className="min-w-0 rounded-xl border border-slate-200 bg-white p-6">
+    <section id="competitors-content" data-title="Content Opportunities to Create" className="min-w-0 rounded-xl border border-slate-200 bg-white p-6">
       <div className="flex items-start justify-between gap-4">
         <h3 className="text-xl font-semibold leading-none text-[#2D4059]">Content Opportunities to Create</h3>
       </div>
@@ -1216,11 +1317,8 @@ export default function CompetitorsPage() {
   const queryClient = useQueryClient();
   const { currentDomain, domainsLoading } = useShellContext();
   const domainId = currentDomain?.id ?? null;
-  const {
-    currentTitle: currentCompetitorSectionTitle,
-    previousTitle: previousCompetitorSectionTitle,
-  } = useScrollSpyBreadcrumbs({
-  });
+  const { currentTitle: currentCompetitorSectionTitle } = useScrollSpyBreadcrumbs({});
+  const maskedDomainId = currentDomain?.id ? maskDomainId(currentDomain.id) : undefined;
 
   // All four data sources hit React Query — sibling tabs hit the same cache.
   const reportQuery = useReport<ReportPayload>(domainId);
@@ -1279,8 +1377,11 @@ export default function CompetitorsPage() {
           : `At industry average (${INDUSTRY_AVERAGE_VISIBILITY})`;
 
     const analysisCompetitors = analysis?.competitors ?? [];
-    const bestCompetitor = analysisCompetitors[0] ?? null;
+    const bestCompetitor =
+      analysisCompetitors.find((competitor) => competitor.rank === 1) ?? analysisCompetitors[0] ?? null;
     const bestScore = bestCompetitor ? Math.round(bestCompetitor.coveragePct * 100) : 0;
+    const bestScoreRaw = bestCompetitor ? bestCompetitor.coveragePct * 100 : 0;
+    const bestScoreDelta = bestScoreRaw - visibility;
 
     let largestGapPct = 0;
     let largestGapPrompt = '';
@@ -1314,6 +1415,8 @@ export default function CompetitorsPage() {
       competitorSOV,
       bestCompetitorHost: bestCompetitor?.host ?? null,
       bestScore,
+      bestScoreRaw,
+      bestScoreDelta,
       largestGapPct: Math.round(largestGapPct * 100),
       largestGapPrompt,
       topInsights,
@@ -1485,10 +1588,12 @@ export default function CompetitorsPage() {
         <div className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/90">
           <div className="mx-auto flex w-full max-w-[1530px] items-center px-5 py-3">
             <AIResultsBreadcrumbs
-              mode="history"
-              prefixHref={domainId != null ? resolveAIResultsNavigation('ai-results', String(domainId)) : undefined}
-              previousLabel={previousCompetitorSectionTitle}
-              currentLabel={currentCompetitorSectionTitle}
+              mode="static"
+              prefixLabel="AI Visibility"
+              prefixHref={resolveSidebarNavigation('ai-visibility').path}
+              pageLabel="Competitors Intelligence"
+              pageHref={maskedDomainId ? resolveAIResultsNavigation('competitors', maskedDomainId) : undefined}
+              currentLabel={currentCompetitorSectionTitle ?? 'Tracked Competitors'}
             />
           </div>
         </div>
@@ -1517,11 +1622,10 @@ export default function CompetitorsPage() {
                     footer={headerMetrics.visibilityComparison}
                     trend={visibilityTrend ?? undefined}
                   />
-                  <ScoreCard
+                  <TopCompetitorCard
                     title="Top Competitor"
-                    score={headerMetrics.bestScore}
-                    maxScore={100}
-                    footer={headerMetrics.bestCompetitorHost ?? 'Awaiting data'}
+                    competitorHost={headerMetrics.bestCompetitorHost}
+                    competitorScoreDelta={headerMetrics.bestScoreDelta}
                   />
                   <ValueCard
                     title="Largest Prompt Gap"

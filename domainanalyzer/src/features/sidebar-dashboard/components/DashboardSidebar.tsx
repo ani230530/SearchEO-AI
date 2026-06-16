@@ -325,11 +325,11 @@ export function DashboardSidebar({
           <div className="sidebar-header-inner">
             {isSidebarExpanded ? (
               <div className="sidebar-brand">
-                <img src="../public/searcheo-full-logo.svg" alt="Searcheo Logo" className="h-6 w-auto" />
+                <img src="/Searcheo-full-logo.svg" alt="Searcheo Logo" className="h-6 w-auto" />
               </div>
             ) : (
               <div className="sidebar-brand flex items-center justify-center" style={{ width: "40px" }}>
-                <img src="../public/18Searcheo 2.svg" alt="Searcheo Logo" className="h-6 w-auto" />
+                <img src="/18Searcheo 2.svg" alt="Searcheo Logo" className="h-6 w-auto" />
               </div>
             )}
 

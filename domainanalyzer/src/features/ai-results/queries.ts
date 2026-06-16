@@ -27,8 +27,8 @@ export const aiResultsKeys = {
   domains: () => ['ai-results', 'domains'] as const,
   report: (domainId: number | string, runId?: number | null) =>
     ['ai-results', 'report', domainId, runId ?? 'latest'] as const,
-  trends: (domainId: number | string) =>
-    ['ai-results', 'trends', domainId] as const,
+  trends: (domainId: number | string, days?: number) =>
+    ['ai-results', 'trends', domainId, days ?? 'legacy'] as const,
   runs: (domainId: number | string) =>
     ['ai-results', 'runs', domainId] as const,
   competitorAnalysis: (domainId: number | string, runId?: number | null) =>
@@ -106,10 +106,13 @@ export function useReport<T = any>(domainId: number | null, runId?: number | nul
   });
 }
 
-export function useTrends<T = any>(domainId: number | null) {
+export function useTrends<T = any>(domainId: number | null, days?: number) {
   return useQuery<T>({
-    queryKey: aiResultsKeys.trends(domainId ?? 'none'),
-    queryFn: () => apiGet<T>(`/wizard/domain/${domainId}/trends`),
+    queryKey: aiResultsKeys.trends(domainId ?? 'none', days),
+    queryFn: () => {
+      const path = typeof days === 'number' ? `/wizard/domain/${domainId}/trends?days=${days}` : `/wizard/domain/${domainId}/trends`;
+      return apiGet<T>(path);
+    },
     enabled: domainId != null,
   });
 }

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Country, State } from "country-state-city";
 import { ChevronDown, Loader2 } from "lucide-react";
 import { apiPost } from "@/services/apiClient";
@@ -80,6 +80,10 @@ export function Step1AddDomain({ initialUrl = "", initialProfile, onContinue, on
     domainId: number;
     url: string;
   } | null>(null);
+
+  useEffect(() => {
+    setDomain(initialUrl);
+  }, [initialUrl]);
 
   const countryOptions = useMemo(
     () => Country.getAllCountries().map((item) => ({ code: item.isoCode, name: item.name })),

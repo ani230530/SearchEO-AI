@@ -27,6 +27,7 @@ import {
   Download,
   ExternalLink,
   Filter,
+  ArrowUp,
   Globe2,
   LayoutDashboard,
   LineChart,
@@ -45,8 +46,10 @@ import {
   Upload,
   UserRound,
   Users,
+  Info,
   TrendingUp,
   X,
+  FileText,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -496,78 +499,78 @@ const MetricCard = ({ card }: { card: MetricCardData }) => (
           ? 'gap-3 sm:gap-4 md:gap-5 xl:gap-[34px] p-4 sm:p-5 xl:min-h-[310px]'
           : card.kind === 'promptSummary'
             ? 'min-h-[130px] gap-4 p-5 sm:p-6'
-          : card.kind === 'citations'
-            ? 'min-h-[228px] gap-5'
-            : 'min-h-[112px] gap-3.5 p-4 sm:p-5',
+            : card.kind === 'citations'
+              ? 'min-h-[228px] gap-5'
+              : 'min-h-[112px] gap-3.5 p-4 sm:p-5',
       )}
     >
-      <CardTitleWithTip title={card.title} />
+    <CardTitleWithTip title={card.title} />
 
-      {card.kind === 'modelPerformance' ? (
-        <div className="flex flex-1 flex-col gap-3 sm:gap-3.5 md:gap-4 xl:gap-[45px] pt-0.5">
-          {card.details.map((item) => (
-            <div
-              key={item.label}
-              className="grid grid-cols-[minmax(0,88px)_minmax(0,1fr)_auto] items-center gap-2.5 sm:grid-cols-[minmax(0,104px)_minmax(0,1fr)_auto]"
-            >
-              <div className="flex min-w-0 items-center gap-2">
-                {item.iconSrc ? <img src={item.iconSrc} alt="" className="h-4 w-4 shrink-0 object-contain" /> : null}
-                <span className="truncate text-[12px] font-medium leading-none text-[#535862]">{item.label}</span>
-              </div>
-              <div className="h-1.5 overflow-hidden rounded-full bg-[#D0D5DD]">
-                <div
-                  className="h-full rounded-full bg-[#8AA4E8]"
-                  style={{ width: `${item.barWidth ?? 0}%` }}
-                />
-              </div>
-              <span className="min-w-[20px] text-right text-[12px] font-medium tabular-nums text-[#2F6BFF]">
+    {card.kind === 'modelPerformance' ? (
+      <div className="flex flex-1 flex-col gap-3 sm:gap-3.5 md:gap-4 xl:gap-[45px] pt-0.5">
+        {card.details.map((item) => (
+          <div
+            key={item.label}
+            className="grid grid-cols-[minmax(0,88px)_minmax(0,1fr)_auto] items-center gap-2.5 sm:grid-cols-[minmax(0,104px)_minmax(0,1fr)_auto]"
+          >
+            <div className="flex min-w-0 items-center gap-2">
+              {item.iconSrc ? <img src={item.iconSrc} alt="" className="h-4 w-4 shrink-0 object-contain" /> : null}
+              <span className="truncate text-[12px] font-medium leading-none text-[#535862]">{item.label}</span>
+            </div>
+            <div className="h-1.5 overflow-hidden rounded-full bg-[#D0D5DD]">
+              <div
+                className="h-full rounded-full bg-[#8AA4E8]"
+                style={{ width: `${item.barWidth ?? 0}%` }}
+              />
+            </div>
+            <span className="min-w-[20px] text-right text-[12px] font-medium tabular-nums text-[#2F6BFF]">
+              {item.value}
+            </span>
+          </div>
+        ))}
+      </div>
+    ) : card.kind === 'promptSummary' ? (
+      <div className="mt-1 grid flex-1 grid-cols-1 gap-6 sm:grid-cols-2 sm:gap-8">
+        {card.details.map((item) => (
+          <div key={item.label} className="min-w-0">
+            <p className="text-[14px] font-semibold leading-[150%] tracking-normal text-[#535862]">{item.label}</p>
+            <p className="mt-2 text-[27px] font-semibold leading-none tracking-normal text-[#3393F2]">
+              {item.value}
+            </p>
+          </div>
+        ))}
+      </div>
+    ) : card.kind === 'citations' ? (
+      <div className="grid flex-1 grid-cols-1 gap-x-6 gap-y-6 sm:grid-cols-2">
+        {card.details.map((item) => (
+          <div key={item.label} className="min-w-0">
+            <p className="text-sm font-semibold leading-[150%] tracking-normal text-[#535862]">{item.label}</p>
+            <div className="mt-2 flex items-start gap-3">
+              {item.iconSrc ? <img src={item.iconSrc} alt="" className="h-6 w-6 shrink-0 object-contain" /> : null}
+              <span className="text-[27px] font-semibold leading-[1] tracking-normal text-[#3393F2]">
                 {item.value}
               </span>
             </div>
-          ))}
-        </div>
-      ) : card.kind === 'promptSummary' ? (
-        <div className="mt-1 grid flex-1 grid-cols-1 gap-6 sm:grid-cols-2 sm:gap-8">
-          {card.details.map((item) => (
-            <div key={item.label} className="min-w-0">
-              <p className="text-[14px] font-semibold leading-[150%] tracking-normal text-[#535862]">{item.label}</p>
-              <p className="mt-2 text-[27px] font-semibold leading-none tracking-normal text-[#3393F2]">
-                {item.value}
-              </p>
-            </div>
-          ))}
-        </div>
-      ) : card.kind === 'citations' ? (
-        <div className="grid flex-1 grid-cols-1 gap-x-6 gap-y-6 sm:grid-cols-2">
-          {card.details.map((item) => (
-            <div key={item.label} className="min-w-0">
-              <p className="text-sm font-semibold leading-[150%] tracking-normal text-[#535862]">{item.label}</p>
-              <div className="mt-2 flex items-start gap-3">
-                {item.iconSrc ? <img src={item.iconSrc} alt="" className="h-6 w-6 shrink-0 object-contain" /> : null}
-                <span className="text-[27px] font-semibold leading-[1] tracking-normal text-[#3393F2]">
-                  {item.value}
-                </span>
-              </div>
-              <p className="mt-1 text-[10px] font-normal leading-[150%] tracking-normal text-[#717680]">
-                Pages <span className="text-[#3393F2]">{item.subValue ?? '1'}</span>
-              </p>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div className="grid flex-1 grid-cols-2 gap-4">
-          {card.details.map((item) => (
-            <div key={item.label} className="min-w-0">
-              <p className="text-sm font-semibold leading-[150%] tracking-normal text-[#535862]">{item.label}</p>
-              <p className="mt-2 text-[27px] font-semibold leading-[1] tracking-normal text-[#3393F2]">
-                {item.value}
-              </p>
-            </div>
-          ))}
-        </div>
-      )}
-    </CardContent>
-  </Card>
+            <p className="mt-1 text-[10px] font-normal leading-[150%] tracking-normal text-[#717680]">
+              Pages <span className="text-[#3393F2]">{item.subValue ?? '1'}</span>
+            </p>
+          </div>
+        ))}
+      </div>
+    ) : (
+      <div className="grid flex-1 grid-cols-2 gap-4">
+        {card.details.map((item) => (
+          <div key={item.label} className="min-w-0">
+            <p className="text-sm font-semibold leading-[150%] tracking-normal text-[#535862]">{item.label}</p>
+            <p className="mt-2 text-[27px] font-semibold leading-[1] tracking-normal text-[#3393F2]">
+              {item.value}
+            </p>
+          </div>
+        ))}
+      </div>
+    )}
+  </CardContent>
+  </Card >
 );
 
 const ModelComparisonGrid = ({ results }: { results: any[] }) => {
@@ -590,6 +593,7 @@ const ModelComparisonGrid = ({ results }: { results: any[] }) => {
             <thead>
               <tr className="border-b border-slate-300">
                 <th className="bg-white text-[12px] font-medium text-slate-500 py-4 px-4 text-center border-r border-slate-200 w-[160px]">
+                  Models
                   Models
                 </th>
                 {metrics.map((metric) => (
@@ -1013,11 +1017,10 @@ const CitationSidebar = ({ activeResult }: { activeResult: any }) => {
               )}
               <span className="truncate text-[10.5px] font-medium text-slate-500">{host}</span>
               <span
-                className={`ml-auto inline-flex flex-shrink-0 items-center rounded-full px-2 py-0.5 text-[9px] font-semibold ${
-                  isDirect
-                    ? 'bg-emerald-50 text-emerald-700'
-                    : 'bg-blue-50 text-blue-700'
-                }`}
+                className={`ml-auto inline-flex flex-shrink-0 items-center rounded-full px-2 py-0.5 text-[9px] font-semibold ${isDirect
+                  ? 'bg-emerald-50 text-emerald-700'
+                  : 'bg-blue-50 text-blue-700'
+                  }`}
               >
                 {typeLabel}
               </span>
@@ -1137,12 +1140,12 @@ export const PromptTable = ({
       const tracked = typeof row?.rawId === 'number' ? trackedRowsByRawId.get(row.rawId) : undefined;
       const merged: PromptTableRow = tracked
         ? {
-            ...row,
-            isTracked: tracked.isTracked ?? true,
-            lastTestedAt: tracked.lastTestedAt ?? row.lastTestedAt ?? null,
-            nextTestAt: tracked.nextTestAt ?? row.nextTestAt ?? null,
-            weekTrend: tracked.weekTrend ?? row.weekTrend ?? null,
-          }
+          ...row,
+          isTracked: tracked.isTracked ?? true,
+          lastTestedAt: tracked.lastTestedAt ?? row.lastTestedAt ?? null,
+          nextTestAt: tracked.nextTestAt ?? row.nextTestAt ?? null,
+          weekTrend: tracked.weekTrend ?? row.weekTrend ?? null,
+        }
         : row;
 
       return {
@@ -1356,12 +1359,12 @@ export const PromptTable = ({
     if (tableMetric) {
       const numericFor = (row: any): number => {
         switch (tableMetric) {
-          case 'Sentiment':   return Number(row?.avgSentiment ?? 0);
+          case 'Sentiment': return Number(row?.avgSentiment ?? 0);
           case 'Position': {
             const rank = Number(row?.bestRank);
             return Number.isFinite(rank) && rank > 0 ? rank : Number.POSITIVE_INFINITY;
           }
-          default:            return 0;
+          default: return 0;
         }
       };
       if (tableMetric === 'Alphabetical') {
@@ -1401,236 +1404,295 @@ export const PromptTable = ({
   useEffect(() => {
     setCurrentPage(1);
   }, [tableMetric]);
+
   useEffect(() => {
     if (currentPage > totalPages) setCurrentPage(totalPages);
   }, [currentPage, totalPages]);
 
-  const displayData = useMemo(() => {
-    const start = (currentPage - 1) * PAGE_SIZE;
-    return fullSortedData.slice(start, start + PAGE_SIZE);
-  }, [fullSortedData, currentPage]);
-  const selectedRows = useMemo(
-    () => fullSortedData.filter((row) => selectedRowIds.has(row.id)),
-    [fullSortedData, selectedRowIds],
-  );
-  const visibleRowIds = useMemo(
-    () => displayData.map((row) => String(row.id)),
-    [displayData]
-  );
-  const allVisibleSelected =
-    visibleRowIds.length > 0 && visibleRowIds.every((id) => selectedRowIds.has(id));
-  // Reference unused legacy state so the lint stays clean — showAllQueries
-  // / setShowAllQueries are kept for now in case other branches rely on
-  // them; once this PR ships they can be removed entirely.
-  void showAllQueries; void setShowAllQueries;
+const displayData = useMemo(() => {
+  const start = (currentPage - 1) * PAGE_SIZE;
+  return fullSortedData.slice(start, start + PAGE_SIZE);
+}, [fullSortedData, currentPage]);
+const selectedRows = useMemo(
+  () => fullSortedData.filter((row) => selectedRowIds.has(row.id)),
+  [fullSortedData, selectedRowIds],
+);
+const visibleRowIds = useMemo(
+  () => displayData.map((row) => String(row.id)),
+  [displayData]
+);
+const allVisibleSelected =
+  visibleRowIds.length > 0 && visibleRowIds.every((id) => selectedRowIds.has(id));
+// Reference unused legacy state so the lint stays clean — showAllQueries
+// / setShowAllQueries are kept for now in case other branches rely on
+// them; once this PR ships they can be removed entirely.
+void showAllQueries; void setShowAllQueries;
 
-  return (
-    <Card className="rounded-xl border-slate-300 shadow-sm overflow-hidden">
-      <CardHeader className="space-y-6 px-6 pt-6 pb-4">
-        <div className="flex flex-col gap-1">
-          <CardTitle className="text-xl font-bold text-[#1e293b]">{title}</CardTitle>
-          <p className="text-sm text-slate-500">
-            Compare how AI models respond, cite sources, and identify competitors across search queries
-          </p>
+return (
+  <Card className="rounded-xl border-slate-300 shadow-sm overflow-hidden">
+    <CardHeader className="space-y-6 px-6 pt-6 pb-4">
+      <div className="flex flex-col gap-1">
+        <CardTitle className="text-xl font-bold text-[#1e293b]">{title}</CardTitle>
+        <p className="text-sm text-slate-500">
+          Compare how AI models respond, cite sources, and identify competitors across search queries
+        </p>
+      </div>
+
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        {/* Left side: Search and Add & Analyze */}
+        <div className="flex items-center gap-2 flex-1 min-w-0 max-w-[450px]">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Enter your custom prompt to analyze"
+              value={analyzeText}
+              onChange={(e) => setAnalyzeText(e.target.value)}
+              disabled={analyzing}
+              title="Add one or more prompts. Use commas to analyze multiple prompts at once."
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  void handleAnalyzePrompt();
+                }
+              }}
+              className="h-10 w-full placeholder:text-xs rounded-lg border border-slate-300 pl-10 pr-4 text-sm outline-none focus:ring-1 focus:ring-slate-300 transition-all placeholder:text-gray-300 disabled:bg-slate-50 disabled:cursor-not-allowed"
+            />
+          </div>
+          <Button
+            type="button"
+            onClick={() => void handleAnalyzePrompt()}
+            disabled={analyzing || !analyzeText.trim() || !domainId}
+            className="h-10 bg-[#2d3748] text-white hover:bg-[#1a202c] gap-2 rounded-lg px-4 shrink-0 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            {analyzing ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span className="text-sm font-medium">Analyzing…</span>
+              </>
+            ) : (
+              <>
+                <Plus className="h-4 w-4" />
+                <span className="text-sm font-medium">Add &amp; Analyze</span>
+              </>
+            )}
+          </Button>
         </div>
 
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          {/* Left side: Search and Add & Analyze */}
-          <div className="flex items-center gap-2 flex-1 min-w-0 max-w-[450px]">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-              <input
-                type="text"
-                placeholder="Enter your custom prompt to analyze"
-                value={analyzeText}
-                onChange={(e) => setAnalyzeText(e.target.value)}
-                disabled={analyzing}
-                title="Add one or more prompts. Use commas to analyze multiple prompts at once."
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    void handleAnalyzePrompt();
-                  }
-                }}
-                className="h-10 w-full placeholder:text-xs rounded-lg border border-slate-300 pl-10 pr-4 text-sm outline-none focus:ring-1 focus:ring-slate-300 transition-all placeholder:text-gray-300 disabled:bg-slate-50 disabled:cursor-not-allowed"
-              />
-            </div>
-            <Button
-              type="button"
-              onClick={() => void handleAnalyzePrompt()}
-              disabled={analyzing || !analyzeText.trim() || !domainId}
-              className="h-10 bg-[#2d3748] text-white hover:bg-[#1a202c] gap-2 rounded-lg px-4 shrink-0 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
-            >
-              {analyzing ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  <span className="text-sm font-medium">Analyzing…</span>
-                </>
-              ) : (
-                <>
-                  <Plus className="h-4 w-4" />
-                  <span className="text-sm font-medium">Add &amp; Analyze</span>
-                </>
-              )}
+        {/* Right side: Icons and Filters */}
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 mr-2">
+            <Button variant="outline" size="icon" className="h-9 w-9 border-slate-300 bg-gray-50/50 hover:bg-gray-100 rounded-lg">
+              <Languages className="h-4 w-4 text-slate-600" />
+            </Button>
+            <Button variant="outline" size="icon" className="h-9 w-9 border-slate-300 bg-gray-50/50 hover:bg-gray-100 rounded-lg">
+              <RefreshCw className="h-4 w-4 text-slate-600" />
+            </Button>
+            <Button variant="outline" size="icon" className="h-9 w-9 border-slate-300 bg-gray-50/50 hover:bg-gray-100 rounded-lg">
+              <Download className="h-4 w-4 text-slate-600" />
             </Button>
           </div>
 
-          {/* Right side: Icons and Filters */}
-          <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1.5 mr-2">
-              <Button variant="outline" size="icon" className="h-9 w-9 border-slate-300 bg-gray-50/50 hover:bg-gray-100 rounded-lg">
-                <Languages className="h-4 w-4 text-slate-600" />
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" className="h-9 gap-2 border-slate-300 text-slate-600 rounded-lg px-3">
+                <BarChart3 className="h-4 w-4" />
+                <span className="text-sm font-medium">{tableMetric ? `Sort: ${tableMetric}` : 'Sort'}</span>
+                <ChevronDown className="h-4 w-4 opacity-50 ml-1" />
               </Button>
-              <Button variant="outline" size="icon" className="h-9 w-9 border-slate-300 bg-gray-50/50 hover:bg-gray-100 rounded-lg">
-                <RefreshCw className="h-4 w-4 text-slate-600" />
-              </Button>
-              <Button variant="outline" size="icon" className="h-9 w-9 border-slate-300 bg-gray-50/50 hover:bg-gray-100 rounded-lg">
-                <Download className="h-4 w-4 text-slate-600" />
-              </Button>
-            </div>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-[180px]">
+              <DropdownMenuItem onClick={() => setTableMetric(null)}>Default order</DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => setTableMetric('Alphabetical')}>Alphabetical A-Z</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setTableMetric('Alphabetical Z-A')}>Alphabetical Z-A</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setTableMetric('Sentiment')}>Sentiment</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setTableMetric('Position')}>Position</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
 
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="h-9 gap-2 border-slate-300 text-slate-600 rounded-lg px-3">
-                  <BarChart3 className="h-4 w-4" />
-                  <span className="text-sm font-medium">{tableMetric ? `Sort: ${tableMetric}` : 'Sort'}</span>
-                  <ChevronDown className="h-4 w-4 opacity-50 ml-1" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-[180px]">
-                <DropdownMenuItem onClick={() => setTableMetric(null)}>Default order</DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => setTableMetric('Alphabetical')}>Alphabetical A-Z</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setTableMetric('Alphabetical Z-A')}>Alphabetical Z-A</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setTableMetric('Sentiment')}>Sentiment</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setTableMetric('Position')}>Position</DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+          <Button
+            type="button"
+            disabled={selectedCount === 0}
+            onClick={() => onOpenWorksheetModal()}
+            className={cn(
+              'h-9 gap-2 text-white border-none rounded-lg px-4 transition-all ml-1',
+              selectedCount === 0
+                ? 'bg-[#94a3b8] hover:bg-[#94a3b8] cursor-not-allowed'
+                : 'bg-[#2D4059] hover:bg-[#24364d]'
+            )}
+          >
+            <LayoutGrid className="h-4 w-4" />
+            <span className="text-sm font-medium">
+              Add to Worksheet{selectedCount > 0 ? ` (${selectedCount})` : ''}
+            </span>
+          </Button>
 
-            <Button
-              type="button"
-              disabled={selectedCount === 0}
-              onClick={() => onOpenWorksheetModal()}
-              className={cn(
-                'h-9 gap-2 text-white border-none rounded-lg px-4 transition-all ml-1',
-                selectedCount === 0
-                  ? 'bg-[#94a3b8] hover:bg-[#94a3b8] cursor-not-allowed'
-                  : 'bg-[#2D4059] hover:bg-[#24364d]'
-              )}
-            >
-              <LayoutGrid className="h-4 w-4" />
-              <span className="text-sm font-medium">
-                Add to Worksheet{selectedCount > 0 ? ` (${selectedCount})` : ''}
-              </span>
-            </Button>
-
-            <Button
-              type="button"
-              onClick={() => void bulkTrack(selectedRows.length > 0 ? selectedRows : fullSortedData, true)}
-              disabled={bulkPending || domainId == null || fullSortedData.length === 0}
-              className="h-[38px] gap-2 rounded-lg border-none bg-[#4b6eb8] px-4 text-white shadow-none transition-all hover:bg-[#3f5d9c] disabled:opacity-60"
-            >
-              {bulkPending
-                ? <Loader2 className="h-4 w-4 animate-spin" />
-                : selectedRows.length > 0
-                  ? <Sparkles className="h-4 w-4" />
-                  : <ShieldCheck className="h-4 w-4" />
-              }
-              <span className="text-[13px] font-medium">
-                {selectedRows.length > 0
-                  ? `Track selected (${selectedRows.length})`
-                  : 'Track all'}
-              </span>
-            </Button>
-          </div>
+          <Button
+            type="button"
+            onClick={() => void bulkTrack(selectedRows.length > 0 ? selectedRows : fullSortedData, true)}
+            disabled={bulkPending || domainId == null || fullSortedData.length === 0}
+            className="h-[38px] gap-2 rounded-lg border-none bg-[#4b6eb8] px-4 text-white shadow-none transition-all hover:bg-[#3f5d9c] disabled:opacity-60"
+          >
+            {bulkPending
+              ? <Loader2 className="h-4 w-4 animate-spin" />
+              : selectedRows.length > 0
+                ? <Sparkles className="h-4 w-4" />
+                : <ShieldCheck className="h-4 w-4" />
+            }
+            <span className="text-[13px] font-medium">
+              {selectedRows.length > 0
+                ? `Track selected (${selectedRows.length})`
+                : 'Track all'}
+            </span>
+          </Button>
         </div>
-      </CardHeader>
+      </div>
+    </CardHeader>
 
-      <CardContent className="px-0 pb-3">
-        <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-gray-200">
-          <Table>
-            <TableHeader>
-              <TableRow className="border-b border-slate-200 hover:bg-transparent">
-                <TableHead className="w-8 px-4">
-                  <input
-                    type="checkbox"
-                    checked={allVisibleSelected}
-                    onChange={() => {
-                      const next = new Set(selectedRowIds);
-                      if (allVisibleSelected) {
-                        visibleRowIds.forEach((id) => next.delete(id));
-                      } else {
-                        visibleRowIds.forEach((id) => next.add(id));
-                      }
-                      onSetSelectedRows(next);
-                    }}
-                    aria-label="Select all visible prompts"
-                    className="h-3.5 w-3.5 rounded border-gray-300 accent-blue-600"
-                  />
-                </TableHead>
-                <TableHead className="text-[10px] font-semibold uppercase tracking-wider text-[#2D4059] px-2">Prompts</TableHead>
-                <TableHead className="text-[10px] font-semibold uppercase tracking-wider text-[#2D4059] px-2">Sentiment</TableHead>
-                <TableHead className="text-[10px] font-semibold uppercase tracking-wider text-[#2D4059] px-2">Ranking</TableHead>
-                <TableHead className="text-[10px] font-semibold uppercase tracking-wider text-[#2D4059] px-2">Position</TableHead>
-                <TableHead className="text-[10px] font-semibold uppercase tracking-wider text-[#2D4059] px-2">AI SOV</TableHead>
-                <TableHead className="text-[10px] font-semibold uppercase tracking-wider text-[#2D4059] px-2">Competitors</TableHead>
-                <TableHead className="text-center text-[10px] font-semibold uppercase tracking-wider text-[#2D4059] px-4">Action</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {/*
+    <CardContent className="px-0 pb-3">
+      <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-gray-200">
+        <Table>
+          <TableHeader>
+            <TableRow className="border-b-0 bg-[#f1f1f1] hover:bg-[#f1f1f1]">
+              <TableHead className="w-8 px-4 rounded-tl-lg">
+                <input
+                  type="checkbox"
+                  checked={allVisibleSelected}
+                  onChange={() => {
+                    const next = new Set(selectedRowIds);
+                    if (allVisibleSelected) {
+                      visibleRowIds.forEach((id) => next.delete(id));
+                    } else {
+                      visibleRowIds.forEach((id) => next.add(id));
+                    }
+                    onSetSelectedRows(next);
+                  }}
+                  aria-label="Select all visible prompts"
+                  className="h-3.5 w-3.5 rounded border-gray-300 accent-blue-600"
+                />
+              </TableHead>
+              <TableHead className="px-2 text-[11px] font-semibold text-[#31415f]">
+                <div className="flex items-center gap-1">
+                  Prompts <Info className="h-[10px] w-[10px] text-slate-400" /> <ArrowUp className="h-3 w-3 text-slate-600" />
+                </div>
+              </TableHead>
+              <TableHead className="px-2 text-[11px] font-semibold text-[#31415f]">
+                <div className="flex items-center gap-1">
+                  Sentiment <Info className="h-[10px] w-[10px] text-slate-400" /> <ArrowUp className="h-3 w-3 text-slate-600" />
+                </div>
+              </TableHead>
+              <TableHead className="px-2 text-[11px] font-semibold text-[#31415f]">
+                <div className="flex items-center gap-1">
+                  Ranking <Info className="h-[10px] w-[10px] text-slate-400" /> <ArrowUp className="h-3 w-3 text-slate-600" />
+                </div>
+              </TableHead>
+              <TableHead className="px-2 text-[11px] font-semibold text-[#31415f]">
+                <div className="flex items-center gap-1">
+                  Position <Info className="h-[10px] w-[10px] text-slate-400" /> <ArrowUp className="h-3 w-3 text-slate-600" />
+                </div>
+              </TableHead>
+              <TableHead className="px-2 text-[11px] font-semibold text-[#31415f]">
+                <div className="flex items-center gap-1">
+                  AI SOV <Info className="h-[10px] w-[10px] text-slate-400" /> <ArrowUp className="h-3 w-3 text-slate-600" />
+                </div>
+              </TableHead>
+              <TableHead className="px-2 text-[11px] font-semibold text-[#31415f]">
+                <div className="flex items-center gap-1">
+                  Competitors <Info className="h-[10px] w-[10px] text-slate-400" /> <ArrowUp className="h-3 w-3 text-slate-600" />
+                </div>
+              </TableHead>
+              <TableHead className="px-4 text-right text-[11px] font-semibold text-[#31415f] rounded-tr-lg">
+                <div className="flex items-center justify-end gap-1">
+                  Action <Info className="h-[10px] w-[10px] text-slate-400" />
+                </div>
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {/*
                 Optimistic skeleton rows for prompts currently being
                 analyzed via the Add & Analyze button. Sits above the
                 real rows so the user sees immediate feedback. Replaced
                 by a real row once the backend returns (the real row is
                 prepended via `newlyAnalyzedRows`).
               */}
-              {pendingRows.map((p) => (
+            {pendingRows.map((p) => (
+              <TableRow
+                key={p.id}
+                className="border-b border-slate-200 bg-slate-50/60"
+              >
+                <TableCell className="w-8 px-4 py-3">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin text-slate-400" />
+                </TableCell>
+                <TableCell className="max-w-[340px] px-2 py-3">
+                  <div className="flex flex-col gap-1">
+                    <span className="truncate text-[12px] italic text-slate-500">
+                      {p.phrase}
+                    </span>
+                    <span className="text-[11px] text-slate-400">
+                      Asking ChatGPT, Claude, and Gemini…
+                    </span>
+                  </div>
+                </TableCell>
+                <TableCell colSpan={6} className="px-2 py-3">
+                  <div className="flex items-center gap-2 text-[12px] font-light text-slate-400">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    Running across models — typically 15–30s
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
+            {displayData.map((row) => (
+              <Fragment key={row.id}>
                 <TableRow
-                  key={p.id}
-                  className="border-b border-slate-200 bg-slate-50/60"
+                  key={row.id}
+                  className={`group transition-all duration-200 border-b hover:bg-slate-50/80 ${expandedId === row.id ? 'bg-slate-50 shadow-sm border-slate-300' : 'border-slate-200'
+                    }`}
                 >
                   <TableCell className="w-8 px-4 py-3">
-                    <Loader2 className="h-3.5 w-3.5 animate-spin text-slate-400" />
+                    <input
+                      type="checkbox"
+                      checked={selectedRowIds.has(String(row.id))}
+                      onClick={(e) => e.stopPropagation()}
+                      onChange={() => onToggleRow(String(row.id))}
+                      aria-label={`Select ${row.phrase ?? 'row'}`}
+                      className="h-3.5 w-3.5 rounded border-gray-300 accent-blue-600"
+                    />
                   </TableCell>
-                  <TableCell className="max-w-[340px] px-2 py-3">
+                  <TableCell className="max-w-[340px] px-2 py-2">
                     <div className="flex flex-col gap-1">
-                      <span className="truncate text-[12px] italic text-slate-500">
-                        {p.phrase}
-                      </span>
-                      <span className="text-[11px] text-slate-400">
-                        Asking ChatGPT, Claude, and Gemini…
-                      </span>
-                    </div>
-                  </TableCell>
-                  <TableCell colSpan={6} className="px-2 py-3">
-                    <div className="flex items-center gap-2 text-[12px] font-light text-slate-400">
-                      <Loader2 className="h-3 w-3 animate-spin" />
-                      Running across models — typically 15–30s
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-              {displayData.map((row) => (
-                <Fragment key={row.id}>
-                  <TableRow
-                    key={row.id}
-                    className={`group transition-all duration-200 border-b hover:bg-slate-50/80 ${expandedId === row.id ? 'bg-slate-50 shadow-sm border-slate-300' : 'border-slate-200'
-                      }`}
-                  >
-                    <TableCell className="w-8 px-4 py-3">
-                      <input
-                        type="checkbox"
-                        checked={selectedRowIds.has(String(row.id))}
-                        onClick={(e) => e.stopPropagation()}
-                        onChange={() => onToggleRow(String(row.id))}
-                        aria-label={`Select ${row.phrase ?? 'row'}`}
-                        className="h-3.5 w-3.5 rounded border-gray-300 accent-blue-600"
-                      />
-                    </TableCell>
-                    <TableCell className="max-w-[340px] px-2 py-2">
-                      <div className="flex flex-col gap-1">
-                        {row.type === 'keyword' ? (
+                      {row.type === 'keyword' ? (
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            aria-label={expandedId === row.id ? "Collapse row details" : "Expand row details"}
+                            aria-expanded={expandedId === row.id}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              setExpandedId(expandedId === row.id ? null : row.id);
+                            }}
+                            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-[6px] border border-slate-200 bg-[#f8f9fc] text-slate-500 transition-colors hover:bg-slate-100"
+                          >
+                            {expandedId === row.id ? (
+                              <ChevronDown className="h-[14px] w-[14px]" />
+                            ) : (
+                              <ChevronRight className="h-[14px] w-[14px]" />
+                            )}
+                          </button>
+                          <span
+                            onClick={(e) => { e.stopPropagation(); togglePhrase(String(row.id)); }}
+                            title={openPhrases.has(String(row.id)) ? 'Click to collapse' : 'Click to show full prompt'}
+                            className={cn(
+                              'cursor-pointer text-[12px] text-[#58606f] italic',
+                              openPhrases.has(String(row.id)) ? 'whitespace-normal break-words' : 'truncate'
+                            )}
+                          >
+                            {row.phrase}
+                          </span>
+                        </div>
+                      ) : (
+                        <>
                           <div className="flex items-center gap-2">
                             <button
                               type="button"
@@ -1659,154 +1721,126 @@ export const PromptTable = ({
                               {row.phrase}
                             </span>
                           </div>
-                        ) : (
-                          <>
-                            <div className="flex items-center gap-2">
-                              <button
-                                type="button"
-                                aria-label={expandedId === row.id ? "Collapse row details" : "Expand row details"}
-                                aria-expanded={expandedId === row.id}
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  setExpandedId(expandedId === row.id ? null : row.id);
+                        </>
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell className="py-3 px-2">
+                    <Badge variant="outline" className={`rounded-full border-0 px-2.5 py-0.5 text-[10px] font-bold ${getSentimentColor(row.avgSentiment > 7 ? 'Positive' : row.avgSentiment > 4 ? 'Neutral' : 'Negative')}`}>
+                      {row.avgSentiment > 7 ? 'Positive' : row.avgSentiment > 4 ? 'Neutral' : 'Negative'}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="py-3 px-2 text-[11px] font-medium text-slate-600">
+                    {row.mentions}/{row.results?.length || 0}
+                  </TableCell>
+                  <TableCell className="py-3 px-2">
+                    <Badge className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-[10px] font-bold text-emerald-600 hover:bg-emerald-50 border-0">
+                      #{row.bestRank || '-'}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="py-3 px-2 text-[11px] font-medium text-slate-600">{row.sov}</TableCell>
+                  <TableCell className="max-w-[160px] py-2 px-2">
+                    <div className="flex flex-wrap items-center gap-1">
+                      {row.competitors?.slice(0, 2).map((name: string) => {
+                        const favicon = getFaviconUrl(name);
+                        return (
+                          <span
+                            key={name}
+                            className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[9.5px] font-medium text-slate-600"
+                          >
+                            {favicon ? (
+                              <img
+                                src={favicon}
+                                alt={name}
+                                className="h-3 w-3 flex-shrink-0 rounded-full border border-white bg-white object-cover"
+                                loading="lazy"
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).style.display = 'none';
                                 }}
-                                className="flex h-6 w-6 shrink-0 items-center justify-center rounded-[6px] border border-slate-200 bg-[#f8f9fc] text-slate-500 transition-colors hover:bg-slate-100"
-                              >
-                                {expandedId === row.id ? (
-                                  <ChevronDown className="h-[14px] w-[14px]" />
-                                ) : (
-                                  <ChevronRight className="h-[14px] w-[14px]" />
-                                )}
-                              </button>
-                              <span
-                                onClick={(e) => { e.stopPropagation(); togglePhrase(String(row.id)); }}
-                                title={openPhrases.has(String(row.id)) ? 'Click to collapse' : 'Click to show full prompt'}
-                                className={cn(
-                                  'cursor-pointer text-[12px] text-[#58606f] italic',
-                                  openPhrases.has(String(row.id)) ? 'whitespace-normal break-words' : 'truncate'
-                                )}
-                              >
-                                {row.phrase}
-                              </span>
-                            </div>
-                          </>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell className="py-3 px-2">
-                      <Badge variant="outline" className={`rounded-full border-0 px-2.5 py-0.5 text-[10px] font-bold ${getSentimentColor(row.avgSentiment > 7 ? 'Positive' : row.avgSentiment > 4 ? 'Neutral' : 'Negative')}`}>
-                        {row.avgSentiment > 7 ? 'Positive' : row.avgSentiment > 4 ? 'Neutral' : 'Negative'}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="py-3 px-2 text-[11px] font-medium text-slate-600">
-                      {row.mentions}/{row.results?.length || 0}
-                    </TableCell>
-                    <TableCell className="py-3 px-2">
-                      <Badge className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-[10px] font-bold text-emerald-600 hover:bg-emerald-50 border-0">
-                        #{row.bestRank || '-'}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="py-3 px-2 text-[11px] font-medium text-slate-600">{row.sov}</TableCell>
-                    <TableCell className="max-w-[160px] py-2 px-2">
-                      <div className="flex flex-wrap items-center gap-1">
-                        {row.competitors?.slice(0, 2).map((name: string) => {
-                          const favicon = getFaviconUrl(name);
-                          return (
-                            <span
-                              key={name}
-                              className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[9.5px] font-medium text-slate-600"
-                            >
-                              {favicon ? (
-                                <img
-                                  src={favicon}
-                                  alt={name}
-                                  className="h-3 w-3 flex-shrink-0 rounded-full border border-white bg-white object-cover"
-                                  loading="lazy"
-                                  onError={(e) => {
-                                    (e.target as HTMLImageElement).style.display = 'none';
-                                  }}
-                                />
-                              ) : null}
-                              <span className="truncate max-w-[80px]">{name}</span>
-                            </span>
-                          );
-                        })}
-                        {row.competitorCount > 2 && (
-                          <span className="text-[10px] text-gray-400">+{row.competitorCount - 2} more</span>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell className="py-3 px-4 text-right">
-                      <div className="flex justify-end gap-2">
-                        <TrackToggleButton
-                          tracked={isRowTracked(row)}
-                          loading={trackPending[row.id]}
-                          disabled={
-                            (row.type === 'prompt'
-                              ? row.rawId == null
-                              : (row.childPromptIds?.length ?? 0) === 0)
-                          }
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            void toggleTracking(row, !isRowTracked(row));
-                          }}
-                        />
-                        <Button
-                          variant="outline"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onOpenWorksheetModal(String(row.id));
-                          }}
-                          className="h-7 rounded-lg px-3 text-[10px] font-bold border-slate-300 text-slate-600 hover:bg-gray-50 shadow-none"
-                        >
-                          Generate
-                        </Button>
-                      </div>
+                              />
+                            ) : null}
+                            <span className="truncate max-w-[80px]">{name}</span>
+                          </span>
+                        );
+                      })}
+                      {row.competitorCount > 2 && (
+                        <span className="text-[10px] text-gray-400">+{row.competitorCount - 2} more</span>
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell className="py-3 px-4 text-right">
+                    <div className="flex justify-end gap-2">
+                      <TrackToggleButton
+                        tracked={isRowTracked(row)}
+                        loading={trackPending[row.id]}
+                        disabled={
+                          (row.type === 'prompt'
+                            ? row.rawId == null
+                            : (row.childPromptIds?.length ?? 0) === 0)
+                        }
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          void toggleTracking(row, !isRowTracked(row));
+                        }}
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onOpenWorksheetModal(String(row.id));
+                        }}
+                        className="h-[38px] rounded-[14px] border-[#e8eef8] bg-[#eff4ff] px-3.5 text-[11px] font-semibold text-[#3b5d9c] shadow-none hover:bg-[#e7efff]"
+                      >
+                        <FileText className="mr-1.5 h-3.5 w-3.5" />
+                        Generate
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+                {expandedId === row.id && (
+                  <TableRow className="bg-gray-50/30 hover:bg-gray-50/30 border-b border-slate-300">
+                    <TableCell colSpan={8} className="p-0">
+                      <ExpandedDetails results={row.results} />
                     </TableCell>
                   </TableRow>
-                  {expandedId === row.id && (
-                    <TableRow className="bg-gray-50/30 hover:bg-gray-50/30 border-b border-slate-300">
-                      <TableCell colSpan={8} className="p-0">
-                        <ExpandedDetails results={row.results} />
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </Fragment>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-        <div className="flex items-center justify-between gap-3 px-6 py-3 border-t border-slate-200 mt-2">
-          <span className="text-[11px] text-gray-500 font-medium tracking-tight">
-            {totalCount === 0
-              ? 'No rows'
-              : `Showing ${(currentPage - 1) * PAGE_SIZE + 1}–${Math.min(currentPage * PAGE_SIZE, totalCount)} of ${totalCount}`}
+                )}
+              </Fragment>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+      <div className="flex items-center justify-between gap-3 px-6 py-3 border-t border-slate-200 mt-2">
+        <span className="text-[11px] text-gray-500 font-medium tracking-tight">
+          {totalCount === 0
+            ? 'No rows'
+            : `Showing ${(currentPage - 1) * PAGE_SIZE + 1}–${Math.min(currentPage * PAGE_SIZE, totalCount)} of ${totalCount}`}
+        </span>
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+            disabled={currentPage <= 1}
+            className="rounded-md border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-medium text-slate-600 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            Prev
+          </button>
+          <span className="px-2 text-[11px] font-medium text-slate-500 tabular-nums">
+            {currentPage} / {totalPages}
           </span>
-          <div className="flex items-center gap-1">
-            <button
-              type="button"
-              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-              disabled={currentPage <= 1}
-              className="rounded-md border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-medium text-slate-600 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              Prev
-            </button>
-            <span className="px-2 text-[11px] font-medium text-slate-500 tabular-nums">
-              {currentPage} / {totalPages}
-            </span>
-            <button
-              type="button"
-              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-              disabled={currentPage >= totalPages}
-              className="rounded-md border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-medium text-slate-600 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              Next
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+            disabled={currentPage >= totalPages}
+            className="rounded-md border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-medium text-slate-600 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            Next
+          </button>
         </div>
-      </CardContent>
-    </Card>
-  );
+      </div>
+    </CardContent>
+  </Card>
+);
 };
 
 const FilterPill = ({
@@ -1922,9 +1956,9 @@ const OpportunityRow = ({
   const [expanded, setExpanded] = useState(false);
   const hasDetail = Boolean(
     recommendedAngle ||
-      brief?.structure ||
-      (brief?.keyPoints && brief.keyPoints.length > 0) ||
-      brief?.audience
+    brief?.structure ||
+    (brief?.keyPoints && brief.keyPoints.length > 0) ||
+    brief?.audience
   );
 
   return (
@@ -2760,829 +2794,834 @@ const AIResultsReportPreview = () => {
         title: 'Mentions',
         kind: 'summary',
         details: [
-          { label: 'Brand',       value: mentionsTotal > 0 ? `${brandSharePct}%`         : '—', subValue: brandPages.toString() },
-          { label: 'Competitors', value: mentionsTotal > 0 ? `${100 - brandSharePct}%`  : '—',  subValue: competitorPages.toString() },
+          { label: 'Brand', value: mentionsTotal > 0 ? `${brandSharePct}%` : '—', subValue: brandPages.toString() },
+          { label: 'Competitors', value: mentionsTotal > 0 ? `${100 - brandSharePct}%` : '—', subValue: competitorPages.toString() },
         ],
       },
     ];
   }, [reportData, categoryFilter, modelFilter]);
 
-  // Sentiment / Accuracy / Share of Voice cards — three single-number cards.
-  // Threshold scale fix: backend returns avgSentiment on a 0-10 displayed
-  // scale (or null when there are zero measurable rows). Old code used
-  // 70/40 thresholds → every real number fell into "Negative".
-  const scoreCards = useMemo(() => {
-    if (!reportData) return [];
+// Sentiment / Accuracy / Share of Voice cards — three single-number cards.
+// Threshold scale fix: backend returns avgSentiment on a 0-10 displayed
+// scale (or null when there are zero measurable rows). Old code used
+// 70/40 thresholds → every real number fell into "Negative".
+const scoreCards = useMemo(() => {
+  if (!reportData) return [];
 
-    // Apply same filter scope as metricCards so all dashboard headlines tell
-    // a single consistent story when the user narrows by model / category.
-    const allItems = reportPrompts;
-    let scoped = allItems.filter(
-      (p: any) => p.type?.toLowerCase() === 'prompt' && Array.isArray(p?.results) && p.results.length > 0,
-    );
-    if (categoryFilter.size > 0) scoped = scoped.filter((p: any) => p.category && categoryFilter.has(p.category));
-    if (modelFilter.size > 0) {
-      scoped = scoped
-        .map((p: any) => ({ ...p, results: (p.results ?? []).filter((r: any) => modelFilter.has(r.model)) }))
-        .filter((p: any) => p.results.length > 0);
-    }
+  // Apply same filter scope as metricCards so all dashboard headlines tell
+  // a single consistent story when the user narrows by model / category.
+  const allItems = reportPrompts;
+  let scoped = allItems.filter(
+    (p: any) => p.type?.toLowerCase() === 'prompt' && Array.isArray(p?.results) && p.results.length > 0,
+  );
+  if (categoryFilter.size > 0) scoped = scoped.filter((p: any) => p.category && categoryFilter.has(p.category));
+  if (modelFilter.size > 0) {
+    scoped = scoped
+      .map((p: any) => ({ ...p, results: (p.results ?? []).filter((r: any) => modelFilter.has(r.model)) }))
+      .filter((p: any) => p.results.length > 0);
+  }
 
-    const allResults = scoped.flatMap((p: any) => p.results ?? []);
-    const totalRows = allResults.length;
-    const presenceRows = allResults.filter((r: any) => Number(r.presence ?? 0) === 1);
+  const allResults = scoped.flatMap((p: any) => p.results ?? []);
+  const totalRows = allResults.length;
+  const presenceRows = allResults.filter((r: any) => Number(r.presence ?? 0) === 1);
 
-    // Sentiment: only rows where the brand was mentioned AND sentiment is
-    // non-null contribute to the average. 0-10 scale per backend transform.
-    const sentimentMeasurements = presenceRows
-      .map((r: any) => (r.sentiment === null || r.sentiment === undefined ? null : Number(r.sentiment)))
-      .filter((s: number | null): s is number => s !== null);
-    const sentimentAvg = sentimentMeasurements.length > 0
-      ? sentimentMeasurements.reduce((a, b) => a + b, 0) / sentimentMeasurements.length
-      : null;
+  // Sentiment: only rows where the brand was mentioned AND sentiment is
+  // non-null contribute to the average. 0-10 scale per backend transform.
+  const sentimentMeasurements = presenceRows
+    .map((r: any) => (r.sentiment === null || r.sentiment === undefined ? null : Number(r.sentiment)))
+    .filter((s: number | null): s is number => s !== null);
+  const sentimentAvg = sentimentMeasurements.length > 0
+    ? sentimentMeasurements.reduce((a, b) => a + b, 0) / sentimentMeasurements.length
+    : null;
 
-    let sentimentLabel = '—';
-    let sentimentTone = 'text-slate-400';
-    let sentimentNote: string | undefined;
-    if (sentimentAvg === null) {
-      sentimentLabel = 'Not measurable';
-      sentimentTone = 'text-slate-400';
-      sentimentNote = totalRows === 0
-        ? 'No data in current filter scope'
-        : 'No prompt mentioned the brand in this scope';
-    } else if (sentimentAvg >= 7) {
-      sentimentLabel = 'Positive';
-      sentimentTone = 'text-emerald-600';
-    } else if (sentimentAvg >= 4) {
-      sentimentLabel = 'Neutral';
-      sentimentTone = 'text-sky-600';
-    } else {
-      sentimentLabel = 'Negative';
-      sentimentTone = 'text-amber-600';
-    }
-    if (sentimentLabel !== 'Not measurable') {
-      sentimentNote = `Based on ${sentimentMeasurements.length} model response${sentimentMeasurements.length === 1 ? '' : 's'}`;
-    }
+  let sentimentLabel = '—';
+  let sentimentTone = 'text-slate-400';
+  let sentimentNote: string | undefined;
+  if (sentimentAvg === null) {
+    sentimentLabel = 'Not measurable';
+    sentimentTone = 'text-slate-400';
+    sentimentNote = totalRows === 0
+      ? 'No data in current filter scope'
+      : 'No prompt mentioned the brand in this scope';
+  } else if (sentimentAvg >= 7) {
+    sentimentLabel = 'Positive';
+    sentimentTone = 'text-emerald-600';
+  } else if (sentimentAvg >= 4) {
+    sentimentLabel = 'Neutral';
+    sentimentTone = 'text-sky-600';
+  } else {
+    sentimentLabel = 'Negative';
+    sentimentTone = 'text-amber-600';
+  }
+  if (sentimentLabel !== 'Not measurable') {
+    sentimentNote = `Based on ${sentimentMeasurements.length} model response${sentimentMeasurements.length === 1 ? '' : 's'}`;
+  }
 
-    // Brand accuracy: average of per-result `accuracy` (0-10) across rows
-    // where the brand was actually mentioned. Surface as a 0-100% figure.
-    const accuracyMeasurements = presenceRows
-      .map((r: any) => (r.accuracy === null || r.accuracy === undefined ? null : Number(r.accuracy)))
-      .filter((a: number | null): a is number => a !== null);
-    const accuracyAvg = accuracyMeasurements.length > 0
-      ? accuracyMeasurements.reduce((a, b) => a + b, 0) / accuracyMeasurements.length
-      : null;
-    const accuracyValue = accuracyAvg === null ? '—' : `${Math.round(accuracyAvg * 10)}%`;
-    const accuracyNote = presenceRows.length === 0
-      ? 'No brand mentions to verify'
-      : `Across ${presenceRows.length} brand mention${presenceRows.length === 1 ? '' : 's'}`;
+  // Brand accuracy: average of per-result `accuracy` (0-10) across rows
+  // where the brand was actually mentioned. Surface as a 0-100% figure.
+  const accuracyMeasurements = presenceRows
+    .map((r: any) => (r.accuracy === null || r.accuracy === undefined ? null : Number(r.accuracy)))
+    .filter((a: number | null): a is number => a !== null);
+  const accuracyAvg = accuracyMeasurements.length > 0
+    ? accuracyMeasurements.reduce((a, b) => a + b, 0) / accuracyMeasurements.length
+    : null;
+  const accuracyValue = accuracyAvg === null ? '—' : `${Math.round(accuracyAvg * 10)}%`;
+  const accuracyNote = presenceRows.length === 0
+    ? 'No brand mentions to verify'
+    : `Across ${presenceRows.length} brand mention${presenceRows.length === 1 ? '' : 's'}`;
 
-    // Share of voice = brand presence rate within the scoped rows.
-    const visibility = totalRows > 0 ? Math.round((presenceRows.length / totalRows) * 100) : 0;
-    const visibilityNote = totalRows > 0
-      ? `${presenceRows.length} of ${totalRows} response${totalRows === 1 ? '' : 's'} mentioned you`
-      : 'No data in current filter scope';
+  // Share of voice = brand presence rate within the scoped rows.
+  const visibility = totalRows > 0 ? Math.round((presenceRows.length / totalRows) * 100) : 0;
+  const visibilityNote = totalRows > 0
+    ? `${presenceRows.length} of ${totalRows} response${totalRows === 1 ? '' : 's'} mentioned you`
+    : 'No data in current filter scope';
 
-    return [
-      { label: 'Overall Sentiment', value: sentimentLabel, tone: sentimentTone, note: sentimentNote },
-      { label: 'Brand Accuracy Score', value: accuracyValue, tone: 'text-[#3393F2]', note: accuracyNote },
-      { label: 'AI Share of Voice', value: `${visibility}%`, tone: 'text-[#3393F2]', note: visibilityNote },
-    ];
-  }, [reportData, categoryFilter, modelFilter]);
+  return [
+    { label: 'Overall Sentiment', value: sentimentLabel, tone: sentimentTone, note: sentimentNote },
+    { label: 'Brand Accuracy Score', value: accuracyValue, tone: 'text-[#3393F2]', note: accuracyNote },
+    { label: 'AI Share of Voice', value: `${visibility}%`, tone: 'text-[#3393F2]', note: visibilityNote },
+  ];
+}, [reportData, categoryFilter, modelFilter]);
 
-  // ── Trend chart data ─────────────────────────────────────────────────────
-  //
-  // The three Visibility-section charts (Citations / Mentions rate / Share
-  // of Voice) all derive from the same /trends payload — one X point per
-  // completed AiRun, ordered ascending by startedAt. The frontend keeps the
-  // chart component dumb (it just renders rows + series); we shape the
-  // rows + series here so empty/single-run states are handled honestly.
+// ── Trend chart data ─────────────────────────────────────────────────────
+//
+// The three Visibility-section charts (Citations / Mentions rate / Share
+// of Voice) all derive from the same /trends payload — one X point per
+// completed AiRun, ordered ascending by startedAt. The frontend keeps the
+// chart component dumb (it just renders rows + series); we shape the
+// rows + series here so empty/single-run states are handled honestly.
 
-  const formatRunDate = (iso: string) => {
-    const d = new Date(iso);
-    if (Number.isNaN(d.getTime())) return iso;
-    return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-  };
+const formatRunDate = (iso: string) => {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+};
 
-  // Citations chart — per-run, per-model citation totals.
-  const citationsChart = useMemo(() => {
-    const series = [
-      { key: 'chatgpt', label: 'ChatGPT', stroke: '#E9897E', match: 'gpt' },
-      { key: 'claude',  label: 'Claude',  stroke: '#79A7F2', match: 'claude' },
-      { key: 'gemini',  label: 'Gemini',  stroke: '#8DD9E8', match: 'gemini' },
-      { key: 'google',  label: 'Google AI Overview', stroke: '#4285F4', match: 'google-gre' },
-    ] as const;
-    // Drop series the user has filtered out via the modelFilter pill (header).
-    const visibleSeries = modelFilter.size === 0
-      ? series
-      : series.filter((s) => {
-          for (const m of modelFilter) if (m.toLowerCase().includes(s.match)) return true;
-          return false;
-        });
-    const data = trendsData.runs.map((run) => {
-      const row: Record<string, string | number> = { date: formatRunDate(run.startedAt) };
-      for (const s of visibleSeries) {
-        // Find any model id containing the matcher (gpt-4o-mini, claude-sonnet-4.5...).
-        const found = Object.entries(run.perModel).find(([m]) => m.toLowerCase().includes(s.match));
-        row[s.key] = found ? found[1].cites : 0;
-      }
-      return row;
+// Citations chart — per-run, per-model citation totals.
+const citationsChart = useMemo(() => {
+  const series = [
+    { key: 'chatgpt', label: 'ChatGPT', stroke: '#E9897E', match: 'gpt' },
+    { key: 'claude', label: 'Claude', stroke: '#79A7F2', match: 'claude' },
+    { key: 'gemini', label: 'Gemini', stroke: '#8DD9E8', match: 'gemini' },
+    { key: 'google', label: 'Google AI Overview', stroke: '#4285F4', match: 'google-gre' },
+  ] as const;
+  // Drop series the user has filtered out via the modelFilter pill (header).
+  const visibleSeries = modelFilter.size === 0
+    ? series
+    : series.filter((s) => {
+      for (const m of modelFilter) if (m.toLowerCase().includes(s.match)) return true;
+      return false;
     });
-    return { data, series: visibleSeries.map(({ key, label, stroke }) => ({ key, label, stroke })) };
-  }, [trendsData, modelFilter]);
+  const data = trendsData.runs.map((run) => {
+    const row: Record<string, string | number> = { date: formatRunDate(run.startedAt) };
+    for (const s of visibleSeries) {
+      // Find any model id containing the matcher (gpt-4o-mini, claude-sonnet-4.5...).
+      const found = Object.entries(run.perModel).find(([m]) => m.toLowerCase().includes(s.match));
+      row[s.key] = found ? found[1].cites : 0;
+    }
+    return row;
+  });
+  return { data, series: visibleSeries.map(({ key, label, stroke }) => ({ key, label, stroke })) };
+}, [trendsData, modelFilter]);
 
-  // Mentions rate trend — brand vs total competitor mentions per run.
-  const mentionsChart = useMemo(() => {
-    const series = [
-      { key: 'brand',       label: 'Brand mentions',       stroke: '#6EA8FF' },
-      { key: 'competitors', label: 'Competitors Mentions', stroke: '#7BD8EB' },
-    ] as const;
-    const data = trendsData.runs.map((run) => ({
-      date: formatRunDate(run.startedAt),
-      brand: run.brandMentions,
-      competitors: run.competitorMentions,
-    }));
-    return { data, series };
-  }, [trendsData]);
+// Mentions rate trend — brand vs total competitor mentions per run.
+const mentionsChart = useMemo(() => {
+  const series = [
+    { key: 'brand', label: 'Brand mentions', stroke: '#6EA8FF' },
+    { key: 'competitors', label: 'Competitors Mentions', stroke: '#7BD8EB' },
+  ] as const;
+  const data = trendsData.runs.map((run) => ({
+    date: formatRunDate(run.startedAt),
+    brand: run.brandMentions,
+    competitors: run.competitorMentions,
+  }));
+  return { data, series };
+}, [trendsData]);
 
-  // Share of Voice — brand + the top 4 competitors observed in the latest
-  // run. Each series shows that host's mention count per run, so users see
-  // their position vs real competitors over time.
-  const shareOfVoiceChart = useMemo(() => {
-    const palette = ['#6EA8FF', '#E9897E', '#8DD9E8', '#9D8CF4', '#FBBF77'];
-    const brandKey = 'brand';
-    const compKeys = trendsData.topCompetitors.slice(0, 4);
-    const brandLabel = reportData?.domainInfo?.companyName
-      || reportData?.domainInfo?.host
-      || 'Your brand';
+// Share of Voice — brand + the top 4 competitors observed in the latest
+// run. Each series shows that host's mention count per run, so users see
+// their position vs real competitors over time.
+const shareOfVoiceChart = useMemo(() => {
+  const palette = ['#6EA8FF', '#E9897E', '#8DD9E8', '#9D8CF4', '#FBBF77'];
+  const brandKey = 'brand';
+  const compKeys = trendsData.topCompetitors.slice(0, 4);
+  const brandLabel = reportData?.domainInfo?.companyName
+    || reportData?.domainInfo?.host
+    || 'Your brand';
 
-    const series = [
-      { key: brandKey, label: brandLabel, stroke: palette[0] },
-      ...compKeys.map((host, i) => ({
-        key: `c_${i}`,
-        label: host,
-        stroke: palette[(i + 1) % palette.length],
-      })),
-    ];
+  const series = [
+    { key: brandKey, label: brandLabel, stroke: palette[0] },
+    ...compKeys.map((host, i) => ({
+      key: `c_${i}`,
+      label: host,
+      stroke: palette[(i + 1) % palette.length],
+    })),
+  ];
 
-    const data = trendsData.runs.map((run) => {
-      const row: Record<string, string | number> = { date: formatRunDate(run.startedAt) };
-      row[brandKey] = run.brandMentions;
-      compKeys.forEach((host, i) => {
-        row[`c_${i}`] = run.perCompetitor?.[host] ?? 0;
-      });
-      return row;
+  const data = trendsData.runs.map((run) => {
+    const row: Record<string, string | number> = { date: formatRunDate(run.startedAt) };
+    row[brandKey] = run.brandMentions;
+    compKeys.forEach((host, i) => {
+      row[`c_${i}`] = run.perCompetitor?.[host] ?? 0;
     });
-    return { data, series };
-  }, [trendsData, reportData]);
+    return row;
+  });
+  return { data, series };
+}, [trendsData, reportData]);
 
-  // Empty-state copy shared by all three trend charts. Uses the same phrasing
-  // so the message blends with the rest of the dashboard's "honest empty"
-  // language elsewhere.
-  const trendEmptyMessage = (() => {
-    if (trendsData.runs.length === 0) return 'Run an audit to see trend data';
-    if (trendsData.runs.length === 1) return 'Trend appears after your next audit';
-    return undefined;
-  })();
+// Empty-state copy shared by all three trend charts. Uses the same phrasing
+// so the message blends with the rest of the dashboard's "honest empty"
+// language elsewhere.
+const trendEmptyMessage = (() => {
+  if (trendsData.runs.length === 0) return 'Run an audit to see trend data';
+  if (trendsData.runs.length === 1) return 'Trend appears after your next audit';
+  return undefined;
+})();
 
-  const filteredPrompts = useMemo(() => {
-    if (!reportPrompts.length) return [];
-    let items = [...reportPrompts];
-    // Hide rows that were never queried — empty `results` array means no
-    // AI calls ran for this prompt, so the metrics row is all zeros
-    // and adds no signal. Only show items the user actually selected and ran.
-    items = items.filter(
-      (p: any) => p.type?.toLowerCase() === 'prompt' && Array.isArray(p?.results) && p.results.length > 0,
-    );
+const filteredPrompts = useMemo(() => {
+  if (!reportPrompts.length) return [];
+  let items = [...reportPrompts];
+  // Hide rows that were never queried — empty `results` array means no
+  // AI calls ran for this prompt, so the metrics row is all zeros
+  // AI calls ran for this prompt, so the metrics row is all zeros
+  // and adds no signal. Only show items the user actually selected and ran.
+  items = items.filter(
+    (p: any) => p.type?.toLowerCase() === 'prompt' && Array.isArray(p?.results) && p.results.length > 0,
+  );
+  items = items.filter(
+    (p: any) => p.type?.toLowerCase() === 'prompt' && Array.isArray(p?.results) && p.results.length > 0,
+  );
 
-    // Category filter (header Filters dropdown). Empty set = show all.
-    if (categoryFilter.size > 0) {
-      items = items.filter((p: any) => p.category && categoryFilter.has(p.category));
+  // Category filter (header Filters dropdown). Empty set = show all.
+  if (categoryFilter.size > 0) {
+    items = items.filter((p: any) => p.category && categoryFilter.has(p.category));
+  }
+
+  // Model filter — narrow each prompt's `results` array to only the selected
+  // models. If a prompt ends up with zero matching results it disappears.
+  if (modelFilter.size > 0) {
+    items = items
+      .map((p: any) => ({
+        ...p,
+        results: (p.results ?? []).filter((r: any) => modelFilter.has(r.model)),
+      }))
+      .filter((p: any) => p.results.length > 0);
+  }
+
+  return items.sort((a, b) => {
+    if (promptSort === 'sentiment') {
+      return Number(b?.avgSentiment ?? 0) - Number(a?.avgSentiment ?? 0);
     }
-
-    // Model filter — narrow each prompt's `results` array to only the selected
-    // models. If a prompt ends up with zero matching results it disappears.
-    if (modelFilter.size > 0) {
-      items = items
-        .map((p: any) => ({
-          ...p,
-          results: (p.results ?? []).filter((r: any) => modelFilter.has(r.model)),
-        }))
-        .filter((p: any) => p.results.length > 0);
+    if (promptSort === 'position') {
+      const positionFor = (row: any) => {
+        const rank = Number(row?.bestRank);
+        return Number.isFinite(rank) && rank > 0 ? rank : Number.POSITIVE_INFINITY;
+      };
+      return positionFor(a) - positionFor(b);
     }
-
-    return items.sort((a, b) => {
-      if (promptSort === 'sentiment') {
-        return Number(b?.avgSentiment ?? 0) - Number(a?.avgSentiment ?? 0);
-      }
-      if (promptSort === 'position') {
-        const positionFor = (row: any) => {
-          const rank = Number(row?.bestRank);
-          return Number.isFinite(rank) && rank > 0 ? rank : Number.POSITIVE_INFINITY;
-        };
-        return positionFor(a) - positionFor(b);
-      }
-      const alphabeticalCompare = String(a?.phrase ?? '').localeCompare(String(b?.phrase ?? ''), undefined, {
-        sensitivity: 'base',
-      });
-      return promptSort === 'alphabetical-desc' ? -alphabeticalCompare : alphabeticalCompare;
+    const alphabeticalCompare = String(a?.phrase ?? '').localeCompare(String(b?.phrase ?? ''), undefined, {
+      sensitivity: 'base',
     });
-  }, [reportPrompts, promptSort, categoryFilter, modelFilter]);
+    return promptSort === 'alphabetical-desc' ? -alphabeticalCompare : alphabeticalCompare;
+  });
+}, [reportPrompts, promptSort, categoryFilter, modelFilter]);
 
-  // Manual refetch for the "Retry" affordance on the opportunities card —
-  // hits /report again so the LLM enrichment cache is exercised (or rebuilt
-  // if the run summary was cleared).
-  const [opportunitiesRetrying, setOpportunitiesRetrying] = useState(false);
-  const [retryError, setRetryError] = useState<string | null>(null);
-  const handleRetryOpportunities = useCallback(async () => {
-    if (!domainId) {
-      setRetryError('No domain selected.');
-      return;
-    }
-    setOpportunitiesRetrying(true);
-    setRetryError(null);
+
+// Manual refetch for the "Retry" affordance on the opportunities card —
+// hits /report again so the LLM enrichment cache is exercised (or rebuilt
+// if the run summary was cleared).
+const [opportunitiesRetrying, setOpportunitiesRetrying] = useState(false);
+const [retryError, setRetryError] = useState<string | null>(null);
+const handleRetryOpportunities = useCallback(async () => {
+  if (!domainId) {
+    setRetryError('No domain selected.');
+    return;
+  }
+  setOpportunitiesRetrying(true);
+  setRetryError(null);
+  try {
+    // Invalidate the cached /report for this domain+run; the useReport
+    // hook above refetches automatically and updates reportData.
+    await queryClient.invalidateQueries({ queryKey: aiResultsKeys.report(domainId, selectedRunId) });
+  } catch (err: any) {
+    setRetryError(err?.message ?? 'Retry failed');
+  } finally {
+    setOpportunitiesRetrying(false);
+  }
+}, [domainId, selectedRunId, queryClient]);
+
+// SSE listener — flips running rows to done/failed when n8n pings back.
+useEffect(() => {
+  const runningKeys = Object.entries(generationByKey).filter(([, s]) => s.kind === 'running');
+  if (runningKeys.length === 0) return;
+
+  const token = localStorage.getItem('authToken');
+  if (!token) return;
+
+  const apiBase = import.meta.env.VITE_API_URL ?? 'http://localhost:3002';
+  const url = `${apiBase}/api/sse?token=${encodeURIComponent(token)}`;
+  const es = new EventSource(url);
+  es.onmessage = (ev) => {
     try {
-      // Invalidate the cached /report for this domain+run; the useReport
-      // hook above refetches automatically and updates reportData.
-      await queryClient.invalidateQueries({ queryKey: aiResultsKeys.report(domainId, selectedRunId) });
-    } catch (err: any) {
-      setRetryError(err?.message ?? 'Retry failed');
-    } finally {
-      setOpportunitiesRetrying(false);
+      const msg = JSON.parse(ev.data);
+      if (msg?.type !== 'generation:update') return;
+      const jobId = msg.jobId as string | undefined;
+      if (!jobId) return;
+      setGenerationByKey((prev) => {
+        const next = { ...prev };
+        for (const [key, state] of Object.entries(prev)) {
+          if (state.kind !== 'running' || state.jobId !== jobId) continue;
+          if (msg.status === 'completed') next[key] = { kind: 'done', draftId: msg.draftId ?? null };
+          else if (msg.status === 'failed') next[key] = { kind: 'failed', error: msg.error ?? 'Generation failed' };
+          else next[key] = { kind: 'running', jobId, progress: msg.progress ?? state.progress, phase: msg.phase ?? state.phase };
+        }
+        return next;
+      });
+    } catch {
+      /* ignore non-JSON */
     }
-  }, [domainId, selectedRunId, queryClient]);
+  };
+  return () => es.close();
+}, [generationByKey]);
 
-  // SSE listener — flips running rows to done/failed when n8n pings back.
-  useEffect(() => {
-    const runningKeys = Object.entries(generationByKey).filter(([, s]) => s.kind === 'running');
-    if (runningKeys.length === 0) return;
-
-    const token = localStorage.getItem('authToken');
-    if (!token) return;
-
-    const apiBase = import.meta.env.VITE_API_URL ?? 'http://localhost:3002';
-    const url = `${apiBase}/api/sse?token=${encodeURIComponent(token)}`;
-    const es = new EventSource(url);
-    es.onmessage = (ev) => {
-      try {
-        const msg = JSON.parse(ev.data);
-        if (msg?.type !== 'generation:update') return;
-        const jobId = msg.jobId as string | undefined;
-        if (!jobId) return;
-        setGenerationByKey((prev) => {
-          const next = { ...prev };
-          for (const [key, state] of Object.entries(prev)) {
-            if (state.kind !== 'running' || state.jobId !== jobId) continue;
-            if (msg.status === 'completed') next[key] = { kind: 'done', draftId: msg.draftId ?? null };
-            else if (msg.status === 'failed') next[key] = { kind: 'failed', error: msg.error ?? 'Generation failed' };
-            else next[key] = { kind: 'running', jobId, progress: msg.progress ?? state.progress, phase: msg.phase ?? state.phase };
-          }
-          return next;
-        });
-      } catch {
-        /* ignore non-JSON */
-      }
-    };
-    return () => es.close();
-  }, [generationByKey]);
-
-  return (
-    <>
-      <div className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur">
-        <div className="mx-auto flex w-full max-w-[1530px] items-center px-4 py-3 sm:px-6">
-          <AIResultsBreadcrumbs
-            mode="static"
-            prefixLabel="AI Visibility"
-            prefixHref={resolveSidebarNavigation('ai-visibility').path}
-            pageLabel="AI Results"
-            pageHref={maskedDomainId ? resolveAIResultsNavigation('ai-results', maskedDomainId) : undefined}
-            currentLabel={currentReportSectionTitle ?? 'Overview'}
-          />
-        </div>
+return (
+  <>
+    <div className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur">
+      <div className="mx-auto flex w-full max-w-[1530px] items-center px-4 py-3 sm:px-6">
+        <AIResultsBreadcrumbs
+          mode="static"
+          prefixLabel="AI Visibility"
+          prefixHref={resolveSidebarNavigation('ai-visibility').path}
+          pageLabel="AI Results"
+          pageHref={maskedDomainId ? resolveAIResultsNavigation('ai-results', maskedDomainId) : undefined}
+          currentLabel={currentReportSectionTitle ?? 'Overview'}
+        />
       </div>
+    </div>
 
-      <section className="flex w-full flex-col bg-white px-4 py-2 sm:px-6">
-        {!gscConnected && (
-          <div className="flex w-full flex-col gap-4 rounded-xl bg-[#F1F6FF] px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-            <div className="min-w-0">
-              <h2 className="text-lg font-semibold leading-[1.35] tracking-normal text-[#7BA0E8] sm:text-xl">
-                Connect your site
-              </h2>
-              <p className="mt-1 text-sm font-normal leading-normal text-[#535862] sm:text-base">
-                Integrate your website to automate content publishing and optimization.
-              </p>
-            </div>
-            <Button
-              onClick={() => navigate('/dashboard?tab=integration')}
-              className="h-[37px] w-full shrink-0 rounded-lg bg-[#2D4059] px-4 gap-12text-sm font-semibold text-white shadow-[0_1px_2px_0_#1018280D] hover:bg-[#24364d] sm:w-auto"
-            >
-              <IntegrateSiteIcon />
-              <span>Connect your website</span>
-            </Button>
+    <section className="flex w-full flex-col bg-white px-4 py-2 sm:px-6">
+      {!gscConnected && (
+        <div className="flex w-full flex-col gap-4 rounded-xl bg-[#F1F6FF] px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+          <div className="min-w-0">
+            <h2 className="text-lg font-semibold leading-[1.35] tracking-normal text-[#7BA0E8] sm:text-xl">
+              Connect your site
+            </h2>
+            <p className="mt-1 text-sm font-normal leading-normal text-[#535862] sm:text-base">
+              Integrate your website to automate content publishing and optimization.
+            </p>
           </div>
-        )}
+          <Button
+            onClick={() => navigate('/dashboard?tab=integration')}
+            className="h-[37px] w-full shrink-0 rounded-lg bg-[#2D4059] px-4 gap-12text-sm font-semibold text-white shadow-[0_1px_2px_0_#1018280D] hover:bg-[#24364d] sm:w-auto"
+          >
+            <IntegrateSiteIcon />
+            <span>Connect your website</span>
+          </Button>
+        </div>
+      )}
 
-        <div id="ai-results-summary" data-title="Overview" className="flex w-full flex-col gap-6 px-0 py-6">
-          <div className="flex w-full flex-col gap-4 lg:flex-row lg:flex-nowrap lg:items-start lg:justify-between">
-            <div className="min-w-0 flex-1">
-              <h1 className="text-xl font-semibold text-gray-950 sm:text-2xl">Your AI Visibility Report</h1>
-              <p className="mt-2 max-w-3xl text-base font-normal leading-normal tracking-normal text-slate-600">
-                See how your domain appears across AI platforms and identify opportunities to improve your AI visibility and performance.
-              </p>
-            </div>
+      <div id="ai-results-summary" data-title="Overview" className="flex w-full flex-col gap-6 px-0 py-6">
+        <div className="flex w-full flex-col gap-4 lg:flex-row lg:flex-nowrap lg:items-start lg:justify-between">
+          <div className="min-w-0 flex-1">
+            <h1 className="text-xl font-semibold text-gray-950 sm:text-2xl">Your AI Visibility Report</h1>
+            <p className="mt-2 max-w-3xl text-base font-normal leading-normal tracking-normal text-slate-600">
+              See how your domain appears across AI platforms and identify opportunities to improve your AI visibility and performance.
+            </p>
+          </div>
 
-            <div className="flex w-full flex-wrap items-center gap-[9px] lg:ml-auto lg:w-auto lg:justify-end">
-              <Button
-                variant="outline"
-                size="icon"
-                aria-label="Download"
-                className="h-[41px] w-[41px] shrink-0 rounded-lg border-2 border-[#F9F9F9] bg-[#F9F9F9] p-0 shadow-[0_1px_2px_0_#1018280D]"
-              >
-                <ReportDownloadIcon />
-              </Button>
-              {/* Run picker — replaces the static "7 days" pill. Lists past
+          <div className="flex w-full flex-wrap items-center gap-[9px] lg:ml-auto lg:w-auto lg:justify-end">
+            <Button
+              variant="outline"
+              size="icon"
+              aria-label="Download"
+              className="h-[41px] w-[41px] shrink-0 rounded-lg border-2 border-[#F9F9F9] bg-[#F9F9F9] p-0 shadow-[0_1px_2px_0_#1018280D]"
+            >
+              <ReportDownloadIcon />
+            </Button>
+            {/* Run picker — replaces the static "7 days" pill. Lists past
                   completed AiRuns for this domain so the user can A/B against
                   earlier audits. Hidden when only one (or zero) runs exist. */}
-              {pastRuns.length > 1 ? (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className="h-[41px] rounded-lg border border-[#D5D7DA] bg-white px-3 text-xs text-[#374252] shadow-[0_1px_2px_0_#1018280D]"
-                    >
-                      <Calendar className="mr-1.5 h-3.5 w-3.5 text-[#717680]" strokeWidth={1.8} />
-                      {selectedRunId
-                        ? new Date(pastRuns.find((r) => r.id === selectedRunId)?.startedAt ?? Date.now()).toLocaleDateString()
-                        : 'Latest run'}
-                      <ChevronDown className="ml-1.5 h-3.5 w-3.5 text-[#717680]" strokeWidth={1.8} />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-[260px] p-1.5">
-                    <DropdownMenuItem
-                      className="rounded-md px-3 py-2 cursor-pointer"
-                      onClick={() => setSelectedRunId(null)}
-                    >
-                      <span className="flex-1 text-[12px] font-medium text-slate-900">Latest run</span>
-                      {!selectedRunId ? <Check className="h-3.5 w-3.5 text-blue-600" /> : null}
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    {pastRuns.map((r) => (
-                      <DropdownMenuItem
-                        key={r.id}
-                        className="flex items-center gap-2 rounded-md px-3 py-2 cursor-pointer"
-                        onClick={() => setSelectedRunId(r.id)}
-                      >
-                        <div className="flex-1 min-w-0">
-                          <div className="text-[12px] font-medium text-slate-900">
-                            {new Date(r.startedAt).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                          </div>
-                          <div className="text-[10px] text-slate-500">
-                            {r.visibilityScore !== null ? `${Math.round(r.visibilityScore)}% visibility` : '—'} · {r.totalQueries ?? '—'} queries
-                          </div>
-                        </div>
-                        {selectedRunId === r.id ? <Check className="h-3.5 w-3.5 text-blue-600" /> : null}
-                      </DropdownMenuItem>
-                    ))}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              ) : (
-                <Button
-                  variant="outline"
-                  disabled
-                  className="h-[41px] rounded-lg border border-[#D5D7DA] bg-white px-3 text-xs text-[#717680] shadow-[0_1px_2px_0_#1018280D] cursor-default"
-                >
-                  <Calendar className="mr-1.5 h-3.5 w-3.5 text-[#717680]" strokeWidth={1.8} />
-                  Latest run
-                </Button>
-              )}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className="h-[41px] rounded-lg border border-[#D5D7DA] bg-[#FFFFFF] px-3 text-xs capitalize text-[#717680] shadow-[0_1px_2px_0_#1018280D]"
-                  >
-                    <ReportSortIcon />
-                    {promptSort === 'alphabetical'
-                      ? 'Alphabetical A-Z'
-                      : promptSort === 'alphabetical-desc'
-                        ? 'Alphabetical Z-A'
-                      : promptSort === 'sentiment'
-                        ? 'Sentiment'
-                        : 'Position'}
-                    <ChevronDown className="ml-1.5 h-3.5 w-3.5 text-[#717680]" strokeWidth={1.8} />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-[180px]">
-                  <DropdownMenuItem onClick={() => setPromptSort('alphabetical')}>Alphabetical A-Z</DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setPromptSort('alphabetical-desc')}>Alphabetical Z-A</DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setPromptSort('sentiment')}>Sentiment</DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setPromptSort('position')}>Position</DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-              {/* Filters — model + category, multi-select. Active count
-                  shows on the trigger so the user can tell at a glance
-                  whether they're looking at filtered or full data. */}
+            {pastRuns.length > 1 ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button
                     variant="outline"
                     className="h-[41px] rounded-lg border border-[#D5D7DA] bg-white px-3 text-xs text-[#374252] shadow-[0_1px_2px_0_#1018280D]"
                   >
-                    <Filter className="mr-1.5 h-3.5 w-3.5 text-[#717680]" strokeWidth={1.8} />
-                    Filters
-                    {modelFilter.size + categoryFilter.size > 0 ? (
-                      <span className="ml-1.5 inline-flex h-4 min-w-[16px] items-center justify-center rounded-full bg-blue-600 px-1 text-[10px] font-semibold text-white">
-                        {modelFilter.size + categoryFilter.size}
-                      </span>
-                    ) : null}
+                    <Calendar className="mr-1.5 h-3.5 w-3.5 text-[#717680]" strokeWidth={1.8} />
+                    {selectedRunId
+                      ? new Date(pastRuns.find((r) => r.id === selectedRunId)?.startedAt ?? Date.now()).toLocaleDateString()
+                      : 'Latest run'}
                     <ChevronDown className="ml-1.5 h-3.5 w-3.5 text-[#717680]" strokeWidth={1.8} />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-[260px] p-2">
-                  <div className="px-2 pb-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-                    Models
-                  </div>
-                  {(['gpt-4o-mini', 'claude-sonnet-4-5', 'gemini-2.0-flash'] as const).map((m) => {
-                    const label = m.includes('gpt') ? 'ChatGPT' : m.includes('claude') ? 'Claude' : 'Gemini';
-                    const on = modelFilter.has(m);
-                    return (
-                      <DropdownMenuItem
-                        key={m}
-                        onSelect={(e) => {
-                          e.preventDefault(); // keep menu open on toggle
-                          setModelFilter((prev) => {
-                            const next = new Set(prev);
-                            on ? next.delete(m) : next.add(m);
-                            return next;
-                          });
-                        }}
-                        className="flex items-center gap-2 rounded-md px-2 py-1.5 cursor-pointer"
-                      >
-                        <span className={`flex h-4 w-4 items-center justify-center rounded border ${on ? 'border-blue-500 bg-blue-500 text-white' : 'border-slate-300 bg-white text-transparent'}`}>
-                          <Check className="h-3 w-3" />
-                        </span>
-                        <span className="text-[12px] text-slate-700">{label}</span>
-                      </DropdownMenuItem>
-                    );
-                  })}
+                <DropdownMenuContent align="end" className="w-[260px] p-1.5">
+                  <DropdownMenuItem
+                    className="rounded-md px-3 py-2 cursor-pointer"
+                    onClick={() => setSelectedRunId(null)}
+                  >
+                    <span className="flex-1 text-[12px] font-medium text-slate-900">Latest run</span>
+                    {!selectedRunId ? <Check className="h-3.5 w-3.5 text-blue-600" /> : null}
+                  </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <div className="px-2 pb-1.5 pt-1 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-                    Categories
-                  </div>
-                  {([
-                    ['unbranded_recommendation', 'Unbranded recommendation'],
-                    ['top_n_listicle', 'Top-N listicle'],
-                    ['alternatives_to_competitor', 'Alternatives to competitor'],
-                    ['problem_statement', 'Problem statement'],
-                  ] as const).map(([key, label]) => {
-                    const on = categoryFilter.has(key);
-                    return (
-                      <DropdownMenuItem
-                        key={key}
-                        onSelect={(e) => {
-                          e.preventDefault();
-                          setCategoryFilter((prev) => {
-                            const next = new Set(prev);
-                            on ? next.delete(key) : next.add(key);
-                            return next;
-                          });
-                        }}
-                        className="flex items-center gap-2 rounded-md px-2 py-1.5 cursor-pointer"
-                      >
-                        <span className={`flex h-4 w-4 items-center justify-center rounded border ${on ? 'border-blue-500 bg-blue-500 text-white' : 'border-slate-300 bg-white text-transparent'}`}>
-                          <Check className="h-3 w-3" />
-                        </span>
-                        <span className="text-[12px] text-slate-700">{label}</span>
-                      </DropdownMenuItem>
-                    );
-                  })}
-                  {(modelFilter.size + categoryFilter.size > 0) ? (
-                    <>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem
-                        onSelect={() => { setModelFilter(new Set()); setCategoryFilter(new Set()); }}
-                        className="rounded-md px-2 py-1.5 text-[12px] text-slate-500 cursor-pointer hover:text-slate-700"
-                      >
-                        Clear all filters
-                      </DropdownMenuItem>
-                    </>
-                  ) : null}
+                  {pastRuns.map((r) => (
+                    <DropdownMenuItem
+                      key={r.id}
+                      className="flex items-center gap-2 rounded-md px-3 py-2 cursor-pointer"
+                      onClick={() => setSelectedRunId(r.id)}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="text-[12px] font-medium text-slate-900">
+                          {new Date(r.startedAt).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                        </div>
+                        <div className="text-[10px] text-slate-500">
+                          {r.visibilityScore !== null ? `${Math.round(r.visibilityScore)}% visibility` : '—'} · {r.totalQueries ?? '—'} queries
+                        </div>
+                      </div>
+                      {selectedRunId === r.id ? <Check className="h-3.5 w-3.5 text-blue-600" /> : null}
+                    </DropdownMenuItem>
+                  ))}
                 </DropdownMenuContent>
               </DropdownMenu>
-              {/* Start New Audit — dropdown blends with the other header
+            ) : (
+              <Button
+                variant="outline"
+                disabled
+                className="h-[41px] rounded-lg border border-[#D5D7DA] bg-white px-3 text-xs text-[#717680] shadow-[0_1px_2px_0_#1018280D] cursor-default"
+              >
+                <Calendar className="mr-1.5 h-3.5 w-3.5 text-[#717680]" strokeWidth={1.8} />
+                Latest run
+              </Button>
+            )}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  className="h-[41px] rounded-lg border border-[#D5D7DA] bg-[#FFFFFF] px-3 text-xs capitalize text-[#717680] shadow-[0_1px_2px_0_#1018280D]"
+                >
+                  <ReportSortIcon />
+                  {promptSort === 'alphabetical'
+                    ? 'Alphabetical A-Z'
+                    : promptSort === 'alphabetical-desc'
+                      ? 'Alphabetical Z-A'
+                      : promptSort === 'sentiment'
+                        ? 'Sentiment'
+                        : 'Position'}
+                  <ChevronDown className="ml-1.5 h-3.5 w-3.5 text-[#717680]" strokeWidth={1.8} />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-[180px]">
+                <DropdownMenuItem onClick={() => setPromptSort('alphabetical')}>Alphabetical A-Z</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setPromptSort('alphabetical-desc')}>Alphabetical Z-A</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setPromptSort('sentiment')}>Sentiment</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setPromptSort('position')}>Position</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            {/* Filters — model + category, multi-select. Active count
+                  shows on the trigger so the user can tell at a glance
+                  whether they're looking at filtered or full data. */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  className="h-[41px] rounded-lg border border-[#D5D7DA] bg-white px-3 text-xs text-[#374252] shadow-[0_1px_2px_0_#1018280D]"
+                >
+                  <Filter className="mr-1.5 h-3.5 w-3.5 text-[#717680]" strokeWidth={1.8} />
+                  Filters
+                  {modelFilter.size + categoryFilter.size > 0 ? (
+                    <span className="ml-1.5 inline-flex h-4 min-w-[16px] items-center justify-center rounded-full bg-blue-600 px-1 text-[10px] font-semibold text-white">
+                      {modelFilter.size + categoryFilter.size}
+                    </span>
+                  ) : null}
+                  <ChevronDown className="ml-1.5 h-3.5 w-3.5 text-[#717680]" strokeWidth={1.8} />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-[260px] p-2">
+                <div className="px-2 pb-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                  Models
+                </div>
+                {(['gpt-4o-mini', 'claude-sonnet-4-5', 'gemini-2.0-flash'] as const).map((m) => {
+                  const label = m.includes('gpt') ? 'ChatGPT' : m.includes('claude') ? 'Claude' : 'Gemini';
+                  const on = modelFilter.has(m);
+                  return (
+                    <DropdownMenuItem
+                      key={m}
+                      onSelect={(e) => {
+                        e.preventDefault(); // keep menu open on toggle
+                        setModelFilter((prev) => {
+                          const next = new Set(prev);
+                          on ? next.delete(m) : next.add(m);
+                          return next;
+                        });
+                      }}
+                      className="flex items-center gap-2 rounded-md px-2 py-1.5 cursor-pointer"
+                    >
+                      <span className={`flex h-4 w-4 items-center justify-center rounded border ${on ? 'border-blue-500 bg-blue-500 text-white' : 'border-slate-300 bg-white text-transparent'}`}>
+                        <Check className="h-3 w-3" />
+                      </span>
+                      <span className="text-[12px] text-slate-700">{label}</span>
+                    </DropdownMenuItem>
+                  );
+                })}
+                <DropdownMenuSeparator />
+                <div className="px-2 pb-1.5 pt-1 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                  Categories
+                </div>
+                {([
+                  ['unbranded_recommendation', 'Unbranded recommendation'],
+                  ['top_n_listicle', 'Top-N listicle'],
+                  ['alternatives_to_competitor', 'Alternatives to competitor'],
+                  ['problem_statement', 'Problem statement'],
+                ] as const).map(([key, label]) => {
+                  const on = categoryFilter.has(key);
+                  return (
+                    <DropdownMenuItem
+                      key={key}
+                      onSelect={(e) => {
+                        e.preventDefault();
+                        setCategoryFilter((prev) => {
+                          const next = new Set(prev);
+                          on ? next.delete(key) : next.add(key);
+                          return next;
+                        });
+                      }}
+                      className="flex items-center gap-2 rounded-md px-2 py-1.5 cursor-pointer"
+                    >
+                      <span className={`flex h-4 w-4 items-center justify-center rounded border ${on ? 'border-blue-500 bg-blue-500 text-white' : 'border-slate-300 bg-white text-transparent'}`}>
+                        <Check className="h-3 w-3" />
+                      </span>
+                      <span className="text-[12px] text-slate-700">{label}</span>
+                    </DropdownMenuItem>
+                  );
+                })}
+                {(modelFilter.size + categoryFilter.size > 0) ? (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      onSelect={() => { setModelFilter(new Set()); setCategoryFilter(new Set()); }}
+                      className="rounded-md px-2 py-1.5 text-[12px] text-slate-500 cursor-pointer hover:text-slate-700"
+                    >
+                      Clear all filters
+                    </DropdownMenuItem>
+                  </>
+                ) : null}
+              </DropdownMenuContent>
+            </DropdownMenu>
+            {/* Start New Audit — dropdown blends with the other header
                   controls (white, slate text). Two re-audit modes: a full
                   re-crawl from Step 2, or jump straight back to picking
                   prompts on the existing crawl + competitors. */}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    className="h-[41px] rounded-lg bg-gradient-to-r from-[#2D4059] to-[#4C74C2] px-4 text-xs text-white shadow-[0_1px_2px_0_#1018280D] hover:opacity-95"
-                  >
-                    <Plus className="mr-1.5 h-3.5 w-3.5" />
-                    Audit Brand Visibility
-                    <ChevronDown className="ml-1.5 h-3.5 w-3.5" strokeWidth={1.8} />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-[280px] p-1.5">
-                  <DropdownMenuItem
-                    className="flex flex-col items-start gap-0.5 rounded-md px-3 py-2.5 cursor-pointer"
-                    onClick={() => {
-                      const id = reportData?.domainInfo?.id;
-                      if (id) navigate(`/ai-checker-v2?domain=${id}&restart=competitors`);
-                    }}
-                  >
-                    <span className="text-[12px] font-semibold text-slate-900">Re-audit from start</span>
-                    <span className="text-[11px] text-slate-500 leading-snug">
-                      Skip the crawl. Refresh competitors and land on the competitor selection step.
-                    </span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    className="flex flex-col items-start gap-0.5 rounded-md px-3 py-2.5 cursor-pointer"
-                    onClick={() => {
-                      const id = reportData?.domainInfo?.id;
-                      if (id) navigate(`/ai-checker-v2?domain=${id}&restart=topics`);
-                    }}
-                  >
-                    <span className="text-[12px] font-semibold text-slate-900">Pick new prompts</span>
-                    <span className="text-[11px] text-slate-500 leading-snug">
-                      Skip the crawl. Generate fresh prompts on top of the existing competitors and pick which to run.
-                    </span>
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    className="rounded-md px-3 py-2 text-[12px] text-slate-600 cursor-pointer"
-                    onClick={() => navigate('/ai-checker-v2')}
-                  >
-                    Audit a different domain →
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4 xl:grid-rows-2 xl:items-stretch">
-            {loading || metricCards.length === 0 ? (
-              <>
-                <div className="h-[230px] w-full animate-pulse rounded-xl border border-slate-200 bg-gray-50 sm:col-span-2 xl:row-span-2 xl:min-h-[310px]" />
-                {Array(6).fill(0).map((_, i) => (
-                  <div key={i} className="h-[112px] w-full animate-pulse rounded-xl border border-slate-200 bg-gray-50" />
-                ))}
-              </>
-            ) : (
-              [...metricCards, ...scoreCards].map((card, index) =>
-                'details' in card ? (
-                  <MetricCard
-                    key={card.title}
-                    card={card as MetricCardData}
-                  />
-                ) : (
-                  <Card
-                    key={card.label}
-                    className={cn(
-                      'h-full rounded-xl border border-[#D5D7DA] bg-white shadow-[0_1px_2px_0_#1018280D]',
-                      index === 0 ? 'sm:col-span-2 xl:row-span-2' : '',
-                    )}
-                  >
-                    <CardContent className="flex h-full flex-col gap-3 p-4 sm:p-5">
-                      <CardTitleWithTip title={card.label} />
-                      {card.note ? <p className="text-sm font-medium text-[#535862]">{card.note}</p> : null}
-                      <p className={cn('text-[27px] font-semibold leading-[1] tracking-normal', card.tone)}>
-                        {card.value}
-                      </p>
-                    </CardContent>
-                  </Card>
-                )
-              )
-            )}
-          </div>
-
-          <div id="ai-results-top-prompts" data-title="Top Performing Prompts">
-            {loading ? (
-              <div className="h-[400px] w-full animate-pulse rounded-xl border border-slate-200 bg-gray-50" />
-            ) : (
-              <PromptTable
-                data={filteredPrompts}
-                selectedRowIds={selectedRowIds}
-                onToggleRow={handleToggleRow}
-                onSetSelectedRows={handleSetSelectedRows}
-                onOpenWorksheetModal={handleOpenWorksheetModal}
-                reportRunId={selectedRunId}
-                domainId={reportData?.domainInfo?.id ?? null}
-              />
-            )}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  className="h-[41px] rounded-lg bg-gradient-to-r from-[#2D4059] to-[#4C74C2] px-4 text-xs text-white shadow-[0_1px_2px_0_#1018280D] hover:opacity-95"
+                >
+                  <Plus className="mr-1.5 h-3.5 w-3.5" />
+                  Audit Brand Visibility
+                  <ChevronDown className="ml-1.5 h-3.5 w-3.5" strokeWidth={1.8} />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-[280px] p-1.5">
+                <DropdownMenuItem
+                  className="flex flex-col items-start gap-0.5 rounded-md px-3 py-2.5 cursor-pointer"
+                  onClick={() => {
+                    const id = reportData?.domainInfo?.id;
+                    if (id) navigate(`/ai-checker-v2?domain=${id}&restart=competitors`);
+                  }}
+                >
+                  <span className="text-[12px] font-semibold text-slate-900">Re-audit from start</span>
+                  <span className="text-[11px] text-slate-500 leading-snug">
+                    Skip the crawl. Refresh competitors and land on the competitor selection step.
+                  </span>
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="flex flex-col items-start gap-0.5 rounded-md px-3 py-2.5 cursor-pointer"
+                  onClick={() => {
+                    const id = reportData?.domainInfo?.id;
+                    if (id) navigate(`/ai-checker-v2?domain=${id}&restart=topics`);
+                  }}
+                >
+                  <span className="text-[12px] font-semibold text-slate-900">Pick new prompts</span>
+                  <span className="text-[11px] text-slate-500 leading-snug">
+                    Skip the crawl. Generate fresh prompts on top of the existing competitors and pick which to run.
+                  </span>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  className="rounded-md px-3 py-2 text-[12px] text-slate-600 cursor-pointer"
+                  onClick={() => navigate('/ai-checker-v2')}
+                >
+                  Audit a different domain →
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
-      </section>
 
-        <section className="grid w-full grid-cols-1 gap-6 bg-white px-4 py-0 sm:px-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
-
-          <Card id="ai-results-visibility-coverage" data-title="Visibility & Coverage" className="min-w-0 rounded-xl border border-[#D5D7DA] bg-white shadow-[0_1px_2px_0_#1018280D]">
-            <CardHeader className="flex flex-col gap-3 px-4 pb-2 pt-4 sm:flex-row sm:items-center sm:justify-between">
-              <CardTitle className="text-base font-semibold text-[#2D4059]">Visibility & Coverage</CardTitle>
-              <div className="flex flex-wrap items-center gap-2">
-                <Button
-                  variant="outline"
-                  className="h-8 rounded-lg border border-[#D5D7DA] bg-white px-3 text-[11px] text-[#717680] shadow-[0_1px_2px_0_#1018280D] hover:bg-white"
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4 xl:grid-rows-2 xl:items-stretch">
+          {loading || metricCards.length === 0 ? (
+            <>
+              <div className="h-[230px] w-full animate-pulse rounded-xl border border-slate-200 bg-gray-50 sm:col-span-2 xl:row-span-2 xl:min-h-[310px]" />
+              {Array(6).fill(0).map((_, i) => (
+                <div key={i} className="h-[112px] w-full animate-pulse rounded-xl border border-slate-200 bg-gray-50" />
+              ))}
+            </>
+          ) : (
+            [...metricCards, ...scoreCards].map((card, index) =>
+              'details' in card ? (
+                <MetricCard
+                  key={card.title}
+                  card={card as MetricCardData}
+                />
+              ) : (
+                <Card
+                  key={card.label}
+                  className={cn(
+                    'h-full rounded-xl border border-[#D5D7DA] bg-white shadow-[0_1px_2px_0_#1018280D]',
+                    index === 0 ? 'sm:col-span-2 xl:row-span-2' : '',
+                  )}
                 >
-                  <Calendar className="mr-1.5 h-3.5 w-3.5 text-[#717680]" strokeWidth={1.8} />
-                  7 days
-                  <ChevronDown className="ml-1.5 h-3.5 w-3.5 text-[#717680]" strokeWidth={1.8} />
-                </Button>
-                <FilterPill label="Sort" icon="sort" />
+                  <CardContent className="flex h-full flex-col gap-3 p-4 sm:p-5">
+                    <CardTitleWithTip title={card.label} />
+                    {card.note ? <p className="text-sm font-medium text-[#535862]">{card.note}</p> : null}
+                    <p className={cn('text-[27px] font-semibold leading-[1] tracking-normal', card.tone)}>
+                      {card.value}
+                    </p>
+                  </CardContent>
+                </Card>
+              )
+            )
+          )}
+        </div>
+
+        <div id="ai-results-top-prompts" data-title="Top Performing Prompts">
+          {loading ? (
+            <div className="h-[400px] w-full animate-pulse rounded-xl border border-slate-200 bg-gray-50" />
+          ) : (
+            <PromptTable
+              data={filteredPrompts}
+              selectedRowIds={selectedRowIds}
+              onToggleRow={handleToggleRow}
+              onSetSelectedRows={handleSetSelectedRows}
+              onOpenWorksheetModal={handleOpenWorksheetModal}
+              reportRunId={selectedRunId}
+              domainId={reportData?.domainInfo?.id ?? null}
+            />
+          )}
+        </div>
+      </div>
+    </section>
+
+    <section className="grid w-full grid-cols-1 gap-6 bg-white px-4 py-0 sm:px-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
+
+      <Card id="ai-results-visibility-coverage" data-title="Visibility & Coverage" className="min-w-0 rounded-xl border border-[#D5D7DA] bg-white shadow-[0_1px_2px_0_#1018280D]">
+        <CardHeader className="flex flex-col gap-3 px-4 pb-2 pt-4 sm:flex-row sm:items-center sm:justify-between">
+          <CardTitle className="text-base font-semibold text-[#2D4059]">Visibility & Coverage</CardTitle>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              variant="outline"
+              className="h-8 rounded-lg border border-[#D5D7DA] bg-white px-3 text-[11px] text-[#717680] shadow-[0_1px_2px_0_#1018280D] hover:bg-white"
+            >
+              <Calendar className="mr-1.5 h-3.5 w-3.5 text-[#717680]" strokeWidth={1.8} />
+              7 days
+              <ChevronDown className="ml-1.5 h-3.5 w-3.5 text-[#717680]" strokeWidth={1.8} />
+            </Button>
+            <FilterPill label="Sort" icon="sort" />
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-8 px-4 pb-4">
+          <AreaChartCard
+            title="Share of Voice"
+            subtitle="Idenitfy visibility gaps and uncover opportunities to capture more AI-driven traffic."
+            data={shareOfVoiceChart.data}
+            series={shareOfVoiceChart.series}
+            tooltipTitle="AI Share of voice"
+            emptyMessage={trendEmptyMessage}
+          />
+          <AreaChartCard
+            title="Citations"
+            subtitle="Track brand citations across AI models."
+            data={citationsChart.data}
+            series={citationsChart.series}
+            tooltipTitle="Citations"
+            emptyMessage={trendEmptyMessage}
+          />
+          <AreaChartCard
+            title="Mentions rate trend"
+            subtitle="Monitor how often your brand is mentioned compared to competitors."
+            data={mentionsChart.data}
+            series={mentionsChart.series}
+            tooltipTitle="Mentions"
+            emptyMessage={trendEmptyMessage}
+          />
+        </CardContent>
+      </Card>
+
+      <div className="min-w-0 grid gap-6 xl:h-full xl:min-h-0 xl:grid-rows-[minmax(0,0.4fr)_minmax(0,0.6fr)]">
+
+        <Card className="h-full rounded-xl border border-[#DDE7F5] bg-[#F1F6FF] shadow-[0_1px_2px_0_#1018280D]">
+          <CardHeader className="flex flex-row items-start justify-between px-4 pb-3 pt-4">
+            <div className="min-w-0">
+              <div className="flex items-center justify-between gap-3">
+                <h3 className="text-[18px] font-semibold leading-normal text-[#414651]">
+                  Suggested Next Actions
+                </h3>
+                <span aria-hidden="true" className="flex items-center gap-0.5 text-[#98A2B3]">
+                  <ChevronRight className="h-3.5 w-3.5 -translate-x-0.5" />
+                  <ChevronRight className="h-3.5 w-3.5 -translate-x-1.5" />
+                </span>
               </div>
-            </CardHeader>
-            <CardContent className="space-y-8 px-4 pb-4">
-              <AreaChartCard
-                title="Share of Voice"
-                subtitle="Idenitfy visibility gaps and uncover opportunities to capture more AI-driven traffic."
-                data={shareOfVoiceChart.data}
-                series={shareOfVoiceChart.series}
-                tooltipTitle="AI Share of voice"
-                emptyMessage={trendEmptyMessage}
-              />
-              <AreaChartCard
-                title="Citations"
-                subtitle="Track brand citations across AI models."
-                data={citationsChart.data}
-                series={citationsChart.series}
-                tooltipTitle="Citations"
-                emptyMessage={trendEmptyMessage}
-              />
-              <AreaChartCard
-                title="Mentions rate trend"
-                subtitle="Monitor how often your brand is mentioned compared to competitors."
-                data={mentionsChart.data}
-                series={mentionsChart.series}
-                tooltipTitle="Mentions"
-                emptyMessage={trendEmptyMessage}
-              />
-            </CardContent>
-          </Card>
-
-          <div className="min-w-0 grid gap-6 xl:h-full xl:min-h-0 xl:grid-rows-[minmax(0,0.4fr)_minmax(0,0.6fr)]">
-
-            <Card className="h-full rounded-xl border border-[#DDE7F5] bg-[#F1F6FF] shadow-[0_1px_2px_0_#1018280D]">
-              <CardHeader className="flex flex-row items-start justify-between px-4 pb-3 pt-4">
-                <div className="min-w-0">
-                  <div className="flex items-center justify-between gap-3">
-                    <h3 className="text-[18px] font-semibold leading-normal text-[#414651]">
-                      Suggested Next Actions
-                    </h3>
-                    <span aria-hidden="true" className="flex items-center gap-0.5 text-[#98A2B3]">
-                      <ChevronRight className="h-3.5 w-3.5 -translate-x-0.5" />
-                      <ChevronRight className="h-3.5 w-3.5 -translate-x-1.5" />
-                    </span>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4 px-4 pb-4 pt-4">
+            {suggestedNextActions.map((action) => {
+              return (
+                <button
+                  key={action.title}
+                  type="button"
+                  onClick={action.onClick}
+                  className="group flex w-full items-center gap-3 rounded-2xl border border-[#E5EEF9] bg-white px-4 py-4 text-left shadow-[0_1px_2px_0_#1018280D] transition-all duration-200 hover:-translate-y-0.5 hover:border-[#D5D7DA] hover:shadow-[0_4px_12px_0_#10182814] focus:outline-none focus:ring-2 focus:ring-[#7BA0E8] focus:ring-offset-2"
+                >
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#DDE7F5] bg-[#F7FAFF]">
+                    <img src={action.iconSrc} alt="" className="h-5 w-5 object-contain" />
                   </div>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-4 px-4 pb-4 pt-4">
-                {suggestedNextActions.map((action) => {
-                  return (
-                    <button
-                      key={action.title}
-                      type="button"
-                      onClick={action.onClick}
-                      className="group flex w-full items-center gap-3 rounded-2xl border border-[#E5EEF9] bg-white px-4 py-4 text-left shadow-[0_1px_2px_0_#1018280D] transition-all duration-200 hover:-translate-y-0.5 hover:border-[#D5D7DA] hover:shadow-[0_4px_12px_0_#10182814] focus:outline-none focus:ring-2 focus:ring-[#7BA0E8] focus:ring-offset-2"
-                    >
-                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#DDE7F5] bg-[#F7FAFF]">
-                        <img src={action.iconSrc} alt="" className="h-5 w-5 object-contain" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-1.5">
-                          <span className="truncate text-[14px] font-medium leading-5 text-[#414651]">
-                            {action.title}
-                          </span>
-                          <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full border border-[#D0D5DD] text-[9px] text-[#667085]">
-                            i
-                          </span>
-                        </div>
-                        <p className="mt-1 text-sm leading-6 text-[#667085]">
-                          {action.description}
-                        </p>
-                      </div>
-                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#F8FAFD] text-[#4C74C2] transition-transform duration-200 group-hover:translate-x-0.5">
-                        <ChevronRight className="h-5 w-5" strokeWidth={2} />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5">
+                      <span className="truncate text-[14px] font-medium leading-5 text-[#414651]">
+                        {action.title}
                       </span>
-                    </button>
-                  );
-                })}
-              </CardContent>
-            </Card>
+                      <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full border border-[#D0D5DD] text-[9px] text-[#667085]">
+                        i
+                      </span>
+                    </div>
+                    <p className="mt-1 text-sm leading-6 text-[#667085]">
+                      {action.description}
+                    </p>
+                  </div>
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#F8FAFD] text-[#4C74C2] transition-transform duration-200 group-hover:translate-x-0.5">
+                    <ChevronRight className="h-5 w-5" strokeWidth={2} />
+                  </span>
+                </button>
+              );
+            })}
+          </CardContent>
+        </Card>
 
-            <Card id="ai-results-opportunities" data-title="Outrank Opportunities" className="h-full min-h-0 rounded-xl border border-[#D5D7DA] bg-white shadow-[0_1px_2px_0_#1018280D]">
-              <CardHeader className="flex flex-row items-start justify-between px-4 pb-3 pt-4">
-                <div className="min-w-0">
-                  <CardTitleWithTip title="Opportunities to Outrank Competitors" />
-                  <p className="mt-2 text-sm leading-[150%] text-[#535862]">
-                    Prioritized recommendations to improve rankings, increase citations, and outperform competitors in Al search.
+        <Card id="ai-results-opportunities" data-title="Outrank Opportunities" className="h-full min-h-0 rounded-xl border border-[#D5D7DA] bg-white shadow-[0_1px_2px_0_#1018280D]">
+          <CardHeader className="flex flex-row items-start justify-between px-4 pb-3 pt-4">
+            <div className="min-w-0">
+              <CardTitleWithTip title="Opportunities to Outrank Competitors" />
+              <p className="mt-2 text-sm leading-[150%] text-[#535862]">
+                Prioritized recommendations to improve rankings, increase citations, and outperform competitors in Al search.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleRetryOpportunities}
+                disabled={opportunitiesRetrying}
+                className="flex items-center gap-1 text-xs font-medium text-slate-600 hover:text-slate-900 disabled:opacity-50"
+                title="Re-run analysis"
+              >
+                <RefreshCw className={cn('h-3.5 w-3.5', opportunitiesRetrying && 'animate-spin')} />
+                Retry
+              </button>
+              <button className="whitespace-nowrap text-xs font-medium text-blue-600">View all</button>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-2 px-4 pb-4 min-h-0">
+            <div className="flex flex-wrap gap-2">
+              <FilterPill label="Sort: By Models" icon="sort" />
+              <FilterPill label="Filters" icon="filter" />
+            </div>
+            {/* Inner scroll container — opportunity briefs can be long and
+                 *  numerous; cap the card height so the layout doesn't push the
+                 *  charts column off-screen. */}
+            <div className="max-h-[560px] space-y-2 overflow-y-auto pr-1">
+              {(reportData?.opportunities ?? []).length === 0 ? (
+                <div className="flex flex-col items-start gap-2 rounded-md border border-dashed border-slate-200 bg-slate-50 px-3 py-3">
+                  <p className="text-xs text-slate-600">
+                    No outrank opportunities yet. This usually means the latest run hasn't completed enrichment, or selected competitors didn't appear in any answer.
                   </p>
-                </div>
-                <div className="flex items-center gap-2">
+                  {retryError ? (
+                    <p className="text-xs text-rose-600">Error: {retryError}</p>
+                  ) : null}
                   <button
                     type="button"
                     onClick={handleRetryOpportunities}
                     disabled={opportunitiesRetrying}
-                    className="flex items-center gap-1 text-xs font-medium text-slate-600 hover:text-slate-900 disabled:opacity-50"
-                    title="Re-run analysis"
+                    className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm hover:bg-slate-100 disabled:opacity-50"
                   >
                     <RefreshCw className={cn('h-3.5 w-3.5', opportunitiesRetrying && 'animate-spin')} />
-                    Retry
+                    {opportunitiesRetrying ? 'Retrying…' : 'Retry analysis'}
                   </button>
-                  <button className="whitespace-nowrap text-xs font-medium text-blue-600">View all</button>
                 </div>
-              </CardHeader>
-              <CardContent className="space-y-2 px-4 pb-4 min-h-0">
-                <div className="flex flex-wrap gap-2">
-                  <FilterPill label="Sort: By Models" icon="sort" />
-                  <FilterPill label="Filters" icon="filter" />
-                </div>
-                {/* Inner scroll container — opportunity briefs can be long and
-                 *  numerous; cap the card height so the layout doesn't push the
-                 *  charts column off-screen. */}
-                <div className="max-h-[560px] space-y-2 overflow-y-auto pr-1">
-                {(reportData?.opportunities ?? []).length === 0 ? (
-                  <div className="flex flex-col items-start gap-2 rounded-md border border-dashed border-slate-200 bg-slate-50 px-3 py-3">
-                    <p className="text-xs text-slate-600">
-                      No outrank opportunities yet. This usually means the latest run hasn't completed enrichment, or selected competitors didn't appear in any answer.
-                    </p>
-                    {retryError ? (
-                      <p className="text-xs text-rose-600">Error: {retryError}</p>
-                    ) : null}
-                    <button
-                      type="button"
-                      onClick={handleRetryOpportunities}
-                      disabled={opportunitiesRetrying}
-                      className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm hover:bg-slate-100 disabled:opacity-50"
-                    >
-                      <RefreshCw className={cn('h-3.5 w-3.5', opportunitiesRetrying && 'animate-spin')} />
-                      {opportunitiesRetrying ? 'Retrying…' : 'Retry analysis'}
-                    </button>
-                  </div>
-                ) : null}
-                {(reportData?.opportunities ?? []).map((opp: any) => (
-                  <OpportunityRow
-                    key={opp.key}
-                    title={opp.title}
-                    rationale={opp.rationale}
-                    recommendedAngle={opp.recommendedAngle}
-                    brief={opp.brief}
-                    severity={SEVERITY_LABEL[opp.severity] ?? opp.severity}
-                    priority={TRAFFIC_LABEL[opp.trafficPotential] ?? opp.trafficPotential}
-                    onAction={() =>
-                      handleGenerateContent(opp.key, {
-                        kind: 'opportunity',
-                        title: opp.title,
-                        rationale: opp.rationale,
-                        primaryKeyword: opp.primaryKeyword,
-                        longtailKeywords: opp.longtailKeywords ?? [],
-                        suggestedTemplate: opp.suggestedTemplate ?? 'blog',
-                        category: opp.category ?? null,
-                        intentStage: opp.intentStage ?? null,
-                        recommendedAngle: opp.recommendedAngle,
-                        brief: opp.brief,
-                      })
-                    }
-                    generation={generationByKey[opp.key]}
-                  />
-                ))}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </section>
+              ) : null}
+              {(reportData?.opportunities ?? []).map((opp: any) => (
+                <OpportunityRow
+                  key={opp.key}
+                  title={opp.title}
+                  rationale={opp.rationale}
+                  recommendedAngle={opp.recommendedAngle}
+                  brief={opp.brief}
+                  severity={SEVERITY_LABEL[opp.severity] ?? opp.severity}
+                  priority={TRAFFIC_LABEL[opp.trafficPotential] ?? opp.trafficPotential}
+                  onAction={() =>
+                    handleGenerateContent(opp.key, {
+                      kind: 'opportunity',
+                      title: opp.title,
+                      rationale: opp.rationale,
+                      primaryKeyword: opp.primaryKeyword,
+                      longtailKeywords: opp.longtailKeywords ?? [],
+                      suggestedTemplate: opp.suggestedTemplate ?? 'blog',
+                      category: opp.category ?? null,
+                      intentStage: opp.intentStage ?? null,
+                      recommendedAngle: opp.recommendedAngle,
+                      brief: opp.brief,
+                    })
+                  }
+                  generation={generationByKey[opp.key]}
+                />
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </section>
 
-        <section className="mx-4 mb-6 flex flex-col items-center gap-[0.9375rem] rounded-xl bg-[#F9F9F9] px-6 py-12 text-center sm:mx-6 sm:px-12 lg:px-[7.9375rem] lg:py-[3.8125rem]">
-          <h2 className="text-2xl font-semibold text-gray-950">Connect Google services</h2>
-          <p className="max-w-3xl text-sm text-gray-500">
-            Unlock deeper insights by connecting Google Analytics and Search Console.
-          </p>
-          <Button className="h-9 rounded-lg bg-[#2f4462] px-4 text-xs text-white hover:bg-[#263852]">
-            <UserRound className="mr-2 h-3.5 w-3.5" />
-            Connect Google
-          </Button>
-        </section>
+    <section className="mx-4 mb-6 flex flex-col items-center gap-[0.9375rem] rounded-xl bg-[#F9F9F9] px-6 py-12 text-center sm:mx-6 sm:px-12 lg:px-[7.9375rem] lg:py-[3.8125rem]">
+      <h2 className="text-2xl font-semibold text-gray-950">Connect Google services</h2>
+      <p className="max-w-3xl text-sm text-gray-500">
+        Unlock deeper insights by connecting Google Analytics and Search Console.
+      </p>
+      <Button className="h-9 rounded-lg bg-[#2f4462] px-4 text-xs text-white hover:bg-[#263852]">
+        <UserRound className="mr-2 h-3.5 w-3.5" />
+        Connect Google
+      </Button>
+    </section>
 
-  <WorksheetPickerModal
-    open={isWorksheetModalOpen}
-    selectedCount={pendingGeneration ? 1 : selectedCount}
-    activeWorksheetId={activeWorksheetId}
-    worksheets={worksheetOptions}
-    loading={worksheetOptionsLoading}
-    onOpenChange={handleWorksheetModalOpenChange}
-    onWorksheetSelect={setActiveWorksheetId}
-    onAddToWorksheet={handleAddToWorksheet}
-    onCreateNewWorksheet={handleCreateNewWorksheet}
-  />
-  <CreateWorksheetModal
-    open={isCreateWorksheetModalOpen}
-    name={newWorksheetName}
-    isSubmitting={isCreatingWorksheet}
-    error={createWorksheetError}
-    onOpenChange={handleCreateWorksheetModalOpenChange}
-    onNameChange={setNewWorksheetName}
-    onSubmit={handleConfirmCreateWorksheet}
-  />
-    </>
-  );
+    <WorksheetPickerModal
+      open={isWorksheetModalOpen}
+      selectedCount={pendingGeneration ? 1 : selectedCount}
+      activeWorksheetId={activeWorksheetId}
+      worksheets={worksheetOptions}
+      loading={worksheetOptionsLoading}
+      onOpenChange={handleWorksheetModalOpenChange}
+      onWorksheetSelect={setActiveWorksheetId}
+      onAddToWorksheet={handleAddToWorksheet}
+      onCreateNewWorksheet={handleCreateNewWorksheet}
+    />
+    <CreateWorksheetModal
+      open={isCreateWorksheetModalOpen}
+      name={newWorksheetName}
+      isSubmitting={isCreatingWorksheet}
+      error={createWorksheetError}
+      onOpenChange={handleCreateWorksheetModalOpenChange}
+      onNameChange={setNewWorksheetName}
+      onSubmit={handleConfirmCreateWorksheet}
+    />
+  </>
+);
 };
 
 export default AIResultsReportPreview;

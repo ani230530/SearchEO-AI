@@ -1555,6 +1555,264 @@ router.get('/domain/:id/trends', authenticateToken, async (req: Request, res: Re
   if (!got.ok) return res.status(got.status).json({ error: got.error });
   const { domain } = got;
 
+  const daysParam = typeof req.query.days === 'string' ? Number(req.query.days) : NaN;
+  const useWindow = Number.isFinite(daysParam) && daysParam > 0;
+
+  const toUtcDayKey = (date: Date) => date.toISOString().slice(0, 10);
+  const startOfUtcDay = (date: Date) => {
+    const copy = new Date(date);
+    copy.setUTCHours(0, 0, 0, 0);
+    return copy;
+  };
+  const addUtcDays = (date: Date, days: number) => {
+    const copy = new Date(date);
+    copy.setUTCDate(copy.getUTCDate() + days);
+    return copy;
+  };
+
+  type TrendRunBucket = {
+    runId: number;
+    startedAt: Date;
+    endedAt: Date | null;
+    perModel: Record<string, { cites: number; presenceCount: number }>;
+    brandMentions: number;
+    competitorMentions: number;
+    totalResponses: number;
+    totalCitations: number;
+    perCompetitor: Record<string, number>;
+    perCompetitorCitations: Record<string, number>;
+  };
+  type TrendDayBucket = TrendRunBucket & {
+    date: string;
+    label: string;
+    runCount: number;
+  };
+
+  const selectResults = {
+    runId: true,
+    model: true,
+    presence: true,
+    citations: true,
+    competitorHosts: true,
+    competitorMentions: true,
+  } as const;
+
+  const buildBucket = (runId: number, startedAt: Date, endedAt: Date | null, date?: string): TrendDayBucket | TrendRunBucket => {
+    const base = {
+      runId,
+      startedAt,
+      endedAt,
+      perModel: {},
+      brandMentions: 0,
+      competitorMentions: 0,
+      totalResponses: 0,
+      totalCitations: 0,
+      perCompetitor: {},
+      perCompetitorCitations: {},
+    };
+    return date
+      ? {
+          ...base,
+          date,
+          label: new Date(date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
+          runCount: 0,
+        }
+      : base;
+  };
+
+  const accumulateResult = (
+    bucket: TrendRunBucket | TrendDayBucket,
+    row: {
+      model: string;
+      presence: number;
+      citations: unknown;
+      competitorHosts: unknown;
+      competitorMentions: unknown;
+    },
+    ownHost: string,
+  ) => {
+    bucket.totalResponses += 1;
+    if (!bucket.perModel[row.model]) bucket.perModel[row.model] = { cites: 0, presenceCount: 0 };
+    bucket.perModel[row.model].presenceCount += row.presence;
+
+    const citations = Array.isArray(row.citations) ? row.citations : [];
+    bucket.perModel[row.model].cites += citations.length;
+    bucket.totalCitations += citations.length;
+
+    bucket.brandMentions += row.presence;
+
+    const compMentions = Array.isArray(row.competitorMentions) ? (row.competitorMentions as Array<{ host?: string; count?: number }>) : [];
+    const compHosts = Array.isArray(row.competitorHosts) ? (row.competitorHosts as string[]) : [];
+    if (compMentions.length > 0) {
+      for (const mention of compMentions) {
+        const host = typeof mention.host === 'string' ? mention.host.trim().toLowerCase() : '';
+        if (!host || host === ownHost) continue;
+        const count = Number.isFinite(mention.count) && typeof mention.count === 'number' ? mention.count : 1;
+        bucket.competitorMentions += count;
+        bucket.perCompetitor[host] = (bucket.perCompetitor[host] ?? 0) + count;
+      }
+    } else {
+      for (const hostRaw of compHosts) {
+        const host = typeof hostRaw === 'string' ? hostRaw.trim().toLowerCase() : '';
+        if (!host || host === ownHost) continue;
+        bucket.competitorMentions += 1;
+        bucket.perCompetitor[host] = (bucket.perCompetitor[host] ?? 0) + 1;
+      }
+    }
+
+    for (const citation of citations as Array<{ host?: string }>) {
+      const host = typeof citation.host === 'string' ? citation.host.trim().toLowerCase() : '';
+      if (!host || host === ownHost) continue;
+      bucket.perCompetitorCitations[host] = (bucket.perCompetitorCitations[host] ?? 0) + 1;
+    }
+  };
+
+  // Optional `?days=7` window mode powers the competitor trend charts.
+  // Without it, we preserve the existing run-based payload used by the
+  // report preview and older dashboard surfaces.
+  if (useWindow) {
+    const windowDays = Math.max(1, Math.floor(daysParam));
+    const windowEnd = startOfUtcDay(addUtcDays(new Date(), 1));
+    const windowStart = addUtcDays(windowEnd, -windowDays);
+
+    const runs = await prisma.aiRun.findMany({
+      where: {
+        domainId: domain.id,
+        status: 'completed',
+        ...runKindFilter(req),
+        startedAt: { gte: windowStart, lt: windowEnd },
+      },
+      orderBy: { startedAt: 'asc' },
+      select: { id: true, startedAt: true, endedAt: true },
+    });
+
+    const dayBuckets = new Map<string, TrendDayBucket>();
+    for (let i = 0; i < windowDays; i++) {
+      const day = startOfUtcDay(addUtcDays(windowStart, i));
+      const date = toUtcDayKey(day);
+      dayBuckets.set(
+        date,
+        {
+          ...(buildBucket(-1, day, null, date) as TrendDayBucket),
+          runId: -1,
+          startedAt: day,
+          endedAt: null,
+          runCount: 0,
+        }
+      );
+    }
+
+    if (runs.length === 0) {
+      return res.json({
+        windowDays,
+        windowStart: windowStart.toISOString(),
+        windowEnd: windowEnd.toISOString(),
+        runs: [],
+        days: [...dayBuckets.values()],
+        topCompetitors: [],
+      });
+    }
+
+    const runBuckets = new Map<number, TrendRunBucket>();
+    for (const run of runs) {
+      runBuckets.set(run.id, buildBucket(run.id, run.startedAt, run.endedAt) as TrendRunBucket);
+      const dayKey = toUtcDayKey(run.startedAt);
+      const dayBucket = dayBuckets.get(dayKey);
+      if (dayBucket) dayBucket.runCount += 1;
+    }
+
+    const runIds = runs.map((r) => r.id);
+    const allResults = await prisma.aiQueryResult.findMany({
+      where: { runId: { in: runIds } },
+      select: selectResults,
+    });
+
+    const competitorTotals = new Map<string, { mentions: number; citations: number }>();
+    for (const row of allResults) {
+      const runBucket = runBuckets.get(row.runId);
+      if (!runBucket) continue;
+      const dayKey = toUtcDayKey(runBucket.startedAt);
+      const dayBucket = dayBuckets.get(dayKey);
+      if (!dayBucket) continue;
+
+      accumulateResult(runBucket, row, domain.host);
+      accumulateResult(dayBucket, row, domain.host);
+
+      const compMentions = Array.isArray(row.competitorMentions)
+        ? (row.competitorMentions as Array<{ host?: string; count?: number }>)
+        : [];
+      if (compMentions.length > 0) {
+        for (const mention of compMentions) {
+          const host = typeof mention.host === 'string' ? mention.host.trim().toLowerCase() : '';
+          if (!host || host === domain.host) continue;
+          const count = Number.isFinite(mention.count) && typeof mention.count === 'number' ? mention.count : 1;
+          const total = competitorTotals.get(host) ?? { mentions: 0, citations: 0 };
+          total.mentions += count;
+          competitorTotals.set(host, total);
+        }
+      } else {
+        const compHosts = Array.isArray(row.competitorHosts) ? (row.competitorHosts as string[]) : [];
+        for (const hostRaw of compHosts) {
+          const host = typeof hostRaw === 'string' ? hostRaw.trim().toLowerCase() : '';
+          if (!host || host === domain.host) continue;
+          const total = competitorTotals.get(host) ?? { mentions: 0, citations: 0 };
+          total.mentions += 1;
+          competitorTotals.set(host, total);
+        }
+      }
+      for (const citation of Array.isArray(row.citations) ? (row.citations as Array<{ host?: string }>) : []) {
+        const host = typeof citation.host === 'string' ? citation.host.trim().toLowerCase() : '';
+        if (!host || host === domain.host) continue;
+        const total = competitorTotals.get(host) ?? { mentions: 0, citations: 0 };
+        total.citations += 1;
+        competitorTotals.set(host, total);
+      }
+    }
+
+    const topCompetitors = [...competitorTotals.entries()]
+      .filter(([, totals]) => totals.mentions + totals.citations > 0)
+      .sort((a, b) => {
+        const scoreA = a[1].mentions + a[1].citations;
+        const scoreB = b[1].mentions + b[1].citations;
+        return scoreB - scoreA || b[1].mentions - a[1].mentions || b[1].citations - a[1].citations;
+      })
+      .slice(0, 4)
+      .map(([host]) => host);
+
+    return res.json({
+      windowDays,
+      windowStart: windowStart.toISOString(),
+      windowEnd: windowEnd.toISOString(),
+      runs: [...runBuckets.values()].map((b) => ({
+        runId: b.runId,
+        startedAt: b.startedAt,
+        endedAt: b.endedAt,
+        perModel: b.perModel,
+        brandMentions: b.brandMentions,
+        competitorMentions: b.competitorMentions,
+        totalResponses: b.totalResponses,
+        totalCitations: b.totalCitations,
+        perCompetitor: b.perCompetitor,
+        perCompetitorCitations: b.perCompetitorCitations,
+      })),
+      days: [...dayBuckets.values()].map((b) => ({
+        date: b.date,
+        label: b.label,
+        runCount: b.runCount,
+        startedAt: b.startedAt,
+        endedAt: b.endedAt,
+        perModel: b.perModel,
+        brandMentions: b.brandMentions,
+        competitorMentions: b.competitorMentions,
+        totalResponses: b.totalResponses,
+        totalCitations: b.totalCitations,
+        perCompetitor: b.perCompetitor,
+        perCompetitorCitations: b.perCompetitorCitations,
+      })),
+      topCompetitors,
+    });
+  }
+
   // Latest 12 completed runs gives ~3 months of weekly history without
   // overflowing the chart card. Ordered ascending so the chart reads L→R.
   const runs = await prisma.aiRun.findMany({
@@ -1572,7 +1830,7 @@ router.get('/domain/:id/trends', authenticateToken, async (req: Request, res: Re
   // when a run has hundreds of (prompt × model) results.
   const allResults = await prisma.aiQueryResult.findMany({
     where: { runId: { in: runIds } },
-    select: { runId: true, model: true, presence: true, citations: true, competitorHosts: true },
+    select: { runId: true, model: true, presence: true, citations: true, competitorHosts: true, competitorMentions: true },
   });
 
   type Bucket = {
@@ -1582,7 +1840,10 @@ router.get('/domain/:id/trends', authenticateToken, async (req: Request, res: Re
     perModel: Record<string, { cites: number; presenceCount: number }>;
     brandMentions: number;
     competitorMentions: number;
+    totalResponses: number;
+    totalCitations: number;
     perCompetitor: Record<string, number>;
+    perCompetitorCitations: Record<string, number>;
   };
   const byRun = new Map<number, Bucket>();
   for (const r of runs) {
@@ -1593,7 +1854,10 @@ router.get('/domain/:id/trends', authenticateToken, async (req: Request, res: Re
       perModel: {},
       brandMentions: 0,
       competitorMentions: 0,
+      totalResponses: 0,
+      totalCitations: 0,
       perCompetitor: {},
+      perCompetitorCitations: {},
     });
   }
 
@@ -1601,16 +1865,38 @@ router.get('/domain/:id/trends', authenticateToken, async (req: Request, res: Re
   for (const row of allResults) {
     const b = byRun.get(row.runId);
     if (!b) continue;
+    b.totalResponses += 1;
     if (!b.perModel[row.model]) b.perModel[row.model] = { cites: 0, presenceCount: 0 };
     b.perModel[row.model].presenceCount += row.presence;
     const cits = Array.isArray(row.citations) ? row.citations : [];
     b.perModel[row.model].cites += cits.length;
+    b.totalCitations += cits.length;
     b.brandMentions += row.presence;
+    const compMentions = Array.isArray(row.competitorMentions)
+      ? (row.competitorMentions as Array<{ host?: string; count?: number }>)
+      : [];
     const compHosts = Array.isArray(row.competitorHosts) ? (row.competitorHosts as string[]) : [];
-    b.competitorMentions += compHosts.length;
-    for (const h of compHosts) {
-      if (!h) continue;
-      b.perCompetitor[h] = (b.perCompetitor[h] ?? 0) + 1;
+    if (compMentions.length > 0) {
+      for (const mention of compMentions) {
+        if (!mention.host) continue;
+        const host = mention.host.trim().toLowerCase();
+        if (!host || host === domain.host) continue;
+        const count = Number.isFinite(mention.count) && typeof mention.count === 'number' ? mention.count : 1;
+        b.competitorMentions += count;
+        b.perCompetitor[host] = (b.perCompetitor[host] ?? 0) + count;
+      }
+    } else {
+      b.competitorMentions += compHosts.length;
+      for (const h of compHosts) {
+        const host = typeof h === 'string' ? h.trim().toLowerCase() : '';
+        if (!host || host === domain.host) continue;
+        b.perCompetitor[host] = (b.perCompetitor[host] ?? 0) + 1;
+      }
+    }
+    for (const c of cits as Array<{ host?: string }>) {
+      const host = typeof c.host === 'string' ? c.host.trim().toLowerCase() : '';
+      if (!host || host === domain.host) continue;
+      b.perCompetitorCitations[host] = (b.perCompetitorCitations[host] ?? 0) + 1;
     }
   }
 
@@ -1633,7 +1919,10 @@ router.get('/domain/:id/trends', authenticateToken, async (req: Request, res: Re
       perModel: b.perModel,
       brandMentions: b.brandMentions,
       competitorMentions: b.competitorMentions,
+      totalResponses: b.totalResponses,
+      totalCitations: b.totalCitations,
       perCompetitor: b.perCompetitor,
+      perCompetitorCitations: b.perCompetitorCitations,
     })),
     topCompetitors,
   });

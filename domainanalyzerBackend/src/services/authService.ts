@@ -60,7 +60,7 @@ function generateOpaqueToken(): string {
 }
 
 function refreshTokenExpiryDate(): Date {
-  return new Date(Date.now() + authEnv.REFRESH_TOKEN_TTL_DAYS * 24 * 60 * 60 * 1000);
+  return new Date(Date.now() + authEnv.REFRESH_TOKEN_TTL_MINUTES * 60 * 1000);
 }
 
 export interface RefreshContext {

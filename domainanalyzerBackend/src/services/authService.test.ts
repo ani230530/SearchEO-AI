@@ -1,6 +1,7 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as bcrypt from 'bcryptjs';
 import { createPrismaMock, PrismaMock } from '../testSupport/prismaMock';
+import { authEnv } from '../config/authEnv';
 
 const state = vi.hoisted(() => ({
   prisma: null as PrismaMock | null,
@@ -47,7 +48,13 @@ const createUser = async (input: {
 
 describe('authService.login', () => {
   beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-06-15T12:00:00.000Z'));
     resetPrisma();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it('logs in a verified user with a valid password', async () => {
@@ -66,9 +73,16 @@ describe('authService.login', () => {
       id: user.id,
       email: 'verified@example.com',
       name: undefined,
+      emailVerified: true,
     });
     expect(result.token).toBeTruthy();
     expect(result.refreshToken).toBeTruthy();
+
+    const refreshRows = state.prisma!.__stores.refreshToken.all();
+    expect(refreshRows).toHaveLength(1);
+    expect(refreshRows[0].expiresAt.getTime()).toBe(
+      Date.now() + authEnv.REFRESH_TOKEN_TTL_MINUTES * 60 * 1000,
+    );
   });
 
   it('logs in an unverified existing user with a valid password', async () => {
@@ -86,6 +100,37 @@ describe('authService.login', () => {
     expect(result.user?.id).toBe(user.id);
     expect(result.token).toBeTruthy();
     expect(result.refreshToken).toBeTruthy();
+  });
+
+  it('rotates refresh tokens and keeps the 1-day TTL on the child token', async () => {
+    await createUser({
+      email: 'rotate@example.com',
+      password: 'password123',
+      emailVerified: true,
+    });
+
+    const loginResult = await authService.login({
+      email: 'rotate@example.com',
+      password: 'password123',
+    });
+
+    vi.setSystemTime(new Date('2026-06-15T12:08:00.000Z'));
+    const refreshResult = await authService.refreshAccessToken(loginResult.refreshToken!);
+
+    expect(refreshResult.token).toBeTruthy();
+    expect(refreshResult.refreshToken).toBeTruthy();
+
+    const refreshRows = state.prisma!.__stores.refreshToken.all();
+    expect(refreshRows).toHaveLength(2);
+
+    const parent = refreshRows.find((row) => row.revokedAt !== null);
+    const child = refreshRows.find((row) => row.revokedAt === null);
+
+    expect(parent).toBeTruthy();
+    expect(child).toBeTruthy();
+    expect(child?.expiresAt.getTime()).toBe(
+      Date.now() + authEnv.REFRESH_TOKEN_TTL_MINUTES * 60 * 1000,
+    );
   });
 
   it('rejects an existing user with a wrong password', async () => {
