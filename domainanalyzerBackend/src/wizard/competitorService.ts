@@ -324,6 +324,9 @@ export async function runCompetitorPipeline(args: RunCompetitorPipelineArgs): Pr
     seedKeywords: args.ownSeedKeywords,
   });
   console.log(`[PERF] competitor.discover ${Date.now() - tDiscover}ms candidates=${candidates.length}`);
+  if (candidates.length === 0) {
+    console.error('[COMPETITOR] WARNING: No candidates discovered. Check OPENROUTER_API_KEY and LLM response.');
+  }
 
   // Stage B — verify. Batch LLM check first; mini-crawl only the unknowns.
   const tVerify = Date.now();

@@ -154,7 +154,7 @@ const SYSTEM = [
   'mention a specific brand in real user conversations.',
   '',
   'Hard rules for EVERY prompt you produce:',
-  '- 12 to 30 words long. Not shorter, not longer.',
+  '- 4 to 12 words long. Not shorter, not longer.',
   '- Sound like a real human typing into ChatGPT — natural, conversational, slightly messy.',
   '- Must include at least one of: persona, use case, OR constraint qualifier.',
   '- Never wrap the prompt in quotation marks.',
@@ -181,37 +181,20 @@ async function generateForCategory(args: {
     .replace(/{N}/g, String(spec.count));
 
   const userPrompt = [
-    `Brand:        ${brand}`,
-    `Category:     ${ctx.category}`,
-    `Vertical:     ${ctx.vertical ?? 'unspecified'}`,
-    `Top competitors: ${competitorList}`,
-    `Personas:     ${ctx.personas.join(' | ')}`,
-    `Use cases:    ${ctx.useCases.join(' | ')}`,
-    `Constraints:  ${ctx.constraints.join(' | ')}`,
-    ctx.priceBand ? `Price band:   ${ctx.priceBand}` : '',
-    `Year:         ${ctx.year}`,
+    `Brand: ${brand}`,
+    `Category: ${ctx.category}`,
+    `Vertical: ${ctx.vertical ?? 'unspecified'}`,
+    `Competitors: ${competitorList}`,
+    `Personas: ${ctx.personas.join(' | ')}`,
+    `Use cases: ${ctx.useCases.join(' | ')}`,
+    `Constraints: ${ctx.constraints.join(' | ')}`,
+    ctx.priceBand ? `Price: ${ctx.priceBand}` : '',
+    `Year: ${ctx.year}`,
     '',
-    `Generate exactly ${spec.count} prompts in the category: "${spec.category}".`,
-    '',
-    `Category definition: ${definition}`,
-    '',
-    `Branding rule: ${spec.brandingRule(brand)}`,
-    '',
-    `Vary persona and use case across the ${spec.count} prompts. Do not repeat.`,
-    '',
-    'Return JSON exactly in this shape:',
-    '{',
-    '  "prompts": [',
-    '    {',
-    '      "prompt": "<12-30 word natural prompt>",',
-    '      "persona": "<persona used or null>",',
-    '      "useCase": "<use case used or null>",',
-    '      "constraint": "<constraint used or null>",',
-    '      "competitorMentioned": "<competitor host or null>",',
-    `      "keyword": "<1-4 word topic this prompt belongs to>"`,
-    '    }',
-    '  ]',
-    '}',
+    `Generate ${spec.count} prompts: "${spec.category}". ${definition}`,
+    `Branding: ${spec.brandingRule(brand)}`,
+    'Vary personas/use-cases. No repeats.',
+    'Return JSON: {prompts: [{prompt, persona, useCase, constraint, competitorMentioned, keyword}]}',
   ].filter(Boolean).join('\n');
 
   let payload: { prompts?: LlmPromptItem[] } = {};
@@ -233,9 +216,9 @@ async function generateForCategory(args: {
     const text = typeof raw.prompt === 'string' ? raw.prompt.trim() : '';
     if (!text) continue;
     const wc = text.split(/\s+/).filter(Boolean).length;
-    // Soft enforcement of length window — drop the egregious outliers but
-    // tolerate ±2 words because LLMs miscount.
-    if (wc < 8 || wc > 40) continue;
+    // Enforce 5-7 word window — drop outliers.
+    // Tolerate ±1 word because LLMs miscount.
+    if (wc < 4 || wc > 8) continue;
 
     out.push({
       text,
