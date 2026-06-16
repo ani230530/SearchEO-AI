@@ -380,3 +380,157 @@ describe('GET /api/wizard/domain/:id/report', () => {
     expect(json.runStatus).toBe('pending');
   });
 });
+
+describe('GET /api/wizard/domain/:id/trends', () => {
+  const dayMs = 24 * 60 * 60 * 1000;
+
+  const makeDay = (daysAgo: number, hour = 12) => {
+    const d = new Date();
+    d.setUTCDate(d.getUTCDate() - daysAgo);
+    d.setUTCHours(hour, 0, 0, 0);
+    return d;
+  };
+
+  it('returns a zeroed 7-day window when there are no completed runs', async () => {
+    const db = state.prisma.__db;
+    db.domains.push({
+      id: 3,
+      userId: 1,
+      url: 'https://silent.example',
+      host: 'silent.example',
+      profile: { industry: null },
+      inferred: { companyName: null },
+    });
+
+    const response = await request('/api/wizard/domain/3/trends?days=7');
+    const json = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(json.windowDays).toBe(7);
+    expect(json.days).toHaveLength(7);
+    expect(json.days.every((day: any) => day.runCount === 0)).toBe(true);
+    expect(json.runs).toEqual([]);
+    expect(json.topCompetitors).toEqual([]);
+  });
+
+  it('keeps competitor series stable across the full 7-day window', async () => {
+    const db = state.prisma.__db;
+    db.domains.push({
+      id: 4,
+      userId: 1,
+      url: 'https://trend.example',
+      host: 'trend.example',
+      profile: { industry: 'SaaS' },
+      inferred: { companyName: 'Trend Co' },
+    });
+
+    const runOneStartedAt = makeDay(5, 9);
+    const runTwoStartedAt = makeDay(1, 15);
+
+    db.runs.push(
+      {
+        id: 41,
+        domainId: 4,
+        status: 'completed',
+        kind: 'audit',
+        startedAt: runOneStartedAt,
+        endedAt: new Date(runOneStartedAt.getTime() + dayMs / 24),
+      },
+      {
+        id: 42,
+        domainId: 4,
+        status: 'completed',
+        kind: 'audit',
+        startedAt: runTwoStartedAt,
+        endedAt: new Date(runTwoStartedAt.getTime() + dayMs / 24),
+      },
+    );
+
+    db.results.push(
+      {
+        id: 401,
+        runId: 41,
+        promptId: 1,
+        model: 'gpt-4o-mini',
+        response: 'alpha appears',
+        presence: 1,
+        relevance: 7,
+        sentiment: 0,
+        accuracy: 0,
+        rankPosition: null,
+        overall: 7,
+        scorerSummary: null,
+        factualClaims: [],
+        competitorHosts: ['alpha.com'],
+        citations: [{ host: 'alpha.com', url: 'https://alpha.com/a', title: 'Alpha A' }],
+        competitorMentions: [{ host: 'alpha.com', count: 2, sentiment: 0 }],
+        latencyMs: 100,
+        createdAt: new Date(runOneStartedAt.getTime() + 5 * 60 * 1000),
+      },
+      {
+        id: 402,
+        runId: 41,
+        promptId: 2,
+        model: 'claude-sonnet-4-5',
+        response: 'beta appears',
+        presence: 1,
+        relevance: 8,
+        sentiment: 1,
+        accuracy: 0,
+        rankPosition: null,
+        overall: 8,
+        scorerSummary: null,
+        factualClaims: [],
+        competitorHosts: ['beta.com'],
+        citations: [{ host: 'beta.com', url: 'https://beta.com/a', title: 'Beta A' }],
+        competitorMentions: [{ host: 'beta.com', count: 1, sentiment: 0 }],
+        latencyMs: 120,
+        createdAt: new Date(runOneStartedAt.getTime() + 10 * 60 * 1000),
+      },
+      {
+        id: 403,
+        runId: 42,
+        promptId: 3,
+        model: 'gpt-4o-mini',
+        response: 'alpha again',
+        presence: 1,
+        relevance: 9,
+        sentiment: 2,
+        accuracy: 0,
+        rankPosition: null,
+        overall: 9,
+        scorerSummary: null,
+        factualClaims: [],
+        competitorHosts: ['alpha.com'],
+        citations: [{ host: 'alpha.com', url: 'https://alpha.com/b', title: 'Alpha B' }],
+        competitorMentions: [{ host: 'alpha.com', count: 1, sentiment: 0 }],
+        latencyMs: 110,
+        createdAt: new Date(runTwoStartedAt.getTime() + 5 * 60 * 1000),
+      },
+    );
+
+    const response = await request('/api/wizard/domain/4/trends?days=7');
+    const json = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(json.windowDays).toBe(7);
+    expect(json.days).toHaveLength(7);
+    expect(json.topCompetitors).toEqual(['alpha.com', 'beta.com']);
+
+    const runOneKey = runOneStartedAt.toISOString().slice(0, 10);
+    const runTwoKey = runTwoStartedAt.toISOString().slice(0, 10);
+    const runOneDay = json.days.find((day: any) => day.date === runOneKey);
+    const runTwoDay = json.days.find((day: any) => day.date === runTwoKey);
+
+    expect(runOneDay).toMatchObject({
+      runCount: 1,
+      perCompetitor: { 'alpha.com': 2, 'beta.com': 1 },
+      perCompetitorCitations: { 'alpha.com': 1, 'beta.com': 1 },
+    });
+    expect(runTwoDay).toMatchObject({
+      runCount: 1,
+      perCompetitor: { 'alpha.com': 1 },
+      perCompetitorCitations: { 'alpha.com': 1 },
+    });
+  });
+});

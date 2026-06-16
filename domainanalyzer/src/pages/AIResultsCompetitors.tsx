@@ -649,6 +649,31 @@ function TrendComparisonPanel({ trends }: { trends: TrendsResponse | null }) {
   // point, which is still more useful than an empty state on day one.
   const hasData = trends && trends.runs.length >= 1;
 
+  const formatTooltipValue = React.useCallback(
+    (dataArray: TrendChartPoint[], unit: string = '') =>
+      (value: number | string, name: string, props: { payload?: TrendChartPoint }) => {
+        const point = props.payload;
+        const numericValue = typeof value === 'number' ? value : Number(value);
+        let slopeStr = '';
+
+        if (point && dataArray) {
+          const currentIndex = dataArray.findIndex((d) => d.label === point.label);
+          if (currentIndex > 0) {
+            const prevPoint = dataArray[currentIndex - 1];
+            const prevValue = prevPoint[name];
+            if (typeof prevValue === 'number' && typeof numericValue === 'number') {
+              const slope = numericValue - prevValue;
+              const sign = slope > 0 ? '+' : '';
+              slopeStr = ` (Slope: ${sign}${slope.toFixed(1)}${unit})`;
+            }
+          }
+        }
+
+        return [`${numericValue}${unit}${slopeStr}`, name];
+      },
+    [],
+  );
+
   const { visibilityData, citationData, sovData, models, topCompetitors } = useMemo(() => {
     if (!trends || trends.runs.length === 0) {
       return { visibilityData: [] as TrendChartPoint[], citationData: [] as TrendChartPoint[], sovData: [] as TrendChartPoint[], models: [] as string[], topCompetitors: [] as string[] };
@@ -702,7 +727,7 @@ function TrendComparisonPanel({ trends }: { trends: TrendsResponse | null }) {
         <div className="mt-3 space-y-6">
           <ChartBlock title="AI Visibility Trend" subtitle="Compare competitor visibility across AI prompts, citations, and responses.">
             <ResponsiveContainer width="100%" height={240}>
-              <LineChart data={visibilityData} margin={{ top: 10, right: 10, bottom: 0, left: -20 }}>
+              <LineChart syncId="competitorTrends" data={visibilityData} margin={{ top: 10, right: 10, bottom: 0, left: -20 }}>
                 <CartesianGrid stroke="#EEF1F5" strokeDasharray="3 3" />
                 <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#98A2B3' }} />
                 <YAxis tick={{ fontSize: 10, fill: '#98A2B3' }} />
@@ -714,6 +739,7 @@ function TrendComparisonPanel({ trends }: { trends: TrendsResponse | null }) {
                     fontSize: '14px',
                     fontWeight: '600',
                   }}
+                  formatter={formatTooltipValue(visibilityData)}
                 />
                 <RLegend wrapperStyle={{ fontSize: 10 }} />
                 {models.map((m, i) => (
@@ -725,7 +751,7 @@ function TrendComparisonPanel({ trends }: { trends: TrendsResponse | null }) {
 
           <ChartBlock title="Citation Share Comparison" subtitle="See where competitors are earning authority and citations.">
             <ResponsiveContainer width="100%" height={240}>
-              <LineChart data={citationData} margin={{ top: 10, right: 10, bottom: 0, left: -20 }}>
+              <LineChart syncId="competitorTrends" data={citationData} margin={{ top: 10, right: 10, bottom: 0, left: -20 }}>
                 <CartesianGrid stroke="#EEF1F5" strokeDasharray="3 3" />
                 <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#98A2B3' }} />
                 <YAxis tick={{ fontSize: 10, fill: '#98A2B3' }} />
@@ -737,6 +763,7 @@ function TrendComparisonPanel({ trends }: { trends: TrendsResponse | null }) {
                     fontSize: '14px',
                     fontWeight: '600',
                   }}
+                  formatter={formatTooltipValue(citationData)}
                 />
                 <RLegend wrapperStyle={{ fontSize: 10 }} />
                 {models.map((m, i) => (
@@ -748,7 +775,7 @@ function TrendComparisonPanel({ trends }: { trends: TrendsResponse | null }) {
 
           <ChartBlock title="Share of Voice" subtitle="Evaluate competitor visibility and market presence.">
             <ResponsiveContainer width="100%" height={240}>
-              <LineChart data={sovData} margin={{ top: 10, right: 10, bottom: 0, left: -20 }}>
+              <LineChart syncId="competitorTrends" data={sovData} margin={{ top: 10, right: 10, bottom: 0, left: -20 }}>
                 <CartesianGrid stroke="#EEF1F5" strokeDasharray="3 3" />
                 <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#98A2B3' }} />
                 <YAxis unit="%" tick={{ fontSize: 10, fill: '#98A2B3' }} />
@@ -760,6 +787,7 @@ function TrendComparisonPanel({ trends }: { trends: TrendsResponse | null }) {
                     fontSize: '14px',
                     fontWeight: '600',
                   }}
+                  formatter={formatTooltipValue(sovData, '%')}
                 />
                 <RLegend wrapperStyle={{ fontSize: 10 }} />
                 <Line type="monotone" dataKey="You" stroke="#2D4059" strokeWidth={2.5} dot={{ r: 3 }} />
