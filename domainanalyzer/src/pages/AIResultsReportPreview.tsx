@@ -1446,7 +1446,7 @@ export const PromptTable = ({
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
               <input
                 type="text"
-                placeholder="Enter your custom phrase to analyze"
+                placeholder="Enter your custom prompt to analyze"
                 value={analyzeText}
                 onChange={(e) => setAnalyzeText(e.target.value)}
                 disabled={analyzing}
