@@ -13,6 +13,7 @@ import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { fetchEventSource } from '@microsoft/fetch-event-source';
 import { Check, Loader2, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { apiGet } from '@/services/apiClient';
 import { maskDomainId } from '@/lib/domainUtils';
 import { WizardStatusRow } from './WizardShell';
@@ -91,6 +92,7 @@ const StatusCell = memo(function StatusCell({
 
 export function Step5RunQueries({ domainId, onError }: Props) {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [prompts, setPrompts] = useState<PromptRow[]>([]);
   const [statusMatrix, setStatusMatrix] = useState<Record<number, Record<string, CellStatus>>>({});
   const [resultMap, setResultMap] = useState<Record<number, Record<string, ResultEvent>>>({});
@@ -202,6 +204,15 @@ export function Step5RunQueries({ domainId, onError }: Props) {
             setOverallPct(100);
             setDone(true);
             ctrl.abort();
+            // A fresh run just landed in the DB. Every AI Results query
+            // (report / trends / runs / competitor-analysis / competitors) is
+            // run-derived and cached for 5 min globally with no refetch on
+            // window focus — so without this the dashboard the user lands on
+            // would keep serving the PRE-audit copy, making a re-audit look
+            // like it did nothing and leaving the trend charts on stale data.
+            // Invalidate the whole `ai-results` tree so each page refetches on
+            // mount with the new run's numbers.
+            void queryClient.invalidateQueries({ queryKey: ['ai-results'] });
             // Brief pause so the user sees the final tick before navigating.
             setTimeout(() => navigate(`/ai-results/${maskDomainId(domainId)}`), 800);
             break;
@@ -222,7 +233,7 @@ export function Step5RunQueries({ domainId, onError }: Props) {
       window.clearInterval(watchdog);
       ctrl.abort();
     };
-  }, [domainId, navigate, onError, stalled]);
+  }, [domainId, navigate, onError, stalled, queryClient]);
 
   const totalCells = prompts.length * MODEL_ORDER.length;
   const completedCells = useMemo(() => {

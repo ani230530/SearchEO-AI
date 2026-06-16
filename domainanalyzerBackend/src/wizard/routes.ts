@@ -2140,7 +2140,12 @@ router.get('/domain/:id/competitor-analysis', timed('GET /competitor-analysis', 
   const [latestRun, selectedCompetitors, prompts, keywords] = await Promise.all([
     useSpecificRun
       ? prisma.aiRun.findFirst({ where: { id: runIdParam, domainId: domain.id, status: 'completed' } })
-      : prisma.aiRun.findFirst({ where: { domainId: domain.id, status: 'completed' }, orderBy: { startedAt: 'desc' } }),
+      // Scope to kind='audit' (via runKindFilter) so the same single-prompt
+      // 'adhoc' / weekly-tracking runs that /report and /trends exclude can't
+      // become the "latest run" here either. Without this filter a 1-prompt
+      // re-test would define the competitor analysis and the page would read
+      // "No competitors mentioned in this audit yet."
+      : prisma.aiRun.findFirst({ where: { domainId: domain.id, status: 'completed', ...runKindFilter(req) }, orderBy: { startedAt: 'desc' } }),
     prisma.competitor.findMany({
       where: { domainId: domain.id, isSelected: true },
       orderBy: [{ rank: 'asc' }, { similarityScore: 'desc' }],
