@@ -499,9 +499,9 @@ const MetricCard = ({ card }: { card: MetricCardData }) => (
           ? 'gap-3 sm:gap-4 md:gap-5 xl:gap-[34px] p-4 sm:p-5 xl:min-h-[310px]'
           : card.kind === 'promptSummary'
             ? 'min-h-[130px] gap-4 p-5 sm:p-6'
-          : card.kind === 'citations'
-            ? 'min-h-[228px] gap-5'
-            : 'min-h-[112px] gap-3.5 p-4 sm:p-5',
+            : card.kind === 'citations'
+              ? 'min-h-[228px] gap-5'
+              : 'min-h-[112px] gap-3.5 p-4 sm:p-5',
       )}
     >
       <CardTitleWithTip title={card.title} />
@@ -593,26 +593,26 @@ const ModelComparisonGrid = ({ results }: { results: any[] }) => {
             <thead>
               <tr className="border-b border-slate-300">
                 <th className="bg-white text-[12px] font-medium text-slate-500 py-4 px-4 text-center border-r border-slate-200 w-[160px]">
-                  Performance
+                  Models
                 </th>
-                {results.map((r) => (
-                  <th key={r.id} className="py-4 px-4 border-r border-slate-200 last:border-r-0">
-                    <div className="flex items-center justify-center gap-2">
-                      {getModelIconNode(r.model, 'sm')}
-                      <span className="text-[12px] font-medium text-slate-700 whitespace-nowrap">{getModelLabel(r.model)}</span>
-                    </div>
+                {metrics.map((metric) => (
+                  <th key={metric.key} className="py-4 px-4 border-r border-slate-200 last:border-r-0">
+                    <span className="text-[12px] font-medium text-slate-700 whitespace-nowrap">{metric.label}</span>
                   </th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {metrics.map((metric) => (
-                <tr key={metric.key} className="border-b border-slate-200 last:border-b-0">
-                  <td className="bg-slate-50 text-[12px] font-medium text-slate-600 py-4 px-4 text-center border-r border-slate-200">
-                    {metric.label}
+              {results.map((r) => (
+                <tr key={r.id} className="border-b border-slate-200 last:border-b-0">
+                  <td className="bg-slate-50 py-4 px-4 text-center border-r border-slate-200">
+                    <div className="flex items-center justify-center gap-2">
+                      {getModelIconNode(r.model, 'sm')}
+                      <span className="text-[12px] font-medium text-slate-700 whitespace-nowrap">{getModelLabel(r.model)}</span>
+                    </div>
                   </td>
-                  {results.map((r) => (
-                    <td key={r.id} className="text-center py-4 px-4 border-r border-slate-200 last:border-r-0">
+                  {metrics.map((metric) => (
+                    <td key={metric.key} className="text-center py-4 px-4 border-r border-slate-200 last:border-r-0">
                       {metric.type === 'badge' ? (
                         <div className="flex justify-center">
                           <span className={`${r.presence > 0 ? 'bg-[#f0fdf4] text-[#16a34a] border-[#dcfce7]' : 'bg-gray-50 text-gray-500 border-slate-200'} border text-[10px] font-medium px-3 py-1 rounded-full whitespace-nowrap`}>
@@ -1016,11 +1016,10 @@ const CitationSidebar = ({ activeResult }: { activeResult: any }) => {
               )}
               <span className="truncate text-[10.5px] font-medium text-slate-500">{host}</span>
               <span
-                className={`ml-auto inline-flex flex-shrink-0 items-center rounded-full px-2 py-0.5 text-[9px] font-semibold ${
-                  isDirect
+                className={`ml-auto inline-flex flex-shrink-0 items-center rounded-full px-2 py-0.5 text-[9px] font-semibold ${isDirect
                     ? 'bg-emerald-50 text-emerald-700'
                     : 'bg-blue-50 text-blue-700'
-                }`}
+                  }`}
               >
                 {typeLabel}
               </span>
@@ -1091,7 +1090,6 @@ export const PromptTable = ({
       next.has(id) ? next.delete(id) : next.add(id);
       return next;
     });
-  const [tableFilter, setTableFilter] = useState<'all' | 'prompt' | 'keyword'>('all');
   const [tableMetric, setTableMetric] = useState<string | null>(null);
   const [showAllQueries, setShowAllQueries] = useState(false);
   const trackedPromptsQuery = useTrackedPrompts<{ prompts?: PromptTableRow[] }>(domainId ?? null);
@@ -1141,12 +1139,12 @@ export const PromptTable = ({
       const tracked = typeof row?.rawId === 'number' ? trackedRowsByRawId.get(row.rawId) : undefined;
       const merged: PromptTableRow = tracked
         ? {
-            ...row,
-            isTracked: tracked.isTracked ?? true,
-            lastTestedAt: tracked.lastTestedAt ?? row.lastTestedAt ?? null,
-            nextTestAt: tracked.nextTestAt ?? row.nextTestAt ?? null,
-            weekTrend: tracked.weekTrend ?? row.weekTrend ?? null,
-          }
+          ...row,
+          isTracked: tracked.isTracked ?? true,
+          lastTestedAt: tracked.lastTestedAt ?? row.lastTestedAt ?? null,
+          nextTestAt: tracked.nextTestAt ?? row.nextTestAt ?? null,
+          weekTrend: tracked.weekTrend ?? row.weekTrend ?? null,
+        }
         : row;
 
       return {
@@ -1340,7 +1338,9 @@ export const PromptTable = ({
   // Full sorted/filtered list, before pagination. We split this from the
   // paginated `displayData` so we know `totalCount` for the pager.
   const fullSortedData = useMemo(() => {
-    let items = [...data].map(mergeTrackedRow);
+    let items = [...data]
+      .map(mergeTrackedRow)
+      .filter((item) => item.type?.toLowerCase() === 'prompt');
 
     // Dedupe parent rows that match a row we just analyzed — the
     // newly-analyzed copy has the fresher result data and wins.
@@ -1355,24 +1355,34 @@ export const PromptTable = ({
       );
     }
 
-    if (tableFilter === 'prompt') {
-      items = items.filter(item => item.type?.toLowerCase() === 'prompt');
-    } else if (tableFilter === 'keyword') {
-      items = items.filter(item => item.type?.toLowerCase() === 'keyword');
-    }
-
     if (tableMetric) {
       const numericFor = (row: any): number => {
         switch (tableMetric) {
-          case 'Sentiment':   return Number(row?.avgSentiment ?? 0);
-          case 'Ranking':     return Number(row?.mentions ?? 0);
-          case 'Position':    return Number(row?.bestRank ?? 0);
-          case 'SOV':         return Number(row?.metrics?.visibility ?? 0);
-          case 'Competitors': return Number(row?.competitorCount ?? 0);
-          default:            return 0;
+          case 'Sentiment': return Number(row?.avgSentiment ?? 0);
+          case 'Position': {
+            const rank = Number(row?.bestRank);
+            return Number.isFinite(rank) && rank > 0 ? rank : Number.POSITIVE_INFINITY;
+          }
+          default: return 0;
         }
       };
-      items.sort((a, b) => numericFor(b) - numericFor(a));
+      if (tableMetric === 'Alphabetical') {
+        items.sort((a, b) =>
+          String(a?.phrase ?? '').localeCompare(String(b?.phrase ?? ''), undefined, {
+            sensitivity: 'base',
+          }),
+        );
+      } else if (tableMetric === 'Alphabetical Z-A') {
+        items.sort((a, b) =>
+          String(b?.phrase ?? '').localeCompare(String(a?.phrase ?? ''), undefined, {
+            sensitivity: 'base',
+          }),
+        );
+      } else if (tableMetric === 'Position') {
+        items.sort((a, b) => numericFor(a) - numericFor(b));
+      } else {
+        items.sort((a, b) => numericFor(b) - numericFor(a));
+      }
     }
 
     // newlyAnalyzedRows pin to the top of the full list — they're the
@@ -1382,7 +1392,7 @@ export const PromptTable = ({
       return [...newlyAnalyzedRows.map(mergeTrackedRow), ...items];
     }
     return items;
-  }, [data, tableFilter, tableMetric, newlyAnalyzedRows, mergeTrackedRow]);
+  }, [data, tableMetric, newlyAnalyzedRows, mergeTrackedRow]);
 
   const totalCount = fullSortedData.length;
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
@@ -1392,7 +1402,7 @@ export const PromptTable = ({
   // top of the new view.
   useEffect(() => {
     setCurrentPage(1);
-  }, [tableFilter, tableMetric]);
+  }, [tableMetric]);
   useEffect(() => {
     if (currentPage > totalPages) setCurrentPage(totalPages);
   }, [currentPage, totalPages]);
@@ -1483,35 +1493,19 @@ export const PromptTable = ({
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="h-9 gap-2 border-slate-300 text-slate-600 rounded-lg px-3 capitalize">
-                  <BarChart3 className="h-4 w-4" />
-                  <span className="text-sm font-medium">{tableFilter === 'all' ? 'Sort' : tableFilter}</span>
-                  <ChevronDown className="h-4 w-4 opacity-50 ml-1" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-[150px]">
-                <DropdownMenuItem onClick={() => setTableFilter('all')}>Mixed View</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setTableFilter('prompt')}>Prompts Only</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setTableFilter('keyword')}>Keywords Only</DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
                 <Button variant="outline" className="h-9 gap-2 border-slate-300 text-slate-600 rounded-lg px-3">
-                  <Filter className="h-4 w-4" />
-                  <span className="text-sm font-medium">{tableMetric || 'Filters'}</span>
+                  <BarChart3 className="h-4 w-4" />
+                  <span className="text-sm font-medium">{tableMetric ? `Sort: ${tableMetric}` : 'Sort'}</span>
                   <ChevronDown className="h-4 w-4 opacity-50 ml-1" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-[180px]">
-                <DropdownMenuItem onClick={() => setTableMetric(null)}>Clear Filters</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setTableMetric(null)}>Default order</DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => setTableMetric('Sentiment')}>Sentiment Score</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setTableMetric('Ranking')}>Ranking</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setTableMetric('Alphabetical')}>Alphabetical A-Z</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setTableMetric('Alphabetical Z-A')}>Alphabetical Z-A</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setTableMetric('Sentiment')}>Sentiment</DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setTableMetric('Position')}>Position</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setTableMetric('SOV')}>SOV %</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setTableMetric('Competitors')}>Competitor Count</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
 
@@ -1572,7 +1566,7 @@ export const PromptTable = ({
                       }
                       onSetSelectedRows(next);
                     }}
-                    aria-label="Select all visible prompts and keywords"
+                    aria-label="Select all visible prompts"
                     className="h-3.5 w-3.5 rounded border-gray-300 accent-blue-600"
                   />
                 </TableHead>
@@ -1960,9 +1954,9 @@ const OpportunityRow = ({
   const [expanded, setExpanded] = useState(false);
   const hasDetail = Boolean(
     recommendedAngle ||
-      brief?.structure ||
-      (brief?.keyPoints && brief.keyPoints.length > 0) ||
-      brief?.audience
+    brief?.structure ||
+    (brief?.keyPoints && brief.keyPoints.length > 0) ||
+    brief?.audience
   );
 
   return (
@@ -2320,7 +2314,7 @@ const AIResultsReportPreview = () => {
   } = useScrollSpyBreadcrumbs({
   });
 
-  const [filterType, setFilterType] = useState<'all' | 'prompt' | 'keyword'>('all');
+  const [promptSort, setPromptSort] = useState<'alphabetical' | 'alphabetical-desc' | 'sentiment' | 'position'>('alphabetical');
 
   // Filter state — drives header dropdowns + per-card / table scoping.
   // pastRuns = list for the run picker; selectedRunId = which one we're viewing
@@ -2725,7 +2719,7 @@ const AIResultsReportPreview = () => {
   // Derived metrics for the 4×2 dashboard cards.
   //
   // The cards re-derive whenever the page-header Sort / Filters dropdowns
-  // change — narrowing the row set (filterType, categoryFilter) and the
+  // change — narrowing the row set (categoryFilter) and the
   // per-result model set (modelFilter) so headline numbers reflect what the
   // user is actually scoping to. Empty filter sets = show everything.
   const metricCards = useMemo<MetricCardData[]>(() => {
@@ -2735,8 +2729,9 @@ const AIResultsReportPreview = () => {
 
     // Apply the same filter chain that PromptTable uses, so the cards and
     // the table tell a consistent story.
-    let scoped = allItems.filter((p: any) => Array.isArray(p?.results) && p.results.length > 0);
-    if (filterType !== 'all') scoped = scoped.filter((p) => p.type?.toLowerCase() === filterType);
+    let scoped = allItems.filter(
+      (p: any) => p.type?.toLowerCase() === 'prompt' && Array.isArray(p?.results) && p.results.length > 0,
+    );
     if (categoryFilter.size > 0) scoped = scoped.filter((p: any) => p.category && categoryFilter.has(p.category));
     if (modelFilter.size > 0) {
       scoped = scoped
@@ -2797,12 +2792,12 @@ const AIResultsReportPreview = () => {
         title: 'Mentions',
         kind: 'summary',
         details: [
-          { label: 'Brand',       value: mentionsTotal > 0 ? `${brandSharePct}%`         : '—', subValue: brandPages.toString() },
-          { label: 'Competitors', value: mentionsTotal > 0 ? `${100 - brandSharePct}%`  : '—',  subValue: competitorPages.toString() },
+          { label: 'Brand', value: mentionsTotal > 0 ? `${brandSharePct}%` : '—', subValue: brandPages.toString() },
+          { label: 'Competitors', value: mentionsTotal > 0 ? `${100 - brandSharePct}%` : '—', subValue: competitorPages.toString() },
         ],
       },
     ];
-  }, [reportData, filterType, categoryFilter, modelFilter]);
+  }, [reportData, categoryFilter, modelFilter]);
 
   // Sentiment / Accuracy / Share of Voice cards — three single-number cards.
   // Threshold scale fix: backend returns avgSentiment on a 0-10 displayed
@@ -2814,8 +2809,9 @@ const AIResultsReportPreview = () => {
     // Apply same filter scope as metricCards so all dashboard headlines tell
     // a single consistent story when the user narrows by model / category.
     const allItems = reportPrompts;
-    let scoped = allItems.filter((p: any) => Array.isArray(p?.results) && p.results.length > 0);
-    if (filterType !== 'all') scoped = scoped.filter((p) => p.type?.toLowerCase() === filterType);
+    let scoped = allItems.filter(
+      (p: any) => p.type?.toLowerCase() === 'prompt' && Array.isArray(p?.results) && p.results.length > 0,
+    );
     if (categoryFilter.size > 0) scoped = scoped.filter((p: any) => p.category && categoryFilter.has(p.category));
     if (modelFilter.size > 0) {
       scoped = scoped
@@ -2883,7 +2879,7 @@ const AIResultsReportPreview = () => {
       { label: 'Brand Accuracy Score', value: accuracyValue, tone: 'text-[#3393F2]', note: accuracyNote },
       { label: 'AI Share of Voice', value: `${visibility}%`, tone: 'text-[#3393F2]', note: visibilityNote },
     ];
-  }, [reportData, filterType, categoryFilter, modelFilter]);
+  }, [reportData, categoryFilter, modelFilter]);
 
   // ── Trend chart data ─────────────────────────────────────────────────────
   //
@@ -2903,17 +2899,17 @@ const AIResultsReportPreview = () => {
   const citationsChart = useMemo(() => {
     const series = [
       { key: 'chatgpt', label: 'ChatGPT', stroke: '#E9897E', match: 'gpt' },
-      { key: 'claude',  label: 'Claude',  stroke: '#79A7F2', match: 'claude' },
-      { key: 'gemini',  label: 'Gemini',  stroke: '#8DD9E8', match: 'gemini' },
-      { key: 'google',  label: 'Google AI Overview', stroke: '#4285F4', match: 'google-gre' },
+      { key: 'claude', label: 'Claude', stroke: '#79A7F2', match: 'claude' },
+      { key: 'gemini', label: 'Gemini', stroke: '#8DD9E8', match: 'gemini' },
+      { key: 'google', label: 'Google AI Overview', stroke: '#4285F4', match: 'google-gre' },
     ] as const;
     // Drop series the user has filtered out via the modelFilter pill (header).
     const visibleSeries = modelFilter.size === 0
       ? series
       : series.filter((s) => {
-          for (const m of modelFilter) if (m.toLowerCase().includes(s.match)) return true;
-          return false;
-        });
+        for (const m of modelFilter) if (m.toLowerCase().includes(s.match)) return true;
+        return false;
+      });
     const data = trendsData.runs.map((run) => {
       const row: Record<string, string | number> = { date: formatRunDate(run.startedAt) };
       for (const s of visibleSeries) {
@@ -2929,7 +2925,7 @@ const AIResultsReportPreview = () => {
   // Mentions rate trend — brand vs total competitor mentions per run.
   const mentionsChart = useMemo(() => {
     const series = [
-      { key: 'brand',       label: 'Brand mentions',       stroke: '#6EA8FF' },
+      { key: 'brand', label: 'Brand mentions', stroke: '#6EA8FF' },
       { key: 'competitors', label: 'Competitors Mentions', stroke: '#7BD8EB' },
     ] as const;
     const data = trendsData.runs.map((run) => ({
@@ -2984,14 +2980,11 @@ const AIResultsReportPreview = () => {
     if (!reportPrompts.length) return [];
     let items = [...reportPrompts];
     // Hide rows that were never queried — empty `results` array means no
-    // AI calls ran for this prompt/keyword, so the metrics row is all zeros
+    // AI calls ran for this prompt, so the metrics row is all zeros
     // and adds no signal. Only show items the user actually selected and ran.
-    items = items.filter((p: any) => Array.isArray(p?.results) && p.results.length > 0);
-
-    // Type filter (Sort dropdown — Prompts only / Keywords only / Mixed).
-    if (filterType !== 'all') {
-      items = items.filter((p) => p.type?.toLowerCase() === filterType);
-    }
+    items = items.filter(
+      (p: any) => p.type?.toLowerCase() === 'prompt' && Array.isArray(p?.results) && p.results.length > 0,
+    );
 
     // Category filter (header Filters dropdown). Empty set = show all.
     if (categoryFilter.size > 0) {
@@ -3009,8 +3002,23 @@ const AIResultsReportPreview = () => {
         .filter((p: any) => p.results.length > 0);
     }
 
-    return items;
-  }, [reportPrompts, filterType, categoryFilter, modelFilter]);
+    return items.sort((a, b) => {
+      if (promptSort === 'sentiment') {
+        return Number(b?.avgSentiment ?? 0) - Number(a?.avgSentiment ?? 0);
+      }
+      if (promptSort === 'position') {
+        const positionFor = (row: any) => {
+          const rank = Number(row?.bestRank);
+          return Number.isFinite(rank) && rank > 0 ? rank : Number.POSITIVE_INFINITY;
+        };
+        return positionFor(a) - positionFor(b);
+      }
+      const alphabeticalCompare = String(a?.phrase ?? '').localeCompare(String(b?.phrase ?? ''), undefined, {
+        sensitivity: 'base',
+      });
+      return promptSort === 'alphabetical-desc' ? -alphabeticalCompare : alphabeticalCompare;
+    });
+  }, [reportPrompts, promptSort, categoryFilter, modelFilter]);
 
   // Manual refetch for the "Retry" affordance on the opportunities card —
   // hits /report again so the LLM enrichment cache is exercised (or rebuilt
@@ -3185,14 +3193,21 @@ const AIResultsReportPreview = () => {
                     className="h-[41px] rounded-lg border border-[#D5D7DA] bg-[#FFFFFF] px-3 text-xs capitalize text-[#717680] shadow-[0_1px_2px_0_#1018280D]"
                   >
                     <ReportSortIcon />
-                    {filterType === 'all' ? 'Sort' : filterType}
+                    {promptSort === 'alphabetical'
+                      ? 'Alphabetical A-Z'
+                      : promptSort === 'alphabetical-desc'
+                        ? 'Alphabetical Z-A'
+                        : promptSort === 'sentiment'
+                          ? 'Sentiment'
+                          : 'Position'}
                     <ChevronDown className="ml-1.5 h-3.5 w-3.5 text-[#717680]" strokeWidth={1.8} />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-[150px]">
-                  <DropdownMenuItem onClick={() => setFilterType('all')}>All Queries</DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setFilterType('prompt')}>Prompts Only</DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setFilterType('keyword')}>Keywords Only</DropdownMenuItem>
+                <DropdownMenuContent align="end" className="w-[180px]">
+                  <DropdownMenuItem onClick={() => setPromptSort('alphabetical')}>Alphabetical A-Z</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setPromptSort('alphabetical-desc')}>Alphabetical Z-A</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setPromptSort('sentiment')}>Sentiment</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setPromptSort('position')}>Position</DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
               {/* Filters — model + category, multi-select. Active count
@@ -3390,132 +3405,132 @@ const AIResultsReportPreview = () => {
         </div>
       </section>
 
-        <section className="grid w-full grid-cols-1 gap-6 bg-white px-4 py-0 sm:px-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
+      <section className="grid w-full grid-cols-1 gap-6 bg-white px-4 py-0 sm:px-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
 
-          <Card id="ai-results-visibility-coverage" data-title="Visibility & Coverage" className="min-w-0 rounded-xl border border-[#D5D7DA] bg-white shadow-[0_1px_2px_0_#1018280D]">
-            <CardHeader className="flex flex-col gap-3 px-4 pb-2 pt-4 sm:flex-row sm:items-center sm:justify-between">
-              <CardTitle className="text-base font-semibold text-[#2D4059]">Visibility & Coverage</CardTitle>
-              <div className="flex flex-wrap items-center gap-2">
-                <Button
-                  variant="outline"
-                  className="h-8 rounded-lg border border-[#D5D7DA] bg-white px-3 text-[11px] text-[#717680] shadow-[0_1px_2px_0_#1018280D] hover:bg-white"
-                >
-                  <Calendar className="mr-1.5 h-3.5 w-3.5 text-[#717680]" strokeWidth={1.8} />
-                  7 days
-                  <ChevronDown className="ml-1.5 h-3.5 w-3.5 text-[#717680]" strokeWidth={1.8} />
-                </Button>
-                <FilterPill label="Sort" icon="sort" />
+        <Card id="ai-results-visibility-coverage" data-title="Visibility & Coverage" className="min-w-0 rounded-xl border border-[#D5D7DA] bg-white shadow-[0_1px_2px_0_#1018280D]">
+          <CardHeader className="flex flex-col gap-3 px-4 pb-2 pt-4 sm:flex-row sm:items-center sm:justify-between">
+            <CardTitle className="text-base font-semibold text-[#2D4059]">Visibility & Coverage</CardTitle>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                variant="outline"
+                className="h-8 rounded-lg border border-[#D5D7DA] bg-white px-3 text-[11px] text-[#717680] shadow-[0_1px_2px_0_#1018280D] hover:bg-white"
+              >
+                <Calendar className="mr-1.5 h-3.5 w-3.5 text-[#717680]" strokeWidth={1.8} />
+                7 days
+                <ChevronDown className="ml-1.5 h-3.5 w-3.5 text-[#717680]" strokeWidth={1.8} />
+              </Button>
+              <FilterPill label="Sort" icon="sort" />
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-8 px-4 pb-4">
+            <AreaChartCard
+              title="Share of Voice"
+              subtitle="Idenitfy visibility gaps and uncover opportunities to capture more AI-driven traffic."
+              data={shareOfVoiceChart.data}
+              series={shareOfVoiceChart.series}
+              tooltipTitle="AI Share of voice"
+              emptyMessage={trendEmptyMessage}
+            />
+            <AreaChartCard
+              title="Citations"
+              subtitle="Track brand citations across AI models."
+              data={citationsChart.data}
+              series={citationsChart.series}
+              tooltipTitle="Citations"
+              emptyMessage={trendEmptyMessage}
+            />
+            <AreaChartCard
+              title="Mentions rate trend"
+              subtitle="Monitor how often your brand is mentioned compared to competitors."
+              data={mentionsChart.data}
+              series={mentionsChart.series}
+              tooltipTitle="Mentions"
+              emptyMessage={trendEmptyMessage}
+            />
+          </CardContent>
+        </Card>
+
+        <div className="min-w-0 grid gap-6 xl:h-full xl:min-h-0 xl:grid-rows-[minmax(0,0.4fr)_minmax(0,0.6fr)]">
+
+          <Card className="h-full rounded-xl border border-[#DDE7F5] bg-[#F1F6FF] shadow-[0_1px_2px_0_#1018280D]">
+            <CardHeader className="flex flex-row items-start justify-between px-4 pb-3 pt-4">
+              <div className="min-w-0">
+                <div className="flex items-center justify-between gap-3">
+                  <h3 className="text-[18px] font-semibold leading-normal text-[#414651]">
+                    Suggested Next Actions
+                  </h3>
+                  <span aria-hidden="true" className="flex items-center gap-0.5 text-[#98A2B3]">
+                    <ChevronRight className="h-3.5 w-3.5 -translate-x-0.5" />
+                    <ChevronRight className="h-3.5 w-3.5 -translate-x-1.5" />
+                  </span>
+                </div>
               </div>
             </CardHeader>
-            <CardContent className="space-y-8 px-4 pb-4">
-              <AreaChartCard
-                title="Share of Voice"
-                subtitle="Idenitfy visibility gaps and uncover opportunities to capture more AI-driven traffic."
-                data={shareOfVoiceChart.data}
-                series={shareOfVoiceChart.series}
-                tooltipTitle="AI Share of voice"
-                emptyMessage={trendEmptyMessage}
-              />
-              <AreaChartCard
-                title="Citations"
-                subtitle="Track brand citations across AI models."
-                data={citationsChart.data}
-                series={citationsChart.series}
-                tooltipTitle="Citations"
-                emptyMessage={trendEmptyMessage}
-              />
-              <AreaChartCard
-                title="Mentions rate trend"
-                subtitle="Monitor how often your brand is mentioned compared to competitors."
-                data={mentionsChart.data}
-                series={mentionsChart.series}
-                tooltipTitle="Mentions"
-                emptyMessage={trendEmptyMessage}
-              />
+            <CardContent className="space-y-4 px-4 pb-4 pt-4">
+              {suggestedNextActions.map((action) => {
+                return (
+                  <button
+                    key={action.title}
+                    type="button"
+                    onClick={action.onClick}
+                    className="group flex w-full items-center gap-3 rounded-2xl border border-[#E5EEF9] bg-white px-4 py-4 text-left shadow-[0_1px_2px_0_#1018280D] transition-all duration-200 hover:-translate-y-0.5 hover:border-[#D5D7DA] hover:shadow-[0_4px_12px_0_#10182814] focus:outline-none focus:ring-2 focus:ring-[#7BA0E8] focus:ring-offset-2"
+                  >
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#DDE7F5] bg-[#F7FAFF]">
+                      <img src={action.iconSrc} alt="" className="h-5 w-5 object-contain" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5">
+                        <span className="truncate text-[14px] font-medium leading-5 text-[#414651]">
+                          {action.title}
+                        </span>
+                        <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full border border-[#D0D5DD] text-[9px] text-[#667085]">
+                          i
+                        </span>
+                      </div>
+                      <p className="mt-1 text-sm leading-6 text-[#667085]">
+                        {action.description}
+                      </p>
+                    </div>
+                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#F8FAFD] text-[#4C74C2] transition-transform duration-200 group-hover:translate-x-0.5">
+                      <ChevronRight className="h-5 w-5" strokeWidth={2} />
+                    </span>
+                  </button>
+                );
+              })}
             </CardContent>
           </Card>
 
-          <div className="min-w-0 grid gap-6 xl:h-full xl:min-h-0 xl:grid-rows-[minmax(0,0.4fr)_minmax(0,0.6fr)]">
-
-            <Card className="h-full rounded-xl border border-[#DDE7F5] bg-[#F1F6FF] shadow-[0_1px_2px_0_#1018280D]">
-              <CardHeader className="flex flex-row items-start justify-between px-4 pb-3 pt-4">
-                <div className="min-w-0">
-                  <div className="flex items-center justify-between gap-3">
-                    <h3 className="text-[18px] font-semibold leading-normal text-[#414651]">
-                      Suggested Next Actions
-                    </h3>
-                    <span aria-hidden="true" className="flex items-center gap-0.5 text-[#98A2B3]">
-                      <ChevronRight className="h-3.5 w-3.5 -translate-x-0.5" />
-                      <ChevronRight className="h-3.5 w-3.5 -translate-x-1.5" />
-                    </span>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-4 px-4 pb-4 pt-4">
-                {suggestedNextActions.map((action) => {
-                  return (
-                    <button
-                      key={action.title}
-                      type="button"
-                      onClick={action.onClick}
-                      className="group flex w-full items-center gap-3 rounded-2xl border border-[#E5EEF9] bg-white px-4 py-4 text-left shadow-[0_1px_2px_0_#1018280D] transition-all duration-200 hover:-translate-y-0.5 hover:border-[#D5D7DA] hover:shadow-[0_4px_12px_0_#10182814] focus:outline-none focus:ring-2 focus:ring-[#7BA0E8] focus:ring-offset-2"
-                    >
-                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#DDE7F5] bg-[#F7FAFF]">
-                        <img src={action.iconSrc} alt="" className="h-5 w-5 object-contain" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-1.5">
-                          <span className="truncate text-[14px] font-medium leading-5 text-[#414651]">
-                            {action.title}
-                          </span>
-                          <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full border border-[#D0D5DD] text-[9px] text-[#667085]">
-                            i
-                          </span>
-                        </div>
-                        <p className="mt-1 text-sm leading-6 text-[#667085]">
-                          {action.description}
-                        </p>
-                      </div>
-                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#F8FAFD] text-[#4C74C2] transition-transform duration-200 group-hover:translate-x-0.5">
-                        <ChevronRight className="h-5 w-5" strokeWidth={2} />
-                      </span>
-                    </button>
-                  );
-                })}
-              </CardContent>
-            </Card>
-
-            <Card id="ai-results-opportunities" data-title="Outrank Opportunities" className="h-full min-h-0 rounded-xl border border-[#D5D7DA] bg-white shadow-[0_1px_2px_0_#1018280D]">
-              <CardHeader className="flex flex-row items-start justify-between px-4 pb-3 pt-4">
-                <div className="min-w-0">
-                  <CardTitleWithTip title="Opportunities to Outrank Competitors" />
-                  <p className="mt-2 text-sm leading-[150%] text-[#535862]">
-                    Prioritized recommendations to improve rankings, increase citations, and outperform competitors in Al search.
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={handleRetryOpportunities}
-                    disabled={opportunitiesRetrying}
-                    className="flex items-center gap-1 text-xs font-medium text-slate-600 hover:text-slate-900 disabled:opacity-50"
-                    title="Re-run analysis"
-                  >
-                    <RefreshCw className={cn('h-3.5 w-3.5', opportunitiesRetrying && 'animate-spin')} />
-                    Retry
-                  </button>
-                  <button className="whitespace-nowrap text-xs font-medium text-blue-600">View all</button>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-2 px-4 pb-4 min-h-0">
-                <div className="flex flex-wrap gap-2">
-                  <FilterPill label="Sort: By Models" icon="sort" />
-                  <FilterPill label="Filters" icon="filter" />
-                </div>
-                {/* Inner scroll container — opportunity briefs can be long and
+          <Card id="ai-results-opportunities" data-title="Outrank Opportunities" className="h-full min-h-0 rounded-xl border border-[#D5D7DA] bg-white shadow-[0_1px_2px_0_#1018280D]">
+            <CardHeader className="flex flex-row items-start justify-between px-4 pb-3 pt-4">
+              <div className="min-w-0">
+                <CardTitleWithTip title="Opportunities to Outrank Competitors" />
+                <p className="mt-2 text-sm leading-[150%] text-[#535862]">
+                  Prioritized recommendations to improve rankings, increase citations, and outperform competitors in Al search.
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleRetryOpportunities}
+                  disabled={opportunitiesRetrying}
+                  className="flex items-center gap-1 text-xs font-medium text-slate-600 hover:text-slate-900 disabled:opacity-50"
+                  title="Re-run analysis"
+                >
+                  <RefreshCw className={cn('h-3.5 w-3.5', opportunitiesRetrying && 'animate-spin')} />
+                  Retry
+                </button>
+                <button className="whitespace-nowrap text-xs font-medium text-blue-600">View all</button>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-2 px-4 pb-4 min-h-0">
+              <div className="flex flex-wrap gap-2">
+                <FilterPill label="Sort: By Models" icon="sort" />
+                <FilterPill label="Filters" icon="filter" />
+              </div>
+              {/* Inner scroll container — opportunity briefs can be long and
                  *  numerous; cap the card height so the layout doesn't push the
                  *  charts column off-screen. */}
-                <div className="max-h-[560px] space-y-2 overflow-y-auto pr-1">
+              <div className="max-h-[560px] space-y-2 overflow-y-auto pr-1">
                 {(reportData?.opportunities ?? []).length === 0 ? (
                   <div className="flex flex-col items-start gap-2 rounded-md border border-dashed border-slate-200 bg-slate-50 px-3 py-3">
                     <p className="text-xs text-slate-600">
@@ -3561,43 +3576,43 @@ const AIResultsReportPreview = () => {
                     generation={generationByKey[opp.key]}
                   />
                 ))}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </section>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </section>
 
-        <section className="mx-4 mb-6 flex flex-col items-center gap-[0.9375rem] rounded-xl bg-[#F9F9F9] px-6 py-12 text-center sm:mx-6 sm:px-12 lg:px-[7.9375rem] lg:py-[3.8125rem]">
-          <h2 className="text-2xl font-semibold text-gray-950">Connect Google services</h2>
-          <p className="max-w-3xl text-sm text-gray-500">
-            Unlock deeper insights by connecting Google Analytics and Search Console.
-          </p>
-          <Button className="h-9 rounded-lg bg-[#2f4462] px-4 text-xs text-white hover:bg-[#263852]">
-            <UserRound className="mr-2 h-3.5 w-3.5" />
-            Connect Google
-          </Button>
-        </section>
+      <section className="mx-4 mb-6 flex flex-col items-center gap-[0.9375rem] rounded-xl bg-[#F9F9F9] px-6 py-12 text-center sm:mx-6 sm:px-12 lg:px-[7.9375rem] lg:py-[3.8125rem]">
+        <h2 className="text-2xl font-semibold text-gray-950">Connect Google services</h2>
+        <p className="max-w-3xl text-sm text-gray-500">
+          Unlock deeper insights by connecting Google Analytics and Search Console.
+        </p>
+        <Button className="h-9 rounded-lg bg-[#2f4462] px-4 text-xs text-white hover:bg-[#263852]">
+          <UserRound className="mr-2 h-3.5 w-3.5" />
+          Connect Google
+        </Button>
+      </section>
 
-  <WorksheetPickerModal
-    open={isWorksheetModalOpen}
-    selectedCount={pendingGeneration ? 1 : selectedCount}
-    activeWorksheetId={activeWorksheetId}
-    worksheets={worksheetOptions}
-    loading={worksheetOptionsLoading}
-    onOpenChange={handleWorksheetModalOpenChange}
-    onWorksheetSelect={setActiveWorksheetId}
-    onAddToWorksheet={handleAddToWorksheet}
-    onCreateNewWorksheet={handleCreateNewWorksheet}
-  />
-  <CreateWorksheetModal
-    open={isCreateWorksheetModalOpen}
-    name={newWorksheetName}
-    isSubmitting={isCreatingWorksheet}
-    error={createWorksheetError}
-    onOpenChange={handleCreateWorksheetModalOpenChange}
-    onNameChange={setNewWorksheetName}
-    onSubmit={handleConfirmCreateWorksheet}
-  />
+      <WorksheetPickerModal
+        open={isWorksheetModalOpen}
+        selectedCount={pendingGeneration ? 1 : selectedCount}
+        activeWorksheetId={activeWorksheetId}
+        worksheets={worksheetOptions}
+        loading={worksheetOptionsLoading}
+        onOpenChange={handleWorksheetModalOpenChange}
+        onWorksheetSelect={setActiveWorksheetId}
+        onAddToWorksheet={handleAddToWorksheet}
+        onCreateNewWorksheet={handleCreateNewWorksheet}
+      />
+      <CreateWorksheetModal
+        open={isCreateWorksheetModalOpen}
+        name={newWorksheetName}
+        isSubmitting={isCreatingWorksheet}
+        error={createWorksheetError}
+        onOpenChange={handleCreateWorksheetModalOpenChange}
+        onNameChange={setNewWorksheetName}
+        onSubmit={handleConfirmCreateWorksheet}
+      />
     </>
   );
 };
