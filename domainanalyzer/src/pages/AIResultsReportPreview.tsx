@@ -502,9 +502,6 @@ const MetricCard = ({ card }: { card: MetricCardData }) => (
             : card.kind === 'citations'
               ? 'min-h-[228px] gap-5'
               : 'min-h-[112px] gap-3.5 p-4 sm:p-5',
-            : card.kind === 'citations'
-    ? 'min-h-[228px] gap-5'
-    : 'min-h-[112px] gap-3.5 p-4 sm:p-5',
       )}
     >
     <CardTitleWithTip title={card.title} />
@@ -1345,9 +1342,6 @@ export const PromptTable = ({
     let items = [...data]
       .map(mergeTrackedRow)
       .filter((item) => item.type?.toLowerCase() === 'prompt');
-    let items = [...data]
-      .map(mergeTrackedRow)
-      .filter((item) => item.type?.toLowerCase() === 'prompt');
 
     // Dedupe parent rows that match a row we just analyzed — the
     // newly-analyzed copy has the fresher result data and wins.
@@ -1410,10 +1404,10 @@ export const PromptTable = ({
   useEffect(() => {
     setCurrentPage(1);
   }, [tableMetric]);
-}, [tableMetric]);
-useEffect(() => {
-  if (currentPage > totalPages) setCurrentPage(totalPages);
-}, [currentPage, totalPages]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(totalPages);
+  }, [currentPage, totalPages]);
 
 const displayData = useMemo(() => {
   const start = (currentPage - 1) * PAGE_SIZE;
@@ -1502,20 +1496,14 @@ return (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" className="h-9 gap-2 border-slate-300 text-slate-600 rounded-lg px-3">
-                <Button variant="outline" className="h-9 gap-2 border-slate-300 text-slate-600 rounded-lg px-3">
-                  <BarChart3 className="h-4 w-4" />
-                  <span className="text-sm font-medium">{tableMetric ? `Sort: ${tableMetric}` : 'Sort'}</span>
-                  <span className="text-sm font-medium">{tableMetric ? `Sort: ${tableMetric}` : 'Sort'}</span>
-                  <ChevronDown className="h-4 w-4 opacity-50 ml-1" />
-                </Button>
+                <BarChart3 className="h-4 w-4" />
+                <span className="text-sm font-medium">{tableMetric ? `Sort: ${tableMetric}` : 'Sort'}</span>
+                <ChevronDown className="h-4 w-4 opacity-50 ml-1" />
+              </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-[180px]">
               <DropdownMenuItem onClick={() => setTableMetric(null)}>Default order</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setTableMetric(null)}>Default order</DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => setTableMetric('Alphabetical')}>Alphabetical A-Z</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setTableMetric('Alphabetical Z-A')}>Alphabetical Z-A</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setTableMetric('Sentiment')}>Sentiment</DropdownMenuItem>
               <DropdownMenuItem onClick={() => setTableMetric('Alphabetical')}>Alphabetical A-Z</DropdownMenuItem>
               <DropdownMenuItem onClick={() => setTableMetric('Alphabetical Z-A')}>Alphabetical Z-A</DropdownMenuItem>
               <DropdownMenuItem onClick={() => setTableMetric('Sentiment')}>Sentiment</DropdownMenuItem>
@@ -1580,7 +1568,6 @@ return (
                     }
                     onSetSelectedRows(next);
                   }}
-                  aria-label="Select all visible prompts"
                   aria-label="Select all visible prompts"
                   className="h-3.5 w-3.5 rounded border-gray-300 accent-blue-600"
                 />
@@ -2330,7 +2317,6 @@ const AIResultsReportPreview = () => {
   });
 
   const [promptSort, setPromptSort] = useState<'alphabetical' | 'alphabetical-desc' | 'sentiment' | 'position'>('alphabetical');
-  const [promptSort, setPromptSort] = useState<'alphabetical' | 'alphabetical-desc' | 'sentiment' | 'position'>('alphabetical');
 
   // Filter state — drives header dropdowns + per-card / table scoping.
   // pastRuns = list for the run picker; selectedRunId = which one we're viewing
@@ -2736,7 +2722,6 @@ const AIResultsReportPreview = () => {
   //
   // The cards re-derive whenever the page-header Sort / Filters dropdowns
   // change — narrowing the row set (categoryFilter) and the
-  // change — narrowing the row set (categoryFilter) and the
   // per-result model set (modelFilter) so headline numbers reflect what the
   // user is actually scoping to. Empty filter sets = show everything.
   const metricCards = useMemo<MetricCardData[]>(() => {
@@ -2746,9 +2731,6 @@ const AIResultsReportPreview = () => {
 
     // Apply the same filter chain that PromptTable uses, so the cards and
     // the table tell a consistent story.
-    let scoped = allItems.filter(
-      (p: any) => p.type?.toLowerCase() === 'prompt' && Array.isArray(p?.results) && p.results.length > 0,
-    );
     let scoped = allItems.filter(
       (p: any) => p.type?.toLowerCase() === 'prompt' && Array.isArray(p?.results) && p.results.length > 0,
     );
@@ -2818,7 +2800,6 @@ const AIResultsReportPreview = () => {
       },
     ];
   }, [reportData, categoryFilter, modelFilter]);
-}, [reportData, categoryFilter, modelFilter]);
 
 // Sentiment / Accuracy / Share of Voice cards — three single-number cards.
 // Threshold scale fix: backend returns avgSentiment on a 0-10 displayed
@@ -2830,9 +2811,6 @@ const scoreCards = useMemo(() => {
   // Apply same filter scope as metricCards so all dashboard headlines tell
   // a single consistent story when the user narrows by model / category.
   const allItems = reportPrompts;
-  let scoped = allItems.filter(
-    (p: any) => p.type?.toLowerCase() === 'prompt' && Array.isArray(p?.results) && p.results.length > 0,
-  );
   let scoped = allItems.filter(
     (p: any) => p.type?.toLowerCase() === 'prompt' && Array.isArray(p?.results) && p.results.length > 0,
   );
@@ -2904,7 +2882,6 @@ const scoreCards = useMemo(() => {
     { label: 'AI Share of Voice', value: `${visibility}%`, tone: 'text-[#3393F2]', note: visibilityNote },
   ];
 }, [reportData, categoryFilter, modelFilter]);
-  }, [reportData, categoryFilter, modelFilter]);
 
 // ── Trend chart data ─────────────────────────────────────────────────────
 //
@@ -3048,23 +3025,7 @@ const filteredPrompts = useMemo(() => {
     return promptSort === 'alphabetical-desc' ? -alphabeticalCompare : alphabeticalCompare;
   });
 }, [reportPrompts, promptSort, categoryFilter, modelFilter]);
-return items.sort((a, b) => {
-  if (promptSort === 'sentiment') {
-    return Number(b?.avgSentiment ?? 0) - Number(a?.avgSentiment ?? 0);
-  }
-  if (promptSort === 'position') {
-    const positionFor = (row: any) => {
-      const rank = Number(row?.bestRank);
-      return Number.isFinite(rank) && rank > 0 ? rank : Number.POSITIVE_INFINITY;
-    };
-    return positionFor(a) - positionFor(b);
-  }
-  const alphabeticalCompare = String(a?.phrase ?? '').localeCompare(String(b?.phrase ?? ''), undefined, {
-    sensitivity: 'base',
-  });
-  return promptSort === 'alphabetical-desc' ? -alphabeticalCompare : alphabeticalCompare;
-});
-  }, [reportPrompts, promptSort, categoryFilter, modelFilter]);
+
 
 // Manual refetch for the "Retry" affordance on the opportunities card —
 // hits /report again so the LLM enrichment cache is exercised (or rebuilt
@@ -3254,12 +3215,7 @@ return (
                 <DropdownMenuItem onClick={() => setPromptSort('alphabetical-desc')}>Alphabetical Z-A</DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setPromptSort('sentiment')}>Sentiment</DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setPromptSort('position')}>Position</DropdownMenuItem>
-                <DropdownMenuContent align="end" className="w-[180px]">
-                  <DropdownMenuItem onClick={() => setPromptSort('alphabetical')}>Alphabetical A-Z</DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setPromptSort('alphabetical-desc')}>Alphabetical Z-A</DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setPromptSort('sentiment')}>Sentiment</DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setPromptSort('position')}>Position</DropdownMenuItem>
-                </DropdownMenuContent>
+              </DropdownMenuContent>
             </DropdownMenu>
             {/* Filters — model + category, multi-select. Active count
                   shows on the trigger so the user can tell at a glance
