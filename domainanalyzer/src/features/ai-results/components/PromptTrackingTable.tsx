@@ -26,7 +26,6 @@ import {
   Download,
   ExternalLink,
   FileText,
-  Filter,
   Globe2,
   Info,
   LayoutGrid,
@@ -866,7 +865,6 @@ export const PromptTable = ({
       next.has(id) ? next.delete(id) : next.add(id);
       return next;
     });
-  const [tableFilter, setTableFilter] = useState<"all" | "prompt" | "keyword">("all");
   const [tableMetric, setTableMetric] = useState<string | null>(null);
   // Page-based pagination (10 rows / page). Replaces the prior
   // View all / Show less toggle — both because page navigation is more
@@ -1132,26 +1130,27 @@ export const PromptTable = ({
 
   // Full sorted/filtered list (before pagination).
   const fullSortedData = useMemo(() => {
-    let items = [...data];
+    let items = [...data].filter((item) => item.type === "prompt");
 
     // Prompt Tracking tab: only tracked rows (honor optimistic overrides).
     if (trackedFilterOnly) {
       items = items.filter((item) => trackOverrides[item.id] ?? item.isTracked ?? false);
     }
 
-    if (tableFilter === "prompt") {
-      items = items.filter((item) => item.type === "prompt");
-    } else if (tableFilter === "keyword") {
-      items = items.filter((item) => item.type === "keyword");
-    }
-
     if (tableMetric) {
       const num = (v: number | null | undefined) => (typeof v === "number" ? v : -1);
+      const positionFor = (row: PromptTableRow) => {
+        const rank = Number(row.bestRank);
+        return Number.isFinite(rank) && rank > 0 ? rank : Number.POSITIVE_INFINITY;
+      };
       items.sort((a, b) => {
-        if (tableMetric === "Ranking") return b.mentions - a.mentions;
-        if (tableMetric === "Position") return a.bestRank - b.bestRank;
-        if (tableMetric === "SOV") return Number.parseInt(b.sov, 10) - Number.parseInt(a.sov, 10);
-        if (tableMetric === "Competitors") return b.competitorCount - a.competitorCount;
+        if (tableMetric === "Alphabetical") {
+          return a.phrase.localeCompare(b.phrase, undefined, { sensitivity: "base" });
+        }
+        if (tableMetric === "Alphabetical Z-A") {
+          return b.phrase.localeCompare(a.phrase, undefined, { sensitivity: "base" });
+        }
+        if (tableMetric === "Position") return positionFor(a) - positionFor(b);
         return num(b.avgSentiment) - num(a.avgSentiment);
       });
     }
@@ -1173,14 +1172,14 @@ export const PromptTable = ({
       return [...newlyAnalyzedRows, ...baseItems];
     }
     return baseItems;
-  }, [data, tableFilter, tableMetric, newlyAnalyzedRows, trackedFilterOnly, trackOverrides]);
+  }, [data, tableMetric, newlyAnalyzedRows, trackedFilterOnly, trackOverrides]);
 
   const totalCount = fullSortedData.length;
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [tableFilter, tableMetric]);
+  }, [tableMetric]);
   useEffect(() => {
     if (currentPage > totalPages) setCurrentPage(totalPages);
   }, [currentPage, totalPages]);
@@ -1243,35 +1242,19 @@ export const PromptTable = ({
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="h-[38px] gap-2 rounded-lg border-slate-200 px-3 capitalize text-slate-600 shadow-none hover:bg-gray-50">
-                  <AlignLeft className="h-[16px] w-[16px]" />
-                  <span className="text-[13px] font-medium">{tableFilter === "all" ? "Sort" : tableFilter}</span>
-                  <ChevronDown className="ml-1 h-3.5 w-3.5 opacity-60" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-[150px]">
-                <DropdownMenuItem onClick={() => setTableFilter("all")}>Mixed View</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setTableFilter("prompt")}>Prompts Only</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setTableFilter("keyword")}>Keywords Only</DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
                 <Button variant="outline" className="h-[38px] gap-2 rounded-lg border-slate-200 px-3 text-slate-600 shadow-none hover:bg-gray-50">
-                  <Filter className="h-[16px] w-[16px]" />
-                  <span className="text-[13px] font-medium">{tableMetric || "Filters"}</span>
+                  <AlignLeft className="h-[16px] w-[16px]" />
+                  <span className="text-[13px] font-medium">{tableMetric ? `Sort: ${tableMetric}` : "Sort"}</span>
                   <ChevronDown className="ml-1 h-3.5 w-3.5 opacity-60" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-[180px]">
-                <DropdownMenuItem onClick={() => setTableMetric(null)}>Clear Filters</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setTableMetric(null)}>Default order</DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => setTableMetric("Sentiment")}>Sentiment Score</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setTableMetric("Ranking")}>Ranking</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setTableMetric("Alphabetical")}>Alphabetical A-Z</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setTableMetric("Alphabetical Z-A")}>Alphabetical Z-A</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setTableMetric("Sentiment")}>Sentiment</DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setTableMetric("Position")}>Position</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setTableMetric("SOV")}>SOV %</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setTableMetric("Competitors")}>Competitor Count</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
 

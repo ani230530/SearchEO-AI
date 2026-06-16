@@ -185,7 +185,11 @@ export async function fromLlmContext(args: {
   summary: string;
   location: string | null;
 }): Promise<CompetitorCandidate[]> {
-  if (!router) return [];
+  if (!router) {
+    console.warn('[COMPETITOR] OpenRouter not initialized. OPENROUTER_API_KEY missing?');
+    return [];
+  }
+  console.log(`[COMPETITOR] Discovering competitors for ${args.ownDomainHost}...`);
   const profileLines = [
     `Target company: ${args.companyName ?? args.ownDomainHost}`,
     `Domain: ${args.ownDomainHost}`,
@@ -197,6 +201,7 @@ export async function fromLlmContext(args: {
 
   let payload: { competitors?: Array<{ host?: unknown; name?: unknown; reason?: unknown }> } = {};
   try {
+    console.log(`[COMPETITOR] Calling OpenRouter for ${args.ownDomainHost}...`);
     const completion = await router.chat.completions.create({
       model: 'openai/gpt-4o-mini',
       messages: [
@@ -226,17 +231,23 @@ export async function fromLlmContext(args: {
       max_tokens: 1500,
     });
     const text = completion.choices[0]?.message?.content ?? '';
+    console.log(`[COMPETITOR] LLM response for ${args.ownDomainHost}: ${text.slice(0, 200)}...`);
     payload = JSON.parse(text);
-  } catch {
+  } catch (err) {
+    console.error(`[COMPETITOR] ERROR discovering competitors for ${args.ownDomainHost}:`, err instanceof Error ? err.message : String(err));
     return [];
   }
 
   const out = new Map<string, CompetitorCandidate>();
   const arr = Array.isArray(payload.competitors) ? payload.competitors : [];
+  console.log(`[COMPETITOR] Parsed ${arr.length} competitors from LLM for ${args.ownDomainHost}`);
   for (const raw of arr) {
     const hostRaw = typeof raw?.host === 'string' ? raw.host.trim() : '';
     const host = extractHost(hostRaw) ?? hostRaw.toLowerCase().replace(/^www\./, '').split('/')[0];
-    if (!host || host === args.ownDomainHost || isBlocked(host)) continue;
+    if (!host || host === args.ownDomainHost || isBlocked(host)) {
+      console.log(`[COMPETITOR] Filtered: host=${hostRaw}, reason=${!host ? 'invalid' : host === args.ownDomainHost ? 'self' : 'blocked'}`);
+      continue;
+    }
     const name = typeof raw?.name === 'string' ? raw.name.trim() : null;
     const reason = typeof raw?.reason === 'string' ? raw.reason.trim() : null;
     if (out.has(host)) continue;
@@ -246,6 +257,7 @@ export async function fromLlmContext(args: {
       rawSignals: { llmName: name, llmReason: reason },
     });
   }
+  console.log(`[COMPETITOR] Final candidates for ${args.ownDomainHost}: ${out.size}`);
   return Array.from(out.values());
 }
 

@@ -590,26 +590,26 @@ const ModelComparisonGrid = ({ results }: { results: any[] }) => {
             <thead>
               <tr className="border-b border-slate-300">
                 <th className="bg-white text-[12px] font-medium text-slate-500 py-4 px-4 text-center border-r border-slate-200 w-[160px]">
-                  Performance
+                  Models
                 </th>
-                {results.map((r) => (
-                  <th key={r.id} className="py-4 px-4 border-r border-slate-200 last:border-r-0">
-                    <div className="flex items-center justify-center gap-2">
-                      {getModelIconNode(r.model, 'sm')}
-                      <span className="text-[12px] font-medium text-slate-700 whitespace-nowrap">{getModelLabel(r.model)}</span>
-                    </div>
+                {metrics.map((metric) => (
+                  <th key={metric.key} className="py-4 px-4 border-r border-slate-200 last:border-r-0">
+                    <span className="text-[12px] font-medium text-slate-700 whitespace-nowrap">{metric.label}</span>
                   </th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {metrics.map((metric) => (
-                <tr key={metric.key} className="border-b border-slate-200 last:border-b-0">
-                  <td className="bg-slate-50 text-[12px] font-medium text-slate-600 py-4 px-4 text-center border-r border-slate-200">
-                    {metric.label}
+              {results.map((r) => (
+                <tr key={r.id} className="border-b border-slate-200 last:border-b-0">
+                  <td className="bg-slate-50 py-4 px-4 text-center border-r border-slate-200">
+                    <div className="flex items-center justify-center gap-2">
+                      {getModelIconNode(r.model, 'sm')}
+                      <span className="text-[12px] font-medium text-slate-700 whitespace-nowrap">{getModelLabel(r.model)}</span>
+                    </div>
                   </td>
-                  {results.map((r) => (
-                    <td key={r.id} className="text-center py-4 px-4 border-r border-slate-200 last:border-r-0">
+                  {metrics.map((metric) => (
+                    <td key={metric.key} className="text-center py-4 px-4 border-r border-slate-200 last:border-r-0">
                       {metric.type === 'badge' ? (
                         <div className="flex justify-center">
                           <span className={`${r.presence > 0 ? 'bg-[#f0fdf4] text-[#16a34a] border-[#dcfce7]' : 'bg-gray-50 text-gray-500 border-slate-200'} border text-[10px] font-medium px-3 py-1 rounded-full whitespace-nowrap`}>
@@ -1088,7 +1088,6 @@ export const PromptTable = ({
       next.has(id) ? next.delete(id) : next.add(id);
       return next;
     });
-  const [tableFilter, setTableFilter] = useState<'all' | 'prompt' | 'keyword'>('all');
   const [tableMetric, setTableMetric] = useState<string | null>(null);
   const [showAllQueries, setShowAllQueries] = useState(false);
   const trackedPromptsQuery = useTrackedPrompts<{ prompts?: PromptTableRow[] }>(domainId ?? null);
@@ -1337,7 +1336,9 @@ export const PromptTable = ({
   // Full sorted/filtered list, before pagination. We split this from the
   // paginated `displayData` so we know `totalCount` for the pager.
   const fullSortedData = useMemo(() => {
-    let items = [...data].map(mergeTrackedRow);
+    let items = [...data]
+      .map(mergeTrackedRow)
+      .filter((item) => item.type?.toLowerCase() === 'prompt');
 
     // Dedupe parent rows that match a row we just analyzed — the
     // newly-analyzed copy has the fresher result data and wins.
@@ -1352,24 +1353,34 @@ export const PromptTable = ({
       );
     }
 
-    if (tableFilter === 'prompt') {
-      items = items.filter(item => item.type?.toLowerCase() === 'prompt');
-    } else if (tableFilter === 'keyword') {
-      items = items.filter(item => item.type?.toLowerCase() === 'keyword');
-    }
-
     if (tableMetric) {
       const numericFor = (row: any): number => {
         switch (tableMetric) {
           case 'Sentiment':   return Number(row?.avgSentiment ?? 0);
-          case 'Ranking':     return Number(row?.mentions ?? 0);
-          case 'Position':    return Number(row?.bestRank ?? 0);
-          case 'SOV':         return Number(row?.metrics?.visibility ?? 0);
-          case 'Competitors': return Number(row?.competitorCount ?? 0);
+          case 'Position': {
+            const rank = Number(row?.bestRank);
+            return Number.isFinite(rank) && rank > 0 ? rank : Number.POSITIVE_INFINITY;
+          }
           default:            return 0;
         }
       };
-      items.sort((a, b) => numericFor(b) - numericFor(a));
+      if (tableMetric === 'Alphabetical') {
+        items.sort((a, b) =>
+          String(a?.phrase ?? '').localeCompare(String(b?.phrase ?? ''), undefined, {
+            sensitivity: 'base',
+          }),
+        );
+      } else if (tableMetric === 'Alphabetical Z-A') {
+        items.sort((a, b) =>
+          String(b?.phrase ?? '').localeCompare(String(a?.phrase ?? ''), undefined, {
+            sensitivity: 'base',
+          }),
+        );
+      } else if (tableMetric === 'Position') {
+        items.sort((a, b) => numericFor(a) - numericFor(b));
+      } else {
+        items.sort((a, b) => numericFor(b) - numericFor(a));
+      }
     }
 
     // newlyAnalyzedRows pin to the top of the full list — they're the
@@ -1379,7 +1390,7 @@ export const PromptTable = ({
       return [...newlyAnalyzedRows.map(mergeTrackedRow), ...items];
     }
     return items;
-  }, [data, tableFilter, tableMetric, newlyAnalyzedRows, mergeTrackedRow]);
+  }, [data, tableMetric, newlyAnalyzedRows, mergeTrackedRow]);
 
   const totalCount = fullSortedData.length;
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
@@ -1389,7 +1400,7 @@ export const PromptTable = ({
   // top of the new view.
   useEffect(() => {
     setCurrentPage(1);
-  }, [tableFilter, tableMetric]);
+  }, [tableMetric]);
   useEffect(() => {
     if (currentPage > totalPages) setCurrentPage(totalPages);
   }, [currentPage, totalPages]);
@@ -1430,7 +1441,7 @@ export const PromptTable = ({
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
               <input
                 type="text"
-                placeholder="Enter your custom phrase/Keyword to analyze"
+                placeholder="Enter your custom prompt to analyze"
                 value={analyzeText}
                 onChange={(e) => setAnalyzeText(e.target.value)}
                 disabled={analyzing}
@@ -1480,35 +1491,19 @@ export const PromptTable = ({
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="h-9 gap-2 border-slate-300 text-slate-600 rounded-lg px-3 capitalize">
-                  <BarChart3 className="h-4 w-4" />
-                  <span className="text-sm font-medium">{tableFilter === 'all' ? 'Sort' : tableFilter}</span>
-                  <ChevronDown className="h-4 w-4 opacity-50 ml-1" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-[150px]">
-                <DropdownMenuItem onClick={() => setTableFilter('all')}>Mixed View</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setTableFilter('prompt')}>Prompts Only</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setTableFilter('keyword')}>Keywords Only</DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
                 <Button variant="outline" className="h-9 gap-2 border-slate-300 text-slate-600 rounded-lg px-3">
-                  <Filter className="h-4 w-4" />
-                  <span className="text-sm font-medium">{tableMetric || 'Filters'}</span>
+                  <BarChart3 className="h-4 w-4" />
+                  <span className="text-sm font-medium">{tableMetric ? `Sort: ${tableMetric}` : 'Sort'}</span>
                   <ChevronDown className="h-4 w-4 opacity-50 ml-1" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-[180px]">
-                <DropdownMenuItem onClick={() => setTableMetric(null)}>Clear Filters</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setTableMetric(null)}>Default order</DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => setTableMetric('Sentiment')}>Sentiment Score</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setTableMetric('Ranking')}>Ranking</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setTableMetric('Alphabetical')}>Alphabetical A-Z</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setTableMetric('Alphabetical Z-A')}>Alphabetical Z-A</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setTableMetric('Sentiment')}>Sentiment</DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setTableMetric('Position')}>Position</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setTableMetric('SOV')}>SOV %</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setTableMetric('Competitors')}>Competitor Count</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
 
@@ -1569,11 +1564,11 @@ export const PromptTable = ({
                       }
                       onSetSelectedRows(next);
                     }}
-                    aria-label="Select all visible prompts and keywords"
+                    aria-label="Select all visible prompts"
                     className="h-3.5 w-3.5 rounded border-gray-300 accent-blue-600"
                   />
                 </TableHead>
-                <TableHead className="text-[10px] font-semibold uppercase tracking-wider text-[#2D4059] px-2">Prompts & Keywords</TableHead>
+                <TableHead className="text-[10px] font-semibold uppercase tracking-wider text-[#2D4059] px-2">Prompts</TableHead>
                 <TableHead className="text-[10px] font-semibold uppercase tracking-wider text-[#2D4059] px-2">Sentiment</TableHead>
                 <TableHead className="text-[10px] font-semibold uppercase tracking-wider text-[#2D4059] px-2">Ranking</TableHead>
                 <TableHead className="text-[10px] font-semibold uppercase tracking-wider text-[#2D4059] px-2">Position</TableHead>
@@ -2272,7 +2267,7 @@ const AIResultsReportPreview = () => {
   } = useScrollSpyBreadcrumbs({
   });
 
-  const [filterType, setFilterType] = useState<'all' | 'prompt' | 'keyword'>('all');
+  const [promptSort, setPromptSort] = useState<'alphabetical' | 'alphabetical-desc' | 'sentiment' | 'position'>('alphabetical');
 
   // Filter state — drives header dropdowns + per-card / table scoping.
   // pastRuns = list for the run picker; selectedRunId = which one we're viewing
@@ -2677,7 +2672,7 @@ const AIResultsReportPreview = () => {
   // Derived metrics for the 4×2 dashboard cards.
   //
   // The cards re-derive whenever the page-header Sort / Filters dropdowns
-  // change — narrowing the row set (filterType, categoryFilter) and the
+  // change — narrowing the row set (categoryFilter) and the
   // per-result model set (modelFilter) so headline numbers reflect what the
   // user is actually scoping to. Empty filter sets = show everything.
   const metricCards = useMemo<MetricCardData[]>(() => {
@@ -2687,8 +2682,9 @@ const AIResultsReportPreview = () => {
 
     // Apply the same filter chain that PromptTable uses, so the cards and
     // the table tell a consistent story.
-    let scoped = allItems.filter((p: any) => Array.isArray(p?.results) && p.results.length > 0);
-    if (filterType !== 'all') scoped = scoped.filter((p) => p.type?.toLowerCase() === filterType);
+    let scoped = allItems.filter(
+      (p: any) => p.type?.toLowerCase() === 'prompt' && Array.isArray(p?.results) && p.results.length > 0,
+    );
     if (categoryFilter.size > 0) scoped = scoped.filter((p: any) => p.category && categoryFilter.has(p.category));
     if (modelFilter.size > 0) {
       scoped = scoped
@@ -2754,7 +2750,7 @@ const AIResultsReportPreview = () => {
         ],
       },
     ];
-  }, [reportData, filterType, categoryFilter, modelFilter]);
+  }, [reportData, categoryFilter, modelFilter]);
 
   // Sentiment / Accuracy / Share of Voice cards — three single-number cards.
   // Threshold scale fix: backend returns avgSentiment on a 0-10 displayed
@@ -2766,8 +2762,9 @@ const AIResultsReportPreview = () => {
     // Apply same filter scope as metricCards so all dashboard headlines tell
     // a single consistent story when the user narrows by model / category.
     const allItems = reportPrompts;
-    let scoped = allItems.filter((p: any) => Array.isArray(p?.results) && p.results.length > 0);
-    if (filterType !== 'all') scoped = scoped.filter((p) => p.type?.toLowerCase() === filterType);
+    let scoped = allItems.filter(
+      (p: any) => p.type?.toLowerCase() === 'prompt' && Array.isArray(p?.results) && p.results.length > 0,
+    );
     if (categoryFilter.size > 0) scoped = scoped.filter((p: any) => p.category && categoryFilter.has(p.category));
     if (modelFilter.size > 0) {
       scoped = scoped
@@ -2835,7 +2832,7 @@ const AIResultsReportPreview = () => {
       { label: 'Brand Accuracy Score', value: accuracyValue, tone: 'text-[#3393F2]', note: accuracyNote },
       { label: 'AI Share of Voice', value: `${visibility}%`, tone: 'text-[#3393F2]', note: visibilityNote },
     ];
-  }, [reportData, filterType, categoryFilter, modelFilter]);
+  }, [reportData, categoryFilter, modelFilter]);
 
   // ── Trend chart data ─────────────────────────────────────────────────────
   //
@@ -2936,14 +2933,11 @@ const AIResultsReportPreview = () => {
     if (!reportPrompts.length) return [];
     let items = [...reportPrompts];
     // Hide rows that were never queried — empty `results` array means no
-    // AI calls ran for this prompt/keyword, so the metrics row is all zeros
+    // AI calls ran for this prompt, so the metrics row is all zeros
     // and adds no signal. Only show items the user actually selected and ran.
-    items = items.filter((p: any) => Array.isArray(p?.results) && p.results.length > 0);
-
-    // Type filter (Sort dropdown — Prompts only / Keywords only / Mixed).
-    if (filterType !== 'all') {
-      items = items.filter((p) => p.type?.toLowerCase() === filterType);
-    }
+    items = items.filter(
+      (p: any) => p.type?.toLowerCase() === 'prompt' && Array.isArray(p?.results) && p.results.length > 0,
+    );
 
     // Category filter (header Filters dropdown). Empty set = show all.
     if (categoryFilter.size > 0) {
@@ -2961,8 +2955,23 @@ const AIResultsReportPreview = () => {
         .filter((p: any) => p.results.length > 0);
     }
 
-    return items;
-  }, [reportPrompts, filterType, categoryFilter, modelFilter]);
+    return items.sort((a, b) => {
+      if (promptSort === 'sentiment') {
+        return Number(b?.avgSentiment ?? 0) - Number(a?.avgSentiment ?? 0);
+      }
+      if (promptSort === 'position') {
+        const positionFor = (row: any) => {
+          const rank = Number(row?.bestRank);
+          return Number.isFinite(rank) && rank > 0 ? rank : Number.POSITIVE_INFINITY;
+        };
+        return positionFor(a) - positionFor(b);
+      }
+      const alphabeticalCompare = String(a?.phrase ?? '').localeCompare(String(b?.phrase ?? ''), undefined, {
+        sensitivity: 'base',
+      });
+      return promptSort === 'alphabetical-desc' ? -alphabeticalCompare : alphabeticalCompare;
+    });
+  }, [reportPrompts, promptSort, categoryFilter, modelFilter]);
 
   // Manual refetch for the "Retry" affordance on the opportunities card —
   // hits /report again so the LLM enrichment cache is exercised (or rebuilt
@@ -3135,14 +3144,21 @@ const AIResultsReportPreview = () => {
                     className="h-[41px] rounded-lg border border-[#D5D7DA] bg-[#FFFFFF] px-3 text-xs capitalize text-[#717680] shadow-[0_1px_2px_0_#1018280D]"
                   >
                     <ReportSortIcon />
-                    {filterType === 'all' ? 'Sort' : filterType}
+                    {promptSort === 'alphabetical'
+                      ? 'Alphabetical A-Z'
+                      : promptSort === 'alphabetical-desc'
+                        ? 'Alphabetical Z-A'
+                      : promptSort === 'sentiment'
+                        ? 'Sentiment'
+                        : 'Position'}
                     <ChevronDown className="ml-1.5 h-3.5 w-3.5 text-[#717680]" strokeWidth={1.8} />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-[150px]">
-                  <DropdownMenuItem onClick={() => setFilterType('all')}>All Queries</DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setFilterType('prompt')}>Prompts Only</DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setFilterType('keyword')}>Keywords Only</DropdownMenuItem>
+                <DropdownMenuContent align="end" className="w-[180px]">
+                  <DropdownMenuItem onClick={() => setPromptSort('alphabetical')}>Alphabetical A-Z</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setPromptSort('alphabetical-desc')}>Alphabetical Z-A</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setPromptSort('sentiment')}>Sentiment</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setPromptSort('position')}>Position</DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
               {/* Filters — model + category, multi-select. Active count
