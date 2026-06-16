@@ -502,75 +502,78 @@ const MetricCard = ({ card }: { card: MetricCardData }) => (
             : card.kind === 'citations'
               ? 'min-h-[228px] gap-5'
               : 'min-h-[112px] gap-3.5 p-4 sm:p-5',
+            : card.kind === 'citations'
+    ? 'min-h-[228px] gap-5'
+    : 'min-h-[112px] gap-3.5 p-4 sm:p-5',
       )}
     >
-      <CardTitleWithTip title={card.title} />
+    <CardTitleWithTip title={card.title} />
 
-      {card.kind === 'modelPerformance' ? (
-        <div className="flex flex-1 flex-col gap-3 sm:gap-3.5 md:gap-4 xl:gap-[45px] pt-0.5">
-          {card.details.map((item) => (
-            <div
-              key={item.label}
-              className="grid grid-cols-[minmax(0,88px)_minmax(0,1fr)_auto] items-center gap-2.5 sm:grid-cols-[minmax(0,104px)_minmax(0,1fr)_auto]"
-            >
-              <div className="flex min-w-0 items-center gap-2">
-                {item.iconSrc ? <img src={item.iconSrc} alt="" className="h-4 w-4 shrink-0 object-contain" /> : null}
-                <span className="truncate text-[12px] font-medium leading-none text-[#535862]">{item.label}</span>
-              </div>
-              <div className="h-1.5 overflow-hidden rounded-full bg-[#D0D5DD]">
-                <div
-                  className="h-full rounded-full bg-[#8AA4E8]"
-                  style={{ width: `${item.barWidth ?? 0}%` }}
-                />
-              </div>
-              <span className="min-w-[20px] text-right text-[12px] font-medium tabular-nums text-[#2F6BFF]">
+    {card.kind === 'modelPerformance' ? (
+      <div className="flex flex-1 flex-col gap-3 sm:gap-3.5 md:gap-4 xl:gap-[45px] pt-0.5">
+        {card.details.map((item) => (
+          <div
+            key={item.label}
+            className="grid grid-cols-[minmax(0,88px)_minmax(0,1fr)_auto] items-center gap-2.5 sm:grid-cols-[minmax(0,104px)_minmax(0,1fr)_auto]"
+          >
+            <div className="flex min-w-0 items-center gap-2">
+              {item.iconSrc ? <img src={item.iconSrc} alt="" className="h-4 w-4 shrink-0 object-contain" /> : null}
+              <span className="truncate text-[12px] font-medium leading-none text-[#535862]">{item.label}</span>
+            </div>
+            <div className="h-1.5 overflow-hidden rounded-full bg-[#D0D5DD]">
+              <div
+                className="h-full rounded-full bg-[#8AA4E8]"
+                style={{ width: `${item.barWidth ?? 0}%` }}
+              />
+            </div>
+            <span className="min-w-[20px] text-right text-[12px] font-medium tabular-nums text-[#2F6BFF]">
+              {item.value}
+            </span>
+          </div>
+        ))}
+      </div>
+    ) : card.kind === 'promptSummary' ? (
+      <div className="mt-1 grid flex-1 grid-cols-1 gap-6 sm:grid-cols-2 sm:gap-8">
+        {card.details.map((item) => (
+          <div key={item.label} className="min-w-0">
+            <p className="text-[14px] font-semibold leading-[150%] tracking-normal text-[#535862]">{item.label}</p>
+            <p className="mt-2 text-[27px] font-semibold leading-none tracking-normal text-[#3393F2]">
+              {item.value}
+            </p>
+          </div>
+        ))}
+      </div>
+    ) : card.kind === 'citations' ? (
+      <div className="grid flex-1 grid-cols-1 gap-x-6 gap-y-6 sm:grid-cols-2">
+        {card.details.map((item) => (
+          <div key={item.label} className="min-w-0">
+            <p className="text-sm font-semibold leading-[150%] tracking-normal text-[#535862]">{item.label}</p>
+            <div className="mt-2 flex items-start gap-3">
+              {item.iconSrc ? <img src={item.iconSrc} alt="" className="h-6 w-6 shrink-0 object-contain" /> : null}
+              <span className="text-[27px] font-semibold leading-[1] tracking-normal text-[#3393F2]">
                 {item.value}
               </span>
             </div>
-          ))}
-        </div>
-      ) : card.kind === 'promptSummary' ? (
-        <div className="mt-1 grid flex-1 grid-cols-1 gap-6 sm:grid-cols-2 sm:gap-8">
-          {card.details.map((item) => (
-            <div key={item.label} className="min-w-0">
-              <p className="text-[14px] font-semibold leading-[150%] tracking-normal text-[#535862]">{item.label}</p>
-              <p className="mt-2 text-[27px] font-semibold leading-none tracking-normal text-[#3393F2]">
-                {item.value}
-              </p>
-            </div>
-          ))}
-        </div>
-      ) : card.kind === 'citations' ? (
-        <div className="grid flex-1 grid-cols-1 gap-x-6 gap-y-6 sm:grid-cols-2">
-          {card.details.map((item) => (
-            <div key={item.label} className="min-w-0">
-              <p className="text-sm font-semibold leading-[150%] tracking-normal text-[#535862]">{item.label}</p>
-              <div className="mt-2 flex items-start gap-3">
-                {item.iconSrc ? <img src={item.iconSrc} alt="" className="h-6 w-6 shrink-0 object-contain" /> : null}
-                <span className="text-[27px] font-semibold leading-[1] tracking-normal text-[#3393F2]">
-                  {item.value}
-                </span>
-              </div>
-              <p className="mt-1 text-[10px] font-normal leading-[150%] tracking-normal text-[#717680]">
-                Pages <span className="text-[#3393F2]">{item.subValue ?? '1'}</span>
-              </p>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div className="grid flex-1 grid-cols-2 gap-4">
-          {card.details.map((item) => (
-            <div key={item.label} className="min-w-0">
-              <p className="text-sm font-semibold leading-[150%] tracking-normal text-[#535862]">{item.label}</p>
-              <p className="mt-2 text-[27px] font-semibold leading-[1] tracking-normal text-[#3393F2]">
-                {item.value}
-              </p>
-            </div>
-          ))}
-        </div>
-      )}
-    </CardContent>
-  </Card>
+            <p className="mt-1 text-[10px] font-normal leading-[150%] tracking-normal text-[#717680]">
+              Pages <span className="text-[#3393F2]">{item.subValue ?? '1'}</span>
+            </p>
+          </div>
+        ))}
+      </div>
+    ) : (
+      <div className="grid flex-1 grid-cols-2 gap-4">
+        {card.details.map((item) => (
+          <div key={item.label} className="min-w-0">
+            <p className="text-sm font-semibold leading-[150%] tracking-normal text-[#535862]">{item.label}</p>
+            <p className="mt-2 text-[27px] font-semibold leading-[1] tracking-normal text-[#3393F2]">
+              {item.value}
+            </p>
+          </div>
+        ))}
+      </div>
+    )}
+  </CardContent>
+  </Card >
 );
 
 const ModelComparisonGrid = ({ results }: { results: any[] }) => {
@@ -1017,8 +1020,8 @@ const CitationSidebar = ({ activeResult }: { activeResult: any }) => {
               <span className="truncate text-[10.5px] font-medium text-slate-500">{host}</span>
               <span
                 className={`ml-auto inline-flex flex-shrink-0 items-center rounded-full px-2 py-0.5 text-[9px] font-semibold ${isDirect
-                    ? 'bg-emerald-50 text-emerald-700'
-                    : 'bg-blue-50 text-blue-700'
+                  ? 'bg-emerald-50 text-emerald-700'
+                  : 'bg-blue-50 text-blue-700'
                   }`}
               >
                 {typeLabel}
