@@ -159,6 +159,20 @@ const getModelIconNode = (model?: string, size: 'sm' | 'md' = 'sm') => {
   return <Bot className={`${dim} text-slate-400`} />;
 };
 
+const getModelPresenceSummary = (results?: any[]) => {
+  const byModel = new Map<string, { mentioned: boolean }>();
+  for (const result of results ?? []) {
+    const model = String(result?.model ?? '').trim().toLowerCase();
+    if (!model) continue;
+    const current = byModel.get(model) ?? { mentioned: false };
+    current.mentioned = current.mentioned || Number(result?.presence ?? 0) > 0;
+    byModel.set(model, current);
+  }
+  const total = byModel.size;
+  const mentions = Array.from(byModel.values()).filter((item) => item.mentioned).length;
+  return { mentions, total };
+};
+
 const sentimentTone = (sentiment?: number | null) => {
   if (sentiment == null || Number.isNaN(Number(sentiment))) {
     return 'border-slate-200 bg-white text-slate-600';
@@ -628,7 +642,6 @@ const ModelComparisonGrid = ({ results }: { results: any[] }) => {
             <thead>
               <tr className="border-b border-slate-300">
                 <th className="bg-white text-[12px] font-medium text-slate-500 py-4 px-4 text-center border-r border-slate-200 w-[160px]">
-                  Models
                   Models
                 </th>
                 {metrics.map((metric) => (
@@ -1759,7 +1772,10 @@ return (
                     </Badge>
                   </TableCell>
                   <TableCell className="py-3 px-2 text-[11px] font-medium text-slate-600">
-                    {row.mentions}/{row.results?.length || 0}
+                    {(() => {
+                      const modelPresence = getModelPresenceSummary(row.results);
+                      return `${modelPresence.mentions}/${modelPresence.total}`;
+                    })()}
                   </TableCell>
                   <TableCell className="py-3 px-2">
                     <Badge className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-[10px] font-bold text-emerald-600 hover:bg-emerald-50 border-0">
