@@ -868,15 +868,23 @@ const ExpandedDetails = ({ results }: { results: any[] }) => {
       const presence = g.presence / g._count;
       const mentionCount = g._mentionCount || 0;
       const mentioned = mentionCount > 0;
+      const displayRelevance = mentioned ? g.relevance / mentionCount : null;
+      const displayAccuracy = mentioned ? g.accuracy / mentionCount : null;
+      const displaySentiment = mentioned ? g.sentiment / mentionCount : null;
+      const overallInputs = [displayRelevance, displayAccuracy, displaySentiment].filter(
+        (score): score is number => typeof score === 'number' && Number.isFinite(score),
+      );
 
       return {
         ...g,
         presence,
         mentioned,
-        displayRelevance: mentioned ? g.relevance / mentionCount : null,
-        displayAccuracy: mentioned ? g.accuracy / mentionCount : null,
-        displaySentiment: mentioned ? g.sentiment / mentionCount : null,
-        displayOverall: mentioned ? g.overall / mentionCount : null,
+        displayRelevance,
+        displayAccuracy,
+        displaySentiment,
+        displayOverall: overallInputs.length > 0
+          ? overallInputs.reduce((sum, score) => sum + score, 0) / overallInputs.length
+          : mentioned ? g.overall / mentionCount : null,
         sources: allSources.length > 0 ? allSources : null,
         citations: allCitations.length > 0 ? allCitations : null,
         competitorMentions: allMentions.length > 0 ? allMentions : []
