@@ -442,7 +442,7 @@ const MetricInfoTooltip = ({ tip }: { tip: string }) => (
     <TooltipContent
       side="top"
       align="start"
-      className="max-w-[280px] bg-slate-900 text-slate-100 text-[12px] leading-relaxed font-normal px-3 py-2 rounded-lg shadow-xl"
+      className="max-w-[280px] bg-white text-[#414651] text-[12px] leading-relaxed font-normal px-3 py-2 rounded-lg shadow-xl"
     >
       {tip}
     </TooltipContent>
@@ -456,23 +456,19 @@ const MetricInfoTooltip = ({ tip }: { tip: string }) => (
  */
 const CARD_TOOLTIPS: Record<string, string> = {
   'Performance Across AI Models':
-    'Static placeholder card for now. It will later be wired to live model performance data for each assistant.',
-  'Top Prompts':
-    'Total prompts the wizard wrote, and how many were run through the AI models. Visibility is the share of model responses that mentioned your brand — measured only across prompts you actually selected.',
+    'See how often your brand appears across AI platforms and which models mention you most.',
   'Top AI Search Prompts':
-    'Total prompts the wizard wrote, and how many were run through the AI models. Visibility is the share of model responses that mentioned your brand — measured only across prompts you actually selected.',
+    'Total prompts tracked for your brand, including queries used to measure visibility across AI answers.',
   'Mentions':
-    'Of every brand mention in the AI responses, what share is yours vs your competitors. Brand 100% means every mention was you; high competitor % means the AIs are talking about your space but recommending others.',
+    'Compares how often your brand is mentioned against competitor mentions across tracked AI prompts.',
   'Overall Sentiment':
-    'How the AI assistants talk about your brand when they mention it. Positive means glowing language ("trusted", "industry-leading"), Negative means critical ("avoid", "outdated"). "Not measurable" means no prompt mentioned you in this run.',
+    'Summarizes how AI responses describe your brand, based on positive, neutral, or negative language.',
   'Brand Accuracy Score':
-    'When AIs make claims about your brand, how often those claims are factually correct based on your own website content. Low scores mean models are hallucinating things about you — a signal to publish clearer info.',
+    'Measures how correctly AI platforms describe your brand, services, positioning, and key information.',
   'AI Share of Voice':
-    'The headline number: across every model query in this run, what percentage of responses mentioned your brand at all. Think of this as your "page-1 ranking" for AI search.',
-  'Phrase Visibility Map':
-    'Per-prompt breakdown showing which questions you win on and which you lose. Click a row to see the actual model responses, citations, and competitor mentions for that prompt.',
+    'Shows your brand’s share of visibility for this prompt compared with other mentioned brands.',
   'Opportunities to Outrank Competitors':
-    'Specific actions derived from the audit data — which prompts your competitors are winning, which sources they\'re cited from, and concrete content moves to close the gap.',
+    'Suggested content ideas designed to help your brand appear more often than competitors in AI answers.',
 };
 
 /** Convenience — wraps a card title + tip badge inline. */
@@ -484,6 +480,45 @@ const CardTitleWithTip = ({ title, className }: { title: string; className?: str
     {CARD_TOOLTIPS[title] ? <MetricInfoTooltip tip={CARD_TOOLTIPS[title]} /> : <MetricInfoBadge />}
   </div>
 );
+
+const TABLE_HEADER_TOOLTIPS: Record<string, string> = {
+  Prompts: 'The AI search query used to check your brand visibility, sentiment, ranking, and competitor mentions.',
+  Sentiment: 'Shows whether the AI response presents your brand in a positive, neutral, or negative way.',
+  Ranking: 'Shows your brand’s rank among all brands mentioned in the AI response for that prompt.',
+  Position: 'Placeholder tooltip copy for the position column. Replace this with final product copy.',
+  'AI SOV': 'Shows your brand’s share of visibility for this prompt compared with other mentioned brands..',
+  Competitors: 'Lists the competing brands that appear with your brand in the same AI response.',
+  Action: 'Track prompt or draft content to improve visibility for that query.',
+};
+
+const TABLE_HEADER_TOOLTIPS_RESOLVED: Record<string, string> = {
+  ...TABLE_HEADER_TOOLTIPS,
+  'AI SOV': 'Shows how visible your brand is within this specific prompt compared with other brands mentioned in the response.',
+};
+
+type TableHeaderWithTipProps = {
+  label: keyof typeof TABLE_HEADER_TOOLTIPS;
+  align?: 'left' | 'right';
+  showSortArrow?: boolean;
+};
+
+const TableHeaderWithTip = ({ label, align = 'left', showSortArrow = false }: TableHeaderWithTipProps) => (
+  <div className={cn('flex items-center gap-1', align === 'right' && 'justify-end')}>
+    <span>{label}</span>
+    <MetricInfoTooltip tip={TABLE_HEADER_TOOLTIPS_RESOLVED[label]} />
+    {showSortArrow ? <ArrowUp className="h-3 w-3 text-slate-600" /> : null}
+  </div>
+);
+
+const CHART_TOOLTIPS: Record<string, string> = {
+  Citations: 'Monitor citation trends across AI models and see whether your sources are gaining authority.',
+  'Mentions rate trend': 'Shows how frequently your brand is mentioned in AI responses over the selected time period.',
+};
+
+const CHART_TOOLTIPS_RESOLVED: Record<string, string> = {
+  ...CHART_TOOLTIPS,
+  'Share of Voice': 'Track how your brand’s AI visibility changes over time against selected competitors.',
+};
 
 const MetricCard = ({ card }: { card: MetricCardData }) => (
   <Card
@@ -504,72 +539,72 @@ const MetricCard = ({ card }: { card: MetricCardData }) => (
               : 'min-h-[112px] gap-3.5 p-4 sm:p-5',
       )}
     >
-    <CardTitleWithTip title={card.title} />
+      <CardTitleWithTip title={card.title} />
 
-    {card.kind === 'modelPerformance' ? (
-      <div className="flex flex-1 flex-col gap-3 sm:gap-3.5 md:gap-4 xl:gap-[45px] pt-0.5">
-        {card.details.map((item) => (
-          <div
-            key={item.label}
-            className="grid grid-cols-[minmax(0,88px)_minmax(0,1fr)_auto] items-center gap-2.5 sm:grid-cols-[minmax(0,104px)_minmax(0,1fr)_auto]"
-          >
-            <div className="flex min-w-0 items-center gap-2">
-              {item.iconSrc ? <img src={item.iconSrc} alt="" className="h-4 w-4 shrink-0 object-contain" /> : null}
-              <span className="truncate text-[12px] font-medium leading-none text-[#535862]">{item.label}</span>
-            </div>
-            <div className="h-1.5 overflow-hidden rounded-full bg-[#D0D5DD]">
-              <div
-                className="h-full rounded-full bg-[#8AA4E8]"
-                style={{ width: `${item.barWidth ?? 0}%` }}
-              />
-            </div>
-            <span className="min-w-[20px] text-right text-[12px] font-medium tabular-nums text-[#2F6BFF]">
-              {item.value}
-            </span>
-          </div>
-        ))}
-      </div>
-    ) : card.kind === 'promptSummary' ? (
-      <div className="mt-1 grid flex-1 grid-cols-1 gap-6 sm:grid-cols-2 sm:gap-8">
-        {card.details.map((item) => (
-          <div key={item.label} className="min-w-0">
-            <p className="text-[14px] font-semibold leading-[150%] tracking-normal text-[#535862]">{item.label}</p>
-            <p className="mt-2 text-[27px] font-semibold leading-none tracking-normal text-[#3393F2]">
-              {item.value}
-            </p>
-          </div>
-        ))}
-      </div>
-    ) : card.kind === 'citations' ? (
-      <div className="grid flex-1 grid-cols-1 gap-x-6 gap-y-6 sm:grid-cols-2">
-        {card.details.map((item) => (
-          <div key={item.label} className="min-w-0">
-            <p className="text-sm font-semibold leading-[150%] tracking-normal text-[#535862]">{item.label}</p>
-            <div className="mt-2 flex items-start gap-3">
-              {item.iconSrc ? <img src={item.iconSrc} alt="" className="h-6 w-6 shrink-0 object-contain" /> : null}
-              <span className="text-[27px] font-semibold leading-[1] tracking-normal text-[#3393F2]">
+      {card.kind === 'modelPerformance' ? (
+        <div className="flex flex-1 flex-col gap-3 sm:gap-3.5 md:gap-4 xl:gap-[45px] pt-0.5">
+          {card.details.map((item) => (
+            <div
+              key={item.label}
+              className="grid grid-cols-[minmax(0,88px)_minmax(0,1fr)_auto] items-center gap-2.5 sm:grid-cols-[minmax(0,104px)_minmax(0,1fr)_auto]"
+            >
+              <div className="flex min-w-0 items-center gap-2">
+                {item.iconSrc ? <img src={item.iconSrc} alt="" className="h-4 w-4 shrink-0 object-contain" /> : null}
+                <span className="truncate text-[12px] font-medium leading-none text-[#535862]">{item.label}</span>
+              </div>
+              <div className="h-1.5 overflow-hidden rounded-full bg-[#D0D5DD]">
+                <div
+                  className="h-full rounded-full bg-[#8AA4E8]"
+                  style={{ width: `${item.barWidth ?? 0}%` }}
+                />
+              </div>
+              <span className="min-w-[20px] text-right text-[12px] font-medium tabular-nums text-[#2F6BFF]">
                 {item.value}
               </span>
             </div>
-            <p className="mt-1 text-[10px] font-normal leading-[150%] tracking-normal text-[#717680]">
-              Pages <span className="text-[#3393F2]">{item.subValue ?? '1'}</span>
-            </p>
-          </div>
-        ))}
-      </div>
-    ) : (
-      <div className="grid flex-1 grid-cols-2 gap-4">
-        {card.details.map((item) => (
-          <div key={item.label} className="min-w-0">
-            <p className="text-sm font-semibold leading-[150%] tracking-normal text-[#535862]">{item.label}</p>
-            <p className="mt-2 text-[27px] font-semibold leading-[1] tracking-normal text-[#3393F2]">
-              {item.value}
-            </p>
-          </div>
-        ))}
-      </div>
-    )}
-  </CardContent>
+          ))}
+        </div>
+      ) : card.kind === 'promptSummary' ? (
+        <div className="mt-1 grid flex-1 grid-cols-1 gap-6 sm:grid-cols-2 sm:gap-8">
+          {card.details.map((item) => (
+            <div key={item.label} className="min-w-0">
+              <p className="text-[14px] font-semibold leading-[150%] tracking-normal text-[#535862]">{item.label}</p>
+              <p className="mt-2 text-[27px] font-semibold leading-none tracking-normal text-[#3393F2]">
+                {item.value}
+              </p>
+            </div>
+          ))}
+        </div>
+      ) : card.kind === 'citations' ? (
+        <div className="grid flex-1 grid-cols-1 gap-x-6 gap-y-6 sm:grid-cols-2">
+          {card.details.map((item) => (
+            <div key={item.label} className="min-w-0">
+              <p className="text-sm font-semibold leading-[150%] tracking-normal text-[#535862]">{item.label}</p>
+              <div className="mt-2 flex items-start gap-3">
+                {item.iconSrc ? <img src={item.iconSrc} alt="" className="h-6 w-6 shrink-0 object-contain" /> : null}
+                <span className="text-[27px] font-semibold leading-[1] tracking-normal text-[#3393F2]">
+                  {item.value}
+                </span>
+              </div>
+              <p className="mt-1 text-[10px] font-normal leading-[150%] tracking-normal text-[#717680]">
+                Pages <span className="text-[#3393F2]">{item.subValue ?? '1'}</span>
+              </p>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="grid flex-1 grid-cols-2 gap-4">
+          {card.details.map((item) => (
+            <div key={item.label} className="min-w-0">
+              <p className="text-sm font-semibold leading-[150%] tracking-normal text-[#535862]">{item.label}</p>
+              <p className="mt-2 text-[27px] font-semibold leading-[1] tracking-normal text-[#3393F2]">
+                {item.value}
+              </p>
+            </div>
+          ))}
+        </div>
+      )}
+    </CardContent>
   </Card >
 );
 
@@ -1412,10 +1447,9 @@ export const PromptTable = ({
   useEffect(() => {
     setCurrentPage(1);
   }, [tableMetric]);
-
-  useEffect(() => {
-    if (currentPage > totalPages) setCurrentPage(totalPages);
-  }, [currentPage, totalPages]);
+useEffect(() => {
+  if (currentPage > totalPages) setCurrentPage(totalPages);
+}, [currentPage, totalPages]);
 
 const displayData = useMemo(() => {
   const start = (currentPage - 1) * PAGE_SIZE;
@@ -1581,39 +1615,25 @@ return (
                 />
               </TableHead>
               <TableHead className="px-2 text-[11px] font-semibold text-[#31415f]">
-                <div className="flex items-center gap-1">
-                  Prompts <Info className="h-[10px] w-[10px] text-slate-400" /> <ArrowUp className="h-3 w-3 text-slate-600" />
-                </div>
+                <TableHeaderWithTip label="Prompts" showSortArrow />
               </TableHead>
               <TableHead className="px-2 text-[11px] font-semibold text-[#31415f]">
-                <div className="flex items-center gap-1">
-                  Sentiment <Info className="h-[10px] w-[10px] text-slate-400" /> <ArrowUp className="h-3 w-3 text-slate-600" />
-                </div>
+                <TableHeaderWithTip label="Sentiment" showSortArrow />
               </TableHead>
               <TableHead className="px-2 text-[11px] font-semibold text-[#31415f]">
-                <div className="flex items-center gap-1">
-                  Ranking <Info className="h-[10px] w-[10px] text-slate-400" /> <ArrowUp className="h-3 w-3 text-slate-600" />
-                </div>
+                <TableHeaderWithTip label="Ranking" showSortArrow />
               </TableHead>
               <TableHead className="px-2 text-[11px] font-semibold text-[#31415f]">
-                <div className="flex items-center gap-1">
-                  Position <Info className="h-[10px] w-[10px] text-slate-400" /> <ArrowUp className="h-3 w-3 text-slate-600" />
-                </div>
+                <TableHeaderWithTip label="Position" showSortArrow />
               </TableHead>
               <TableHead className="px-2 text-[11px] font-semibold text-[#31415f]">
-                <div className="flex items-center gap-1">
-                  AI SOV <Info className="h-[10px] w-[10px] text-slate-400" /> <ArrowUp className="h-3 w-3 text-slate-600" />
-                </div>
+                <TableHeaderWithTip label="AI SOV" showSortArrow />
               </TableHead>
               <TableHead className="px-2 text-[11px] font-semibold text-[#31415f]">
-                <div className="flex items-center gap-1">
-                  Competitors <Info className="h-[10px] w-[10px] text-slate-400" /> <ArrowUp className="h-3 w-3 text-slate-600" />
-                </div>
+                <TableHeaderWithTip label="Competitors" showSortArrow />
               </TableHead>
               <TableHead className="px-4 text-right text-[11px] font-semibold text-[#31415f] rounded-tr-lg">
-                <div className="flex items-center justify-end gap-1">
-                  Action <Info className="h-[10px] w-[10px] text-slate-400" />
-                </div>
+                <TableHeaderWithTip label="Action" align="right" />
               </TableHead>
             </TableRow>
           </TableHeader>
@@ -2199,9 +2219,11 @@ export const AreaChartCard = ({
           <h3 className="text-[20px] font-semibold leading-[135%] text-[#414651]">{title}</h3>
           {/* Chart title gets the same per-title tooltip lookup; falls back
               to a plain badge if the title isn't in CARD_TOOLTIPS. */}
-          {CARD_TOOLTIPS[title]
-            ? <MetricInfoTooltip tip={CARD_TOOLTIPS[title]} />
-            : <MetricInfoBadge />}
+          {CHART_TOOLTIPS_RESOLVED[title]
+            ? <MetricInfoTooltip tip={CHART_TOOLTIPS_RESOLVED[title]} />
+            : CARD_TOOLTIPS[title]
+              ? <MetricInfoTooltip tip={CARD_TOOLTIPS[title]} />
+              : <MetricInfoBadge />}
         </div>
         <p className="mt-2 text-sm leading-[150%] text-[#535862]">{subtitle}</p>
         <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
@@ -2730,6 +2752,7 @@ const AIResultsReportPreview = () => {
   //
   // The cards re-derive whenever the page-header Sort / Filters dropdowns
   // change — narrowing the row set (categoryFilter) and the
+  // change — narrowing the row set (categoryFilter) and the
   // per-result model set (modelFilter) so headline numbers reflect what the
   // user is actually scoping to. Empty filter sets = show everything.
   const metricCards = useMemo<MetricCardData[]>(() => {
@@ -2996,9 +3019,6 @@ const filteredPrompts = useMemo(() => {
   items = items.filter(
     (p: any) => p.type?.toLowerCase() === 'prompt' && Array.isArray(p?.results) && p.results.length > 0,
   );
-  items = items.filter(
-    (p: any) => p.type?.toLowerCase() === 'prompt' && Array.isArray(p?.results) && p.results.length > 0,
-  );
 
   // Category filter (header Filters dropdown). Empty set = show all.
   if (categoryFilter.size > 0) {
@@ -3033,8 +3053,6 @@ const filteredPrompts = useMemo(() => {
     return promptSort === 'alphabetical-desc' ? -alphabeticalCompare : alphabeticalCompare;
   });
 }, [reportPrompts, promptSort, categoryFilter, modelFilter]);
-
-
 // Manual refetch for the "Retry" affordance on the opportunities card —
 // hits /report again so the LLM enrichment cache is exercised (or rebuilt
 // if the run summary was cleared).
@@ -3422,9 +3440,9 @@ return (
 
     <section className="grid w-full grid-cols-1 gap-6 bg-white px-4 py-0 sm:px-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
 
-      <Card id="ai-results-visibility-coverage" data-title="Visibility & Coverage" className="min-w-0 rounded-xl border border-[#D5D7DA] bg-white shadow-[0_1px_2px_0_#1018280D]">
+        <Card id="ai-results-visibility-coverage" data-title="Visibility Insights" className="min-w-0 rounded-xl border border-[#D5D7DA] bg-white shadow-[0_1px_2px_0_#1018280D]">
         <CardHeader className="flex flex-col gap-3 px-4 pb-2 pt-4 sm:flex-row sm:items-center sm:justify-between">
-          <CardTitle className="text-base font-semibold text-[#2D4059]">Visibility & Coverage</CardTitle>
+          <CardTitle className="text-base font-semibold text-[#2D4059]">Visibility Insights</CardTitle>
           <div className="flex flex-wrap items-center gap-2">
             <Button
               variant="outline"
@@ -3497,9 +3515,6 @@ return (
                     <div className="flex items-center gap-1.5">
                       <span className="truncate text-[14px] font-medium leading-5 text-[#414651]">
                         {action.title}
-                      </span>
-                      <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full border border-[#D0D5DD] text-[9px] text-[#667085]">
-                        i
                       </span>
                     </div>
                     <p className="mt-1 text-sm leading-6 text-[#667085]">
