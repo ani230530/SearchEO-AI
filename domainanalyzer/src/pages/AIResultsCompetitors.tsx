@@ -7,6 +7,7 @@ import {
   Info,
   Loader2,
   Plus,
+  RefreshCw,
   Search,
   Sparkles,
   X,
@@ -644,10 +645,14 @@ function CompetitorSelector({
 type TrendChartPoint = { label: string } & Record<string, number | string>;
 
 function TrendComparisonPanel({ trends }: { trends: TrendsResponse | null }) {
-  // Render the line charts as soon as we have a single completed run —
-  // recharts plots a single point per series when there's only one data
-  // point, which is still more useful than an empty state on day one.
-  const hasData = trends && trends.runs.length >= 1;
+  const runCount = trends?.runs.length ?? 0;
+  const hasData = runCount >= 1;
+  // With a single completed run a <Line> has only one point — recharts cannot
+  // draw a segment from one point, so without visible dots the chart renders
+  // blank. Show dots whenever the series is sparse (1–2 runs, e.g. right after
+  // a fresh re-audit that wiped history) so day-one data is always visible.
+  const sparse = runCount < 3;
+  const dotProp = sparse ? ({ r: 4 } as const) : (false as const);
 
   const formatTooltipValue = React.useCallback(
     (dataArray: TrendChartPoint[], unit: string = '') =>
@@ -674,9 +679,9 @@ function TrendComparisonPanel({ trends }: { trends: TrendsResponse | null }) {
     [],
   );
 
-  const { visibilityData, citationData, sovData, models, topCompetitors } = useMemo(() => {
+  const { visibilityData, citationData, sovData, models, topCompetitors, hasSignal } = useMemo(() => {
     if (!trends || trends.runs.length === 0) {
-      return { visibilityData: [] as TrendChartPoint[], citationData: [] as TrendChartPoint[], sovData: [] as TrendChartPoint[], models: [] as string[], topCompetitors: [] as string[] };
+      return { visibilityData: [] as TrendChartPoint[], citationData: [] as TrendChartPoint[], sovData: [] as TrendChartPoint[], models: [] as string[], topCompetitors: [] as string[], hasSignal: false };
     }
     const modelsSet = new Set<string>();
     for (const r of trends.runs) for (const m of Object.keys(r.perModel)) modelsSet.add(m);
@@ -686,8 +691,6 @@ function TrendComparisonPanel({ trends }: { trends: TrendsResponse | null }) {
       const point: TrendChartPoint = { label: new Date(r.startedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) };
       for (const m of modelList) {
         const cell = r.perModel[m];
-        // presenceCount / queries is a rough visibility %; runs without a model emit 0
-        const queries = cell ? Object.values(r.perModel).reduce((s, x) => s + (x?.presenceCount ?? 0), 0) : 0;
         point[m] = cell ? cell.presenceCount : 0;
       }
       return point;
@@ -709,7 +712,11 @@ function TrendComparisonPanel({ trends }: { trends: TrendsResponse | null }) {
       return point;
     });
 
-    return { visibilityData: visibility, citationData: citation, sovData: sov, models: modelList, topCompetitors: trends.topCompetitors };
+    const signal =
+      trends.runs.some((r) => r.brandMentions > 0 || r.competitorMentions > 0) ||
+      Object.values(trends.runs[trends.runs.length - 1]?.perModel ?? {}).some((m) => (m?.cites ?? 0) > 0);
+
+    return { visibilityData: visibility, citationData: citation, sovData: sov, models: modelList, topCompetitors: trends.topCompetitors, hasSignal: signal };
   }, [trends]);
 
   return (
@@ -743,7 +750,7 @@ function TrendComparisonPanel({ trends }: { trends: TrendsResponse | null }) {
                 />
                 <RLegend wrapperStyle={{ fontSize: 10 }} />
                 {models.map((m, i) => (
-                  <Line key={m} type="monotone" dataKey={m} stroke={COMPETITOR_COLORS[i % COMPETITOR_COLORS.length]} strokeWidth={2} dot={false} />
+                  <Line key={m} type="monotone" dataKey={m} stroke={COMPETITOR_COLORS[i % COMPETITOR_COLORS.length]} strokeWidth={2} dot={dotProp} activeDot={{ r: 5 }} />
                 ))}
               </LineChart>
             </ResponsiveContainer>
@@ -767,7 +774,7 @@ function TrendComparisonPanel({ trends }: { trends: TrendsResponse | null }) {
                 />
                 <RLegend wrapperStyle={{ fontSize: 10 }} />
                 {models.map((m, i) => (
-                  <Line key={m} type="monotone" dataKey={m} stroke={COMPETITOR_COLORS[i % COMPETITOR_COLORS.length]} strokeWidth={2} dot={false} />
+                  <Line key={m} type="monotone" dataKey={m} stroke={COMPETITOR_COLORS[i % COMPETITOR_COLORS.length]} strokeWidth={2} dot={dotProp} activeDot={{ r: 5 }} />
                 ))}
               </LineChart>
             </ResponsiveContainer>
@@ -790,13 +797,19 @@ function TrendComparisonPanel({ trends }: { trends: TrendsResponse | null }) {
                   formatter={formatTooltipValue(sovData, '%')}
                 />
                 <RLegend wrapperStyle={{ fontSize: 10 }} />
-                <Line type="monotone" dataKey="You" stroke="#2D4059" strokeWidth={2.5} dot={{ r: 3 }} />
+                <Line type="monotone" dataKey="You" stroke="#2D4059" strokeWidth={2.5} dot={{ r: 3 }} activeDot={{ r: 5 }} />
                 {topCompetitors.map((host, i) => (
-                  <Line key={host} type="monotone" dataKey={host} stroke={COMPETITOR_COLORS[i % COMPETITOR_COLORS.length]} strokeWidth={2} dot={false} />
+                  <Line key={host} type="monotone" dataKey={host} stroke={COMPETITOR_COLORS[i % COMPETITOR_COLORS.length]} strokeWidth={2} dot={dotProp} activeDot={{ r: 5 }} />
                 ))}
               </LineChart>
             </ResponsiveContainer>
           </ChartBlock>
+
+          {!hasSignal ? (
+            <p className="rounded-md border border-dashed border-slate-200 bg-slate-50 px-4 py-3 text-center text-xs text-slate-500">
+              This run recorded no brand mentions, competitor mentions, or citations yet. Charts will fill in as the AI models start surfacing these domains.
+            </p>
+          ) : null}
         </div>
       )}
     </section>
@@ -1460,6 +1473,27 @@ export default function CompetitorsPage() {
     }
   };
 
+  // Manual refresh — invalidate every run-derived query for this domain so the
+  // page re-pulls report / trends / competitor-analysis / selected-competitors
+  // from the server. This is the escape hatch for the case where a re-audit
+  // finished in another tab (or the global 5-min staleTime is still holding a
+  // pre-audit copy) and the user wants to force the freshest numbers.
+  const isRefreshing =
+    reportQuery.isFetching ||
+    analysisQuery.isFetching ||
+    trendsQuery.isFetching ||
+    competitorsQuery.isFetching;
+
+  const handleRefresh = useCallback(() => {
+    if (domainId == null) return;
+    void queryClient.invalidateQueries({
+      predicate: (query) =>
+        Array.isArray(query.queryKey) &&
+        query.queryKey[0] === 'ai-results' &&
+        query.queryKey[2] === domainId,
+    });
+  }, [domainId, queryClient]);
+
   const closeDrawer = () => {
     setActiveDrawer(null);
     setSelectedCompetitor(null);
@@ -1612,6 +1646,16 @@ export default function CompetitorsPage() {
               <section className="flex flex-col gap-4">
                 <div className="flex items-center justify-between">
                   <h2 className="text-base font-semibold leading-none text-[#2D4059]">Competitor Analysis</h2>
+                  <button
+                    type="button"
+                    onClick={handleRefresh}
+                    disabled={isRefreshing}
+                    title="Refresh competitor data"
+                    className="inline-flex h-9 items-center gap-2 rounded-md border border-slate-200 bg-white px-3 text-xs font-semibold text-[#5F6877] shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <RefreshCw className={`h-3.5 w-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
+                    {isRefreshing ? 'Refreshing…' : 'Refresh'}
+                  </button>
                 </div>
 
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5">

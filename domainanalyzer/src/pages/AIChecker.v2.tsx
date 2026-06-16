@@ -19,6 +19,7 @@
 
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { apiGet, apiPost } from "@/services/apiClient";
 import { useAuth } from "@/contexts/AuthContext";
 import { WizardShell } from "@/features/wizard-v2/WizardShell";
@@ -94,6 +95,7 @@ function loadPersistedForm(): PersistedStep1 | null {
 export default function AICheckerV2() {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { user, exchangeGoogleCode } = useAuth();
   const initialStep: WizardStep = searchParams.get("restart") === "crawl" ? 2 : searchParams.get("restart") === "competitors" ? 3 : searchParams.get("restart") === "topics" ? 4 : 1;
   const [step, setStep] = useState<WizardStep>(initialStep);
@@ -179,6 +181,11 @@ export default function AICheckerV2() {
         // canResumeAt would land us at the wrong step.
         if (restart === 'crawl' || restart === 'competitors' || restart === 'topics') {
           await apiPost(`/wizard/domain/${id}/restart`, { from: restart });
+          // The restart wiped runs (and, for crawl/competitors, the whole
+          // downstream pipeline) server-side. Any AI Results data still cached
+          // from before the restart is now stale/orphaned — drop it so the
+          // dashboard can't flash deleted runs if the user backs out mid-wizard.
+          void queryClient.invalidateQueries({ queryKey: ['ai-results'] });
           // Strip the param from the URL so a refresh doesn't re-restart.
           setSearchParams(
             (prev) => {
@@ -228,7 +235,7 @@ export default function AICheckerV2() {
       }
     };
     run();
-  }, [searchParams, setSearchParams]);
+  }, [searchParams, setSearchParams, queryClient]);
 
   // Advance to a target step, optionally pinning a fresh domainId into the URL
   // so a refresh restores the right resume point.

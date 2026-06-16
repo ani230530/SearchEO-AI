@@ -1078,7 +1078,15 @@ export async function runOnePrompt(
     timezone: null,
   };
 
-  const run = await prisma.aiRun.create({ data: { domainId, status: 'running' } });
+  // kind='adhoc' — this run covers a SINGLE prompt (the /prompts/analyze
+  // endpoint). It must never masquerade as the domain's latest full audit:
+  // the audit dashboards (/report, /trends, /competitor-analysis) all read the
+  // latest completed kind='audit' run, so a 1-prompt run defaulting to 'audit'
+  // would replace the real audit and collapse the dashboard to one prompt
+  // (competitor analysis goes empty, trends gains a junk point). The endpoint
+  // returns this run's results to the caller directly, so isolating its kind
+  // costs nothing while keeping the aggregate dashboards honest.
+  const run = await prisma.aiRun.create({ data: { domainId, status: 'running', kind: 'adhoc' } });
 
   // Run each model in parallel — bounded by ROSTER size (currently 3), so
   // we don't bother with the worker-queue concurrency control runQueries
