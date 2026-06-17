@@ -832,10 +832,6 @@ export const PromptTable = ({
       })),
     [campaignsQuery.data],
   );
-  const activeWorksheet = useMemo(
-    () => worksheetOptions.find((worksheet) => worksheet.id === activeWorksheetId) ?? null,
-    [activeWorksheetId, worksheetOptions]
-  );
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerRowIds, setPickerRowIds] = useState<string[]>([]);
   const [activeWorksheetId, setActiveWorksheetId] = useState<string | null>(null);
@@ -843,6 +839,10 @@ export const PromptTable = ({
   const [newWorksheetName, setNewWorksheetName] = useState("");
   const [creatingWorksheet, setCreatingWorksheet] = useState(false);
   const [createWorksheetError, setCreateWorksheetError] = useState<string | null>(null);
+  const activeWorksheet = useMemo(
+    () => worksheetOptions.find((worksheet) => worksheet.id === activeWorksheetId) ?? null,
+    [activeWorksheetId, worksheetOptions]
+  );
 
   // Open the picker for a single row (Draft Blog) or the current selection.
   const navigateToWorksheet = (rowId?: string) => {
