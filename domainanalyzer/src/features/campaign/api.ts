@@ -85,9 +85,9 @@ const authHeaders = (): Record<string, string> => {
 
 const handle = async <T>(res: Response): Promise<T> => {
   const text = await res.text();
-  let json: any = null;
+  let json: { success?: boolean; error?: string } | null = null;
   try {
-    json = text ? JSON.parse(text) : null;
+    json = text ? (JSON.parse(text) as { success?: boolean; error?: string }) : null;
   } catch {
     /* non-json response */
   }
@@ -250,14 +250,26 @@ export async function addTopicKeyword(
  */
 export async function aiSuggestTopicKeywords(
   topicId: number,
-  options?: { count?: number }
+  options?: {
+    count?: number;
+    keywordLogic?: string;
+    language?: string;
+    model?: string;
+  }
 ): Promise<WorksheetTopic[]> {
   const res = await fetch(
     `${API_BASE_URL}/api/campaigns/topics/${topicId}/keywords/ai`,
     {
       method: 'POST',
       headers: authHeaders(),
-      body: JSON.stringify({ count: options?.count ?? 5 }),
+      body: JSON.stringify({
+        count: options?.count ?? 5,
+        maxKeywordsPerCell: options?.count ?? 5,
+        keywordLogic: options?.keywordLogic ?? undefined,
+        keyword_logic: options?.keywordLogic ?? undefined,
+        language: options?.language ?? undefined,
+        model: options?.model ?? undefined,
+      }),
     }
   );
   const data = await handle<StructureResponse>(res);

@@ -15,7 +15,7 @@ import { Check, Loader2, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { apiGet } from '@/services/apiClient';
-import { maskDomainId } from '@/lib/domainUtils';
+import { buildDomainSlug, maskDomainId } from '@/lib/domainUtils';
 import { WizardStatusRow } from './WizardShell';
 
 interface Props {
@@ -29,6 +29,16 @@ interface Props {
 const STALL_WATCHDOG_MS = 45_000;
 
 const API_BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3002';
+
+const getReadableDomainSlug = async (domainId: number) => {
+  try {
+    const data = await apiGet<{ domains?: Array<{ id: number; url?: string; host?: string }> }>('/wizard/domains');
+    const domain = data.domains?.find((item) => item.id === domainId);
+    return domain ? buildDomainSlug(domain) : maskDomainId(domainId);
+  } catch {
+    return maskDomainId(domainId);
+  }
+};
 
 interface PromptRow {
   id: number;
@@ -214,7 +224,9 @@ export function Step5RunQueries({ domainId, onError }: Props) {
             // mount with the new run's numbers.
             void queryClient.invalidateQueries({ queryKey: ['ai-results'] });
             // Brief pause so the user sees the final tick before navigating.
-            setTimeout(() => navigate(`/ai-results/${maskDomainId(domainId)}`), 800);
+            setTimeout(() => {
+              void getReadableDomainSlug(domainId).then((slug) => navigate(`/ai-results/${slug}`));
+            }, 800);
             break;
           case 'error':
             ctrl.abort();

@@ -1,5 +1,6 @@
 import { Bell, CircleHelp, LogOut, UserRound, Link as LinkIcon } from "lucide-react"; // Renamed icon to LinkIcon
 import { Link } from "react-router-dom"; // Link for navigation (use "next/link" if using Next.js)
+import { resolveDashboardPath } from "@/features/sidebar-dashboard/navigation";
 
 import type { DashboardHeaderProps } from "@/features/sidebar-dashboard/types";
 import {
@@ -38,7 +39,7 @@ export function DashboardHeader({
       })
     : "Not synced yet";
 
-  const profileLink = "/dashboard?tab=settings&subtab=profile";
+  const profileLink = resolveDashboardPath("settings", { settingsSubTab: "profile" });
 
   // This one variable now contains all your header buttons (Bell, Help, Profile)
   const headerActions = (

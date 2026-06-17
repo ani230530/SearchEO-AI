@@ -2,8 +2,9 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
-import { maskDomainId } from "@/lib/domainUtils";
+import { buildDomainSlug, domainMatchesSlug } from "@/lib/domainUtils";
 import { apiGet } from "../services/apiClient";
+import { resolveDashboardPath } from "@/features/sidebar-dashboard/navigation";
 
 export const AI_VISIBILITY_LAST_DOMAIN_SLUG = "ai-visibility:lastDomainSlug";
 
@@ -26,7 +27,7 @@ const AIVisibilityRedirect = () => {
     const resolveDomain = async () => {
       try {
         // We always fetch the domains list to ensure we have fresh data and
-        // to populate the sessionStorage mapping via maskDomainId.
+        // to populate the latest readable domain slug.
         const data = await apiGet<any>("/wizard/domains");
         const domains = data.domains ?? [];
 
@@ -43,7 +44,7 @@ const AIVisibilityRedirect = () => {
 
         if (storedSlug) {
           // Try to find the domain that matches the stored slug
-          targetDomain = domains.find((d) => maskDomainId(d.id) === storedSlug);
+          targetDomain = domains.find((d) => domainMatchesSlug(d, storedSlug));
         }
 
         if (!targetDomain) {
@@ -56,7 +57,7 @@ const AIVisibilityRedirect = () => {
         }
 
         if (targetDomain) {
-          const slug = maskDomainId(targetDomain.id);
+          const slug = buildDomainSlug(targetDomain);
           setState({ status: "redirect", slug });
         } else {
           setState({ status: "empty" });
@@ -97,7 +98,7 @@ const AIVisibilityRedirect = () => {
             Analyze a domain first to see your AI visibility report.
           </p>
           <button
-            onClick={() => navigate("/dashboard?tab=overview")}
+            onClick={() => navigate(resolveDashboardPath("overview"))}
             className="px-4 py-2 rounded-full bg-black text-white hover:bg-black/90 transition"
           >
             Back to dashboard
@@ -114,7 +115,7 @@ const AIVisibilityRedirect = () => {
           <h2 className="text-xl font-semibold text-gray-900 mb-2">Something went wrong</h2>
           <p className="text-gray-600 mb-6">{state.message}</p>
           <button
-            onClick={() => navigate("/dashboard?tab=overview")}
+            onClick={() => navigate(resolveDashboardPath("overview"))}
             className="px-4 py-2 rounded-full bg-black text-white hover:bg-black/90 transition"
           >
             Back to dashboard

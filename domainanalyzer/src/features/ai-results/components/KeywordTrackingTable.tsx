@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { apiGet, apiPost } from "@/services/apiClient";
 import { useToast } from "@/components/ui/use-toast";
 import { maskDomainId } from "@/lib/domainUtils";
@@ -545,6 +545,7 @@ export const KeywordTrackingTable = ({
 }) => {
   const { toast } = useToast();
   const navigate = useNavigate();
+  const location = useLocation();
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [tableSort, setTableSort] = useState<SortState<KeywordSortMetric>>(null);
   const toggleTableSort = (metric: KeywordSortMetric) => {
@@ -621,10 +622,11 @@ export const KeywordTrackingTable = ({
       });
       return;
     }
-    const slug = maskDomainId(domainId);
+    const currentAiResultsPath = location.pathname.match(/^\/ai-results\/[^/]+/)?.[0];
+    const basePath = currentAiResultsPath ?? `/ai-results/${domainId}`;
     const url = rowId
-      ? `/ai-results/${slug}?openWorksheet=${encodeURIComponent(rowId)}`
-      : `/ai-results/${slug}?openWorksheet=1`;
+      ? `${basePath}?openWorksheet=${encodeURIComponent(rowId)}`
+      : `${basePath}?openWorksheet=1`;
     navigate(url);
   };
 

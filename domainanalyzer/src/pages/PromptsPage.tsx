@@ -1021,6 +1021,10 @@ const PromptsPage = () => {
   const [newWorksheetName, setNewWorksheetName] = useState("");
   const [creatingWorksheet, setCreatingWorksheet] = useState(false);
   const [createWorksheetError, setCreateWorksheetError] = useState<string | null>(null);
+  const activeWorksheet = useMemo(
+    () => worksheetOptions.find((worksheet) => worksheet.id === activeWorksheetId) ?? null,
+    [activeWorksheetId, worksheetOptions]
+  );
 
   const pickerRows = useMemo(() => {
     const byId = new Map([...reportRows, ...trackedRows].map((row) => [row.id, row]));
@@ -1035,7 +1039,7 @@ const PromptsPage = () => {
     };
     writeWorksheetHandoff({ worksheetId, importPayload: payload });
     localStorage.setItem("activeTab", "projects");
-    navigate(buildProjectsWorksheetPath(worksheetId));
+    navigate(buildProjectsWorksheetPath(worksheetId, activeWorksheet?.name));
   };
 
   const handleAddToWorksheet = () => {
@@ -1044,7 +1048,7 @@ const PromptsPage = () => {
       activeWorksheetId,
       selectedItemIds: pickerRowIds,
       selectedRows: buildWorksheetRows(pickerRows),
-    });
+    }, activeWorksheet?.name);
     if (!openedTab) return;
     localStorage.setItem("activeTab", "projects");
     setPickerOpen(false);

@@ -24,7 +24,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { maskDomainId } from '@/lib/domainUtils';
+import { buildDomainSlug } from '@/lib/domainUtils';
 
 type Phase = 'idle' | 'crawl' | 'competitors' | 'topics' | 'done' | 'error';
 
@@ -323,7 +323,7 @@ export function AddDomainModal({
       });
       setPhase('done');
       // Navigate to results page (preserves existing route shape).
-      navigate(`/ai-results/${maskDomainId(domainId)}`);
+      navigate(`/ai-results/${buildDomainSlug({ id: domainId, url })}`);
     } catch (err) {
       setPhase('error');
       setError(err instanceof Error ? err.message : 'Final selection failed');

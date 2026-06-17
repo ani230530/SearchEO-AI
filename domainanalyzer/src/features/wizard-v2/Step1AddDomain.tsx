@@ -3,7 +3,7 @@ import { Country, State } from "country-state-city";
 import { ChevronDown, Loader2 } from "lucide-react";
 import { apiPost } from "@/services/apiClient";
 import { classifyError } from "./wizardErrors";
-import { maskDomainId } from "@/lib/domainUtils";
+import { buildDomainSlug } from "@/lib/domainUtils";
 import type { WizardProfile } from "./types";
 
 interface ValidateResponse {
@@ -221,7 +221,7 @@ export function Step1AddDomain({ initialUrl = "", initialProfile, onContinue, on
   // User chose "View existing report".
   const handleViewExisting = () => {
     if (!existingChoice || !onExistingDomain) return;
-    onExistingDomain(maskDomainId(existingChoice.domainId));
+    onExistingDomain(buildDomainSlug({ id: existingChoice.domainId, url: existingChoice.url }));
   };
 
   return (

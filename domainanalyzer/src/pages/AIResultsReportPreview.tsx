@@ -85,7 +85,6 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { useToast } from '@/components/ui/use-toast';
-import { maskDomainId, unmaskDomainId } from '../lib/domainUtils';
 import { useShellContext } from '@/features/ai-results/AIResultsShell';
 import { useCampaigns, useGscStatus, useReport, useRuns, useTrackedPrompts, useTrends } from '@/features/ai-results/queries';
 import { useQueryClient } from '@tanstack/react-query';
@@ -2481,6 +2480,10 @@ const AIResultsReportPreview = () => {
       description: c.description?.trim() ? c.description.trim() : null,
     }));
   }, [campaignsQuery.data]);
+  const activeWorksheet = useMemo(
+    () => worksheetOptions.find((worksheet) => worksheet.id === activeWorksheetId) ?? null,
+    [activeWorksheetId, worksheetOptions]
+  );
   const worksheetOptionsLoading = campaignsQuery.isLoading;
 
   const gscQuery = useGscStatus<{ connected?: boolean }>();
@@ -2525,7 +2528,7 @@ const AIResultsReportPreview = () => {
         title: 'Connect Website',
         description: 'Integrate your website to automate content publishing and optimization.',
         iconSrc: '/suggested-actions/connect-website.svg',
-        onClick: () => navigate('/dashboard?tab=integration'),
+        onClick: () => navigate(resolveSidebarNavigation('integration').path),
       },
       {
         title: 'Explore Opportunities',
@@ -2645,7 +2648,7 @@ const AIResultsReportPreview = () => {
         writeWorksheetHandoff({ worksheetId: built.campaignId });
         localStorage.setItem('activeTab', 'projects');
         setGenerationByKey((prev) => ({ ...prev, [key]: { kind: 'done', draftId: null } }));
-        const worksheetPath = buildProjectsWorksheetPath(built.campaignId);
+        const worksheetPath = buildProjectsWorksheetPath(built.campaignId, activeWorksheet?.name);
         if (worksheetTab) {
           worksheetTab.location.href = worksheetPath;
         } else {
@@ -2663,7 +2666,7 @@ const AIResultsReportPreview = () => {
         return false;
       }
     },
-    [navigate, reportData]
+    [activeWorksheet?.name, navigate, reportData]
   );
 
   const handleGenerateContent = useCallback(
@@ -2742,12 +2745,12 @@ const AIResultsReportPreview = () => {
       });
 
     const payload = { activeWorksheetId, selectedItemIds, selectedRows };
-    const worksheetTab = openWorksheetInNewTab(activeWorksheetId, payload);
+    const worksheetTab = openWorksheetInNewTab(activeWorksheetId, payload, activeWorksheet?.name);
     if (!worksheetTab) return;
     localStorage.setItem('activeTab', 'projects');
     setIsWorksheetModalOpen(false);
     setActiveWorksheetId(null);
-  }, [activeWorksheetId, pendingGeneration, reportData, runGeneration, selectedRowIds]);
+  }, [activeWorksheet?.name, activeWorksheetId, pendingGeneration, reportData, runGeneration, selectedRowIds]);
 
   const handleCreateNewWorksheet = useCallback(() => {
     setCreateWorksheetError(null);
@@ -2831,7 +2834,7 @@ const AIResultsReportPreview = () => {
       localStorage.setItem('activeTab', 'projects');
       setIsWorksheetModalOpen(false);
       setActiveWorksheetId(null);
-      navigate(buildProjectsWorksheetPath(newId));
+      navigate(buildProjectsWorksheetPath(newId, newWorksheetName));
     } catch (err) {
       console.error('[AIResults] Create worksheet failed:', err);
       setCreateWorksheetError('Failed to create worksheet. Please try again.');
@@ -3229,7 +3232,7 @@ return (
             </p>
           </div>
           <Button
-            onClick={() => navigate('/dashboard?tab=integration')}
+            onClick={() => navigate(resolveSidebarNavigation('integration').path)}
             className="h-[37px] w-full shrink-0 rounded-lg bg-[#2D4059] px-4 gap-12text-sm font-semibold text-white shadow-[0_1px_2px_0_#1018280D] hover:bg-[#24364d] sm:w-auto"
           >
             <IntegrateSiteIcon />

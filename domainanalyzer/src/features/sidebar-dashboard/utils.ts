@@ -1,11 +1,9 @@
 import type {
-  CompanySubTabId,
   DashboardSearchState,
   TabId,
 } from "@/features/sidebar-dashboard/types";
-import type { SettingsSubTab } from "@/features/sidebar-dashboard/sections/settings/types";
 import type { Keyword, KeywordTableItem } from "@/types";
-import { DASHBOARD_QUERY_TABS } from "@/features/sidebar-dashboard/navigation";
+import { resolveDashboardTabFromPathname } from "@/features/sidebar-dashboard/navigation";
 
 const VALID_TABS: readonly TabId[] = [
   "overview",
@@ -21,20 +19,6 @@ const VALID_TABS: readonly TabId[] = [
   "knowledge-base",
   "domain-history",
   "competitor-intelligence",
-];
-
-const VALID_COMPANY_SUB_TABS: readonly CompanySubTabId[] = [
-  "company-info",
-  "integration",
-];
-
-const VALID_SETTINGS_SUB_TABS: readonly SettingsSubTab[] = [
-  "profile",
-  "knowledge-base",
-  "privacy-security",
-  "notifications",
-  "subscription",
-  "integrations",
 ];
 
 export function summarizeDomainContext(
@@ -66,38 +50,29 @@ export function getStoredActiveTab(value: string | null, fallback: TabId = "over
   return value && VALID_TABS.includes(value as TabId) ? (value as TabId) : fallback;
 }
 
-export function parseDashboardSearchState(search: string): DashboardSearchState {
+export function slugifyCampaignTitle(value: string) {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "") || "campaign";
+}
+
+export function parseDashboardSearchState(pathname: string, search: string): DashboardSearchState {
   const params = new URLSearchParams(search);
-  const tabParam = params.get("tab");
-  const subtabParam = params.get("subtab");
   const wordpressParam = params.get("wordpress");
   const actionParam = params.get("action");
   const campaignParam = params.get("campaign");
   const parsedCampaignId = campaignParam ? Number(campaignParam) : undefined;
-  const isLegacyProfileTab = tabParam === "profile";
-  const activeSettingsSubTab = isLegacyProfileTab
-    ? "profile"
-    : tabParam === "settings" && subtabParam && VALID_SETTINGS_SUB_TABS.includes(subtabParam as SettingsSubTab)
-      ? (subtabParam as SettingsSubTab)
-      : undefined;
-
-  if (tabParam === "ai-checker") {
-    return { redirectToAiVisibility: true };
-  }
+  const pathState = resolveDashboardTabFromPathname(pathname);
+  const campaignSlugMatch = pathname.match(/^\/dashboard\/campaigns\/([^/]+)$/);
 
   return {
     redirectToAiVisibility: false,
-    activeTab:
-      isLegacyProfileTab
-        ? "settings"
-        : tabParam && DASHBOARD_QUERY_TABS.includes(tabParam as TabId)
-        ? (tabParam as TabId)
-        : undefined,
-    activeCompanySubTab:
-      subtabParam && VALID_COMPANY_SUB_TABS.includes(subtabParam as CompanySubTabId)
-        ? (subtabParam as CompanySubTabId)
-        : undefined,
-    activeSettingsSubTab,
+    activeTab: pathState.activeTab,
+    activeCompanySubTab: undefined,
+    activeSettingsSubTab: pathState.activeSettingsSubTab,
+    activeCampaignSlug: campaignSlugMatch?.[1] ? decodeURIComponent(campaignSlugMatch[1]) : undefined,
     activeCampaignId:
       typeof parsedCampaignId === "number" && Number.isFinite(parsedCampaignId)
         ? parsedCampaignId

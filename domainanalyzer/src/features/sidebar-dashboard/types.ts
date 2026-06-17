@@ -49,6 +49,7 @@ export interface DashboardSearchState {
   activeCompanySubTab?: CompanySubTabId;
   activeSettingsSubTab?: SettingsSubTab;
   activeCampaignId?: number;
+  activeCampaignSlug?: string;
   openWordpressConnection?: boolean;
   action?: string;
 }
