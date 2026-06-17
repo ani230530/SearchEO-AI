@@ -42,7 +42,7 @@ import type {
 } from '@/components/competitors/aiResponseAnalysisData';
 import { apiPost } from '../services/apiClient';
 import { logoUrl as logoUrlHelper } from '@/lib/logoUrl';
-import { maskDomainId } from '@/lib/domainUtils';
+import { buildDomainSlug } from '@/lib/domainUtils';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { useShellContext } from '@/features/ai-results/AIResultsShell';
@@ -1331,7 +1331,7 @@ export default function CompetitorsPage() {
   const { currentDomain, domainsLoading } = useShellContext();
   const domainId = currentDomain?.id ?? null;
   const { currentTitle: currentCompetitorSectionTitle } = useScrollSpyBreadcrumbs({});
-  const maskedDomainId = currentDomain?.id ? maskDomainId(currentDomain.id) : undefined;
+  const maskedDomainId = currentDomain ? buildDomainSlug(currentDomain) : undefined;
 
   // All four data sources hit React Query — sibling tabs hit the same cache.
   const reportQuery = useReport<ReportPayload>(domainId);

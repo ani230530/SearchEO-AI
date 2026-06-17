@@ -3,10 +3,13 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { ChatWidget } from "@/features/chat/ChatWidget";
+import { resolveSidebarNavigation } from "@/features/sidebar-dashboard/navigation";
+import type { TabId } from "@/features/sidebar-dashboard/types";
+import type { SettingsSubTab } from "@/features/sidebar-dashboard/sections/settings/types";
 
 // Eager — needed for first paint or are tiny / part of the auth funnel.
 import Auth from "./pages/Auth";
@@ -18,7 +21,6 @@ import { AIResultsShell } from "./features/ai-results/AIResultsShell";
 // Lazy — gated behind auth or under the AI Checker shell. Each becomes its
 // own chunk, downloaded only when the user navigates to it.
 const SidebarDashboard = lazy(() => import("./pages/SidebarDashboard"));
-const KnowledgeBase = lazy(() => import("./pages/KnowledgeBase"));
 const AICheckerV2 = lazy(() => import("./pages/AIChecker.v2"));
 const AIResultsReportPreview = lazy(() => import("./pages/AIResultsReportPreview"));
 const AIResultsCompetitors = lazy(() => import("./pages/AIResultsCompetitors"));
@@ -57,10 +59,54 @@ const RootRoute = () => {
   }
 
   if (user && token) {
-    return <Navigate to="/newdashboard" replace />;
+    return <Navigate to="/dashboard/overview" replace />;
   }
 
   return <LandingPage />;
+};
+
+const DashboardRoute = () => {
+  const location = useLocation();
+  const params = new URLSearchParams(location.search);
+  const legacyTab = params.get("tab");
+
+  if (legacyTab) {
+    const targetTab = legacyTab === "profile" ? "settings" : legacyTab;
+    const validTabs: readonly TabId[] = [
+      "overview",
+      "analytics",
+      "integration",
+      "projects",
+      "settings",
+      "ai-visibility",
+      "gsc-analytics",
+      "attribution",
+      "audit",
+      "analytics-report",
+      "competitor-intelligence",
+      "knowledge-base",
+      "domain-history",
+    ];
+
+    if (validTabs.includes(targetTab as TabId)) {
+      const route =
+        targetTab === "settings"
+          ? resolveSidebarNavigation("settings", {
+              settingsSubTab: (params.get("subtab") as SettingsSubTab | null) ?? undefined,
+            })
+          : resolveSidebarNavigation(targetTab as TabId);
+      params.delete("tab");
+      params.delete("subtab");
+      const nextSearch = params.toString();
+      return <Navigate to={`${route.path}${nextSearch ? `?${nextSearch}` : ""}`} replace />;
+    }
+  }
+
+  if (location.pathname === "/dashboard" || location.pathname === "/newdashboard") {
+    return <Navigate to="/dashboard/overview" replace />;
+  }
+
+  return <SidebarDashboard />;
 };
 
 const App = () => (
@@ -97,11 +143,16 @@ const App = () => (
               {/* Protected routes */}
               <Route path="/dashboard" element={
                 <ProtectedRoute>
-                  <SidebarDashboard />
+                  <DashboardRoute />
+                </ProtectedRoute>
+              } />
+              <Route path="/dashboard/*" element={
+                <ProtectedRoute>
+                  <DashboardRoute />
                 </ProtectedRoute>
               } />
               <Route path="/ai-visibility" element={
-                <Navigate to="/dashboard?tab=ai-visibility" replace />
+                <Navigate to="/dashboard/ai-visibility" replace />
               } />
               <Route path="/ai-checker-v2" element={
                 <ProtectedRoute>
@@ -121,22 +172,27 @@ const App = () => (
               </Route>
               <Route path="/profile" element={
                 <ProtectedRoute>
-                  <Navigate to="/dashboard?tab=settings&subtab=profile" replace />
+                  <Navigate to="/dashboard/settings/profile" replace />
                 </ProtectedRoute>
               } />
               <Route path="/newdashboard" element={
                 <ProtectedRoute>
-                  <SidebarDashboard />
+                  <DashboardRoute />
+                </ProtectedRoute>
+              } />
+              <Route path="/newdashboard/*" element={
+                <ProtectedRoute>
+                  <DashboardRoute />
                 </ProtectedRoute>
               } />
               <Route path="/knowledge-base" element={
                 <ProtectedRoute>
-                  <KnowledgeBase />
+                  <Navigate to="/dashboard/knowledge-base" replace />
                 </ProtectedRoute>
               } />
               <Route path="/wordpress-connection" element={
                 <ProtectedRoute>
-                  <Navigate to="/dashboard?tab=integration&subtab=integration&wordpress=1" replace />
+                  <Navigate to="/dashboard/integration?wordpress=1" replace />
                 </ProtectedRoute>
               } />
               <Route path="/ai-results-report-preview" element={<AIVisibilityRedirect />} />

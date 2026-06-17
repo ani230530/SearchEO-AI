@@ -21,10 +21,10 @@
  */
 
 import { Suspense, useEffect, useMemo } from 'react';
-import { Outlet, useLocation, useOutletContext, useParams } from 'react-router-dom';
+import { Outlet, useLocation, useNavigate, useOutletContext, useParams } from 'react-router-dom';
 import { AIResultsLayout } from './components/AIResultsLayout';
 import { useDomains, type DomainRow } from './queries';
-import { maskDomainId, unmaskDomainId } from '@/lib/domainUtils';
+import { buildDomainSlug, domainMatchesSlug, unmaskDomainId } from '@/lib/domainUtils';
 
 export type ShellActiveItem = 'ai-results' | 'competitors' | 'prompts';
 
@@ -57,13 +57,14 @@ function byLastAnalyzed(a: DomainRow, b: DomainRow): number {
 export function AIResultsShell({ activeItem, title }: ShellProps) {
   const params = useParams();
   const location = useLocation();
+  const navigate = useNavigate();
 
   // Two ways the URL can carry the masked domain id:
   //   1. /:domain in the path (Report Preview, Track Prompts, Track Keywords)
   //   2. ?domain= in the query string (Competitors, Prompt Gaps — no path param)
   // Fall through to the last-visited slug from localStorage so the user
   // doesn't lose their working domain when navigating to a tab without one.
-  const urlMaskedId = useMemo(() => {
+  const urlDomainSlug = useMemo(() => {
     if (params.domain) return params.domain;
     const q = new URLSearchParams(location.search).get('domain');
     if (q) return q;
@@ -75,33 +76,43 @@ export function AIResultsShell({ activeItem, title }: ShellProps) {
 
   const currentDomain = useMemo<DomainRow | null>(() => {
     if (allDomains.length === 0) return null;
-    if (urlMaskedId) {
+    if (urlDomainSlug) {
       // Try direct id match first (cheap), then mask comparison (handles
       // hash strings that don't reverse cleanly).
-      const realId = unmaskDomainId(urlMaskedId);
+      const realId = unmaskDomainId(urlDomainSlug);
       if (realId != null) {
         const direct = allDomains.find((d) => d.id === realId);
         if (direct) return direct;
       }
-      const masked = allDomains.find((d) => maskDomainId(d.id) === urlMaskedId);
-      if (masked) return masked;
+      const readable = allDomains.find((d) => domainMatchesSlug(d, urlDomainSlug));
+      if (readable) return readable;
     }
     return [...allDomains].sort(byLastAnalyzed)[0] ?? null;
-  }, [allDomains, urlMaskedId]);
+  }, [allDomains, urlDomainSlug]);
 
   // Persist the resolved domain so a tab navigation that lands on a route
   // without an explicit :domain param (e.g. /airesults-competitors-preview)
   // can still pick up where the user left off.
   useEffect(() => {
     if (currentDomain) {
-      localStorage.setItem('ai-visibility:lastDomainSlug', maskDomainId(currentDomain.id));
+      localStorage.setItem('ai-visibility:lastDomainSlug', buildDomainSlug(currentDomain));
     }
   }, [currentDomain?.id]);
+
+  useEffect(() => {
+    if (!currentDomain || !params.domain) return;
+
+    const canonicalSlug = buildDomainSlug(currentDomain);
+    if (params.domain === canonicalSlug) return;
+
+    const suffix = location.pathname.endsWith('/prompts') ? '/prompts' : '';
+    navigate(`/ai-results/${canonicalSlug}${suffix}${location.search}`, { replace: true });
+  }, [currentDomain, location.pathname, location.search, navigate, params.domain]);
 
   const ctx: ShellContext = {
     allDomains,
     currentDomain,
-    maskedDomainId: currentDomain ? maskDomainId(currentDomain.id) : urlMaskedId,
+    maskedDomainId: currentDomain ? buildDomainSlug(currentDomain) : urlDomainSlug,
     domainsLoading,
   };
 

@@ -5,6 +5,7 @@ import { useToast } from "@/components/ui/use-toast";
 import PagesTable from "./PagesTable";
 import PageQueriesTable from "./PageQueriesTable";
 import { getDefaultDateRange, formatDateForDisplay, getDateRangeDescription } from "@/lib/gsc/dateUtils";
+import { resolveDashboardPath } from "@/features/sidebar-dashboard/navigation";
 
 type BlogAggregateRow = {
   id: number;
@@ -342,7 +343,7 @@ const GSCAnalyticsView = ({ onConnectGsc }: GSCAnalyticsViewProps = {}) => {
       onConnectGsc();
       return;
     }
-    window.location.href = '/newdashboard?tab=integration';
+    window.location.href = resolveDashboardPath("integration");
   };
 
   // Loading state

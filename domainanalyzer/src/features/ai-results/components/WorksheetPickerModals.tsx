@@ -16,13 +16,14 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { resolveDashboardPath } from "@/features/sidebar-dashboard/navigation";
 
 // sessionStorage keys + path helper shared by every surface that hands a
 // selection off to the worksheet/projects page.
 export const WORKSHEET_IMPORT_KEY = "ai-results/pending-worksheet-import";
 export const WORKSHEET_TARGET_KEY = "ai-results/pending-worksheet-target";
 export const buildProjectsWorksheetPath = (campaignId: string | number) =>
-  `/dashboard?tab=projects&campaign=${encodeURIComponent(String(campaignId))}`;
+  `${resolveDashboardPath("projects")}?campaign=${encodeURIComponent(String(campaignId))}`;
 
 type WorksheetImportRow = {
   id: string;

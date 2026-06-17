@@ -30,10 +30,10 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useAuth } from "@/contexts/AuthContext";
-import { maskDomainId } from "@/lib/domainUtils";
+import { buildDomainSlug } from "@/lib/domainUtils";
 import { DashboardSidebar } from "@/features/sidebar-dashboard/components/DashboardSidebar";
 import { DASHBOARD_TABS } from "@/features/sidebar-dashboard/constants";
-import { resolveSidebarNavigation, resolveAIResultsNavigation } from "@/features/sidebar-dashboard/navigation";
+import { resolveDashboardPath, resolveSidebarNavigation, resolveAIResultsNavigation } from "@/features/sidebar-dashboard/navigation";
 import type { TabId } from "@/features/sidebar-dashboard/types";
 
 type AIResultsNavItemId =
@@ -139,7 +139,9 @@ export function AIResultsLayout({
     "Loading…";
   const triggerLogo = logoUrlFor(triggerHost);
   const navigate = useNavigate();
-  const resolvedMaskedDomainId = maskedDomainId ?? (currentDomainId ? maskDomainId(currentDomainId) : undefined);
+  const resolvedMaskedDomainId =
+    maskedDomainId ??
+    (currentDomainId ? buildDomainSlug({ id: currentDomainId, url: currentDomainUrl, host: currentDomainHost }) : undefined);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const isSidebarExpanded = sidebarOpen;
 
@@ -190,7 +192,7 @@ export function AIResultsLayout({
           onToggleSidebar={setSidebarOpen}
           onSelectPricing={() => navigate(resolveSidebarNavigation("pricing").path)}
           onSelectCompanySubTab={() => {}}
-          onSelectCreateProject={() => navigate("/dashboard?tab=projects&action=create")}
+          onSelectCreateProject={() => navigate(`${resolveDashboardPath("projects")}?action=create`)}
           onSelectTab={handleSelectTab}
           activeSettingsSubTab={undefined}
           showResults={true}
@@ -276,7 +278,7 @@ export function AIResultsLayout({
                 >
                   {allDomains.length > 0 ? (
                     allDomains.map((domain) => {
-                      const nextMaskedId = maskDomainId(domain.id);
+                      const nextMaskedId = buildDomainSlug(domain);
                       const name = displayDomainName(domain);
                       const logo = logoUrlFor(domain.host ?? domain.url);
                       const isCurrent = domain.id === currentDomainId;
@@ -442,7 +444,7 @@ export function AIResultsLayout({
                   </Tooltip>
                   <DropdownMenuContent align="end" className="min-w-[14rem] p-1">
                     <DropdownMenuItem asChild className="cursor-pointer">
-                      <Link to="/dashboard?tab=settings&subtab=profile">Profile information</Link>
+                      <Link to={resolveDashboardPath("settings", { settingsSubTab: "profile" })}>Profile information</Link>
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       onSelect={(event) => {
