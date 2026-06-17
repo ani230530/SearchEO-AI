@@ -63,6 +63,47 @@ export const maskDomainId = (id: number): string => {
   return masked;
 };
 
+export type DomainSlugSource = {
+  id?: number | null;
+  url?: string | null;
+  host?: string | null;
+};
+
+export const getDomainHost = (value?: string | null): string => {
+  if (!value) return '';
+
+  const trimmed = value.trim();
+  if (!trimmed) return '';
+
+  try {
+    const target = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+    return new URL(target).hostname.replace(/^www\./i, '').toLowerCase();
+  } catch {
+    return trimmed
+      .replace(/^https?:\/\//i, '')
+      .replace(/^www\./i, '')
+      .split('/')[0]
+      .split('?')[0]
+      .split('#')[0]
+      .toLowerCase();
+  }
+};
+
+export const buildDomainSlug = (domain: DomainSlugSource): string => {
+  const host = getDomainHost(domain.host || domain.url);
+  if (host) {
+    return encodeURIComponent(host);
+  }
+
+  return domain.id != null ? maskDomainId(domain.id) : '';
+};
+
+export const domainMatchesSlug = (domain: DomainSlugSource, slug: string): boolean => {
+  const decodedSlug = decodeURIComponent(slug).toLowerCase();
+  return buildDomainSlug(domain).toLowerCase() === slug.toLowerCase()
+    || getDomainHost(domain.host || domain.url) === decodedSlug;
+};
+
 export const unmaskDomainId = (masked: string): number | null => {
   const mapping = getDomainIdMapping();
   const idFromMapping = mapping[masked];

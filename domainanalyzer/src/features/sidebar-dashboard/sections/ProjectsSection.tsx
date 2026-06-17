@@ -1,8 +1,9 @@
 import React from 'react';
 import { ArrowUpDown, Ellipsis, Grid3X3, List, Megaphone, Plus, SquarePen, Star, Trash2 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import Worksheet from '@/features/campaign/Worksheet';
+import { resolveDashboardPath } from '@/features/sidebar-dashboard/navigation';
 
 export function ProjectsSection(props: any) {
   const {
@@ -13,15 +14,14 @@ export function ProjectsSection(props: any) {
     setEditingCampaignId, setEditTitle, setEditDescription, setShowEditModal, confirmDelete, handleDeleteCampaign,
     showEditModal, handleUpdateCampaign, editTitle,
   } = props;
-  const location = useLocation();
   const navigate = useNavigate();
-  const dashboardBasePath = location.pathname.startsWith('/newdashboard') ? '/newdashboard' : '/dashboard';
   const buildProjectsPath = (campaignId?: number | null) => {
-    const params = new URLSearchParams({ tab: 'projects' });
+    const params = new URLSearchParams();
     if (campaignId !== undefined && campaignId !== null) {
       params.set('campaign', String(campaignId));
     }
-    return `${dashboardBasePath}?${params.toString()}`;
+    const query = params.toString();
+    return `${resolveDashboardPath('projects')}${query ? `?${query}` : ''}`;
   };
 
   if (selectedCampaignId) {

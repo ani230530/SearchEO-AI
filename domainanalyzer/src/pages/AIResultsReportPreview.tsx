@@ -83,7 +83,6 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { useToast } from '@/components/ui/use-toast';
-import { maskDomainId, unmaskDomainId } from '../lib/domainUtils';
 import { useShellContext } from '@/features/ai-results/AIResultsShell';
 import { useCampaigns, useGscStatus, useReport, useRuns, useTrackedPrompts, useTrends } from '@/features/ai-results/queries';
 import { useQueryClient } from '@tanstack/react-query';
@@ -2449,7 +2448,7 @@ const AIResultsReportPreview = () => {
         title: 'Connect Website',
         description: 'Integrate your website to automate content publishing and optimization.',
         iconSrc: '/suggested-actions/connect-website.svg',
-        onClick: () => navigate('/dashboard?tab=integration'),
+        onClick: () => navigate(resolveSidebarNavigation('integration').path),
       },
       {
         title: 'Explore Opportunities',
@@ -3153,7 +3152,7 @@ return (
             </p>
           </div>
           <Button
-            onClick={() => navigate('/dashboard?tab=integration')}
+            onClick={() => navigate(resolveSidebarNavigation('integration').path)}
             className="h-[37px] w-full shrink-0 rounded-lg bg-[#2D4059] px-4 gap-12text-sm font-semibold text-white shadow-[0_1px_2px_0_#1018280D] hover:bg-[#24364d] sm:w-auto"
           >
             <IntegrateSiteIcon />

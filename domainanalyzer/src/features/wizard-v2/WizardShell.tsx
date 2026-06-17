@@ -2,6 +2,7 @@ import { ReactNode, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { ArrowLeft, LineChart, ListFilter, MoreVertical, RefreshCw } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { resolveDashboardPath } from "@/features/sidebar-dashboard/navigation";
 import type { WizardStep } from "./types";
 
 interface WizardShellProps {
@@ -58,7 +59,7 @@ export function WizardShell({
   // to go back to. Send those users to /auth instead; authenticated users
   // continue to fall back to their dashboard's Domain History tab.
   const { user } = useAuth();
-  const fallbackBackTo = user ? "/dashboard?tab=domain-history" : "/auth";
+  const fallbackBackTo = user ? resolveDashboardPath("domain-history") : "/auth";
   const fallbackBackLabel = user ? "Domain history" : "Sign in";
 
   // Hide the document scrollbar while the wizard is mounted so the canvas

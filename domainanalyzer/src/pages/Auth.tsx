@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import Login from '@/components/auth/Login';
+import { resolveDashboardPath } from '@/features/sidebar-dashboard/navigation';
 
 interface FromLocation {
   from?: { pathname?: string; search?: string; hash?: string };
@@ -26,7 +27,7 @@ const Auth: React.FC = () => {
 
   // Where to send the user after login completes. ProtectedRoute populates
   // `location.state.from` when a deep-link redirected here. Fall back to
-  // the older localStorage flag, then /newdashboard.
+  // the older localStorage flag, then the canonical dashboard URL.
   const computeRedirect = useMemo(() => {
     return (): string => {
       const fromState = (location.state as FromLocation | null)?.from;
@@ -38,7 +39,7 @@ const Auth: React.FC = () => {
         localStorage.removeItem('postAuthRedirect');
         return stored;
       }
-      return '/newdashboard';
+      return resolveDashboardPath('overview');
     };
   }, [location.state]);
 

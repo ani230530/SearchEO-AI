@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { ButtonSpinner } from "@/components/ui/button-spinner";
 import { SettingsNotificationSection } from "@/features/sidebar-dashboard/sections/settings/SettingsNotificationSection";
 import { SettingsPlaceholderSection } from "@/features/sidebar-dashboard/sections/settings/SettingsPlaceholderSection";
@@ -7,6 +8,7 @@ import Profile from "@/pages/Profile";
 import { SettingsSubSidebar } from "@/features/sidebar-dashboard/sections/settings/SettingsSubSidebar";
 import { SETTINGS_ITEMS, type SettingsSubTab } from "@/features/sidebar-dashboard/sections/settings/types";
 import type { SettingsSectionProps } from "@/features/sidebar-dashboard/types";
+import { resolveDashboardPath } from "@/features/sidebar-dashboard/navigation";
 
 export function SettingsSection({
   confirmUpdateOpen,
@@ -16,6 +18,7 @@ export function SettingsSection({
   onOpenConfirm,
   activeSubTab,
 }: SettingsSectionProps) {
+  const navigate = useNavigate();
   const [currentSubTab, setCurrentSubTab] = useState<SettingsSubTab>(activeSubTab ?? "profile");
 
   useEffect(() => {
@@ -71,7 +74,10 @@ export function SettingsSection({
         <SettingsSubSidebar
           activeSubTab={currentSubTab}
           items={SETTINGS_ITEMS}
-          onSelect={setCurrentSubTab}
+          onSelect={(subTab) => {
+            setCurrentSubTab(subTab);
+            navigate(resolveDashboardPath("settings", { settingsSubTab: subTab }));
+          }}
         />
         <div className="rounded-xl border border-gray-200 bg-[#f8f8f9] p-4">{renderContent()}</div>
       </div>
