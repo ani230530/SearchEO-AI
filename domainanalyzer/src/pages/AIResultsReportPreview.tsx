@@ -5,8 +5,10 @@ import { apiPatch, apiPost } from '../services/apiClient';
 import { logoUrl as logoUrlHelper } from '@/lib/logoUrl';
 import { cn } from '@/lib/utils';
 import { AIResultsBreadcrumbs } from '@/features/ai-results/components/AIResultsBreadcrumbs';
+import { SortableTableHeader } from '@/features/ai-results/components/SortableTableHeader';
 import { resolveAIResultsNavigation, resolveSidebarNavigation } from '@/features/sidebar-dashboard/navigation';
 import { useScrollSpyBreadcrumbs } from '@/features/ai-results/useScrollSpyBreadcrumbs';
+import { compareNumbers, compareStrings, type SortDirection, type SortState } from '@/features/ai-results/sort';
 import {
   Area,
   AreaChart,
@@ -512,15 +514,23 @@ const TABLE_HEADER_TOOLTIPS_RESOLVED: Record<string, string> = {
 type TableHeaderWithTipProps = {
   label: keyof typeof TABLE_HEADER_TOOLTIPS;
   align?: 'left' | 'right';
-  showSortArrow?: boolean;
+  sortDirection?: SortDirection | null;
+  onToggleSort?: () => void;
 };
 
-const TableHeaderWithTip = ({ label, align = 'left', showSortArrow = false }: TableHeaderWithTipProps) => (
-  <div className={cn('flex items-center gap-1', align === 'right' && 'justify-end')}>
-    <span>{label}</span>
-    <MetricInfoTooltip tip={TABLE_HEADER_TOOLTIPS_RESOLVED[label]} />
-    {showSortArrow ? <ArrowUp className="h-3 w-3 text-slate-600" /> : null}
-  </div>
+const TableHeaderWithTip = ({
+  label,
+  align = 'left',
+  sortDirection = null,
+  onToggleSort,
+}: TableHeaderWithTipProps) => (
+  <SortableTableHeader
+    label={label}
+    align={align}
+    tooltip={<MetricInfoTooltip tip={TABLE_HEADER_TOOLTIPS_RESOLVED[label]} />}
+    activeDirection={sortDirection}
+    onToggleSort={onToggleSort}
+  />
 );
 
 const CHART_TOOLTIPS: Record<string, string> = {
@@ -1124,6 +1134,47 @@ type PromptTableProps = {
   domainId?: number | null;
 };
 
+type PromptTableSortMetric =
+  | 'prompts'
+  | 'sentiment'
+  | 'ranking'
+  | 'position'
+  | 'aiSov'
+  | 'competitors';
+
+const PROMPT_TABLE_SORT_LABELS: Record<PromptTableSortMetric, string> = {
+  prompts: 'Prompts',
+  sentiment: 'Sentiment',
+  ranking: 'Ranking',
+  position: 'Position',
+  aiSov: 'AI SOV',
+  competitors: 'Competitors',
+};
+
+const getPromptTableSortLabel = (sort: SortState<PromptTableSortMetric>) => {
+  if (!sort) return 'Sort';
+  return `${PROMPT_TABLE_SORT_LABELS[sort.metric]} ${sort.direction === 'asc' ? '↑' : '↓'}`;
+};
+
+const getPromptRankingScore = (row: PromptTableRow) => {
+  const positions = (row.results ?? [])
+    .map((result) => Number((result as { rankPosition?: number | null }).rankPosition))
+    .filter((position: number) => Number.isFinite(position) && position > 0);
+  return positions.length > 0 ? Math.min(...positions) : null;
+};
+
+const getPromptPositionScore = (row: PromptTableRow) => {
+  const rank = Number(row.bestRank);
+  return Number.isFinite(rank) && rank > 0 ? rank : null;
+};
+
+const getPromptSovScore = (row: PromptTableRow) => {
+  const value = Number.parseFloat(String(row.sov ?? '').replace('%', ''));
+  return Number.isFinite(value) ? value : null;
+};
+
+const getPromptCompetitorScore = (row: PromptTableRow) => Number(row.competitorCount ?? 0);
+
 export const PromptTable = ({
   data,
   selectedRowIds,
@@ -1146,7 +1197,18 @@ export const PromptTable = ({
       next.has(id) ? next.delete(id) : next.add(id);
       return next;
     });
-  const [tableMetric, setTableMetric] = useState<string | null>(null);
+  const [tableSort, setTableSort] = useState<SortState<PromptTableSortMetric>>(null);
+  const toggleTableSort = (metric: PromptTableSortMetric) => {
+    setTableSort((current) => {
+      if (current?.metric === metric) {
+        return {
+          metric,
+          direction: current.direction === 'asc' ? 'desc' : 'asc',
+        };
+      }
+      return { metric, direction: 'asc' };
+    });
+  };
   const [showAllQueries, setShowAllQueries] = useState(false);
   const trackedPromptsQuery = useTrackedPrompts<{ prompts?: PromptTableRow[] }>(domainId ?? null);
   const trackedPromptRows = useMemo(
@@ -1411,44 +1473,35 @@ export const PromptTable = ({
       );
     }
 
-    if (tableMetric) {
-      const numericFor = (row: any): number => {
-        switch (tableMetric) {
-          case 'Sentiment': return Number(row?.avgSentiment ?? 0);
-          case 'Position': {
-            const rank = Number(row?.bestRank);
-            return Number.isFinite(rank) && rank > 0 ? rank : Number.POSITIVE_INFINITY;
-          }
-          default: return 0;
+    if (tableSort) {
+      items.sort((a, b) => {
+        switch (tableSort.metric) {
+          case 'prompts':
+            return compareStrings(a?.phrase, b?.phrase, tableSort.direction);
+          case 'sentiment':
+            return compareNumbers(a?.avgSentiment, b?.avgSentiment, tableSort.direction);
+          case 'ranking':
+            return compareNumbers(getPromptRankingScore(a), getPromptRankingScore(b), tableSort.direction);
+          case 'position':
+            return compareNumbers(getPromptPositionScore(a), getPromptPositionScore(b), tableSort.direction);
+          case 'aiSov':
+            return compareNumbers(getPromptSovScore(a), getPromptSovScore(b), tableSort.direction);
+          case 'competitors':
+            return compareNumbers(getPromptCompetitorScore(a), getPromptCompetitorScore(b), tableSort.direction);
+          default:
+            return 0;
         }
-      };
-      if (tableMetric === 'Alphabetical') {
-        items.sort((a, b) =>
-          String(a?.phrase ?? '').localeCompare(String(b?.phrase ?? ''), undefined, {
-            sensitivity: 'base',
-          }),
-        );
-      } else if (tableMetric === 'Alphabetical Z-A') {
-        items.sort((a, b) =>
-          String(b?.phrase ?? '').localeCompare(String(a?.phrase ?? ''), undefined, {
-            sensitivity: 'base',
-          }),
-        );
-      } else if (tableMetric === 'Position') {
-        items.sort((a, b) => numericFor(a) - numericFor(b));
-      } else {
-        items.sort((a, b) => numericFor(b) - numericFor(a));
-      }
+      });
     }
 
     // newlyAnalyzedRows pin to the top of the full list — they're the
     // freshest data the user just produced. We DON'T pin them above
     // the metric-sort (that would lie about the sort).
-    if (!tableMetric) {
+    if (!tableSort) {
       return [...newlyAnalyzedRows.map(mergeTrackedRow), ...items];
     }
     return items;
-  }, [data, tableMetric, newlyAnalyzedRows, mergeTrackedRow]);
+  }, [data, tableSort, newlyAnalyzedRows, mergeTrackedRow]);
 
   const totalCount = fullSortedData.length;
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
@@ -1458,7 +1511,7 @@ export const PromptTable = ({
   // top of the new view.
   useEffect(() => {
     setCurrentPage(1);
-  }, [tableMetric]);
+  }, [tableSort]);
 useEffect(() => {
   if (currentPage > totalPages) setCurrentPage(totalPages);
 }, [currentPage, totalPages]);
@@ -1551,17 +1604,20 @@ return (
             <DropdownMenuTrigger asChild>
               <Button variant="outline" className="h-9 gap-2 border-slate-300 text-slate-600 rounded-lg px-3">
                 <BarChart3 className="h-4 w-4" />
-                <span className="text-sm font-medium">{tableMetric ? `Sort: ${tableMetric}` : 'Sort'}</span>
+                <span className="text-sm font-medium">{getPromptTableSortLabel(tableSort)}</span>
                 <ChevronDown className="h-4 w-4 opacity-50 ml-1" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-[180px]">
-              <DropdownMenuItem onClick={() => setTableMetric(null)}>Default order</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setTableSort(null)}>Default order</DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => setTableMetric('Alphabetical')}>Alphabetical A-Z</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setTableMetric('Alphabetical Z-A')}>Alphabetical Z-A</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setTableMetric('Sentiment')}>Sentiment</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setTableMetric('Position')}>Position</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setTableSort({ metric: 'prompts', direction: 'asc' })}>Prompts A-Z</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setTableSort({ metric: 'prompts', direction: 'desc' })}>Prompts Z-A</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setTableSort({ metric: 'sentiment', direction: 'desc' })}>Sentiment</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setTableSort({ metric: 'ranking', direction: 'asc' })}>Ranking</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setTableSort({ metric: 'position', direction: 'asc' })}>Position</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setTableSort({ metric: 'aiSov', direction: 'desc' })}>AI SOV</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setTableSort({ metric: 'competitors', direction: 'desc' })}>Competitors</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
 
@@ -1627,22 +1683,42 @@ return (
                 />
               </TableHead>
               <TableHead className="px-2 text-[11px] font-semibold text-[#31415f]">
-                <TableHeaderWithTip label="Prompts" showSortArrow />
+                <TableHeaderWithTip
+                  label="Prompts"
+                  sortDirection={tableSort?.metric === 'prompts' ? tableSort.direction : null}
+                  onToggleSort={() => toggleTableSort('prompts')}
+                />
               </TableHead>
               <TableHead className="px-2 text-[11px] font-semibold text-[#31415f]">
-                <TableHeaderWithTip label="Sentiment" showSortArrow />
+                <TableHeaderWithTip
+                  label="Sentiment"
+                  sortDirection={tableSort?.metric === 'sentiment' ? tableSort.direction : null}
+                  onToggleSort={() => toggleTableSort('sentiment')}
+                />
               </TableHead>
               <TableHead className="px-2 text-[11px] font-semibold text-[#31415f]">
-                <TableHeaderWithTip label="Ranking" showSortArrow />
+                <TableHeaderWithTip
+                  label="Ranking"
+                  sortDirection={tableSort?.metric === 'ranking' ? tableSort.direction : null}
+                  onToggleSort={() => toggleTableSort('ranking')}
+                />
               </TableHead>
               <TableHead className="px-2 text-[11px] font-semibold text-[#31415f]">
-                <TableHeaderWithTip label="Position" showSortArrow />
+                <TableHeaderWithTip
+                  label="Position"
+                  sortDirection={tableSort?.metric === 'position' ? tableSort.direction : null}
+                  onToggleSort={() => toggleTableSort('position')}
+                />
               </TableHead>
               <TableHead className="px-2 text-[11px] font-semibold text-[#31415f]">
-                <TableHeaderWithTip label="AI SOV" showSortArrow />
+                <TableHeaderWithTip
+                  label="AI SOV"
+                  sortDirection={tableSort?.metric === 'aiSov' ? tableSort.direction : null}
+                  onToggleSort={() => toggleTableSort('aiSov')}
+                />
               </TableHead>
               <TableHead className="px-2 text-[11px] font-semibold text-[#31415f]">
-                <TableHeaderWithTip label="Competitors" showSortArrow />
+                <TableHeaderWithTip label="Competitors" />
               </TableHead>
               <TableHead className="px-4 text-right text-[11px] font-semibold text-[#31415f] rounded-tr-lg">
                 <TableHeaderWithTip label="Action" align="right" />
@@ -3246,9 +3322,9 @@ return (
                 >
                   <ReportSortIcon />
                   {promptSort === 'alphabetical'
-                    ? 'Alphabetical A-Z'
+                    ? 'Prompts A-Z'
                     : promptSort === 'alphabetical-desc'
-                      ? 'Alphabetical Z-A'
+                      ? 'Prompts Z-A'
                       : promptSort === 'sentiment'
                         ? 'Sentiment'
                         : 'Position'}
@@ -3256,8 +3332,8 @@ return (
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-[180px]">
-                <DropdownMenuItem onClick={() => setPromptSort('alphabetical')}>Alphabetical A-Z</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setPromptSort('alphabetical-desc')}>Alphabetical Z-A</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setPromptSort('alphabetical')}>Prompts A-Z</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setPromptSort('alphabetical-desc')}>Prompts Z-A</DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setPromptSort('sentiment')}>Sentiment</DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setPromptSort('position')}>Position</DropdownMenuItem>
               </DropdownMenuContent>

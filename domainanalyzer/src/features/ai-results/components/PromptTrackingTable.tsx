@@ -65,6 +65,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { SortableTableHeader } from "@/features/ai-results/components/SortableTableHeader";
+import { compareNumbers, compareStrings, type SortState } from "../sort";
 
 export type PromptModelResult = {
   accuracy?: number | null;
@@ -123,6 +125,48 @@ type ProcessedPromptResult = PromptModelResult & {
   presence: number;
   sources: string[];
 };
+
+type PromptSortMetric =
+  | "prompts"
+  | "visibility"
+  | "coverage"
+  | "ranking"
+  | "volume"
+  | "sentiment";
+
+const PROMPT_SORT_LABELS: Record<PromptSortMetric, string> = {
+  prompts: "Prompts",
+  visibility: "Visibility",
+  coverage: "Coverage",
+  ranking: "Ranking",
+  volume: "Volume",
+  sentiment: "Sentiment",
+};
+
+const getPromptSortLabel = (sort: SortState<PromptSortMetric>) => {
+  if (!sort) return "Sort";
+  return `${PROMPT_SORT_LABELS[sort.metric]} ${sort.direction === "asc" ? "↑" : "↓"}`;
+};
+
+const getPromptVisibilityScore = (row: PromptTableRow) => {
+  const value = Number.parseFloat(String(row.sov ?? "").replace("%", ""));
+  return Number.isFinite(value) ? value : null;
+};
+
+const getPromptCoverageScore = (row: PromptTableRow) => {
+  const total = Number(row.results?.length ?? 0);
+  if (!Number.isFinite(total) || total <= 0) return null;
+  return Number(row.mentions ?? 0) / total;
+};
+
+const getPromptRankingScore = (row: PromptTableRow) => {
+  const positions = (row.results ?? [])
+    .map((result) => Number((result as { rankPosition?: number | null }).rankPosition))
+    .filter((position): position is number => Number.isFinite(position) && position > 0);
+  return positions.length > 0 ? Math.min(...positions) : null;
+};
+
+const getPromptVolumeScore = (row: PromptTableRow) => Number(row.results?.length ?? 0);
 
 // detailGraphData / detailGraphTicks / detailGraphHighlight removed — the
 // per-prompt detail chart now derives from the live /history endpoint
@@ -868,7 +912,18 @@ export const PromptTable = ({
       next.has(id) ? next.delete(id) : next.add(id);
       return next;
     });
-  const [tableMetric, setTableMetric] = useState<string | null>(null);
+  const [tableSort, setTableSort] = useState<SortState<PromptSortMetric>>(null);
+  const toggleTableSort = (metric: PromptSortMetric) => {
+    setTableSort((current) => {
+      if (current?.metric === metric) {
+        return {
+          metric,
+          direction: current.direction === "asc" ? "desc" : "asc",
+        };
+      }
+      return { metric, direction: "asc" };
+    });
+  };
   // Page-based pagination (10 rows / page). Replaces the prior
   // View all / Show less toggle — both because page navigation is more
   // predictable for large lists, and because the parent flow can now
@@ -897,7 +952,12 @@ export const PromptTable = ({
   // then navigate there. The picker popup itself now lives on this tab.
   const buildWorksheetRows = (rows: PromptTableRow[]) =>
     rows.map((row) => {
-      const r = row as any;
+      const r = row as PromptTableRow & {
+        keyword?: string;
+        keywordIntent?: string;
+        prompt?: string;
+        text?: string;
+      };
       const primaryKeyword =
         row.type === "keyword" ? (r.phrase ?? r.text ?? null) : (r.keyword ?? null);
       const primaryIntent =
@@ -1140,21 +1200,24 @@ export const PromptTable = ({
       items = items.filter((item) => trackOverrides[item.id] ?? item.isTracked ?? false);
     }
 
-    if (tableMetric) {
-      const num = (v: number | null | undefined) => (typeof v === "number" ? v : -1);
-      const positionFor = (row: PromptTableRow) => {
-        const rank = Number(row.bestRank);
-        return Number.isFinite(rank) && rank > 0 ? rank : Number.POSITIVE_INFINITY;
-      };
+    if (tableSort) {
       items.sort((a, b) => {
-        if (tableMetric === "Alphabetical") {
-          return a.phrase.localeCompare(b.phrase, undefined, { sensitivity: "base" });
+        switch (tableSort.metric) {
+          case "prompts":
+            return compareStrings(a.phrase, b.phrase, tableSort.direction);
+          case "visibility":
+            return compareNumbers(getPromptVisibilityScore(a), getPromptVisibilityScore(b), tableSort.direction);
+          case "coverage":
+            return compareNumbers(getPromptCoverageScore(a), getPromptCoverageScore(b), tableSort.direction);
+          case "ranking":
+            return compareNumbers(getPromptRankingScore(a), getPromptRankingScore(b), tableSort.direction);
+          case "volume":
+            return compareNumbers(getPromptVolumeScore(a), getPromptVolumeScore(b), tableSort.direction);
+          case "sentiment":
+            return compareNumbers(a.avgSentiment, b.avgSentiment, tableSort.direction);
+          default:
+            return 0;
         }
-        if (tableMetric === "Alphabetical Z-A") {
-          return b.phrase.localeCompare(a.phrase, undefined, { sensitivity: "base" });
-        }
-        if (tableMetric === "Position") return positionFor(a) - positionFor(b);
-        return num(b.avgSentiment) - num(a.avgSentiment);
       });
     }
 
@@ -1171,18 +1234,18 @@ export const PromptTable = ({
     // matches the user's expectation that the result they JUST produced
     // is most relevant. With a metric sort, we don't pin (that would
     // lie about the sort order).
-    if (!tableMetric) {
+    if (!tableSort) {
       return [...newlyAnalyzedRows, ...baseItems];
     }
     return baseItems;
-  }, [data, tableMetric, newlyAnalyzedRows, trackedFilterOnly, trackOverrides]);
+  }, [data, tableSort, newlyAnalyzedRows, trackedFilterOnly, trackOverrides]);
 
   const totalCount = fullSortedData.length;
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [tableMetric]);
+  }, [tableSort]);
   useEffect(() => {
     if (currentPage > totalPages) setCurrentPage(totalPages);
   }, [currentPage, totalPages]);
@@ -1247,17 +1310,17 @@ export const PromptTable = ({
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" className="h-[38px] gap-2 rounded-lg border-slate-200 px-3 text-slate-600 shadow-none hover:bg-gray-50">
                   <AlignLeft className="h-[16px] w-[16px]" />
-                  <span className="text-[13px] font-medium">{tableMetric ? `Sort: ${tableMetric}` : "Sort"}</span>
+                  <span className="text-[13px] font-medium">{getPromptSortLabel(tableSort)}</span>
                   <ChevronDown className="ml-1 h-3.5 w-3.5 opacity-60" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-[180px]">
-                <DropdownMenuItem onClick={() => setTableMetric(null)}>Default order</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setTableSort(null)}>Default order</DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => setTableMetric("Alphabetical")}>Alphabetical A-Z</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setTableMetric("Alphabetical Z-A")}>Alphabetical Z-A</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setTableMetric("Sentiment")}>Sentiment</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setTableMetric("Position")}>Position</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setTableSort({ metric: "prompts", direction: "asc" })}>Prompts A-Z</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setTableSort({ metric: "prompts", direction: "desc" })}>Prompts Z-A</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setTableSort({ metric: "sentiment", direction: "desc" })}>Sentiment</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setTableSort({ metric: "ranking", direction: "asc" })}>Position</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
 
@@ -1373,7 +1436,7 @@ export const PromptTable = ({
 
       <CardContent className="px-0 pb-3">
         <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-gray-200">
-          <Table>
+              <Table>
             <TableHeader>
               <TableRow className="border-b-0 bg-[#f1f1f1] hover:bg-[#f1f1f1]">
                 <TableHead className="w-8 px-4 rounded-tl-lg">
@@ -1396,34 +1459,52 @@ export const PromptTable = ({
                   />
                 </TableHead>
                 <TableHead className="px-2 text-[11px] font-semibold text-[#31415f]">
-                  <div className="flex items-center gap-1">
-                    Prompts <Info className="h-[10px] w-[10px] text-slate-400" /> <ArrowUp className="h-3 w-3 text-slate-600" />
-                  </div>
+                  <SortableTableHeader
+                    label="Prompts"
+                    tooltip={<Info className="h-[10px] w-[10px] text-slate-400" />}
+                    activeDirection={tableSort?.metric === "prompts" ? tableSort.direction : null}
+                    onToggleSort={() => toggleTableSort("prompts")}
+                  />
                 </TableHead>
                 <TableHead className="px-2 text-[11px] font-semibold text-[#31415f]">
-                  <div className="flex items-center gap-1">
-                    Visibility <Info className="h-[10px] w-[10px] text-slate-400" /> <ArrowUp className="h-3 w-3 text-slate-600" />
-                  </div>
+                  <SortableTableHeader
+                    label="Visibility"
+                    tooltip={<Info className="h-[10px] w-[10px] text-slate-400" />}
+                    activeDirection={tableSort?.metric === "visibility" ? tableSort.direction : null}
+                    onToggleSort={() => toggleTableSort("visibility")}
+                  />
                 </TableHead>
                 <TableHead className="px-2 text-[11px] font-semibold text-[#31415f]">
-                  <div className="flex items-center gap-1">
-                    Coverage <Info className="h-[10px] w-[10px] text-slate-400" /> <ArrowUp className="h-3 w-3 text-slate-600" />
-                  </div>
+                  <SortableTableHeader
+                    label="Coverage"
+                    tooltip={<Info className="h-[10px] w-[10px] text-slate-400" />}
+                    activeDirection={tableSort?.metric === "coverage" ? tableSort.direction : null}
+                    onToggleSort={() => toggleTableSort("coverage")}
+                  />
                 </TableHead>
                 <TableHead className="px-2 text-[11px] font-semibold text-[#31415f]">
-                  <div className="flex items-center gap-1">
-                    Ranking <Info className="h-[10px] w-[10px] text-slate-400" /> <ArrowUp className="h-3 w-3 text-slate-600" />
-                  </div>
+                  <SortableTableHeader
+                    label="Ranking"
+                    tooltip={<Info className="h-[10px] w-[10px] text-slate-400" />}
+                    activeDirection={tableSort?.metric === "ranking" ? tableSort.direction : null}
+                    onToggleSort={() => toggleTableSort("ranking")}
+                  />
                 </TableHead>
                 <TableHead className="px-2 text-[11px] font-semibold text-[#31415f]">
-                  <div className="flex items-center gap-1">
-                    Sentiment <Info className="h-[10px] w-[10px] text-slate-400" /> <ArrowUp className="h-3 w-3 text-slate-600" />
-                  </div>
+                  <SortableTableHeader
+                    label="Volume"
+                    tooltip={<Info className="h-[10px] w-[10px] text-slate-400" />}
+                    activeDirection={tableSort?.metric === "volume" ? tableSort.direction : null}
+                    onToggleSort={() => toggleTableSort("volume")}
+                  />
                 </TableHead>
                 <TableHead className="px-2 text-[11px] font-semibold text-[#31415f]">
-                  <div className="flex items-center gap-1">
-                    Volume <Info className="h-[10px] w-[10px] text-slate-400" /> <ArrowUp className="h-3 w-3 text-slate-600" />
-                  </div>
+                  <SortableTableHeader
+                    label="Sentiment"
+                    tooltip={<Info className="h-[10px] w-[10px] text-slate-400" />}
+                    activeDirection={tableSort?.metric === "sentiment" ? tableSort.direction : null}
+                    onToggleSort={() => toggleTableSort("sentiment")}
+                  />
                 </TableHead>
                 <TableHead className="px-4 text-right text-[11px] font-semibold text-[#31415f] rounded-tr-lg">
                   <div className="flex items-center justify-end gap-1">
@@ -1559,8 +1640,8 @@ export const PromptTable = ({
                           "—" which made the column look uniformly broken. */}
                       {(() => {
                         const positions = row.results
-                          .map((r: any) => r.rankPosition)
-                          .filter((p: any): p is number => typeof p === "number" && p > 0);
+                          .map((result) => Number((result as { rankPosition?: number | null }).rankPosition))
+                          .filter((p): p is number => typeof p === "number" && p > 0);
                         if (positions.length > 0) {
                           return <span>#{Math.min(...positions)}</span>;
                         }

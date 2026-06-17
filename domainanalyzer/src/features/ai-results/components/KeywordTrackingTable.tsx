@@ -2,6 +2,9 @@ import { Fragment, useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { apiGet, apiPost } from "@/services/apiClient";
 import { useToast } from "@/components/ui/use-toast";
+import { maskDomainId } from "@/lib/domainUtils";
+import { SortableTableHeader } from "@/features/ai-results/components/SortableTableHeader";
+import { compareNumbers, compareStrings, type SortState } from "../sort";
 import ReactMarkdown from "react-markdown";
 import {
   Area,
@@ -14,7 +17,6 @@ import {
 } from "recharts";
 import {
   AlignLeft,
-  ArrowUp,
   Bot,
   Calendar,
   ChevronDown,
@@ -94,6 +96,48 @@ type ProcessedKeywordResult = KeywordModelResult & {
   presence: number;
   sources: string[];
 };
+
+type KeywordSortMetric =
+  | "prompts"
+  | "visibility"
+  | "coverage"
+  | "ranking"
+  | "volume"
+  | "sentiment";
+
+const KEYWORD_SORT_LABELS: Record<KeywordSortMetric, string> = {
+  prompts: "Prompts",
+  visibility: "Visibility",
+  coverage: "Coverage",
+  ranking: "Ranking",
+  volume: "Volume",
+  sentiment: "Sentiment",
+};
+
+const getKeywordSortLabel = (sort: SortState<KeywordSortMetric>) => {
+  if (!sort) return "Sort";
+  return `${KEYWORD_SORT_LABELS[sort.metric]} ${sort.direction === "asc" ? "↑" : "↓"}`;
+};
+
+const getKeywordVisibilityScore = (row: KeywordTableRow) => {
+  const value = Number.parseFloat(String(row.sov ?? "").replace("%", ""));
+  return Number.isFinite(value) ? value : null;
+};
+
+const getKeywordCoverageScore = (row: KeywordTableRow) => {
+  const total = Number(row.results?.length ?? 0);
+  if (!Number.isFinite(total) || total <= 0) return null;
+  return Number(row.mentions ?? 0) / total;
+};
+
+const getKeywordRankingScore = (row: KeywordTableRow) => {
+  const positions = (row.results ?? [])
+    .map((result) => Number((result as { rankPosition?: number | null }).rankPosition))
+    .filter((position): position is number => Number.isFinite(position) && position > 0);
+  return positions.length > 0 ? Math.min(...positions) : null;
+};
+
+const getKeywordVolumeScore = (row: KeywordTableRow) => Number(row.results?.length ?? 0);
 
 // detailGraphData / detailGraphTicks / detailGraphHighlight removed —
 // the keyword detail chart now derives from the live /history endpoint
@@ -503,7 +547,18 @@ export const KeywordTrackingTable = ({
   const navigate = useNavigate();
   const location = useLocation();
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [tableMetric, setTableMetric] = useState<string | null>(null);
+  const [tableSort, setTableSort] = useState<SortState<KeywordSortMetric>>(null);
+  const toggleTableSort = (metric: KeywordSortMetric) => {
+    setTableSort((current) => {
+      if (current?.metric === metric) {
+        return {
+          metric,
+          direction: current.direction === "asc" ? "desc" : "asc",
+        };
+      }
+      return { metric, direction: "asc" };
+    });
+  };
   // Page-based pagination (10 rows / page). Replaces the prior
   // View all / Show less toggle.
   const PAGE_SIZE = 10;
@@ -577,16 +632,26 @@ export const KeywordTrackingTable = ({
 
   // Full sorted list (before pagination).
   const fullSortedData = useMemo(() => {
-    let items = [...data];
+    const items = [...data];
 
-    if (tableMetric) {
-      const num = (v: number | null | undefined) => (typeof v === "number" ? v : -1);
+    if (tableSort) {
       items.sort((a, b) => {
-        if (tableMetric === "Ranking") return b.mentions - a.mentions;
-        if (tableMetric === "Position") return a.bestRank - b.bestRank;
-        if (tableMetric === "SOV") return Number.parseInt(b.sov, 10) - Number.parseInt(a.sov, 10);
-        if (tableMetric === "Competitors") return b.competitorCount - a.competitorCount;
-        return num(b.avgSentiment) - num(a.avgSentiment);
+        switch (tableSort.metric) {
+          case "prompts":
+            return compareStrings(a.phrase, b.phrase, tableSort.direction);
+          case "visibility":
+            return compareNumbers(getKeywordVisibilityScore(a), getKeywordVisibilityScore(b), tableSort.direction);
+          case "coverage":
+            return compareNumbers(getKeywordCoverageScore(a), getKeywordCoverageScore(b), tableSort.direction);
+          case "ranking":
+            return compareNumbers(getKeywordRankingScore(a), getKeywordRankingScore(b), tableSort.direction);
+          case "volume":
+            return compareNumbers(getKeywordVolumeScore(a), getKeywordVolumeScore(b), tableSort.direction);
+          case "sentiment":
+            return compareNumbers(a.avgSentiment, b.avgSentiment, tableSort.direction);
+          default:
+            return 0;
+        }
       });
     }
 
@@ -599,18 +664,18 @@ export const KeywordTrackingTable = ({
       (item) => !(typeof item.rawId === "number" && newIds.has(item.rawId)),
     );
 
-    if (!tableMetric) {
+    if (!tableSort) {
       return [...newlyAnalyzedRows, ...base];
     }
     return base;
-  }, [data, tableMetric, newlyAnalyzedRows]);
+  }, [data, tableSort, newlyAnalyzedRows]);
 
   const totalCount = fullSortedData.length;
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [tableMetric]);
+  }, [tableSort]);
   useEffect(() => {
     if (currentPage > totalPages) setCurrentPage(totalPages);
   }, [currentPage, totalPages]);
@@ -682,18 +747,18 @@ export const KeywordTrackingTable = ({
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" className="h-[38px] gap-2 rounded-lg border-slate-200 px-3 text-slate-600 shadow-none hover:bg-gray-50">
                   <Filter className="h-[16px] w-[16px]" />
-                  <span className="text-[13px] font-medium">{tableMetric || "Filters"}</span>
+                  <span className="text-[13px] font-medium">{getKeywordSortLabel(tableSort)}</span>
                   <ChevronDown className="ml-1 h-3.5 w-3.5 opacity-60" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-[180px]">
-                <DropdownMenuItem onClick={() => setTableMetric(null)}>Clear Filters</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setTableSort(null)}>Default order</DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => setTableMetric("Sentiment")}>Sentiment Score</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setTableMetric("Ranking")}>Ranking</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setTableMetric("Position")}>Position</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setTableMetric("SOV")}>SOV %</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setTableMetric("Competitors")}>Competitor Count</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setTableSort({ metric: "sentiment", direction: "desc" })}>Sentiment Score</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setTableSort({ metric: "ranking", direction: "desc" })}>Ranking</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setTableSort({ metric: "ranking", direction: "asc" })}>Position</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setTableSort({ metric: "visibility", direction: "desc" })}>SOV %</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setTableSort({ metric: "coverage", direction: "desc" })}>Competitor Count</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
 
@@ -750,41 +815,59 @@ export const KeywordTrackingTable = ({
 
       <CardContent className="px-0 pb-3">
         <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-gray-200">
-          <Table>
+              <Table>
             <TableHeader>
               <TableRow className="border-b-0 bg-[#f1f1f1] hover:bg-[#f1f1f1]">
                 <TableHead className="w-8 px-4 rounded-tl-lg">
                   <input type="checkbox" className="h-3.5 w-3.5 rounded border-gray-300 accent-blue-600" />
                 </TableHead>
                 <TableHead className="px-2 text-[11px] font-semibold text-[#31415f]">
-                  <div className="flex items-center gap-1">
-                    Prompts <Info className="h-[10px] w-[10px] text-slate-400" /> <ArrowUp className="h-3 w-3 text-slate-600" />
-                  </div>
+                  <SortableTableHeader
+                    label="Prompts"
+                    tooltip={<Info className="h-[10px] w-[10px] text-slate-400" />}
+                    activeDirection={tableSort?.metric === "prompts" ? tableSort.direction : null}
+                    onToggleSort={() => toggleTableSort("prompts")}
+                  />
                 </TableHead>
                 <TableHead className="px-2 text-[11px] font-semibold text-[#31415f]">
-                  <div className="flex items-center gap-1">
-                    Visibility <Info className="h-[10px] w-[10px] text-slate-400" /> <ArrowUp className="h-3 w-3 text-slate-600" />
-                  </div>
+                  <SortableTableHeader
+                    label="Visibility"
+                    tooltip={<Info className="h-[10px] w-[10px] text-slate-400" />}
+                    activeDirection={tableSort?.metric === "visibility" ? tableSort.direction : null}
+                    onToggleSort={() => toggleTableSort("visibility")}
+                  />
                 </TableHead>
                 <TableHead className="px-2 text-[11px] font-semibold text-[#31415f]">
-                  <div className="flex items-center gap-1">
-                    Coverage <Info className="h-[10px] w-[10px] text-slate-400" /> <ArrowUp className="h-3 w-3 text-slate-600" />
-                  </div>
+                  <SortableTableHeader
+                    label="Coverage"
+                    tooltip={<Info className="h-[10px] w-[10px] text-slate-400" />}
+                    activeDirection={tableSort?.metric === "coverage" ? tableSort.direction : null}
+                    onToggleSort={() => toggleTableSort("coverage")}
+                  />
                 </TableHead>
                 <TableHead className="px-2 text-[11px] font-semibold text-[#31415f]">
-                  <div className="flex items-center gap-1">
-                    Ranking <Info className="h-[10px] w-[10px] text-slate-400" /> <ArrowUp className="h-3 w-3 text-slate-600" />
-                  </div>
+                  <SortableTableHeader
+                    label="Ranking"
+                    tooltip={<Info className="h-[10px] w-[10px] text-slate-400" />}
+                    activeDirection={tableSort?.metric === "ranking" ? tableSort.direction : null}
+                    onToggleSort={() => toggleTableSort("ranking")}
+                  />
                 </TableHead>
                 <TableHead className="px-2 text-[11px] font-semibold text-[#31415f]">
-                  <div className="flex items-center gap-1">
-                    Sentiment <Info className="h-[10px] w-[10px] text-slate-400" /> <ArrowUp className="h-3 w-3 text-slate-600" />
-                  </div>
+                  <SortableTableHeader
+                    label="Sentiment"
+                    tooltip={<Info className="h-[10px] w-[10px] text-slate-400" />}
+                    activeDirection={tableSort?.metric === "sentiment" ? tableSort.direction : null}
+                    onToggleSort={() => toggleTableSort("sentiment")}
+                  />
                 </TableHead>
                 <TableHead className="px-2 text-[11px] font-semibold text-[#31415f]">
-                  <div className="flex items-center gap-1">
-                    Volume <Info className="h-[10px] w-[10px] text-slate-400" /> <ArrowUp className="h-3 w-3 text-slate-600" />
-                  </div>
+                  <SortableTableHeader
+                    label="Volume"
+                    tooltip={<Info className="h-[10px] w-[10px] text-slate-400" />}
+                    activeDirection={tableSort?.metric === "volume" ? tableSort.direction : null}
+                    onToggleSort={() => toggleTableSort("volume")}
+                  />
                 </TableHead>
                 <TableHead className="px-4 text-right text-[11px] font-semibold text-[#31415f] rounded-tr-lg">
                   <div className="flex items-center justify-end gap-1">
