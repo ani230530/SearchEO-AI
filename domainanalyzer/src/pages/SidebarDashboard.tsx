@@ -65,7 +65,6 @@ import {
   clearDraftOverlayHandoff,
   clearWorksheetHandoff,
   clearWorksheetTarget,
-  openDraftOverlayInNewTab,
   readDraftOverlayHandoff,
   readWorksheetTarget,
 } from "@/features/ai-results/components/WorksheetPickerModals";
@@ -322,9 +321,6 @@ const [improvedContent, setImprovedContent] = useState("");
   const [draftOverlayId, setDraftOverlayId] = useState<number | null>(null);
 
   const handleOpenDraftInPublish = useCallback((draftId: number) => {
-    const openedTab = openDraftOverlayInNewTab(draftId);
-    if (openedTab) return;
-
     setDraftOverlayId(draftId);
   }, []);
 
@@ -1074,6 +1070,12 @@ useEffect(() => {
       setSelectedCampaignId(null);
     }
   }, [activeTab, campaigns, searchState.activeCampaignId, searchState.activeCampaignSlug, selectedCampaignId]);
+
+  useEffect(() => {
+    if (activeTab !== "projects" && draftOverlayId !== null) {
+      setDraftOverlayId(null);
+    }
+  }, [activeTab, draftOverlayId]);
 
   // Auto-advance carousel to show running task
   useEffect(() => {
