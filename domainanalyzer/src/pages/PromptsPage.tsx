@@ -1014,6 +1014,10 @@ const PromptsPage = () => {
       })),
     [campaignsQuery.data],
   );
+  const activeWorksheet = useMemo(
+    () => worksheetOptions.find((worksheet) => worksheet.id === activeWorksheetId) ?? null,
+    [activeWorksheetId, worksheetOptions]
+  );
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerRowIds, setPickerRowIds] = useState<string[]>([]);
   const [activeWorksheetId, setActiveWorksheetId] = useState<string | null>(null);
@@ -1035,7 +1039,7 @@ const PromptsPage = () => {
     };
     writeWorksheetHandoff({ worksheetId, importPayload: payload });
     localStorage.setItem("activeTab", "projects");
-    navigate(buildProjectsWorksheetPath(worksheetId));
+    navigate(buildProjectsWorksheetPath(worksheetId, activeWorksheet?.name));
   };
 
   const handleAddToWorksheet = () => {
@@ -1044,7 +1048,7 @@ const PromptsPage = () => {
       activeWorksheetId,
       selectedItemIds: pickerRowIds,
       selectedRows: buildWorksheetRows(pickerRows),
-    });
+    }, activeWorksheet?.name);
     if (!openedTab) return;
     localStorage.setItem("activeTab", "projects");
     setPickerOpen(false);

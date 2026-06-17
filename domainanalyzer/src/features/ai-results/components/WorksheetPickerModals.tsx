@@ -17,13 +17,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { resolveDashboardPath } from "@/features/sidebar-dashboard/navigation";
+import { slugifyCampaignTitle } from "@/features/sidebar-dashboard/utils";
 
 // sessionStorage keys + path helper shared by every surface that hands a
 // selection off to the worksheet/projects page.
 export const WORKSHEET_IMPORT_KEY = "ai-results/pending-worksheet-import";
 export const WORKSHEET_TARGET_KEY = "ai-results/pending-worksheet-target";
-export const buildProjectsWorksheetPath = (campaignId: string | number) =>
-  `${resolveDashboardPath("projects")}?campaign=${encodeURIComponent(String(campaignId))}`;
+export const buildProjectsWorksheetPath = (campaignId: string | number, campaignName?: string | null) =>
+  `${resolveDashboardPath("projects")}/${encodeURIComponent(
+    slugifyCampaignTitle(campaignName ?? String(campaignId))
+  )}`;
 
 type WorksheetImportRow = {
   id: string;
@@ -92,11 +95,12 @@ export const readWorksheetImportPayload = () => {
 
 export const openWorksheetInNewTab = (
   worksheetId: string | number,
-  importPayload: WorksheetImportPayload | null = null
+  importPayload: WorksheetImportPayload | null = null,
+  worksheetName?: string | null
 ) => {
   writeWorksheetHandoff({ worksheetId, importPayload });
 
-  const openedTab = window.open(buildProjectsWorksheetPath(worksheetId), "_blank");
+  const openedTab = window.open(buildProjectsWorksheetPath(worksheetId, worksheetName), "_blank");
   if (!openedTab) {
     clearWorksheetHandoff();
   }

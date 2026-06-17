@@ -4,6 +4,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import Worksheet from '@/features/campaign/Worksheet';
 import { resolveDashboardPath } from '@/features/sidebar-dashboard/navigation';
+import { slugifyCampaignTitle } from '@/features/sidebar-dashboard/utils';
 
 export function ProjectsSection(props: any) {
   const {
@@ -15,13 +16,9 @@ export function ProjectsSection(props: any) {
     showEditModal, handleUpdateCampaign, editTitle,
   } = props;
   const navigate = useNavigate();
-  const buildProjectsPath = (campaignId?: number | null) => {
-    const params = new URLSearchParams();
-    if (campaignId !== undefined && campaignId !== null) {
-      params.set('campaign', String(campaignId));
-    }
-    const query = params.toString();
-    return `${resolveDashboardPath('projects')}${query ? `?${query}` : ''}`;
+  const buildProjectsPath = (campaignTitle?: string | null, campaignId?: number | null) => {
+    const slugSource = campaignTitle?.trim() || (campaignId !== undefined && campaignId !== null ? String(campaignId) : '');
+    return `${resolveDashboardPath('projects')}/${encodeURIComponent(slugifyCampaignTitle(slugSource))}`;
   };
 
   if (selectedCampaignId) {
@@ -46,7 +43,7 @@ export function ProjectsSection(props: any) {
                 type="button"
                 onClick={() => {
                   setSelectedCampaignId(null);
-                  navigate(buildProjectsPath(null), { replace: true });
+                  navigate(resolveDashboardPath('projects'), { replace: true });
                 }}
                 className="px-5 py-2 bg-black text-white rounded-full text-sm"
               >
@@ -65,7 +62,7 @@ export function ProjectsSection(props: any) {
             type="button"
             onClick={() => {
               setSelectedCampaignId(null);
-              navigate(buildProjectsPath(null), { replace: true });
+              navigate(resolveDashboardPath('projects'), { replace: true });
             }}
             className="text-sm text-gray-700 hover:text-black"
           >
@@ -376,15 +373,15 @@ export function ProjectsSection(props: any) {
                           tabIndex={0}
                           onClick={() => {
                             setSelectedCampaignId(campaign.id);
-                            navigate(buildProjectsPath(campaign.id));
+                            navigate(buildProjectsPath(campaign.title, campaign.id));
                           }}
                           onKeyDown={(event) => {
-                            if (event.key === 'Enter' || event.key === ' ') {
-                              event.preventDefault();
-                              setSelectedCampaignId(campaign.id);
-                              navigate(buildProjectsPath(campaign.id));
-                            }
-                          }}
+                              if (event.key === 'Enter' || event.key === ' ') {
+                                event.preventDefault();
+                                setSelectedCampaignId(campaign.id);
+                                navigate(buildProjectsPath(campaign.title, campaign.id));
+                              }
+                            }}
                           className="cursor-pointer flex-1 overflow-hidden mr-4 pt-2"
                           title={campaign.title}
                         >

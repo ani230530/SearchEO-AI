@@ -2404,6 +2404,10 @@ const AIResultsReportPreview = () => {
       description: c.description?.trim() ? c.description.trim() : null,
     }));
   }, [campaignsQuery.data]);
+  const activeWorksheet = useMemo(
+    () => worksheetOptions.find((worksheet) => worksheet.id === activeWorksheetId) ?? null,
+    [activeWorksheetId, worksheetOptions]
+  );
   const worksheetOptionsLoading = campaignsQuery.isLoading;
 
   const gscQuery = useGscStatus<{ connected?: boolean }>();
@@ -2568,7 +2572,7 @@ const AIResultsReportPreview = () => {
         writeWorksheetHandoff({ worksheetId: built.campaignId });
         localStorage.setItem('activeTab', 'projects');
         setGenerationByKey((prev) => ({ ...prev, [key]: { kind: 'done', draftId: null } }));
-        const worksheetPath = buildProjectsWorksheetPath(built.campaignId);
+        const worksheetPath = buildProjectsWorksheetPath(built.campaignId, activeWorksheet?.name);
         if (worksheetTab) {
           worksheetTab.location.href = worksheetPath;
         } else {
@@ -2586,7 +2590,7 @@ const AIResultsReportPreview = () => {
         return false;
       }
     },
-    [navigate, reportData]
+    [activeWorksheet?.name, navigate, reportData]
   );
 
   const handleGenerateContent = useCallback(
@@ -2665,12 +2669,12 @@ const AIResultsReportPreview = () => {
       });
 
     const payload = { activeWorksheetId, selectedItemIds, selectedRows };
-    const worksheetTab = openWorksheetInNewTab(activeWorksheetId, payload);
+    const worksheetTab = openWorksheetInNewTab(activeWorksheetId, payload, activeWorksheet?.name);
     if (!worksheetTab) return;
     localStorage.setItem('activeTab', 'projects');
     setIsWorksheetModalOpen(false);
     setActiveWorksheetId(null);
-  }, [activeWorksheetId, pendingGeneration, reportData, runGeneration, selectedRowIds]);
+  }, [activeWorksheet?.name, activeWorksheetId, pendingGeneration, reportData, runGeneration, selectedRowIds]);
 
   const handleCreateNewWorksheet = useCallback(() => {
     setCreateWorksheetError(null);
@@ -2754,7 +2758,7 @@ const AIResultsReportPreview = () => {
       localStorage.setItem('activeTab', 'projects');
       setIsWorksheetModalOpen(false);
       setActiveWorksheetId(null);
-      navigate(buildProjectsWorksheetPath(newId));
+      navigate(buildProjectsWorksheetPath(newId, newWorksheetName));
     } catch (err) {
       console.error('[AIResults] Create worksheet failed:', err);
       setCreateWorksheetError('Failed to create worksheet. Please try again.');

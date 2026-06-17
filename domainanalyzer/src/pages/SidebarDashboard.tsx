@@ -98,6 +98,7 @@ import {
   parseDashboardSearchState,
   sortKeywordTableData,
   summarizeDomainContext,
+  slugifyCampaignTitle,
 } from "@/features/sidebar-dashboard/utils";
 import type { ParsedDomainInput } from "@/lib/domainValidation";
 import { validateDomainInput } from "@/lib/domainValidation";
@@ -1059,10 +1060,20 @@ useEffect(() => {
       return;
     }
 
+    if (searchState.activeCampaignSlug) {
+      const matchedCampaign = campaigns.find(
+        (campaign) => slugifyCampaignTitle(campaign.title) === searchState.activeCampaignSlug
+      );
+      if (matchedCampaign && selectedCampaignId !== matchedCampaign.id) {
+        setSelectedCampaignId(matchedCampaign.id);
+      }
+      return;
+    }
+
     if (selectedCampaignId !== null) {
       setSelectedCampaignId(null);
     }
-  }, [activeTab, searchState.activeCampaignId, selectedCampaignId]);
+  }, [activeTab, campaigns, searchState.activeCampaignId, searchState.activeCampaignSlug, selectedCampaignId]);
 
   // Auto-advance carousel to show running task
   useEffect(() => {

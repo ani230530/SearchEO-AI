@@ -100,6 +100,14 @@ export function resolveDashboardTabFromPathname(pathname: string): {
     };
   }
 
+  const campaignMatch = normalizedPath.match(/^\/dashboard\/campaigns(?:\/([^/]+))?$/);
+  if (campaignMatch) {
+    return {
+      activeTab: "projects",
+      canonicalPath: normalizedPath,
+    };
+  }
+
   const settingsMatch = normalizedPath.match(/^\/dashboard\/settings\/([^/]+)$/);
   if (settingsMatch) {
     const subTab = settingsMatch[1] as SettingsSubTab;

@@ -50,6 +50,14 @@ export function getStoredActiveTab(value: string | null, fallback: TabId = "over
   return value && VALID_TABS.includes(value as TabId) ? (value as TabId) : fallback;
 }
 
+export function slugifyCampaignTitle(value: string) {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "") || "campaign";
+}
+
 export function parseDashboardSearchState(pathname: string, search: string): DashboardSearchState {
   const params = new URLSearchParams(search);
   const wordpressParam = params.get("wordpress");
@@ -57,12 +65,14 @@ export function parseDashboardSearchState(pathname: string, search: string): Das
   const campaignParam = params.get("campaign");
   const parsedCampaignId = campaignParam ? Number(campaignParam) : undefined;
   const pathState = resolveDashboardTabFromPathname(pathname);
+  const campaignSlugMatch = pathname.match(/^\/dashboard\/campaigns\/([^/]+)$/);
 
   return {
     redirectToAiVisibility: false,
     activeTab: pathState.activeTab,
     activeCompanySubTab: undefined,
     activeSettingsSubTab: pathState.activeSettingsSubTab,
+    activeCampaignSlug: campaignSlugMatch?.[1] ? decodeURIComponent(campaignSlugMatch[1]) : undefined,
     activeCampaignId:
       typeof parsedCampaignId === "number" && Number.isFinite(parsedCampaignId)
         ? parsedCampaignId
