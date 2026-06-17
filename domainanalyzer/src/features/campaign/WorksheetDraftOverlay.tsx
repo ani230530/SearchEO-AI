@@ -7,7 +7,7 @@ import type { KeywordTableItem } from '@/types';
 /**
  * Content-area overlay that hosts PublishExperience as the draft preview.
  * Positioning is `position: fixed` with a sidebar-width left offset so the
- * overlay covers the working area only — the sidebar stays visible and the
+ * overlay covers the working area only - the sidebar stays visible and the
  * 0.3s ease transition matches `.main-content`'s margin-left rule.
  */
 export interface WorksheetDraftOverlayProps {
@@ -70,24 +70,31 @@ export default function WorksheetDraftOverlay({
     <div
       className="fixed top-0 right-0 bottom-0 z-40 bg-white"
       style={{ left: `${leftOffset}px`, transition: 'left 0.3s ease' }}
+      onClick={(event) => {
+        if (event.target === event.currentTarget) {
+          onClose();
+        }
+      }}
     >
-      {/* Floating close button — PublishExperience's embedded header has its
-          own back chevron, but we mount this here too so the overlay always
-          has a visible close affordance regardless of inner state. */}
-      <button
-        type="button"
-        onClick={onClose}
-        aria-label="Close draft preview"
-        className="absolute top-4 right-4 z-[1] inline-flex h-9 w-9 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-500 shadow-sm hover:bg-gray-50 hover:text-gray-700"
-      >
-        <X className="h-5 w-5" />
-      </button>
+      <div className="relative h-full w-full" onClick={(event) => event.stopPropagation()}>
+        {/* Floating close button - PublishExperience's embedded header has its
+            own back chevron, but we mount this here too so the overlay always
+            has a visible close affordance regardless of inner state. */}
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close draft preview"
+          className="absolute top-4 right-4 z-[1] inline-flex h-9 w-9 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-500 shadow-sm hover:bg-gray-50 hover:text-gray-700"
+        >
+          <X className="h-5 w-5" />
+        </button>
 
-      <PublishExperience
-        {...publishProps}
-        initialDraftId={draftId}
-        onBack={onClose}
-      />
+        <PublishExperience
+          {...publishProps}
+          initialDraftId={draftId}
+          onBack={onClose}
+        />
+      </div>
     </div>
   );
 }

@@ -251,8 +251,11 @@ export function DashboardSidebar({
                 <img src="/Searcheo-full-logo.svg" alt="Searcheo Logo" className="h-6 w-auto" />
               </div>
             ) : (
-              <div className="sidebar-brand flex items-center justify-center" style={{ width: "40px" }}>
-                <img src="/18Searcheo 2.svg" alt="Searcheo Logo" className="h-6 w-auto" />
+              <div
+                className="sidebar-brand flex items-center justify-center rounded-xl bg-white/80 shadow-sm"
+                style={{ width: "52px", height: "52px" }}
+              >
+                <img src="/searcheo-logo.png" alt="Searcheo Logo" className="h-8 w-8 object-contain" />
               </div>
             )}
 
