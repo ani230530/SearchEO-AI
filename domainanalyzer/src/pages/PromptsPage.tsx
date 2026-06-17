@@ -1014,10 +1014,6 @@ const PromptsPage = () => {
       })),
     [campaignsQuery.data],
   );
-  const activeWorksheet = useMemo(
-    () => worksheetOptions.find((worksheet) => worksheet.id === activeWorksheetId) ?? null,
-    [activeWorksheetId, worksheetOptions]
-  );
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerRowIds, setPickerRowIds] = useState<string[]>([]);
   const [activeWorksheetId, setActiveWorksheetId] = useState<string | null>(null);
@@ -1025,6 +1021,10 @@ const PromptsPage = () => {
   const [newWorksheetName, setNewWorksheetName] = useState("");
   const [creatingWorksheet, setCreatingWorksheet] = useState(false);
   const [createWorksheetError, setCreateWorksheetError] = useState<string | null>(null);
+  const activeWorksheet = useMemo(
+    () => worksheetOptions.find((worksheet) => worksheet.id === activeWorksheetId) ?? null,
+    [activeWorksheetId, worksheetOptions]
+  );
 
   const pickerRows = useMemo(() => {
     const byId = new Map([...reportRows, ...trackedRows].map((row) => [row.id, row]));
