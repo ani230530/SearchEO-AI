@@ -54,6 +54,45 @@ import {
 
 type WorksheetColumnKey = 'topic' | 'keywords' | 'status' | 'action' | 'more';
 
+type KeywordSettingsSnapshot = {
+  model: string;
+  maxKeywordsPerCell: string;
+  language: string;
+  keywordLogic: string;
+};
+
+const KEYWORD_SETTINGS_CACHE_KEY = 'worksheet-keyword-settings/v1';
+
+const DEFAULT_KEYWORD_SETTINGS: KeywordSettingsSnapshot = {
+  model: 'SearchEO.AI (Recommended)',
+  maxKeywordsPerCell: '5',
+  language: 'English (Widely used)',
+  keywordLogic: '',
+};
+
+const loadKeywordSettings = (): KeywordSettingsSnapshot => {
+  try {
+    const raw = localStorage.getItem(KEYWORD_SETTINGS_CACHE_KEY);
+    if (!raw) return DEFAULT_KEYWORD_SETTINGS;
+    return { ...DEFAULT_KEYWORD_SETTINGS, ...(JSON.parse(raw) as Partial<KeywordSettingsSnapshot>) };
+  } catch {
+    return DEFAULT_KEYWORD_SETTINGS;
+  }
+};
+
+const saveKeywordSettings = (snapshot: KeywordSettingsSnapshot) => {
+  try {
+    localStorage.setItem(KEYWORD_SETTINGS_CACHE_KEY, JSON.stringify(snapshot));
+  } catch {
+    /* ignore persistence failures */
+  }
+};
+
+const parseKeywordLimit = (value: string) => {
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) ? Math.max(1, parsed) : 5;
+};
+
 interface WorksheetProps {
   campaignId: number;
   /** Bubbled to the dashboard so the click on a row's "Draft Blog" action
@@ -176,12 +215,7 @@ export default function Worksheet({
     promptLogic: '',
     userPromptTemplate: '',
   });
-  const [keywordSettings, setKeywordSettings] = useState({
-    model: 'SearchEO.AI (Recommended)',
-    maxKeywordsPerCell: '5',
-    language: 'English (Widely used)',
-    keywordLogic: '',
-  });
+  const [keywordSettings, setKeywordSettings] = useState<KeywordSettingsSnapshot>(loadKeywordSettings);
   const selectShellClass =
     'relative rounded-md border border-[#c5ccd9] bg-white';
   const selectClass =
@@ -845,11 +879,24 @@ export default function Worksheet({
     const { topicId, keywordType } = keywordEditor;
     setKeywordEditor(null);
 
+    const maxKeywords = parseKeywordLimit(keywordSettings.maxKeywordsPerCell);
+    const currentCount = topics.find((topic) => topic.id === topicId)?.keywords.length ?? 0;
+    const remainingSlots = Math.max(0, maxKeywords - currentCount);
+    if (remainingSlots === 0) {
+      setError(`This row already has the maximum of ${maxKeywords} keywords.`);
+      return;
+    }
+
+    const allowedTerms = terms.slice(0, remainingSlots);
+    if (allowedTerms.length < terms.length) {
+      setNotice(`Only added ${allowedTerms.length} keyword${allowedTerms.length === 1 ? '' : 's'} to stay within the ${maxKeywords}-keyword limit.`);
+    }
+
     setBusyTopicId(topicId);
     setError(null);
     try {
       let latest: WorksheetTopic[] = topics;
-      for (const term of terms) {
+      for (const term of allowedTerms) {
         latest = await addTopicKeyword(topicId, { term, keywordType });
       }
       setTopics(latest);
@@ -863,7 +910,34 @@ export default function Worksheet({
   const handleAiSuggestKeywords = async (topic: WorksheetTopic) => {
     setAiSuggestingKeywordsForRow(topic.id);
     try {
-      await withBusy(topic.id, () => aiSuggestTopicKeywords(topic.id, { count: 5 }));
+      await withBusy(topic.id, async () => {
+        const maxKeywords = parseKeywordLimit(keywordSettings.maxKeywordsPerCell);
+
+        // Treat reruns as a replacement operation so the keyword limit is
+        // enforced against the final row, not appended on top of old values.
+        for (const keyword of topic.keywords) {
+          await deleteKeyword(keyword.id);
+        }
+
+        const latest = await aiSuggestTopicKeywords(topic.id, {
+          count: maxKeywords,
+          keywordLogic: keywordSettings.keywordLogic.trim() || undefined,
+          language: keywordSettings.language.trim() || undefined,
+          model: keywordSettings.model.trim() || undefined,
+        });
+
+        const currentTopic = latest.find((row) => row.id === topic.id);
+        if (!currentTopic || currentTopic.keywords.length <= maxKeywords) {
+          return latest;
+        }
+
+        let trimmed = latest;
+        for (const keyword of currentTopic.keywords.slice(maxKeywords)) {
+          trimmed = await deleteKeyword(keyword.id);
+        }
+
+        return trimmed;
+      });
     } finally {
       setAiSuggestingKeywordsForRow(null);
     }
@@ -965,8 +1039,12 @@ export default function Worksheet({
         latest = await createTopic(campaignId, { title: row.topic!.trim() });
         const newTopic = latest.find((t) => t.title === row.topic!.trim());
         if (newTopic && row.keywords?.length) {
+          const maxKeywords = parseKeywordLimit(keywordSettings.maxKeywordsPerCell);
+          let currentCount = newTopic.keywords.length;
           for (const kw of row.keywords) {
+            if (currentCount >= maxKeywords) break;
             latest = await addTopicKeyword(newTopic.id, { term: kw });
+            currentCount += 1;
           }
         }
       }
@@ -1037,6 +1115,11 @@ export default function Worksheet({
       setColumnSettingsKey(columnKey);
       return;
     }
+  };
+
+  const handleCloseKeywordSettings = () => {
+    saveKeywordSettings(keywordSettings);
+    setColumnSettingsKey(null);
   };
 
   /* ---------- Render ---------- */
@@ -1745,11 +1828,11 @@ export default function Worksheet({
 
       {columnSettingsKey === 'topic' && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/40" onClick={() => setColumnSettingsKey(null)} />
+          <div className="absolute inset-0 bg-black/40" onClick={handleCloseKeywordSettings} />
           <div className="relative mx-4 w-full max-w-4xl rounded-xl border border-[#d9dde4] bg-[#f7f7f8] p-6 shadow-2xl">
             <button
               type="button"
-              onClick={() => setColumnSettingsKey(null)}
+              onClick={handleCloseKeywordSettings}
               className="absolute right-4 top-4 text-[#8b93a3] hover:text-[#4f586b]"
               aria-label="Close settings"
             >
@@ -1870,7 +1953,7 @@ export default function Worksheet({
             <div className="mt-6 flex justify-center">
               <button
                 type="button"
-                onClick={() => setColumnSettingsKey(null)}
+                onClick={handleCloseKeywordSettings}
                 className="rounded-md bg-[#2d4059] px-6 py-2 text-sm font-medium text-white hover:bg-[#27384e]"
               >
                 Done
