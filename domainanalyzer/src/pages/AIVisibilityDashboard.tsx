@@ -18,7 +18,7 @@ import {
 import { useDomains } from '@/features/ai-results/queries';
 import { logoUrl } from '@/lib/logoUrl';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { maskDomainId } from "@/lib/domainUtils";
+import { buildDomainSlug } from "@/lib/domainUtils";
 import { resolveAIResultsNavigation } from "@/features/sidebar-dashboard/navigation";
 
 const AIVisibilityDashboard = () => {
@@ -149,7 +149,7 @@ const AIVisibilityDashboard = () => {
               const logo = logoUrl(d.host || d.url, 64) || null;
 
               return (
-                <div key={d.id} onClick={() => navigate(`/ai-results/${d.id}`)} className="bg-white rounded-xl border border-gray-100 shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)] p-6 transition-all hover:shadow-md cursor-pointer">
+                <div key={d.id} onClick={() => navigate(`/ai-results/${buildDomainSlug(d)}`)} className="bg-white rounded-xl border border-gray-100 shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)] p-6 transition-all hover:shadow-md cursor-pointer">
                   <div className="flex justify-between items-start mb-6">
                     <div className="flex items-center gap-4">
                       {logo ? (
@@ -180,7 +180,7 @@ const AIVisibilityDashboard = () => {
                               className="flex items-center gap-3 px-2 py-2.5 text-sm font-medium text-gray-700 cursor-pointer rounded-lg hover:bg-blue-50 hover:text-blue-600 transition-colors"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                navigate(resolveAIResultsNavigation("ai-results", maskDomainId(d.id)));
+                                navigate(resolveAIResultsNavigation("ai-results", buildDomainSlug(d)));
                               }}
                             >
                               <Sparkles className="w-4 h-4 text-gray-400" />
@@ -190,7 +190,7 @@ const AIVisibilityDashboard = () => {
                               className="flex items-center gap-3 px-2 py-2.5 text-sm font-medium text-gray-700 cursor-pointer rounded-lg hover:bg-blue-50 hover:text-blue-600 transition-colors"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                navigate(resolveAIResultsNavigation("competitors", maskDomainId(d.id)));
+                                navigate(resolveAIResultsNavigation("competitors", buildDomainSlug(d)));
                               }}
                             >
                               <Users className="w-4 h-4 text-gray-400" />
@@ -200,7 +200,7 @@ const AIVisibilityDashboard = () => {
                               className="flex items-center gap-3 px-2 py-2.5 text-sm font-medium text-gray-700 cursor-pointer rounded-lg hover:bg-blue-50 hover:text-blue-600 transition-colors"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                navigate(resolveAIResultsNavigation("prompts", maskDomainId(d.id)));
+                                navigate(resolveAIResultsNavigation("prompts", buildDomainSlug(d)));
                               }}
                             >
                               <MessageSquareText className="w-4 h-4 text-gray-400" />

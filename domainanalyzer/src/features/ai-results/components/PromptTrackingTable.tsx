@@ -883,6 +883,10 @@ export const PromptTable = ({
   const [newWorksheetName, setNewWorksheetName] = useState("");
   const [creatingWorksheet, setCreatingWorksheet] = useState(false);
   const [createWorksheetError, setCreateWorksheetError] = useState<string | null>(null);
+  const activeWorksheet = useMemo(
+    () => worksheetOptions.find((worksheet) => worksheet.id === activeWorksheetId) ?? null,
+    [activeWorksheetId, worksheetOptions]
+  );
 
   // Open the picker for a single row (Draft Blog) or the current selection.
   const navigateToWorksheet = (rowId?: string) => {
@@ -980,7 +984,7 @@ export const PromptTable = ({
     };
     writeWorksheetHandoff({ worksheetId, importPayload: payload });
     localStorage.setItem("activeTab", "projects");
-    navigate(buildProjectsWorksheetPath(worksheetId));
+    navigate(buildProjectsWorksheetPath(worksheetId, activeWorksheet?.name));
   };
 
   const handleAddToWorksheet = () => {
@@ -989,7 +993,7 @@ export const PromptTable = ({
       activeWorksheetId,
       selectedItemIds: pickerRowIds,
       selectedRows: buildWorksheetRows(pickerRows),
-    });
+    }, activeWorksheet?.name);
     if (!openedTab) return;
     localStorage.setItem("activeTab", "projects");
     setPickerOpen(false);

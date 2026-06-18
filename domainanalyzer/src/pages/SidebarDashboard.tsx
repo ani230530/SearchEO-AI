@@ -71,7 +71,11 @@ import {
 } from "@/features/ai-results/components/WorksheetPickerModals";
 import { DASHBOARD_TABS } from "@/features/sidebar-dashboard/constants";
 import CompetitorPage from '@/features/sidebar-dashboard/sections/CompetitorPage';
-import { resolveSidebarNavigation } from "@/features/sidebar-dashboard/navigation";
+import {
+  resolveDashboardPath,
+  resolveDashboardTabFromPathname,
+  resolveSidebarNavigation,
+} from "@/features/sidebar-dashboard/navigation";
 
 import type {
   CompanySubTabId,
@@ -94,6 +98,7 @@ import {
   parseDashboardSearchState,
   sortKeywordTableData,
   summarizeDomainContext,
+  slugifyCampaignTitle,
 } from "@/features/sidebar-dashboard/utils";
 import type { ParsedDomainInput } from "@/lib/domainValidation";
 import { validateDomainInput } from "@/lib/domainValidation";
@@ -136,8 +141,12 @@ const SidebarDashboard = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const searchState = useMemo(
-    () => parseDashboardSearchState(location.search),
-    [location.search]
+    () => parseDashboardSearchState(location.pathname, location.search),
+    [location.pathname, location.search]
+  );
+  const pathState = useMemo(
+    () => resolveDashboardTabFromPathname(location.pathname),
+    [location.pathname]
   );
   const [activeTab, setActiveTab] = useState<TabId>(() =>
   searchState.activeTab ?? getStoredActiveTab(localStorage.getItem("activeTab"))
@@ -257,9 +266,8 @@ const sseRef = useRef<EventSource | null>(null);
   const openSettingsIntegrations = useCallback(() => {
     setActiveTab("settings");
     setActiveCompanySubTab("integration");
-    const basePath = location.pathname.startsWith("/newdashboard") ? "/newdashboard" : "/dashboard";
-    navigate(`${basePath}?tab=settings&subtab=integrations`);
-  }, [location.pathname, navigate]);
+    navigate(resolveDashboardPath("settings", { settingsSubTab: "integrations" }));
+  }, [navigate]);
 
   // Track pages currently being published (waiting for SSE confirmation)
   const [publishingPageIds, setPublishingPageIds] = useState<Set<number>>(new Set());
@@ -983,23 +991,24 @@ useEffect(() => {
   }, [logout, navigate]);
 
 
-  // Sync dashboard state with URL search parameters
+  // Sync dashboard state with the active dashboard route.
   useEffect(() => {
     if (searchState.redirectToAiVisibility) {
-      navigate('/ai-visibility');
+      navigate(resolveDashboardPath("ai-visibility"), { replace: true });
       return;
-    } 
-    
-    if (searchState.activeTab) {
-      setActiveTab(searchState.activeTab);
     }
 
-    if (searchState.activeCompanySubTab) {
-      setActiveCompanySubTab(searchState.activeCompanySubTab);
+    if (pathState.canonicalPath && pathState.canonicalPath !== location.pathname) {
+      navigate(`${pathState.canonicalPath}${location.search}`, { replace: true });
+      return;
     }
 
-    if (searchState.activeSettingsSubTab) {
-       // activeSettingsSubTab is handled via props in SettingsSection but we can sync if needed
+    if (
+      (location.pathname.startsWith("/dashboard/") || location.pathname.startsWith("/newdashboard/")) &&
+      !pathState.activeTab
+    ) {
+      navigate(resolveDashboardPath("overview"), { replace: true });
+      return;
     }
 
     if (searchState.openWordpressConnection) {
@@ -1016,7 +1025,25 @@ useEffect(() => {
       setNewCampaignDescription("");
       setShowCreateCampaign(true);
     }
-  }, [navigate, searchState]);
+  }, [location.pathname, location.search, navigate, pathState.activeTab, pathState.canonicalPath, searchState]);
+
+  useEffect(() => {
+    const nextTab = searchState.activeTab ?? pathState.activeTab ?? "overview";
+    if (nextTab !== activeTab) {
+      setActiveTab(nextTab);
+    }
+
+    const nextCompanySubTab = searchState.activeCompanySubTab ?? "company-info";
+    if (nextCompanySubTab !== activeCompanySubTab) {
+      setActiveCompanySubTab(nextCompanySubTab);
+    }
+  }, [
+    activeCompanySubTab,
+    activeTab,
+    pathState.activeTab,
+    searchState.activeCompanySubTab,
+    searchState.activeTab,
+  ]);
 
   useEffect(() => {
     if (activeTab !== "projects") {
@@ -1033,29 +1060,20 @@ useEffect(() => {
       return;
     }
 
+    if (searchState.activeCampaignSlug) {
+      const matchedCampaign = campaigns.find(
+        (campaign) => slugifyCampaignTitle(campaign.title) === searchState.activeCampaignSlug
+      );
+      if (matchedCampaign && selectedCampaignId !== matchedCampaign.id) {
+        setSelectedCampaignId(matchedCampaign.id);
+      }
+      return;
+    }
+
     if (selectedCampaignId !== null) {
       setSelectedCampaignId(null);
     }
-  }, [activeTab, searchState.activeCampaignId, selectedCampaignId]);
-
-  useEffect(() => {
-    if (
-      (location.pathname === "/dashboard" || location.pathname === "/newdashboard") &&
-      !location.search
-    ) {
-      const basePath = location.pathname.startsWith("/newdashboard") ? "/newdashboard" : "/dashboard";
-      navigate(`${basePath}?tab=overview`, { replace: true });
-    }
-  }, [location.pathname, location.search, navigate]);
-
-  useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    if ((location.pathname === "/dashboard" || location.pathname === "/newdashboard") && params.get("tab") === "profile") {
-      const basePath = location.pathname.startsWith("/newdashboard") ? "/newdashboard" : "/dashboard";
-      navigate(`${basePath}?tab=settings&subtab=profile`, { replace: true });
-    }
-  }, [location.pathname, location.search, navigate]);
-
+  }, [activeTab, campaigns, searchState.activeCampaignId, searchState.activeCampaignSlug, selectedCampaignId]);
 
   // Auto-advance carousel to show running task
   useEffect(() => {
@@ -2093,7 +2111,7 @@ useEffect(() => {
     if (!matchedCampaign) return;
 
     setSelectedCampaignId(matchedCampaign.id);
-    navigate(`${location.pathname}?tab=projects&campaign=${matchedCampaign.id}`, { replace: true });
+    navigate(`${resolveDashboardPath("projects")}?campaign=${matchedCampaign.id}`, { replace: true });
     clearWorksheetTarget();
   }, [activeTab, campaigns, location.pathname, navigate, searchState.activeCampaignId, selectedCampaignId]);
 

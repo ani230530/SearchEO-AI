@@ -12,7 +12,8 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, type UIMessage } from "ai";
 import { aiResultsKeys } from "@/features/ai-results/queries";
-import { maskDomainId, unmaskDomainId } from "@/lib/domainUtils";
+import { unmaskDomainId } from "@/lib/domainUtils";
+import { resolveDashboardPath } from "@/features/sidebar-dashboard/navigation";
 
 const API_BASE = import.meta.env.VITE_API_URL
   ? `${import.meta.env.VITE_API_URL}/api`
@@ -90,21 +91,22 @@ export function useAgentChat(threadId: number, initialMessages: UIMessage[]) {
         if (EFFECT_TOOLS.has(toolName)) {
           processed.current.add(part.toolCallId);
           const domainId: number | null = out.domainId ?? ctxRef.current.domainId;
-          const slug = domainId != null ? maskDomainId(domainId) : null;
+          const currentSlug = ctxRef.current.path.match(/\/ai-results\/([^/?#]+)/)?.[1] ?? null;
+          const slug = domainId != null ? currentSlug : null;
           if (toolName === "navigate") {
-            let path = "/dashboard";
+            let path = resolveDashboardPath("overview");
             switch (out.destination) {
-              case "ai-report": path = slug ? `/ai-results/${slug}` : "/dashboard"; break;
-              case "prompt-tracking": path = slug ? `/ai-results/${slug}/prompts` : "/dashboard"; break;
+              case "ai-report": path = slug ? `/ai-results/${slug}` : resolveDashboardPath("overview"); break;
+              case "prompt-tracking": path = slug ? `/ai-results/${slug}/prompts` : resolveDashboardPath("overview"); break;
               case "competitors": path = "/airesults-competitors-preview"; break;
-              case "worksheets": path = out.worksheetId != null ? `/dashboard?tab=projects&campaign=${encodeURIComponent(out.worksheetId)}` : "/dashboard?tab=projects"; break;
-              case "gsc": path = "/dashboard?tab=gsc-analytics"; break;
-              case "settings": path = "/dashboard?tab=settings"; break;
-              default: path = "/dashboard"; break;
+              case "worksheets": path = out.worksheetId != null ? `${resolveDashboardPath("projects")}?campaign=${encodeURIComponent(out.worksheetId)}` : resolveDashboardPath("projects"); break;
+              case "gsc": path = resolveDashboardPath("gsc-analytics"); break;
+              case "settings": path = resolveDashboardPath("settings"); break;
+              default: path = resolveDashboardPath("overview"); break;
             }
             navigate(path);
           } else if (toolName === "openWorksheetPicker") {
-            navigate(slug ? `/ai-results/${slug}/prompts` : "/dashboard?tab=projects");
+            navigate(slug ? `/ai-results/${slug}/prompts` : resolveDashboardPath("projects"));
           } else if (toolName === "startDomainAudit") {
             navigate("/audit");
           }

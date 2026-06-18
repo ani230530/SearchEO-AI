@@ -18,6 +18,7 @@
 
 import OpenAI from 'openai';
 import axios from 'axios';
+import crypto from 'crypto';
 import type { PrismaClient } from '../../generated/prisma';
 import { scoreResponse as llmScoreResponse } from './scoreService';
 import { recordCompetitorMention } from './competitorService';
@@ -138,6 +139,135 @@ interface CallOutcome {
   response: string;
   latencyMs: number;
   costUsd: number | null;
+}
+
+export class RunPipelineError extends Error {
+  constructor(
+    message: string,
+    public code: string,
+    public status = 502,
+    public details: Record<string, unknown> | null = null,
+  ) {
+    super(message);
+    this.name = 'RunPipelineError';
+  }
+}
+
+function readErrorMessage(err: unknown): string {
+  if (err instanceof Error && err.message.trim()) return err.message.trim();
+  if (typeof err === 'string' && err.trim()) return err.trim();
+  return 'Unknown error';
+}
+
+function readErrorStatus(err: unknown): number | null {
+  if (!err || typeof err !== 'object') return null;
+  const record = err as Record<string, unknown> & { response?: { status?: unknown; data?: unknown } };
+  if (typeof record.status === 'number') return record.status;
+  if (typeof record.statusCode === 'number') return record.statusCode;
+  if (typeof record.response?.status === 'number') return record.response.status;
+  return null;
+}
+
+function readErrorDetails(err: unknown): unknown {
+  if (!err || typeof err !== 'object') return null;
+  const record = err as Record<string, unknown> & { response?: { data?: unknown } };
+  if (record.response?.data !== undefined) return record.response.data;
+  if ('details' in record) return record.details;
+  return null;
+}
+
+function normalizeRunError(
+  err: unknown,
+  context: { domainId: number; host: string; model?: string; promptId?: number },
+): RunPipelineError {
+  if (err instanceof RunPipelineError) return err;
+
+  const upstreamStatus = readErrorStatus(err);
+  const upstreamMessage = readErrorMessage(err);
+  const upstreamDetails = readErrorDetails(err);
+  const message = `Refresh failed for ${context.host}${context.model ? ` (${context.model})` : ''}${context.promptId ? ` prompt ${context.promptId}` : ''}: ${upstreamMessage}`;
+
+  let code = 'RUN_PIPELINE_FAILED';
+  let status = 500;
+  if (upstreamStatus === 401 && /Missing Authentication header/i.test(upstreamMessage)) {
+    code = 'OPENROUTER_AUTH_MISSING';
+    status = 502;
+  } else if (upstreamStatus === 401 || upstreamStatus === 403) {
+    code = 'OPENROUTER_AUTH_FAILED';
+    status = 502;
+  } else if (upstreamStatus === 429) {
+    code = 'OPENROUTER_RATE_LIMITED';
+    status = 502;
+  } else if (upstreamStatus !== null && upstreamStatus >= 500) {
+    code = 'OPENROUTER_UPSTREAM_ERROR';
+    status = 502;
+  }
+
+  return new RunPipelineError(message, code, status, {
+    domainId: context.domainId,
+    host: context.host,
+    model: context.model ?? null,
+    promptId: context.promptId ?? null,
+    upstreamStatus,
+    upstreamMessage,
+    upstreamDetails,
+  });
+}
+
+type AnalysisPromptSnapshotItem = {
+  id: number;
+  text: string;
+  intent: string | null;
+  source: string;
+  keywordId: number | null;
+  category: string | null;
+  intentStage: string | null;
+  persona: string | null;
+  useCase: string | null;
+  constraint: string | null;
+  isBranded: boolean;
+  competitorMentioned: string | null;
+};
+
+const normalizeSnapshotText = (value: string | null | undefined): string => (value ?? '').trim().replace(/\s+/g, ' ').toLowerCase();
+
+function buildAnalysisFingerprint(prompts: AnalysisPromptSnapshotItem[]): string {
+  const payload = prompts
+    .map((p) => ({
+      text: normalizeSnapshotText(p.text),
+      intent: normalizeSnapshotText(p.intent),
+      source: normalizeSnapshotText(p.source),
+      keywordId: p.keywordId ?? null,
+      category: normalizeSnapshotText(p.category),
+      intentStage: normalizeSnapshotText(p.intentStage),
+      persona: normalizeSnapshotText(p.persona),
+      useCase: normalizeSnapshotText(p.useCase),
+      constraint: normalizeSnapshotText(p.constraint),
+      isBranded: Boolean(p.isBranded),
+      competitorMentioned: normalizeSnapshotText(p.competitorMentioned),
+    }))
+    .sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
+
+  return crypto.createHash('sha256').update(JSON.stringify(payload)).digest('hex');
+}
+
+function buildAnalysisSnapshot(prompts: AnalysisPromptSnapshotItem[]) {
+  return prompts
+    .map((p) => ({
+      id: p.id,
+      text: p.text,
+      intent: p.intent,
+      source: p.source,
+      keywordId: p.keywordId,
+      category: p.category,
+      intentStage: p.intentStage,
+      persona: p.persona,
+      useCase: p.useCase,
+      constraint: p.constraint,
+      isBranded: p.isBranded,
+      competitorMentioned: p.competitorMentioned,
+    }))
+    .sort((a, b) => a.id - b.id);
 }
 
 /**
@@ -564,16 +694,16 @@ export interface RunOptions {
   domainId: number;
   onProgress: (event: RunProgress) => void;
   /**
-   * Which prompts to run. 'selected' (default) uses the wizard audit set
-   * (isSelected=true). 'tracked' uses the weekly-tracking set (isTracked=true).
+   * Which prompts to run. 'selected' (default) uses the active branch's
+   * selected prompts. 'tracked' keeps the tracked-prompt convenience path.
    */
   selection?: 'selected' | 'tracked';
   /**
-   * How this run is tagged on AiRun.kind. 'audit' (default) is the manual
-   * wizard run; 'weekly' is the scheduled tracked-prompt re-test. Keeping them
-   * distinct prevents weekly runs from polluting the audit trend/runs charts.
+   * How this run is tagged on AiRun.kind. 'audit' is the wizard run,
+   * 'refresh' is the manual branch refresh, and 'adhoc' is the single-prompt
+   * path that must stay out of the branch charts.
    */
-  kind?: 'audit' | 'weekly';
+  kind?: 'audit' | 'refresh' | 'adhoc';
 }
 
 export async function runQueries({
@@ -584,13 +714,14 @@ export async function runQueries({
   kind = 'audit',
 }: RunOptions): Promise<void> {
   if (!router) {
-    onProgress({ type: 'error', error: 'OPENROUTER_API_KEY not configured.' });
-    return;
+    throw new RunPipelineError('OPENROUTER_API_KEY not configured.', 'OPENROUTER_CLIENT_MISSING', 500, {
+      domainId,
+      host: null,
+    });
   }
 
-  // The only difference between an audit run and a weekly tracked run is which
-  // prompts we load — everything downstream (worker pool, scoring, summary) is
-  // identical.
+  // The only difference between run modes is which prompts we load and
+  // whether we persist a branch fingerprint / refresh lock.
   const promptWhere =
     selection === 'tracked'
       ? { domainId, isTracked: true }
@@ -601,6 +732,7 @@ export async function runQueries({
       where: { id: domainId },
       select: {
         host: true,
+        currentAnalysisFingerprint: true,
         inferred: { select: { companyName: true, summary: true } },
         // Pull the user-supplied profile so we can localize the LLM calls
         // to the brand's actual market instead of defaulting to US (the
@@ -615,7 +747,20 @@ export async function runQueries({
     }),
     prisma.prompt.findMany({
       where: promptWhere,
-      select: { id: true, text: true },
+      select: {
+        id: true,
+        text: true,
+        intent: true,
+        source: true,
+        keywordId: true,
+        category: true,
+        intentStage: true,
+        persona: true,
+        useCase: true,
+        constraint: true,
+        isBranded: true,
+        competitorMentioned: true,
+      },
     }),
     prisma.competitor.findMany({
       where: { domainId, isSelected: true },
@@ -667,7 +812,28 @@ export async function runQueries({
       })).filter((p) => p.url)
     : [];
 
-  const run = await prisma.aiRun.create({ data: { domainId, status: 'running', kind } });
+  const promptSnapshot = buildAnalysisSnapshot(selectedPrompts as AnalysisPromptSnapshotItem[]);
+  const analysisFingerprint = buildAnalysisFingerprint(selectedPrompts as AnalysisPromptSnapshotItem[]);
+  const isRefresh = kind === 'refresh';
+
+  const run = await prisma.aiRun.create({
+    data: {
+      domainId,
+      status: 'running',
+      kind,
+      analysisFingerprint,
+      analysisSnapshot: promptSnapshot as any,
+    },
+  });
+
+  if (selection === 'selected' || isRefresh) {
+    await prisma.domain.update({
+      where: { id: domainId },
+      data: {
+        currentAnalysisFingerprint: analysisFingerprint,
+      },
+    });
+  }
 
   onProgress({
     type: 'progress',
@@ -713,9 +879,11 @@ export async function runQueries({
   for (const prompt of selectedPrompts) for (const model of ROSTER) queue.push({ prompt, model });
 
   let completedQueries = 0;
+  let firstFailure: RunPipelineError | null = null;
 
   async function worker() {
     while (queue.length > 0) {
+      if (firstFailure) return;
       const item = queue.shift();
       if (!item) return;
       let response = '';
@@ -726,9 +894,21 @@ export async function runQueries({
         response = out.response;
         latencyMs = out.latencyMs;
         costUsd = out.costUsd;
-      } catch {
-        response = '';
+      } catch (err) {
+        firstFailure = normalizeRunError(err, {
+          domainId,
+          host: domain!.host,
+          model: item.model.id,
+          promptId: item.prompt.id,
+        });
+        console.error(
+          `[RUN] model call failed domainId=${domainId} host=${domain!.host} promptId=${item.prompt.id} model=${item.model.id} code=${firstFailure.code} status=${firstFailure.status} message=${firstFailure.message}`,
+          firstFailure.details,
+        );
+        return;
       }
+
+      if (firstFailure) return;
       // Heuristic scoring is fast and runs unconditionally — used as the
       // baseline + safety net if the LLM scorer fails or times out.
       const heuristic = scoreResponse({
@@ -896,6 +1076,9 @@ export async function runQueries({
 
   try {
     await Promise.all(Array.from({ length: MAX_PARALLEL }, worker));
+    if (firstFailure) {
+      throw firstFailure;
+    }
 
     const summary = {
       totalQueries,
@@ -953,7 +1136,7 @@ export async function runQueries({
     });
     // Stamp the prompts we just re-tested so the dashboard can show
     // "last tested" without re-deriving it from run history.
-    if (kind === 'weekly') {
+    if (selection === 'selected' && kind === 'refresh') {
       await prisma.prompt.updateMany({
         where: { id: { in: selectedPrompts.map((p) => p.id) } },
         data: { lastTrackedRunAt: new Date() },
@@ -965,7 +1148,9 @@ export async function runQueries({
       where: { id: run.id },
       data: { status: 'failed', endedAt: new Date() },
     });
-    onProgress({ type: 'error', error: err instanceof Error ? err.message : 'AI queries failed' });
+    const normalized = normalizeRunError(err, { domainId, host: domain!.host });
+    onProgress({ type: 'error', error: normalized.message });
+    throw normalized;
   }
 }
 
@@ -980,7 +1165,7 @@ export async function runTrackedQueries(
   domainId: number,
   onProgress: (event: RunProgress) => void = () => {},
 ): Promise<void> {
-  return runQueries({ prisma, domainId, onProgress, selection: 'tracked', kind: 'weekly' });
+  return runQueries({ prisma, domainId, onProgress, selection: 'selected', kind: 'refresh' });
 }
 
 /**

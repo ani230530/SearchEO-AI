@@ -29,11 +29,13 @@ import { extractHost, normalizeUrl } from './urlNormalize';
 import { crawlDomain, inferCompanySize, inferDomainFromHomepage, synthesizeContext } from './crawlService';
 import { embedText } from './llmClient';
 import { runCompetitorPipeline, persistCompetitors } from './competitorService';
+import { CompetitorDiscoveryError } from './competitorSources';
 import { generateAuditPrompts, persistAuditPrompts, type PromptCategory } from './topicsService';
 import { generateKeywordsForDomain, persistKeywords } from './keywordsService';
 import { enrichDomainContext } from './enrichmentService';
 import { setPhase, readState } from './wizardState';
-import { runOnePrompt, runQueries } from './runService';
+import { runOnePrompt, runQueries, RunPipelineError } from './runService';
+import { runWeeklyForDomain } from '../services/weeklyTrackingService';
 import { computePhraseVisibility, computeOpportunities, computeCompetitorAnalysis } from './analyticsService';
 import { enrichOpportunities, type EnrichedOpportunity } from './opportunityEnrichment';
 import { enrichCompetitorInsights, type CompetitorInsight } from './competitorInsightEnrichment';
@@ -172,6 +174,174 @@ function nextWeeklyRunAt(): Date {
   if (add === 0 && now.getTime() >= next.getTime()) add = 7;
   next.setUTCDate(next.getUTCDate() + add);
   return next;
+}
+
+type AnalysisSnapshotPrompt = {
+  id: number;
+  text: string | null;
+  intent: string | null;
+  source: string | null;
+  keywordId: number | null;
+  category: string | null;
+  intentStage: string | null;
+  persona: string | null;
+  useCase: string | null;
+  constraint: string | null;
+  isBranded: boolean | null;
+  competitorMentioned: string | null;
+};
+
+function parseSnapshotPrompts(snapshot: unknown): AnalysisSnapshotPrompt[] {
+  if (!Array.isArray(snapshot)) return [];
+  return snapshot
+    .map((item) => {
+      if (!item || typeof item !== 'object') return null;
+      const row = item as Record<string, unknown>;
+      const id = Number(row.id);
+      if (!Number.isFinite(id)) return null;
+      return {
+        id,
+        text: typeof row.text === 'string' ? row.text : null,
+        intent: typeof row.intent === 'string' ? row.intent : null,
+        source: typeof row.source === 'string' ? row.source : null,
+        keywordId: typeof row.keywordId === 'number' ? row.keywordId : null,
+        category: typeof row.category === 'string' ? row.category : null,
+        intentStage: typeof row.intentStage === 'string' ? row.intentStage : null,
+        persona: typeof row.persona === 'string' ? row.persona : null,
+        useCase: typeof row.useCase === 'string' ? row.useCase : null,
+        constraint: typeof row.constraint === 'string' ? row.constraint : null,
+        isBranded: typeof row.isBranded === 'boolean' ? row.isBranded : null,
+        competitorMentioned: typeof row.competitorMentioned === 'string' ? row.competitorMentioned : null,
+      };
+    })
+    .filter((item): item is AnalysisSnapshotPrompt => item !== null)
+    .sort((a, b) => a.id - b.id);
+}
+
+function snapshotPromptIds(snapshot: unknown): number[] {
+  return parseSnapshotPrompts(snapshot).map((p) => p.id);
+}
+
+type BranchRun = {
+  id: number;
+  status: string;
+  startedAt: Date;
+  endedAt: Date | null;
+  analysisSnapshot: unknown;
+  analysisFingerprint: string | null;
+  summary: unknown;
+  kind: string;
+};
+
+type BranchHistory = {
+  mode: 'snapshot' | 'fingerprint' | 'legacy';
+  promptIds: number[] | null;
+  latestRun: BranchRun | null;
+  runs: BranchRun[];
+  currentFingerprint: string | null;
+};
+
+const ACTIVE_BRANCH_KIND_LIST = ['audit', 'refresh'];
+const ACTIVE_BRANCH_KINDS = { in: ACTIVE_BRANCH_KIND_LIST };
+const BRANCH_RUN_SELECT = {
+  id: true,
+  status: true,
+  startedAt: true,
+  endedAt: true,
+  kind: true,
+  analysisFingerprint: true,
+  analysisSnapshot: true,
+  summary: true,
+} as const;
+
+function samePromptIdSet(left: number[], right: number[]): boolean {
+  if (left.length !== right.length) return false;
+  return left.every((id, idx) => id === right[idx]);
+}
+
+function trimFingerprint(value: unknown): string | null {
+  return typeof value === 'string' && value.trim() ? value.trim() : null;
+}
+
+function stringifyRunDetails(details: unknown): string {
+  if (details == null) return '';
+  if (typeof details === 'string') return details;
+  try {
+    return JSON.stringify(details);
+  } catch {
+    return String(details);
+  }
+}
+
+async function resolveBranchHistory(domain: { id: number; currentAnalysisFingerprint?: string | null }, take?: number): Promise<BranchHistory> {
+  const currentFingerprint = trimFingerprint(domain.currentAnalysisFingerprint ?? null);
+  const activeRuns = await prisma.aiRun.findMany({
+    where: { domainId: domain.id, status: 'completed', kind: ACTIVE_BRANCH_KINDS },
+    orderBy: { startedAt: 'asc' },
+    select: BRANCH_RUN_SELECT,
+  }) as BranchRun[];
+
+  const latestRun = activeRuns.length > 0 ? activeRuns[activeRuns.length - 1] : null;
+  const promptIds = snapshotPromptIds(latestRun?.analysisSnapshot);
+  if (promptIds.length > 0) {
+    const branchRuns = activeRuns.filter((run) => samePromptIdSet(snapshotPromptIds(run.analysisSnapshot), promptIds));
+    return {
+      mode: 'snapshot',
+      promptIds,
+      latestRun: branchRuns.length > 0 ? branchRuns[branchRuns.length - 1] : null,
+      runs: take ? branchRuns.slice(-take) : branchRuns,
+      currentFingerprint,
+    };
+  }
+
+  if (currentFingerprint) {
+    const fingerprintRuns = await prisma.aiRun.findMany({
+      where: { domainId: domain.id, status: 'completed', analysisFingerprint: currentFingerprint, kind: ACTIVE_BRANCH_KINDS },
+      orderBy: { startedAt: 'asc' },
+      select: BRANCH_RUN_SELECT,
+    }) as BranchRun[];
+    return {
+      mode: 'fingerprint',
+      promptIds: null,
+      latestRun: fingerprintRuns.length > 0 ? fingerprintRuns[fingerprintRuns.length - 1] : null,
+      runs: take ? fingerprintRuns.slice(-take) : fingerprintRuns,
+      currentFingerprint,
+    };
+  }
+
+  const weeklyRuns = await prisma.aiRun.findMany({
+    where: { domainId: domain.id, status: 'completed', kind: 'weekly' },
+    orderBy: { startedAt: 'asc' },
+    select: BRANCH_RUN_SELECT,
+  }) as BranchRun[];
+  if (weeklyRuns.length > 0) {
+    return {
+      mode: 'legacy',
+      promptIds: null,
+      latestRun: weeklyRuns[weeklyRuns.length - 1],
+      runs: take ? weeklyRuns.slice(-take) : weeklyRuns,
+      currentFingerprint: null,
+    };
+  }
+
+  const auditRuns = await prisma.aiRun.findMany({
+    where: { domainId: domain.id, status: 'completed', kind: 'audit' },
+    orderBy: { startedAt: 'asc' },
+    select: BRANCH_RUN_SELECT,
+  }) as BranchRun[];
+  return {
+    mode: 'legacy',
+    promptIds: null,
+    latestRun: auditRuns.length > 0 ? auditRuns[auditRuns.length - 1] : null,
+    runs: take ? auditRuns.slice(-take) : auditRuns,
+    currentFingerprint: null,
+  };
+}
+
+function nextRefreshAt(startedAt: Date | null | undefined, lockedUntil: Date | null | undefined): Date {
+  if (lockedUntil && lockedUntil.getTime() > Date.now()) return lockedUntil;
+  if (startedAt) return new Date(startedAt.getTime() + 30 * 60 * 1000);
+  return nextWeeklyRunAt();
 }
 
 // A tracked prompt that has never been through a weekly run yet — zeroed
@@ -633,19 +803,22 @@ router.get('/domain/:id/report', timed('GET /report', 800), authenticateToken, a
   // the latest completed run for this domain (existing behaviour).
   const runIdParam = typeof req.query.runId === 'string' ? Number(req.query.runId) : NaN;
   const useSpecificRun = Number.isFinite(runIdParam) && runIdParam > 0;
-  // Default to audit-kind runs so weekly tracked-prompt runs don't become the
-  // "latest run" the dashboard renders. ?kind=weekly|all overrides.
-  const kindFilter = runKindFilter(req);
+  const branchHistory = useSpecificRun ? null : await resolveBranchHistory(domain);
+  const latestRun = useSpecificRun
+    ? await prisma.aiRun.findFirst({
+        where: { id: runIdParam, domainId: domain.id, status: 'completed' },
+        select: { id: true, analysisFingerprint: true, analysisSnapshot: true, startedAt: true, endedAt: true, status: true, summary: true },
+      })
+    : branchHistory?.latestRun ?? null;
+  const promptSnapshotIds = useSpecificRun
+    ? snapshotPromptIds(latestRun?.analysisSnapshot)
+    : branchHistory?.promptIds ?? snapshotPromptIds(latestRun?.analysisSnapshot);
+  const promptWhere = promptSnapshotIds && promptSnapshotIds.length > 0
+    ? { domainId: domain.id, id: { in: promptSnapshotIds } }
+    : { domainId: domain.id, isSelected: true };
+  const branchRunIds = useSpecificRun ? [runIdParam] : branchHistory?.runs.map((run) => run.id) ?? [];
 
-  const [latestRun, allResults, keywords, prompts] = await Promise.all([
-    useSpecificRun
-      ? prisma.aiRun.findFirst({
-          where: { id: runIdParam, domainId: domain.id, status: 'completed' },
-        })
-      : prisma.aiRun.findFirst({
-          where: { domainId: domain.id, status: 'completed', ...kindFilter },
-          orderBy: { startedAt: 'desc' },
-        }),
+  const [allResults, keywords, prompts] = await Promise.all([
     // Explicit select — every field listed is consumed below. Omits
     // costUsd / createdAt / runId which the report doesn't need (the query
     // planner skips reading them; in particular costUsd is only used by the
@@ -654,7 +827,7 @@ router.get('/domain/:id/report', timed('GET /report', 800), authenticateToken, a
     prisma.aiQueryResult.findMany({
       where: useSpecificRun
         ? { runId: runIdParam, run: { domainId: domain.id } }
-        : { run: { domainId: domain.id, status: 'completed', ...kindFilter } },
+        : { runId: { in: branchRunIds } },
       orderBy: { createdAt: 'desc' },
       take: 1000,
       select: {
@@ -686,7 +859,7 @@ router.get('/domain/:id/report', timed('GET /report', 800), authenticateToken, a
       select: { id: true, term: true, intent: true, source: true },
     }),
     prisma.prompt.findMany({
-      where: { domainId: domain.id, isSelected: true },
+      where: promptWhere,
       select: {
         id: true,
         text: true,
@@ -1180,42 +1353,40 @@ router.get('/domain/:id/tracked-prompts', authenticateToken, async (req: Request
   const got = await ensureDomain(req, req.params.id);
   if (!got.ok) return res.status(got.status).json({ error: got.error });
   const { domain } = got;
+  const branchHistory = await resolveBranchHistory(domain, 12);
+  const latestBranchRun = branchHistory.latestRun;
+  const trackedPromptIds = branchHistory.promptIds;
 
   const trackedPrompts = await prisma.prompt.findMany({
-    where: { domainId: domain.id, isTracked: true },
+    where: {
+      domainId: domain.id,
+      isTracked: true,
+      ...(trackedPromptIds ? { id: { in: trackedPromptIds } } : {}),
+    },
     select: { id: true, text: true, intent: true, source: true, keywordId: true, lastTrackedRunAt: true },
   });
+
   if (trackedPrompts.length === 0) {
-    return res.json({ prompts: [], latestRunAt: null, nextTestAt: nextWeeklyRunAt() });
+    return res.json({ prompts: [], latestRunAt: latestBranchRun?.startedAt ?? null, nextTestAt: nextRefreshAt(latestBranchRun?.startedAt ?? null, domain.analysisRefreshLockedUntil ?? null) });
   }
-  const promptIds = trackedPrompts.map((p) => p.id);
 
-  // Recent weekly runs (newest first). [0] = latest, [1] = previous (for the
-  // delta); up to 12 power the sparkline.
-  const weeklyRuns = await prisma.aiRun.findMany({
-    where: { domainId: domain.id, kind: 'weekly', status: 'completed' },
-    orderBy: { startedAt: 'desc' },
-    take: 12,
-    select: { id: true, startedAt: true },
-  });
+  const fallbackRuns = branchHistory.runs;
 
-  if (weeklyRuns.length === 0) {
-    // Tracked but never run yet — return rows with no metrics so the UI can
-    // show "Not yet tested".
+  if (fallbackRuns.length === 0) {
     return res.json({
-      latestRunAt: null,
-      nextTestAt: nextWeeklyRunAt(),
+      latestRunAt: latestBranchRun?.startedAt ?? null,
+      nextTestAt: nextRefreshAt(latestBranchRun?.startedAt ?? null, domain.analysisRefreshLockedUntil ?? null),
       prompts: trackedPrompts.map((p) => emptyTrackedRow(p)),
     });
   }
 
-  const latestRunId = weeklyRuns[0].id;
-  const prevRunId = weeklyRuns[1]?.id ?? null;
-  const trendRunIds = weeklyRuns.map((r) => r.id);
-  const startedAtByRun = new Map(weeklyRuns.map((r) => [r.id, r.startedAt] as const));
+  const latestRunId = fallbackRuns[fallbackRuns.length - 1].id;
+  const prevRunId = fallbackRuns[fallbackRuns.length - 2]?.id ?? null;
+  const trendRunIds = fallbackRuns.map((r) => r.id);
+  const startedAtByRun = new Map(fallbackRuns.map((r) => [r.id, r.startedAt] as const));
 
   const results = await prisma.aiQueryResult.findMany({
-    where: { promptId: { in: promptIds }, runId: { in: trendRunIds } },
+    where: { promptId: { in: trackedPrompts.map((p) => p.id) }, runId: { in: trendRunIds } },
     select: {
       id: true, promptId: true, model: true, response: true, presence: true,
       relevance: true, sentiment: true, accuracy: true, rankPosition: true,
@@ -1225,7 +1396,6 @@ router.get('/domain/:id/tracked-prompts', authenticateToken, async (req: Request
     },
   });
 
-  // Index results: promptId -> runId -> rows.
   const byPromptRun = new Map<number, Map<number, AiResultRow[]>>();
   for (const r of results) {
     let perRun = byPromptRun.get(r.promptId);
@@ -1235,7 +1405,6 @@ router.get('/domain/:id/tracked-prompts', authenticateToken, async (req: Request
     perRun.set(r.runId, arr);
   }
 
-  // Visibility % (presence/total) for a prompt in a given run.
   const visibilityFor = (promptId: number, runId: number): number | null => {
     const rows = byPromptRun.get(promptId)?.get(runId);
     if (!rows || rows.length === 0) return null;
@@ -1243,7 +1412,7 @@ router.get('/domain/:id/tracked-prompts', authenticateToken, async (req: Request
     return Math.round((mentions / rows.length) * 100);
   };
 
-  const latestRunAt = weeklyRuns[0].startedAt;
+  const latestRunAt = fallbackRuns[0].startedAt;
 
   const prompts = trackedPrompts.map((p) => {
     const latestRows = byPromptRun.get(p.id)?.get(latestRunId) ?? [];
@@ -1257,13 +1426,10 @@ router.get('/domain/:id/tracked-prompts', authenticateToken, async (req: Request
       : null;
     const competitors = rollupCompetitors(built);
 
-    // Week-over-week deltas vs the previous weekly run.
     const prevVis = prevRunId != null ? visibilityFor(p.id, prevRunId) : null;
     const visibilityDelta = prevVis != null ? sovPct - prevVis : null;
 
-    // Sparkline: one point per weekly run that has data for this prompt,
-    // oldest → newest.
-    const trend = [...weeklyRuns]
+    const trend = [...fallbackRuns]
       .reverse()
       .map((run) => {
         const vis = visibilityFor(p.id, run.id);
@@ -1288,15 +1454,14 @@ router.get('/domain/:id/tracked-prompts', authenticateToken, async (req: Request
       competitorCount: competitors.length,
       results: built,
       metrics: { visibility: sovPct, avgOverall: total > 0 ? Number((built.reduce((s, r) => s + r.overall, 0) / total).toFixed(2)) : 0, runs: total },
-      // Tracking metadata.
       isTracked: true,
       lastTestedAt: p.lastTrackedRunAt ?? latestRunAt,
-      nextTestAt: nextWeeklyRunAt(),
+      nextTestAt: nextRefreshAt(latestRunAt, domain.analysisRefreshLockedUntil ?? null),
       weekTrend: { delta: visibilityDelta, lastVisibility: sovPct, points: trend },
     };
   });
 
-  return res.json({ latestRunAt, nextTestAt: nextWeeklyRunAt(), prompts });
+  return res.json({ latestRunAt, nextTestAt: nextRefreshAt(latestRunAt, domain.analysisRefreshLockedUntil ?? null), prompts });
 });
 
 // ── POST /domain/:id/tracked-prompts/run-now ──────────────────────────────
@@ -1309,14 +1474,53 @@ router.post('/domain/:id/tracked-prompts/run-now', authenticateToken, async (req
   if (!got.ok) return res.status(got.status).json({ error: got.error });
   const { domain } = got;
 
-  const count = await prisma.prompt.count({ where: { domainId: domain.id, isTracked: true } });
-  if (count === 0) return res.status(400).json({ error: 'No tracked prompts to test' });
+  const count = await prisma.prompt.count({ where: { domainId: domain.id, isSelected: true } });
+  if (count === 0) {
+    return res.status(400).json({
+      error: 'No selected prompts to refresh',
+      code: 'NO_SELECTED_PROMPTS',
+      details: 'The active branch has no selected prompts, so refresh cannot start.',
+    });
+  }
 
-  const { runWeeklyForDomain } = require('../services/weeklyTrackingService');
-  // Don't await — the sweep streams nothing and can take minutes.
-  Promise.resolve(runWeeklyForDomain(domain.id)).catch((e: unknown) =>
-    console.error(`[tracked-prompts] run-now for domain ${domain.id} failed`, e));
-  return res.json({ started: true, trackedPrompts: count });
+  console.log(`[COMPETITOR] run-now domainId=${domain.id} host=${domain.host} selectedPrompts=${count}`);
+
+  try {
+    const result = await Promise.resolve(runWeeklyForDomain(domain.id));
+    if (result.skipped) {
+      return res.status(409).json({
+        error: 'A refresh is already running. Try again shortly.',
+        code: 'REFRESH_IN_PROGRESS',
+        details: 'A refresh job is already in flight for this domain.',
+      });
+    }
+    return res.json({ started: true, selectedPrompts: count });
+  } catch (err) {
+    const errRecord = err && typeof err === 'object' ? (err as Record<string, unknown>) : null;
+    const pipelineError =
+      err instanceof RunPipelineError
+        ? err
+        : new RunPipelineError(
+            err instanceof Error ? err.message : 'AI queries failed',
+            typeof errRecord?.code === 'string' ? errRecord.code : 'RUN_PIPELINE_FAILED',
+            typeof errRecord?.status === 'number' ? errRecord.status : 502,
+            (errRecord?.details as Record<string, unknown> | null | undefined) ?? (
+              err instanceof Error
+                ? { name: err.name, message: err.message }
+                : { error: String(err) }
+            ),
+          );
+    console.error(
+      `[COMPETITOR] POST /competitors domainId=${domain.id} host=${domain.host} failed code=${pipelineError.code} status=${pipelineError.status} message=${pipelineError.message}`,
+      pipelineError.details,
+    );
+    return res.status(pipelineError.status).json({
+      error: pipelineError.message,
+      code: pipelineError.code,
+      details: stringifyRunDetails(pipelineError.details),
+      debug: pipelineError.details,
+    });
+  }
 });
 
 // ── GET /domain/:id/prompts/:promptId/history ─────────────────────────────
@@ -1335,6 +1539,9 @@ router.get('/domain/:id/prompts/:promptId/history', authenticateToken, async (re
   const { domain } = got;
   const promptId = Number(req.params.promptId);
   if (!Number.isFinite(promptId)) return res.status(400).json({ error: 'Invalid promptId' });
+  const currentFingerprint = typeof domain.currentAnalysisFingerprint === 'string' && domain.currentAnalysisFingerprint.trim()
+    ? domain.currentAnalysisFingerprint
+    : null;
 
   const prompt = await prisma.prompt.findFirst({
     where: { id: promptId, domainId: domain.id },
@@ -1345,7 +1552,9 @@ router.get('/domain/:id/prompts/:promptId/history', authenticateToken, async (re
   const rows = await prisma.aiQueryResult.findMany({
     where: {
       promptId,
-      run: { domainId: domain.id, status: 'completed', ...runKindFilter(req) },
+      run: currentFingerprint
+        ? { domainId: domain.id, status: 'completed', analysisFingerprint: currentFingerprint, kind: { in: ['audit', 'refresh'] } }
+        : { domainId: domain.id, status: 'completed', ...runKindFilter(req) },
     },
     select: {
       runId: true,
@@ -1420,6 +1629,9 @@ router.get('/domain/:id/keywords/:keywordId/history', authenticateToken, async (
   const { domain } = got;
   const keywordId = Number(req.params.keywordId);
   if (!Number.isFinite(keywordId)) return res.status(400).json({ error: 'Invalid keywordId' });
+  const currentFingerprint = typeof domain.currentAnalysisFingerprint === 'string' && domain.currentAnalysisFingerprint.trim()
+    ? domain.currentAnalysisFingerprint
+    : null;
 
   const keyword = await prisma.keyword.findFirst({
     where: { id: keywordId, domainId: domain.id },
@@ -1440,7 +1652,9 @@ router.get('/domain/:id/keywords/:keywordId/history', authenticateToken, async (
   const rows = await prisma.aiQueryResult.findMany({
     where: {
       promptId: { in: childIds },
-      run: { domainId: domain.id, status: 'completed', ...runKindFilter(req) },
+      run: currentFingerprint
+        ? { domainId: domain.id, status: 'completed', analysisFingerprint: currentFingerprint, kind: { in: ['audit', 'refresh'] } }
+        : { domainId: domain.id, status: 'completed', ...runKindFilter(req) },
     },
     select: {
       runId: true,
@@ -1511,17 +1725,14 @@ router.get('/domain/:id/runs', authenticateToken, async (req: Request, res: Resp
   const got = await ensureDomain(req, req.params.id);
   if (!got.ok) return res.status(got.status).json({ error: got.error });
   const { domain } = got;
-  const runs = await prisma.aiRun.findMany({
-    where: { domainId: domain.id, ...runKindFilter(req) },
-    orderBy: { startedAt: 'desc' },
-    take: 30,
-    select: { id: true, status: true, startedAt: true, endedAt: true, summary: true },
-  });
+  const branchHistory = await resolveBranchHistory(domain);
+  const runs = branchHistory.runs.slice(-30).reverse();
   return res.json({
     domainId: domain.id,
     runs: runs.map((r) => ({
       id: r.id,
-      status: r.status,
+      status: 'completed',
+      kind: r.kind,
       startedAt: r.startedAt,
       endedAt: r.endedAt,
       visibilityScore: typeof (r.summary as Record<string, unknown> | null)?.presenceRate === 'number'
@@ -1554,6 +1765,7 @@ router.get('/domain/:id/trends', authenticateToken, async (req: Request, res: Re
   const got = await ensureDomain(req, req.params.id);
   if (!got.ok) return res.status(got.status).json({ error: got.error });
   const { domain } = got;
+  const branchHistory = await resolveBranchHistory(domain);
 
   const daysParam = typeof req.query.days === 'string' ? Number(req.query.days) : NaN;
   const useWindow = Number.isFinite(daysParam) && daysParam > 0;
@@ -1675,16 +1887,7 @@ router.get('/domain/:id/trends', authenticateToken, async (req: Request, res: Re
     const windowEnd = startOfUtcDay(addUtcDays(new Date(), 1));
     const windowStart = addUtcDays(windowEnd, -windowDays);
 
-    const runs = await prisma.aiRun.findMany({
-      where: {
-        domainId: domain.id,
-        status: 'completed',
-        ...runKindFilter(req),
-        startedAt: { gte: windowStart, lt: windowEnd },
-      },
-      orderBy: { startedAt: 'asc' },
-      select: { id: true, startedAt: true, endedAt: true },
-    });
+    const runs = branchHistory.runs.filter((run) => run.startedAt >= windowStart && run.startedAt < windowEnd);
 
     const dayBuckets = new Map<string, TrendDayBucket>();
     for (let i = 0; i < windowDays; i++) {
@@ -1815,12 +2018,7 @@ router.get('/domain/:id/trends', authenticateToken, async (req: Request, res: Re
 
   // Latest 12 completed runs gives ~3 months of weekly history without
   // overflowing the chart card. Ordered ascending so the chart reads L→R.
-  const runs = await prisma.aiRun.findMany({
-    where: { domainId: domain.id, status: 'completed', ...runKindFilter(req) },
-    orderBy: { startedAt: 'asc' },
-    take: 12,
-    select: { id: true, startedAt: true, endedAt: true },
-  });
+  const runs = branchHistory.runs.slice(-12);
   if (runs.length === 0) {
     return res.json({ runs: [], topCompetitors: [] });
   }
@@ -2011,72 +2209,28 @@ router.post('/domain/:id/restart', authenticateToken, async (req: Request, res: 
     return res.status(400).json({ error: "from must be 'crawl', 'competitors', or 'topics'" });
   }
 
-  if (from === 'crawl' || from === 'competitors') {
-    // Hard reset — keep Domain + DomainProfile, wipe everything generated.
-    // 'competitors' keeps the crawl snapshot intact, but otherwise clears
-    // the wizard back to a fresh competitor-selection restart.
-    const destructiveOps = [
-      prisma.aiQueryResult.deleteMany({ where: { run: { domainId: domain.id } } }),
-      prisma.aiRun.deleteMany({ where: { domainId: domain.id } }),
-      prisma.prompt.deleteMany({ where: { domainId: domain.id } }),
-      prisma.keyword.deleteMany({ where: { domainId: domain.id } }),
-      prisma.competitor.deleteMany({ where: { domainId: domain.id } }),
-      ...(from === 'crawl' ? [prisma.crawlSnapshot.deleteMany({ where: { domainId: domain.id } })] : []),
-    ];
-    await prisma.$transaction([
-      ...destructiveOps,
-      // Reset wizard phases to the appropriate resume point.
-      prisma.wizardState.upsert({
-        where: { domainId: domain.id },
-        update: {
-          phases:
-            from === 'crawl'
-              ? ({} as any)
-              : ({ crawl: 'completed', profile: 'completed' } as any),
-          selectionDraft: { set: undefined } as any,
-        },
-        create: {
-          domainId: domain.id,
-          phases: from === 'crawl' ? ({} as any) : ({ crawl: 'completed', profile: 'completed' } as any),
-        },
-      }),
-    ]);
-  } else {
-    // Soft reset — keep crawl, competitors, custom prompts/keywords.
-    // Drop AI-source prompts/keywords + every run.
-    const aiKeywords = await prisma.keyword.findMany({
-      where: { domainId: domain.id, source: 'ai' },
-      select: { id: true },
-    });
-    const aiKwIds = aiKeywords.map((k) => k.id);
+  // Branch-aware reset: keep historical prompts/runs intact so prior branches
+  // remain queryable. We only rewind wizard state so the user can re-enter the
+  // setup flow without losing previous analysis data.
+  const existing = await prisma.wizardState.findUnique({ where: { domainId: domain.id } });
+  const phases = (existing?.phases as Record<string, string> | undefined) ?? {};
+  delete phases.topics;
+  delete phases.select;
+  delete phases.run;
 
-    // Soft reset: drop AI prompts/keywords. We deliberately keep AiRun rows
-    // (and let AiQueryResult cascade-delete via the prompt FK) so the
-    // dashboard's "latest completed run" lookup still finds the previous
-    // run's summary.avgOverall while the user re-picks prompts. Without this,
-    // the Domain History card flips from "Visibility 72%" to "Pick prompts"
-    // the moment the user enters Step 4 from the AI Dashboard, which is
-    // disorienting — the prior result hasn't been replaced yet.
-    await prisma.$transaction([
-      prisma.prompt.deleteMany({
-        where: {
-          domainId: domain.id,
-          OR: [{ source: 'ai' }, { keywordId: { in: aiKwIds } }],
-        },
-      }),
-      prisma.keyword.deleteMany({ where: { id: { in: aiKwIds } } }),
-      // Drop topics/select/run phases; keep crawl + profile + competitors.
-      prisma.wizardState.upsert({
-        where: { domainId: domain.id },
-        update: { selectionDraft: { set: undefined } as any },
-        create: { domainId: domain.id, phases: {} as any },
-      }),
-    ]);
-    const existing = await prisma.wizardState.findUnique({ where: { domainId: domain.id } });
-    const phases = (existing?.phases as Record<string, string> | undefined) ?? {};
-    delete phases.topics;
-    delete phases.select;
-    delete phases.run;
+  await prisma.wizardState.upsert({
+    where: { domainId: domain.id },
+    update: {
+      phases: from === 'crawl' ? ({} as any) : ({ crawl: 'completed', profile: 'completed' } as any),
+      selectionDraft: { set: undefined } as any,
+    },
+    create: {
+      domainId: domain.id,
+      phases: from === 'crawl' ? ({} as any) : ({ crawl: 'completed', profile: 'completed' } as any),
+    },
+  });
+
+  if (Object.keys(phases).length > 0) {
     await prisma.wizardState.update({
       where: { domainId: domain.id },
       data: { phases: phases as any },
@@ -2136,16 +2290,12 @@ router.get('/domain/:id/competitor-analysis', timed('GET /competitor-analysis', 
 
   const runIdParam = typeof req.query.runId === 'string' ? Number(req.query.runId) : NaN;
   const useSpecificRun = Number.isFinite(runIdParam) && runIdParam > 0;
+  const branchHistory = useSpecificRun ? null : await resolveBranchHistory(domain);
 
   const [latestRun, selectedCompetitors, prompts, keywords] = await Promise.all([
     useSpecificRun
       ? prisma.aiRun.findFirst({ where: { id: runIdParam, domainId: domain.id, status: 'completed' } })
-      // Scope to kind='audit' (via runKindFilter) so the same single-prompt
-      // 'adhoc' / weekly-tracking runs that /report and /trends exclude can't
-      // become the "latest run" here either. Without this filter a 1-prompt
-      // re-test would define the competitor analysis and the page would read
-      // "No competitors mentioned in this audit yet."
-      : prisma.aiRun.findFirst({ where: { domainId: domain.id, status: 'completed', ...runKindFilter(req) }, orderBy: { startedAt: 'desc' } }),
+      : Promise.resolve(branchHistory?.latestRun ?? null),
     prisma.competitor.findMany({
       where: { domainId: domain.id, isSelected: true },
       orderBy: [{ rank: 'asc' }, { similarityScore: 'desc' }],
@@ -2293,6 +2443,7 @@ router.post('/domain/:id/competitors', timed('POST /competitors', 5000), authent
   const got = await ensureDomain(req, req.params.id);
   if (!got.ok) return res.status(got.status).json({ error: got.error });
   const { domain } = got;
+  console.log(`[COMPETITOR] POST /competitors domainId=${domain.id} host=${domain.host} phase=starting`);
   await setPhase(prisma, domain.id, 'competitors', 'running');
   try {
     const seedKw = await prisma.keyword.findMany({ where: { domainId: domain.id }, select: { term: true }, take: 30 });
@@ -2347,7 +2498,21 @@ router.post('/domain/:id/competitors', timed('POST /competitors', 5000), authent
     });
   } catch (err) {
     await setPhase(prisma, domain.id, 'competitors', 'failed');
-    return res.status(500).json({ error: err instanceof Error ? err.message : 'Competitor pipeline failed' });
+    const isDiscoveryError = err instanceof CompetitorDiscoveryError;
+    const code = isDiscoveryError
+      ? err.code
+      : err instanceof Error && typeof (err as Error & { code?: string }).code === 'string'
+        ? (err as Error & { code?: string }).code!
+        : 'COMPETITOR_PIPELINE_FAILED';
+    const message = err instanceof Error ? err.message : 'Competitor pipeline failed';
+    console.error(
+      `[COMPETITOR] POST /competitors domainId=${domain.id} host=${domain.host} failed code=${code} message=${message}`
+    );
+    return res.status(500).json({
+      error: message,
+      code,
+      details: err instanceof Error ? { name: err.name, stack: process.env.NODE_ENV !== 'production' ? err.stack : undefined } : undefined,
+    });
   }
 });
 
@@ -3282,16 +3447,25 @@ router.post('/domain/:id/run', authenticateOrSession(), async (req: Request, res
   };
 
   await setPhase(prisma, domain.id, 'run', 'running');
-  await runQueries({
-    prisma,
-    domainId: domain.id,
-    onProgress: (event) => {
-      const { type, ...rest } = event;
-      sendEvent(type, rest);
-    },
-  });
-  await setPhase(prisma, domain.id, 'run', 'completed');
-  res.end();
+  try {
+    await runQueries({
+      prisma,
+      domainId: domain.id,
+      onProgress: (event) => {
+        const { type, ...rest } = event;
+        sendEvent(type, rest);
+      },
+    });
+    await setPhase(prisma, domain.id, 'run', 'completed');
+    res.end();
+  } catch (err) {
+    await setPhase(prisma, domain.id, 'run', 'failed');
+    sendEvent('error', {
+      error: err instanceof Error ? err.message : 'AI queries failed',
+      code: err instanceof RunPipelineError ? err.code : 'RUN_PIPELINE_FAILED',
+    });
+    res.end();
+  }
 });
 
 // ── DELETE /domain/:id ─────────────────────────────────────────────────────

@@ -85,7 +85,6 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { useToast } from '@/components/ui/use-toast';
-import { maskDomainId, unmaskDomainId } from '../lib/domainUtils';
 import { useShellContext } from '@/features/ai-results/AIResultsShell';
 import { useCampaigns, useGscStatus, useReport, useRuns, useTrackedPrompts, useTrends } from '@/features/ai-results/queries';
 import { useQueryClient } from '@tanstack/react-query';
@@ -1211,7 +1210,11 @@ export const PromptTable = ({
     });
   };
   const [showAllQueries, setShowAllQueries] = useState(false);
-  const trackedPromptsQuery = useTrackedPrompts<{ prompts?: PromptTableRow[] }>(domainId ?? null);
+  const trackedPromptsQuery = useTrackedPrompts<{
+    latestRunAt?: string | null;
+    nextTestAt?: string | null;
+    prompts?: PromptTableRow[];
+  }>(domainId ?? null);
   const trackedPromptRows = useMemo(
     () => (Array.isArray(trackedPromptsQuery.data?.prompts) ? trackedPromptsQuery.data!.prompts : []),
     [trackedPromptsQuery.data],
@@ -2481,6 +2484,10 @@ const AIResultsReportPreview = () => {
       description: c.description?.trim() ? c.description.trim() : null,
     }));
   }, [campaignsQuery.data]);
+  const activeWorksheet = useMemo(
+    () => worksheetOptions.find((worksheet) => worksheet.id === activeWorksheetId) ?? null,
+    [activeWorksheetId, worksheetOptions]
+  );
   const worksheetOptionsLoading = campaignsQuery.isLoading;
 
   const gscQuery = useGscStatus<{ connected?: boolean }>();
@@ -2492,6 +2499,11 @@ const AIResultsReportPreview = () => {
   const reportQuery = useReport<any>(domainId, selectedRunId);
   const runsQuery = useRuns<{ runs: Array<{ id: number; status: string; startedAt: string; visibilityScore: number | null; totalQueries: number | null }> }>(domainId);
   const trendsQuery = useTrends<{ runs: TrendRun[]; topCompetitors: string[] }>(domainId);
+  const trackedPromptsQuery = useTrackedPrompts<{
+    latestRunAt?: string | null;
+    nextTestAt?: string | null;
+    prompts?: PromptTableRow[];
+  }>(domainId);
 
   const reportData: any = reportQuery.data ?? null;
   const loading = reportQuery.isLoading;
@@ -2510,8 +2522,51 @@ const AIResultsReportPreview = () => {
     }),
     [trendsQuery.data],
   );
+  const { toast } = useToast();
+  const [refreshingBranch, setRefreshingBranch] = useState(false);
+  const refreshCooldownUntil = trackedPromptsQuery.data?.nextTestAt ?? null;
+  const refreshCooldownActive = Boolean(
+    refreshCooldownUntil && Number.isFinite(Date.parse(refreshCooldownUntil)) && Date.parse(refreshCooldownUntil) > Date.now(),
+  );
 
   const selectedCount = selectedRowIds.size;
+
+  const handleBranchRefresh = useCallback(async () => {
+    if (domainId == null || refreshingBranch || refreshCooldownActive) return;
+    setRefreshingBranch(true);
+    try {
+      const response = await apiPost<{ started?: boolean; selectedPrompts?: number }>(
+        `/wizard/domain/${domainId}/tracked-prompts/run-now`,
+      );
+      await queryClient.invalidateQueries({
+        predicate: (query) =>
+          Array.isArray(query.queryKey) &&
+          query.queryKey[0] === 'ai-results' &&
+          query.queryKey[2] === domainId,
+      });
+      toast({
+        title: 'Refresh complete',
+        description: response.selectedPrompts
+          ? `Updated the active branch for ${response.selectedPrompts} prompt${response.selectedPrompts === 1 ? '' : 's'}.`
+          : 'Updated the active branch.',
+      });
+    } catch (err) {
+      const error = err as Error & { status?: number; code?: string };
+      const message =
+        error.status === 409
+          ? 'Refresh cooldown active. Try again in a few minutes.'
+          : error.status === 400
+            ? 'No selected prompts to refresh.'
+            : error.message || 'Refresh failed.';
+      toast({
+        title: 'Refresh unavailable',
+        description: message,
+        variant: 'destructive',
+      });
+    } finally {
+      setRefreshingBranch(false);
+    }
+  }, [domainId, queryClient, refreshCooldownActive, refreshingBranch, toast]);
 
   const scrollToSection = useCallback((sectionId: string) => {
     const target = document.getElementById(sectionId);
@@ -2525,7 +2580,7 @@ const AIResultsReportPreview = () => {
         title: 'Connect Website',
         description: 'Integrate your website to automate content publishing and optimization.',
         iconSrc: '/suggested-actions/connect-website.svg',
-        onClick: () => navigate('/dashboard?tab=integration'),
+        onClick: () => navigate(resolveSidebarNavigation('integration').path),
       },
       {
         title: 'Explore Opportunities',
@@ -2645,7 +2700,7 @@ const AIResultsReportPreview = () => {
         writeWorksheetHandoff({ worksheetId: built.campaignId });
         localStorage.setItem('activeTab', 'projects');
         setGenerationByKey((prev) => ({ ...prev, [key]: { kind: 'done', draftId: null } }));
-        const worksheetPath = buildProjectsWorksheetPath(built.campaignId);
+        const worksheetPath = buildProjectsWorksheetPath(built.campaignId, activeWorksheet?.name);
         if (worksheetTab) {
           worksheetTab.location.href = worksheetPath;
         } else {
@@ -2663,7 +2718,7 @@ const AIResultsReportPreview = () => {
         return false;
       }
     },
-    [navigate, reportData]
+    [activeWorksheet?.name, navigate, reportData]
   );
 
   const handleGenerateContent = useCallback(
@@ -2742,12 +2797,12 @@ const AIResultsReportPreview = () => {
       });
 
     const payload = { activeWorksheetId, selectedItemIds, selectedRows };
-    const worksheetTab = openWorksheetInNewTab(activeWorksheetId, payload);
+    const worksheetTab = openWorksheetInNewTab(activeWorksheetId, payload, activeWorksheet?.name);
     if (!worksheetTab) return;
     localStorage.setItem('activeTab', 'projects');
     setIsWorksheetModalOpen(false);
     setActiveWorksheetId(null);
-  }, [activeWorksheetId, pendingGeneration, reportData, runGeneration, selectedRowIds]);
+  }, [activeWorksheet?.name, activeWorksheetId, pendingGeneration, reportData, runGeneration, selectedRowIds]);
 
   const handleCreateNewWorksheet = useCallback(() => {
     setCreateWorksheetError(null);
@@ -2831,7 +2886,7 @@ const AIResultsReportPreview = () => {
       localStorage.setItem('activeTab', 'projects');
       setIsWorksheetModalOpen(false);
       setActiveWorksheetId(null);
-      navigate(buildProjectsWorksheetPath(newId));
+      navigate(buildProjectsWorksheetPath(newId, newWorksheetName));
     } catch (err) {
       console.error('[AIResults] Create worksheet failed:', err);
       setCreateWorksheetError('Failed to create worksheet. Please try again.');
@@ -3229,7 +3284,7 @@ return (
             </p>
           </div>
           <Button
-            onClick={() => navigate('/dashboard?tab=integration')}
+            onClick={() => navigate(resolveSidebarNavigation('integration').path)}
             className="h-[37px] w-full shrink-0 rounded-lg bg-[#2D4059] px-4 gap-12text-sm font-semibold text-white shadow-[0_1px_2px_0_#1018280D] hover:bg-[#24364d] sm:w-auto"
           >
             <IntegrateSiteIcon />
@@ -3311,6 +3366,21 @@ return (
                 Latest run
               </Button>
             )}
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => void handleBranchRefresh()}
+              disabled={domainId == null || refreshingBranch || refreshCooldownActive}
+              className="h-[41px] rounded-lg border border-[#D5D7DA] bg-white px-3 text-xs text-[#374252] shadow-[0_1px_2px_0_#1018280D] hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400"
+              title={refreshCooldownActive ? `Refresh available after ${new Date(refreshCooldownUntil ?? '').toLocaleTimeString()}` : 'Refresh active branch'}
+            >
+              {refreshingBranch ? (
+                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
+              )}
+              Refresh
+            </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button

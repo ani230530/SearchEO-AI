@@ -8,7 +8,8 @@
  *
  * Sources today:
  *   - llmContext: GPT proposes likely competitors from the crawled domain
- *                 context. Always available (uses OpenRouter), and the
+ *                 context. Always available for this test path (uses
+ *                 OpenAI), and the
  *                 verification step downstream filters hallucinations.
  *   - serpApi:    organic Google results — adds real SERP signal when
  *                 SERP_API_KEY is configured. No-op otherwise.
@@ -28,6 +29,7 @@ import { redisService } from '../services/RedisService';
 const SERPAPI_KEY = process.env.SERP_API_KEY || process.env.SERPAPI_KEY;
 const CLEARBIT_KEY = process.env.CLEARBIT_KEY;
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const APP_URL = process.env.OPENROUTER_REFERRER || 'http://localhost:3002';
 
 // OpenRouter — used by the LLM-context proposer. One key, one model.
@@ -48,6 +50,106 @@ const BLOCKED_HOSTS = new Set([
 
 function isBlocked(host: string): boolean {
   return BLOCKED_HOSTS.has(host) || host.endsWith('.gov') || host.endsWith('.edu');
+}
+
+export class CompetitorDiscoveryError extends Error {
+  constructor(
+    message: string,
+    public code: string,
+  ) {
+    super(message);
+    this.name = 'CompetitorDiscoveryError';
+  }
+}
+
+async function fromLlmContextHttp(args: {
+  ownDomainHost: string;
+  companyName: string | null;
+  industry: string | null;
+  products: string[];
+  summary: string;
+  location: string | null;
+}): Promise<CompetitorCandidate[]> {
+  console.log(
+    `[COMPETITOR] OpenAI auth=${OPENAI_API_KEY?.trim() ? 'present' : 'missing'} model=gpt-4o-mini host=${args.ownDomainHost}`
+  );
+  if (!OPENAI_API_KEY?.trim()) {
+    throw new CompetitorDiscoveryError(
+      'Competitor discovery is unavailable: OPENAI_API_KEY is not configured.',
+      'OPENAI_CLIENT_MISSING'
+    );
+  }
+
+  const profileLines = [
+    `Target company: ${args.companyName ?? args.ownDomainHost}`,
+    `Domain: ${args.ownDomainHost}`,
+    args.industry ? `Industry: ${args.industry}` : null,
+    args.products.length ? `Products / services: ${args.products.slice(0, 6).join(', ')}` : null,
+    args.location ? `Location / market: ${args.location}` : null,
+    args.summary ? `Summary: ${args.summary.slice(0, 600)}` : null,
+  ].filter(Boolean).join('\n');
+
+  const openai = new OpenAI({ apiKey: OPENAI_API_KEY.trim() });
+  const completion = await openai.chat.completions.create({
+    model: 'gpt-4o-mini',
+    messages: [
+      {
+        role: 'system',
+        content:
+          'You identify direct competitors of a target company. ' +
+          'Return real, verifiable companies that operate in the same market and serve a similar audience. ' +
+          'Use lowercase host names without "www." (e.g. "stripe.com"). ' +
+          'No marketplaces (amazon, ebay, walmart), no social platforms, no review aggregators. ' +
+          'No fictional or generic names. ' +
+          'Output strict JSON.',
+      },
+      {
+        role: 'user',
+        content: [
+          'Propose 8-12 direct competitors for this company.',
+          '',
+          profileLines,
+          '',
+          'Return JSON: { "competitors": [ { "host": "example.com", "name": "Example Inc", "reason": "one sentence on why they compete" } ] }',
+        ].join('\n'),
+      },
+    ],
+    response_format: { type: 'json_object' },
+    temperature: 0.2,
+    max_tokens: 1500,
+  });
+  const text = completion.choices[0]?.message?.content ?? '';
+  console.log(`[COMPETITOR] LLM response for ${args.ownDomainHost}: ${text.slice(0, 200)}...`);
+
+  const payload = JSON.parse(text) as { competitors?: Array<{ host?: unknown; name?: unknown; reason?: unknown }> };
+  const out = new Map<string, CompetitorCandidate>();
+  const arr = Array.isArray(payload.competitors) ? payload.competitors : [];
+  console.log(`[COMPETITOR] Parsed ${arr.length} competitors from LLM for ${args.ownDomainHost}`);
+  if (arr.length === 0) {
+    throw new CompetitorDiscoveryError(
+      `Competitor discovery returned no candidates for ${args.ownDomainHost}. Check the OpenAI prompt response or API key.`,
+      'OPENAI_EMPTY_RESPONSE'
+    );
+  }
+
+  for (const raw of arr) {
+    const hostRaw = typeof raw?.host === 'string' ? raw.host.trim() : '';
+    const host = extractHost(hostRaw) ?? hostRaw.toLowerCase().replace(/^www\./, '').split('/')[0];
+    if (!host || host === args.ownDomainHost || isBlocked(host)) {
+      console.log(`[COMPETITOR] Filtered: host=${hostRaw}, reason=${!host ? 'invalid' : host === args.ownDomainHost ? 'self' : 'blocked'}`);
+      continue;
+    }
+    const name = typeof raw?.name === 'string' ? raw.name.trim() : null;
+    const reason = typeof raw?.reason === 'string' ? raw.reason.trim() : null;
+    if (out.has(host)) continue;
+    out.set(host, {
+      competitorHost: host,
+      source: 'llm-rank',
+      rawSignals: { llmName: name, llmReason: reason },
+    });
+  }
+  console.log(`[COMPETITOR] Final candidates for ${args.ownDomainHost}: ${out.size}`);
+  return Array.from(out.values());
 }
 
 /**
@@ -185,9 +287,14 @@ export async function fromLlmContext(args: {
   summary: string;
   location: string | null;
 }): Promise<CompetitorCandidate[]> {
+  console.log(
+    `[COMPETITOR] OpenRouter client=${router ? 'ready' : 'missing'} model=openai/gpt-4o-mini host=${args.ownDomainHost}`
+  );
   if (!router) {
-    console.warn('[COMPETITOR] OpenRouter not initialized. OPENROUTER_API_KEY missing?');
-    return [];
+    throw new CompetitorDiscoveryError(
+      'Competitor discovery is unavailable: OPENROUTER_API_KEY is not configured.',
+      'OPENROUTER_CLIENT_MISSING'
+    );
   }
   console.log(`[COMPETITOR] Discovering competitors for ${args.ownDomainHost}...`);
   const profileLines = [
@@ -234,13 +341,27 @@ export async function fromLlmContext(args: {
     console.log(`[COMPETITOR] LLM response for ${args.ownDomainHost}: ${text.slice(0, 200)}...`);
     payload = JSON.parse(text);
   } catch (err) {
-    console.error(`[COMPETITOR] ERROR discovering competitors for ${args.ownDomainHost}:`, err instanceof Error ? err.message : String(err));
-    return [];
+    const message = err instanceof Error ? err.message : String(err);
+    const status = typeof (err as { status?: unknown })?.status === 'number' ? (err as { status: number }).status : undefined;
+    const code =
+      status === 401 || /Missing Authentication header/i.test(message)
+        ? 'OPENROUTER_AUTH_MISSING'
+        : status === 403
+          ? 'OPENROUTER_FORBIDDEN'
+          : 'OPENROUTER_REQUEST_FAILED';
+    console.error(`[COMPETITOR] ERROR discovering competitors for ${args.ownDomainHost}: code=${code} status=${status ?? 'n/a'} message=${message}`);
+    throw new CompetitorDiscoveryError(`Competitor discovery failed for ${args.ownDomainHost}: ${message}`, code);
   }
 
   const out = new Map<string, CompetitorCandidate>();
   const arr = Array.isArray(payload.competitors) ? payload.competitors : [];
   console.log(`[COMPETITOR] Parsed ${arr.length} competitors from LLM for ${args.ownDomainHost}`);
+  if (arr.length === 0) {
+    throw new CompetitorDiscoveryError(
+      `Competitor discovery returned no candidates for ${args.ownDomainHost}. Check the OpenRouter prompt response or API key.`,
+      'OPENROUTER_EMPTY_RESPONSE'
+    );
+  }
   for (const raw of arr) {
     const hostRaw = typeof raw?.host === 'string' ? raw.host.trim() : '';
     const host = extractHost(hostRaw) ?? hostRaw.toLowerCase().replace(/^www\./, '').split('/')[0];
@@ -282,7 +403,7 @@ export async function discoverCandidates(args: {
   seedKeywords: string[];
 }): Promise<CompetitorCandidate[]> {
   const [llm, serp, mentions, enrich] = await Promise.all([
-    fromLlmContext({
+    fromLlmContextHttp({
       ownDomainHost: args.ownDomainHost,
       companyName: args.companyName,
       industry: args.industry,

@@ -4,9 +4,6 @@ import {
   BarChart3,
   ChevronRight,
   ChevronLeft,
-  History,
-  Globe,
-  Info,
   Lightbulb,
   Link as LinkIcon,
   CircleHelp,
@@ -14,8 +11,8 @@ import {
   Send,
   Sparkles,
   Tag,
+  Globe,
   House,
-  ClipboardList,
   PieChart,
   Settings,
   Route,
@@ -33,6 +30,7 @@ import type {
   TabId,
 } from "@/features/sidebar-dashboard/types";
 import type { SettingsSubTab } from "@/features/sidebar-dashboard/sections/settings/types";
+import { resolveDashboardPath, resolveSidebarNavigation } from "@/features/sidebar-dashboard/navigation";
 
 interface DashboardSidebarProps {
   activeCompanySubTab: CompanySubTabId;
@@ -120,7 +118,7 @@ export function DashboardSidebar({
             icon: <House className="h-4 w-4" />,
             isActive: activeTab === "overview",
             onClick: () => onSelectTab("overview"),
-            href: "/dashboard?tab=overview",
+            href: resolveDashboardPath("overview"),
             variant: "primary",
           },
           {
@@ -129,7 +127,7 @@ export function DashboardSidebar({
             icon: <Sparkles className="h-4 w-4" />,
             isActive: activeTab === "ai-visibility",
             onClick: () => onSelectTab("ai-visibility"),
-            href: "/dashboard?tab=ai-visibility",
+            href: resolveDashboardPath("ai-visibility"),
             variant: "premium",
           },
         ],
@@ -142,7 +140,7 @@ export function DashboardSidebar({
             label: "Create New Campaign",
             icon: <Plus className="h-4 w-4" />,
             onClick: onSelectCreateProject,
-            href: "/dashboard?tab=projects&action=create",
+            href: `${resolveDashboardPath("projects")}?action=create`,
           },
           {
             key: "all-projects",
@@ -150,7 +148,7 @@ export function DashboardSidebar({
             icon: <Send className="h-4 w-4" />,
             isActive: activeTab === "projects",
             onClick: () => onSelectTab("projects"),
-            href: "/dashboard?tab=projects",
+            href: resolveDashboardPath("projects"),
           },
         ],
       },
@@ -166,7 +164,7 @@ export function DashboardSidebar({
               onSelectTab("integration");
               onSelectCompanySubTab("integration");
             },
-            href: "/dashboard?tab=integration&subtab=integration",
+            href: resolveDashboardPath("integration"),
           },
           {
             key: "website-audit",
@@ -174,7 +172,7 @@ export function DashboardSidebar({
             icon: <Globe className="h-4 w-4" />,
             isActive: activeTab === "audit",
             onClick: () => onSelectTab("audit"),
-            href: "/dashboard?tab=audit",
+            href: resolveDashboardPath("audit"),
           },
         ],
       },
@@ -187,7 +185,7 @@ export function DashboardSidebar({
             icon: <PieChart className="h-4 w-4" />,
             isActive: activeTab === "gsc-analytics",
             onClick: () => onSelectTab("gsc-analytics"),
-            href: "/dashboard?tab=gsc-analytics",
+            href: resolveDashboardPath("gsc-analytics"),
           },
           {
             key: "performance-reports",
@@ -195,85 +193,10 @@ export function DashboardSidebar({
             icon: <BarChart3 className="h-4 w-4" />,
             isActive: activeTab === "analytics-report",
             onClick: () => onSelectTab("analytics-report"),
-            href: "/dashboard?tab=analytics-report",
+            href: resolveDashboardPath("analytics-report"),
           },
         ],
       },
-      
-      // {
-      //   title: "Company Tools",
-      //   items: [
-      //     {
-      //       key: "domain-info",
-      //       label: "Domain Info",
-      //       icon: <Info className="h-4 w-4" />,
-      //       isActive: activeTab === "analytics",
-      //       onClick: () => {
-      //         onSelectTab("analytics");
-      //         onSelectCompanySubTab("company-info");
-      //       },
-      //       href: "/dashboard?tab=analytics&subtab=company-info",
-      //     },
-      //     {
-      //       key: "website-audit",
-      //       label: "Website Audit",
-      //       icon: <Globe className="h-4 w-4" />,
-      //       isActive: activeTab === "audit",
-      //       onClick: () => onSelectTab("audit"),
-      //       href: "/dashboard?tab=audit",
-      //     },
-      //      {
-      //       key: "domain-history",
-      //       label: "Domain History",
-      //       icon: <History  className="h-4 w-4" />,
-      //       isActive: activeTab === "domain-history",
-      //       onClick: () => onSelectTab("domain-history"),
-      //       href: "/dashboard?tab=domain-history",
-      //     },
-      //     {
-      //       key: "competitor-analysis",
-      //       label: "Competitor analysis",
-      //       icon: <ClipboardList className="h-4 w-4" />,
-      //       isActive: activeTab === "competitor-intelligence",
-      //       onClick: () => onSelectTab("competitor-intelligence"),
-      //       href: "/dashboard?tab=competitor-intelligence",
-      //     },
-      //     {
-      //       key: "gsc-analytics",
-      //       label: "GSC Analytics",
-      //       icon: <PieChart className="h-4 w-4" />,
-      //       isActive: activeTab === "gsc-analytics",
-      //       onClick: () => onSelectTab("gsc-analytics"),
-      //       href: "/dashboard?tab=gsc-analytics",
-      //     },
-      //     {
-      //       key: "performance-reports",
-      //       label: "Performance Reports",
-      //       icon: <BarChart3 className="h-4 w-4" />,
-      //       isActive: activeTab === "analytics-report",
-      //       onClick: () => onSelectTab("analytics-report"),
-      //       href: "/dashboard?tab=analytics-report",
-      //     },
-      //     {
-      //       key: "integration",
-      //       label: "Integration",
-      //       icon: <LinkIcon className="h-4 w-4" />,
-      //       isActive: activeTab === "integration",
-      //       onClick: () => {
-      //         onSelectTab("integration");
-      //         onSelectCompanySubTab("integration");
-      //       },
-      //       href: "/dashboard?tab=integration&subtab=integration",
-      //     },
-      //     {key: "attribution",
-      //      label: "Attribution",
-      //      icon: <Route className="h-4 w-4" />,
-      //      isActive: activeTab === "attribution",
-      //      onClick: () => onSelectTab("attribution"),
-      //      href: "/dashboard?tab=attribution",
-      //     },
-      //   ],
-      // },
       {
         title: "Drive & Data",
         items: [
@@ -283,7 +206,7 @@ export function DashboardSidebar({
             icon: <Lightbulb className="h-4 w-4" />,
             isActive: activeTab === "knowledge-base",
             onClick: () => onSelectTab("knowledge-base"),
-            href: "/dashboard?tab=knowledge-base",
+            href: resolveDashboardPath("knowledge-base"),
           },
          
         ],
@@ -296,7 +219,7 @@ export function DashboardSidebar({
            icon: <Route className="h-4 w-4" />,
            isActive: activeTab === "attribution",
            onClick: () => onSelectTab("attribution"),
-           href: "/dashboard?tab=attribution",
+           href: resolveDashboardPath("attribution"),
           },
         ],
       },
@@ -309,7 +232,7 @@ export function DashboardSidebar({
             icon: <Tag className="h-4 w-4" />,
             isActive: activeTab === "settings" && activeSettingsSubTab === "subscription",
             onClick: onSelectPricing,
-            href: "/dashboard?tab=settings&subtab=subscription",
+            href: resolveSidebarNavigation("pricing").path,
           },
         ],
       },
@@ -432,7 +355,7 @@ export function DashboardSidebar({
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Link
-                    to="/dashboard?tab=settings"
+                    to={resolveDashboardPath("settings")}
                     className={`sidebar-tab ${activeTab === "settings" && activeSettingsSubTab !== "subscription" ? "active" : ""}`}
                     onClick={(event) => {
                       if (isModifiedClick(event)) return;

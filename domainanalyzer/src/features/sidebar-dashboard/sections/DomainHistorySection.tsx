@@ -15,11 +15,12 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { logoUrl as logoUrlHelper } from "@/lib/logoUrl";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { apiGet } from "../../../services/apiClient";
-import { maskDomainId } from "../../../lib/domainUtils";
+import { buildDomainSlug } from "../../../lib/domainUtils";
 import { AddDomainModal } from "../components/AddDomainModal";
 import { TabId } from "../types";
+import { resolveDashboardPath } from "../navigation";
 
 type DashboardDomain = {
   id: number;
@@ -154,7 +155,6 @@ function DomainHistoryLoader() {
 }
 
 export function DomainHistorySection({ onMenuItemClick }: DomainHistorySectionProps) {
-  const location = useLocation();
   const navigate = useNavigate();
   const [openMenuId, setOpenMenuId] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -305,7 +305,6 @@ export function DomainHistorySection({ onMenuItemClick }: DomainHistorySectionPr
   }, [items, searchQuery]);
 
   const hasDomains = items.length > 0;
-  const dashboardBasePath = location.pathname.startsWith("/newdashboard") ? "/newdashboard" : "/dashboard";
 
   if (state.status === "loading") {
     return <DomainHistoryLoader />;
@@ -399,7 +398,7 @@ export function DomainHistorySection({ onMenuItemClick }: DomainHistorySectionPr
             </p>
             <button
               type="button"
-              onClick={() => navigate(`${dashboardBasePath}?tab=settings&subtab=integrations`)}
+              onClick={() => navigate(resolveDashboardPath("settings", { settingsSubTab: "integrations" }))}
               className="mt-5 inline-flex h-10 items-center gap-2 rounded-md px-5 text-sm font-medium text-white"
               style={{ background: "linear-gradient(90deg, #2D4059 0%, #4E76C7 100%)" }}
             >
@@ -494,7 +493,7 @@ export function DomainHistorySection({ onMenuItemClick }: DomainHistorySectionPr
                             key={tab.label}
                             type="button"
                             onClick={() => {
-                              navigate(tab.path(maskDomainId(domain.id)));
+                              navigate(tab.path(buildDomainSlug(domain)));
                               setOpenMenuId(null);
                             }}
                             className="block w-full px-3 py-2 text-left text-xs text-[#374252] hover:bg-[#f4f6fa]"

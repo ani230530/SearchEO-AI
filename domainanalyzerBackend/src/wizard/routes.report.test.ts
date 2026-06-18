@@ -76,7 +76,13 @@ function createReportPrismaMock() {
     const { domainId, status, kind, ...rest } = where;
     if (domainId !== undefined && run.domainId !== domainId) return false;
     if (status !== undefined && run.status !== status) return false;
-    if (kind !== undefined && run.kind !== kind) return false;
+    if (kind !== undefined) {
+      if (typeof kind === 'object' && !Array.isArray(kind) && Array.isArray(kind.in)) {
+        if (!kind.in.includes(run.kind)) return false;
+      } else if (run.kind !== kind) {
+        return false;
+      }
+    }
     return matchesWhere(run, rest);
   };
 
@@ -176,6 +182,9 @@ const state = vi.hoisted(() => {
       set: vi.fn(async () => undefined),
       del: vi.fn(async () => undefined),
     },
+    weeklyTracking: {
+      runWeeklyForDomain: vi.fn(async () => ({ skipped: false })),
+    },
   };
 });
 
@@ -210,6 +219,8 @@ vi.mock('./analyticsService', () => ({
   computeOpportunities: state.computeOpportunities,
   computeCompetitorAnalysis: state.computeCompetitorAnalysis,
 }));
+
+vi.mock('../services/weeklyTrackingService', () => state.weeklyTracking);
 
 import wizardRouter from './routes';
 
@@ -248,6 +259,10 @@ async function request(path: string) {
   return fetch(`${baseUrl}${path}`);
 }
 
+async function post(path: string) {
+  return fetch(`${baseUrl}${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json' } });
+}
+
 function resetData() {
   const db = state.prisma.__db;
   for (const key of Object.keys(db) as Array<keyof typeof db>) {
@@ -259,6 +274,8 @@ function resetData() {
   state.computePhraseVisibility.mockClear();
   state.computeOpportunities.mockClear();
   state.computeCompetitorAnalysis.mockClear();
+  state.weeklyTracking.runWeeklyForDomain.mockReset();
+  state.weeklyTracking.runWeeklyForDomain.mockResolvedValue({ skipped: false });
 }
 
 beforeAll(async () => {
@@ -532,5 +549,258 @@ describe('GET /api/wizard/domain/:id/trends', () => {
       perCompetitor: { 'alpha.com': 1 },
       perCompetitorCitations: { 'alpha.com': 1 },
     });
+  });
+});
+
+describe('POST /api/wizard/domain/:id/tracked-prompts/run-now', () => {
+  it('returns a structured error when the refresh pipeline fails', async () => {
+    const db = state.prisma.__db;
+    db.domains.push({
+      id: 20,
+      userId: 1,
+      url: 'https://example.com',
+      host: 'example.com',
+      profile: { industry: 'SaaS' },
+      inferred: { companyName: 'Example Co' },
+      wizardState: { phases: {} },
+    });
+    db.prompts.push({
+      id: 201,
+      domainId: 20,
+      text: 'Prompt 1',
+      isSelected: true,
+    });
+
+    state.weeklyTracking.runWeeklyForDomain.mockRejectedValueOnce(
+      Object.assign(new Error('401 Missing Authentication header'), {
+        name: 'RunPipelineError',
+        code: 'OPENROUTER_AUTH_MISSING',
+        status: 502,
+        details: { upstreamStatus: 401 },
+      }),
+    );
+
+    const response = await post('/api/wizard/domain/20/tracked-prompts/run-now');
+    const json = await response.json();
+
+    expect(response.status).toBe(502);
+    expect(json.code).toBe('OPENROUTER_AUTH_MISSING');
+    expect(json.error).toContain('Missing Authentication header');
+    expect(json.debug).toMatchObject({ upstreamStatus: 401 });
+  });
+
+  it('returns a code when there are no selected prompts', async () => {
+    const db = state.prisma.__db;
+    db.domains.push({
+      id: 21,
+      userId: 1,
+      url: 'https://empty.example',
+      host: 'empty.example',
+      profile: { industry: 'SaaS' },
+      inferred: { companyName: 'Empty Co' },
+      wizardState: { phases: {} },
+    });
+
+    const response = await post('/api/wizard/domain/21/tracked-prompts/run-now');
+    const json = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(json.code).toBe('NO_SELECTED_PROMPTS');
+    expect(json.error).toContain('No selected prompts');
+  });
+});
+
+describe('branch-aware competitor history', () => {
+  const dayMs = 24 * 60 * 60 * 1000;
+
+  const makeDay = (daysAgo: number, hour = 12) => {
+    const d = new Date();
+    d.setUTCDate(d.getUTCDate() - daysAgo);
+    d.setUTCHours(hour, 0, 0, 0);
+    return d;
+  };
+
+  it('keeps same-prompt refresh runs together and excludes a different prompt set', async () => {
+    const db = state.prisma.__db;
+    db.domains.push({
+      id: 6,
+      userId: 1,
+      url: 'https://branch.example',
+      host: 'branch.example',
+      currentAnalysisFingerprint: 'legacy-fingerprint',
+      profile: { industry: 'SaaS' },
+      inferred: { companyName: 'Branch Co' },
+    });
+
+    const olderDifferentStartedAt = makeDay(6, 8);
+    const firstBranchStartedAt = makeDay(3, 9);
+    const secondBranchStartedAt = makeDay(1, 15);
+
+    db.runs.push(
+      {
+        id: 61,
+        domainId: 6,
+        status: 'completed',
+        kind: 'audit',
+        startedAt: olderDifferentStartedAt,
+        endedAt: new Date(olderDifferentStartedAt.getTime() + dayMs / 24),
+        analysisFingerprint: 'hash-old',
+        analysisSnapshot: [{ id: 301, text: 'older different prompt' }],
+        summary: { presenceRate: 0.2, totalQueries: 1 },
+      },
+      {
+        id: 62,
+        domainId: 6,
+        status: 'completed',
+        kind: 'audit',
+        startedAt: firstBranchStartedAt,
+        endedAt: new Date(firstBranchStartedAt.getTime() + dayMs / 24),
+        analysisFingerprint: 'hash-branch-a',
+        analysisSnapshot: [
+          { id: 101, text: 'same prompt one v1' },
+          { id: 102, text: 'same prompt two v1' },
+        ],
+        summary: { presenceRate: 0.5, totalQueries: 2 },
+      },
+      {
+        id: 63,
+        domainId: 6,
+        status: 'completed',
+        kind: 'refresh',
+        startedAt: secondBranchStartedAt,
+        endedAt: new Date(secondBranchStartedAt.getTime() + dayMs / 24),
+        analysisFingerprint: 'hash-branch-b',
+        analysisSnapshot: [
+          { id: 101, text: 'same prompt one v2' },
+          { id: 102, text: 'same prompt two v2' },
+        ],
+        summary: { presenceRate: 0.7, totalQueries: 2 },
+      },
+    );
+
+    db.results.push(
+      {
+        id: 611,
+        runId: 61,
+        promptId: 301,
+        model: 'gpt-4o-mini',
+        response: 'older different prompt',
+        presence: 0,
+        relevance: 0,
+        sentiment: null,
+        accuracy: null,
+        rankPosition: null,
+        overall: 0,
+        scorerSummary: null,
+        factualClaims: [],
+        competitorHosts: [],
+        citations: [],
+        competitorMentions: [],
+        latencyMs: 90,
+        createdAt: new Date(olderDifferentStartedAt.getTime() + 5 * 60 * 1000),
+      },
+      {
+        id: 621,
+        runId: 62,
+        promptId: 101,
+        model: 'gpt-4o-mini',
+        response: 'branch run one',
+        presence: 1,
+        relevance: 7,
+        sentiment: 1,
+        accuracy: 0,
+        rankPosition: null,
+        overall: 7,
+        scorerSummary: null,
+        factualClaims: [],
+        competitorHosts: ['alpha.com'],
+        citations: [{ host: 'alpha.com', url: 'https://alpha.com/a', title: 'Alpha A' }],
+        competitorMentions: [{ host: 'alpha.com', count: 1, sentiment: 0 }],
+        latencyMs: 100,
+        createdAt: new Date(firstBranchStartedAt.getTime() + 5 * 60 * 1000),
+      },
+      {
+        id: 622,
+        runId: 62,
+        promptId: 102,
+        model: 'claude-sonnet-4-5',
+        response: 'branch run one',
+        presence: 0,
+        relevance: 6,
+        sentiment: null,
+        accuracy: 0,
+        rankPosition: null,
+        overall: 6,
+        scorerSummary: null,
+        factualClaims: [],
+        competitorHosts: [],
+        citations: [],
+        competitorMentions: [],
+        latencyMs: 120,
+        createdAt: new Date(firstBranchStartedAt.getTime() + 10 * 60 * 1000),
+      },
+      {
+        id: 631,
+        runId: 63,
+        promptId: 101,
+        model: 'gpt-4o-mini',
+        response: 'branch run two',
+        presence: 1,
+        relevance: 8,
+        sentiment: 2,
+        accuracy: 0,
+        rankPosition: null,
+        overall: 8,
+        scorerSummary: null,
+        factualClaims: [],
+        competitorHosts: ['beta.com'],
+        citations: [{ host: 'beta.com', url: 'https://beta.com/b', title: 'Beta B' }],
+        competitorMentions: [{ host: 'beta.com', count: 1, sentiment: 0 }],
+        latencyMs: 110,
+        createdAt: new Date(secondBranchStartedAt.getTime() + 5 * 60 * 1000),
+      },
+      {
+        id: 632,
+        runId: 63,
+        promptId: 102,
+        model: 'claude-sonnet-4-5',
+        response: 'branch run two',
+        presence: 1,
+        relevance: 9,
+        sentiment: 3,
+        accuracy: 0,
+        rankPosition: null,
+        overall: 9,
+        scorerSummary: null,
+        factualClaims: [],
+        competitorHosts: ['beta.com'],
+        citations: [{ host: 'beta.com', url: 'https://beta.com/c', title: 'Beta C' }],
+        competitorMentions: [{ host: 'beta.com', count: 2, sentiment: 1 }],
+        latencyMs: 115,
+        createdAt: new Date(secondBranchStartedAt.getTime() + 10 * 60 * 1000),
+      },
+    );
+
+    const [trendsResponse, runsResponse, competitorResponse] = await Promise.all([
+      request('/api/wizard/domain/6/trends'),
+      request('/api/wizard/domain/6/runs'),
+      request('/api/wizard/domain/6/competitor-analysis'),
+    ]);
+
+    const trendsJson = await trendsResponse.json();
+    const runsJson = await runsResponse.json();
+    const competitorJson = await competitorResponse.json();
+
+    expect(trendsResponse.status).toBe(200);
+    expect(trendsJson.runs.map((run: any) => run.runId)).toEqual([62, 63]);
+    expect(trendsJson.runs).toHaveLength(2);
+
+    expect(runsResponse.status).toBe(200);
+    expect(runsJson.runs.map((run: any) => run.id)).toEqual([63, 62]);
+    expect(runsJson.runs).toHaveLength(2);
+
+    expect(competitorResponse.status).toBe(200);
+    expect(competitorJson.runId).toBe(63);
+    expect(competitorJson.runStartedAt).toBe(secondBranchStartedAt.toISOString());
   });
 });
