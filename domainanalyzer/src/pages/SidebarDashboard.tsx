@@ -148,13 +148,13 @@ const SidebarDashboard = () => {
     [location.pathname]
   );
   const [activeTab, setActiveTab] = useState<TabId>(() =>
-  searchState.activeTab ?? getStoredActiveTab(localStorage.getItem("activeTab"))
-);
-useEffect(() => {
-  if (activeTab) {
-    localStorage.setItem("activeTab", activeTab);
-  }
-}, [activeTab]);
+    searchState.activeTab ?? getStoredActiveTab(localStorage.getItem("activeTab"))
+  );
+  useEffect(() => {
+    if (activeTab) {
+      localStorage.setItem("activeTab", activeTab);
+    }
+  }, [activeTab]);
 
   const [activeCompanySubTab, setActiveCompanySubTab] =
     useState<CompanySubTabId>(searchState.activeCompanySubTab ?? "company-info");
@@ -175,20 +175,20 @@ useEffect(() => {
     setDeleteAction(() => action);
     setShowDeleteModal(true);
   }
-const [auditData, setAuditData] = useState<any>(null);
-const [auditLoading, setAuditLoading] = useState(false);
-const [auditError, setAuditError] = useState<string | null>(null);
-const [auditResult, setAuditResult] = useState<any>(null);
-const [auditComplete, setAuditComplete] = useState(false);
-const [selectedMetric, setSelectedMetric] = useState<string | undefined>();
-const [showAuditModal, setShowAuditModal] = useState(false);
-const resultsRef = useRef<HTMLDivElement | null>(null);
+  const [auditData, setAuditData] = useState<any>(null);
+  const [auditLoading, setAuditLoading] = useState(false);
+  const [auditError, setAuditError] = useState<string | null>(null);
+  const [auditResult, setAuditResult] = useState<any>(null);
+  const [auditComplete, setAuditComplete] = useState(false);
+  const [selectedMetric, setSelectedMetric] = useState<string | undefined>();
+  const [showAuditModal, setShowAuditModal] = useState(false);
+  const resultsRef = useRef<HTMLDivElement | null>(null);
   const [activeChartTab, setActiveChartTab] = useState<'overview' | 'comparison' | 'distribution'>('overview');
   const [n8nSending, setN8nSending] = useState(false);
-const [n8nRequestId, setN8nRequestId] = useState<string | null>(null);
-const [n8nStatus, setN8nStatus] = useState<'processing' | 'completed' | 'failed' | null>(null);
-const [n8nResults, setN8nResults] = useState<{sheetsUrl?: string; slidesUrl?: string} | null>(null);
-const sseRef = useRef<EventSource | null>(null);
+  const [n8nRequestId, setN8nRequestId] = useState<string | null>(null);
+  const [n8nStatus, setN8nStatus] = useState<'processing' | 'completed' | 'failed' | null>(null);
+  const [n8nResults, setN8nResults] = useState<{ sheetsUrl?: string; slidesUrl?: string } | null>(null);
+  const sseRef = useRef<EventSource | null>(null);
   const autoAuditTriggeredRef = useRef(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loadingSteps, setLoadingSteps] = useState([
@@ -285,7 +285,7 @@ const sseRef = useRef<EventSource | null>(null);
   // Track generation job statuses
   const [generationJobs, setGenerationJobs] = useState<Map<number, GenerationPageStatus>>(new Map());
   const notifiedReadyPageIdsRef = useRef<Set<number>>(new Set());
-const [improvedContent, setImprovedContent] = useState("");
+  const [improvedContent, setImprovedContent] = useState("");
   const [gscEmail, setGscEmail] = useState<string>("");
   const [gscSelectedProperty, setGscSelectedProperty] = useState<string>("");
   const [gscProperties, setGscProperties] = useState<
@@ -328,56 +328,56 @@ const [improvedContent, setImprovedContent] = useState("");
     setDraftOverlayId(null);
   }, []);
   const [openSortMenu, setOpenSortMenu] = useState(false);
-const [sortBy, setSortBy] = useState<"date" | "name">("date");
+  const [sortBy, setSortBy] = useState<"date" | "name">("date");
   const [favouriteIds, setFavouriteIds] = useState<Set<number>>(new Set());
-const [openMenuId, setOpenMenuId] = useState<number | null>(null);
-const toggleFavourite = (id: number) => {
-  setFavouriteIds(prev => {
-    const newSet = new Set(prev);
-    if (newSet.has(id)) {
-      newSet.delete(id);
-    } else {
-      newSet.add(id);
-    }
-    return newSet;
-  });
-};
+  const [openMenuId, setOpenMenuId] = useState<number | null>(null);
+  const toggleFavourite = (id: number) => {
+    setFavouriteIds(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(id)) {
+        newSet.delete(id);
+      } else {
+        newSet.add(id);
+      }
+      return newSet;
+    });
+  };
   // PUBLISH PAGE STATES
-const [primaryKeyword, setPrimaryKeyword] = useState("");
-const [longtailKeywords, setLongtailKeywords] = useState("");
-const [brandName, setBrandName] = useState("");
-const [brandDescription, setBrandDescription] = useState("");
-const [image, setImage] = useState(1);
-const [wordCount, setWordCount] = useState(1500);
-const [featuredImage, setFeaturedImage] = useState("");
+  const [primaryKeyword, setPrimaryKeyword] = useState("");
+  const [longtailKeywords, setLongtailKeywords] = useState("");
+  const [brandName, setBrandName] = useState("");
+  const [brandDescription, setBrandDescription] = useState("");
+  const [image, setImage] = useState(1);
+  const [wordCount, setWordCount] = useState(1500);
+  const [featuredImage, setFeaturedImage] = useState("");
 
-// UI STATES
-const [publishLoading, setPublishLoading] = useState(false);
-const [publishSuccess, setPublishSuccess] = useState(false);
-const [publishError, setPublishError] = useState("");
-const [openIndex, setOpenIndex] = useState<number | null>(null);
+  // UI STATES
+  const [publishLoading, setPublishLoading] = useState(false);
+  const [publishSuccess, setPublishSuccess] = useState(false);
+  const [publishError, setPublishError] = useState("");
+  const [openIndex, setOpenIndex] = useState<number | null>(null);
 
-const toggleSection = (idx: number) => {
-  setOpenIndex(prev => (prev === idx ? null : idx));
-};
+  const toggleSection = (idx: number) => {
+    setOpenIndex(prev => (prev === idx ? null : idx));
+  };
   // Company info carousel: track index and count to show arrows conditionally
   const companyCarouselRef = useRef<HTMLDivElement | null>(null);
   const [companyCurrentIndex, setCompanyCurrentIndex] = useState(0);
   const [companySectionsCount, setCompanySectionsCount] = useState(0);
-  
+
   const extractOrgName = (context: string) => {
     if (!context) return "";
     const lines = context.split('\n');
     for (const line of lines) {
-      const match = line.match(/(?:Organization|Company|Brand)\s*:\s*([^\n]+)/i) || 
-                    line.match(/###\s*(?:Brand Analysis for|Company Profile:)\s*([^\n]+)/i);
+      const match = line.match(/(?:Organization|Company|Brand)\s*:\s*([^\n]+)/i) ||
+        line.match(/###\s*(?:Brand Analysis for|Company Profile:)\s*([^\n]+)/i);
       if (match && match[1]) {
         return match[1].trim().replace(/\*+/g, '');
       }
     }
     return "";
   };
-  
+
   const companyCarouselCleanupRef = useRef<(() => void) | null>(null);
   const setCompanyCarouselRef = useCallback((el: HTMLDivElement | null) => {
     if (companyCarouselCleanupRef.current) {
@@ -408,11 +408,11 @@ const toggleSection = (idx: number) => {
   const { toast } = useToast();
   const isSidebarExpanded = sidebarOpen;
 
-// For inline editing of campaigns
-const [showEditModal, setShowEditModal] = useState(false);
-const [editingCampaignId, setEditingCampaignId] = useState<number | null>(null);
-const [editTitle, setEditTitle] = useState('');
-const [editDescription, setEditDescription] = useState('');
+  // For inline editing of campaigns
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingCampaignId, setEditingCampaignId] = useState<number | null>(null);
+  const [editTitle, setEditTitle] = useState('');
+  const [editDescription, setEditDescription] = useState('');
 
 
   const handlePublishUpdate = useCallback((data: {
@@ -586,380 +586,380 @@ const [editDescription, setEditDescription] = useState('');
   };
 
   //Handle Analyze Button----
-const handleAnalyze = async () => {
-  try {
-    setCompanyDomainLoading(true);
+  const handleAnalyze = async () => {
+    try {
+      setCompanyDomainLoading(true);
 
-    // 1️⃣ Fetch GSC Analysis
-    const gscRes = await fetch(
-      `${import.meta.env.VITE_API_URL}/api/gsc/analyze?domain=${companyDomain}`,
-      {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("authToken")}`,
-        },
-      }
-    );
+      // 1️⃣ Fetch GSC Analysis
+      const gscRes = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/gsc/analyze?domain=${companyDomain}`,
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("authToken")}`,
+          },
+        }
+      );
 
-    const gscData = await gscRes.json();
-    setGscAnalysis(gscData);
+      const gscData = await gscRes.json();
+      setGscAnalysis(gscData);
 
-    // 2️⃣ Fetch Page HTML Content
-    const pageRes = await fetch(
-      `${import.meta.env.VITE_API_URL}/api/scraper/content?domain=${companyDomain}`,
-      {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("authToken")}`,
-        },
-      }
-    );
+      // 2️⃣ Fetch Page HTML Content
+      const pageRes = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/scraper/content?domain=${companyDomain}`,
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("authToken")}`,
+          },
+        }
+      );
 
-    const pageData = await pageRes.json();
-    setImprovedContent(pageData.html); 
+      const pageData = await pageRes.json();
+      setImprovedContent(pageData.html);
 
-  } catch (err) {
-    console.error(err);
-  } finally {
-    setCompanyDomainLoading(false);
-  }
-};
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setCompanyDomainLoading(false);
+    }
+  };
 
 
-const normalizedDomain = normalizeDomain(companyDomain);
+  const normalizedDomain = normalizeDomain(companyDomain);
 
-const competitorAnalysisQuery = useCompetitorAnalysis<any>(createdDomainId);
+  const competitorAnalysisQuery = useCompetitorAnalysis<any>(createdDomainId);
 
-const competitorIntelligenceRows = useMemo(() => {
-  const competitorRows = Array.isArray(competitorAnalysisQuery.data?.competitors)
-    ? competitorAnalysisQuery.data.competitors
-    : [];
+  const competitorIntelligenceRows = useMemo(() => {
+    const competitorRows = Array.isArray(competitorAnalysisQuery.data?.competitors)
+      ? competitorAnalysisQuery.data.competitors
+      : [];
 
-  return competitorRows
-    .map((competitor: any) => {
-      const estimatedTraffic =
-        typeof competitor?.estimatedTraffic === "number"
-          ? competitor.estimatedTraffic
-          : Math.round(
+    return competitorRows
+      .map((competitor: any) => {
+        const estimatedTraffic =
+          typeof competitor?.estimatedTraffic === "number"
+            ? competitor.estimatedTraffic
+            : Math.round(
               (typeof competitor?.marketShare === "number" ? competitor.marketShare : 0) * 1_000_000
             );
 
-      return {
-        domain: String(competitor?.host ?? competitor?.domain ?? "Unknown"),
-        keywords: Number(
-          competitor?.promptCoverage ?? competitor?.mentions ?? competitor?.keywordCount ?? competitor?.frequency ?? 0
-        ),
-        overlap: Number(
-          competitor?.coveragePct ?? competitor?.similarityScore ?? competitor?.overlap ?? 0
-        ),
-        mentions: Number(competitor?.mentions ?? 0),
-        marketShare: Number(competitor?.marketShare ?? 0),
-        estimatedTraffic,
-        traffic: estimatedTraffic,
-        rank: typeof competitor?.rank === "number" ? competitor.rank : null,
-        threatLevel: competitor?.threatLevel ?? null,
-        reasoning: competitor?.reasoning ?? null,
-      };
-    })
-    .sort((a, b) => {
-      const aRank = typeof a.rank === "number" ? a.rank : Number.MAX_SAFE_INTEGER;
-      const bRank = typeof b.rank === "number" ? b.rank : Number.MAX_SAFE_INTEGER;
-      if (aRank !== bRank) return aRank - bRank;
-      return b.estimatedTraffic - a.estimatedTraffic;
-    });
-}, [competitorAnalysisQuery.data]);
+        return {
+          domain: String(competitor?.host ?? competitor?.domain ?? "Unknown"),
+          keywords: Number(
+            competitor?.promptCoverage ?? competitor?.mentions ?? competitor?.keywordCount ?? competitor?.frequency ?? 0
+          ),
+          overlap: Number(
+            competitor?.coveragePct ?? competitor?.similarityScore ?? competitor?.overlap ?? 0
+          ),
+          mentions: Number(competitor?.mentions ?? 0),
+          marketShare: Number(competitor?.marketShare ?? 0),
+          estimatedTraffic,
+          traffic: estimatedTraffic,
+          rank: typeof competitor?.rank === "number" ? competitor.rank : null,
+          threatLevel: competitor?.threatLevel ?? null,
+          reasoning: competitor?.reasoning ?? null,
+        };
+      })
+      .sort((a, b) => {
+        const aRank = typeof a.rank === "number" ? a.rank : Number.MAX_SAFE_INTEGER;
+        const bRank = typeof b.rank === "number" ? b.rank : Number.MAX_SAFE_INTEGER;
+        if (aRank !== bRank) return aRank - bRank;
+        return b.estimatedTraffic - a.estimatedTraffic;
+      });
+  }, [competitorAnalysisQuery.data]);
 
-const competitorOverview = useMemo(() => {
-  const rows = competitorIntelligenceRows.slice(0, 4).map((competitor) => ({
-    domain: competitor.domain,
-    keywords: formatDashboardCount(competitor.keywords),
-    overlap: formatDashboardPercent(competitor.overlap),
-    traffic: formatDashboardTraffic(competitor.estimatedTraffic ?? competitor.traffic),
-  }));
+  const competitorOverview = useMemo(() => {
+    const rows = competitorIntelligenceRows.slice(0, 4).map((competitor) => ({
+      domain: competitor.domain,
+      keywords: formatDashboardCount(competitor.keywords),
+      overlap: formatDashboardPercent(competitor.overlap),
+      traffic: formatDashboardTraffic(competitor.estimatedTraffic ?? competitor.traffic),
+    }));
 
-  return {
-    loading: createdDomainId != null && competitorAnalysisQuery.isLoading,
-    error: competitorAnalysisQuery.isError
-      ? "Unable to load competitor overview right now."
-      : null,
-    rows,
-  };
-}, [
-  competitorAnalysisQuery.data,
-  competitorAnalysisQuery.isError,
-  competitorAnalysisQuery.isLoading,
-  competitorIntelligenceRows,
-  createdDomainId,
-]);
-
-
-// Fetch existing audit for company domain
-const fetchAudit = useCallback(async () => {
-  const token = localStorage.getItem("authToken");
-  if (!token) return;
-
-  try {
-    const resp = await fetch(`${import.meta.env.VITE_API_URL}/api/audit`, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-    });
-
-    if (resp.ok) {
-      const data = await resp.json();
-      if (data.success && data.audit) {
-        // Convert database format to normalized format for frontend
-        setAuditResult({
-          performance: data.audit.performance,
-          seo: data.audit.seo,
-          accessibility: data.audit.accessibility,
-          bestPractices: data.audit.bestPractices,
-          audits: data.audit.audits,
-          screenshot: data.audit.screenshotUrl || null,
-          recommendations: data.audit.recommendations ?? null,
-          suggestions: data.audit.suggestions ?? null,
-          opportunities: data.audit.opportunities ?? null,
-          insights: data.audit.insights ?? null,
-          pageSpeedSuggestions:
-            data.audit.pageSpeedSuggestions ?? data.audit.pagespeedSuggestions ?? null,
-        });
-        setAuditData(data.audit);
-      }
-    }
-  } catch (err) {
-    console.error('Error fetching audit:', err);
-  }
-}, []);
-
-const overallScore =
-  auditData
-    ? (auditData.performance +
-        auditData.seo +
-        auditData.accessibility +
-        auditData.bestPractices) / 4
-    : 0;
+    return {
+      loading: createdDomainId != null && competitorAnalysisQuery.isLoading,
+      error: competitorAnalysisQuery.isError
+        ? "Unable to load competitor overview right now."
+        : null,
+      rows,
+    };
+  }, [
+    competitorAnalysisQuery.data,
+    competitorAnalysisQuery.isError,
+    competitorAnalysisQuery.isLoading,
+    competitorIntelligenceRows,
+    createdDomainId,
+  ]);
 
 
-//Handle Run Audit
-const handleRunAudit = async (url?: string) => {
-  const token = localStorage.getItem("authToken");   
+  // Fetch existing audit for company domain
+  const fetchAudit = useCallback(async () => {
+    const token = localStorage.getItem("authToken");
+    if (!token) return;
 
-  if (!url || !token) {
-    console.error("Missing URL or token");
-    return;
-  }
-
-  setAuditLoading(true);
-  setAuditError(null);
-
-  const runAuditRequest = async () => {
-    const resp = await fetch(`${import.meta.env.VITE_API_URL}/api/audit`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ url }),
-    });
-
-    if (!resp.ok) {
-      const errorData = await resp.json().catch(() => ({}));
-      throw new Error(errorData.error || `Failed to run audit (${resp.status})`);
-    }
-
-    return resp.json();
-  };
-
-  try {
-    let data: any;
     try {
-      data = await runAuditRequest();
-    } catch (firstError) {
-      // First-run failures can happen on cold starts / transient infra hiccups.
-      // Retry once automatically before surfacing an error.
-      await new Promise((resolve) => setTimeout(resolve, 1200));
-      data = await runAuditRequest();
-    }
-
-    if (data.success) {
-      const normalizedAudit = data.normalized ?? data.audit ?? data;
-      setAuditResult({
-        performance: normalizedAudit?.performance ?? 0,
-        seo: normalizedAudit?.seo ?? 0,
-        accessibility: normalizedAudit?.accessibility ?? 0,
-        bestPractices: normalizedAudit?.bestPractices ?? 0,
-        audits: normalizedAudit?.audits ?? null,
-        screenshot:
-          normalizedAudit?.screenshot ??
-          normalizedAudit?.screenshotUrl ??
-          data?.screenshot ??
-          data?.screenshotUrl ??
-          null,
-        screenshotUrl:
-          normalizedAudit?.screenshotUrl ??
-          normalizedAudit?.screenshot ??
-          data?.screenshotUrl ??
-          data?.screenshot ??
-          null,
-        recommendations:
-          normalizedAudit?.recommendations ?? data?.recommendations ?? null,
-        suggestions: normalizedAudit?.suggestions ?? data?.suggestions ?? null,
-        opportunities: normalizedAudit?.opportunities ?? data?.opportunities ?? null,
-        insights: normalizedAudit?.insights ?? data?.insights ?? null,
-        pageSpeedSuggestions:
-          normalizedAudit?.pageSpeedSuggestions ??
-          normalizedAudit?.pagespeedSuggestions ??
-          data?.pageSpeedSuggestions ??
-          data?.pagespeedSuggestions ??
-          null,
-        pagespeedSuggestions:
-          normalizedAudit?.pagespeedSuggestions ??
-          normalizedAudit?.pageSpeedSuggestions ??
-          data?.pagespeedSuggestions ??
-          data?.pageSpeedSuggestions ??
-          null,
+      const resp = await fetch(`${import.meta.env.VITE_API_URL}/api/audit`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
       });
-      setAuditData({
-        performance: normalizedAudit?.performance ?? 0,
-        seo: normalizedAudit?.seo ?? 0,
-        accessibility: normalizedAudit?.accessibility ?? 0,
-        bestPractices: normalizedAudit?.bestPractices ?? 0,
-        audits: normalizedAudit?.audits ?? null,
-        screenshotUrl:
-          normalizedAudit?.screenshot ??
-          normalizedAudit?.screenshotUrl ??
-          data?.screenshot ??
-          data?.screenshotUrl ??
-          null,
-      });
-      setAuditComplete(true);
-      setShowAuditModal(true);
-      setTimeout(() => setAuditComplete(false), 3500);
-      return;
-    }
-    throw new Error('Audit did not complete successfully');
-  } catch (err) {
-    console.error(err);
-    const message = err instanceof Error ? err.message : 'Failed to run audit';
-    setAuditError(message);
-    toast({
-      title: 'Audit Failed',
-      description: message,
-      variant: 'destructive',
-    });
-  } finally {
-    setAuditLoading(false);
-  }
-};
-// Handle Send to N8n
-const handleSendToN8n = async () => {
-  const token = localStorage.getItem("authToken");
-  if (!token) {
-    console.error("Missing token");
-    return;
-  }
 
-  setN8nSending(true);
-  setN8nStatus(null);
-  setN8nResults(null);
-
-  try {
-    const resp = await fetch(`${import.meta.env.VITE_API_URL}/api/audit/n8n/send`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-    });
-
-    if (!resp.ok) {
-      const errorData = await resp.json().catch(() => ({}));
-      throw new Error(errorData.error || 'Failed to send to n8n');
-    }
-
-    const data = await resp.json();
-    if (data.success) {
-      setN8nRequestId(data.requestId);
-      setN8nStatus('processing');
-      toast({
-        title: 'Processing',
-        description: 'N8n is processing your request',
-      });
-      
-      // Connect to SSE for real-time updates
-      connectSSE(token, data.requestId);
-    }
-  } catch (err) {
-    console.error(err);
-    toast({
-      title: 'Failed to Send',
-      description: err instanceof Error ? err.message : 'Failed to send to n8n',
-      variant: 'destructive',
-    });
-    setN8nSending(false);
-  }
-};
-
-// Connect to SSE for n8n updates
-const connectSSE = (token: string, requestId: string) => {
-  if (sseRef.current) {
-    sseRef.current.close();
-  }
-
-  const url = `${import.meta.env.VITE_API_URL}/api/sse?token=${encodeURIComponent(token)}`;
-  const eventSource = new EventSource(url);
-
-  eventSource.onmessage = (event) => {
-    try {
-      const data = JSON.parse(event.data);
-      if (data.type === 'n8n_update' && data.data?.requestId === requestId) {
-        setN8nStatus(data.data.status);
-        
-        if (data.data.status === 'completed') {
-          setN8nResults({
-            sheetsUrl: data.data.googleSheetsUrl,
-            slidesUrl: data.data.googleSlidesUrl
+      if (resp.ok) {
+        const data = await resp.json();
+        if (data.success && data.audit) {
+          // Convert database format to normalized format for frontend
+          setAuditResult({
+            performance: data.audit.performance,
+            seo: data.audit.seo,
+            accessibility: data.audit.accessibility,
+            bestPractices: data.audit.bestPractices,
+            audits: data.audit.audits,
+            screenshot: data.audit.screenshotUrl || null,
+            recommendations: data.audit.recommendations ?? null,
+            suggestions: data.audit.suggestions ?? null,
+            opportunities: data.audit.opportunities ?? null,
+            insights: data.audit.insights ?? null,
+            pageSpeedSuggestions:
+              data.audit.pageSpeedSuggestions ?? data.audit.pagespeedSuggestions ?? null,
           });
-          toast({
-            title: 'Success',
-            description: 'N8n processing completed successfully',
-          });
-          eventSource.close();
-          sseRef.current = null;
-          setN8nSending(false);
-        } else if (data.data.status === 'failed') {
-          toast({
-            title: 'Failed',
-            description: data.data.error || 'N8n processing failed',
-            variant: 'destructive',
-          });
-          eventSource.close();
-          sseRef.current = null;
-          setN8nSending(false);
+          setAuditData(data.audit);
         }
       }
     } catch (err) {
-      console.error('Error parsing SSE:', err);
+      console.error('Error fetching audit:', err);
+    }
+  }, []);
+
+  const overallScore =
+    auditData
+      ? (auditData.performance +
+        auditData.seo +
+        auditData.accessibility +
+        auditData.bestPractices) / 4
+      : 0;
+
+
+  //Handle Run Audit
+  const handleRunAudit = async (url?: string) => {
+    const token = localStorage.getItem("authToken");
+
+    if (!url || !token) {
+      console.error("Missing URL or token");
+      return;
+    }
+
+    setAuditLoading(true);
+    setAuditError(null);
+
+    const runAuditRequest = async () => {
+      const resp = await fetch(`${import.meta.env.VITE_API_URL}/api/audit`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ url }),
+      });
+
+      if (!resp.ok) {
+        const errorData = await resp.json().catch(() => ({}));
+        throw new Error(errorData.error || `Failed to run audit (${resp.status})`);
+      }
+
+      return resp.json();
+    };
+
+    try {
+      let data: any;
+      try {
+        data = await runAuditRequest();
+      } catch (firstError) {
+        // First-run failures can happen on cold starts / transient infra hiccups.
+        // Retry once automatically before surfacing an error.
+        await new Promise((resolve) => setTimeout(resolve, 1200));
+        data = await runAuditRequest();
+      }
+
+      if (data.success) {
+        const normalizedAudit = data.normalized ?? data.audit ?? data;
+        setAuditResult({
+          performance: normalizedAudit?.performance ?? 0,
+          seo: normalizedAudit?.seo ?? 0,
+          accessibility: normalizedAudit?.accessibility ?? 0,
+          bestPractices: normalizedAudit?.bestPractices ?? 0,
+          audits: normalizedAudit?.audits ?? null,
+          screenshot:
+            normalizedAudit?.screenshot ??
+            normalizedAudit?.screenshotUrl ??
+            data?.screenshot ??
+            data?.screenshotUrl ??
+            null,
+          screenshotUrl:
+            normalizedAudit?.screenshotUrl ??
+            normalizedAudit?.screenshot ??
+            data?.screenshotUrl ??
+            data?.screenshot ??
+            null,
+          recommendations:
+            normalizedAudit?.recommendations ?? data?.recommendations ?? null,
+          suggestions: normalizedAudit?.suggestions ?? data?.suggestions ?? null,
+          opportunities: normalizedAudit?.opportunities ?? data?.opportunities ?? null,
+          insights: normalizedAudit?.insights ?? data?.insights ?? null,
+          pageSpeedSuggestions:
+            normalizedAudit?.pageSpeedSuggestions ??
+            normalizedAudit?.pagespeedSuggestions ??
+            data?.pageSpeedSuggestions ??
+            data?.pagespeedSuggestions ??
+            null,
+          pagespeedSuggestions:
+            normalizedAudit?.pagespeedSuggestions ??
+            normalizedAudit?.pageSpeedSuggestions ??
+            data?.pagespeedSuggestions ??
+            data?.pageSpeedSuggestions ??
+            null,
+        });
+        setAuditData({
+          performance: normalizedAudit?.performance ?? 0,
+          seo: normalizedAudit?.seo ?? 0,
+          accessibility: normalizedAudit?.accessibility ?? 0,
+          bestPractices: normalizedAudit?.bestPractices ?? 0,
+          audits: normalizedAudit?.audits ?? null,
+          screenshotUrl:
+            normalizedAudit?.screenshot ??
+            normalizedAudit?.screenshotUrl ??
+            data?.screenshot ??
+            data?.screenshotUrl ??
+            null,
+        });
+        setAuditComplete(true);
+        setShowAuditModal(true);
+        setTimeout(() => setAuditComplete(false), 3500);
+        return;
+      }
+      throw new Error('Audit did not complete successfully');
+    } catch (err) {
+      console.error(err);
+      const message = err instanceof Error ? err.message : 'Failed to run audit';
+      setAuditError(message);
+      toast({
+        title: 'Audit Failed',
+        description: message,
+        variant: 'destructive',
+      });
+    } finally {
+      setAuditLoading(false);
+    }
+  };
+  // Handle Send to N8n
+  const handleSendToN8n = async () => {
+    const token = localStorage.getItem("authToken");
+    if (!token) {
+      console.error("Missing token");
+      return;
+    }
+
+    setN8nSending(true);
+    setN8nStatus(null);
+    setN8nResults(null);
+
+    try {
+      const resp = await fetch(`${import.meta.env.VITE_API_URL}/api/audit/n8n/send`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!resp.ok) {
+        const errorData = await resp.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to send to n8n');
+      }
+
+      const data = await resp.json();
+      if (data.success) {
+        setN8nRequestId(data.requestId);
+        setN8nStatus('processing');
+        toast({
+          title: 'Processing',
+          description: 'N8n is processing your request',
+        });
+
+        // Connect to SSE for real-time updates
+        connectSSE(token, data.requestId);
+      }
+    } catch (err) {
+      console.error(err);
+      toast({
+        title: 'Failed to Send',
+        description: err instanceof Error ? err.message : 'Failed to send to n8n',
+        variant: 'destructive',
+      });
+      setN8nSending(false);
     }
   };
 
-  eventSource.onerror = () => {
-    eventSource.close();
-    sseRef.current = null;
-  };
-
-  sseRef.current = eventSource;
-};
-
-// Cleanup SSE on unmount
-useEffect(() => {
-  return () => {
+  // Connect to SSE for n8n updates
+  const connectSSE = (token: string, requestId: string) => {
     if (sseRef.current) {
       sseRef.current.close();
-      sseRef.current = null;
     }
+
+    const url = `${import.meta.env.VITE_API_URL}/api/sse?token=${encodeURIComponent(token)}`;
+    const eventSource = new EventSource(url);
+
+    eventSource.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.type === 'n8n_update' && data.data?.requestId === requestId) {
+          setN8nStatus(data.data.status);
+
+          if (data.data.status === 'completed') {
+            setN8nResults({
+              sheetsUrl: data.data.googleSheetsUrl,
+              slidesUrl: data.data.googleSlidesUrl
+            });
+            toast({
+              title: 'Success',
+              description: 'N8n processing completed successfully',
+            });
+            eventSource.close();
+            sseRef.current = null;
+            setN8nSending(false);
+          } else if (data.data.status === 'failed') {
+            toast({
+              title: 'Failed',
+              description: data.data.error || 'N8n processing failed',
+              variant: 'destructive',
+            });
+            eventSource.close();
+            sseRef.current = null;
+            setN8nSending(false);
+          }
+        }
+      } catch (err) {
+        console.error('Error parsing SSE:', err);
+      }
+    };
+
+    eventSource.onerror = () => {
+      eventSource.close();
+      sseRef.current = null;
+    };
+
+    sseRef.current = eventSource;
   };
-}, []);
+
+  // Cleanup SSE on unmount
+  useEffect(() => {
+    return () => {
+      if (sseRef.current) {
+        sseRef.current.close();
+        sseRef.current = null;
+      }
+    };
+  }, []);
 
 
 
@@ -1066,16 +1066,20 @@ useEffect(() => {
       return;
     }
 
+    if (searchState.activeCampaignSlug) {
+      const matchedCampaign = campaigns.find(
+        (campaign) => slugifyCampaignTitle(campaign.title) === searchState.activeCampaignSlug
+      );
+      if (matchedCampaign && selectedCampaignId !== matchedCampaign.id) {
+        setSelectedCampaignId(matchedCampaign.id);
+      }
+      return;
+    }
+
     if (selectedCampaignId !== null) {
       setSelectedCampaignId(null);
     }
   }, [activeTab, campaigns, searchState.activeCampaignId, searchState.activeCampaignSlug, selectedCampaignId]);
-
-  useEffect(() => {
-    if (activeTab !== "projects" && draftOverlayId !== null) {
-      setDraftOverlayId(null);
-    }
-  }, [activeTab, draftOverlayId]);
 
   // Auto-advance carousel to show running task
   useEffect(() => {
@@ -1102,7 +1106,7 @@ useEffect(() => {
     if (awaitingNewDomain && !force) {
       return;
     }
-    
+
     try {
       setCompanyDomainLoading(true);
       setCompanyDomainFetchError(null);
@@ -1123,11 +1127,11 @@ useEffect(() => {
         // If it's a 404, it might genuinely mean "no domain", so we clear.
         // But if it's 500 or network error, we should probably keep existing data.
         if (response.status === 404) {
-           setCompanyDomain("");
-           setDomainContext("");
-           setKeywords([]);
-           setCreatedDomainId(null);
-           setShowResults(false);
+          setCompanyDomain("");
+          setDomainContext("");
+          setKeywords([]);
+          setCreatedDomainId(null);
+          setShowResults(false);
         }
         throw new Error("Failed to fetch company domain");
       }
@@ -1138,13 +1142,13 @@ useEffect(() => {
         // Company domain exists - show results
         setCompanyDomain(data.domain.url);
         setDomainContext(data.domain.context || "");
-        
+
         // IMPORTANT: Only update keywords if we received them, or if the list is explicitly empty but valid.
         // This prevents overwriting with empty array if backend has an issue returning keywords but returns domain.
         if (data.keywords) {
-             setKeywords(data.keywords);
+          setKeywords(data.keywords);
         }
-        
+
         setCreatedDomainId(data.domain.id);
         setGoogleAnalyticsId(data.domain.googleAnalyticsId || "");
         setShowResults(true);
@@ -1171,7 +1175,7 @@ useEffect(() => {
   // Fetch all campaign tab data in parallel when campaign tab is active
   const fetchCampaignTabData = useCallback(async () => {
     if (activeTab !== 'projects') return;
-    
+
     setCampaignTabDataLoading(true);
     try {
       // Fetch all required data in parallel
@@ -1199,7 +1203,7 @@ useEffect(() => {
           setCompanyDomain(domainData.domain.url);
           setDomainContext(domainData.domain.context || '');
           if (domainData.keywords) {
-             setKeywords(domainData.keywords);
+            setKeywords(domainData.keywords);
           }
           setCreatedDomainId(domainData.domain.id);
           setGoogleAnalyticsId(domainData.domain.googleAnalyticsId || "");
@@ -1235,16 +1239,16 @@ useEffect(() => {
 
   // Modified useEffect: Only fetch company domain on specific tabs or if currently empty
   useEffect(() => {
-      // We always want to fetch on initial mount (handled by the other useEffect below) or if we are on tabs that assume data presence.
-      // But we shouldn't re-fetch on *every* tab switch if we already have data, to prevent flickering.
-      const shouldFetch =
-        activeTab === 'overview' ||
-        activeTab === 'analytics';
+    // We always want to fetch on initial mount (handled by the other useEffect below) or if we are on tabs that assume data presence.
+    // But we shouldn't re-fetch on *every* tab switch if we already have data, to prevent flickering.
+    const shouldFetch =
+      activeTab === 'overview' ||
+      activeTab === 'analytics';
 
-      if (shouldFetch) {
-          fetchCompanyDomain();
-      }
-  }, [activeTab, fetchCompanyDomain]); 
+    if (shouldFetch) {
+      fetchCompanyDomain();
+    }
+  }, [activeTab, fetchCompanyDomain]);
 
   // Fetch audit when audit tab is active
   useEffect(() => {
@@ -1257,7 +1261,7 @@ useEffect(() => {
   useEffect(() => {
     // Check if we already have data to avoid double fetch
     if (!companyDomain) {
-        fetchCompanyDomain();
+      fetchCompanyDomain();
     }
     fetchAudit();
   }, [fetchCompanyDomain, fetchAudit]);
@@ -1355,7 +1359,7 @@ useEffect(() => {
       setKeywordsTableData([]);
     }
     console.log("keywords:", keywords.length);
-  console.log("createdDomainId:", createdDomainId);
+    console.log("createdDomainId:", createdDomainId);
   }, [keywords, createdDomainId, companyDomain]);
 
   // Filter and sort keywords
@@ -1553,8 +1557,8 @@ useEffect(() => {
           saveResult.keyword.difficulty === "High"
             ? "High"
             : saveResult.keyword.difficulty === "Low"
-            ? "Low"
-            : "Medium",
+              ? "Low"
+              : "Medium",
         cpc: saveResult.keyword.cpc,
         organic: Math.floor(saveResult.keyword.volume * 0.1),
         paid: Math.floor(saveResult.keyword.volume * 0.05),
@@ -1707,7 +1711,7 @@ useEffect(() => {
       }
 
       const data = await response.json();
-      
+
       if (data.success) {
         setGscProperties(data.properties || []);
       }
@@ -1744,7 +1748,7 @@ useEffect(() => {
         setGscEmail(data.email || '');
         setGscSelectedProperty(data.selectedProperty || '');
         setGscLastSynced(data.lastSyncedAt ? new Date(data.lastSyncedAt) : null);
-        
+
         if (!data.selectedProperty) {
           fetchGscProperties();
         }
@@ -1767,10 +1771,10 @@ useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const success = urlParams.get('success');
     const error = urlParams.get('error');
-      
+
     if (activeTab === 'integration' || (activeTab === 'analytics' && activeCompanySubTab === 'integration')) {
       if (success === 'true') {
-      toast({
+        toast({
           title: "Connected Successfully",
           description: "Google Search Console and Google Analytics access have been connected",
         });
@@ -1783,13 +1787,13 @@ useEffect(() => {
         toast({
           title: "Connection Failed",
           description: `Failed to connect: ${error}`,
-        variant: "destructive"
-      });
+          variant: "destructive"
+        });
         const newUrl = new URL(window.location.href);
         newUrl.searchParams.delete('success');
         newUrl.searchParams.delete('error');
         window.history.replaceState({}, '', newUrl.toString());
-    }
+      }
     }
   }, [activeTab, activeCompanySubTab, toast, fetchGscStatus]);
 
@@ -2038,9 +2042,9 @@ useEffect(() => {
 
 
   useEffect(() => {
-      fetchGscStatus();
-      fetchWordpressIntegration();
-    
+    fetchGscStatus();
+    fetchWordpressIntegration();
+
     // Also refresh campaign tab data if we're on campaign tab and WordPress integration might have changed
     if (activeTab === 'projects' && activeCompanySubTab === 'integration') {
       fetchCampaignTabData();
@@ -2173,63 +2177,63 @@ useEffect(() => {
     }
   };
 
- const handleUpdateCampaign = async () => {
-  if (!editTitle.trim()) {
-    toast({
-      title: "Title Required",
-      description: "Please enter a Project title",
-      variant: "destructive",
-    });
-    return;
-  }
-
-  if (editingCampaignId === null) return;
-
-  try {
-    const response = await fetch(
-      `${import.meta.env.VITE_API_URL}/api/campaigns/${editingCampaignId}`,
-      {
-        method: "PUT",
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("authToken")}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          title: editTitle.trim(),
-          description: editDescription.trim() || null,
-        }),
-      }
-    );
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || "Failed to update project");
-    }
-
-    const data = await response.json();
-
-    if (data.success) {
+  const handleUpdateCampaign = async () => {
+    if (!editTitle.trim()) {
       toast({
-        title: "Project Updated",
-        description: "Your project has been updated successfully",
+        title: "Title Required",
+        description: "Please enter a Project title",
+        variant: "destructive",
       });
-      setEditingCampaignId(null);
-      setEditTitle("");
-      setEditDescription("");
-      fetchCampaigns();
+      return;
     }
-  } catch (error) {
-    console.error("Error updating project:", error);
-    toast({
-      title: "Error",
-      description:
-        error instanceof Error
-          ? error.message
-          : "Failed to update project",
-      variant: "destructive",
-    });
-  }
-};
+
+    if (editingCampaignId === null) return;
+
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/campaigns/${editingCampaignId}`,
+        {
+          method: "PUT",
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("authToken")}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            title: editTitle.trim(),
+            description: editDescription.trim() || null,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to update project");
+      }
+
+      const data = await response.json();
+
+      if (data.success) {
+        toast({
+          title: "Project Updated",
+          description: "Your project has been updated successfully",
+        });
+        setEditingCampaignId(null);
+        setEditTitle("");
+        setEditDescription("");
+        fetchCampaigns();
+      }
+    } catch (error) {
+      console.error("Error updating project:", error);
+      toast({
+        title: "Error",
+        description:
+          error instanceof Error
+            ? error.message
+            : "Failed to update project",
+        variant: "destructive",
+      });
+    }
+  };
 
 
   const handleDeleteCampaign = async (campaignId: number) => {
@@ -2566,8 +2570,7 @@ useEffect(() => {
                   try {
                     // Fetch domain with context
                     const domainResponse = await fetch(
-                      `${
-                        import.meta.env.VITE_API_URL
+                      `${import.meta.env.VITE_API_URL
                       }/api/domain/${finalDomainId}`,
                       {
                         headers: {
@@ -2586,8 +2589,7 @@ useEffect(() => {
 
                     // Fetch keywords
                     const keywordsResponse = await fetch(
-                      `${
-                        import.meta.env.VITE_API_URL
+                      `${import.meta.env.VITE_API_URL
                       }/api/keywords/${finalDomainId}`,
                       {
                         headers: {
@@ -3042,33 +3044,33 @@ useEffect(() => {
               {...dashboardContentRouterProps}
             />
           )}
-        {showDeleteModal && (
-          <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50">
-            <div className="bg-white p-6 rounded-xl shadow-xl w-[90%] max-w-sm">
-              <h2 className="text-lg font-medium text-gray-800">Delete {deleteLabel}?</h2>
-              <p className="text-sm text-gray-500 mt-2">
-                Are you sure you want to delete this {deleteLabel}?
-              </p>
-              <div className="flex justify-end gap-3 mt-6">
-                <button
-                  onClick={() => setShowDeleteModal(false)}
-                  className="px-4 py-2 rounded-lg text-sm bg-gray-100 hover:bg-gray-200"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={() => {
-                    if (deleteAction) deleteAction();
-                    setShowDeleteModal(false);
-                  }}
-                  className="px-4 py-2 rounded-lg text-sm bg-black text-white hover:bg-red-700"
-                >
-                  Delete
-                </button>
+          {showDeleteModal && (
+            <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50">
+              <div className="bg-white p-6 rounded-xl shadow-xl w-[90%] max-w-sm">
+                <h2 className="text-lg font-medium text-gray-800">Delete {deleteLabel}?</h2>
+                <p className="text-sm text-gray-500 mt-2">
+                  Are you sure you want to delete this {deleteLabel}?
+                </p>
+                <div className="flex justify-end gap-3 mt-6">
+                  <button
+                    onClick={() => setShowDeleteModal(false)}
+                    className="px-4 py-2 rounded-lg text-sm bg-gray-100 hover:bg-gray-200"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (deleteAction) deleteAction();
+                      setShowDeleteModal(false);
+                    }}
+                    className="px-4 py-2 rounded-lg text-sm bg-black text-white hover:bg-red-700"
+                  >
+                    Delete
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
         </div>
       </main>
 

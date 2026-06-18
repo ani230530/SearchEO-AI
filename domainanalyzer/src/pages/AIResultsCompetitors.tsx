@@ -65,6 +65,7 @@ import {
   CreateWorksheetModal,
   type WorksheetOption,
 } from '@/features/ai-results/components/WorksheetPickerModals';
+import { useToast } from '@/components/ui/use-toast';
 
 // ── API shapes ─────────────────────────────────────────────────────────────
 
@@ -651,11 +652,10 @@ function CompetitorSelector({
             <div
               key={c.host}
               title={c.loading ? 'Scoring against saved AI responses…' : c.host}
-              className={`group inline-flex h-9 items-center gap-2 rounded-full border px-3 text-xs font-semibold shadow-sm transition ${
-                c.loading
+              className={`group inline-flex h-9 items-center gap-2 rounded-full border px-3 text-xs font-semibold shadow-sm transition ${c.loading
                   ? 'border-slate-200 bg-slate-50 text-[#7B8494]'
                   : 'border-slate-200 bg-white text-[#2D4059] hover:border-[#B7C8E8] hover:bg-[#F8FBFF]'
-              }`}
+                }`}
             >
               <span className="relative grid h-6 w-6 place-items-center overflow-hidden rounded-full" style={{ backgroundColor: `${colorForHost(c.host, idx)}22` }}>
                 {c.loading ? (
@@ -685,9 +685,40 @@ function CompetitorSelector({
 
 // ── Trend comparison panels ────────────────────────────────────────────────
 
-type TrendChartPoint = { label: string } & Record<string, number | string>;
+type TrendChartPoint = {
+  timestamp: number;
+  label: string;
+} & Record<string, number | string>;
 
-function TrendComparisonPanel({ trends }: { trends: TrendsResponse | null }) {
+const formatTrendTimestampUtc = (iso: string): string => {
+  const date = new Date(iso);
+  const dd = String(date.getUTCDate()).padStart(2, '0');
+  const mm = String(date.getUTCMonth() + 1).padStart(2, '0');
+  const yyyy = String(date.getUTCFullYear());
+  const hh = String(date.getUTCHours()).padStart(2, '0');
+  const mins = String(date.getUTCMinutes()).padStart(2, '0');
+  return `${dd}:${mm}:${yyyy} ${hh}:${mins}`;
+};
+
+const formatTrendTimestampUtcMs = (value: number | string): string => {
+  const timestamp = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(timestamp)) return '';
+  return formatTrendTimestampUtc(new Date(timestamp).toISOString());
+};
+
+function TrendComparisonPanel({
+  trends,
+  onRefresh,
+  isRefreshing,
+  refreshDisabled,
+  refreshTitle,
+}: {
+  trends: TrendsResponse | null;
+  onRefresh: () => void;
+  isRefreshing: boolean;
+  refreshDisabled: boolean;
+  refreshTitle: string;
+}) {
   const runCount = trends?.runs.length ?? 0;
   const hasData = runCount >= 1;
   // With a single completed run a <Line> has only one point — recharts cannot
@@ -705,7 +736,7 @@ function TrendComparisonPanel({ trends }: { trends: TrendsResponse | null }) {
         let slopeStr = '';
 
         if (point && dataArray) {
-          const currentIndex = dataArray.findIndex((d) => d.label === point.label);
+          const currentIndex = dataArray.findIndex((d) => d.timestamp === point.timestamp);
           if (currentIndex > 0) {
             const prevPoint = dataArray[currentIndex - 1];
             const prevValue = prevPoint[name];
@@ -731,7 +762,10 @@ function TrendComparisonPanel({ trends }: { trends: TrendsResponse | null }) {
     const modelList = [...modelsSet];
 
     const visibility: TrendChartPoint[] = trends.runs.map((r) => {
-      const point: TrendChartPoint = { label: new Date(r.startedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) };
+      const point: TrendChartPoint = {
+        timestamp: Date.parse(r.startedAt),
+        label: formatTrendTimestampUtc(r.startedAt),
+      };
       for (const m of modelList) {
         const cell = r.perModel[m];
         point[m] = cell ? cell.presenceCount : 0;
@@ -740,14 +774,20 @@ function TrendComparisonPanel({ trends }: { trends: TrendsResponse | null }) {
     });
 
     const citation: TrendChartPoint[] = trends.runs.map((r) => {
-      const point: TrendChartPoint = { label: new Date(r.startedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) };
+      const point: TrendChartPoint = {
+        timestamp: Date.parse(r.startedAt),
+        label: formatTrendTimestampUtc(r.startedAt),
+      };
       for (const m of modelList) point[m] = r.perModel[m]?.cites ?? 0;
       return point;
     });
 
     const sov: TrendChartPoint[] = trends.runs.map((r) => {
       const total = r.brandMentions + r.competitorMentions;
-      const point: TrendChartPoint = { label: new Date(r.startedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) };
+      const point: TrendChartPoint = {
+        timestamp: Date.parse(r.startedAt),
+        label: formatTrendTimestampUtc(r.startedAt),
+      };
       point['You'] = total > 0 ? Math.round((r.brandMentions / total) * 100) : 0;
       for (const host of trends.topCompetitors) {
         point[host] = total > 0 ? Math.round(((r.perCompetitor[host] ?? 0) / total) * 100) : 0;
@@ -765,8 +805,28 @@ function TrendComparisonPanel({ trends }: { trends: TrendsResponse | null }) {
   return (
     <section id="competitors-trends" data-title="Competitor Trend Comparison" className="min-w-0 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <h3 className="text-base font-semibold text-[#2D4059]">Competitor Trend Comparison</h3>
-        <span className="text-xs text-[#7B8494]">Last {trends?.runs.length ?? 0} runs</span>
+        <div>
+          <h3 className="text-base font-semibold text-[#2D4059]">Competitor Trend Comparison</h3>
+          <span className="mt-1 block text-xs text-[#7B8494]">Last {trends?.runs.length ?? 0} runs</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => void onRefresh()}
+            disabled={refreshDisabled}
+            title={refreshTitle}
+            className="h-8 rounded-md border border-slate-200 bg-white px-2.5 text-xs font-semibold text-[#5F6877] shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {isRefreshing ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <RefreshCw className="h-3.5 w-3.5" />
+            )}
+            Refresh
+          </Button>
+        </div>
       </div>
 
       {!hasData ? (
@@ -779,7 +839,14 @@ function TrendComparisonPanel({ trends }: { trends: TrendsResponse | null }) {
             <ResponsiveContainer width="100%" height={240}>
               <LineChart syncId="competitorTrends" data={visibilityData} margin={{ top: 10, right: 10, bottom: 0, left: -20 }}>
                 <CartesianGrid stroke="#EEF1F5" strokeDasharray="3 3" />
-                <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#98A2B3' }} />
+                <XAxis
+                  dataKey="timestamp"
+                  type="number"
+                  scale="time"
+                  domain={['dataMin', 'dataMax']}
+                  tickFormatter={formatTrendTimestampUtcMs}
+                  tick={{ fontSize: 10, fill: '#98A2B3' }}
+                />
                 <YAxis tick={{ fontSize: 10, fill: '#98A2B3' }} />
                 <Tooltip
                   contentStyle={{
@@ -789,6 +856,7 @@ function TrendComparisonPanel({ trends }: { trends: TrendsResponse | null }) {
                     fontSize: '14px',
                     fontWeight: '600',
                   }}
+                  labelFormatter={formatTrendTimestampUtcMs}
                   formatter={formatTooltipValue(visibilityData)}
                 />
                 <RLegend wrapperStyle={{ fontSize: 10 }} />
@@ -803,7 +871,14 @@ function TrendComparisonPanel({ trends }: { trends: TrendsResponse | null }) {
             <ResponsiveContainer width="100%" height={240}>
               <LineChart syncId="competitorTrends" data={citationData} margin={{ top: 10, right: 10, bottom: 0, left: -20 }}>
                 <CartesianGrid stroke="#EEF1F5" strokeDasharray="3 3" />
-                <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#98A2B3' }} />
+                <XAxis
+                  dataKey="timestamp"
+                  type="number"
+                  scale="time"
+                  domain={['dataMin', 'dataMax']}
+                  tickFormatter={formatTrendTimestampUtcMs}
+                  tick={{ fontSize: 10, fill: '#98A2B3' }}
+                />
                 <YAxis tick={{ fontSize: 10, fill: '#98A2B3' }} />
                 <Tooltip
                   contentStyle={{
@@ -813,6 +888,7 @@ function TrendComparisonPanel({ trends }: { trends: TrendsResponse | null }) {
                     fontSize: '14px',
                     fontWeight: '600',
                   }}
+                  labelFormatter={formatTrendTimestampUtcMs}
                   formatter={formatTooltipValue(citationData)}
                 />
                 <RLegend wrapperStyle={{ fontSize: 10 }} />
@@ -827,7 +903,14 @@ function TrendComparisonPanel({ trends }: { trends: TrendsResponse | null }) {
             <ResponsiveContainer width="100%" height={240}>
               <LineChart syncId="competitorTrends" data={sovData} margin={{ top: 10, right: 10, bottom: 0, left: -20 }}>
                 <CartesianGrid stroke="#EEF1F5" strokeDasharray="3 3" />
-                <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#98A2B3' }} />
+                <XAxis
+                  dataKey="timestamp"
+                  type="number"
+                  scale="time"
+                  domain={['dataMin', 'dataMax']}
+                  tickFormatter={formatTrendTimestampUtcMs}
+                  tick={{ fontSize: 10, fill: '#98A2B3' }}
+                />
                 <YAxis unit="%" tick={{ fontSize: 10, fill: '#98A2B3' }} />
                 <Tooltip
                   contentStyle={{
@@ -837,6 +920,7 @@ function TrendComparisonPanel({ trends }: { trends: TrendsResponse | null }) {
                     fontSize: '14px',
                     fontWeight: '600',
                   }}
+                  labelFormatter={formatTrendTimestampUtcMs}
                   formatter={formatTooltipValue(sovData, '%')}
                 />
                 <RLegend wrapperStyle={{ fontSize: 10 }} />
@@ -1375,6 +1459,7 @@ export default function CompetitorsPage() {
   const domainId = currentDomain?.id ?? null;
   const { currentTitle: currentCompetitorSectionTitle } = useScrollSpyBreadcrumbs({});
   const maskedDomainId = currentDomain ? buildDomainSlug(currentDomain) : undefined;
+  const { toast } = useToast();
 
   // All four data sources hit React Query — sibling tabs hit the same cache.
   const reportQuery = useReport<ReportPayload>(domainId);
@@ -1412,6 +1497,7 @@ export default function CompetitorsPage() {
   const [newWorksheetName, setNewWorksheetName] = useState('');
   const [createWorksheetError, setCreateWorksheetError] = useState<string | null>(null);
   const [isCreatingWorksheet, setIsCreatingWorksheet] = useState(false);
+  const [refreshingBranch, setRefreshingBranch] = useState(false);
   const worksheetOptions: WorksheetOption[] = useMemo(() => {
     const campaigns = Array.isArray(campaignsQuery.data?.campaigns) ? campaignsQuery.data.campaigns : [];
     return campaigns.map((c) => ({
@@ -1490,6 +1576,46 @@ export default function CompetitorsPage() {
     const diff = ((curr - prev) / prev) * 100;
     return { value: `${diff >= 0 ? '+' : ''}${diff.toFixed(1)}%`, positive: diff >= 0 };
   }, [trends]);
+
+  const handleBranchRefresh = useCallback(async () => {
+    if (domainId == null || refreshingBranch) return;
+
+    setRefreshingBranch(true);
+    try {
+      const response = await apiPost<{ started?: boolean; selectedPrompts?: number }>(
+        `/wizard/domain/${domainId}/tracked-prompts/run-now`,
+      );
+
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: aiResultsKeys.trends(domainId) }),
+        queryClient.invalidateQueries({ queryKey: aiResultsKeys.competitorAnalysis(domainId) }),
+        queryClient.invalidateQueries({ queryKey: aiResultsKeys.runs(domainId) }),
+        queryClient.invalidateQueries({ queryKey: aiResultsKeys.trackedPrompts(domainId) }),
+      ]);
+
+      toast({
+        title: 'Refresh complete',
+        description: response.selectedPrompts
+          ? `Updated the active branch for ${response.selectedPrompts} prompt${response.selectedPrompts === 1 ? '' : 's'}.`
+          : 'Updated the active branch.',
+      });
+    } catch (err) {
+      const error = err as Error & { status?: number; code?: string };
+      const message =
+        error.status === 400
+          ? 'No selected prompts to refresh.'
+          : error.status === 409
+            ? 'A refresh is already running. Try again shortly.'
+            : error.message || 'Refresh failed.';
+      toast({
+        title: 'Refresh unavailable',
+        description: message,
+        variant: 'destructive',
+      });
+    } finally {
+      setRefreshingBranch(false);
+    }
+  }, [domainId, queryClient, refreshingBranch, toast]);
 
   // Inline add: push an optimistic "loading" pill, POST to the backend
   // (which re-scores every saved AiQueryResult against the new competitor),
@@ -1708,16 +1834,6 @@ export default function CompetitorsPage() {
               <section className="flex flex-col gap-4">
                 <div className="flex items-center justify-between">
                   <h2 className="text-base font-semibold leading-none text-[#2D4059]">Competitor Analysis</h2>
-                  <button
-                    type="button"
-                    onClick={handleRefresh}
-                    disabled={isRefreshing}
-                    title="Refresh competitor data"
-                    className="inline-flex h-9 items-center gap-2 rounded-md border border-slate-200 bg-white px-3 text-xs font-semibold text-[#5F6877] shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    <RefreshCw className={`h-3.5 w-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
-                    {isRefreshing ? 'Refreshing…' : 'Refresh'}
-                  </button>
                 </div>
 
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5">
@@ -1751,7 +1867,13 @@ export default function CompetitorsPage() {
               <CompetitorSelector competitors={selected} onAdd={handleAddCompetitor} onRemove={handleRemoveCompetitor} />
 
               <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.45fr)_minmax(360px,0.85fr)]">
-                <TrendComparisonPanel trends={trends} />
+                <TrendComparisonPanel
+                  trends={trends}
+                  onRefresh={() => void handleBranchRefresh()}
+                  isRefreshing={refreshingBranch}
+                  refreshDisabled={domainId == null || refreshingBranch}
+                  refreshTitle="Refresh active branch"
+                />
                 <PromptGapPanel
                   opportunities={report?.opportunities ?? []}
                   onAiResponse={openPromptGapDrawer}

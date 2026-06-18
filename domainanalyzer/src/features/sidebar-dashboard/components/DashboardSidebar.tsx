@@ -227,10 +227,10 @@ export function DashboardSidebar({
           },
         ],
       },
-       {
+      {
         title: "Analytics",
         items: [
-         {
+          {
             key: "gsc-analytics",
             label: "GSC Analytics",
             icon: <PieChart className="h-4 w-4" />,
@@ -259,25 +259,26 @@ export function DashboardSidebar({
             onClick: () => onSelectTab("knowledge-base"),
             href: resolveDashboardPath("knowledge-base"),
           },
-         
+
         ],
       },
       {
         title: "Attribution",
         items: [
-         {key: "attribution",
-           label: "Attribution",
-           icon: <Route className="h-4 w-4" />,
-           isActive: activeTab === "attribution",
-           onClick: () => onSelectTab("attribution"),
-           href: resolveDashboardPath("attribution"),
+          {
+            key: "attribution",
+            label: "Attribution",
+            icon: <Route className="h-4 w-4" />,
+            isActive: activeTab === "attribution",
+            onClick: () => onSelectTab("attribution"),
+            href: resolveDashboardPath("attribution"),
           },
         ],
       },
       {
         title: "Billing",
         items: [
-           {
+          {
             key: "Pricing",
             label: "Pricing",
             icon: <Tag className="h-4 w-4" />,
@@ -292,7 +293,7 @@ export function DashboardSidebar({
 
   return (
     <TooltipProvider delayDuration={180}>
-      <aside 
+      <aside
         className={`${sidebarClass} relative`}
       >
         <div className="sidebar-header">
@@ -354,13 +355,12 @@ export function DashboardSidebar({
                     );
 
                     const commonProps = {
-                      className: `sidebar-tab ${item.isActive ? "active" : ""} ${
-                        item.variant === "primary"
+                      className: `sidebar-tab ${item.isActive ? "active" : ""} ${item.variant === "primary"
                           ? "sidebar-tab-primary"
                           : item.variant === "premium"
                             ? "sidebar-tab-premium"
                             : ""
-                      }`,
+                        }`,
                       onClick: (event: MouseEvent<HTMLElement>) => {
                         if (isModifiedClick(event)) {
                           return;
@@ -392,41 +392,37 @@ export function DashboardSidebar({
                         {item.subItems?.length && (isSidebarExpanded || isAiVisibilityExpanded) ? (
                           <div className={isSidebarExpanded ? "mt-1 ml-4 space-y-1 border-l border-slate-200 pl-3" : "mt-1 flex flex-col items-center gap-1"}>
                             {item.subItems.map((subItem) => (
-                            <Tooltip key={subItem.key}>
-                              <TooltipTrigger asChild>
+                              <Tooltip key={subItem.key}>
+                                <TooltipTrigger asChild>
                                   <Link
                                     to={subItem.href ?? resolveDashboardPath("ai-visibility")}
                                     onClick={() => setIsAiVisibilityExpanded(true)}
                                     className={
                                       isSidebarExpanded
-                                        ? `group flex items-center gap-2 rounded-md px-2 py-1.5 transition ${
-                                            isAiVisibilitySubItemActive(subItem.key)
-                                              ? "border border-[#9DB3DD] bg-[#EFF5FF] text-[#213A63] shadow-[0_6px_16px_rgba(47,68,98,0.10)]"
-                                              : "border border-transparent text-slate-500 hover:border-slate-200 hover:bg-slate-50 hover:text-slate-900"
-                                          }`
-                                        : `group flex h-9 w-9 items-center justify-center rounded-lg transition ${
-                                            isAiVisibilitySubItemActive(subItem.key)
-                                              ? "border border-[#9DB3DD] bg-[#EFF5FF] text-[#213A63] shadow-[0_6px_16px_rgba(47,68,98,0.10)]"
-                                              : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
-                                          }`
+                                        ? `group flex items-center gap-2 rounded-md px-2 py-1.5 transition ${isAiVisibilitySubItemActive(subItem.key)
+                                          ? "border border-[#9DB3DD] bg-[#EFF5FF] text-[#213A63] shadow-[0_6px_16px_rgba(47,68,98,0.10)]"
+                                          : "border border-transparent text-slate-500 hover:border-slate-200 hover:bg-slate-50 hover:text-slate-900"
+                                        }`
+                                        : `group flex h-9 w-9 items-center justify-center rounded-lg transition ${isAiVisibilitySubItemActive(subItem.key)
+                                          ? "border border-[#9DB3DD] bg-[#EFF5FF] text-[#213A63] shadow-[0_6px_16px_rgba(47,68,98,0.10)]"
+                                          : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
+                                        }`
                                     }
                                   >
                                     <span
-                                      className={`flex h-6 w-6 items-center justify-center rounded-md transition ${
-                                        isAiVisibilitySubItemActive(subItem.key)
+                                      className={`flex h-6 w-6 items-center justify-center rounded-md transition ${isAiVisibilitySubItemActive(subItem.key)
                                           ? "bg-white text-[#355A9B]"
                                           : "bg-white text-slate-400"
-                                      }`}
+                                        }`}
                                     >
                                       {subItem.icon}
                                     </span>
                                     {isSidebarExpanded ? (
                                       <span
-                                        className={`sidebar-tab-label text-[12px] font-semibold transition ${
-                                          isAiVisibilitySubItemActive(subItem.key)
+                                        className={`sidebar-tab-label text-[12px] font-semibold transition ${isAiVisibilitySubItemActive(subItem.key)
                                             ? "text-[#213A63]"
                                             : "text-slate-500"
-                                        }`}
+                                          }`}
                                       >
                                         {subItem.label}
                                       </span>

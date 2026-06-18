@@ -189,8 +189,4 @@ app.listen(PORT, () => {
   // Worksheet generation stale-job sweeper (campaigns/blog flow).
   const { startStaleJobSweeper } = require('./services/generationJobService');
   startStaleJobSweeper();
-  // Weekly tracked-prompt re-test scheduler (BullMQ repeatable, idempotent).
-  const { registerWeeklyTracking } = require('./services/weeklyTrackingService');
-  registerWeeklyTracking().catch((e: unknown) =>
-    console.error('[startup] weekly tracking registration failed', e));
 });

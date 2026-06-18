@@ -472,9 +472,8 @@ export function AddDomainModal({
                 return (
                   <label
                     key={`${t.type}-${t.id}`}
-                    className={`flex items-center gap-3 p-2 rounded hover:bg-slate-50 cursor-pointer ${
-                      isKeyword ? 'bg-slate-50/50 font-medium' : 'pl-8 text-sm'
-                    }`}
+                    className={`flex items-center gap-3 p-2 rounded hover:bg-slate-50 cursor-pointer ${isKeyword ? 'bg-slate-50/50 font-medium' : 'pl-8 text-sm'
+                      }`}
                   >
                     <input
                       type="checkbox"

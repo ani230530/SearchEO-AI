@@ -1232,7 +1232,11 @@ export const PromptTable = ({
     });
   };
   const [showAllQueries, setShowAllQueries] = useState(false);
-  const trackedPromptsQuery = useTrackedPrompts<{ prompts?: PromptTableRow[] }>(domainId ?? null);
+  const trackedPromptsQuery = useTrackedPrompts<{
+    latestRunAt?: string | null;
+    nextTestAt?: string | null;
+    prompts?: PromptTableRow[];
+  }>(domainId ?? null);
   const trackedPromptRows = useMemo(
     () => (Array.isArray(trackedPromptsQuery.data?.prompts) ? trackedPromptsQuery.data!.prompts : []),
     [trackedPromptsQuery.data],
@@ -2517,6 +2521,11 @@ const AIResultsReportPreview = () => {
   const reportQuery = useReport<any>(domainId, selectedRunId);
   const runsQuery = useRuns<{ runs: Array<{ id: number; status: string; startedAt: string; visibilityScore: number | null; totalQueries: number | null }> }>(domainId);
   const trendsQuery = useTrends<{ runs: TrendRun[]; topCompetitors: string[] }>(domainId);
+  const trackedPromptsQuery = useTrackedPrompts<{
+    latestRunAt?: string | null;
+    nextTestAt?: string | null;
+    prompts?: PromptTableRow[];
+  }>(domainId);
 
   const reportData: any = reportQuery.data ?? null;
   const loading = reportQuery.isLoading;
@@ -2535,8 +2544,51 @@ const AIResultsReportPreview = () => {
     }),
     [trendsQuery.data],
   );
+  const { toast } = useToast();
+  const [refreshingBranch, setRefreshingBranch] = useState(false);
+  const refreshCooldownUntil = trackedPromptsQuery.data?.nextTestAt ?? null;
+  const refreshCooldownActive = Boolean(
+    refreshCooldownUntil && Number.isFinite(Date.parse(refreshCooldownUntil)) && Date.parse(refreshCooldownUntil) > Date.now(),
+  );
 
   const selectedCount = selectedRowIds.size;
+
+  const handleBranchRefresh = useCallback(async () => {
+    if (domainId == null || refreshingBranch || refreshCooldownActive) return;
+    setRefreshingBranch(true);
+    try {
+      const response = await apiPost<{ started?: boolean; selectedPrompts?: number }>(
+        `/wizard/domain/${domainId}/tracked-prompts/run-now`,
+      );
+      await queryClient.invalidateQueries({
+        predicate: (query) =>
+          Array.isArray(query.queryKey) &&
+          query.queryKey[0] === 'ai-results' &&
+          query.queryKey[2] === domainId,
+      });
+      toast({
+        title: 'Refresh complete',
+        description: response.selectedPrompts
+          ? `Updated the active branch for ${response.selectedPrompts} prompt${response.selectedPrompts === 1 ? '' : 's'}.`
+          : 'Updated the active branch.',
+      });
+    } catch (err) {
+      const error = err as Error & { status?: number; code?: string };
+      const message =
+        error.status === 409
+          ? 'Refresh cooldown active. Try again in a few minutes.'
+          : error.status === 400
+            ? 'No selected prompts to refresh.'
+            : error.message || 'Refresh failed.';
+      toast({
+        title: 'Refresh unavailable',
+        description: message,
+        variant: 'destructive',
+      });
+    } finally {
+      setRefreshingBranch(false);
+    }
+  }, [domainId, queryClient, refreshCooldownActive, refreshingBranch, toast]);
 
   const scrollToSection = useCallback((sectionId: string) => {
     const target = document.getElementById(sectionId);
@@ -3357,6 +3409,21 @@ return (
                 Latest run
               </Button>
             )}
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => void handleBranchRefresh()}
+              disabled={domainId == null || refreshingBranch || refreshCooldownActive}
+              className="h-[41px] rounded-lg border border-[#D5D7DA] bg-white px-3 text-xs text-[#374252] shadow-[0_1px_2px_0_#1018280D] hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400"
+              title={refreshCooldownActive ? `Refresh available after ${new Date(refreshCooldownUntil ?? '').toLocaleTimeString()}` : 'Refresh active branch'}
+            >
+              {refreshingBranch ? (
+                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
+              )}
+              Refresh
+            </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button

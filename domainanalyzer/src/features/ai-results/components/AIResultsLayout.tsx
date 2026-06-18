@@ -167,7 +167,7 @@ export function AIResultsLayout({
     <div className="flex min-h-screen w-full flex-col bg-[#f5f5f7] text-slate-900 lg:flex-row">
       {/* Collapsible icon rail. The outer <aside> reserves a fixed 72px/268px slot
        *  on desktop so the rest of the layout never reflows. */}
-      <aside 
+      <aside
         className="group relative z-40 hidden min-h-[220px] shrink-0 basis-auto overflow-visible border-b border-slate-300 bg-transparent lg:sticky lg:top-0 lg:flex lg:h-screen lg:max-h-screen lg:border-b-0 lg:self-start lg:w-[var(--rail-width)]"
         style={{
           ["--rail-width" as string]: sidebarOpen ? "268px" : "72px",
@@ -181,7 +181,7 @@ export function AIResultsLayout({
           isSidebarExpanded={isSidebarExpanded}
           onToggleSidebar={setSidebarOpen}
           onSelectPricing={() => navigate(resolveSidebarNavigation("pricing").path)}
-          onSelectCompanySubTab={() => {}}
+          onSelectCompanySubTab={() => { }}
           onSelectCreateProject={() => navigate(`${resolveDashboardPath("projects")}?action=create`)}
           onSelectTab={handleSelectTab}
           activeSettingsSubTab={undefined}
@@ -194,8 +194,8 @@ export function AIResultsLayout({
 
       <aside className={cn(
         "min-h-[220px] shrink-0 basis-auto border-b border-slate-300 bg-white lg:sticky lg:top-0 lg:h-screen lg:max-h-screen lg:border-b-0 lg:border-r lg:self-start transition-all duration-300 ease-in-out overflow-hidden flex flex-col",
-        isResultsSidebarOpen 
-          ? "p-4 w-full lg:basis-[16%] lg:min-w-[230px] lg:max-w-[300px]" 
+        isResultsSidebarOpen
+          ? "p-4 w-full lg:basis-[16%] lg:min-w-[230px] lg:max-w-[300px]"
           : "p-2 w-full lg:basis-0 lg:min-w-[58px] lg:max-w-[58px]"
       )}>
         <div className="flex h-full flex-col overflow-hidden">
@@ -213,7 +213,7 @@ export function AIResultsLayout({
                 <Globe2 className={cn("text-slate-400", isResultsSidebarOpen ? "h-5 w-5" : "h-4 w-4")} />
               )}
             </span>
-            
+
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -223,11 +223,11 @@ export function AIResultsLayout({
                     onClick={() => setIsResultsSidebarOpen(!isResultsSidebarOpen)}
                     aria-label={isResultsSidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
                   >
-                    <ChevronRight 
+                    <ChevronRight
                       className={cn(
                         "h-6 w-6 transition-transform duration-200",
                         isResultsSidebarOpen ? "rotate-180" : ""
-                      )} 
+                      )}
                     />
                   </button>
                 </TooltipTrigger>
@@ -308,7 +308,7 @@ export function AIResultsLayout({
                                     month: 'short',
                                     year: 'numeric'
                                   })
-                                : 'No date'}
+                                  : 'No date'}
                               </span>
                             </div>
                           </Link>
@@ -393,7 +393,7 @@ export function AIResultsLayout({
                                     month: 'short',
                                     year: 'numeric'
                                   })
-                                : 'No date'}
+                                  : 'No date'}
                               </span>
                             </div>
                           </Link>

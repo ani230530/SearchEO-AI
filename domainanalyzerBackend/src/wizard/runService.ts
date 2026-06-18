@@ -19,6 +19,7 @@
 
 import OpenAI from 'openai';
 import axios from 'axios';
+import crypto from 'crypto';
 import type { PrismaClient } from '../../generated/prisma';
 import {
   scoreResponse as llmScoreResponse,
@@ -36,14 +37,14 @@ const APP_TITLE = 'AI Visibility Wizard';
 
 const router = OPENROUTER_API_KEY
   ? new OpenAI({
-      apiKey: OPENROUTER_API_KEY,
-      baseURL: 'https://openrouter.ai/api/v1',
-      // OpenRouter requires these headers for analytics + ranking on their end.
-      defaultHeaders: {
-        'HTTP-Referer': APP_URL,
-        'X-Title': APP_TITLE,
-      },
-    })
+    apiKey: OPENROUTER_API_KEY,
+    baseURL: 'https://openrouter.ai/api/v1',
+    // OpenRouter requires these headers for analytics + ranking on their end.
+    defaultHeaders: {
+      'HTTP-Referer': APP_URL,
+      'X-Title': APP_TITLE,
+    },
+  })
   : null;
 
 const QUERY_TIMEOUT_MS = 60_000;
@@ -188,6 +189,135 @@ interface CallOutcome {
   response: string;
   latencyMs: number;
   costUsd: number | null;
+}
+
+export class RunPipelineError extends Error {
+  constructor(
+    message: string,
+    public code: string,
+    public status = 502,
+    public details: Record<string, unknown> | null = null,
+  ) {
+    super(message);
+    this.name = 'RunPipelineError';
+  }
+}
+
+function readErrorMessage(err: unknown): string {
+  if (err instanceof Error && err.message.trim()) return err.message.trim();
+  if (typeof err === 'string' && err.trim()) return err.trim();
+  return 'Unknown error';
+}
+
+function readErrorStatus(err: unknown): number | null {
+  if (!err || typeof err !== 'object') return null;
+  const record = err as Record<string, unknown> & { response?: { status?: unknown; data?: unknown } };
+  if (typeof record.status === 'number') return record.status;
+  if (typeof record.statusCode === 'number') return record.statusCode;
+  if (typeof record.response?.status === 'number') return record.response.status;
+  return null;
+}
+
+function readErrorDetails(err: unknown): unknown {
+  if (!err || typeof err !== 'object') return null;
+  const record = err as Record<string, unknown> & { response?: { data?: unknown } };
+  if (record.response?.data !== undefined) return record.response.data;
+  if ('details' in record) return record.details;
+  return null;
+}
+
+function normalizeRunError(
+  err: unknown,
+  context: { domainId: number; host: string; model?: string; promptId?: number },
+): RunPipelineError {
+  if (err instanceof RunPipelineError) return err;
+
+  const upstreamStatus = readErrorStatus(err);
+  const upstreamMessage = readErrorMessage(err);
+  const upstreamDetails = readErrorDetails(err);
+  const message = `Refresh failed for ${context.host}${context.model ? ` (${context.model})` : ''}${context.promptId ? ` prompt ${context.promptId}` : ''}: ${upstreamMessage}`;
+
+  let code = 'RUN_PIPELINE_FAILED';
+  let status = 500;
+  if (upstreamStatus === 401 && /Missing Authentication header/i.test(upstreamMessage)) {
+    code = 'OPENROUTER_AUTH_MISSING';
+    status = 502;
+  } else if (upstreamStatus === 401 || upstreamStatus === 403) {
+    code = 'OPENROUTER_AUTH_FAILED';
+    status = 502;
+  } else if (upstreamStatus === 429) {
+    code = 'OPENROUTER_RATE_LIMITED';
+    status = 502;
+  } else if (upstreamStatus !== null && upstreamStatus >= 500) {
+    code = 'OPENROUTER_UPSTREAM_ERROR';
+    status = 502;
+  }
+
+  return new RunPipelineError(message, code, status, {
+    domainId: context.domainId,
+    host: context.host,
+    model: context.model ?? null,
+    promptId: context.promptId ?? null,
+    upstreamStatus,
+    upstreamMessage,
+    upstreamDetails,
+  });
+}
+
+type AnalysisPromptSnapshotItem = {
+  id: number;
+  text: string;
+  intent: string | null;
+  source: string;
+  keywordId: number | null;
+  category: string | null;
+  intentStage: string | null;
+  persona: string | null;
+  useCase: string | null;
+  constraint: string | null;
+  isBranded: boolean;
+  competitorMentioned: string | null;
+};
+
+const normalizeSnapshotText = (value: string | null | undefined): string => (value ?? '').trim().replace(/\s+/g, ' ').toLowerCase();
+
+function buildAnalysisFingerprint(prompts: AnalysisPromptSnapshotItem[]): string {
+  const payload = prompts
+    .map((p) => ({
+      text: normalizeSnapshotText(p.text),
+      intent: normalizeSnapshotText(p.intent),
+      source: normalizeSnapshotText(p.source),
+      keywordId: p.keywordId ?? null,
+      category: normalizeSnapshotText(p.category),
+      intentStage: normalizeSnapshotText(p.intentStage),
+      persona: normalizeSnapshotText(p.persona),
+      useCase: normalizeSnapshotText(p.useCase),
+      constraint: normalizeSnapshotText(p.constraint),
+      isBranded: Boolean(p.isBranded),
+      competitorMentioned: normalizeSnapshotText(p.competitorMentioned),
+    }))
+    .sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
+
+  return crypto.createHash('sha256').update(JSON.stringify(payload)).digest('hex');
+}
+
+function buildAnalysisSnapshot(prompts: AnalysisPromptSnapshotItem[]) {
+  return prompts
+    .map((p) => ({
+      id: p.id,
+      text: p.text,
+      intent: p.intent,
+      source: p.source,
+      keywordId: p.keywordId,
+      category: p.category,
+      intentStage: p.intentStage,
+      persona: p.persona,
+      useCase: p.useCase,
+      constraint: p.constraint,
+      isBranded: p.isBranded,
+      competitorMentioned: p.competitorMentioned,
+    }))
+    .sort((a, b) => a.id - b.id);
 }
 
 /**
@@ -690,9 +820,9 @@ async function callModelWithRetry(model: ModelDef, promptText: string, loc: User
 function crawledPagesFromSnapshot(latestCrawl: { pages: unknown; pagesScanned?: number | null } | null | undefined) {
   return Array.isArray(latestCrawl?.pages)
     ? (latestCrawl!.pages as Array<{ url?: string; title?: string | null }>).map((p) => ({
-        url: p.url ?? '',
-        title: p.title ?? null,
-      })).filter((p) => p.url)
+      url: p.url ?? '',
+      title: p.title ?? null,
+    })).filter((p) => p.url)
     : [];
 }
 
@@ -841,230 +971,16 @@ export interface RunOptions {
   domainId: number;
   onProgress: (event: RunProgress) => void;
   /**
-   * Which prompts to run. 'selected' (default) uses the wizard audit set
-   * (isSelected=true). 'tracked' uses the weekly-tracking set (isTracked=true).
+   * Which prompts to run. 'selected' (default) uses the active branch's
+   * selected prompts. 'tracked' keeps the tracked-prompt convenience path.
    */
   selection?: 'selected' | 'tracked';
   /**
-   * How this run is tagged on AiRun.kind. 'audit' (default) is the manual
-   * wizard run; 'weekly' is the scheduled tracked-prompt re-test. Keeping them
-   * distinct prevents weekly runs from polluting the audit trend/runs charts.
+   * How this run is tagged on AiRun.kind. 'audit' is the wizard run,
+   * 'refresh' is the manual branch refresh, and 'adhoc' is the single-prompt
+   * path that must stay out of the branch charts.
    */
-  kind?: 'audit' | 'weekly';
-}
-
-export function queueDeepScoringForRun(args: {
-  prisma: PrismaClient;
-  domainId: number;
-  runId: number;
-}): void {
-  if (!DEEP_SCORING_IN_BACKGROUND) return;
-  if (deepScoringInFlight.has(args.runId)) return;
-  deepScoringInFlight.add(args.runId);
-  setTimeout(() => {
-    runDeepScoringForRun(args)
-      .catch((err) => console.warn(`[run:${args.runId}] background scoring failed`, err))
-      .finally(() => deepScoringInFlight.delete(args.runId));
-  }, 0);
-}
-
-export async function runDeepScoringForRun(args: {
-  prisma: PrismaClient;
-  domainId: number;
-  runId: number;
-}): Promise<void> {
-  const { prisma, domainId, runId } = args;
-
-  const [run, domain, latestCrawl, selectedCompetitors, rows] = await Promise.all([
-    prisma.aiRun.findFirst({
-      where: { id: runId, domainId },
-      select: { id: true, summary: true },
-    }),
-    prisma.domain.findUnique({
-      where: { id: domainId },
-      select: {
-        host: true,
-        inferred: { select: { companyName: true, summary: true } },
-        profile: { select: { country: true, state: true, targetLocation: true } },
-      },
-    }),
-    prisma.crawlSnapshot.findFirst({
-      where: { domainId },
-      orderBy: { createdAt: 'desc' },
-      select: { pages: true, pagesScanned: true, rawText: true },
-    }),
-    prisma.competitor.findMany({
-      where: { domainId, isSelected: true },
-      select: { competitorHost: true, rawSignals: true },
-    }),
-    prisma.aiQueryResult.findMany({
-      where: { runId },
-      select: {
-        id: true,
-        promptId: true,
-        model: true,
-        response: true,
-        prompt: { select: { text: true } },
-      },
-    }),
-  ]);
-
-  if (!run || !domain || rows.length === 0) return;
-  const domainRow = domain;
-
-  const existingSummary = (run.summary as Record<string, unknown> | null) ?? {};
-  await prisma.aiRun.update({
-    where: { id: runId },
-    data: {
-      summary: {
-        ...existingSummary,
-        scoringStatus: 'enriching',
-        scoringProvisional: true,
-        scoringStartedAt: new Date().toISOString(),
-      } as any,
-    },
-  }).catch(() => undefined);
-
-  const competitorHosts = selectedCompetitors.map((c) => c.competitorHost);
-  const competitorRoster = selectedCompetitors.map((c) => ({
-    host: c.competitorHost,
-    name:
-      typeof (c.rawSignals as Record<string, unknown> | null)?.llmName === 'string'
-        ? ((c.rawSignals as Record<string, unknown>).llmName as string)
-        : null,
-  }));
-  const brandName = domainRow.inferred?.companyName ?? null;
-  const brandFacts = domainRow.inferred?.summary ?? latestCrawl?.rawText?.slice(0, 1500) ?? '';
-  const userLocation: UserLocation = {
-    country: domainRow.profile?.country ?? null,
-    state: domainRow.profile?.state ?? null,
-    city: domainRow.profile?.targetLocation ?? null,
-    timezone: null,
-  };
-
-  let cursor = 0;
-  async function worker() {
-    while (cursor < rows.length) {
-      const row = rows[cursor++];
-      const model = ROSTER.find((item) => item.id === row.model);
-      let response = row.response ?? '';
-      let latencyMs: number | null = null;
-      let costUsd: number | null = null;
-
-      if (!response.trim() && model) {
-        try {
-          const retried = await callModelWithRetry(model, row.prompt.text, userLocation);
-          response = retried.response;
-          latencyMs = retried.latencyMs;
-          costUsd = retried.costUsd;
-          if (!response.trim()) {
-            console.warn(`[run:${runId}] ${model.id} returned an empty response during background retry for prompt ${row.promptId}`);
-          }
-        } catch (err) {
-          console.warn(`[run:${runId}] ${model.id} background retry failed for prompt ${row.promptId}: ${describeModelError(err)}`);
-          response = '';
-        }
-      }
-
-      const heuristic = scoreResponse({
-        ownDomainHost: domainRow.host,
-        competitorHosts,
-        modelResponse: response,
-      });
-
-      const scoreInput: LlmScoreInput = {
-        prompt: row.prompt.text,
-        response,
-        brand: { name: brandName, aliases: [], host: domainRow.host },
-        competitors: competitorRoster,
-        brandFacts,
-      };
-      const llm = response.trim() ? await scoreWithRetry(scoreInput) : null;
-      const final = finalFromLlmOrHeuristic({ llm, heuristic, competitorRoster });
-
-      if (llm) {
-        for (const mention of llm.competitorMentions) {
-          const host = mention.host ?? resolveHostFromRoster(mention.name, competitorRoster);
-          if (!host || host === domainRow.host || competitorHosts.includes(host)) continue;
-          await recordCompetitorMention(prisma, domainId, {
-            host,
-            name: mention.name,
-            sentiment: mention.sentiment ?? 0,
-          }).catch(() => undefined);
-        }
-      }
-
-      const competitorHostsForRow = Array.from(new Set(final.competitorMentions.map((m) => m.host).filter(Boolean)));
-      await prisma.aiQueryResult.update({
-        where: { id: row.id },
-        data: {
-          response,
-          presence: final.presence,
-          relevance: final.relevance,
-          sentiment: final.sentiment,
-          accuracy: final.accuracy,
-          rankPosition: final.rankPosition,
-          overall: final.overall,
-          scorerSummary: final.summary || null,
-          factualClaims: final.factualClaims as any,
-          competitorHosts: competitorHostsForRow as any,
-          citations: final.citations as any,
-          competitorMentions: final.competitorMentions as any,
-          ...(latencyMs !== null ? { latencyMs } : {}),
-          ...(costUsd !== null ? { costUsd } : {}),
-        },
-      });
-    }
-  }
-
-  try {
-    await Promise.all(Array.from({ length: Math.max(1, DEEP_SCORING_PARALLEL) }, worker));
-    const refreshed = await prisma.aiQueryResult.findMany({
-      where: { runId },
-      select: {
-        model: true,
-        presence: true,
-        relevance: true,
-        sentiment: true,
-        overall: true,
-        competitorMentions: true,
-        citations: true,
-      },
-    });
-    const latestRun = await prisma.aiRun.findUnique({ where: { id: runId }, select: { summary: true } });
-    const preserved = (latestRun?.summary as Record<string, unknown> | null) ?? existingSummary;
-    const summary = buildRunSummaryFromRows({
-      rows: refreshed,
-      crawledPages: crawledPagesFromSnapshot(latestCrawl),
-      pagesScanned: latestCrawl?.pagesScanned ?? 0,
-      scoringStatus: 'completed',
-      scoringProvisional: false,
-      extra: {
-        ...preserved,
-        scoringCompletedAt: new Date().toISOString(),
-      },
-    });
-    await prisma.aiRun.update({
-      where: { id: runId },
-      data: { summary: summary as any },
-    });
-  } catch (err) {
-    const latestRun = await prisma.aiRun.findUnique({ where: { id: runId }, select: { summary: true } });
-    const preserved = (latestRun?.summary as Record<string, unknown> | null) ?? existingSummary;
-    await prisma.aiRun.update({
-      where: { id: runId },
-      data: {
-        summary: {
-          ...preserved,
-          scoringStatus: 'failed',
-          scoringProvisional: true,
-          scoringError: err instanceof Error ? err.message : 'background scoring failed',
-          scoringFailedAt: new Date().toISOString(),
-        } as any,
-      },
-    }).catch(() => undefined);
-    throw err;
-  }
+  kind?: 'audit' | 'refresh' | 'adhoc';
 }
 
 export async function runQueries({
@@ -1075,13 +991,14 @@ export async function runQueries({
   kind = 'audit',
 }: RunOptions): Promise<void> {
   if (!router) {
-    onProgress({ type: 'error', error: 'OPENROUTER_API_KEY not configured.' });
-    return;
+    throw new RunPipelineError('OPENROUTER_API_KEY not configured.', 'OPENROUTER_CLIENT_MISSING', 500, {
+      domainId,
+      host: null,
+    });
   }
 
-  // The only difference between an audit run and a weekly tracked run is which
-  // prompts we load — everything downstream (worker pool, scoring, summary) is
-  // identical.
+  // The only difference between run modes is which prompts we load and
+  // whether we persist a branch fingerprint / refresh lock.
   const promptWhere =
     selection === 'tracked'
       ? { domainId, isTracked: true }
@@ -1092,6 +1009,7 @@ export async function runQueries({
       where: { id: domainId },
       select: {
         host: true,
+        currentAnalysisFingerprint: true,
         inferred: { select: { companyName: true, summary: true } },
         // Pull the user-supplied profile so we can localize the LLM calls
         // to the brand's actual market instead of defaulting to US (the
@@ -1106,7 +1024,20 @@ export async function runQueries({
     }),
     prisma.prompt.findMany({
       where: promptWhere,
-      select: { id: true, text: true },
+      select: {
+        id: true,
+        text: true,
+        intent: true,
+        source: true,
+        keywordId: true,
+        category: true,
+        intentStage: true,
+        persona: true,
+        useCase: true,
+        constraint: true,
+        isBranded: true,
+        competitorMentioned: true,
+      },
     }),
     prisma.competitor.findMany({
       where: { domainId, isSelected: true },
@@ -1151,9 +1082,35 @@ export async function runQueries({
     timezone: null,
   };
   const totalQueries = selectedPrompts.length * ROSTER.length;
-  const crawledPages = crawledPagesFromSnapshot(latestCrawl);
+  const crawledPages = Array.isArray(latestCrawl?.pages)
+    ? (latestCrawl!.pages as Array<{ url?: string; title?: string | null }>).map((p) => ({
+      url: p.url ?? '',
+      title: p.title ?? null,
+    })).filter((p) => p.url)
+    : [];
 
-  const run = await prisma.aiRun.create({ data: { domainId, status: 'running', kind } });
+  const promptSnapshot = buildAnalysisSnapshot(selectedPrompts as AnalysisPromptSnapshotItem[]);
+  const analysisFingerprint = buildAnalysisFingerprint(selectedPrompts as AnalysisPromptSnapshotItem[]);
+  const isRefresh = kind === 'refresh';
+
+  const run = await prisma.aiRun.create({
+    data: {
+      domainId,
+      status: 'running',
+      kind,
+      analysisFingerprint,
+      analysisSnapshot: promptSnapshot as any,
+    },
+  });
+
+  if (selection === 'selected' || isRefresh) {
+    await prisma.domain.update({
+      where: { id: domainId },
+      data: {
+        currentAnalysisFingerprint: analysisFingerprint,
+      },
+    });
+  }
 
   onProgress({
     type: 'progress',
@@ -1199,9 +1156,11 @@ export async function runQueries({
   for (const prompt of selectedPrompts) for (const model of ROSTER) queue.push({ prompt, model });
 
   let completedQueries = 0;
+  let firstFailure: RunPipelineError | null = null;
 
   async function worker() {
     while (queue.length > 0) {
+      if (firstFailure) return;
       const item = queue.shift();
       if (!item) return;
       let response = '';
@@ -1212,13 +1171,21 @@ export async function runQueries({
         response = out.response;
         latencyMs = out.latencyMs;
         costUsd = out.costUsd;
-        if (!response.trim()) {
-          console.warn(`[run:${run.id}] ${item.model.id} returned an empty response for prompt ${item.prompt.id}`);
-        }
       } catch (err) {
-        console.warn(`[run:${run.id}] ${item.model.id} failed for prompt ${item.prompt.id}: ${describeModelError(err)}`);
-        response = '';
+        firstFailure = normalizeRunError(err, {
+          domainId,
+          host: domain!.host,
+          model: item.model.id,
+          promptId: item.prompt.id,
+        });
+        console.error(
+          `[RUN] model call failed domainId=${domainId} host=${domain!.host} promptId=${item.prompt.id} model=${item.model.id} code=${firstFailure.code} status=${firstFailure.status} message=${firstFailure.message}`,
+          firstFailure.details,
+        );
+        return;
       }
+
+      if (firstFailure) return;
       // Heuristic scoring is fast and runs unconditionally — used as the
       // baseline + safety net if the LLM scorer fails or times out.
       const heuristic = scoreResponse({
@@ -1232,12 +1199,12 @@ export async function runQueries({
       // scorer behavior for debugging or one-off quality checks.
       const llm = !DEEP_SCORING_IN_BACKGROUND && response.trim()
         ? await scoreWithRetry({
-            prompt: item.prompt.text,
-            response,
-            brand: { name: brandName, aliases: [], host: domain!.host },
-            competitors: competitorRoster,
-            brandFacts,
-          })
+          prompt: item.prompt.text,
+          response,
+          brand: { name: brandName, aliases: [], host: domain!.host },
+          competitors: competitorRoster,
+          brandFacts,
+        })
         : null;
       const final = finalFromLlmOrHeuristic({ llm, heuristic, competitorRoster });
 
@@ -1343,6 +1310,9 @@ export async function runQueries({
 
   try {
     await Promise.all(Array.from({ length: MAX_PARALLEL }, worker));
+    if (firstFailure) {
+      throw firstFailure;
+    }
 
     const summary = {
       totalQueries,
@@ -1403,7 +1373,7 @@ export async function runQueries({
     });
     // Stamp the prompts we just re-tested so the dashboard can show
     // "last tested" without re-deriving it from run history.
-    if (kind === 'weekly') {
+    if (selection === 'selected' && kind === 'refresh') {
       await prisma.prompt.updateMany({
         where: { id: { in: selectedPrompts.map((p) => p.id) } },
         data: { lastTrackedRunAt: new Date() },
@@ -1416,7 +1386,9 @@ export async function runQueries({
       where: { id: run.id },
       data: { status: 'failed', endedAt: new Date() },
     });
-    onProgress({ type: 'error', error: err instanceof Error ? err.message : 'AI queries failed' });
+    const normalized = normalizeRunError(err, { domainId, host: domain!.host });
+    onProgress({ type: 'error', error: normalized.message });
+    throw normalized;
   }
 }
 
@@ -1429,9 +1401,9 @@ export async function runQueries({
 export async function runTrackedQueries(
   prisma: PrismaClient,
   domainId: number,
-  onProgress: (event: RunProgress) => void = () => {},
+  onProgress: (event: RunProgress) => void = () => { },
 ): Promise<void> {
-  return runQueries({ prisma, domainId, onProgress, selection: 'tracked', kind: 'weekly' });
+  return runQueries({ prisma, domainId, onProgress, selection: 'selected', kind: 'refresh' });
 }
 
 /**
@@ -1575,12 +1547,12 @@ export async function runOnePrompt(
 
       const llm = !DEEP_SCORING_IN_BACKGROUND && response.trim()
         ? await scoreWithRetry({
-            prompt: promptRow.text,
-            response,
-            brand: { name: brandName, aliases: [], host: domain.host },
-            competitors: competitorRoster,
-            brandFacts,
-          })
+          prompt: promptRow.text,
+          response,
+          brand: { name: brandName, aliases: [], host: domain.host },
+          competitors: competitorRoster,
+          brandFacts,
+        })
         : null;
       const final = finalFromLlmOrHeuristic({ llm, heuristic, competitorRoster });
 
