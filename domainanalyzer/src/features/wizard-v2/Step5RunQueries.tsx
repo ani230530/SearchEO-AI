@@ -60,8 +60,9 @@ const MODEL_LABELS: Record<string, string> = {
   'gpt-4o-mini': 'ChatGPT',
   'claude-sonnet-4-5': 'Claude',
   'gemini-2.0-flash': 'Gemini',
+  'google-gre': 'Google AI',
 };
-const MODEL_ORDER = ['gpt-4o-mini', 'claude-sonnet-4-5', 'gemini-2.0-flash'];
+const MODEL_ORDER = ['gpt-4o-mini', 'claude-sonnet-4-5', 'gemini-2.0-flash', 'google-gre'];
 
 /**
  * Memoized cell so we don't re-render the entire 90-cell grid on every SSE
@@ -128,8 +129,8 @@ export function Step5RunQueries({ domainId, onError }: Props) {
         setStatusMatrix(seeded);
         setStatusMsg(
           selected.length === 1
-            ? `Asking ChatGPT, Claude and Gemini your prompt…`
-            : `Asking ChatGPT, Claude and Gemini all ${selected.length} of your prompts…`
+            ? `Asking each AI assistant your prompt…`
+            : `Asking each AI assistant all ${selected.length} of your prompts…`
         );
       })
       .catch((err) => onError(err));
@@ -263,7 +264,7 @@ export function Step5RunQueries({ domainId, onError }: Props) {
       <WizardStatusRow
         message={
           done
-            ? 'All responses scored — taking you to your dashboard…'
+            ? 'All responses collected — taking you to your dashboard…'
             : stalled
               ? 'Still working — some models take longer to answer than others.'
               : statusMsg
@@ -271,7 +272,7 @@ export function Step5RunQueries({ domainId, onError }: Props) {
         done={done}
         subtle={
           totalCells
-            ? `${completedCells} of ${totalCells} model responses scored. You can leave this tab open — we'll redirect to the dashboard the moment everything's in.`
+            ? `${completedCells} of ${totalCells} model responses collected. Deep scoring continues in the background if needed.`
             : undefined
         }
       />

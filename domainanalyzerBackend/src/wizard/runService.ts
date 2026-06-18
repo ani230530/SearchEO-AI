@@ -2,14 +2,15 @@
  * runService — Step 5 of the wizard.
  *
  * Fans each user-selected prompt across multiple LLMs through OpenRouter and
- * scores every response twice:
+ * writes fast deterministic scores immediately:
  *
  *   1. Deterministic — fast regex/keyword extraction (citations, hostname
  *      matches). Used as the immediate fallback if the LLM scorer fails.
- *   2. LLM scorer    — second OpenRouter call with strict JSON schema, returns
- *      alias-aware presence, real sentiment, real relevance, rank position,
- *      factual-claim verdicts, and per-competitor sentiment. When this returns
- *      successfully, its numbers override the heuristic ones.
+ *   2. LLM scorer    — second OpenRouter call with strict JSON schema. By
+ *      default it runs in the background after model answers are collected,
+ *      then overwrites provisional scores with alias-aware presence, real
+ *      sentiment, relevance, rank position, factual-claim verdicts, and
+ *      per-competitor sentiment.
  *
  * Any competitor the scorer surfaces in the response that isn't already in
  * the Competitor table gets auto-added (source: 'mention') so the next Step 3
@@ -19,12 +20,17 @@
 import OpenAI from 'openai';
 import axios from 'axios';
 import type { PrismaClient } from '../../generated/prisma';
-import { scoreResponse as llmScoreResponse } from './scoreService';
+import {
+  scoreResponse as llmScoreResponse,
+  shouldUseLlmScorer,
+  type ScoreInput as LlmScoreInput,
+} from './scoreService';
 import { recordCompetitorMention } from './competitorService';
 import { extractHost } from './urlNormalize';
 
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 const SERPAPI_KEY = process.env.SERP_API_KEY || process.env.SERPAPI_KEY;
+const SERPER_API_KEY = process.env.SERPER_API_KEY || process.env.SERPER_KEY;
 const APP_URL = process.env.OPENROUTER_REFERRER || 'http://localhost:3002';
 const APP_TITLE = 'AI Visibility Wizard';
 
@@ -41,17 +47,18 @@ const router = OPENROUTER_API_KEY
   : null;
 
 const QUERY_TIMEOUT_MS = 60_000;
-// Bounded worker pool over (prompt × model) work. The pool already lets the
-// three models for a single prompt run in parallel — the only effective
-// knob is the pool size. Raised from 4 → 6 because OpenRouter comfortably
-// handles 8 concurrent requests on standard accounts; 6 leaves headroom
-// for the per-result scoring LLM call (gpt-4o-mini) that follows each
-// model response. Net effect: ~33% faster audits without a meaningful
-// rate-limit risk.
+const DEEP_SCORING_IN_BACKGROUND = process.env.DEEP_SCORING_IN_BACKGROUND !== 'false';
+const DEEP_SCORING_PARALLEL = Number(process.env.DEEP_SCORING_PARALLEL ?? 3);
+const DEEP_SCORING_RETRIES = Number(process.env.DEEP_SCORING_RETRIES ?? 2);
+const DEEP_ANSWER_RETRIES = Number(process.env.DEEP_ANSWER_RETRIES ?? 2);
+const deepScoringInFlight = new Set<number>();
+// Bounded worker pool over (prompt × model) work. The pool lets all models for
+// a single prompt run in parallel while leaving headroom for provider variance,
+// retries, and the background scorer.
 const MAX_PARALLEL = 6;
 
 /**
- * The roster — three frontier models routed via OpenRouter, configured to
+ * The roster — the models we audit against, configured to
  * mirror what real users see in the consumer chat products as closely as
  * possible. The single biggest accuracy lever is whether the model can
  * actually browse the web (Seer / Ahrefs / Search Engine Land research) —
@@ -107,14 +114,13 @@ const ROSTER: ReadonlyArray<ModelDef> = [
   },
   {
     id: 'gemini-2.0-flash',
-    // `:online` wraps the model in OpenRouter's Exa-backed web search.
-    // Best parity available — OpenRouter can't passthrough Google's native
-    // google_search grounding tool. For true Gemini grounding we'd need to
-    // call Vertex/AI Studio direct (future work).
-    openrouterModel: 'google/gemini-2.0-flash-001:online',
+    // Keep the persisted id stable for existing UI/report data, but route to
+    // a live OpenRouter Gemini endpoint. The old 2.0 Flash slug now returns
+    // 404, which was silently creating blank Gemini rows.
+    openrouterModel: 'google/gemini-2.5-flash:online',
     webSearchMode: 'online_shim',
     productName: 'Gemini',
-    knowledgeCutoff: 'early 2025',
+    knowledgeCutoff: 'June 2025',
     maker: 'Google',
   },
   {
@@ -132,6 +138,50 @@ function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
     p,
     new Promise<T>((_, reject) => setTimeout(() => reject(new Error(`Timeout after ${ms}ms`)), ms)),
   ]);
+}
+
+function describeModelError(err: unknown): string {
+  if (axios.isAxiosError(err)) {
+    const status = err.response?.status;
+    const data = err.response?.data;
+    const detail =
+      typeof data === 'string'
+        ? data
+        : typeof data?.error === 'string'
+          ? data.error
+          : typeof data?.message === 'string'
+            ? data.message
+            : err.message;
+    return `${status ? `${status} ` : ''}${String(detail).slice(0, 240)}`;
+  }
+  return err instanceof Error ? err.message.slice(0, 240) : String(err).slice(0, 240);
+}
+
+function searchResultText(data: any): string {
+  const lines: string[] = [];
+  const push = (value: unknown) => {
+    const text = String(value ?? '').replace(/\s+/g, ' ').trim();
+    if (text && !lines.includes(text)) lines.push(text);
+  };
+
+  if (typeof data?.ai_overview?.text === 'string') push(data.ai_overview.text);
+  if (Array.isArray(data?.ai_overview?.text_blocks)) {
+    for (const block of data.ai_overview.text_blocks) {
+      push(block?.snippet);
+      push(block?.text);
+    }
+  }
+  push(data?.answer_box?.answer);
+  push(data?.answer_box?.snippet);
+  push(data?.knowledge_graph?.description);
+
+  for (const item of (data?.organic_results ?? data?.organic ?? []).slice(0, 5)) {
+    const title = item?.title;
+    const snippet = item?.snippet;
+    if (title || snippet) push([title, snippet].filter(Boolean).join(': '));
+  }
+
+  return lines.slice(0, 6).join('\n\n').slice(0, 2400);
 }
 
 interface CallOutcome {
@@ -286,31 +336,38 @@ async function callModel(model: ModelDef, promptText: string, loc: UserLocation)
   const startedAt = Date.now();
 
   if (model.webSearchMode === 'serpapi_sge') {
-    if (!SERPAPI_KEY) throw new Error('SERP_API_KEY not configured for Google AI Overview');
     const iso = isoCountry(loc.country);
-    const locationParam = iso ? COUNTRY_TO_ISO[iso.toLowerCase()] || iso : undefined;
-    
-    const res = await axios.get('https://serpapi.com/search', {
-      params: {
-        api_key: SERPAPI_KEY,
-        engine: 'google',
-        q: promptText,
-        gl: iso?.toLowerCase() || 'us',
-        hl: 'en',
-      },
-      timeout: QUERY_TIMEOUT_MS,
-    });
+    let responseText = '';
+    if (SERPAPI_KEY) {
+      const res = await axios.get('https://serpapi.com/search', {
+        params: {
+          api_key: SERPAPI_KEY,
+          engine: 'google',
+          q: promptText,
+          gl: iso?.toLowerCase() || 'us',
+          hl: 'en',
+        },
+        timeout: QUERY_TIMEOUT_MS,
+      });
+      responseText = searchResultText(res.data);
+    } else if (SERPER_API_KEY) {
+      const res = await axios.post(
+        'https://google.serper.dev/search',
+        { q: promptText, gl: iso?.toLowerCase() || 'us', hl: 'en', num: 6 },
+        {
+          headers: { 'X-API-KEY': SERPER_API_KEY, 'Content-Type': 'application/json' },
+          timeout: QUERY_TIMEOUT_MS,
+        }
+      );
+      responseText = searchResultText(res.data);
+    } else {
+      throw new Error('SERP_API_KEY or SERPER_API_KEY not configured for Google AI Overview');
+    }
 
-    const aiOverview = res.data?.ai_overview?.text ?? '';
-    const organic = res.data?.organic_results?.[0]?.snippet ?? '';
-    
-    // Fallback to organic snippet if AI overview is not present
-    const responseText = aiOverview || organic;
-    
     return {
       response: responseText,
       latencyMs: Date.now() - startedAt,
-      costUsd: 0.005, // Approximation of SerpAPI per-request cost
+      costUsd: SERPAPI_KEY ? 0.005 : 0.001,
     };
   }
 
@@ -537,6 +594,226 @@ function resolveHostFromRoster(
   return null;
 }
 
+type FinalScore = {
+  presence: number;
+  relevance: number;
+  sentiment: number | null;
+  accuracy: number | null;
+  overall: number;
+  rankPosition: number | null;
+  summary: string;
+  citations: Array<{ url: string | null; title: string | null; host: string | null; type: 'direct' | 'indirect' }>;
+  competitorMentions: Array<{
+    host: string;
+    name?: string | null;
+    count: number;
+    sentiment: number | null;
+    rankPosition: number | null;
+  }>;
+  factualClaims: Array<{ claim: string; verdict: 'true' | 'false' | 'uncertain' }>;
+};
+
+function finalFromLlmOrHeuristic(args: {
+  llm: Awaited<ReturnType<typeof llmScoreResponse>>;
+  heuristic: ScoreOutput;
+  competitorRoster: Array<{ name: string | null; host: string }>;
+}): FinalScore {
+  const { llm, heuristic, competitorRoster } = args;
+  if (llm) {
+    return {
+      presence: llm.presence,
+      relevance: Math.round(llm.relevance),
+      sentiment: llm.sentiment === null ? null : Math.round(llm.sentiment),
+      accuracy: llm.accuracy,
+      overall: Number(llm.overall.toFixed(2)),
+      rankPosition: llm.rankPosition,
+      summary: llm.summary,
+      citations: mergeCitations(llm.citationsClassified, heuristic.citations),
+      competitorMentions: llm.competitorMentions.map((c) => ({
+        host: c.host ?? resolveHostFromRoster(c.name, competitorRoster) ?? '',
+        name: c.name,
+        count: c.mentionCount,
+        sentiment: c.sentiment,
+        rankPosition: c.rankPosition,
+      })).filter((c) => c.host || c.name),
+      factualClaims: llm.factualClaims,
+    };
+  }
+
+  return {
+    presence: heuristic.presence,
+    relevance: heuristic.relevance,
+    sentiment: heuristic.presence === 1 ? heuristic.sentiment : null,
+    accuracy: null,
+    overall: heuristic.presence === 1 ? heuristic.overall : 0,
+    rankPosition: null,
+    summary: '',
+    citations: heuristic.citations.map((c) => ({ ...c, type: 'direct' as const })),
+    competitorMentions: heuristic.competitorMentions.map((m) => ({
+      ...m,
+      name: m.host,
+      rankPosition: null,
+    })),
+    factualClaims: [],
+  };
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function scoreWithRetry(input: LlmScoreInput): Promise<Awaited<ReturnType<typeof llmScoreResponse>>> {
+  if (!shouldUseLlmScorer(input)) return null;
+  const attempts = Math.max(1, DEEP_SCORING_RETRIES);
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    const scored = await llmScoreResponse(input).catch(() => null);
+    if (scored) return scored;
+    if (attempt < attempts - 1) await sleep(350 * (attempt + 1));
+  }
+  return null;
+}
+
+async function callModelWithRetry(model: ModelDef, promptText: string, loc: UserLocation): Promise<CallOutcome> {
+  const attempts = Math.max(1, DEEP_ANSWER_RETRIES);
+  let lastErr: unknown = null;
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try {
+      return await callModel(model, promptText, loc);
+    } catch (err) {
+      lastErr = err;
+      if (attempt < attempts - 1) await sleep(500 * (attempt + 1));
+    }
+  }
+  throw lastErr instanceof Error ? lastErr : new Error('Model call failed');
+}
+
+function crawledPagesFromSnapshot(latestCrawl: { pages: unknown; pagesScanned?: number | null } | null | undefined) {
+  return Array.isArray(latestCrawl?.pages)
+    ? (latestCrawl!.pages as Array<{ url?: string; title?: string | null }>).map((p) => ({
+        url: p.url ?? '',
+        title: p.title ?? null,
+      })).filter((p) => p.url)
+    : [];
+}
+
+function buildRunSummaryFromRows(args: {
+  rows: Array<{
+    model: string;
+    presence: number;
+    relevance: number;
+    sentiment: number | null;
+    overall: number;
+    competitorMentions: unknown;
+    citations: unknown;
+  }>;
+  crawledPages: Array<{ url: string; title: string | null }>;
+  pagesScanned: number;
+  scoringStatus: 'queued' | 'enriching' | 'completed' | 'failed';
+  scoringProvisional: boolean;
+  extra?: Record<string, unknown>;
+}): Record<string, unknown> {
+  const totalQueries = args.rows.length;
+  const summaryAccum = { presence: 0, relevance: 0, sentiment: 0, sentimentCount: 0, overall: 0 };
+  const perModel: Record<string, { count: number; presence: number; overall: number; sentiment: number; sentimentCount: number }> = {};
+  for (const m of ROSTER) perModel[m.id] = { count: 0, presence: 0, overall: 0, sentiment: 0, sentimentCount: 0 };
+  const competitorRollup: Record<string, { mentions: number; sentimentSum: number; sentimentCount: number }> = {};
+  const citationRollup: Record<string, { count: number; titles: string[] }> = {};
+
+  for (const row of args.rows) {
+    summaryAccum.presence += row.presence;
+    summaryAccum.relevance += row.relevance;
+    summaryAccum.overall += row.overall;
+    if (row.sentiment !== null) {
+      summaryAccum.sentiment += row.sentiment;
+      summaryAccum.sentimentCount += 1;
+    }
+
+    const pm = perModel[row.model] ?? { count: 0, presence: 0, overall: 0, sentiment: 0, sentimentCount: 0 };
+    pm.count += 1;
+    pm.presence += row.presence;
+    pm.overall += row.overall;
+    if (row.sentiment !== null) {
+      pm.sentiment += row.sentiment;
+      pm.sentimentCount += 1;
+    }
+    perModel[row.model] = pm;
+
+    const mentions = Array.isArray(row.competitorMentions)
+      ? (row.competitorMentions as Array<{ host?: string; count?: number; sentiment?: number | null }>)
+      : [];
+    for (const mention of mentions) {
+      const host = mention.host?.toLowerCase();
+      if (!host) continue;
+      const r = competitorRollup[host] ?? { mentions: 0, sentimentSum: 0, sentimentCount: 0 };
+      r.mentions += typeof mention.count === 'number' && mention.count > 0 ? mention.count : 1;
+      if (typeof mention.sentiment === 'number') {
+        r.sentimentSum += mention.sentiment;
+        r.sentimentCount += 1;
+      }
+      competitorRollup[host] = r;
+    }
+
+    const citations = Array.isArray(row.citations)
+      ? (row.citations as Array<{ host?: string | null; title?: string | null }>)
+      : [];
+    for (const citation of citations) {
+      const host = citation.host?.toLowerCase();
+      if (!host) continue;
+      if (!citationRollup[host]) citationRollup[host] = { count: 0, titles: [] };
+      citationRollup[host].count += 1;
+      if (citation.title && citationRollup[host].titles.length < 3) citationRollup[host].titles.push(citation.title);
+    }
+  }
+
+  return {
+    ...(args.extra ?? {}),
+    totalQueries,
+    models: ROSTER.map((r) => r.id),
+    presenceRate: totalQueries > 0 ? Number((summaryAccum.presence / totalQueries).toFixed(3)) : 0,
+    avgRelevance: totalQueries > 0 ? Number((summaryAccum.relevance / totalQueries).toFixed(2)) : 0,
+    avgSentiment:
+      summaryAccum.sentimentCount > 0
+        ? Number((summaryAccum.sentiment / summaryAccum.sentimentCount).toFixed(2))
+        : null,
+    sentimentSampleSize: summaryAccum.sentimentCount,
+    avgOverall: totalQueries > 0 ? Number((summaryAccum.overall / totalQueries).toFixed(2)) : 0,
+    perModel: Object.fromEntries(
+      Object.entries(perModel).map(([model, m]) => [
+        model,
+        {
+          queries: m.count,
+          presenceRate: Number((m.presence / Math.max(1, m.count)).toFixed(3)),
+          avgOverall: Number((m.overall / Math.max(1, m.count)).toFixed(2)),
+          avgSentiment:
+            m.sentimentCount > 0
+              ? Number((m.sentiment / m.sentimentCount).toFixed(2))
+              : null,
+          sentimentSampleSize: m.sentimentCount,
+        },
+      ])
+    ),
+    competitors: Object.entries(competitorRollup)
+      .filter(([, v]) => v.mentions > 0)
+      .map(([host, v]) => ({
+        host,
+        mentions: v.mentions,
+        avgSentiment: v.sentimentCount > 0 ? Number((v.sentimentSum / v.sentimentCount).toFixed(2)) : null,
+        shareOfVoice: totalQueries > 0 ? Number((v.mentions / totalQueries).toFixed(3)) : 0,
+      }))
+      .sort((a, b) => b.mentions - a.mentions),
+    topCitedDomains: Object.entries(citationRollup)
+      .map(([host, v]) => ({ host, count: v.count, sampleTitles: v.titles }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10),
+    crawled: {
+      pagesScanned: args.pagesScanned,
+      pages: args.crawledPages.slice(0, 20),
+    },
+    scoringStatus: args.scoringStatus,
+    scoringProvisional: args.scoringProvisional,
+  };
+}
+
 // ── Public API ─────────────────────────────────────────────────────────────
 
 export interface RunProgress {
@@ -574,6 +851,220 @@ export interface RunOptions {
    * distinct prevents weekly runs from polluting the audit trend/runs charts.
    */
   kind?: 'audit' | 'weekly';
+}
+
+export function queueDeepScoringForRun(args: {
+  prisma: PrismaClient;
+  domainId: number;
+  runId: number;
+}): void {
+  if (!DEEP_SCORING_IN_BACKGROUND) return;
+  if (deepScoringInFlight.has(args.runId)) return;
+  deepScoringInFlight.add(args.runId);
+  setTimeout(() => {
+    runDeepScoringForRun(args)
+      .catch((err) => console.warn(`[run:${args.runId}] background scoring failed`, err))
+      .finally(() => deepScoringInFlight.delete(args.runId));
+  }, 0);
+}
+
+export async function runDeepScoringForRun(args: {
+  prisma: PrismaClient;
+  domainId: number;
+  runId: number;
+}): Promise<void> {
+  const { prisma, domainId, runId } = args;
+
+  const [run, domain, latestCrawl, selectedCompetitors, rows] = await Promise.all([
+    prisma.aiRun.findFirst({
+      where: { id: runId, domainId },
+      select: { id: true, summary: true },
+    }),
+    prisma.domain.findUnique({
+      where: { id: domainId },
+      select: {
+        host: true,
+        inferred: { select: { companyName: true, summary: true } },
+        profile: { select: { country: true, state: true, targetLocation: true } },
+      },
+    }),
+    prisma.crawlSnapshot.findFirst({
+      where: { domainId },
+      orderBy: { createdAt: 'desc' },
+      select: { pages: true, pagesScanned: true, rawText: true },
+    }),
+    prisma.competitor.findMany({
+      where: { domainId, isSelected: true },
+      select: { competitorHost: true, rawSignals: true },
+    }),
+    prisma.aiQueryResult.findMany({
+      where: { runId },
+      select: {
+        id: true,
+        promptId: true,
+        model: true,
+        response: true,
+        prompt: { select: { text: true } },
+      },
+    }),
+  ]);
+
+  if (!run || !domain || rows.length === 0) return;
+  const domainRow = domain;
+
+  const existingSummary = (run.summary as Record<string, unknown> | null) ?? {};
+  await prisma.aiRun.update({
+    where: { id: runId },
+    data: {
+      summary: {
+        ...existingSummary,
+        scoringStatus: 'enriching',
+        scoringProvisional: true,
+        scoringStartedAt: new Date().toISOString(),
+      } as any,
+    },
+  }).catch(() => undefined);
+
+  const competitorHosts = selectedCompetitors.map((c) => c.competitorHost);
+  const competitorRoster = selectedCompetitors.map((c) => ({
+    host: c.competitorHost,
+    name:
+      typeof (c.rawSignals as Record<string, unknown> | null)?.llmName === 'string'
+        ? ((c.rawSignals as Record<string, unknown>).llmName as string)
+        : null,
+  }));
+  const brandName = domainRow.inferred?.companyName ?? null;
+  const brandFacts = domainRow.inferred?.summary ?? latestCrawl?.rawText?.slice(0, 1500) ?? '';
+  const userLocation: UserLocation = {
+    country: domainRow.profile?.country ?? null,
+    state: domainRow.profile?.state ?? null,
+    city: domainRow.profile?.targetLocation ?? null,
+    timezone: null,
+  };
+
+  let cursor = 0;
+  async function worker() {
+    while (cursor < rows.length) {
+      const row = rows[cursor++];
+      const model = ROSTER.find((item) => item.id === row.model);
+      let response = row.response ?? '';
+      let latencyMs: number | null = null;
+      let costUsd: number | null = null;
+
+      if (!response.trim() && model) {
+        try {
+          const retried = await callModelWithRetry(model, row.prompt.text, userLocation);
+          response = retried.response;
+          latencyMs = retried.latencyMs;
+          costUsd = retried.costUsd;
+          if (!response.trim()) {
+            console.warn(`[run:${runId}] ${model.id} returned an empty response during background retry for prompt ${row.promptId}`);
+          }
+        } catch (err) {
+          console.warn(`[run:${runId}] ${model.id} background retry failed for prompt ${row.promptId}: ${describeModelError(err)}`);
+          response = '';
+        }
+      }
+
+      const heuristic = scoreResponse({
+        ownDomainHost: domainRow.host,
+        competitorHosts,
+        modelResponse: response,
+      });
+
+      const scoreInput: LlmScoreInput = {
+        prompt: row.prompt.text,
+        response,
+        brand: { name: brandName, aliases: [], host: domainRow.host },
+        competitors: competitorRoster,
+        brandFacts,
+      };
+      const llm = response.trim() ? await scoreWithRetry(scoreInput) : null;
+      const final = finalFromLlmOrHeuristic({ llm, heuristic, competitorRoster });
+
+      if (llm) {
+        for (const mention of llm.competitorMentions) {
+          const host = mention.host ?? resolveHostFromRoster(mention.name, competitorRoster);
+          if (!host || host === domainRow.host || competitorHosts.includes(host)) continue;
+          await recordCompetitorMention(prisma, domainId, {
+            host,
+            name: mention.name,
+            sentiment: mention.sentiment ?? 0,
+          }).catch(() => undefined);
+        }
+      }
+
+      const competitorHostsForRow = Array.from(new Set(final.competitorMentions.map((m) => m.host).filter(Boolean)));
+      await prisma.aiQueryResult.update({
+        where: { id: row.id },
+        data: {
+          response,
+          presence: final.presence,
+          relevance: final.relevance,
+          sentiment: final.sentiment,
+          accuracy: final.accuracy,
+          rankPosition: final.rankPosition,
+          overall: final.overall,
+          scorerSummary: final.summary || null,
+          factualClaims: final.factualClaims as any,
+          competitorHosts: competitorHostsForRow as any,
+          citations: final.citations as any,
+          competitorMentions: final.competitorMentions as any,
+          ...(latencyMs !== null ? { latencyMs } : {}),
+          ...(costUsd !== null ? { costUsd } : {}),
+        },
+      });
+    }
+  }
+
+  try {
+    await Promise.all(Array.from({ length: Math.max(1, DEEP_SCORING_PARALLEL) }, worker));
+    const refreshed = await prisma.aiQueryResult.findMany({
+      where: { runId },
+      select: {
+        model: true,
+        presence: true,
+        relevance: true,
+        sentiment: true,
+        overall: true,
+        competitorMentions: true,
+        citations: true,
+      },
+    });
+    const latestRun = await prisma.aiRun.findUnique({ where: { id: runId }, select: { summary: true } });
+    const preserved = (latestRun?.summary as Record<string, unknown> | null) ?? existingSummary;
+    const summary = buildRunSummaryFromRows({
+      rows: refreshed,
+      crawledPages: crawledPagesFromSnapshot(latestCrawl),
+      pagesScanned: latestCrawl?.pagesScanned ?? 0,
+      scoringStatus: 'completed',
+      scoringProvisional: false,
+      extra: {
+        ...preserved,
+        scoringCompletedAt: new Date().toISOString(),
+      },
+    });
+    await prisma.aiRun.update({
+      where: { id: runId },
+      data: { summary: summary as any },
+    });
+  } catch (err) {
+    const latestRun = await prisma.aiRun.findUnique({ where: { id: runId }, select: { summary: true } });
+    const preserved = (latestRun?.summary as Record<string, unknown> | null) ?? existingSummary;
+    await prisma.aiRun.update({
+      where: { id: runId },
+      data: {
+        summary: {
+          ...preserved,
+          scoringStatus: 'failed',
+          scoringProvisional: true,
+          scoringError: err instanceof Error ? err.message : 'background scoring failed',
+          scoringFailedAt: new Date().toISOString(),
+        } as any,
+      },
+    }).catch(() => undefined);
+    throw err;
+  }
 }
 
 export async function runQueries({
@@ -660,12 +1151,7 @@ export async function runQueries({
     timezone: null,
   };
   const totalQueries = selectedPrompts.length * ROSTER.length;
-  const crawledPages = Array.isArray(latestCrawl?.pages)
-    ? (latestCrawl!.pages as Array<{ url?: string; title?: string | null }>).map((p) => ({
-        url: p.url ?? '',
-        title: p.title ?? null,
-      })).filter((p) => p.url)
-    : [];
+  const crawledPages = crawledPagesFromSnapshot(latestCrawl);
 
   const run = await prisma.aiRun.create({ data: { domainId, status: 'running', kind } });
 
@@ -726,7 +1212,11 @@ export async function runQueries({
         response = out.response;
         latencyMs = out.latencyMs;
         costUsd = out.costUsd;
-      } catch {
+        if (!response.trim()) {
+          console.warn(`[run:${run.id}] ${item.model.id} returned an empty response for prompt ${item.prompt.id}`);
+        }
+      } catch (err) {
+        console.warn(`[run:${run.id}] ${item.model.id} failed for prompt ${item.prompt.id}: ${describeModelError(err)}`);
         response = '';
       }
       // Heuristic scoring is fast and runs unconditionally — used as the
@@ -737,62 +1227,19 @@ export async function runQueries({
         modelResponse: response,
       });
 
-      // Accurate LLM scorer — costs ~$0.0001/call, returns alias-aware presence,
-      // real sentiment, real relevance, rank position, factual claims.
-      let llm = response.trim()
-        ? await llmScoreResponse({
+      // Foreground runs stay fast: write heuristic/provisional scores now.
+      // Set DEEP_SCORING_IN_BACKGROUND=false to restore the old fully-inline
+      // scorer behavior for debugging or one-off quality checks.
+      const llm = !DEEP_SCORING_IN_BACKGROUND && response.trim()
+        ? await scoreWithRetry({
             prompt: item.prompt.text,
             response,
             brand: { name: brandName, aliases: [], host: domain!.host },
             competitors: competitorRoster,
             brandFacts,
-          }).catch(() => null)
+          })
         : null;
-
-      // Final values written to AiQueryResult. LLM scorer wins; heuristic
-      // is the fallback. Honest semantics throughout — null = "not measurable
-      // because the brand wasn't in the response."
-      const final = llm
-        ? {
-            presence: llm.presence,
-            // Relevance always meaningful — measures answer quality, not visibility.
-            relevance: Math.round(llm.relevance),
-            // Sentiment / accuracy are NULL when presence=0 (enforced by scorer
-            // and re-checked here). The dashboard shows "Not mentioned"
-            // instead of fabricating Neutral/Negative/etc.
-            sentiment: llm.sentiment === null ? null : Math.round(llm.sentiment),
-            accuracy: llm.accuracy,
-            overall: Number(llm.overall.toFixed(2)),
-            rankPosition: llm.rankPosition,
-            summary: llm.summary,
-            citations: mergeCitations(llm.citationsClassified, heuristic.citations),
-            competitorMentions: llm.competitorMentions.map((c) => ({
-              host: c.host ?? resolveHostFromRoster(c.name, competitorRoster) ?? '',
-              name: c.name,
-              count: c.mentionCount,
-              sentiment: c.sentiment,
-              rankPosition: c.rankPosition,
-            })).filter((c) => c.host || c.name),
-            factualClaims: llm.factualClaims,
-          }
-        : {
-            // Heuristic fallback — same null semantics so the rest of the
-            // pipeline doesn't have to special-case the source.
-            presence: heuristic.presence,
-            relevance: heuristic.relevance,
-            sentiment: heuristic.presence === 1 ? heuristic.sentiment : null,
-            accuracy: null,
-            overall: heuristic.presence === 1 ? heuristic.overall : 0,
-            rankPosition: null,
-            summary: '',
-            citations: heuristic.citations.map((c) => ({ ...c, type: 'direct' as const })),
-            competitorMentions: heuristic.competitorMentions.map((m) => ({
-              ...m,
-              name: m.host,
-              rankPosition: null,
-            })),
-            factualClaims: [] as Array<{ claim: string; verdict: 'true' | 'false' | 'uncertain' }>,
-          };
+      const final = finalFromLlmOrHeuristic({ llm, heuristic, competitorRoster });
 
       // Auto-add any LLM-discovered competitor that isn't already tracked
       // for this domain — closes the AI-mention feedback loop.
@@ -946,6 +1393,9 @@ export async function runQueries({
         pagesScanned: latestCrawl?.pagesScanned ?? 0,
         pages: crawledPages.slice(0, 20),
       },
+      scoringStatus: DEEP_SCORING_IN_BACKGROUND ? 'queued' : 'completed',
+      scoringProvisional: DEEP_SCORING_IN_BACKGROUND,
+      scoringQueuedAt: DEEP_SCORING_IN_BACKGROUND ? new Date().toISOString() : null,
     };
     await prisma.aiRun.update({
       where: { id: run.id },
@@ -959,6 +1409,7 @@ export async function runQueries({
         data: { lastTrackedRunAt: new Date() },
       });
     }
+    queueDeepScoringForRun({ prisma, domainId, runId: run.id });
     onProgress({ type: 'complete', runId: run.id, summary });
   } catch (err) {
     await prisma.aiRun.update({
@@ -986,10 +1437,10 @@ export async function runTrackedQueries(
 /**
  * runOnePrompt — single-prompt variant of runQueries.
  *
- * Fans ONE prompt across the ROSTER, scores each response with the same
- * heuristic + LLM scorer pipeline, persists AiQueryResult rows under a
- * fresh AiRun, and returns the new run's id + the persisted results so
- * the caller can shape them into a PromptTableRow.
+ * Fans ONE prompt across the ROSTER, persists fast provisional AiQueryResult
+ * rows under a fresh AiRun, and returns the new run's id + persisted results
+ * so the caller can shape them into a PromptTableRow. The deeper scorer is
+ * queued in the background just like the full wizard run.
  *
  * Used by POST /api/wizard/domain/:id/prompts/analyze — the "Analyze
  * Prompt" button on the AI Checker dashboard. The dashboard never wants
@@ -1088,7 +1539,7 @@ export async function runOnePrompt(
   // costs nothing while keeping the aggregate dashboards honest.
   const run = await prisma.aiRun.create({ data: { domainId, status: 'running', kind: 'adhoc' } });
 
-  // Run each model in parallel — bounded by ROSTER size (currently 3), so
+  // Run each model in parallel — bounded by ROSTER size, so
   // we don't bother with the worker-queue concurrency control runQueries
   // uses for tens of prompts.
   let summaryPresence = 0;
@@ -1108,7 +1559,11 @@ export async function runOnePrompt(
         response = out.response;
         latencyMs = out.latencyMs;
         costUsd = out.costUsd;
-      } catch {
+        if (!response.trim()) {
+          console.warn(`[run:${run.id}] ${model.id} returned an empty response for ad-hoc prompt ${promptRow.id}`);
+        }
+      } catch (err) {
+        console.warn(`[run:${run.id}] ${model.id} failed for ad-hoc prompt ${promptRow.id}: ${describeModelError(err)}`);
         response = '';
       }
 
@@ -1118,51 +1573,16 @@ export async function runOnePrompt(
         modelResponse: response,
       });
 
-      const llm = response.trim()
-        ? await llmScoreResponse({
+      const llm = !DEEP_SCORING_IN_BACKGROUND && response.trim()
+        ? await scoreWithRetry({
             prompt: promptRow.text,
             response,
             brand: { name: brandName, aliases: [], host: domain.host },
             competitors: competitorRoster,
             brandFacts,
-          }).catch(() => null)
+          })
         : null;
-
-      const final = llm
-        ? {
-            presence: llm.presence,
-            relevance: Math.round(llm.relevance),
-            sentiment: llm.sentiment === null ? null : Math.round(llm.sentiment),
-            accuracy: llm.accuracy,
-            overall: Number(llm.overall.toFixed(2)),
-            rankPosition: llm.rankPosition,
-            summary: llm.summary,
-            citations: mergeCitations(llm.citationsClassified, heuristic.citations),
-            competitorMentions: llm.competitorMentions.map((c) => ({
-              host: c.host ?? resolveHostFromRoster(c.name, competitorRoster) ?? '',
-              name: c.name,
-              count: c.mentionCount,
-              sentiment: c.sentiment,
-              rankPosition: c.rankPosition,
-            })).filter((c) => c.host || c.name),
-            factualClaims: llm.factualClaims,
-          }
-        : {
-            presence: heuristic.presence,
-            relevance: heuristic.relevance,
-            sentiment: heuristic.presence === 1 ? heuristic.sentiment : null,
-            accuracy: null,
-            overall: heuristic.presence === 1 ? heuristic.overall : 0,
-            rankPosition: null,
-            summary: '',
-            citations: heuristic.citations.map((c) => ({ ...c, type: 'direct' as const })),
-            competitorMentions: heuristic.competitorMentions.map((m) => ({
-              ...m,
-              name: m.host,
-              rankPosition: null,
-            })),
-            factualClaims: [] as Array<{ claim: string; verdict: 'true' | 'false' | 'uncertain' }>,
-          };
+      const final = finalFromLlmOrHeuristic({ llm, heuristic, competitorRoster });
 
       const competitorHostsForRow = Array.from(
         new Set(final.competitorMentions.map((m) => m.host).filter(Boolean))
@@ -1229,11 +1649,15 @@ export async function runOnePrompt(
       sentimentSampleSize: sentimentSamples.length,
       totalLatencyMs: totalLatency,
       singlePromptAnalysis: true, // discriminator for ops queries
+      scoringStatus: DEEP_SCORING_IN_BACKGROUND ? 'queued' : 'completed',
+      scoringProvisional: DEEP_SCORING_IN_BACKGROUND,
+      scoringQueuedAt: DEEP_SCORING_IN_BACKGROUND ? new Date().toISOString() : null,
     };
     await prisma.aiRun.update({
       where: { id: run.id },
       data: { status: 'completed', endedAt: new Date(), summary: summary as any },
     });
+    queueDeepScoringForRun({ prisma, domainId, runId: run.id });
   } catch (err) {
     await prisma.aiRun
       .update({

@@ -29,8 +29,9 @@ const router = OPENROUTER_API_KEY
     })
   : null;
 
-const SCORER_MODEL = 'openai/gpt-4o-mini';
-const SCORER_TIMEOUT_MS = 45_000;
+const SCORER_MODEL = process.env.SCORER_MODEL || 'openai/gpt-4o-mini';
+const SCORER_TIMEOUT_MS = Number(process.env.SCORER_TIMEOUT_MS ?? 15_000);
+const FAST_SCORER_ENABLED = process.env.FAST_SCORER_ENABLED !== 'false';
 
 export interface ScoreInput {
   prompt: string;
@@ -98,6 +99,56 @@ export interface ScoreOutput {
   factualClaims: Array<{ claim: string; verdict: 'true' | 'false' | 'uncertain' }>;
 }
 
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function normalizeTerm(value: string | null | undefined): string {
+  return String(value ?? '')
+    .replace(/^https?:\/\//i, '')
+    .replace(/^www\./i, '')
+    .replace(/\/.*$/, '')
+    .trim()
+    .toLowerCase();
+}
+
+function compactText(value: string | null | undefined): string {
+  return String(value ?? '').replace(/\s+/g, ' ').trim();
+}
+
+function textHasTerm(text: string, term: string): boolean {
+  const cleaned = normalizeTerm(term);
+  if (cleaned.length < 3) return false;
+  if (cleaned.includes('.')) return text.includes(cleaned);
+  return new RegExp(`\\b${escapeRegExp(cleaned)}\\b`, 'i').test(text);
+}
+
+function likelyNeedsSemanticScoring(text: string): boolean {
+  return (
+    /\b(vs|versus|compare|comparison|alternative|alternatives|competitor|competitors|rank|ranking|top|best|leading|recommend|recommended)\b/i.test(text) ||
+    /(?:^|\n)\s*(?:\d+[\).]|[-*])\s+\S+/.test(text)
+  );
+}
+
+export function shouldUseLlmScorer(input: ScoreInput): boolean {
+  if (!FAST_SCORER_ENABLED) return true;
+  const response = input.response.trim();
+  if (!response) return false;
+  const lower = response.toLowerCase();
+
+  const brandTerms = [input.brand.host, input.brand.name, ...input.brand.aliases]
+    .map(compactText)
+    .filter(Boolean);
+  if (brandTerms.some((term) => textHasTerm(lower, term))) return true;
+
+  const competitorTerms = input.competitors.flatMap((competitor) => [competitor.host, competitor.name])
+    .map(compactText)
+    .filter(Boolean);
+  if (competitorTerms.some((term) => textHasTerm(lower, term))) return true;
+
+  return likelyNeedsSemanticScoring(response);
+}
+
 /**
  * Score one response. If OPENROUTER_API_KEY is missing or the call fails,
  * returns null and the caller should fall back to the heuristic scorer.
@@ -105,6 +156,7 @@ export interface ScoreOutput {
 export async function scoreResponse(input: ScoreInput): Promise<ScoreOutput | null> {
   if (!router) return null;
   if (!input.response.trim()) return null;
+  if (!shouldUseLlmScorer(input)) return null;
 
   const competitorBlock = input.competitors.length
     ? input.competitors.map((c) => `  - ${c.name ?? c.host} (${c.host})`).join('\n')
@@ -121,25 +173,25 @@ export async function scoreResponse(input: ScoreInput): Promise<ScoreOutput | nu
     `## Known competitors (use both name and host to detect mentions; flag any new ones the response brings up)`,
     competitorBlock,
     '',
-    `## Brand facts (from the brand's own website — judge factual accuracy of any claim against these)`,
-    input.brandFacts ? input.brandFacts.slice(0, 1500) : '(no crawl context available)',
+    `## Brand facts`,
+    input.brandFacts ? input.brandFacts.slice(0, 700) : '(none)',
     '',
     `## User asked the AI`,
     input.prompt,
     '',
     `## AI's response`,
-    input.response.slice(0, 4000),
+    input.response.slice(0, 2600),
     '',
     `## Your task`,
-    `Score this response strictly. Hard rules:`,
+    `Score strictly. Hard rules:`,
     `- presence=1 ONLY if the brand is explicitly named (by name, alias, or domain). Never inferred.`,
-    `- relevance: how well did the response answer the user's question? Independent of presence — a great answer that ignores the brand can still score 10.`,
-    `- sentiment: ONLY meaningful if presence=1. If presence=0, return null. Respect negation ("not great" = negative), sarcasm, qualified praise.`,
-    `- accuracy: ONLY meaningful if presence=1. If presence=0, return null. Cross-check claims about the brand against the brand facts above.`,
-    `- overall: ONLY non-zero if presence=1. If presence=0, overall MUST be 0 — no AI visibility for this query.`,
-    `- rankPosition: if brands are listed in order ("1. Stripe 2. Adyen ..."), record the brand's exact 1-based position. null if no list or brand not in list.`,
-    `- For each competitor mentioned, give sentiment toward THAT competitor (not the user's brand). null competitor sentiment if the response only names them without commentary.`,
-    `- factualClaims: only list claims about the user's brand. Empty array if presence=0.`,
+    `- relevance: 0..10 answer quality, independent of presence.`,
+    `- sentiment/accuracy are null if presence=0.`,
+    `- overall is 0 if presence=0.`,
+    `- rankPosition is the brand's 1-based position in an ordered list, else null.`,
+    `- competitorMentions: known or newly mentioned companies only; max 8.`,
+    `- citationsClassified: explicit URLs/sources only; max 5.`,
+    `- factualClaims: only claims about the target brand; max 3; empty if presence=0.`,
     '',
     `Return strict JSON, no prose:`,
     `{`,
@@ -175,7 +227,7 @@ export async function scoreResponse(input: ScoreInput): Promise<ScoreOutput | nu
         ],
         response_format: { type: 'json_object' },
         temperature: 0.0,
-        max_tokens: 1200,
+        max_tokens: 650,
       }),
       new Promise<never>((_, rej) => setTimeout(() => rej(new Error('scorer timeout')), SCORER_TIMEOUT_MS)),
     ]);

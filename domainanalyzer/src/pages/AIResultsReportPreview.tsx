@@ -144,6 +144,8 @@ const getModelLabel = (model?: string) => {
   return resolveModelMeta(model)?.label ?? model;
 };
 
+const getModelIconSrc = (model?: string) => resolveModelMeta(model)?.src;
+
 const getModelIconNode = (model?: string, size: 'sm' | 'md' = 'sm') => {
   const dim = size === 'md' ? 'h-[18px] w-[18px]' : 'h-4 w-4';
   const meta = resolveModelMeta(model);
@@ -633,29 +635,37 @@ const MetricCard = ({ card }: { card: MetricCardData }) => (
 
 const ModelComparisonGrid = ({ results }: { results: any[] }) => {
   const metrics = [
-    { label: 'Domain Presence', key: 'presence', type: 'badge' },
-    { label: 'Overall Score', key: 'displayOverall', type: 'number' },
+    { label: 'Presence', key: 'presence', type: 'badge' },
+    { label: 'Overall', key: 'displayOverall', type: 'number' },
     { label: 'Relevance', key: 'displayRelevance', type: 'number' },
     { label: 'Accuracy', key: 'displayAccuracy', type: 'number' },
-    { label: 'Sentiments', key: 'displaySentiment', type: 'number' }
+    { label: 'Sentiment', key: 'displaySentiment', type: 'number' }
   ];
 
   return (
-    <div className="flex flex-col gap-2 lg:px-4 lg:pt-3 lg:pb-4">
+    <div className="min-w-0 flex flex-col gap-2 lg:px-4 lg:pt-3 lg:pb-4">
       <div className="flex items-center min-h-9 px-1">
         <h4 className="text-[16px] sm:text-[18px] font-medium text-slate-900">Compare Model response</h4>
       </div>
-      <div className="overflow-hidden rounded-none border border-slate-300 bg-white shadow-sm min-h-[280px] h-auto lg:h-[320px]">
-        <div className="overflow-x-auto lg:h-full">
-          <table className="w-full border-collapse">
+      <div className="overflow-hidden rounded-none border border-slate-300 bg-white shadow-sm min-h-[260px] h-auto lg:h-[300px]">
+        <div className="lg:h-full">
+          <table className="w-full table-fixed border-collapse">
+            <colgroup>
+              <col style={{ width: '30%' }} />
+              <col style={{ width: '18%' }} />
+              <col style={{ width: '13%' }} />
+              <col style={{ width: '13%' }} />
+              <col style={{ width: '13%' }} />
+              <col style={{ width: '13%' }} />
+            </colgroup>
             <thead>
               <tr className="border-b border-slate-300">
-                <th className="bg-white text-[12px] font-medium text-slate-500 py-4 px-4 text-center border-r border-slate-200 w-[160px]">
+                <th className="border-r border-slate-200 bg-white px-2.5 py-3.5 text-center text-[11.5px] font-medium text-slate-500">
                   Models
                 </th>
                 {metrics.map((metric) => (
-                  <th key={metric.key} className="py-4 px-4 border-r border-slate-200 last:border-r-0">
-                    <span className="text-[12px] font-medium text-slate-700 whitespace-nowrap">{metric.label}</span>
+                  <th key={metric.key} className="border-r border-slate-200 px-2 py-3.5 last:border-r-0">
+                    <span className="block truncate text-[11px] font-medium leading-tight text-slate-700">{metric.label}</span>
                   </th>
                 ))}
               </tr>
@@ -663,22 +673,22 @@ const ModelComparisonGrid = ({ results }: { results: any[] }) => {
             <tbody>
               {results.map((r) => (
                 <tr key={r.id} className="border-b border-slate-200 last:border-b-0">
-                  <td className="bg-slate-50 py-4 px-4 text-center border-r border-slate-200">
+                  <td className="border-r border-slate-200 bg-slate-50 px-2.5 py-3.5 text-center">
                     <div className="flex items-center justify-center gap-2">
                       {getModelIconNode(r.model, 'sm')}
-                      <span className="text-[12px] font-medium text-slate-700 whitespace-nowrap">{getModelLabel(r.model)}</span>
+                      <span className="min-w-0 truncate text-[12px] font-medium text-slate-700">{getModelLabel(r.model)}</span>
                     </div>
                   </td>
                   {metrics.map((metric) => (
-                    <td key={metric.key} className="text-center py-4 px-4 border-r border-slate-200 last:border-r-0">
+                    <td key={metric.key} className="border-r border-slate-200 px-2 py-3.5 text-center last:border-r-0">
                       {metric.type === 'badge' ? (
                         <div className="flex justify-center">
-                          <span className={`${r.presence > 0 ? 'bg-[#f0fdf4] text-[#16a34a] border-[#dcfce7]' : 'bg-gray-50 text-gray-500 border-slate-200'} border text-[10px] font-medium px-3 py-1 rounded-full whitespace-nowrap`}>
-                            {r.presence > 0 ? 'Mentioned' : 'Not Mentioned'}
+                          <span className={`${r.presence > 0 ? 'border-[#dcfce7] bg-[#f0fdf4] text-[#16a34a]' : 'border-slate-200 bg-gray-50 text-gray-500'} rounded-full border px-2 py-1 text-[9.5px] font-medium leading-none whitespace-nowrap`}>
+                            {r.presence > 0 ? 'Mentioned' : 'No mention'}
                           </span>
                         </div>
                       ) : (
-                        <span className="text-[13px] font-normal text-slate-500">
+                        <span className="text-[12px] font-normal text-slate-500">
                           {r[metric.key] !== null && r[metric.key] !== undefined
                             ? Number(r[metric.key]).toFixed(1)
                             : 'N/A'}
@@ -714,7 +724,7 @@ const AIResponseViewer = ({
     : [];
 
   return (
-    <div className="flex flex-col gap-2 lg:px-4 lg:pt-3 lg:pb-4">
+    <div className="min-w-0 flex flex-col gap-2 lg:px-4 lg:pt-3 lg:pb-4">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between min-h-9 px-1">
         <h4 className="text-[16px] sm:text-[18px] font-medium text-slate-900">AI Response</h4>
         <div className="flex items-center gap-2 sm:gap-3">
@@ -746,12 +756,12 @@ const AIResponseViewer = ({
         </div>
       </div>
 
-      <Card className="flex flex-col rounded-none border border-slate-300 bg-white shadow-sm min-h-[320px] h-auto lg:h-[320px] overflow-hidden">
+      <Card className="min-w-0 flex flex-col rounded-none border border-slate-300 bg-white shadow-sm min-h-[320px] h-auto lg:h-[320px] overflow-hidden">
 
-        <div className="flex-1 grid grid-cols-1 lg:grid-cols-[1.25fr_0.75fr] divide-y lg:divide-y-0 lg:divide-x divide-slate-100 min-h-0">
+        <div className="flex-1 grid min-h-0 grid-cols-1 divide-y divide-slate-100 lg:grid-cols-[minmax(0,1fr)_minmax(190px,240px)] lg:divide-x lg:divide-y-0">
           {/* Left Column: Response Content (INTERNAL SCROLL HERE) */}
           <div className="flex flex-col min-h-0 bg-slate-50/50 overflow-hidden">
-            <div className="flex-1 overflow-y-auto px-8 py-7 scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent">
+            <div className="flex-1 overflow-y-auto px-5 py-5 sm:px-6 scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent">
               <h3 className="text-[20px] font-medium text-slate-800 leading-tight mb-4 tracking-tight">
                 {activeResult.phrase || 'Analysis Result'}
               </h3>
@@ -811,7 +821,7 @@ const AIResponseViewer = ({
           </div>
 
           {/* Right Column: Citations & Evidence (FIXED OR INDEPENDENT SCROLL) */}
-          <div className="bg-white flex flex-col min-h-0 overflow-y-auto px-5 py-6 scrollbar-thin scrollbar-thumb-slate-200">
+          <div className="bg-white flex min-h-0 flex-col overflow-y-auto px-5 py-5 scrollbar-thin scrollbar-thumb-slate-200">
             <CitationSidebar activeResult={activeResult} />
           </div>
         </div>
@@ -952,7 +962,7 @@ const ExpandedDetails = ({ results }: { results: any[] }) => {
   const [selectedModel, setSelectedModel] = useState(processedResults[0]?.model || '');
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-[0.62fr_1.38fr] lg:divide-x lg:divide-slate-300">
+    <div className="grid min-w-0 grid-cols-1 lg:grid-cols-[minmax(520px,0.62fr)_minmax(0,1.38fr)] lg:divide-x lg:divide-slate-300">
       <ModelComparisonGrid results={processedResults} />
       <AIResponseViewer
         results={processedResults}
@@ -2901,16 +2911,37 @@ const AIResultsReportPreview = () => {
     const mentionsTotal = brandPages + competitorPages;
     const brandSharePct = mentionsTotal > 0 ? Math.round((brandPages / mentionsTotal) * 100) : 0;
 
+    const preferredModelOrder = ['google-gre', 'gpt-4o-mini', 'claude-sonnet-4-5', 'gemini-2.0-flash'];
+    const modelBuckets = new Map<string, { total: number; mentions: number }>();
+    for (const result of allResults) {
+      const model = String(result?.model ?? '').trim();
+      if (!model) continue;
+      const bucket = modelBuckets.get(model) ?? { total: 0, mentions: 0 };
+      bucket.total += 1;
+      bucket.mentions += Number(result?.presence ?? 0);
+      modelBuckets.set(model, bucket);
+    }
+    const orderedModels = Array.from(modelBuckets.keys()).sort((a, b) => {
+      const ai = preferredModelOrder.indexOf(a);
+      const bi = preferredModelOrder.indexOf(b);
+      return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi) || getModelLabel(a).localeCompare(getModelLabel(b));
+    });
+    const maxMentions = Math.max(1, ...Array.from(modelBuckets.values()).map((bucket) => bucket.mentions));
+    const modelPerformanceDetails = orderedModels.map((model) => {
+      const bucket = modelBuckets.get(model) ?? { total: 0, mentions: 0 };
+      return {
+        label: getModelLabel(model),
+        value: bucket.mentions.toString(),
+        iconSrc: getModelIconSrc(model),
+        barWidth: bucket.mentions > 0 ? Math.max(8, Math.round((bucket.mentions / maxMentions) * 100)) : 0,
+      };
+    });
+
     return [
       {
         title: 'Performance Across AI Models',
         kind: 'modelPerformance',
-        details: [
-          { label: 'AI Overview', value: '13', iconSrc: '/report-icons/google.svg', barWidth: 59 },
-          { label: 'ChatGPT', value: '7', iconSrc: '/report-icons/chat-gpt.svg', barWidth: 32 },
-          { label: 'Claude', value: '6', iconSrc: '/report-icons/claude.svg', barWidth: 27 },
-          { label: 'Gemini', value: '22', iconSrc: '/report-icons/gemini.svg', barWidth: 100 },
-        ],
+        details: modelPerformanceDetails,
       },
       {
         title: 'Top AI Search Prompts',
@@ -3112,7 +3143,7 @@ const shareOfVoiceChart = useMemo(() => {
 // language elsewhere.
 const trendEmptyMessage = (() => {
   if (trendsData.runs.length === 0) return 'Run an audit to see trend data';
-  if (trendsData.runs.length === 1) return 'Trend appears after your next audit';
+  if (trendsData.runs.length === 1) return 'One audit so far - run another audit to compare';
   return undefined;
 })();
 
@@ -3565,7 +3596,7 @@ return (
         <CardContent className="space-y-8 px-4 pb-4">
           <AreaChartCard
             title="Share of Voice"
-            subtitle="Idenitfy visibility gaps and uncover opportunities to capture more AI-driven traffic."
+            subtitle="Identify visibility gaps and uncover opportunities to capture more AI-driven traffic."
             data={shareOfVoiceChart.data}
             series={shareOfVoiceChart.series}
             tooltipTitle="AI Share of voice"
@@ -3755,4 +3786,3 @@ return (
 };
 
 export default AIResultsReportPreview;
-

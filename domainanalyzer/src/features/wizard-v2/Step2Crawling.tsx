@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { fetchEventSource } from "@microsoft/fetch-event-source";
 import { WizardStatusRow } from "./WizardShell";
 import type { WizardProfile } from "./types";
+import { getWizardSessionToken, setWizardSessionToken } from "@/services/apiClient";
 
 interface Step2Props {
   url: string;
@@ -54,6 +55,14 @@ export function Step2Crawling({ url, profile, onComplete, onError }: Step2Props)
       if (stalled) setStalled(false);
     };
 
+    const authToken = localStorage.getItem("authToken");
+    const wizardSessionToken = getWizardSessionToken();
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+      ...(!authToken && wizardSessionToken ? { "X-Wizard-Session": wizardSessionToken } : {}),
+    };
+
     fetchEventSource(`${API_BASE_URL}/api/wizard/domain`, {
       method: "POST",
       // credentials:'include' is load-bearing for the cross-site
@@ -69,10 +78,7 @@ export function Step2Crawling({ url, profile, onComplete, onError }: Step2Props)
       // sends the OLD cookie from /validate, hits a different shadow
       // user, and 404s with "Domain not found".
       credentials: "include",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${localStorage.getItem("authToken")}`,
-      },
+      headers,
       body: JSON.stringify({
         url,
         country: profile.country,
@@ -93,6 +99,9 @@ export function Step2Crawling({ url, profile, onComplete, onError }: Step2Props)
         if (!ev.data) return;
         try {
           const data = JSON.parse(ev.data);
+          if (typeof data.wizardSessionToken === "string") {
+            setWizardSessionToken(data.wizardSessionToken);
+          }
           switch (data.type) {
             case "progress":
               // Translate backend phase names into friendly copy.

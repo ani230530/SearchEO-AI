@@ -33,7 +33,7 @@ import { generateAuditPrompts, persistAuditPrompts, type PromptCategory } from '
 import { generateKeywordsForDomain, persistKeywords } from './keywordsService';
 import { enrichDomainContext } from './enrichmentService';
 import { setPhase, readState } from './wizardState';
-import { runOnePrompt, runQueries } from './runService';
+import { queueDeepScoringForRun, runOnePrompt, runQueries } from './runService';
 import { computePhraseVisibility, computeOpportunities, computeCompetitorAnalysis } from './analyticsService';
 import { enrichOpportunities, type EnrichedOpportunity } from './opportunityEnrichment';
 import { enrichCompetitorInsights, type CompetitorInsight } from './competitorInsightEnrichment';
@@ -461,6 +461,10 @@ router.post('/domain', authenticateOrSession(), async (req: Request, res: Respon
   res.setHeader('Connection', 'keep-alive');
   res.flushHeaders();
   const send = (data: object) => res.write(`data: ${JSON.stringify(data)}\n\n`);
+  const wizardSessionToken =
+    req.identity?.kind === 'anon' && req.wizardSessionToken
+      ? req.wizardSessionToken
+      : undefined;
 
   try {
     // Upsert Domain (identity row only). For anon callers `ownerId` is the
@@ -488,7 +492,7 @@ router.post('/domain', authenticateOrSession(), async (req: Request, res: Respon
           console.warn('[wizard/domain] session update failed', err);
         });
     }
-    send({ type: 'domain_created', domainId: domain.id });
+    send({ type: 'domain_created', domainId: domain.id, wizardSessionToken });
 
     // Bust the user's domain-list cache so the new row appears on the
     // next /domains call without waiting for the 60s TTL.
@@ -591,6 +595,7 @@ router.post('/domain', authenticateOrSession(), async (req: Request, res: Respon
     send({
       type: 'complete',
       domainId: domain.id,
+      wizardSessionToken,
       profile: { companySize, summary: crawl.contextJson?.summary ?? null },
       crawlQuality: crawl.quality,
     });
@@ -637,24 +642,24 @@ router.get('/domain/:id/report', timed('GET /report', 800), authenticateToken, a
   // "latest run" the dashboard renders. ?kind=weekly|all overrides.
   const kindFilter = runKindFilter(req);
 
-  const [latestRun, allResults, keywords, prompts] = await Promise.all([
-    useSpecificRun
-      ? prisma.aiRun.findFirst({
-          where: { id: runIdParam, domainId: domain.id, status: 'completed' },
-        })
-      : prisma.aiRun.findFirst({
-          where: { domainId: domain.id, status: 'completed', ...kindFilter },
-          orderBy: { startedAt: 'desc' },
-        }),
+  const latestRun = useSpecificRun
+    ? await prisma.aiRun.findFirst({
+        where: { id: runIdParam, domainId: domain.id, status: 'completed' },
+      })
+    : await prisma.aiRun.findFirst({
+        where: { domainId: domain.id, status: 'completed', ...kindFilter },
+        orderBy: { startedAt: 'desc' },
+      });
+
+  const reportRunId = latestRun?.id ?? -1;
+  const [allResults, keywords, prompts] = await Promise.all([
     // Explicit select — every field listed is consumed below. Omits
     // costUsd / createdAt / runId which the report doesn't need (the query
     // planner skips reading them; in particular costUsd is only used by the
     // billing summary on AiRun, not per-row). Keeps the response/JSONB
     // columns we need (they're surfaced verbatim in the API response).
     prisma.aiQueryResult.findMany({
-      where: useSpecificRun
-        ? { runId: runIdParam, run: { domainId: domain.id } }
-        : { run: { domainId: domain.id, status: 'completed', ...kindFilter } },
+      where: { runId: reportRunId, run: { domainId: domain.id } },
       orderBy: { createdAt: 'desc' },
       take: 1000,
       select: {
@@ -706,6 +711,15 @@ router.get('/domain/:id/report', timed('GET /report', 800), authenticateToken, a
   ]);
 
   const summary = (latestRun?.summary as Record<string, unknown> | null) ?? null;
+  if (
+    latestRun?.id &&
+    (summary?.scoringProvisional === true ||
+      summary?.scoringStatus === 'queued' ||
+      summary?.scoringStatus === 'enriching' ||
+      summary?.scoringStatus === 'failed')
+  ) {
+    queueDeepScoringForRun({ prisma, domainId: domain.id, runId: latestRun.id });
+  }
   const perModelRaw = (summary?.perModel as Record<string, { presenceRate?: number; avgOverall?: number; avgSentiment?: number; queries?: number }> | undefined) ?? {};
 
   // Per-model mention totals (count of presence=1) — the dashboard reads
@@ -2573,6 +2587,7 @@ router.post('/domain/:id/topics', timed('POST /topics', 4000), authenticateOrSes
     // each filled with the real personas/use-cases/competitors from Stage 1.
     const prompts = await generateAuditPrompts({
       brand: domain.inferred?.companyName ?? domain.host,
+      host: domain.host,
       context: enriched,
       onlyCategories: categoryFilter,
     });
@@ -2780,7 +2795,7 @@ router.post('/domain/:id/keywords/:kwId/prompts', authenticateToken, async (req:
  * existing keyword the prompt belongs to (or returns null if it's standalone),
  * so the prompt slots into the right group in the picker UI.
  */
-router.post('/domain/:id/prompts/custom', authenticateToken, async (req: Request, res: Response) => {
+router.post('/domain/:id/prompts/custom', authenticateOrSession(), async (req: Request, res: Response) => {
   const got = await ensureDomain(req, req.params.id);
   if (!got.ok) return res.status(got.status).json({ error: got.error });
   const { domain } = got;

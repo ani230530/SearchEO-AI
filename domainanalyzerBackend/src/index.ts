@@ -29,7 +29,14 @@ import { startTimeoutChecker } from './services/n8nTimeout';
 const app = express();
 const prisma = new PrismaClient();
 
-const allowedOrigins = [
+const configuredOrigins = [
+  authEnv.FRONTEND_URL,
+  ...(process.env.CORS_ORIGINS ?? '').split(','),
+]
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+const allowedOrigins = new Set([
   'http://localhost:3000',
   'http://localhost:3001',
   'http://localhost:5173',
@@ -44,11 +51,12 @@ const allowedOrigins = [
   'https://domainanalyzer-rosy.vercel.app',
   'https://seo-gpt-teal.vercel.app',
   'https://search-eo-ai.vercel.app',
-];
+  ...configuredOrigins,
+]);
 
 const corsOptions: cors.CorsOptions = {
   origin: (origin, callback) => {
-    if (!origin || origin.startsWith('http://localhost:') || allowedOrigins.indexOf(origin) !== -1) {
+    if (!origin || origin.startsWith('http://localhost:') || allowedOrigins.has(origin)) {
       callback(null, true);
     } else {
       callback(new Error('Not allowed by CORS'));

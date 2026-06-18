@@ -13,6 +13,7 @@ import {
 } from '../middleware/rateLimit';
 import {
   WIZARD_COOKIE_NAME,
+  WIZARD_SESSION_HEADER,
   buildClearCookieHeader,
   linkSessionToUser,
   lookupSession,
@@ -39,7 +40,9 @@ function clientContext(req: Request) {
 async function maybeLinkWizardSession(req: Request, res: Response, userId: number) {
   try {
     const cookies = parseCookieHeader(req.headers.cookie);
-    const token = cookies[WIZARD_COOKIE_NAME];
+    const rawHeader = req.headers[WIZARD_SESSION_HEADER];
+    const headerToken = Array.isArray(rawHeader) ? rawHeader[0] : rawHeader;
+    const token = cookies[WIZARD_COOKIE_NAME] || (typeof headerToken === 'string' ? headerToken.trim() : '');
     if (!token) return null;
     const session = await lookupSession(prisma, token);
     if (!session) return null;

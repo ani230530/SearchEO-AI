@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback, ReactNode } from 'react';
 import { isTokenExpired, getTimeUntilExpiration } from '@/services/tokenService';
-import { tokenManager, apiRequest } from '@/services/apiClient';
+import { getWizardSessionToken, tokenManager, apiRequest } from '@/services/apiClient';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3002';
 
@@ -37,6 +37,11 @@ const getLoginErrorMessage = (response: Response, data: AuthResponseBody) => {
   }
 
   return getAuthErrorMessage(data, 'Login failed. Please try again.');
+};
+
+const wizardSessionHeaders = (): Record<string, string> => {
+  const wizardSessionToken = getWizardSessionToken();
+  return wizardSessionToken ? { 'X-Wizard-Session': wizardSessionToken } : {};
 };
 
 export interface User {
@@ -356,6 +361,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
+          ...wizardSessionHeaders(),
         },
         body: JSON.stringify({ email, password, name }),
       });
@@ -419,6 +425,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
+          ...wizardSessionHeaders(),
         },
         body: JSON.stringify({ code }),
       });

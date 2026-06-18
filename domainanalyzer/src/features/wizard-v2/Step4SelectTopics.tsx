@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowRight, Check, Loader2, Pencil, Plus, RefreshCw, Sparkles } from "lucide-react";
 import { apiGet, apiPatch, apiPost } from "@/services/apiClient";
 import { WizardStatusRow } from "./WizardShell";
-import type { WizardItem } from "./types";
+import type { PromptCategory, WizardItem } from "./types";
 
 interface Step4Props {
   domainId: number;
@@ -18,9 +18,33 @@ interface Step4Props {
 }
 
 const HEAVY_RUN_THRESHOLD = 20;
-const VISIBLE_PROMPT_LIMIT = 10;
-const AUTO_SELECT_LIMIT = 10;
-const MAX_VISIBLE_PROMPT_LIMIT = 14;
+const VISIBLE_PROMPT_LIMIT = 6;
+const AUTO_SELECT_LIMIT = 6;
+const MAX_VISIBLE_PROMPT_LIMIT = 12;
+const AUDIT_MODEL_COUNT = 4;
+
+const PROMPT_RESEARCH_STEPS = [
+  {
+    message: "Reading the messy questions people actually ask...",
+    subtle: "Checking search and community language first, so this does not turn into a neat AI-written list.",
+  },
+  {
+    message: "Keeping the buyer phrasing a little imperfect...",
+    subtle: "Looking for the useful stuff: pricing anxiety, comparisons, client pressure, manual work, and \"is this worth it?\" moments.",
+  },
+  {
+    message: "Turning those signals into prompt candidates...",
+    subtle: "Mixing short questions, normal conversational prompts, and one longer context-rich prompt.",
+  },
+  {
+    message: "Cutting anything that sounds too polished...",
+    subtle: "Removing brand leaks, duplicates, generic SEO phrasing, and words real buyers almost never type.",
+  },
+  {
+    message: "Picking the six prompts most likely to expose AI visibility...",
+    subtle: "Balancing human feel with commercial intent before we show you the final set.",
+  },
+];
 
 interface TopicsResponse {
   domainId: number;
@@ -35,6 +59,7 @@ export function Step4SelectTopics({ domainId, initialDraft, onContinue, forceRef
   const [items, setItems] = useState<WizardItem[]>([]);
   const [visiblePromptLimit, setVisiblePromptLimit] = useState(VISIBLE_PROMPT_LIMIT);
   const [loading, setLoading] = useState(true);
+  const [loadingStepIndex, setLoadingStepIndex] = useState(0);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -63,9 +88,18 @@ export function Step4SelectTopics({ domainId, initialDraft, onContinue, forceRef
     [promptCards, visiblePromptLimit]
   );
 
+  const loadingStep = PROMPT_RESEARCH_STEPS[loadingStepIndex % PROMPT_RESEARCH_STEPS.length];
+  const hasHiddenPrompts = promptCards.length > visiblePromptLimit;
+  const canGenerateMorePrompts = promptCards.length > 0 && promptCards.length < MAX_VISIBLE_PROMPT_LIMIT;
+
   const generate = async (mode: "fresh" | "append") => {
-    if (mode === "fresh") setLoading(true);
-    else setLoadingMore(true);
+    if (mode === "fresh") {
+      setLoadingStepIndex(0);
+      setLoading(true);
+      setVisiblePromptLimit(VISIBLE_PROMPT_LIMIT);
+    } else {
+      setLoadingMore(true);
+    }
     setError(null);
     try {
       const path =
@@ -155,6 +189,17 @@ export function Step4SelectTopics({ domainId, initialDraft, onContinue, forceRef
   }, [domainId]);
 
   useEffect(() => {
+    if (!loading) {
+      setLoadingStepIndex(0);
+      return;
+    }
+    const timer = window.setInterval(() => {
+      setLoadingStepIndex((index) => (index + 1) % PROMPT_RESEARCH_STEPS.length);
+    }, 2300);
+    return () => window.clearInterval(timer);
+  }, [loading]);
+
+  useEffect(() => {
     if (loading) return;
     if (draftTimerRef.current) clearTimeout(draftTimerRef.current);
     draftTimerRef.current = setTimeout(() => {
@@ -217,10 +262,14 @@ export function Step4SelectTopics({ domainId, initialDraft, onContinue, forceRef
   const deselectAll = () => setSelectedPr(new Set());
 
   const handleLoadMore = async () => {
+    if (hasHiddenPrompts) {
+      setVisiblePromptLimit((prev) => Math.min(MAX_VISIBLE_PROMPT_LIMIT, prev + VISIBLE_PROMPT_LIMIT));
+      return;
+    }
     const nextItems = await generate("append");
     if (!nextItems) return;
     const nextPromptCount = nextItems.filter((item) => item.type === "prompt").length;
-    setVisiblePromptLimit((prev) => Math.min(MAX_VISIBLE_PROMPT_LIMIT, Math.min(prev + 4, nextPromptCount)));
+    setVisiblePromptLimit((prev) => Math.min(MAX_VISIBLE_PROMPT_LIMIT, Math.min(prev + VISIBLE_PROMPT_LIMIT, nextPromptCount)));
   };
 
   const handleAddCustom = async () => {
@@ -280,7 +329,7 @@ export function Step4SelectTopics({ domainId, initialDraft, onContinue, forceRef
     <div className="mx-auto w-full max-w-[760px]">
       <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div className="text-[12px] text-slate-500">
-          <span className="font-medium text-slate-700">Prompts only:</span>{" "}
+          <span className="font-medium text-slate-700">Human prompt set:</span>{" "}
           <button
             type="button"
             onClick={selectAll}
@@ -288,7 +337,7 @@ export function Step4SelectTopics({ domainId, initialDraft, onContinue, forceRef
             className="font-medium text-blue-600 underline decoration-blue-300 underline-offset-2 transition-colors hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
             title="Auto-select the available prompts"
           >
-            {AUTO_SELECT_LIMIT} prompts
+            best {AUTO_SELECT_LIMIT}
           </button>
         </div>
         <div className="flex items-center gap-2 self-start sm:self-auto">
@@ -323,7 +372,7 @@ export function Step4SelectTopics({ domainId, initialDraft, onContinue, forceRef
             className="inline-flex items-center gap-1.5 rounded-xl bg-slate-700 px-3.5 py-2 text-[12px] font-semibold text-white shadow-sm transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
           >
             <Sparkles className="h-3.5 w-3.5" />
-            {allSelected ? "Deselect all" : "Auto-select (10)"}
+            {allSelected ? "Deselect all" : `Auto-select (${AUTO_SELECT_LIMIT})`}
           </button>
         </div>
       </div>
@@ -331,8 +380,8 @@ export function Step4SelectTopics({ domainId, initialDraft, onContinue, forceRef
       <div className="space-y-4">
         {loading && (
           <WizardStatusRow
-            message="Sketching the questions a real customer would ask about you..."
-            subtle="Pulling together a handful of topics and the natural questions people would actually type."
+            message={loadingStep.message}
+            subtle={loadingStep.subtle}
           />
         )}
 
@@ -462,7 +511,7 @@ export function Step4SelectTopics({ domainId, initialDraft, onContinue, forceRef
         )}
       </div>
 
-      {!loading && items.length > VISIBLE_PROMPT_LIMIT && (
+      {!loading && (hasHiddenPrompts || canGenerateMorePrompts) && (
         <button
           type="button"
           onClick={() => void handleLoadMore()}
@@ -470,7 +519,7 @@ export function Step4SelectTopics({ domainId, initialDraft, onContinue, forceRef
           className="mt-4 flex w-full items-center justify-center gap-2 py-2.5 text-[12px] font-medium text-slate-500 transition-colors hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {loadingMore ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
-          {loadingMore ? "Generating more prompts..." : "Load more prompts"}
+          {loadingMore ? "Finding another human angle..." : hasHiddenPrompts ? "Show more prompts" : "Generate more prompts"}
         </button>
       )}
 
@@ -515,7 +564,7 @@ export function Step4SelectTopics({ domainId, initialDraft, onContinue, forceRef
         <div className="mt-5 rounded-[10px] border border-amber-100 bg-amber-50/50 px-3 py-3 text-[12px] text-slate-700">
           <p className="font-medium text-slate-900">That's a lot of prompts.</p>
           <p className="mt-1 text-slate-600">
-            {selectedPr.size} prompts × 3 AI assistants ≈ {selectedPr.size * 3} answers.
+            {selectedPr.size} prompts × {AUDIT_MODEL_COUNT} AI assistants ≈ {selectedPr.size * AUDIT_MODEL_COUNT} answers.
             This will take a few minutes and uses more of your AI quota. Sure you want to run all of them?
           </p>
           <div className="mt-3 flex gap-2">

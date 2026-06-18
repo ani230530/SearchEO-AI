@@ -34,6 +34,7 @@ import * as crypto from 'crypto';
 import type { PrismaClient, Prisma, WizardSession } from '../../generated/prisma';
 
 export const WIZARD_COOKIE_NAME = 'aiv_ws';
+export const WIZARD_SESSION_HEADER = 'x-wizard-session';
 export const WIZARD_SESSION_TTL_MS = 24 * 60 * 60 * 1000; // 24h sliding
 
 /** Local-part prefix on shadow user emails. Keeps them clearly separable

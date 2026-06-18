@@ -1,13 +1,16 @@
 /**
  * topicsService — Stage 2 of the prompt generator.
  *
- * Two-stage architecture (research-backed: Soar / Profound / Ahrefs):
+ * Two-stage architecture (research-backed: Airbnb synthetic-query research,
+ * Apple query generation, Ahrefs / Profound / SE Ranking prompt guidance):
  *
  *   1. enrichmentService.enrichDomainContext() — extracts {category, vertical,
  *      personas[3], useCases[3], constraints[], competitors[3], priceBand}.
- *   2. THIS SERVICE generates 24 prompts in 4 UNBRANDED categories using those
- *      entities. Per category, a separate LLM call (keeps the model on-task
- *      and the taxonomy clean).
+ *   2. promptSignalsService.collectPromptSeedSignals() — pulls fast community /
+ *      search snippets through Serper, then falls back to domain context.
+ *   3. humanPromptService.generateHumanAuditPrompts() — generates 6 prompts by
+ *      bucket and validates the set locally for human texture, length mix,
+ *      commercial intent, duplicate intent, and target-brand leakage.
  *
  * Why all-unbranded: the audit's job is to measure whether the LLM brings up
  * the brand on its own when a real user asks a generic / category question.
@@ -32,6 +35,8 @@ import type { PrismaClient } from '../../generated/prisma';
 import type { Intent } from './types';
 import type { EnrichedContext } from './enrichmentService';
 import { callJson, Models } from './llmClient';
+import { generateHumanAuditPrompts } from './humanPromptService';
+import { collectPromptSeedSignals } from './promptSignalsService';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -248,21 +253,29 @@ async function generateForCategory(args: {
 
 export interface GenerateAllInput {
   brand: string;
+  host?: string;
   context: EnrichedContext;
   /** Optional category subset (for "Load more" of a single category). Defaults to all. */
   onlyCategories?: PromptCategory[];
 }
 
 export async function generateAuditPrompts(input: GenerateAllInput): Promise<GeneratedPrompt[]> {
-  const specs = categorySpecs().filter(
-    (s) => !input.onlyCategories || input.onlyCategories.includes(s.category)
-  );
-  // Run categories in parallel — separate LLM calls keep each prompt set
-  // tight to its category definition.
-  const results = await Promise.all(
-    specs.map((spec) => generateForCategory({ brand: input.brand, ctx: input.context, spec }))
-  );
-  return results.flat();
+  const host = input.host ?? input.brand;
+  const signals = await collectPromptSeedSignals({
+    brand: input.brand,
+    host,
+    context: input.context,
+    limit: 40,
+  });
+  const prompts = await generateHumanAuditPrompts({
+    brand: input.brand,
+    host,
+    context: input.context,
+    signals,
+  });
+  if (!input.onlyCategories || input.onlyCategories.length === 0) return prompts;
+  const filtered = prompts.filter((prompt) => input.onlyCategories?.includes(prompt.category));
+  return filtered.length > 0 ? filtered : prompts;
 }
 
 // ── Persistence ────────────────────────────────────────────────────────────

@@ -37,6 +37,7 @@ import { PrismaClient, WizardSession } from '../../generated/prisma';
 import { authService, JWTPayload } from '../services/authService';
 import {
   WIZARD_COOKIE_NAME,
+  WIZARD_SESSION_HEADER,
   buildSetCookieHeader,
   issueSession,
   lookupSession,
@@ -57,6 +58,10 @@ declare global {
       /** Identity resolved by authenticateOrSession. Always set by the time
        *  a wizard handler runs. */
       identity?: WizardIdentity;
+      /** Plain anonymous wizard token from the cookie/header/issued session.
+       *  Only attached on anonymous requests so SSE can give browsers a
+       *  fallback when third-party cookies are blocked in production. */
+      wizardSessionToken?: string;
     }
   }
 }
@@ -79,6 +84,12 @@ const extractFingerprint = (req: Request): string | null => {
   const fp = req.headers['x-wizard-fingerprint'];
   if (typeof fp === 'string' && fp.length > 0 && fp.length < 256) return fp;
   return null;
+};
+
+const getWizardSessionHeader = (req: Request): string => {
+  const raw = req.headers[WIZARD_SESSION_HEADER];
+  const value = Array.isArray(raw) ? raw[0] : raw;
+  return typeof value === 'string' && value.trim().length >= 16 ? value.trim() : '';
 };
 
 /** True when the identity is `kind='user'`. Type-narrowing helper for
@@ -220,13 +231,28 @@ export const authenticateOrSession = (
         // best-effort; a failure here doesn't tear down the handler.
         void touchSession(db, session.id);
         req.identity = { kind: 'anon', session };
+        req.wizardSessionToken = cookieToken;
         return next();
       }
-      // Cookie present but invalid/expired/linked. Fall through to issue
-      // a new one (if allowed) — the old cookie will be overwritten.
+      // Cookie present but invalid/expired/linked. Fall through to the
+      // header fallback before issuing a new one.
     }
 
-    // 4) No usable identity. Either mint a fresh anon session or pass
+    // 4) Header fallback for cross-site production deploys where browsers
+    // block third-party Set-Cookie on the SSE request. The token is still
+    // opaque; only its hash is stored in the DB.
+    const headerToken = getWizardSessionHeader(req);
+    if (headerToken) {
+      const session = await lookupSession(db, headerToken);
+      if (session) {
+        void touchSession(db, session.id);
+        req.identity = { kind: 'anon', session };
+        req.wizardSessionToken = headerToken;
+        return next();
+      }
+    }
+
+    // 5) No usable identity. Either mint a fresh anon session or pass
     //    through, depending on issueWhenMissing.
     if (!issueWhenMissing) {
       req.identity = undefined;
@@ -254,6 +280,7 @@ export const authenticateOrSession = (
           .json({ error: 'Failed to initialize anonymous session' });
       }
       req.identity = { kind: 'anon', session };
+      req.wizardSessionToken = issued.token;
       return next();
     } catch (err) {
       console.error('[authenticateOrSession] issue failed', err);

@@ -7,6 +7,7 @@ import {
 } from './authenticateOrSession';
 import {
   WIZARD_COOKIE_NAME,
+  WIZARD_SESSION_HEADER,
   buildSetCookieHeader,
   generateCookieToken,
   hashCookieToken,
@@ -31,6 +32,7 @@ vi.mock('../services/authService', () => ({
 const makeReqRes = (input: {
   authorization?: string;
   cookie?: string;
+  wizardSession?: string;
   fingerprint?: string;
   ip?: string;
   userAgent?: string;
@@ -38,6 +40,7 @@ const makeReqRes = (input: {
   const headers: Record<string, any> = {};
   if (input.authorization) headers.authorization = input.authorization;
   if (input.cookie) headers.cookie = input.cookie;
+  if (input.wizardSession) headers[WIZARD_SESSION_HEADER] = input.wizardSession;
   if (input.fingerprint) headers['x-wizard-fingerprint'] = input.fingerprint;
   if (input.userAgent) headers['user-agent'] = input.userAgent;
 
@@ -157,6 +160,40 @@ describe('authenticateOrSession — anonymous cookie path', () => {
     expect(req.identity?.kind).toBe('anon');
     expect((req.identity as any)?.session?.id).toBe(sessionId);
     // No new cookie minted — existing one stays valid.
+    expect(res._headers['Set-Cookie']).toBeUndefined();
+  });
+
+  it('resolves an existing valid wizard session header when the cookie is missing', async () => {
+    const prisma = createPrismaMock();
+    const { token, sessionId } = await issueSession(prisma);
+    const { req, res, next } = makeReqRes({ wizardSession: token });
+    const mw = authenticateOrSession({ prisma });
+    await mw(req, res, next);
+    expect(next).toHaveBeenCalledOnce();
+    expect(req.identity?.kind).toBe('anon');
+    expect((req.identity as any)?.session?.id).toBe(sessionId);
+    expect(req.wizardSessionToken).toBe(token);
+    expect(res._headers['Set-Cookie']).toBeUndefined();
+  });
+
+  it('falls back to the wizard session header when an old cookie is stale', async () => {
+    const prisma = createPrismaMock();
+    const { token: staleToken, sessionId: staleSessionId } = await issueSession(prisma);
+    await prisma.wizardSession.update({
+      where: { id: staleSessionId },
+      data: { expiresAt: new Date(Date.now() - 1000) } as any,
+    });
+    const { token, sessionId } = await issueSession(prisma);
+    const { req, res, next } = makeReqRes({
+      cookie: `${WIZARD_COOKIE_NAME}=${encodeURIComponent(staleToken)}`,
+      wizardSession: token,
+    });
+    const mw = authenticateOrSession({ prisma });
+    await mw(req, res, next);
+    expect(next).toHaveBeenCalledOnce();
+    expect(req.identity?.kind).toBe('anon');
+    expect((req.identity as any)?.session?.id).toBe(sessionId);
+    expect(req.wizardSessionToken).toBe(token);
     expect(res._headers['Set-Cookie']).toBeUndefined();
   });
 

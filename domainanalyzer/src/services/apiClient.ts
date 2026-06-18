@@ -5,6 +5,7 @@
 import { isTokenExpired } from './tokenService';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api` : 'http://localhost:3002/api';
+const WIZARD_SESSION_STORAGE_KEY = 'wizard:session-token';
 
 // Request queue for handling concurrent requests during token refresh
 let isRefreshing = false;
@@ -19,6 +20,23 @@ const requestQueue: Array<{
  */
 function getAuthToken(): string | null {
   return localStorage.getItem('authToken');
+}
+
+export function getWizardSessionToken(): string | null {
+  return sessionStorage.getItem(WIZARD_SESSION_STORAGE_KEY) || localStorage.getItem(WIZARD_SESSION_STORAGE_KEY);
+}
+
+export function setWizardSessionToken(token: string | null | undefined): void {
+  if (!token || typeof token !== 'string') return;
+  sessionStorage.setItem(WIZARD_SESSION_STORAGE_KEY, token);
+  // localStorage fallback survives a tab refresh on browsers that also clear
+  // sessionStorage during aggressive privacy-mode navigations.
+  localStorage.setItem(WIZARD_SESSION_STORAGE_KEY, token);
+}
+
+export function clearWizardSessionToken(): void {
+  sessionStorage.removeItem(WIZARD_SESSION_STORAGE_KEY);
+  localStorage.removeItem(WIZARD_SESSION_STORAGE_KEY);
 }
 
 /**
@@ -168,6 +186,10 @@ export async function apiRequest<T>(
     ...(options.headers as Record<string, string> | undefined),
   };
   if (token) baseHeaders['Authorization'] = `Bearer ${token}`;
+  if (!token) {
+    const wizardSessionToken = getWizardSessionToken();
+    if (wizardSessionToken) baseHeaders['X-Wizard-Session'] = wizardSessionToken;
+  }
 
   let response = await fetch(`${API_BASE_URL}${endpoint}`, {
     ...options,
@@ -296,4 +318,3 @@ export const tokenManager = {
 
 // Re-export isTokenExpired from tokenService
 export { isTokenExpired } from './tokenService';
-

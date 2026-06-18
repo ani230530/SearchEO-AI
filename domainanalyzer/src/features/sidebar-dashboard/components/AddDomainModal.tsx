@@ -25,6 +25,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { buildDomainSlug } from '@/lib/domainUtils';
+import { getWizardSessionToken, setWizardSessionToken } from '@/services/apiClient';
 
 type Phase = 'idle' | 'crawl' | 'competitors' | 'topics' | 'done' | 'error';
 
@@ -62,9 +63,11 @@ const API_BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3002';
 
 function authHeaders(): Record<string, string> {
   const token = localStorage.getItem('authToken');
+  const wizardSessionToken = getWizardSessionToken();
   return {
     'Content-Type': 'application/json',
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...(!token && wizardSessionToken ? { 'X-Wizard-Session': wizardSessionToken } : {}),
   };
 }
 
@@ -74,6 +77,7 @@ async function postJson<T>(path: string, body: unknown, signal?: AbortSignal): P
     headers: authHeaders(),
     body: JSON.stringify(body ?? {}),
     signal,
+    credentials: 'include',
   });
   if (!res.ok) {
     const text = await res.text().catch(() => '');
@@ -87,6 +91,7 @@ async function patchJson<T>(path: string, body: unknown): Promise<T> {
     method: 'PATCH',
     headers: authHeaders(),
     body: JSON.stringify(body ?? {}),
+    credentials: 'include',
   });
   if (!res.ok) {
     const text = await res.text().catch(() => '');
@@ -133,6 +138,9 @@ function streamCrawl(args: {
       onmessage(ev) {
         try {
           const data = JSON.parse(ev.data ?? '{}') as Record<string, unknown>;
+          if (typeof data.wizardSessionToken === 'string') {
+            setWizardSessionToken(data.wizardSessionToken);
+          }
           if (data.type === 'domain_created' && typeof data.domainId === 'number') {
             domainId = data.domainId;
           }

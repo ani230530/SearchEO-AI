@@ -29,6 +29,8 @@ export interface EnrichedContext {
   constraints: string[];
   competitors: string[];
   priceBand: string | null;
+  /** Scrape-derived plain-English topic to use inside prompts. More specific than industry/category. */
+  productContext: string;
   year: string;
 }
 
@@ -53,8 +55,105 @@ const FALLBACK: EnrichedContext = {
   constraints: ['budget under $100/mo', 'team under 20 people', 'no engineering required'],
   competitors: [],
   priceBand: null,
+  productContext: 'daily operations',
   year: new Date().getFullYear().toString(),
 };
+
+const BROAD_INDUSTRY_RE =
+  /\b(technology|it|software|business|services|consulting|hospitality|tourism|transportation|logistics|retail|consumer|healthcare|financial|education|media|entertainment|manufacturing|construction)\b/i;
+
+function normalize(value: string | null | undefined): string {
+  return String(value ?? '')
+    .toLowerCase()
+    .replace(/&/g, 'and')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
+function compactPhrase(value: string | null | undefined, maxWords: number): string {
+  return String(value ?? '')
+    .replace(/https?:\/\/\S+/g, '')
+    .replace(/[^\w\s&+./-]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, maxWords)
+    .join(' ');
+}
+
+function isBroadCategory(category: string | null | undefined, industry: string | null | undefined): boolean {
+  const cleanCategory = normalize(category);
+  if (!cleanCategory) return true;
+  if (industry && cleanCategory === normalize(industry)) return true;
+  const words = cleanCategory.split(/\s+/).filter(Boolean);
+  return words.length <= 4 && BROAD_INDUSTRY_RE.test(cleanCategory);
+}
+
+export function refineCategory(input: {
+  category: string | null | undefined;
+  inferredIndustry: string | null | undefined;
+  useCases: string[];
+  summary: string | null | undefined;
+}): string {
+  const rawCategory = typeof input.category === 'string' ? input.category.trim() : '';
+  if (rawCategory && !isBroadCategory(rawCategory, input.inferredIndustry)) return rawCategory;
+
+  const blob = [input.summary, ...input.useCases].filter(Boolean).join(' ').toLowerCase();
+  if (/\b(version control|git repositories?|source code management|code hosting)\b/.test(blob)) {
+    return 'version control platform';
+  }
+  if (/\b(devops|ci\/cd|continuous integration|deployment pipeline)\b/.test(blob)) {
+    return 'DevOps platform';
+  }
+  if (/\b(collaborative coding|developer collaboration|software projects?)\b/.test(blob)) {
+    return 'developer collaboration platform';
+  }
+  if (/\b(luxury hotel|hotel|hospitality|resort)\b/.test(blob)) {
+    return 'luxury hotel brand';
+  }
+  if (/\b(digital transformation|technology consulting|expert witness|reputation management)\b/.test(blob)) {
+    return 'technology consulting firm';
+  }
+
+  const firstUseCase = input.useCases.find((item) => item && item.trim());
+  if (firstUseCase) {
+    const cleaned = compactPhrase(firstUseCase, 5)
+      .replace(/^(using|managing|tracking|finding|providing|implementing|seeking|booking|planning)\s+/i, '')
+      .replace(/\s+for\s+.+$/i, '')
+      .trim();
+    if (cleaned && !isBroadCategory(cleaned, input.inferredIndustry)) return cleaned;
+  }
+
+  return rawCategory || FALLBACK.category;
+}
+
+export function deriveProductContext(input: {
+  category: string;
+  useCases: string[];
+  summary: string | null | undefined;
+}): string {
+  const blob = [input.summary, input.category, ...input.useCases].filter(Boolean).join(' ').toLowerCase();
+  if (/\b(version control|git repositories?|source code management|code hosting|pull requests?)\b/.test(blob)) {
+    return 'version control and code collaboration';
+  }
+  if (/\b(devops|ci\/cd|continuous integration|deployment pipeline|workflow automation)\b/.test(blob)) {
+    return 'DevOps and development workflow automation';
+  }
+  if (/\b(collaborative coding|developer collaboration|software projects?)\b/.test(blob)) {
+    return 'software project collaboration';
+  }
+  if (/\b(luxury hotel|hotel|hospitality|resort|venue|wedding)\b/.test(blob)) {
+    return 'luxury hotel booking and guest experiences';
+  }
+  if (/\b(digital transformation|technology consulting|expert witness|reputation management)\b/.test(blob)) {
+    return 'digital transformation consulting';
+  }
+
+  const useCase = input.useCases.find((item) => item && item.trim());
+  if (useCase) return compactPhrase(useCase, 7);
+  return compactPhrase(input.category, 6) || FALLBACK.productContext;
+}
 
 export async function enrichDomainContext(input: EnrichInput): Promise<EnrichedContext> {
   const profileBlock = [
@@ -72,6 +171,9 @@ export async function enrichDomainContext(input: EnrichInput): Promise<EnrichedC
     (input.inferredSummary ?? input.rawText ?? '').slice(0, 3500),
     '',
     'Extract brand profile entities.',
+    'Category MUST be the specific product/service category a buyer asks about, not a broad industry label.',
+    'Good category examples: "version control platform", "luxury hotel brand", "digital transformation consulting".',
+    'Bad category examples: "Technology & IT", "Hospitality & Tourism", "business software".',
     'Personas: role + scale + vertical.',
     'Use cases: jobs-to-be-done.',
     'Return JSON: {category, vertical, personas[3], useCases[3], constraints[2-4], competitors[0-3], priceBand, year}',
@@ -121,10 +223,15 @@ export async function enrichDomainContext(input: EnrichInput): Promise<EnrichedC
     if (host && host !== input.host) competitorSet.add(host);
   }
 
+  const category = refineCategory({
+      category: typeof parsed.category === 'string' ? parsed.category : null,
+      inferredIndustry: input.inferredIndustry,
+      useCases,
+      summary: input.inferredSummary ?? input.rawText,
+    });
+
   return {
-    category: typeof parsed.category === 'string' && parsed.category.trim()
-      ? parsed.category.trim()
-      : FALLBACK.category,
+    category,
     vertical: typeof parsed.vertical === 'string' && parsed.vertical.trim() ? parsed.vertical.trim() : null,
     personas: personas.length === 3 ? personas : [...personas, ...FALLBACK.personas].slice(0, 3),
     useCases: useCases.length === 3 ? useCases : [...useCases, ...FALLBACK.useCases].slice(0, 3),
@@ -133,6 +240,11 @@ export async function enrichDomainContext(input: EnrichInput): Promise<EnrichedC
     priceBand: typeof parsed.priceBand === 'string' && parsed.priceBand.trim() && parsed.priceBand !== 'null'
       ? parsed.priceBand.trim()
       : null,
+    productContext: deriveProductContext({
+      category,
+      useCases: useCases.length ? useCases : FALLBACK.useCases,
+      summary: input.inferredSummary ?? input.rawText,
+    }),
     year: new Date().getFullYear().toString(),
   };
 }
