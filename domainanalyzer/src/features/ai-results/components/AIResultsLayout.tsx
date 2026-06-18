@@ -87,16 +87,6 @@ import { logoUrl as logoUrlHelper } from "@/lib/logoUrl";
 /** Backend-proxied logo URL for a host. Returns null if host is missing. */
 const logoUrlFor = (host: string | null | undefined): string | null => logoUrlHelper(host, 64);
 
-const sidebarItems: Array<{
-  id: AIResultsNavItemId;
-  iconSrc: string;
-  label: string;
-}> = [
-    { id: "ai-results", label: "AI Results", iconSrc: "/sidebar-icons/ai-results.svg" },
-    { id: "competitors", label: "Competitors Intelligence", iconSrc: "/sidebar-icons/track-prompts.svg" },
-    { id: "prompts", label: "Prompts Research", iconSrc: "/sidebar-icons/competitors.svg" },
-  ];
-
 type RailSectionItem = {
   id: string;
   label: string;
@@ -142,7 +132,7 @@ export function AIResultsLayout({
   const resolvedMaskedDomainId =
     maskedDomainId ??
     (currentDomainId ? buildDomainSlug({ id: currentDomainId, url: currentDomainUrl, host: currentDomainHost }) : undefined);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(() => window.innerWidth >= 1024);
   const isSidebarExpanded = sidebarOpen;
 
   const [isResultsSidebarOpen, setIsResultsSidebarOpen] = useState(() => {
@@ -198,20 +188,20 @@ export function AIResultsLayout({
           showResults={true}
           sidebarOpen={sidebarOpen}
           tabs={dashboardSidebarTabs}
-          defaultCollapsedOnDesktop={true}
+          defaultCollapsedOnDesktop={false}
         />
       </aside>
 
       <aside className={cn(
         "min-h-[220px] shrink-0 basis-auto border-b border-slate-300 bg-white lg:sticky lg:top-0 lg:h-screen lg:max-h-screen lg:border-b-0 lg:border-r lg:self-start transition-all duration-300 ease-in-out overflow-hidden flex flex-col",
         isResultsSidebarOpen 
-          ? "p-4 w-full lg:basis-[18%] lg:min-w-[260px] lg:max-w-[342px]" 
-          : "p-2 w-full lg:basis-0 lg:min-w-[64px] lg:max-w-[64px]"
+          ? "p-4 w-full lg:basis-[16%] lg:min-w-[230px] lg:max-w-[300px]" 
+          : "p-2 w-full lg:basis-0 lg:min-w-[58px] lg:max-w-[58px]"
       )}>
         <div className="flex h-full flex-col overflow-hidden">
           {/* Top of the sidebar — domain logo and toggle button */}
           <div className={cn("flex items-center", isResultsSidebarOpen ? "justify-between" : "justify-center flex-col gap-4")}>
-            <span className={cn("grid shrink-0 place-items-center overflow-hidden rounded-xl bg-slate-50 ring-1 ring-slate-200", isResultsSidebarOpen ? "h-10 w-10" : "h-9 w-9")}>
+            <span className={cn("grid shrink-0 place-items-center overflow-hidden rounded-xl bg-slate-50 ring-1 ring-slate-200", isResultsSidebarOpen ? "h-10 w-10" : "h-9 w-10")}>
               {triggerLogo ? (
                 <img
                   src={triggerLogo}
@@ -331,62 +321,94 @@ export function AIResultsLayout({
                 </DropdownMenuContent>
               </DropdownMenu>
             ) : (
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Link 
-                      to={resolveSidebarNavigation("domain-history").path}
-                      className="flex h-10 w-10 items-center justify-center rounded-lg border border-slate-300 bg-white shadow-sm transition hover:bg-gray-50"
-                    >
-                      <Globe2 className="h-5 w-5 text-slate-500" />
-                    </Link>
-                  </TooltipTrigger>
-                  <TooltipContent side="right">Change Domain</TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
+              <DropdownMenu>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <DropdownMenuTrigger asChild>
+                        <button
+                          type="button"
+                          className="flex h-10 w-10 items-center justify-center rounded-lg border border-slate-300 shadow-sm transition hover:bg-gray-50"
+                          aria-label="Change domain"
+                        >
+                          {triggerLogo ? (
+                            <img
+                              src={triggerLogo}
+                              alt=""
+                              className="h-6 w-6 object-contain"
+                              onError={(e) => ((e.currentTarget as HTMLImageElement).style.display = "none")}
+                            />
+                          ) : (
+                            <Globe2 className="h-5 w-5 text-slate-500" />
+                          )}
+                        </button>
+                      </DropdownMenuTrigger>
+                    </TooltipTrigger>
+                    <TooltipContent side="right">Change Domain</TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+                <DropdownMenuContent
+                  className="w-[280px] p-1 max-h-[60vh] overflow-y-auto custom-scrollbar"
+                  align="start"
+                >
+                  {allDomains.length > 0 ? (
+                    allDomains.map((domain) => {
+                      const nextMaskedId = buildDomainSlug(domain);
+                      const name = displayDomainName(domain);
+                      const logo = logoUrlFor(domain.host ?? domain.url);
+                      const isCurrent = domain.id === currentDomainId;
+                      const targetPath = resolveAIResultsNavigation(activeItem, nextMaskedId);
+
+                      return (
+                        <DropdownMenuItem
+                          key={domain.id}
+                          asChild
+                          className={`flex cursor-pointer items-center gap-2.5 px-2.5 py-2 ${isCurrent ? "bg-gray-50" : ""}`}
+                        >
+                          <Link to={targetPath}>
+                            <span className="grid h-7 w-7 shrink-0 place-items-center overflow-hidden rounded-md bg-slate-50">
+                              {logo ? (
+                                <img
+                                  src={logo}
+                                  alt=""
+                                  className="h-6 w-6 object-contain"
+                                  onError={(e) => ((e.currentTarget as HTMLImageElement).style.display = "none")}
+                                />
+                              ) : (
+                                <Globe2 className="h-3.5 w-3.5 text-slate-500" />
+                              )}
+                            </span>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="truncate text-xs font-semibold text-gray-900">{name}</span>
+                                {isCurrent ? <Sparkles className="h-3 w-3 shrink-0 text-emerald-600" /> : null}
+                              </div>
+                              <span className="block truncate text-[10px] text-gray-500">
+                                {domain.host ?? domain.url.replace(/^https?:\/\//, '')}
+                                {' Â· '}
+
+                                {domain.lastAnalyzed
+                                  ? new Date(domain.lastAnalyzed).toLocaleString('en-IN', {
+                                    day: '2-digit',
+                                    month: 'short',
+                                    year: 'numeric'
+                                  })
+                                : 'No date'}
+                              </span>
+                            </div>
+                          </Link>
+                        </DropdownMenuItem>
+                      );
+                    })
+                  ) : (
+                    <div className="p-3 text-center text-xs text-gray-500">No other domains found</div>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
             )}
           </div>
 
-          <nav className={cn("mt-5 space-y-1", !isResultsSidebarOpen && "flex flex-col items-center")}>
-            {sidebarItems.map((item) => {
-              const isActive = item.id === activeItem;
-              const targetPath = resolvedMaskedDomainId 
-                ? resolveAIResultsNavigation(item.id, resolvedMaskedDomainId, item.id === "prompts" ? "all-prompts" : undefined)
-                : "#";
-
-              return (
-                <TooltipProvider key={item.id}>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Link
-                        to={targetPath}
-                        className={cn(
-                          "flex items-center gap-3 rounded-lg transition",
-                          isResultsSidebarOpen ? "w-full px-3 py-2 text-left text-xs font-medium" : "h-10 w-10 justify-center",
-                          isActive ? "bg-[#2f4462] text-white" : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
-                        )}
-                      >
-                        <img
-                          src={item.iconSrc}
-                          alt=""
-                          aria-hidden="true"
-                          className={cn(
-                            "shrink-0",
-                            isResultsSidebarOpen ? "h-4 w-4" : "h-5 w-5",
-                            item.id === "ai-results"
-                              ? isActive ? "opacity-100" : "brightness-0 opacity-80"
-                              : isActive ? "brightness-0 invert" : "opacity-80"
-                          )}
-                        />
-                        {isResultsSidebarOpen && item.label}
-                      </Link>
-                    </TooltipTrigger>
-                    {!isResultsSidebarOpen && <TooltipContent side="right">{item.label}</TooltipContent>}
-                  </Tooltip>
-                </TooltipProvider>
-              );
-            })}
-          </nav>
+          <div className="mt-5" />
         </div>
       </aside>
 

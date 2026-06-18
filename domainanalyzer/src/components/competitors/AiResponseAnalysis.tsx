@@ -8,6 +8,16 @@ interface AiResponseAnalysisProps {
   loading?: boolean;
 }
 
+const appendUtmSource = (value: string): string => {
+  try {
+    const url = new URL(value.startsWith('http://') || value.startsWith('https://') ? value : `https://${value}`);
+    url.searchParams.set('utm_source', 'searcheo_ai');
+    return url.toString();
+  } catch {
+    return value;
+  }
+};
+
 function StatCard({
   label,
   value,
@@ -53,7 +63,14 @@ function RankingRow({
         <span className="grid h-8 w-8 shrink-0 place-items-center overflow-hidden rounded-md border border-slate-200 bg-white">
           <img src={item.logo} alt="" className="h-6 w-6 object-contain" />
         </span>
-        <span className="truncate text-sm font-medium text-slate-700">{item.domain}</span>
+        <a
+          href={appendUtmSource(item.domain)}
+          target="_blank"
+          rel="noreferrer"
+          className="truncate text-sm font-medium text-slate-700 transition hover:text-[#2D5B93] hover:underline"
+        >
+          {item.domain}
+        </a>
       </div>
 
       <div className="flex items-center gap-3">
@@ -172,7 +189,14 @@ export function AiResponseAnalysis({ data, prompt, loading }: AiResponseAnalysis
                 <span className="grid h-8 w-8 shrink-0 place-items-center overflow-hidden rounded-md border border-slate-200 bg-white">
                   <img src={item.logo} alt="" className="h-6 w-6 object-contain" />
                 </span>
-                <span className="truncate text-sm font-medium text-slate-700">{item.domain}</span>
+                <a
+                  href={appendUtmSource(item.domain)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="truncate text-sm font-medium text-slate-700 transition hover:text-[#2D5B93] hover:underline"
+                >
+                  {item.domain}
+                </a>
               </div>
 
               <div className="flex items-center gap-3">

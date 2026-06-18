@@ -756,7 +756,7 @@ const AIResponseViewer = ({
                 {activeResult.phrase || 'Analysis Result'}
               </h3>
               <div className="prose prose-slate prose-sm max-w-none prose-headings:font-semibold prose-headings:text-slate-800 prose-h1:text-[18px] prose-h2:text-[15px] prose-h3:text-[14px] prose-p:text-slate-600/95 prose-p:leading-relaxed prose-strong:text-slate-800 prose-strong:font-semibold prose-ul:list-disc prose-ul:pl-5 prose-ol:pl-5 prose-li:text-slate-600/95 prose-li:my-0.5 prose-a:text-blue-600 prose-a:no-underline hover:prose-a:underline prose-code:rounded prose-code:bg-slate-100 prose-code:px-1 prose-code:py-0.5 prose-code:text-[12px] prose-code:before:content-[''] prose-code:after:content-[''] prose-pre:rounded-md prose-pre:bg-slate-900 prose-pre:text-slate-100">
-                <ReactMarkdown>{activeResult.response || 'No response available.'}</ReactMarkdown>
+                <ReactMarkdown components={markdownLinkComponents}>{activeResult.response || 'No response available.'}</ReactMarkdown>
               </div>
 
               {competitorMentions.length > 0 && (
@@ -1003,12 +1003,24 @@ const getHref = (s: string) => {
     if (url.hostname.includes(' ') || url.hostname.includes('%20') || !url.hostname.includes('.')) {
       throw new Error('Invalid hostname');
     }
-    return target;
+    url.searchParams.set('utm_source', 'searcheo_ai');
+    return url.toString();
   } catch {
     // If invalid URL structure, strip the protocol and treat as search
     const query = s.includes('://') ? s.split('://')[1] : s;
     return `https://www.google.com/search?q=${encodeURIComponent(decodeURIComponent(query))}`;
   }
+};
+
+const markdownLinkComponents = {
+  a: ({ href, children, ...props }: any) => {
+    const resolvedHref = getHref(typeof href === 'string' ? href : '');
+    return (
+      <a href={resolvedHref} target="_blank" rel="noopener noreferrer" {...props}>
+        {children}
+      </a>
+    );
+  },
 };
 
 const CitationSidebar = ({ activeResult }: { activeResult: any }) => {

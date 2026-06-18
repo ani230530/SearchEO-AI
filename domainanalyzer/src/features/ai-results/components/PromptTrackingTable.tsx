@@ -262,11 +262,23 @@ const getHref = (value: string) => {
     if (url.hostname.includes(" ") || url.hostname.includes("%20") || !url.hostname.includes(".")) {
       throw new Error("Invalid hostname");
     }
-    return target;
+    url.searchParams.set("utm_source", "searcheo_ai");
+    return url.toString();
   } catch {
     const query = value.includes("://") ? value.split("://")[1] : value;
     return `https://www.google.com/search?q=${encodeURIComponent(decodeURIComponent(query))}`;
   }
+};
+
+const markdownLinkComponents = {
+  a: ({ href, children, ...props }: any) => {
+    const resolvedHref = getHref(typeof href === "string" ? href : "");
+    return (
+      <a href={resolvedHref} target="_blank" rel="noopener noreferrer" {...props}>
+        {children}
+      </a>
+    );
+  },
 };
 
 /**
@@ -478,7 +490,7 @@ const CitationCard = ({ citation }: { citation: CitationLike }) => {
   const blurb = (citation.snippet || citation.citedText || "")?.toString().trim();
   return (
     <a
-      href={citation.url ?? `https://${host}`}
+      href={getHref(citation.url ?? `https://${host}`)}
       target="_blank"
       rel="noreferrer"
       className="group block rounded-[10px] border border-slate-200 bg-white p-3 transition hover:border-slate-300 hover:shadow-sm"
@@ -539,7 +551,7 @@ const CompetitorPill = ({ host, name, sentiment }: { host: string; name?: string
       : "text-slate-700 bg-slate-50 border-slate-200";
   return (
     <a
-      href={host ? `https://${host}` : "#"}
+      href={host ? getHref(`https://${host}`) : "#"}
       target="_blank"
       rel="noreferrer"
       className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium transition hover:shadow-sm ${tone}`}
@@ -621,7 +633,7 @@ const PromptAIResponsePanel = ({
         <div className="min-h-[260px] flex-1 overflow-y-auto px-4 py-4 lg:max-h-[420px] lg:border-r lg:border-slate-100 custom-scrollbar">
           {activeResult.response?.trim() ? (
             <article className="prose prose-sm prose-slate max-w-none prose-headings:font-semibold prose-headings:text-slate-900 prose-h1:text-[15px] prose-h2:text-[14px] prose-h3:text-[13px] prose-p:text-[13px] prose-p:leading-relaxed prose-p:text-slate-700 prose-li:text-[13px] prose-li:text-slate-700 prose-a:text-blue-600 prose-a:no-underline hover:prose-a:underline prose-strong:text-slate-900 prose-code:rounded prose-code:bg-slate-100 prose-code:px-1 prose-code:py-0.5 prose-code:text-[12px] prose-code:font-medium prose-code:text-slate-800">
-              <ReactMarkdown>{activeResult.response}</ReactMarkdown>
+              <ReactMarkdown components={markdownLinkComponents}>{activeResult.response}</ReactMarkdown>
             </article>
           ) : (
             <p className="text-[13px] italic text-slate-400">

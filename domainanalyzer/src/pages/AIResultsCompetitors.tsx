@@ -113,6 +113,8 @@ interface SelectedCompetitor {
   loading?: boolean;
 }
 
+const MAX_COMPETITORS = 10;
+
 interface ReportOpportunity {
   key: string;
   type: string;
@@ -498,15 +500,19 @@ function normalizeHostInput(raw: string): string | null {
 function CompetitorSelector({
   competitors,
   onAdd,
+  onRemove,
 }: {
   competitors: SelectedCompetitor[];
   onAdd: (host: string) => Promise<void>;
+  onRemove: (host: string) => Promise<void>;
 }) {
   const [search, setSearch] = useState('');
   const [adding, setAdding] = useState(false);
   const [draft, setDraft] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [removingHost, setRemovingHost] = useState<string | null>(null);
   const [localError, setLocalError] = useState<string | null>(null);
+  const canAddMore = competitors.length < MAX_COMPETITORS;
 
   const filtered = useMemo(() => {
     if (!search.trim()) return competitors;
@@ -520,6 +526,19 @@ function CompetitorSelector({
     setLocalError(null);
   };
 
+  const handleRemove = async (host: string) => {
+    setLocalError(null);
+    setRemovingHost(host);
+    try {
+      await onRemove(host);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to remove competitor.';
+      setLocalError(msg);
+    } finally {
+      setRemovingHost((current) => (current === host ? null : current));
+    }
+  };
+
   const submitAdd = async () => {
     const host = normalizeHostInput(draft);
     if (!host) {
@@ -528,6 +547,10 @@ function CompetitorSelector({
     }
     if (competitors.some((c) => c.host.toLowerCase() === host)) {
       setLocalError('Already tracked.');
+      return;
+    }
+    if (!canAddMore) {
+      setLocalError(`You can track up to ${MAX_COMPETITORS} competitors only.`);
       return;
     }
     setLocalError(null);
@@ -596,11 +619,18 @@ function CompetitorSelector({
         ) : (
           <button
             type="button"
-            onClick={() => setAdding(true)}
-            className="inline-flex h-9 items-center gap-2 rounded bg-[#243B5A] px-4 text-xs font-semibold text-white shadow-sm transition hover:bg-[#1F334D]"
+            onClick={() => {
+              if (!canAddMore) {
+                setLocalError(`You can track up to ${MAX_COMPETITORS} competitors only.`);
+                return;
+              }
+              setAdding(true);
+            }}
+            disabled={!canAddMore}
+            className="inline-flex h-9 items-center gap-2 rounded bg-[#243B5A] px-4 text-xs font-semibold text-white shadow-sm transition hover:bg-[#1F334D] disabled:cursor-not-allowed disabled:opacity-60"
           >
             <Plus className="h-3.5 w-3.5" />
-            Add competitor
+            {canAddMore ? 'Add competitor' : 'Limit reached'}
           </button>
         )}
       </div>
@@ -618,21 +648,34 @@ function CompetitorSelector({
       ) : (
         <div className="flex flex-wrap gap-3">
           {filtered.map((c, idx) => (
-            <span
+            <div
               key={c.host}
               title={c.loading ? 'Scoring against saved AI responses…' : c.host}
-              className={`inline-flex h-9 items-center gap-2 rounded border border-slate-200 bg-white px-3 text-xs font-semibold shadow-sm ${c.loading ? 'text-[#7B8494]' : 'text-[#2D4059]'}`}
+              className={`group inline-flex h-9 items-center gap-2 rounded-full border px-3 text-xs font-semibold shadow-sm transition ${
+                c.loading
+                  ? 'border-slate-200 bg-slate-50 text-[#7B8494]'
+                  : 'border-slate-200 bg-white text-[#2D4059] hover:border-[#B7C8E8] hover:bg-[#F8FBFF]'
+              }`}
             >
-              <span className="relative grid h-6 w-6 place-items-center overflow-hidden rounded" style={{ backgroundColor: `${colorForHost(c.host, idx)}22` }}>
+              <span className="relative grid h-6 w-6 place-items-center overflow-hidden rounded-full" style={{ backgroundColor: `${colorForHost(c.host, idx)}22` }}>
                 {c.loading ? (
                   <Loader2 className="h-3.5 w-3.5 animate-spin text-[#5F6877]" />
                 ) : (
                   <img src={c.logoUrl} alt="" className="h-5 w-5 object-contain" />
                 )}
               </span>
-              {c.host}
+              <span className="max-w-[180px] truncate">{c.host}</span>
               {c.loading ? <span className="ml-1 text-[10px] font-normal text-[#7B8494]">Scoring…</span> : null}
-            </span>
+              <button
+                type="button"
+                aria-label={`Remove ${c.host}`}
+                disabled={c.loading || removingHost === c.host}
+                onClick={() => void handleRemove(c.host)}
+                className="ml-0.5 inline-flex h-5 w-5 items-center justify-center rounded-full text-[#98A2B3] transition hover:bg-rose-50 hover:text-rose-600 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {removingHost === c.host ? <Loader2 className="h-3 w-3 animate-spin" /> : <X className="h-3.5 w-3.5" />}
+              </button>
+            </div>
           ))}
         </div>
       )}
@@ -979,24 +1022,24 @@ function AnalysisResultCard({
   const threatLabel = competitor.threatLevel ? `${competitor.threatLevel} Threat` : 'Unranked';
 
   return (
-    <article className="shrink-0 grid min-w-0 grid-cols-[minmax(0,1fr)_56px] overflow-hidden rounded-xl border border-slate-200 bg-white">
-      <div className="min-w-0 p-5">
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex min-w-0 items-center gap-4">
-            <span className="grid h-14 w-14 shrink-0 place-items-center overflow-hidden rounded-xl bg-[#EEF4FF]">
-              <img src={competitorLogo(competitor.host, 64)} alt="" className="h-10 w-10 object-contain" />
+    <article className="shrink-0 grid min-w-0 grid-cols-[minmax(0,1fr)_44px] overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+      <div className="min-w-0 p-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-3">
+            <span className="grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-lg bg-[#EEF4FF]">
+              <img src={competitorLogo(competitor.host, 64)} alt="" className="h-8 w-8 object-contain" />
             </span>
             <div className="min-w-0">
-              <h4 className="truncate text-xl font-semibold leading-6 text-[#1F2937]">{competitor.host}</h4>
-              <p className="mt-2 truncate text-sm font-medium text-[#7B8494]">Market Share: {Math.round(competitor.marketShare * 100)}%</p>
+              <h4 className="truncate text-base font-semibold leading-5 text-[#1F2937]">{competitor.host}</h4>
+              <p className="mt-1 truncate text-xs font-medium text-[#7B8494]">Market Share: {Math.round(competitor.marketShare * 100)}%</p>
             </div>
           </div>
-          <span className={`inline-flex h-5 shrink-0 items-center rounded-full border px-2.5 text-[10px] font-medium ${threatStyles}`}>
+          <span className={`inline-flex h-5 shrink-0 items-center rounded-full border px-2 text-[10px] font-medium ${threatStyles}`}>
             {threatLabel}
           </span>
         </div>
 
-        <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
           <AnalysisInfoBox title="Strongest Prompt Cluster" value={formatStrongestCluster(competitor)} />
           <AnalysisInfoBox title="Top Cited Source Types" value={formatSourceTypes(competitor.topCitedSourceTypes)} />
         </div>
@@ -1008,7 +1051,7 @@ function AnalysisResultCard({
         onClick={() => onOpenDetail(competitor)}
         className="flex h-full items-center justify-center border-l border-[#D5D7DA] bg-[#F9F9F9] text-[#8A93A3] transition hover:bg-[#F4F4F5] hover:text-[#2D4059]"
       >
-        <ChevronRight className="h-9 w-9" strokeWidth={2.25} />
+        <ChevronRight className="h-7 w-7" strokeWidth={2.25} />
       </button>
     </article>
   );
@@ -1046,13 +1089,13 @@ function AICompetitorAnalysisResults({
   }, [competitors]);
 
   return (
-    <section id="competitors-analysis" data-title="AI-Based Competitor Analysis Results" className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+    <section id="competitors-analysis" data-title="AI-Based Competitor Analysis Results" className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
       <div>
-        <h3 className="text-xl font-semibold leading-none text-[#2D4059]">AI-Based Competitor Analysis Results</h3>
-        <p className="mt-5 text-sm text-[#7B8494]">Compare AI analysis of competitor performance and visibility.</p>
+        <h3 className="text-lg font-semibold leading-none text-[#2D4059]">AI-Based Competitor Analysis Results</h3>
+        <p className="mt-3 text-sm text-[#7B8494]">Compare AI analysis of competitor performance and visibility.</p>
       </div>
 
-      <div className="mt-7 flex max-h-[640px] flex-col gap-6 overflow-y-auto pr-2">
+      <div className="mt-5 flex max-h-[700px] flex-col gap-4 overflow-y-auto pr-1 border">
         {visibleCompetitors.length === 0 ? (
           <p className="rounded-md border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-center text-sm text-slate-500">
             No competitors mentioned in this audit yet. Re-run the audit, or add competitors in the wizard.
@@ -1456,6 +1499,12 @@ export default function CompetitorsPage() {
   // list lands.
   const handleAddCompetitor = async (host: string): Promise<void> => {
     if (!domainId) throw new Error('No domain selected.');
+    if (selected.length >= MAX_COMPETITORS) {
+      throw new Error(`You can track up to ${MAX_COMPETITORS} competitors only.`);
+    }
+    if (selected.some((c) => c.host.toLowerCase() === host.toLowerCase())) {
+      throw new Error('Already tracked.');
+    }
     setOptimisticPills((p) => [
       ...p,
       { host, url: `https://${host}`, logoUrl: competitorLogo(host, 32), rank: null, threatLevel: null, loading: true },
@@ -1471,6 +1520,19 @@ export default function CompetitorsPage() {
       setOptimisticPills((p) => p.filter((c) => c.host !== host));
       throw err;
     }
+  };
+
+  const handleRemoveCompetitor = async (host: string): Promise<void> => {
+    if (!domainId) throw new Error('No domain selected.');
+    const remainingHosts = selected
+      .filter((competitor) => competitor.host.toLowerCase() !== host.toLowerCase())
+      .map((competitor) => competitor.host);
+    await apiPost(`/wizard/domain/${domainId}/competitors/select`, { hosts: remainingHosts });
+    setOptimisticPills((p) => p.filter((c) => c.host.toLowerCase() !== host.toLowerCase()));
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: aiResultsKeys.competitors(domainId) }),
+      queryClient.invalidateQueries({ queryKey: aiResultsKeys.competitorAnalysis(domainId) }),
+    ]);
   };
 
   // Manual refresh — invalidate every run-derived query for this domain so the
@@ -1686,7 +1748,7 @@ export default function CompetitorsPage() {
                 </div>
               </section>
 
-              <CompetitorSelector competitors={selected} onAdd={handleAddCompetitor} />
+              <CompetitorSelector competitors={selected} onAdd={handleAddCompetitor} onRemove={handleRemoveCompetitor} />
 
               <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.45fr)_minmax(360px,0.85fr)]">
                 <TrendComparisonPanel trends={trends} />

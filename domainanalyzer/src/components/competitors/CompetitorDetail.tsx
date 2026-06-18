@@ -8,6 +8,16 @@ import {
   type CompetitorInsightPriority,
 } from './competitorDetailData';
 
+const appendUtmSource = (value: string): string => {
+  try {
+    const url = new URL(value.startsWith('http://') || value.startsWith('https://') ? value : `https://${value}`);
+    url.searchParams.set('utm_source', 'searcheo_ai');
+    return url.toString();
+  } catch {
+    return value;
+  }
+};
+
 interface CompetitorDetailProps {
   competitor: CompetitorDetailData;
 }
@@ -31,6 +41,15 @@ function DetailHeader({ competitor }: { competitor: CompetitorDetailData }) {
             </Badge>
           </div>
           <p className="mt-2 text-sm text-slate-500">{competitor.subtitle}</p>
+          <a
+            href={appendUtmSource(competitor.domain)}
+            target="_blank"
+            rel="noreferrer"
+            className="mt-3 inline-flex items-center gap-1.5 text-sm font-medium text-[#355DAA] transition hover:text-[#24447A] hover:underline"
+          >
+            Visit website
+            <ArrowRight className="h-3.5 w-3.5" />
+          </a>
         </div>
       </div>
     </div>
