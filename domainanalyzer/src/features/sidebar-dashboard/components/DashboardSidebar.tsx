@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState, type MouseEvent, type ReactNode } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import {
   BarChart3,
   ChevronRight,
   ChevronLeft,
+  ClipboardList,
   Lightbulb,
   Link as LinkIcon,
   CircleHelp,
@@ -30,7 +31,7 @@ import type {
   TabId,
 } from "@/features/sidebar-dashboard/types";
 import type { SettingsSubTab } from "@/features/sidebar-dashboard/sections/settings/types";
-import { resolveDashboardPath, resolveSidebarNavigation } from "@/features/sidebar-dashboard/navigation";
+import { resolveAIResultsNavigation, resolveDashboardPath, resolveSidebarNavigation } from "@/features/sidebar-dashboard/navigation";
 
 interface DashboardSidebarProps {
   activeCompanySubTab: CompanySubTabId;
@@ -56,6 +57,7 @@ type SidebarActionItem = {
   onClick?: () => void;
   href?: string;
   variant?: "standard" | "primary" | "premium";
+  subItems?: SidebarActionItem[];
 };
 
 type SidebarSection = {
@@ -78,10 +80,16 @@ export function DashboardSidebar({
   tabs: _tabs,
   defaultCollapsedOnDesktop = false,
 }: DashboardSidebarProps) {
+  const location = useLocation();
   const [isCompactViewport, setIsCompactViewport] = useState(false);
+  const [isAiVisibilityExpanded, setIsAiVisibilityExpanded] = useState(() => {
+    const saved = localStorage.getItem("dashboard:aiVisibilityExpanded");
+    return saved !== "false";
+  });
   void _tabs;
   void _activeCompanySubTab;
   void _showResults;
+  const aiVisibilityDomainSlug = localStorage.getItem("ai-visibility:lastDomainSlug") ?? undefined;
 
   const isModifiedClick = (event: MouseEvent<HTMLElement>) =>
     event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0;
@@ -107,6 +115,20 @@ export function DashboardSidebar({
     ? "sidebar closed compact"
     : `sidebar ${isSidebarExpanded ? "open" : "closed"}`;
 
+  const currentPathname = location.pathname;
+  const isAiResultsActive = /^\/ai-results\/[^/]+\/?$/.test(currentPathname) && !currentPathname.endsWith("/prompts");
+  const isCompetitorIntelligenceActive = currentPathname.startsWith("/airesults-competitors-preview");
+  const isPromptResearchActive = /^\/ai-results\/[^/]+\/prompts\/?$/.test(currentPathname);
+  const isAiVisibilitySubItemActive = (subItemKey: string) =>
+    (subItemKey === "ai-results" && isAiResultsActive) ||
+    (subItemKey === "competitor-intelligence" && isCompetitorIntelligenceActive) ||
+    (subItemKey === "prompt-research" && isPromptResearchActive);
+  const isAiVisibilityParentActive = activeTab === "ai-visibility" || isAiResultsActive || isCompetitorIntelligenceActive || isPromptResearchActive;
+
+  useEffect(() => {
+    localStorage.setItem("dashboard:aiVisibilityExpanded", String(isAiVisibilityExpanded));
+  }, [isAiVisibilityExpanded]);
+
   const sections = useMemo<SidebarSection[]>(() => {
     return [
       {
@@ -125,10 +147,39 @@ export function DashboardSidebar({
             key: "ai-visibility",
             label: "AI Visibility",
             icon: <Sparkles className="h-4 w-4" />,
-            isActive: activeTab === "ai-visibility",
-            onClick: () => onSelectTab("ai-visibility"),
+            isActive: isAiVisibilityParentActive,
+            onClick: () => {
+              setIsAiVisibilityExpanded(true);
+              onSelectTab("ai-visibility");
+            },
             href: resolveDashboardPath("ai-visibility"),
             variant: "premium",
+            subItems: [
+              {
+                key: "ai-results",
+                label: "AI Results",
+                icon: <ClipboardList className="h-3.5 w-3.5" />,
+                href: aiVisibilityDomainSlug
+                  ? resolveAIResultsNavigation("ai-results", aiVisibilityDomainSlug)
+                  : resolveDashboardPath("ai-visibility"),
+              },
+              {
+                key: "competitor-intelligence",
+                label: "Competitor Intelligence",
+                icon: <BarChart3 className="h-3.5 w-3.5" />,
+                href: aiVisibilityDomainSlug
+                  ? resolveAIResultsNavigation("competitors", aiVisibilityDomainSlug)
+                  : resolveDashboardPath("ai-visibility"),
+              },
+              {
+                key: "prompt-research",
+                label: "Prompt Research",
+                icon: <Send className="h-3.5 w-3.5" />,
+                href: aiVisibilityDomainSlug
+                  ? resolveAIResultsNavigation("prompts", aiVisibilityDomainSlug)
+                  : resolveDashboardPath("ai-visibility"),
+              },
+            ],
           },
         ],
       },
@@ -322,20 +373,72 @@ export function DashboardSidebar({
                     };
 
                     return (
-                      <Tooltip key={item.key}>
-                        <TooltipTrigger asChild>
-                          {item.href ? (
-                            <Link to={item.href} {...commonProps}>
-                              {tabContent}
-                            </Link>
-                          ) : (
-                            <button type="button" {...commonProps}>
-                              {tabContent}
-                            </button>
-                          )}
-                        </TooltipTrigger>
-                        <TooltipContent side="right">{item.label}</TooltipContent>
-                      </Tooltip>
+                      <div key={item.key}>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            {item.href ? (
+                              <Link to={item.href} {...commonProps}>
+                                {tabContent}
+                              </Link>
+                            ) : (
+                              <button type="button" {...commonProps}>
+                                {tabContent}
+                              </button>
+                            )}
+                          </TooltipTrigger>
+                          <TooltipContent side="right">{item.label}</TooltipContent>
+                        </Tooltip>
+
+                        {item.subItems?.length && (isSidebarExpanded || isAiVisibilityExpanded) ? (
+                          <div className={isSidebarExpanded ? "mt-1 ml-4 space-y-1 border-l border-slate-200 pl-3" : "mt-1 flex flex-col items-center gap-1"}>
+                            {item.subItems.map((subItem) => (
+                            <Tooltip key={subItem.key}>
+                              <TooltipTrigger asChild>
+                                  <Link
+                                    to={subItem.href ?? resolveDashboardPath("ai-visibility")}
+                                    onClick={() => setIsAiVisibilityExpanded(true)}
+                                    className={
+                                      isSidebarExpanded
+                                        ? `group flex items-center gap-2 rounded-md px-2 py-1.5 transition ${
+                                            isAiVisibilitySubItemActive(subItem.key)
+                                              ? "border border-[#9DB3DD] bg-[#EFF5FF] text-[#213A63] shadow-[0_6px_16px_rgba(47,68,98,0.10)]"
+                                              : "border border-transparent text-slate-500 hover:border-slate-200 hover:bg-slate-50 hover:text-slate-900"
+                                          }`
+                                        : `group flex h-9 w-9 items-center justify-center rounded-lg transition ${
+                                            isAiVisibilitySubItemActive(subItem.key)
+                                              ? "border border-[#9DB3DD] bg-[#EFF5FF] text-[#213A63] shadow-[0_6px_16px_rgba(47,68,98,0.10)]"
+                                              : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
+                                          }`
+                                    }
+                                  >
+                                    <span
+                                      className={`flex h-6 w-6 items-center justify-center rounded-md transition ${
+                                        isAiVisibilitySubItemActive(subItem.key)
+                                          ? "bg-white text-[#355A9B]"
+                                          : "bg-white text-slate-400"
+                                      }`}
+                                    >
+                                      {subItem.icon}
+                                    </span>
+                                    {isSidebarExpanded ? (
+                                      <span
+                                        className={`sidebar-tab-label text-[12px] font-semibold transition ${
+                                          isAiVisibilitySubItemActive(subItem.key)
+                                            ? "text-[#213A63]"
+                                            : "text-slate-500"
+                                        }`}
+                                      >
+                                        {subItem.label}
+                                      </span>
+                                    ) : null}
+                                  </Link>
+                                </TooltipTrigger>
+                                <TooltipContent side="right">{subItem.label}</TooltipContent>
+                              </Tooltip>
+                            ))}
+                          </div>
+                        ) : null}
+                      </div>
                     );
                   })}
                 </div>
