@@ -27,6 +27,9 @@ const AIResultsCompetitors = lazy(() => import("./pages/AIResultsCompetitors"));
 const PromptsPage = lazy(() => import("./pages/PromptsPage"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const VerifyEmailPending = lazy(() => import("./pages/VerifyEmailPending"));
+const Blog = lazy(() => import("./pages/Blog"));
+const Solutions = lazy(() => import("./pages/Solutions"));
+const Pricing = lazy(() => import("./pages/Pricing"));
 
 // Tab-switching inside the AI Checker reuses cached query data for ~5 min
 // instead of refetching on every mount. gcTime=30min keeps results around
@@ -120,6 +123,9 @@ const App = () => (
             <Routes>
               {/* Public routes */}
               <Route path="/" element={<RootRoute />} />
+              <Route path="/blog" element={<Blog />} />
+              <Route path="/solutions" element={<Solutions />} />
+              <Route path="/pricing" element={<Pricing />} />
               {/* Anonymous AI Visibility audit. Same component as the
                   authenticated dashboard wizard — runs against the wizard
                   cookie identity when no JWT is present. Steps 1-4 work

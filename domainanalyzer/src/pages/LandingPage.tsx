@@ -6,6 +6,7 @@ import Testimonials from "../components/Testimonials";
 import FeaturesSection from "../components/Features";
 import ProcessFlow from "../components/ProcessFlow";
 import AIModels from "../components/AIModels";
+import MarketingHeader from "@/components/marketing/MarketingHeader";
 
 function LandingPage() {
   const navigate = useNavigate();
@@ -521,15 +522,7 @@ footer {
 }
       `}</style>
 
-        {/* Header */}
-        <header className="header">
-            <a className="brand" href="#" target="_blank" rel="noopener noreferrer">
-              AI Brand Analyzer
-            </a>
-          <button className="cta" type="button" onClick={() => navigate('/auth')}>
-            login/signup
-          </button>
-        </header>
+        <MarketingHeader />
 
         {/* Hero */}
         <main className="hero">
