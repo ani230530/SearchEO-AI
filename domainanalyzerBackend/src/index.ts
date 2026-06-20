@@ -29,6 +29,14 @@ import { startTimeoutChecker } from './services/n8nTimeout';
 const app = express();
 const prisma = new PrismaClient();
 
+// Boot-time diagnostics for the wizard AI paths.
+// Never print secrets; only log presence so runtime env mismatches are obvious.
+console.log(
+  `[BOOT] cwd=${process.cwd()} nodeEnv=${process.env.NODE_ENV ?? 'undefined'} ` +
+    `openrouterKey=${process.env.OPENROUTER_API_KEY?.trim() ? 'present' : 'missing'} ` +
+    `openaiKey=${process.env.OPENAI_API_KEY?.trim() ? 'present' : 'missing'}`
+);
+
 const allowedOrigins = [
   'http://localhost:3000',
   'http://localhost:3001',
@@ -181,8 +189,4 @@ app.listen(PORT, () => {
   // Worksheet generation stale-job sweeper (campaigns/blog flow).
   const { startStaleJobSweeper } = require('./services/generationJobService');
   startStaleJobSweeper();
-  // Weekly tracked-prompt re-test scheduler (BullMQ repeatable, idempotent).
-  const { registerWeeklyTracking } = require('./services/weeklyTrackingService');
-  registerWeeklyTracking().catch((e: unknown) =>
-    console.error('[startup] weekly tracking registration failed', e));
 });

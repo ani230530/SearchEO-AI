@@ -293,23 +293,6 @@ export interface PersistedTopicsItem {
 }
 
 export async function persistAuditPrompts(args: PersistArgs): Promise<PersistedTopicsItem[]> {
-  // Fresh regen wipes AI-source rows; append mode keeps them.
-  if (!args.append) {
-    const aiKeywords = await args.prisma.keyword.findMany({
-      where: { domainId: args.domainId, source: 'ai' },
-      select: { id: true },
-    });
-    const aiKeywordIds = aiKeywords.map((k) => k.id);
-    if (aiKeywordIds.length > 0) {
-      await args.prisma.prompt.deleteMany({
-        where: { domainId: args.domainId, OR: [{ keywordId: { in: aiKeywordIds } }, { keywordId: null, source: 'ai' }] },
-      });
-      await args.prisma.keyword.deleteMany({ where: { id: { in: aiKeywordIds } } });
-    } else {
-      await args.prisma.prompt.deleteMany({ where: { domainId: args.domainId, source: 'ai', keywordId: null } });
-    }
-  }
-
   const out: PersistedTopicsItem[] = [];
 
   // Group prompts by their keyword text so we upsert one Keyword row per unique seed.

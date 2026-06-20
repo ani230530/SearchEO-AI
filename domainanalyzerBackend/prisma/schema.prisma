@@ -145,6 +145,10 @@ model Domain {
   url               String // canonical https://host
   host              String // normalized: lowercased, no www, no path
   isCompanyDomain   Boolean  @default(false)
+  // Fingerprint of the currently active prompt-set branch.
+  currentAnalysisFingerprint String?
+  // 30-minute cooldown for the active branch's manual refresh.
+  analysisRefreshLockedUntil DateTime?
   // GSC analytics property id, kept here because GSC integration writes to it.
   googleAnalyticsId String?
   createdAt         DateTime @default(now())
@@ -335,12 +339,15 @@ model Prompt {
 model AiRun {
   id        Int             @id @default(autoincrement())
   domainId  Int
+  // Branch fingerprint this run belongs to; null only for ad hoc single-prompt runs.
+  analysisFingerprint String?
+  // Immutable snapshot of the prompts used for this run.
+  analysisSnapshot Json?
   startedAt DateTime        @default(now())
   endedAt   DateTime?
   status    String          @default("running") // running | completed | failed
-  // How this run was triggered: 'audit' (manual wizard run) | 'weekly' (scheduled
-  // tracked-prompt re-test). Audit dashboards filter on kind='audit' so weekly
-  // runs never pollute the existing trend/runs charts.
+  // How this run was triggered: 'audit' (manual wizard run) | 'refresh'
+  // (manual branch refresh) | 'adhoc' (single-prompt analysis).
   kind      String          @default("audit")
   // Aggregate scores: { presenceRate, avgRelevance, avgSentiment, avgOverall, perModel }
   summary   Json?
@@ -352,8 +359,8 @@ model AiRun {
   // status: 'completed' } orderBy startedAt desc. Without this compound index
   // the planner narrows by domainId then sequentially scans on status.
   @@index([domainId, status, startedAt])
-  // "latest completed weekly run for domain" — used by the tracked-prompts
-  // endpoint and the in-flight dedupe check.
+  // "latest completed branch run for domain" — used by branch-aware reads.
+  @@index([domainId, analysisFingerprint, status, startedAt])
   @@index([domainId, kind, status, startedAt])
 }
 
