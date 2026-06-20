@@ -66,6 +66,7 @@ import {
   type WorksheetOption,
 } from '@/features/ai-results/components/WorksheetPickerModals';
 import { useToast } from '@/components/ui/use-toast';
+import { useToast } from '@/components/ui/use-toast';
 
 // ── API shapes ─────────────────────────────────────────────────────────────
 
@@ -653,8 +654,8 @@ function CompetitorSelector({
               key={c.host}
               title={c.loading ? 'Scoring against saved AI responses…' : c.host}
               className={`group inline-flex h-9 items-center gap-2 rounded-full border px-3 text-xs font-semibold shadow-sm transition ${c.loading
-                  ? 'border-slate-200 bg-slate-50 text-[#7B8494]'
-                  : 'border-slate-200 bg-white text-[#2D4059] hover:border-[#B7C8E8] hover:bg-[#F8FBFF]'
+                ? 'border-slate-200 bg-slate-50 text-[#7B8494]'
+                : 'border-slate-200 bg-white text-[#2D4059] hover:border-[#B7C8E8] hover:bg-[#F8FBFF]'
                 }`}
             >
               <span className="relative grid h-6 w-6 place-items-center overflow-hidden rounded-full" style={{ backgroundColor: `${colorForHost(c.host, idx)}22` }}>

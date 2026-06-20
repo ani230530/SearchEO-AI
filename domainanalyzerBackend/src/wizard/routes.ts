@@ -30,6 +30,7 @@ import { crawlDomain, inferCompanySize, inferDomainFromHomepage, synthesizeConte
 import { embedText } from './llmClient';
 import { runCompetitorPipeline, persistCompetitors } from './competitorService';
 import { CompetitorDiscoveryError } from './competitorSources';
+import { CompetitorDiscoveryError } from './competitorSources';
 import { generateAuditPrompts, persistAuditPrompts, type PromptCategory } from './topicsService';
 import { generateKeywordsForDomain, persistKeywords } from './keywordsService';
 import { enrichDomainContext } from './enrichmentService';
