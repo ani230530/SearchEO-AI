@@ -6,6 +6,7 @@ import Testimonials from "../components/Testimonials";
 import FeaturesSection from "../components/Features";
 import ProcessFlow from "../components/ProcessFlow";
 import AIModels from "../components/AIModels";
+import { SiteHeader } from "../components/SiteHeader";
 
 function LandingPage() {
   const navigate = useNavigate();
@@ -77,48 +78,123 @@ function LandingPage() {
 /* header */
 .header {
   position: fixed;
-  top: 0; left: 0; right: 0;
-  padding: 16px 24px;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  background: rgba(237, 243, 255, 0.96);
+  backdrop-filter: blur(18px) saturate(160%);
+  -webkit-backdrop-filter: blur(18px) saturate(160%);
+  border-bottom: 1px solid rgba(187, 207, 239, 0.9);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.85), 0 8px 24px rgba(31, 78, 121, 0.05);
+}
+
+.header-inner {
+  width: min(1240px, calc(100% - 40px));
+  min-height: 76px;
+  margin: 0 auto;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: rgba(255, 255, 255, 0.72);
-  backdrop-filter: saturate(180%) blur(20px);
-  -webkit-backdrop-filter: saturate(180%) blur(20px);
-  border-bottom: 0.5px solid rgba(0, 0, 0, 0.1);
-  z-index: 100;
+  gap: 24px;
 }
+
 .brand {
-  font-size: 17px;
-  font-weight: 400;
-  letter-spacing: -0.022em;
-  color: var(--fg);
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
   text-decoration: none;
-  transition: opacity 0.2s ease;
 }
-.brand:hover {
-  opacity: 0.7;
+
+.brand-logo {
+  display: block;
+  width: clamp(136px, 13vw, 166px);
+  height: auto;
 }
-.cta {
-  height: 36px;
-  padding: 0 20px;
-  border-radius: 980px;
-  background: var(--fg);
-  color: var(--bg);
-  border: none;
-  font-size: 14px;
-  font-weight: 400;
-  letter-spacing: -0.022em;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  min-width: 120px;
+
+.header-nav {
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: clamp(20px, 2.4vw, 34px);
+  flex: 1;
+  min-width: 0;
 }
-.cta:hover { 
-  background: #424245; 
-  transform: scale(1.02);
+
+.header-link {
+  font-size: 16px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: #27456c;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.header-link--active {
+  color: #4b87d4;
+  font-weight: 600;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.header-login,
+.header-signup,
+.header-book-demo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 40px;
+  padding: 0 18px;
+  border-radius: 999px;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease,
+    border-color 0.2s ease, color 0.2s ease;
+}
+
+.header-login {
+  padding-inline: 10px;
+  height: 36px;
+  color: #4a638e;
+}
+
+.header-login:hover {
+  color: #27456c;
+}
+
+.header-signup {
+  min-width: 84px;
+  border: 1px solid rgba(63, 114, 179, 0.7);
+  background: rgba(255, 255, 255, 0.78);
+  color: #335b90;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.header-signup:hover {
+  transform: translateY(-1px);
+  border-color: rgba(63, 114, 179, 0.95);
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.header-book-demo {
+  min-width: 110px;
+  border: 1px solid rgba(72, 128, 207, 0.18);
+  background: linear-gradient(180deg, #67a1eb 0%, #4f8fe0 100%);
+  color: #ffffff;
+  box-shadow: 0 8px 18px rgba(79, 143, 224, 0.22);
+}
+
+.header-book-demo:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 20px rgba(79, 143, 224, 0.28);
 }
 
 /* hero center */
@@ -129,7 +205,7 @@ function LandingPage() {
   align-items: center;
   justify-content: center;
   text-align: center;
-  padding: 120px 24px 80px 24px;
+  padding: 132px 24px 80px 24px;
 }
 .kicker {
   font-size: 12px;
@@ -409,7 +485,7 @@ footer {
 /* responsive adjustments */
 @media (max-width: 768px) {
   .hero {
-    padding: 100px 20px 60px 20px;
+    padding: 116px 20px 60px 20px;
   }
   
   .trusted-section {
@@ -420,25 +496,96 @@ footer {
     padding: 80px 20px;
   }
   
-  .header {
-    padding: 12px 20px;
+  .header-inner {
+    width: min(1240px, calc(100% - 24px));
+    min-height: 70px;
+    gap: 16px;
   }
   
-  .brand {
-    font-size: 16px;
+  .brand-logo {
+    width: 124px;
   }
-  
-  .cta {
-    height: 32px;
-    padding: 0 16px;
-    font-size: 13px;
+
+  .header-nav {
+    gap: 16px;
+  }
+
+  .header-link {
+    font-size: 15px;
+  }
+
+  .header-actions {
+    gap: 8px;
+  }
+
+  .header-login {
+    height: 34px;
+    padding-inline: 8px;
+    font-size: 14px;
+  }
+
+  .header-signup,
+  .header-book-demo {
+    height: 36px;
+    font-size: 14px;
+  }
+
+  .header-signup {
+    min-width: 76px;
+    padding-inline: 14px;
+  }
+
+  .header-book-demo {
     min-width: 100px;
+    padding-inline: 16px;
+  }
+}
+
+@media (max-width: 640px) {
+  .header-nav {
+    display: none;
+  }
+
+  .header-inner {
+    width: min(1240px, calc(100% - 20px));
+    min-height: 66px;
+    gap: 10px;
+  }
+
+  .brand-logo {
+    width: 116px;
+  }
+
+  .header-actions {
+    gap: 6px;
+  }
+
+  .header-login {
+    height: 32px;
+    padding-inline: 6px;
+    font-size: 13px;
+  }
+
+  .header-signup,
+  .header-book-demo {
+    height: 34px;
+    font-size: 13px;
+  }
+
+  .header-signup {
+    min-width: 70px;
+    padding-inline: 12px;
+  }
+
+  .header-book-demo {
+    min-width: 92px;
+    padding-inline: 14px;
   }
 }
 
 @media (max-width: 480px) {
   .hero {
-    padding: 80px 16px 40px 16px;
+    padding: 104px 16px 40px 16px;
   }
   
   .trusted-section {
@@ -447,21 +594,6 @@ footer {
   
   .testimonials-section {
     padding: 60px 16px;
-  }
-  
-  .header {
-    padding: 10px 16px;
-  }
-  
-  .brand {
-    font-size: 15px;
-  }
-  
-  .cta {
-    height: 30px;
-    padding: 0 14px;
-    font-size: 12px;
-    min-width: 90px;
   }
 }
 
@@ -522,14 +654,7 @@ footer {
       `}</style>
 
         {/* Header */}
-        <header className="header">
-            <a className="brand" href="#" target="_blank" rel="noopener noreferrer">
-              AI Brand Analyzer
-            </a>
-          <button className="cta" type="button" onClick={() => navigate('/auth')}>
-            login/signup
-          </button>
-        </header>
+        <SiteHeader />
 
         {/* Hero */}
         <main className="hero">

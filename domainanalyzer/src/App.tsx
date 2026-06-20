@@ -15,6 +15,7 @@ import type { SettingsSubTab } from "@/features/sidebar-dashboard/sections/setti
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import LandingPage from "./pages/LandingPage";
+import BlogsPage from "./pages/BlogsPage";
 import AIVisibilityRedirect from "./pages/AIVisibilityRedirect";
 import { AIResultsShell } from "./features/ai-results/AIResultsShell";
 
@@ -120,6 +121,7 @@ const App = () => (
             <Routes>
               {/* Public routes */}
               <Route path="/" element={<RootRoute />} />
+              <Route path="/blogs" element={<BlogsPage />} />
               {/* Anonymous AI Visibility audit. Same component as the
                   authenticated dashboard wizard — runs against the wizard
                   cookie identity when no JWT is present. Steps 1-4 work
