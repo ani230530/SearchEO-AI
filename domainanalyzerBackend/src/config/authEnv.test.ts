@@ -8,11 +8,19 @@ const REQUIRED_KEYS = [
   'RESEND_API_KEY',
   'EMAIL_FROM',
 ] as const;
+const TRACKED_KEYS = [
+  ...REQUIRED_KEYS,
+  'REFRESH_TOKEN_TTL_MINUTES',
+  'BACKEND_PUBLIC_URL',
+  'GOOGLE_AUTH_REDIRECT_URI',
+  'NODE_ENV',
+  'PORT',
+] as const;
 
 const ORIGINAL_VALUES = new Map<string, string | undefined>();
 
 function seedRequiredAuthEnv(extra: Record<string, string | undefined> = {}) {
-  for (const key of REQUIRED_KEYS) {
+  for (const key of TRACKED_KEYS) {
     if (!ORIGINAL_VALUES.has(key)) {
       ORIGINAL_VALUES.set(key, process.env[key]);
     }
@@ -26,6 +34,10 @@ function seedRequiredAuthEnv(extra: Record<string, string | undefined> = {}) {
   process.env.EMAIL_FROM = 'ops@example.com';
 
   delete process.env.REFRESH_TOKEN_TTL_MINUTES;
+  delete process.env.BACKEND_PUBLIC_URL;
+  delete process.env.GOOGLE_AUTH_REDIRECT_URI;
+  delete process.env.NODE_ENV;
+  delete process.env.PORT;
 
   for (const [key, value] of Object.entries(extra)) {
     if (value === undefined) {
@@ -37,7 +49,7 @@ function seedRequiredAuthEnv(extra: Record<string, string | undefined> = {}) {
 }
 
 function restoreEnv() {
-  for (const key of REQUIRED_KEYS) {
+  for (const key of TRACKED_KEYS) {
     const original = ORIGINAL_VALUES.get(key);
     if (original === undefined) {
       delete process.env[key];
@@ -45,7 +57,6 @@ function restoreEnv() {
       process.env[key] = original;
     }
   }
-  delete process.env.REFRESH_TOKEN_TTL_MINUTES;
 }
 
 beforeEach(() => {
@@ -77,5 +88,22 @@ describe('authEnv', () => {
     await expect(import('./authEnv')).rejects.toThrow(
       /REFRESH_TOKEN_TTL_MINUTES must be a positive integer/i,
     );
+  });
+
+  it('derives the Google auth callback from BACKEND_PUBLIC_URL', async () => {
+    process.env.NODE_ENV = 'production';
+    process.env.BACKEND_PUBLIC_URL = 'https://myapibackend.girlpowerx.com/';
+    vi.resetModules();
+    const { authEnv } = await import('./authEnv');
+    expect(authEnv.GOOGLE_AUTH_REDIRECT_URI).toBe(
+      'https://myapibackend.girlpowerx.com/api/auth/google/auth-callback',
+    );
+  });
+
+  it('rejects localhost Google auth callbacks in production', async () => {
+    process.env.NODE_ENV = 'production';
+    process.env.GOOGLE_AUTH_REDIRECT_URI = 'http://localhost:3002/api/auth/google/auth-callback';
+    vi.resetModules();
+    await expect(import('./authEnv')).rejects.toThrow(/points to localhost in production/i);
   });
 });

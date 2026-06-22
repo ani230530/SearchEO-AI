@@ -3,7 +3,24 @@ import { encryptToken, decryptToken } from './tokenEncryption';
 
 const CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
-const REDIRECT_URI = process.env.GOOGLE_REDIRECT_URI || 'http://localhost:3002/api/auth/google/callback';
+const BACKEND_PUBLIC_URL = (
+  process.env.BACKEND_PUBLIC_URL?.trim() ||
+  `http://localhost:${Number(process.env.PORT) || 3002}`
+).replace(/\/+$/, '');
+const REDIRECT_URI =
+  process.env.GOOGLE_REDIRECT_URI?.trim() ||
+  `${BACKEND_PUBLIC_URL}/api/auth/google/callback`;
+
+if (process.env.NODE_ENV === 'production') {
+  const hostname = new URL(REDIRECT_URI).hostname;
+  if (hostname === 'localhost' || hostname === '127.0.0.1') {
+    throw new Error(
+      '[googleOAuthService] GOOGLE_REDIRECT_URI points to localhost in production. ' +
+        'Set GOOGLE_REDIRECT_URI=https://<backend-host>/api/auth/google/callback ' +
+        'or set BACKEND_PUBLIC_URL=https://<backend-host>.',
+    );
+  }
+}
 
 if (!CLIENT_ID || !CLIENT_SECRET) {
   console.error('❌ ERROR: Google OAuth credentials not configured!');

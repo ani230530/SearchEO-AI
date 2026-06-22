@@ -37,6 +37,27 @@ function optional(name: string, fallback: string): string {
   return process.env[name]?.trim() || fallback;
 }
 
+function withoutTrailingSlash(value: string): string {
+  return value.replace(/\/+$/, '');
+}
+
+function assertNoLocalhostRedirect(name: string, value: string): void {
+  if (process.env.NODE_ENV !== 'production') return;
+  let hostname = '';
+  try {
+    hostname = new URL(value).hostname;
+  } catch {
+    throw new Error(`[authEnv] ${name} must be a valid absolute URL (got ${value})`);
+  }
+  if (hostname === 'localhost' || hostname === '127.0.0.1') {
+    throw new Error(
+      `[authEnv] ${name} points to localhost in production. ` +
+        `Set ${name}=https://<backend-host>/api/auth/google/auth-callback ` +
+        'or set BACKEND_PUBLIC_URL=https://<backend-host>.',
+    );
+  }
+}
+
 function optionalPositiveInteger(name: string, fallback: number): number {
   const raw = process.env[name]?.trim();
   if (!raw) return fallback;
@@ -55,6 +76,16 @@ if (JWT_REFRESH_SECRET === JWT_SECRET) {
   throw new Error('[authEnv] JWT_REFRESH_SECRET must differ from JWT_SECRET');
 }
 
+const BACKEND_PUBLIC_URL = withoutTrailingSlash(
+  process.env.BACKEND_PUBLIC_URL?.trim() ||
+    `http://localhost:${Number(process.env.PORT) || 3002}`,
+);
+const GOOGLE_AUTH_REDIRECT_URI = optional(
+  'GOOGLE_AUTH_REDIRECT_URI',
+  `${BACKEND_PUBLIC_URL}/api/auth/google/auth-callback`,
+);
+assertNoLocalhostRedirect('GOOGLE_AUTH_REDIRECT_URI', GOOGLE_AUTH_REDIRECT_URI);
+
 export const authEnv = {
   JWT_SECRET,
   JWT_REFRESH_SECRET,
@@ -62,16 +93,11 @@ export const authEnv = {
   REFRESH_TOKEN_TTL_MINUTES: optionalPositiveInteger('REFRESH_TOKEN_TTL_MINUTES', 24 * 60),
 
   FRONTEND_URL: optional('FRONTEND_URL', 'http://localhost:8080'),
-  BACKEND_PUBLIC_URL:
-    process.env.BACKEND_PUBLIC_URL?.trim() ||
-    `http://localhost:${Number(process.env.PORT) || 3002}`,
+  BACKEND_PUBLIC_URL,
 
   GOOGLE_CLIENT_ID: required('GOOGLE_CLIENT_ID'),
   GOOGLE_CLIENT_SECRET: required('GOOGLE_CLIENT_SECRET'),
-  GOOGLE_AUTH_REDIRECT_URI: optional(
-    'GOOGLE_AUTH_REDIRECT_URI',
-    'http://localhost:3002/api/auth/google/auth-callback',
-  ),
+  GOOGLE_AUTH_REDIRECT_URI,
 
   // Resend — preferred over SMTP because outbound SMTP is blocked or
   // unreliable on most hosts (Render, Vercel, Fly). RESEND_API_KEY is
