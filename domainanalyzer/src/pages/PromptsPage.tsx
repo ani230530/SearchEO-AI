@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import {
@@ -32,7 +32,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { PromptTable, type PromptTableRow } from "@/features/ai-results/components/PromptTrackingTable";
+import { PromptExpandedDetails, PromptTable, type PromptTableRow } from "@/features/ai-results/components/PromptTrackingTable";
 import {
   buildProjectsWorksheetPath,
   CreateWorksheetModal,
@@ -96,37 +96,41 @@ const METRIC_CARDS: MetricCardConfig[] = [
     label: "New Prompt Opportunities",
     tooltip: "How many new prompts were added to the current list.",
     subtitle: "New Prompts added",
-    value: "120",
-    trend: "+3.2%",
+    value: "0",
+    trend: "",
     tone: "positive",
     valueClassName: "text-[#2f6bff]",
+    showTrend: false,
   },
   {
     label: "Tracked Prompts",
     tooltip: "How many prompts are currently being monitored.",
     subtitle: "Prompts tracked",
-    value: "45",
-    trend: "+3.2%",
+    value: "0",
+    trend: "",
     tone: "positive",
     valueClassName: "text-[#2f6bff]",
+    showTrend: false,
   },
   {
     label: "Competitive Visibility Gaps",
     tooltip: "Prompts where coverage is weaker than expected this week.",
     subtitle: "This week",
-    value: "+12%",
-    trend: "+3.2%",
+    value: "0",
+    trend: "",
     tone: "positive",
     valueClassName: "text-[#2f6bff]",
+    showTrend: false,
   },
   {
-    label: "Citations",
-    tooltip: "Prompts that lost citations compared with the latest run.",
-    subtitle: "Lost Citations",
-    value: "5",
-    trend: "-0.5%",
+    label: "Visibility Drops",
+    tooltip: "Tracked prompts whose visibility declined compared with the previous weekly run.",
+    subtitle: "Tracked prompts down",
+    value: "0",
+    trend: "",
     tone: "negative",
     valueClassName: "text-[#B23131]",
+    showTrend: false,
   },
 ];
 
@@ -142,37 +146,41 @@ const TAB_CONFIGS: Record<PromptsTabId, PromptTabConfig> = {
         label: "Monitored Prompts",
         tooltip: "Total prompts currently tracked in this workspace.",
         subtitle: "Prompts tracked",
-        value: "45",
-        trend: "+3.2%",
+        value: "0",
+        trend: "",
         tone: "positive",
         valueClassName: "text-[#2f6bff]",
+        showTrend: false,
       },
       {
         label: "Average Visibility",
         tooltip: "Average visibility across all AI models.",
         subtitle: "Across all AI models",
-        value: "68%",
-        trend: "+3.2%",
+        value: "0%",
+        trend: "",
         tone: "positive",
         valueClassName: "text-[#2f6bff]",
+        showTrend: false,
       },
       {
         label: "Prompts Gained",
         tooltip: "The share of prompts that improved this week.",
         subtitle: "This week",
-        value: "+12%",
-        trend: "+3.2%",
+        value: "0",
+        trend: "",
         tone: "positive",
         valueClassName: "text-[#2f6bff]",
+        showTrend: false,
       },
       {
         label: "Prompts Lost",
         tooltip: "Prompt rows that dropped from results.",
         subtitle: "Prompts dropped from results",
-        value: "5",
-        trend: "-0.5%",
+        value: "0",
+        trend: "",
         tone: "negative",
         valueClassName: "text-[#c81e1e]",
+        showTrend: false,
       },
     ],
   },
@@ -183,8 +191,8 @@ const TAB_CONFIGS: Record<PromptsTabId, PromptTabConfig> = {
         label: "Content Gaps Found",
         tooltip: "How many content opportunities are missing coverage.",
         subtitle: "Missing content opportunities",
-        value: "45",
-        trend: "+8.6%",
+        value: "0",
+        trend: "",
         tone: "positive",
         valueClassName: "text-[#2f6bff]",
         showTrend: false,
@@ -193,8 +201,8 @@ const TAB_CONFIGS: Record<PromptsTabId, PromptTabConfig> = {
         label: "Content Ideas Ready",
         tooltip: "High-confidence content opportunities ready to work on.",
         subtitle: "Ready to review",
-        value: "16",
-        trend: "+3.4%",
+        value: "0",
+        trend: "",
         tone: "positive",
         valueClassName: "text-[#2f6bff]",
         showTrend: false,
@@ -203,8 +211,8 @@ const TAB_CONFIGS: Record<PromptsTabId, PromptTabConfig> = {
         label: "Content Drafts Ready",
         tooltip: "Content opportunities ready to turn into drafts.",
         subtitle: "Ready to brief",
-        value: "9",
-        trend: "+1.2%",
+        value: "0",
+        trend: "",
         tone: "warning",
         valueClassName: "text-[#b45309]",
         showTrend: false,
@@ -213,8 +221,8 @@ const TAB_CONFIGS: Record<PromptsTabId, PromptTabConfig> = {
         label: "Projected Lift",
         tooltip: "Estimated visibility lift if the opportunities are created.",
         subtitle: "Estimated if published",
-        value: "+12%",
-        trend: "+0.9%",
+        value: "0%",
+        trend: "",
         tone: "positive",
         valueClassName: "text-[#2f6bff]",
         showTrend: false,
@@ -572,9 +580,38 @@ function getTrackedWeekCells(row: PromptTableRow): WeeklyPromptCell[] {
   });
 }
 
+function getTrackedRunStatus(row: PromptTableRow): {
+  attempted: number;
+  failed: number;
+  label: string;
+  percent: number;
+  successful: number;
+  tone: string;
+} {
+  const results = row.results ?? [];
+  const attempted = results.length;
+  const successfulFromMetric = Number(row.successfulResponses);
+  const successful = Number.isFinite(successfulFromMetric)
+    ? successfulFromMetric
+    : results.filter((result) => result.status !== "failed").length;
+  const failed = results.filter((result) => result.status === "failed").length;
+  const percent = attempted > 0 ? Math.round((successful / attempted) * 100) : 0;
+  const label =
+    attempted === 0 ? "Not tested"
+    : failed > 0 ? `${successful}/${attempted} scored`
+    : "Scored";
+  const tone =
+    attempted === 0 ? "bg-slate-300"
+    : failed > 0 ? "bg-[#e6a700]"
+    : "bg-[#0d7c1c]";
+  return { attempted, failed, label, percent, successful, tone };
+}
+
 function getTrackedModel(row: PromptTableRow): { label: string; iconSrc: string | null } {
-  const model = (row.results ?? []).find((result) => result.model)?.model ?? "";
-  const label = model ? prettyModel(model) : "No model data";
+  const successfulResults = (row.results ?? []).filter((result) => result.status !== "failed");
+  const model = successfulResults.find((result) => result.model)?.model ?? "";
+  const status = getTrackedRunStatus(row);
+  const label = status.attempted > 0 ? `${status.successful}/${status.attempted} models` : "No run yet";
   const lower = model.toLowerCase();
   const iconSrc =
     /claude|anthropic/.test(lower) ? "/report-icons/claude.svg"
@@ -633,7 +670,7 @@ function TrackedPromptsWeeklyTable({
         { tracked: next },
       );
       queryClient.invalidateQueries({ queryKey: aiResultsKeys.trackedPrompts(domainId) });
-      queryClient.invalidateQueries({ queryKey: aiResultsKeys.report(domainId) });
+      queryClient.invalidateQueries({ queryKey: ["ai-results", "report", domainId] });
       toast({
         title: next ? "Tracking weekly" : "Tracking stopped",
         description: next
@@ -729,103 +766,118 @@ function TrackedPromptsWeeklyTable({
               ) : null}
               {visibleRows.map((row) => {
                 const weeks = getTrackedWeekCells(row);
-                const trackedWeeks = weeks.filter((week) => week.tracked).length;
-                const statusPercent = trackedWeeks * 25;
-                const statusTone =
-                  statusPercent >= 100 ? "bg-[#0d7c1c]"
-                  : statusPercent >= 50 ? "bg-[#e6a700]"
-                  : "bg-[#c93d3d]";
-                const statusLabel = statusPercent >= 100 ? "Scanned" : "Scanning";
+                const runStatus = getTrackedRunStatus(row);
                 const model = getTrackedModel(row);
                 const expanded = expandedIds.has(row.id);
                 return (
-                  <TableRow key={row.id} className="border-b border-slate-200 transition-colors hover:bg-slate-50/80">
-                    <TableCell className="w-8 px-4 py-3">
-                      <input
-                        type="checkbox"
-                        checked={selectedIds.has(row.id)}
-                        aria-label="Select tracked prompt"
-                        className="h-3.5 w-3.5 rounded border-gray-300 accent-blue-600"
-                        onChange={() => toggleSelected(row.id)}
-                      />
-                    </TableCell>
-                    <TableCell className="max-w-[340px] px-2 py-3">
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          aria-label={expanded ? "Collapse prompt" : "Expand prompt"}
-                          onClick={() => toggleExpanded(row.id)}
-                          className="flex h-6 w-6 shrink-0 items-center justify-center rounded-[6px] bg-[#f8f9fc] text-slate-500 transition-colors hover:bg-slate-100"
-                        >
-                          <ChevronRight className={cn("h-[14px] w-[14px] transition-transform", expanded && "rotate-90")} />
-                        </button>
-                        <span
-                          className={cn(
-                            "text-[12px] italic leading-relaxed text-[#58606f]",
-                            expanded ? "whitespace-normal break-words" : "line-clamp-2",
-                          )}
-                          title={row.phrase}
-                        >
-                          {row.phrase}
-                        </span>
-                      </div>
-                    </TableCell>
-                    {weeks.map((week, index) => {
-                      return (
-                        <TableCell key={`${row.id}-week-${index}`} className="px-2 py-3">
-                          <span className={cn(
-                            "text-[11px] font-medium",
-                            week.tracked ? "text-[#0d7c1c]" : "text-slate-500",
-                          )}>
-                            {week.tracked ? "Tracked" : "Not Tracked"}
-                          </span>
-                        </TableCell>
-                      );
-                    })}
-                    <TableCell className="px-2 py-3">
-                      <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-slate-500">
-                        {model.iconSrc ? (
-                          <img src={model.iconSrc} alt="" className="h-4 w-4 object-contain" />
-                        ) : null}
-                        {model.label}
-                      </span>
-                    </TableCell>
-                    <TableCell className="px-2 py-3">
-                      <div className="flex w-[155px] flex-col gap-1.5">
-                        <div className="flex items-baseline gap-2">
-                          <span className="text-[18px] font-semibold leading-none text-[#30343b]">{statusPercent}%</span>
-                          <span className={cn(
-                            "text-[9px]",
-                            statusPercent >= 100 ? "text-slate-500" : statusPercent >= 50 ? "text-slate-500" : "text-[#c93d3d]",
-                          )}>
-                            {statusLabel}
-                          </span>
-                        </div>
-                        <div className="h-2 overflow-hidden rounded-full bg-slate-100">
-                          <div className={cn("h-full rounded-full", statusTone)} style={{ width: `${statusPercent}%` }} />
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell className="px-4 py-3 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <TrackToggleButton
-                          className="h-[38px] w-[38px]"
-                          tracked={isRowTracked(row)}
-                          loading={trackPending[row.id]}
-                          disabled={row.rawId == null}
-                          onClick={() => void toggleTracking(row, !isRowTracked(row))}
+                  <Fragment key={row.id}>
+                    <TableRow className="border-b border-slate-200 transition-colors hover:bg-slate-50/80">
+                      <TableCell className="w-8 px-4 py-3">
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(row.id)}
+                          aria-label="Select tracked prompt"
+                          className="h-3.5 w-3.5 rounded border-gray-300 accent-blue-600"
+                          onChange={() => toggleSelected(row.id)}
                         />
-                        <button
-                          type="button"
-                          onClick={() => onDraftBlog(row.id)}
-                          className="inline-flex h-[38px] items-center gap-1.5 rounded-[14px] border border-[#e8eef8] bg-[#eff4ff] px-3.5 text-[11px] font-semibold text-[#3b5d9c] transition hover:bg-[#e7efff]"
-                        >
-                          <FileText className="h-3.5 w-3.5" />
-                          Draft Blog
-                        </button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
+                      </TableCell>
+                      <TableCell className="max-w-[340px] px-2 py-3">
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            aria-label={expanded ? "Collapse prompt details" : "Expand prompt details"}
+                            aria-expanded={expanded}
+                            onClick={() => toggleExpanded(row.id)}
+                            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-[6px] bg-[#f8f9fc] text-slate-500 transition-colors hover:bg-slate-100"
+                          >
+                            <ChevronRight className={cn("h-[14px] w-[14px] transition-transform", expanded && "rotate-90")} />
+                          </button>
+                          <span
+                            className={cn(
+                              "text-[12px] italic leading-relaxed text-[#58606f]",
+                              expanded ? "whitespace-normal break-words" : "line-clamp-2",
+                            )}
+                            title={row.phrase}
+                          >
+                            {row.phrase}
+                          </span>
+                        </div>
+                      </TableCell>
+                      {weeks.map((week, index) => {
+                        return (
+                          <TableCell key={`${row.id}-week-${index}`} className="px-2 py-3">
+                            <span className={cn(
+                              "text-[11px] font-medium",
+                              week.tracked ? "text-[#0d7c1c]" : "text-slate-500",
+                            )}>
+                              {week.tracked ? "Tested" : "No run"}
+                            </span>
+                          </TableCell>
+                        );
+                      })}
+                      <TableCell className="px-2 py-3">
+                        <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-slate-500">
+                          {model.iconSrc ? (
+                            <img src={model.iconSrc} alt="" className="h-4 w-4 object-contain" />
+                          ) : null}
+                          {model.label}
+                        </span>
+                      </TableCell>
+                      <TableCell className="px-2 py-3">
+                        <div className="flex w-[155px] flex-col gap-1.5">
+                          <div className="flex items-baseline gap-2">
+                            <span className="text-[18px] font-semibold leading-none text-[#30343b]">{runStatus.percent}%</span>
+                            <span className={cn(
+                              "text-[9px]",
+                              runStatus.attempted === 0 ? "text-slate-500"
+                              : runStatus.failed > 0 ? "text-[#9a6a00]"
+                              : "text-slate-500",
+                            )}>
+                              {runStatus.label}
+                            </span>
+                          </div>
+                          <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+                            <div className={cn("h-full rounded-full", runStatus.tone)} style={{ width: `${runStatus.percent}%` }} />
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell className="px-4 py-3 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <TrackToggleButton
+                            className="h-[38px] w-[38px]"
+                            tracked={isRowTracked(row)}
+                            loading={trackPending[row.id]}
+                            disabled={row.rawId == null}
+                            onClick={() => void toggleTracking(row, !isRowTracked(row))}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => onDraftBlog(row.id)}
+                            className="inline-flex h-[38px] items-center gap-1.5 rounded-[14px] border border-[#e8eef8] bg-[#eff4ff] px-3.5 text-[11px] font-semibold text-[#3b5d9c] transition hover:bg-[#e7efff]"
+                          >
+                            <FileText className="h-3.5 w-3.5" />
+                            Draft Blog
+                          </button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                    {expanded ? (
+                      <TableRow className="border-b border-slate-300 bg-white hover:bg-white">
+                        <TableCell colSpan={9} className="p-0">
+                          <PromptExpandedDetails
+                            results={row.results}
+                            phrase={row.phrase}
+                            domainId={domainId}
+                            rawId={row.rawId}
+                            rowType={row.type}
+                            trackedView
+                            lastTestedAt={row.lastTestedAt}
+                            nextTestAt={row.nextTestAt}
+                          />
+                        </TableCell>
+                      </TableRow>
+                    ) : null}
+                  </Fragment>
                 );
               })}
             </TableBody>
@@ -863,6 +915,50 @@ function mapReportRows(data: any): PromptTableRow[] {
 function mapTrackedRows(data: any): PromptTableRow[] {
   const rows = Array.isArray(data?.prompts) ? data.prompts : [];
   return (rows as PromptTableRow[]).filter((r) => r.type === "prompt");
+}
+
+function hasScoredPromptResults(row: PromptTableRow): boolean {
+  const successful = Number(row.successfulResponses);
+  if (Number.isFinite(successful) && successful > 0) return true;
+  return (row.results ?? []).some((result) => result.status !== "failed");
+}
+
+function mergeTrackedResultsIntoPromptInventory(
+  reportRows: PromptTableRow[],
+  trackedRows: PromptTableRow[],
+): PromptTableRow[] {
+  const trackedById = new Map(trackedRows.map((row) => [row.id, row]));
+
+  return reportRows.map((row) => {
+    if (hasScoredPromptResults(row)) return row;
+    const tracked = trackedById.get(row.id);
+    if (!tracked || !hasScoredPromptResults(tracked)) return row;
+
+    return {
+      ...row,
+      aiSov: tracked.aiSov,
+      aiSovPercent: tracked.aiSovPercent,
+      avgRankPosition: tracked.avgRankPosition,
+      avgSentiment: tracked.avgSentiment,
+      bestRank: tracked.bestRank,
+      brandMentionEvents: tracked.brandMentionEvents,
+      competitorCount: tracked.competitorCount,
+      competitorMentionEvents: tracked.competitorMentionEvents,
+      competitors: tracked.competitors,
+      mentions: tracked.mentions,
+      rankedResponses: tracked.rankedResponses,
+      rankingPosition: tracked.rankingPosition,
+      results: tracked.results,
+      sov: tracked.sov,
+      successfulResponses: tracked.successfulResponses,
+      totalMentionEvents: tracked.totalMentionEvents,
+      isTracked: tracked.isTracked ?? row.isTracked,
+      historyKind: "weekly",
+      lastTestedAt: tracked.lastTestedAt ?? row.lastTestedAt,
+      nextTestAt: tracked.nextTestAt ?? row.nextTestAt,
+      weekTrend: tracked.weekTrend ?? row.weekTrend,
+    };
+  });
 }
 
 function buildWorksheetRows(rows: PromptTableRow[]) {
@@ -999,12 +1095,49 @@ const PromptsPage = () => {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  const reportQuery = useReport<any>(domainId);
-  const trackedQuery = useTrackedPrompts<any>(domainId);
-  const campaignsQuery = useCampaigns<{ campaigns: Array<{ id: number; title: string; description?: string | null }> }>();
+  const reportQuery = useReport<any>(domainId, null, { includeInsights: false });
+  const reportReady = Boolean(reportQuery.data);
+  const [responsesEnabled, setResponsesEnabled] = useState(false);
+  const insightsQuery = useReport<any>(domainId, null, {
+    includeInsights: true,
+    enabled: activeTab === "content-opportunities",
+  });
+  const responseReportQuery = useReport<any>(domainId, null, {
+    includeInsights: false,
+    includeResponses: true,
+    enabled: reportReady && responsesEnabled && activeTab !== "content-opportunities",
+  });
+  const trackedQuery = useTrackedPrompts<any>(domainId, {
+    enabled: activeTab !== "content-opportunities",
+  });
+  const reportData = responseReportQuery.data ?? reportQuery.data;
 
-  const reportRows = useMemo(() => mapReportRows(reportQuery.data), [reportQuery.data]);
+  useEffect(() => {
+    setResponsesEnabled(false);
+  }, [domainId]);
+
+  useEffect(() => {
+    if (!reportReady || responsesEnabled || activeTab === "content-opportunities") return;
+    const hydrationId = window.setTimeout(() => setResponsesEnabled(true), 1200);
+    return () => window.clearTimeout(hydrationId);
+  }, [activeTab, reportReady, responsesEnabled]);
+
+  const reportRows = useMemo(() => mapReportRows(reportData), [reportData]);
   const trackedRows = useMemo(() => mapTrackedRows(trackedQuery.data), [trackedQuery.data]);
+  const allPromptRows = useMemo(
+    () => mergeTrackedResultsIntoPromptInventory(reportRows, trackedRows),
+    [reportRows, trackedRows],
+  );
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerRowIds, setPickerRowIds] = useState<string[]>([]);
+  const [activeWorksheetId, setActiveWorksheetId] = useState<string | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [newWorksheetName, setNewWorksheetName] = useState("");
+  const [creatingWorksheet, setCreatingWorksheet] = useState(false);
+  const [createWorksheetError, setCreateWorksheetError] = useState<string | null>(null);
+  const campaignsQuery = useCampaigns<{ campaigns: Array<{ id: number; title: string; description?: string | null }> }>({
+    enabled: pickerOpen || createOpen,
+  });
   const worksheetOptions: WorksheetOption[] = useMemo(
     () =>
       (campaignsQuery.data?.campaigns ?? []).map((campaign) => ({
@@ -1014,22 +1147,15 @@ const PromptsPage = () => {
       })),
     [campaignsQuery.data],
   );
-  const [pickerOpen, setPickerOpen] = useState(false);
-  const [pickerRowIds, setPickerRowIds] = useState<string[]>([]);
-  const [activeWorksheetId, setActiveWorksheetId] = useState<string | null>(null);
-  const [createOpen, setCreateOpen] = useState(false);
-  const [newWorksheetName, setNewWorksheetName] = useState("");
-  const [creatingWorksheet, setCreatingWorksheet] = useState(false);
-  const [createWorksheetError, setCreateWorksheetError] = useState<string | null>(null);
   const activeWorksheet = useMemo(
     () => worksheetOptions.find((worksheet) => worksheet.id === activeWorksheetId) ?? null,
     [activeWorksheetId, worksheetOptions]
   );
 
   const pickerRows = useMemo(() => {
-    const byId = new Map([...reportRows, ...trackedRows].map((row) => [row.id, row]));
+    const byId = new Map([...allPromptRows, ...trackedRows].map((row) => [row.id, row]));
     return pickerRowIds.map((id) => byId.get(id)).filter(Boolean) as PromptTableRow[];
-  }, [pickerRowIds, reportRows, trackedRows]);
+  }, [pickerRowIds, allPromptRows, trackedRows]);
 
   const navigateToWorksheetFromPicker = (worksheetId: string) => {
     const payload = {
@@ -1091,11 +1217,11 @@ const PromptsPage = () => {
 
     // Card 1 — prompts added since the previous audit run (server-computed; 0
     // when there's no prior run to diff against).
-    const newPrompts = Number(reportQuery.data?.metrics?.newPromptsSinceLastRun ?? 0);
+    const newPrompts = Number(reportData?.metrics?.newPromptsSinceLastRun ?? 0);
     // Card 2 — prompts currently marked for weekly tracking.
     const trackedCount = trackedRows.length;
     // Card 3 — "gap" prompts: visibility (sov) below 30%.
-    const gapCount = reportRows.filter((r) => {
+    const gapCount = allPromptRows.filter((r) => {
       const v = Number.parseInt(String(r.sov ?? ""), 10);
       return Number.isFinite(v) && v < 30;
     }).length;
@@ -1108,7 +1234,7 @@ const PromptsPage = () => {
       "New Prompt Opportunities": String(newPrompts),
       "Tracked Prompts": String(trackedCount),
       "Competitive Visibility Gaps": String(gapCount),
-      "Citations": String(droppedCount),
+      "Visibility Drops": String(droppedCount),
     };
 
     return base.map((card) => ({
@@ -1116,7 +1242,7 @@ const PromptsPage = () => {
       value: valueByLabel[card.label] ?? card.value,
       showTrend: false,
     }));
-  }, [reportQuery.data, reportRows, trackedRows]);
+  }, [reportData, allPromptRows, trackedRows]);
 
   // Real KPI cards for the Content Opportunities tab, derived from the
   // /report `opportunities` list (heuristic gaps enriched with a brief).
@@ -1126,8 +1252,8 @@ const PromptsPage = () => {
       TAB_CONFIGS["content-opportunities"].kind === "cards"
         ? TAB_CONFIGS["content-opportunities"].kpis
         : [];
-    const opportunities: any[] = Array.isArray(reportQuery.data?.opportunities)
-      ? reportQuery.data.opportunities
+    const opportunities: any[] = Array.isArray(insightsQuery.data?.opportunities)
+      ? insightsQuery.data.opportunities
       : [];
 
     // Card 1 — every content gap surfaced by the analyzer.
@@ -1148,7 +1274,7 @@ const PromptsPage = () => {
     return base
       .filter((card) => card.label !== "Projected Lift")
       .map((card) => ({ ...card, value: valueByLabel[card.label] ?? card.value }));
-  }, [reportQuery.data]);
+  }, [insightsQuery.data]);
 
   // Cancel any in-flight poll when the domain changes or the page unmounts.
   const pollRef = useRef<{ cancelled: boolean } | null>(null);
@@ -1237,11 +1363,26 @@ const PromptsPage = () => {
         onRetry: () => queryClient.invalidateQueries({ queryKey: aiResultsKeys.trackedPrompts(domainId ?? "none") }),
       };
     }
+    if (tabId === "content-opportunities") {
+      return {
+        rows: reportRows,
+        loading: reportQuery.isLoading || insightsQuery.isLoading || domainId == null,
+        isError: reportQuery.isError || insightsQuery.isError,
+        onRetry: () => {
+          queryClient.invalidateQueries({ queryKey: aiResultsKeys.report(domainId ?? "none", null, "lite") });
+          queryClient.invalidateQueries({ queryKey: aiResultsKeys.report(domainId ?? "none", null, "responses") });
+          queryClient.invalidateQueries({ queryKey: aiResultsKeys.report(domainId ?? "none", null, "full") });
+        },
+      };
+    }
     return {
-      rows: reportRows,
+      rows: allPromptRows,
       loading: reportQuery.isLoading || domainId == null,
       isError: reportQuery.isError,
-      onRetry: () => queryClient.invalidateQueries({ queryKey: aiResultsKeys.report(domainId ?? "none") }),
+      onRetry: () => {
+        queryClient.invalidateQueries({ queryKey: aiResultsKeys.report(domainId ?? "none", null, "lite") });
+        queryClient.invalidateQueries({ queryKey: aiResultsKeys.report(domainId ?? "none", null, "responses") });
+      },
     };
   };
 

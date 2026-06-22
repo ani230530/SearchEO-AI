@@ -257,6 +257,8 @@ export interface GenerateAllInput {
   context: EnrichedContext;
   /** Optional category subset (for "Load more" of a single category). Defaults to all. */
   onlyCategories?: PromptCategory[];
+  /** Existing saved prompts that append-mode generation must not repeat. */
+  avoidPrompts?: string[];
 }
 
 export async function generateAuditPrompts(input: GenerateAllInput): Promise<GeneratedPrompt[]> {
@@ -272,6 +274,7 @@ export async function generateAuditPrompts(input: GenerateAllInput): Promise<Gen
     host,
     context: input.context,
     signals,
+    avoidPrompts: input.avoidPrompts,
   });
   if (!input.onlyCategories || input.onlyCategories.length === 0) return prompts;
   const filtered = prompts.filter((prompt) => input.onlyCategories?.includes(prompt.category));
@@ -324,10 +327,24 @@ export async function persistAuditPrompts(args: PersistArgs): Promise<PersistedT
   }
 
   const out: PersistedTopicsItem[] = [];
+  const normalizePrompt = (value: string): string =>
+    value
+      .toLowerCase()
+      .replace(/https?:\/\/\S+/g, '')
+      .replace(/[^a-z0-9]+/g, ' ')
+      .trim();
+  const existingPromptRows = await args.prisma.prompt.findMany({
+    where: { domainId: args.domainId },
+    select: { text: true },
+  });
+  const seenPromptTexts = new Set(existingPromptRows.map((row) => normalizePrompt(row.text)).filter(Boolean));
 
   // Group prompts by their keyword text so we upsert one Keyword row per unique seed.
   const promptsByKeyword = new Map<string, GeneratedPrompt[]>();
   for (const p of args.prompts) {
+    const promptKey = normalizePrompt(p.text);
+    if (!promptKey || seenPromptTexts.has(promptKey)) continue;
+    seenPromptTexts.add(promptKey);
     const key = p.keyword;
     const arr = promptsByKeyword.get(key) ?? [];
     arr.push(p);

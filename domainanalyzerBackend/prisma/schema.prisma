@@ -362,6 +362,8 @@ model AiQueryResult {
   runId              Int
   promptId           Int
   model              String // e.g. 'gpt-4o-mini', 'claude-3-5-haiku', 'gemini-1.5-flash'
+  status             String   @default("success") // success | failed
+  errorMessage       String?
   response           String
   presence           Int      @default(0) // 0 | 1
   relevance          Int      @default(0) // 0..10 (always measurable — answer quality)
@@ -383,6 +385,7 @@ model AiQueryResult {
   prompt             Prompt   @relation(fields: [promptId], references: [id], onDelete: Cascade)
 
   @@index([runId])
+  @@index([runId, status])
   @@index([promptId])
 }
 

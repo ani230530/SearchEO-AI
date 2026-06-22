@@ -1,10 +1,9 @@
 import { Queue, Worker, Job } from 'bullmq';
 import IORedis from 'ioredis';
 import axios from 'axios';
-import { PrismaClient } from '../../generated/prisma';
+import { prisma } from '../lib/prisma';
 import { formatRedisError, getRedisUrl } from '../lib/redisConfig';
 
-const prisma = new PrismaClient();
 
 // Redis Connection
 const REDIS_URL = getRedisUrl(process.env.REDIS_URL);

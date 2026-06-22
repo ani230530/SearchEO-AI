@@ -71,15 +71,19 @@ import { compareNumbers, compareStrings, type SortState } from "../sort";
 export type PromptModelResult = {
   accuracy?: number | null;
   citations?: Array<{ title?: string; url: string; citedText?: string; snippet?: string; content?: string }>;
+  competitorHosts?: string[];
+  competitorMentions?: Array<{ host?: string; count?: number; rankPosition?: number | null; sentiment?: number | null }>;
   id: string;
   model: string;
   overall?: number | null;
   phrase?: string;
   presence?: number;
+  rankPosition?: number | null;
   relevance?: number;
   response?: string;
   sentiment?: number | null;  // null when presence=0 (not mentioned)
   sources?: string[];
+  status?: string | null;
 };
 
 export type PromptWeekTrend = {
@@ -92,8 +96,13 @@ export type PromptWeekTrend = {
 export type PromptTableRow = {
   /** Average sentiment ON A 0..10 SCALE — null if no model in this row mentioned the brand. */
   avgSentiment: number | null;
+  aiSov?: string | null;
+  aiSovPercent?: number | null;
+  avgRankPosition?: number | null;
   bestRank: number;
+  brandMentionEvents?: number;
   competitorCount: number;
+  competitorMentionEvents?: number;
   competitors: string[];
   id: string;
   /** Raw DB id (Prompt.id or Keyword.id). Used to fetch /history for this row. */
@@ -101,7 +110,11 @@ export type PromptTableRow = {
   mentions: number;
   phrase: string;
   results: PromptModelResult[];
+  rankedResponses?: number;
+  rankingPosition?: number | null;
   sov: string;
+  successfulResponses?: number;
+  totalMentionEvents?: number;
   type: "prompt" | "keyword";
   /** True if the user marked this prompt for weekly tracking. */
   isTracked?: boolean;
@@ -111,6 +124,8 @@ export type PromptTableRow = {
   nextTestAt?: string | null;
   /** Week-over-week visibility trend (present on tracked-prompt rows). */
   weekTrend?: PromptWeekTrend | null;
+  /** Which historical run family should drive the expanded detail chart. */
+  historyKind?: "audit" | "weekly";
   /** For keyword rows: the child prompt ids. Tracking a keyword tracks them all. */
   childPromptIds?: number[];
 };
@@ -148,25 +163,52 @@ const getPromptSortLabel = (sort: SortState<PromptSortMetric>) => {
   return `${PROMPT_SORT_LABELS[sort.metric]} ${sort.direction === "asc" ? "↑" : "↓"}`;
 };
 
+const CATEGORY_LABELS: Record<string, string> = {
+  unbranded_recommendation: "Unbranded recommendation",
+  top_n_listicle: "Top-N listicle",
+  alternatives_to_competitor: "Alternatives to competitor",
+  problem_statement: "Problem statement",
+  brand_vs_competitor: "Brand vs competitor",
+  branded_trust: "Branded trust",
+};
+
+const getPromptCategoryLabel = (category?: string | null) => {
+  if (!category) return "Uncategorized";
+  return CATEGORY_LABELS[category] ?? category.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
+};
+
 const getPromptVisibilityScore = (row: PromptTableRow) => {
   const value = Number.parseFloat(String(row.sov ?? "").replace("%", ""));
   return Number.isFinite(value) ? value : null;
 };
 
 const getPromptCoverageScore = (row: PromptTableRow) => {
-  const total = Number(row.results?.length ?? 0);
+  const total = getSuccessfulResponseCount(row);
   if (!Number.isFinite(total) || total <= 0) return null;
   return Number(row.mentions ?? 0) / total;
 };
 
+const getSuccessfulResponseCount = (row: PromptTableRow) => {
+  const direct = Number(row.successfulResponses);
+  if (Number.isFinite(direct) && direct >= 0) return direct;
+  return (row.results ?? []).filter((result) => result.status !== "failed").length;
+};
+
 const getPromptRankingScore = (row: PromptTableRow) => {
+  const direct = Number(row.rankingPosition ?? row.bestRank);
+  if (Number.isFinite(direct) && direct > 0) return direct;
   const positions = (row.results ?? [])
     .map((result) => Number((result as { rankPosition?: number | null }).rankPosition))
     .filter((position): position is number => Number.isFinite(position) && position > 0);
   return positions.length > 0 ? Math.min(...positions) : null;
 };
 
-const getPromptVolumeScore = (row: PromptTableRow) => Number(row.results?.length ?? 0);
+const getPromptVolumeScore = (row: PromptTableRow) => getSuccessfulResponseCount(row);
+
+const formatRankValue = (value: number | null | undefined) => {
+  if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) return null;
+  return Number.isInteger(value) ? `#${value}` : `#${value.toFixed(1)}`;
+};
 
 // detailGraphData / detailGraphTicks / detailGraphHighlight removed — the
 // per-prompt detail chart now derives from the live /history endpoint
@@ -189,7 +231,8 @@ const getSentimentColor = (sentiment: string) => {
 const MODEL_ICON_SRC: Array<{ test: RegExp; src: string }> = [
   { test: /gpt|openai|chatgpt/i, src: "/report-icons/chat-gpt.svg" },
   { test: /claude|anthropic/i,   src: "/report-icons/claude.svg" },
-  { test: /gemini|google/i,      src: "/report-icons/gemini.svg" },
+  { test: /google-gre|google.*overview|overview|serpapi/i, src: "/report-icons/google.svg" },
+  { test: /gemini/i,      src: "/report-icons/gemini.svg" },
 ];
 
 /** Human-friendly label for a model id. */
@@ -202,6 +245,7 @@ const MODEL_LABELS: Record<string, string> = {
   "gemini-2.0-flash": "Gemini",
   "gemini-1.5-flash": "Gemini",
   "google/gemini-2.0-flash-001": "Gemini",
+  "google-gre": "Google AI Overview",
 };
 
 const getModelLabel = (model?: string): string => {
@@ -210,7 +254,8 @@ const getModelLabel = (model?: string): string => {
   const lower = model.toLowerCase();
   if (/gpt|openai/.test(lower)) return "ChatGPT";
   if (/claude|anthropic/.test(lower)) return "Claude";
-  if (/gemini|google/.test(lower)) return "Gemini";
+  if (/google-gre|google.*overview|overview|serpapi/.test(lower)) return "Google AI Overview";
+  if (/gemini/.test(lower)) return "Gemini";
   if (/deep/.test(lower)) return "DeepSeek";
   // last resort: humanise the slug
   return model.replace(/[-_/]/g, " ");
@@ -288,18 +333,23 @@ const markdownLinkComponents = {
  * model's responses for this prompt actually mentioned the brand.
  */
 const buildModelPresenceRows = (results: ProcessedPromptResult[]) => {
-  const byModel = new Map<string, { total: number; mentions: number }>();
+  const byModel = new Map<string, { total: number; mentions: number; failed: number }>();
   for (const r of results) {
     const k = r.model;
-    if (!byModel.has(k)) byModel.set(k, { total: 0, mentions: 0 });
+    if (!byModel.has(k)) byModel.set(k, { total: 0, mentions: 0, failed: 0 });
     const slot = byModel.get(k)!;
+    if (r.status === "failed") {
+      slot.failed += 1;
+      continue;
+    }
     slot.total += 1;
     slot.mentions += r.presence > 0 ? 1 : 0;
   }
   return Array.from(byModel.entries()).map(([model, v]) => ({
     label: getModelLabel(model),
     model,
-    score: `${v.mentions}/${v.total}`,
+    score: v.total > 0 ? `${v.mentions}/${v.total}` : v.failed > 0 ? "Failed" : "0/0",
+    failed: v.failed,
   }));
 };
 
@@ -315,6 +365,8 @@ type HistoryRun = {
   startedAt: string;
   presenceRate: number;
   mentions: number;
+  attempted?: number;
+  failed?: number;
   total: number;
   byModel?: Record<string, { mentions: number; total: number; presenceRate: number }>;
 };
@@ -334,6 +386,7 @@ const PromptVisibilityComparisonGraph = ({
   promptRawId,
   rowType,
   trackedView = false,
+  historyKind,
   timeWindowDays = null,
   modelFilter = null,
 }: {
@@ -343,6 +396,7 @@ const PromptVisibilityComparisonGraph = ({
   rowType: "prompt" | "keyword";
   /** When true, the chart shows the weekly-tracking series (kind=weekly runs). */
   trackedView?: boolean;
+  historyKind?: "audit" | "weekly";
   /** Limit the chart to runs within the last N days (null = all history). */
   timeWindowDays?: number | null;
   /** Plot a single model's presence (raw model key) instead of the aggregate. */
@@ -358,8 +412,9 @@ const PromptVisibilityComparisonGraph = ({
   // runs so the chart is a clean week-over-week series.
   const { data: historyData, isLoading: loadingHistory } = usePromptHistory<{
     runs: HistoryRun[];
-  }>(domainId ?? null, promptRawId ?? null, rowType, trackedView);
+  }>(domainId ?? null, promptRawId ?? null, rowType, historyKind ?? (trackedView ? "weekly" : "audit"));
   const history = historyData?.runs ?? [];
+  const weeklyHistory = (historyKind ?? (trackedView ? "weekly" : "audit")) === "weekly";
 
   // Apply the "7 days" time-window filter, then map each run's Y value to the
   // selected model's presence (or the aggregate when no model is chosen).
@@ -369,10 +424,15 @@ const PromptVisibilityComparisonGraph = ({
   const windowed = cutoff != null
     ? history.filter((h) => new Date(h.startedAt).getTime() >= cutoff)
     : history;
-  const chartData = windowed.map((h, i) => ({
+  const scoredWindowed = windowed.filter((h) => h.total > 0);
+  const chartData = scoredWindowed.map((h, i) => ({
     x: i,
     presence: modelFilter ? (h.byModel?.[modelFilter]?.presenceRate ?? 0) : h.presenceRate,
     label: new Date(h.startedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" }),
+    mentions: modelFilter ? (h.byModel?.[modelFilter]?.mentions ?? 0) : h.mentions,
+    total: modelFilter ? (h.byModel?.[modelFilter]?.total ?? 0) : h.total,
+    attempted: h.attempted ?? h.total,
+    failed: h.failed ?? 0,
   }));
   const ticks = chartData.length > 0
     ? [0, Math.floor(chartData.length / 2), chartData.length - 1].filter((v, i, a) => a.indexOf(v) === i)
@@ -387,10 +447,13 @@ const PromptVisibilityComparisonGraph = ({
     : loadingHistory
       ? "Loading history…"
       : history.length === 0
-        ? (trackedView ? "No weekly history yet — runs every Monday" : "No audit history for this prompt yet")
+        ? (weeklyHistory ? "No weekly history yet — runs every Monday" : "No audit history for this prompt yet")
         : windowed.length === 0
           ? "No runs in this time range"
+          : chartData.length === 0
+            ? "No successful model responses in this range"
           : null;
+  const singleRun = chartData.length === 1 ? chartData[0] : null;
 
   return (
     <div className="relative border-r border-[#e7ebf2] pr-3">
@@ -413,9 +476,22 @@ const PromptVisibilityComparisonGraph = ({
           </div>
         </div>
       ) : null}
-      <div className="relative h-[246px]">
-        {emptyMessage ? (
-          <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
+        <div className="relative h-[246px]">
+          {singleRun ? (
+            <div className="pointer-events-none absolute bottom-3 left-3 z-10 max-w-[260px] rounded-[8px] border border-slate-200 bg-white/95 px-3 py-2 text-[11px] leading-snug text-slate-600 shadow-sm">
+              <span className="font-semibold text-slate-800">
+                {weeklyHistory ? "Single weekly run" : "Single audit run"}: {singleRun.presence}% visibility.
+              </span>{" "}
+              Trend line appears after the next scored run.
+              {singleRun.failed > 0 ? (
+                <span className="mt-1 block text-slate-500">
+                  {singleRun.failed} failed provider attempt{singleRun.failed === 1 ? "" : "s"} excluded from the denominator.
+                </span>
+              ) : null}
+            </div>
+          ) : null}
+          {emptyMessage ? (
+            <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
             <span className="rounded-full bg-white/95 border border-slate-200 px-3 py-1.5 text-[11px] text-slate-500 shadow-sm">
               {emptyMessage}
             </span>
@@ -446,8 +522,9 @@ const PromptVisibilityComparisonGraph = ({
               <ReferenceDot
                 fill="#83a9da"
                 isFront
-                r={4.5}
+                r={chartData.length === 1 ? 6 : 4.5}
                 stroke="#83a9da"
+                strokeWidth={chartData.length === 1 ? 3 : 1}
                 x={lastIdx}
                 y={chartData[lastIdx]?.presence ?? 0}
               />
@@ -637,7 +714,11 @@ const PromptAIResponsePanel = ({
             </article>
           ) : (
             <p className="text-[13px] italic text-slate-400">
-              {activeResult.mentioned ? "No response captured." : "This model didn't mention your brand."}
+              {activeResult.status === "failed"
+                ? activeResult.errorMessage
+                  ? `Provider failed: ${activeResult.errorMessage}`
+                  : "Provider failed before a response was captured."
+                : activeResult.mentioned ? "No response captured." : "This model didn't mention your brand."}
             </p>
           )}
         </div>
@@ -674,13 +755,14 @@ const PromptAIResponsePanel = ({
   );
 };
 
-const PromptExpandedDetails = ({
+export const PromptExpandedDetails = ({
   results,
   phrase,
   domainId,
   rawId,
   rowType,
   trackedView = false,
+  historyKind,
   lastTestedAt,
   nextTestAt,
 }: {
@@ -690,6 +772,7 @@ const PromptExpandedDetails = ({
   rawId?: number | null;
   rowType: "prompt" | "keyword";
   trackedView?: boolean;
+  historyKind?: "audit" | "weekly";
   lastTestedAt?: string | null;
   nextTestAt?: string | null;
 }) => {
@@ -697,39 +780,70 @@ const PromptExpandedDetails = ({
     iso ? new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" }) : null;
   const processedResults = useMemo<ProcessedPromptResult[]>(() => {
     const grouped = new Map<string, ProcessedPromptResult>();
+    const counts = new Map<string, {
+      accuracy: number;
+      overall: number;
+      relevance: number;
+      sentiment: number;
+      scored: number;
+    }>();
 
     for (const result of results) {
       const existing = grouped.get(result.model);
-      const presence = result.presence || 0;
+      const successful = result.status !== "failed";
+      const presence = successful ? result.presence || 0 : 0;
+      const mentioned = presence > 0;
       const citations = Array.isArray(result.citations) ? result.citations : [];
       const sources = Array.isArray(result.sources) ? result.sources : [];
 
       if (!existing) {
         grouped.set(result.model, {
           ...result,
-          accuracy: presence > 0 ? result.accuracy || 0 : 0,
+          accuracy: mentioned && typeof result.accuracy === "number" ? result.accuracy : 0,
           citations: [...citations],
-          displayAccuracy: presence > 0 ? result.accuracy || 0 : null,
-          displayOverall: presence > 0 ? result.overall || 0 : null,
-          displayRelevance: presence > 0 ? result.relevance || 0 : null,
-          displaySentiment: presence > 0 ? result.sentiment || 0 : null,
-          mentioned: presence > 0,
-          overall: presence > 0 ? result.overall || 0 : 0,
+          displayAccuracy: mentioned && typeof result.accuracy === "number" ? result.accuracy : null,
+          displayOverall: mentioned && typeof result.overall === "number" ? result.overall : null,
+          displayRelevance: mentioned && typeof result.relevance === "number" ? result.relevance : null,
+          displaySentiment: mentioned && typeof result.sentiment === "number" ? result.sentiment : null,
+          mentioned,
+          overall: mentioned && typeof result.overall === "number" ? result.overall : 0,
           phrase,
           presence,
-          relevance: presence > 0 ? result.relevance || 0 : 0,
-          sentiment: presence > 0 ? result.sentiment || 0 : 0,
+          relevance: mentioned && typeof result.relevance === "number" ? result.relevance : 0,
+          sentiment: mentioned && typeof result.sentiment === "number" ? result.sentiment : 0,
           sources: [...sources],
+        });
+        counts.set(result.model, {
+          accuracy: mentioned && typeof result.accuracy === "number" ? 1 : 0,
+          overall: mentioned && typeof result.overall === "number" ? 1 : 0,
+          relevance: mentioned && typeof result.relevance === "number" ? 1 : 0,
+          sentiment: mentioned && typeof result.sentiment === "number" ? 1 : 0,
+          scored: mentioned ? 1 : 0,
         });
         continue;
       }
 
       existing.presence += presence;
-      if (presence > 0) {
-        existing.accuracy = (existing.accuracy || 0) + (result.accuracy || 0);
-        existing.overall = (existing.overall || 0) + (result.overall || 0);
-        existing.relevance = (existing.relevance || 0) + (result.relevance || 0);
-        existing.sentiment = (existing.sentiment || 0) + (result.sentiment || 0);
+      if (mentioned) {
+        const modelCounts = counts.get(result.model) ?? { accuracy: 0, overall: 0, relevance: 0, sentiment: 0, scored: 0 };
+        modelCounts.scored += 1;
+        if (typeof result.accuracy === "number") {
+          existing.accuracy = (existing.accuracy || 0) + result.accuracy;
+          modelCounts.accuracy += 1;
+        }
+        if (typeof result.overall === "number") {
+          existing.overall = (existing.overall || 0) + result.overall;
+          modelCounts.overall += 1;
+        }
+        if (typeof result.relevance === "number") {
+          existing.relevance = (existing.relevance || 0) + result.relevance;
+          modelCounts.relevance += 1;
+        }
+        if (typeof result.sentiment === "number") {
+          existing.sentiment = (existing.sentiment || 0) + result.sentiment;
+          modelCounts.sentiment += 1;
+        }
+        counts.set(result.model, modelCounts);
       }
 
       for (const source of sources) {
@@ -747,29 +861,60 @@ const PromptExpandedDetails = ({
 
     return Array.from(grouped.values()).map((item) => {
       const mentions = item.presence > 0 ? item.presence : 0;
+      const modelCounts = counts.get(item.model) ?? { accuracy: 0, overall: 0, relevance: 0, sentiment: 0, scored: 0 };
       return {
         ...item,
-        displayAccuracy: mentions > 0 ? Number(item.accuracy || 0) / mentions : null,
-        displayOverall: mentions > 0 ? Number(item.overall || 0) / mentions : null,
-        displayRelevance: mentions > 0 ? Number(item.relevance || 0) / mentions : null,
-        displaySentiment: mentions > 0 ? Number(item.sentiment || 0) / mentions : null,
+        displayAccuracy: modelCounts.accuracy > 0 ? Number(item.accuracy || 0) / modelCounts.accuracy : null,
+        displayOverall: modelCounts.overall > 0 ? Number(item.overall || 0) / modelCounts.overall : null,
+        displayRelevance: modelCounts.relevance > 0 ? Number(item.relevance || 0) / modelCounts.relevance : null,
+        displaySentiment: modelCounts.sentiment > 0 ? Number(item.sentiment || 0) / modelCounts.sentiment : null,
         mentioned: mentions > 0,
       };
     });
-  }, [results]);
+  }, [results, phrase]);
 
   const [selectedModel, setSelectedModel] = useState(processedResults[0]?.model || "");
+  useEffect(() => {
+    if (processedResults.length === 0) return;
+    if (!processedResults.some((result) => result.model === selectedModel)) {
+      setSelectedModel(processedResults[0]?.model || "");
+    }
+  }, [processedResults, selectedModel]);
   // Graph filters driven by the header dropdowns.
   const [windowIdx, setWindowIdx] = useState(0); // default: All time
   const [graphModel, setGraphModel] = useState<string | null>(null); // default: All models
   const graphModelLabel = graphModel ? getModelLabel(graphModel) : "All models";
+  const weeklyHistory = (historyKind ?? (trackedView ? "weekly" : "audit")) === "weekly";
+
+  if (processedResults.length === 0) {
+    return (
+      <div className="bg-[#fcfcfd] px-4 py-4">
+        <div className="mb-2 flex items-center justify-between">
+          <h4 className="text-[15px] font-medium text-[#3f4754]">Detailed prompt analysis</h4>
+        </div>
+        <div className="rounded-[12px] border border-dashed border-slate-200 bg-white px-4 py-5">
+          <div className="flex items-start gap-3">
+            <span className="mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-slate-50 text-slate-500">
+              <Info className="h-4 w-4" />
+            </span>
+            <div className="min-w-0">
+              <p className="text-[13px] font-semibold text-slate-700">No model responses saved for this prompt yet</p>
+              <p className="mt-1 max-w-[720px] text-[12px] leading-relaxed text-slate-500">
+                This prompt is in the inventory, but it has not been analyzed in the current result set. Use Analyze Prompt or include it in the next audit to collect ChatGPT, Claude, and Gemini responses.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-[#fcfcfd] px-4 py-4">
       <div className="mb-2 flex items-center justify-between">
         <h4 className="text-[15px] font-medium text-[#3f4754]">Detailed prompt analysis</h4>
         <div className="flex items-center gap-2">
-          {trackedView ? (
+          {weeklyHistory ? (
             <span className="inline-flex items-center gap-1.5 rounded-[8px] border border-[#d7dde7] bg-white px-3 h-8 text-[11px] font-medium text-[#717b8b]">
               <Calendar className="h-3.5 w-3.5" />
               {fmtDate(lastTestedAt) ? `Last tested ${fmtDate(lastTestedAt)}` : "Not yet tested"}
@@ -839,6 +984,7 @@ const PromptExpandedDetails = ({
           promptRawId={rawId}
           rowType={rowType}
           trackedView={trackedView}
+          historyKind={historyKind}
           timeWindowDays={GRAPH_TIME_WINDOWS[windowIdx].days}
           modelFilter={graphModel}
         />
@@ -925,6 +1071,18 @@ export const PromptTable = ({
       return next;
     });
   const [tableSort, setTableSort] = useState<SortState<PromptSortMetric>>(null);
+  const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
+  const categoryOptions = useMemo(() => {
+    const categories = new Set<string>();
+    for (const row of data) {
+      if (row.type !== "prompt") continue;
+      const category = (row as PromptTableRow & { category?: string | null }).category;
+      if (category) categories.add(category);
+    }
+    return Array.from(categories)
+      .sort((a, b) => getPromptCategoryLabel(a).localeCompare(getPromptCategoryLabel(b)))
+      .map((value) => ({ value, label: getPromptCategoryLabel(value) }));
+  }, [data]);
   const toggleTableSort = (metric: PromptSortMetric) => {
     setTableSort((current) => {
       if (current?.metric === metric) {
@@ -951,6 +1109,10 @@ export const PromptTable = ({
   const [trackPending, setTrackPending] = useState<Record<string, boolean>>({});
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const isRowTracked = (row: PromptTableRow) => trackOverrides[row.id] ?? row.isTracked ?? false;
+
+  useEffect(() => {
+    setSelectedIds(new Set());
+  }, [categoryFilter]);
 
   // Clear optimistic overrides when the domain changes (fresh server data).
   useEffect(() => {
@@ -1041,7 +1203,7 @@ export const PromptTable = ({
   const invalidateTracking = () => {
     if (domainId == null) return;
     queryClient.invalidateQueries({ queryKey: aiResultsKeys.trackedPrompts(domainId) });
-    queryClient.invalidateQueries({ queryKey: aiResultsKeys.report(domainId) });
+    queryClient.invalidateQueries({ queryKey: ["ai-results", "report", domainId] });
   };
 
   const toggleTracking = async (row: PromptTableRow, next: boolean) => {
@@ -1211,6 +1373,9 @@ export const PromptTable = ({
     if (trackedFilterOnly) {
       items = items.filter((item) => trackOverrides[item.id] ?? item.isTracked ?? false);
     }
+    if (categoryFilter) {
+      items = items.filter((item) => (item as PromptTableRow & { category?: string | null }).category === categoryFilter);
+    }
 
     if (tableSort) {
       items.sort((a, b) => {
@@ -1235,8 +1400,11 @@ export const PromptTable = ({
 
     // Dedupe parent rows that match a row we just analyzed — the
     // newly-analyzed copy has the fresher result data and wins.
+    const visibleNewlyAnalyzedRows = categoryFilter
+      ? newlyAnalyzedRows.filter((row) => (row as PromptTableRow & { category?: string | null }).category === categoryFilter)
+      : newlyAnalyzedRows;
     const mergedNewIds = new Set(
-      newlyAnalyzedRows.map((r) => r.rawId).filter((id): id is number => typeof id === "number"),
+      visibleNewlyAnalyzedRows.map((r) => r.rawId).filter((id): id is number => typeof id === "number"),
     );
     const baseItems = items.filter(
       (item) => !(typeof item.rawId === "number" && mergedNewIds.has(item.rawId)),
@@ -1247,17 +1415,17 @@ export const PromptTable = ({
     // is most relevant. With a metric sort, we don't pin (that would
     // lie about the sort order).
     if (!tableSort) {
-      return [...newlyAnalyzedRows, ...baseItems];
+      return [...visibleNewlyAnalyzedRows, ...baseItems];
     }
     return baseItems;
-  }, [data, tableSort, newlyAnalyzedRows, trackedFilterOnly, trackOverrides]);
+  }, [categoryFilter, data, tableSort, newlyAnalyzedRows, trackedFilterOnly, trackOverrides]);
 
   const totalCount = fullSortedData.length;
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [tableSort]);
+  }, [tableSort, categoryFilter]);
   useEffect(() => {
     if (currentPage > totalPages) setCurrentPage(totalPages);
   }, [currentPage, totalPages]);
@@ -1303,20 +1471,14 @@ export const PromptTable = ({
               </Button>
             </div>
 
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="h-[38px] gap-2 rounded-lg border-slate-200 px-3 text-slate-600 shadow-none hover:bg-gray-50">
-                  <Calendar className="h-[16px] w-[16px]" />
-                  <span className="text-[13px] font-medium">7 days</span>
-                  <ChevronDown className="ml-1 h-3.5 w-3.5 opacity-60" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-[150px]">
-                <DropdownMenuItem>7 days</DropdownMenuItem>
-                <DropdownMenuItem>14 days</DropdownMenuItem>
-                <DropdownMenuItem>30 days</DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <Button
+              variant="outline"
+              disabled
+              className="h-[38px] gap-2 rounded-lg border-slate-200 px-3 text-slate-500 shadow-none disabled:cursor-default disabled:opacity-100"
+            >
+              <Calendar className="h-[16px] w-[16px]" />
+              <span className="text-[13px] font-medium">Current result set</span>
+            </Button>
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -1430,15 +1592,29 @@ export const PromptTable = ({
                     className="h-[38px] gap-2 rounded-lg border-slate-200 px-3 text-slate-600 shadow-none hover:bg-gray-50"
                   >
                     <LayoutGrid className="h-[16px] w-[16px]" />
-                    <span className="text-[13px] font-medium">Select Prompt Category</span>
+                    <span className="text-[13px] font-medium">
+                      {categoryFilter ? getPromptCategoryLabel(categoryFilter) : "All Categories"}
+                    </span>
                     <ChevronDown className="ml-1 h-3.5 w-3.5 opacity-60" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-[220px]">
-                  <DropdownMenuItem>All Categories</DropdownMenuItem>
-                  <DropdownMenuItem>Brand Mentions</DropdownMenuItem>
-                  <DropdownMenuItem>Competitor Research</DropdownMenuItem>
-                  <DropdownMenuItem>Content Gaps</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setCategoryFilter(null)}>
+                    All Categories
+                  </DropdownMenuItem>
+                  {categoryOptions.length === 0 ? (
+                    <DropdownMenuItem disabled>No categories in this data</DropdownMenuItem>
+                  ) : (
+                    categoryOptions.map((category) => (
+                      <DropdownMenuItem
+                        key={category.value}
+                        onClick={() => setCategoryFilter(category.value)}
+                        className={categoryFilter === category.value ? "bg-slate-50" : ""}
+                      >
+                        {category.label}
+                      </DropdownMenuItem>
+                    ))
+                  )}
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
@@ -1629,18 +1805,28 @@ export const PromptTable = ({
                     </TableCell>
                     <TableCell className="px-2 py-3">
                       {/* Coverage = how many models out of total mentioned the brand */}
+                      {(() => {
+                        const successfulResponses = getSuccessfulResponseCount(row);
+                        const fullCoverage = successfulResponses > 0 && row.mentions === successfulResponses;
+                        return (
                       <Badge
                         variant="outline"
                         className={`rounded-full px-2.5 py-[2px] text-[10px] font-medium tracking-normal shadow-sm ${
                           row.mentions === 0
                             ? "border-slate-200 bg-slate-50 text-slate-500"
-                            : row.mentions === row.results.length
+                            : fullCoverage
                               ? "border-[#a8dab5] bg-[#e6f4ea] text-[#1e8e3e]"
                               : "border-amber-200 bg-amber-50 text-amber-700"
                         }`}
                       >
-                        {row.mentions === 0 ? "0 of " + row.results.length : `${row.mentions}/${row.results.length} models`}
+                        {successfulResponses === 0
+                          ? "No scored models"
+                          : row.mentions === 0
+                            ? `0 of ${successfulResponses}`
+                            : `${row.mentions}/${successfulResponses} models`}
                       </Badge>
+                        );
+                      })()}
                     </TableCell>
                     <TableCell className="px-2 py-3 text-[11px] font-medium text-slate-600">
                       {/* Ranking column with three honest states:
@@ -1651,12 +1837,8 @@ export const PromptTable = ({
                           Previous version collapsed cases 2 + 3 into a single
                           "—" which made the column look uniformly broken. */}
                       {(() => {
-                        const positions = row.results
-                          .map((result) => Number((result as { rankPosition?: number | null }).rankPosition))
-                          .filter((p): p is number => typeof p === "number" && p > 0);
-                        if (positions.length > 0) {
-                          return <span>#{Math.min(...positions)}</span>;
-                        }
+                        const formatted = formatRankValue(getPromptRankingScore(row));
+                        if (formatted) return <span>{formatted}</span>;
                         if (row.mentions > 0) {
                           return <span className="text-emerald-600">Mentioned</span>;
                         }
@@ -1664,14 +1846,17 @@ export const PromptTable = ({
                       })()}
                     </TableCell>
                     <TableCell className="px-2 py-3">
-                      <span className="text-[11px] font-medium text-slate-600">500</span>
+                      <span className="text-[11px] font-medium text-slate-600">
+                        {getSuccessfulResponseCount(row) || "—"}
+                      </span>
                     </TableCell>
                     <TableCell className="px-2 py-3">
-                      {row.avgSentiment === null || row.mentions === 0 ? (
-                        // No model mentioned the brand → there's no sentiment
-                        // to measure. Honest display instead of a fake badge.
-                        <span className="text-[10px] font-medium text-slate-400 italic">
-                          Not mentioned
+                      {row.avgSentiment === null ? (
+                        <span
+                          title={row.mentions > 0 ? "Brand was mentioned, but sentiment was not scored for this prompt." : "Brand was not mentioned for this prompt."}
+                          className="text-[10px] font-medium text-slate-400 italic"
+                        >
+                          {row.mentions > 0 ? "No sentiment" : "Not mentioned"}
                         </span>
                       ) : (
                         <Badge
@@ -1725,6 +1910,7 @@ export const PromptTable = ({
                           rawId={row.rawId}
                           rowType={row.type}
                           trackedView={trackedFilterOnly}
+                          historyKind={row.historyKind}
                           lastTestedAt={row.lastTestedAt}
                           nextTestAt={row.nextTestAt}
                         />

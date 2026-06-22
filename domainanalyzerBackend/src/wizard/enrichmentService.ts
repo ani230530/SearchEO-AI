@@ -28,6 +28,8 @@ export interface EnrichedContext {
   useCases: string[];
   constraints: string[];
   competitors: string[];
+  /** Real service areas / buyer locations to use in natural local prompts. */
+  locations: string[];
   priceBand: string | null;
   /** Scrape-derived plain-English topic to use inside prompts. More specific than industry/category. */
   productContext: string;
@@ -54,6 +56,7 @@ const FALLBACK: EnrichedContext = {
   useCases: ['daily operations', 'managing growth', 'reducing costs'],
   constraints: ['budget under $100/mo', 'team under 20 people', 'no engineering required'],
   competitors: [],
+  locations: [],
   priceBand: null,
   productContext: 'daily operations',
   year: new Date().getFullYear().toString(),
@@ -176,7 +179,7 @@ export async function enrichDomainContext(input: EnrichInput): Promise<EnrichedC
     'Bad category examples: "Technology & IT", "Hospitality & Tourism", "business software".',
     'Personas: role + scale + vertical.',
     'Use cases: jobs-to-be-done.',
-    'Return JSON: {category, vertical, personas[3], useCases[3], constraints[2-4], competitors[0-3], priceBand, year}',
+    'Return JSON: {category, vertical, personas[3], useCases[3], constraints[2-4], competitors[0-3], locations[0-5], priceBand, year}',
   ].join('\n');
 
   let parsed: Partial<EnrichedContext> & { competitors?: unknown } = {};
@@ -211,6 +214,7 @@ export async function enrichDomainContext(input: EnrichInput): Promise<EnrichedC
   const useCases = sanitizeArr(parsed.useCases, 3, 3);
   const constraints = sanitizeArr(parsed.constraints, 4, 2);
   const competitorsRaw = sanitizeArr(parsed.competitors, 5, 0);
+  const locationsRaw = sanitizeArr((parsed as { locations?: unknown }).locations, 5, 0);
 
   // Merge user-supplied competitors first; LLM-proposed ones as fillers.
   const competitorSet = new Set<string>();
@@ -222,6 +226,19 @@ export async function enrichDomainContext(input: EnrichInput): Promise<EnrichedC
     const host = c.replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0].toLowerCase();
     if (host && host !== input.host) competitorSet.add(host);
   }
+
+  const locations = Array.from(
+    new Set(
+      [
+        input.state,
+        input.country && !/^united states$/i.test(input.country) ? input.country : null,
+        ...locationsRaw,
+      ]
+        .filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
+        .map((value) => compactPhrase(value, 5))
+        .filter(Boolean)
+    )
+  ).slice(0, 5);
 
   const category = refineCategory({
       category: typeof parsed.category === 'string' ? parsed.category : null,
@@ -237,6 +254,7 @@ export async function enrichDomainContext(input: EnrichInput): Promise<EnrichedC
     useCases: useCases.length === 3 ? useCases : [...useCases, ...FALLBACK.useCases].slice(0, 3),
     constraints: constraints.length >= 2 ? constraints : [...constraints, ...FALLBACK.constraints].slice(0, 4),
     competitors: Array.from(competitorSet).slice(0, 5),
+    locations,
     priceBand: typeof parsed.priceBand === 'string' && parsed.priceBand.trim() && parsed.priceBand !== 'null'
       ? parsed.priceBand.trim()
       : null,

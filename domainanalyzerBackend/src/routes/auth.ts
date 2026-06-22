@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import crypto from 'crypto';
-import { PrismaClient } from '../../generated/prisma';
+import { prisma } from '../lib/prisma';
 import { authService } from '../services/authService';
 import { authenticateToken } from '../middleware/auth';
 import { authEnv } from '../config/authEnv';
@@ -25,7 +25,6 @@ import {
 } from '../services/googleAuthLoginService';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 // Pulled from the request so refresh tokens know which device they were
 // issued for — surfaced later in /sessions UIs and useful for forensic

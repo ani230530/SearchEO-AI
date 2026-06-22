@@ -27,7 +27,8 @@
 
 import axios from 'axios';
 import { randomUUID } from 'crypto';
-import { Prisma, PrismaClient } from '../../generated/prisma';
+import { Prisma } from '../../generated/prisma';
+import { prisma } from '../lib/prisma';
 import {
   buildUniversalPayload,
   isTemplateType,
@@ -39,7 +40,6 @@ import { decryptToken } from './tokenEncryption';
 import { normalizeKeyword as normalizeKw } from '../utils/payloadNormalization';
 import { broadcastToUser } from './sseService';
 
-const prisma = new PrismaClient();
 
 const N8N_UNIVERSAL_WEBHOOK_URL =
   process.env.N8N_UNIVERSAL_WEBHOOK_URL ||

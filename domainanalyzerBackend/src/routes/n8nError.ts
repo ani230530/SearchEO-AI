@@ -1,9 +1,8 @@
 import { Router, Request, Response } from 'express';
-import { PrismaClient } from '../../generated/prisma';
+import { prisma } from '../lib/prisma';
 import { broadcastToUser } from '../services/sseService';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 /**
  * POST /api/webhooks/n8n/error

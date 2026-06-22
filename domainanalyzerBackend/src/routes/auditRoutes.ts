@@ -1,11 +1,10 @@
 import express, { Request, Response } from "express";
 import puppeteer from "puppeteer";
-import { PrismaClient } from "../../generated/prisma";
+import { prisma } from "../lib/prisma";
 import { authenticateToken, AuthenticatedRequest } from "../middleware/auth";
 import { uploadScreenshot, deleteScreenshot } from "../utils/cloudinary";
 
 const router = express.Router();
-const prisma = new PrismaClient();
 
 function asyncHandler(fn: (req: Request, res: Response, next: any) => Promise<any>) {
   return function (req: Request, res: Response, next: any) {

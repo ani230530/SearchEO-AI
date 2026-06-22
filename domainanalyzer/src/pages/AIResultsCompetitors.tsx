@@ -150,6 +150,14 @@ interface ReportPayload {
     brandPages: number;
     competitorPages: number;
     totalQueries: number;
+    reportCards?: {
+      aiShareOfVoice?: {
+        percent: number;
+        brandMentionEvents: number;
+        competitorMentionEvents: number;
+        totalMentionEvents: number;
+      };
+    };
   };
   topPrompts: Array<{
     rawId: number;
@@ -159,9 +167,11 @@ interface ReportPayload {
     competitors: string[];
     results: Array<{
       model: string;
+      status?: string;
       presence: number;
       sentiment: number | null;
       rankPosition: number | null;
+      competitorHosts?: string[];
       competitorMentions: Array<{ host: string; count: number; sentiment: number | null; rankPosition?: number | null }>;
     }>;
   }>;
@@ -176,7 +186,10 @@ interface TrendsResponse {
     perModel: Record<string, { cites: number; presenceCount: number }>;
     brandMentions: number;
     competitorMentions: number;
+    totalResponses?: number;
+    totalCitations?: number;
     perCompetitor: Record<string, number>;
+    perCompetitorCitations?: Record<string, number>;
   }>;
   topCompetitors: string[];
 }
@@ -242,11 +255,32 @@ const formatStrongestCluster = (c: CompetitorAnalysisRow): string => {
 
 const formatDeltaLabel = (delta: number): string => {
   const sign = delta >= 0 ? '+' : '-';
-  return `${sign}${Math.abs(delta).toFixed(1)}%`;
+  return `${sign}${Math.abs(delta).toFixed(1)} pts`;
 };
 
 const priorityFromServer = (p: 'high' | 'medium' | 'low'): CompetitorInsightPriority => p;
 const INDUSTRY_AVERAGE_VISIBILITY = 68;
+
+type PromptResult = ReportPayload['topPrompts'][number]['results'][number];
+
+const normalizeComparisonHost = (host: unknown): string =>
+  String(host ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/^https?:\/\//, '')
+    .replace(/^www\./, '')
+    .replace(/\/.*$/, '');
+
+const isSuccessfulPromptResult = (result: PromptResult): boolean => result.status !== 'failed';
+
+const resultMentionsCompetitor = (result: PromptResult, competitorHost: string): boolean => {
+  const target = normalizeComparisonHost(competitorHost);
+  if (!target) return false;
+  const mentions = Array.isArray(result.competitorMentions) ? result.competitorMentions : [];
+  if (mentions.some((mention) => normalizeComparisonHost(mention.host) === target)) return true;
+  const hosts = Array.isArray(result.competitorHosts) ? result.competitorHosts : [];
+  return hosts.some((host) => normalizeComparisonHost(host) === target);
+};
 
 const buildCompetitorDetail = (c: CompetitorAnalysisRow): CompetitorDetailData => {
   const visibilityScore = Math.round(c.coveragePct * 100);
@@ -397,8 +431,14 @@ function TopCompetitorCard({
 }) {
   const displayHost = competitorHost?.replace(/^www\./i, '') ?? null;
   const hasCompetitor = Boolean(displayHost);
-  const deltaLabel = formatDeltaLabel(competitorScoreDelta);
-  const deltaIcon = competitorScoreDelta >= 0 ? ArrowUpRight : ArrowDownRight;
+  const isTied = Math.abs(competitorScoreDelta) < 0.05;
+  const deltaLabel = isTied ? '0.0 pts' : formatDeltaLabel(competitorScoreDelta);
+  const deltaIcon = competitorScoreDelta > 0 ? ArrowUpRight : ArrowDownRight;
+  const deltaStyles = isTied
+    ? 'border-slate-200 bg-slate-50 text-slate-500'
+    : competitorScoreDelta > 0
+      ? 'border-[#FFC9C9] bg-[#FFE5E5] text-[#D83A3A]'
+      : 'border-[#BCECC5] bg-[#DFFBE4] text-[#087B25]';
 
   return (
     <article className="flex min-w-0 flex-col rounded-lg border border-slate-200 bg-white px-6 py-4 shadow-[0_1px_2px_0_#1018280D]">
@@ -418,8 +458,8 @@ function TopCompetitorCard({
                 onError={(event) => ((event.currentTarget as HTMLImageElement).style.display = 'none')}
               />
             ) : null}
-            <span className="inline-flex h-7 shrink-0 items-center gap-1 rounded-full border border-[#FFC9C9] bg-[#FFE5E5] px-2.5 text-[11px] font-semibold leading-none text-[#D83A3A] shadow-none">
-              {React.createElement(deltaIcon, { className: 'h-3.5 w-3.5' })}
+            <span className={`inline-flex h-7 shrink-0 items-center gap-1 rounded-full border px-2.5 text-[11px] font-semibold leading-none shadow-none ${deltaStyles}`}>
+              {isTied ? null : React.createElement(deltaIcon, { className: 'h-3.5 w-3.5' })}
               {deltaLabel}
             </span>
           </div>
@@ -722,26 +762,38 @@ function TrendComparisonPanel({ trends }: { trends: TrendsResponse | null }) {
     [],
   );
 
-  const { visibilityData, citationData, sovData, models, topCompetitors, hasSignal } = useMemo(() => {
+  const { visibilityData, citationData, sovData, visibilitySeries, citationSeries, topCompetitors, hasSignal } = useMemo(() => {
     if (!trends || trends.runs.length === 0) {
-      return { visibilityData: [] as TrendChartPoint[], citationData: [] as TrendChartPoint[], sovData: [] as TrendChartPoint[], models: [] as string[], topCompetitors: [] as string[], hasSignal: false };
+      return {
+        visibilityData: [] as TrendChartPoint[],
+        citationData: [] as TrendChartPoint[],
+        sovData: [] as TrendChartPoint[],
+        visibilitySeries: [] as Array<{ key: string; label: string; stroke: string }>,
+        citationSeries: [] as Array<{ key: string; label: string; stroke: string }>,
+        topCompetitors: [] as string[],
+        hasSignal: false,
+      };
     }
-    const modelsSet = new Set<string>();
-    for (const r of trends.runs) for (const m of Object.keys(r.perModel)) modelsSet.add(m);
-    const modelList = [...modelsSet];
+    const competitorHosts = trends.topCompetitors.slice(0, 4);
+    const brandSeries = { key: 'You', label: 'You', stroke: '#2D4059' };
+    const competitorSeries = competitorHosts.map((host, i) => ({
+      key: host,
+      label: host,
+      stroke: COMPETITOR_COLORS[i % COMPETITOR_COLORS.length],
+    }));
+    const visibilitySeries = [brandSeries, ...competitorSeries];
+    const citationSeries = competitorSeries;
 
     const visibility: TrendChartPoint[] = trends.runs.map((r) => {
       const point: TrendChartPoint = { label: new Date(r.startedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) };
-      for (const m of modelList) {
-        const cell = r.perModel[m];
-        point[m] = cell ? cell.presenceCount : 0;
-      }
+      point['You'] = r.brandMentions;
+      for (const host of competitorHosts) point[host] = r.perCompetitor?.[host] ?? 0;
       return point;
     });
 
     const citation: TrendChartPoint[] = trends.runs.map((r) => {
       const point: TrendChartPoint = { label: new Date(r.startedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) };
-      for (const m of modelList) point[m] = r.perModel[m]?.cites ?? 0;
+      for (const host of competitorHosts) point[host] = r.perCompetitorCitations?.[host] ?? 0;
       return point;
     });
 
@@ -749,7 +801,7 @@ function TrendComparisonPanel({ trends }: { trends: TrendsResponse | null }) {
       const total = r.brandMentions + r.competitorMentions;
       const point: TrendChartPoint = { label: new Date(r.startedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) };
       point['You'] = total > 0 ? Math.round((r.brandMentions / total) * 100) : 0;
-      for (const host of trends.topCompetitors) {
+      for (const host of competitorHosts) {
         point[host] = total > 0 ? Math.round(((r.perCompetitor[host] ?? 0) / total) * 100) : 0;
       }
       return point;
@@ -757,9 +809,9 @@ function TrendComparisonPanel({ trends }: { trends: TrendsResponse | null }) {
 
     const signal =
       trends.runs.some((r) => r.brandMentions > 0 || r.competitorMentions > 0) ||
-      Object.values(trends.runs[trends.runs.length - 1]?.perModel ?? {}).some((m) => (m?.cites ?? 0) > 0);
+      trends.runs.some((r) => Number(r.totalCitations ?? 0) > 0 || Object.values(r.perCompetitorCitations ?? {}).some((count) => count > 0));
 
-    return { visibilityData: visibility, citationData: citation, sovData: sov, models: modelList, topCompetitors: trends.topCompetitors, hasSignal: signal };
+    return { visibilityData: visibility, citationData: citation, sovData: sov, visibilitySeries, citationSeries, topCompetitors: competitorHosts, hasSignal: signal };
   }, [trends]);
 
   return (
@@ -775,7 +827,7 @@ function TrendComparisonPanel({ trends }: { trends: TrendsResponse | null }) {
         </p>
       ) : (
         <div className="mt-3 space-y-6">
-          <ChartBlock title="AI Visibility Trend" subtitle="Compare competitor visibility across AI prompts, citations, and responses.">
+          <ChartBlock title="AI Visibility Trend" subtitle="Compare brand and competitor mention events across scored AI responses.">
             <ResponsiveContainer width="100%" height={240}>
               <LineChart syncId="competitorTrends" data={visibilityData} margin={{ top: 10, right: 10, bottom: 0, left: -20 }}>
                 <CartesianGrid stroke="#EEF1F5" strokeDasharray="3 3" />
@@ -792,14 +844,14 @@ function TrendComparisonPanel({ trends }: { trends: TrendsResponse | null }) {
                   formatter={formatTooltipValue(visibilityData)}
                 />
                 <RLegend wrapperStyle={{ fontSize: 10 }} />
-                {models.map((m, i) => (
-                  <Line key={m} type="monotone" dataKey={m} stroke={COMPETITOR_COLORS[i % COMPETITOR_COLORS.length]} strokeWidth={2} dot={dotProp} activeDot={{ r: 5 }} />
+                {visibilitySeries.map((series) => (
+                  <Line key={series.key} type="monotone" dataKey={series.key} name={series.label} stroke={series.stroke} strokeWidth={series.key === 'You' ? 2.5 : 2} dot={dotProp} activeDot={{ r: 5 }} />
                 ))}
               </LineChart>
             </ResponsiveContainer>
           </ChartBlock>
 
-          <ChartBlock title="Citation Share Comparison" subtitle="See where competitors are earning authority and citations.">
+          <ChartBlock title="Citation Share Comparison" subtitle="See which competitors are earning cited-source authority.">
             <ResponsiveContainer width="100%" height={240}>
               <LineChart syncId="competitorTrends" data={citationData} margin={{ top: 10, right: 10, bottom: 0, left: -20 }}>
                 <CartesianGrid stroke="#EEF1F5" strokeDasharray="3 3" />
@@ -816,9 +868,13 @@ function TrendComparisonPanel({ trends }: { trends: TrendsResponse | null }) {
                   formatter={formatTooltipValue(citationData)}
                 />
                 <RLegend wrapperStyle={{ fontSize: 10 }} />
-                {models.map((m, i) => (
-                  <Line key={m} type="monotone" dataKey={m} stroke={COMPETITOR_COLORS[i % COMPETITOR_COLORS.length]} strokeWidth={2} dot={dotProp} activeDot={{ r: 5 }} />
-                ))}
+                {citationSeries.length > 0 ? (
+                  citationSeries.map((series) => (
+                    <Line key={series.key} type="monotone" dataKey={series.key} name={series.label} stroke={series.stroke} strokeWidth={2} dot={dotProp} activeDot={{ r: 5 }} />
+                  ))
+                ) : (
+                  <Line type="monotone" dataKey="No competitor citations" stroke="#CBD5E1" strokeWidth={2} dot={dotProp} activeDot={{ r: 5 }} />
+                )}
               </LineChart>
             </ResponsiveContainer>
           </ChartBlock>
@@ -951,10 +1007,12 @@ function OpportunityCard({
 
 function PromptGapPanel({
   opportunities,
+  loading = false,
   onAiResponse,
   onGenerate,
 }: {
   opportunities: ReportOpportunity[];
+  loading?: boolean;
   onAiResponse: (o: ReportOpportunity) => void;
   onGenerate: (o: ReportOpportunity) => void;
 }) {
@@ -976,7 +1034,11 @@ function PromptGapPanel({
       </div>
 
       <div className="mt-8 space-y-6">
-        {shown.length === 0 ? (
+        {loading ? (
+          <p className="rounded-md border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-center text-sm text-slate-500">
+            Checking prompt gaps from the latest completed audit…
+          </p>
+        ) : shown.length === 0 ? (
           <p className="rounded-md border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-center text-sm text-slate-500">
             No prompt gaps yet — you're holding your own across the tracked prompts.
           </p>
@@ -1376,14 +1438,36 @@ export default function CompetitorsPage() {
   const { currentTitle: currentCompetitorSectionTitle } = useScrollSpyBreadcrumbs({});
   const maskedDomainId = currentDomain ? buildDomainSlug(currentDomain) : undefined;
 
-  // All four data sources hit React Query — sibling tabs hit the same cache.
-  const reportQuery = useReport<ReportPayload>(domainId);
-  const analysisQuery = useCompetitorAnalysis<CompetitorAnalysisResponse>(domainId);
-  const trendsQuery = useTrends<TrendsResponse>(domainId);
+  // Core data loads first; opportunity enrichment and chart history are
+  // secondary so the page doesn't block on lower-priority panels.
+  const reportQuery = useReport<ReportPayload>(domainId, null, { includeInsights: false });
+  const reportReady = Boolean(reportQuery.data);
+  const [insightsEnabled, setInsightsEnabled] = useState(false);
+  const insightsQuery = useReport<ReportPayload>(domainId, null, {
+    includeInsights: true,
+    enabled: reportReady && insightsEnabled,
+  });
+  const analysisQuery = useCompetitorAnalysis<CompetitorAnalysisResponse>(domainId, null, { enabled: reportReady });
+  const trendsQuery = useTrends<TrendsResponse>(domainId, undefined, { enabled: reportReady && insightsEnabled });
   const competitorsQuery = useCompetitors<{ competitors: SelectedCompetitor[] }>(domainId);
-  const campaignsQuery = useCampaigns<{ campaigns: Array<{ id: number; title: string; description?: string | null }> }>();
 
-  const report = reportQuery.data ?? null;
+  useEffect(() => {
+    setInsightsEnabled(false);
+  }, [domainId]);
+
+  useEffect(() => {
+    if (!reportReady || insightsEnabled) return;
+    const hydrationId = window.setTimeout(() => setInsightsEnabled(true), 1400);
+    return () => window.clearTimeout(hydrationId);
+  }, [insightsEnabled, reportReady]);
+
+  const report = useMemo<ReportPayload | null>(() => {
+    if (!reportQuery.data) return null;
+    return {
+      ...reportQuery.data,
+      opportunities: insightsQuery.data?.opportunities ?? [],
+    };
+  }, [insightsQuery.data, reportQuery.data]);
   const analysis = analysisQuery.data ?? null;
   const trends = trendsQuery.data ?? null;
   const remoteSelected = competitorsQuery.data?.competitors ?? [];
@@ -1398,8 +1482,9 @@ export default function CompetitorsPage() {
     return [...remoteSelected, ...pending];
   }, [remoteSelected, optimisticPills]);
 
-  const loading = domainsLoading || reportQuery.isLoading || analysisQuery.isLoading;
-  const error = reportQuery.error || analysisQuery.error || trendsQuery.error || competitorsQuery.error;
+  const loading = domainsLoading || reportQuery.isLoading;
+  const error = reportQuery.error;
+  const promptGapsLoading = reportReady && !insightsQuery.data && !insightsQuery.isError;
 
   const [selectedCompetitor, setSelectedCompetitor] = useState<CompetitorDetailData | null>(null);
   const [selectedPromptGap, setSelectedPromptGap] = useState<PromptGapContext | null>(null);
@@ -1412,6 +1497,9 @@ export default function CompetitorsPage() {
   const [newWorksheetName, setNewWorksheetName] = useState('');
   const [createWorksheetError, setCreateWorksheetError] = useState<string | null>(null);
   const [isCreatingWorksheet, setIsCreatingWorksheet] = useState(false);
+  const campaignsQuery = useCampaigns<{ campaigns: Array<{ id: number; title: string; description?: string | null }> }>({
+    enabled: isWorksheetModalOpen || isCreateWorksheetModalOpen,
+  });
   const worksheetOptions: WorksheetOption[] = useMemo(() => {
     const campaigns = Array.isArray(campaignsQuery.data?.campaigns) ? campaignsQuery.data.campaigns : [];
     return campaigns.map((c) => ({
@@ -1424,7 +1512,22 @@ export default function CompetitorsPage() {
   // Derived metrics for the top cards.
   const headerMetrics = useMemo(() => {
     const visibility = report?.metrics.visibilityScore ?? 0;
-    const competitorSOV = report ? Math.max(0, 100 - report.metrics.mentionRate) : 0;
+    const canonicalSov = report?.metrics.reportCards?.aiShareOfVoice ?? null;
+    const totalMentionEvents =
+      canonicalSov?.totalMentionEvents ??
+      ((analysis?.ownBrand.mentions ?? 0) + (analysis?.totals.competitorMentions ?? 0));
+    const brandMentionEvents =
+      canonicalSov?.brandMentionEvents ??
+      (analysis?.ownBrand.mentions ?? 0);
+    const competitorMentionEvents =
+      canonicalSov?.competitorMentionEvents ??
+      (analysis?.totals.competitorMentions ?? 0);
+    const brandSov = totalMentionEvents > 0
+      ? (brandMentionEvents / totalMentionEvents) * 100
+      : (report?.metrics.mentionRate ?? 0);
+    const competitorSOV = totalMentionEvents > 0
+      ? Math.round((competitorMentionEvents / totalMentionEvents) * 100)
+      : 0;
     const visibilityComparison =
       visibility > INDUSTRY_AVERAGE_VISIBILITY
         ? `Above industry average (${INDUSTRY_AVERAGE_VISIBILITY})`
@@ -1434,25 +1537,47 @@ export default function CompetitorsPage() {
 
     const analysisCompetitors = analysis?.competitors ?? [];
     const bestCompetitor =
-      analysisCompetitors.find((competitor) => competitor.rank === 1) ?? analysisCompetitors[0] ?? null;
-    const bestScore = bestCompetitor ? Math.round(bestCompetitor.coveragePct * 100) : 0;
-    const bestScoreRaw = bestCompetitor ? bestCompetitor.coveragePct * 100 : 0;
-    const bestScoreDelta = bestScoreRaw - visibility;
+      analysisCompetitors
+        .filter((competitor) => competitor.mentions > 0)
+        .slice()
+        .sort((a, b) =>
+          b.mentions - a.mentions ||
+          (b.promptCoverage ?? 0) - (a.promptCoverage ?? 0) ||
+          ((a.rank ?? Number.MAX_SAFE_INTEGER) - (b.rank ?? Number.MAX_SAFE_INTEGER))
+        )[0] ??
+      analysisCompetitors
+        .slice()
+        .sort((a, b) => (a.rank ?? Number.MAX_SAFE_INTEGER) - (b.rank ?? Number.MAX_SAFE_INTEGER))[0] ??
+      null;
+    const bestScoreRaw = bestCompetitor && totalMentionEvents > 0
+      ? (bestCompetitor.mentions / totalMentionEvents) * 100
+      : 0;
+    const bestScoreDelta = bestCompetitor ? bestScoreRaw - brandSov : 0;
 
     let largestGapPct = 0;
     let largestGapPrompt = '';
     if (report?.topPrompts) {
       for (const p of report.topPrompts) {
         if (p.type !== 'prompt') continue;
-        const total = p.results.length;
+        const successfulResults = p.results.filter(isSuccessfulPromptResult);
+        const total = successfulResults.length;
         if (total === 0) continue;
-        const presence = p.results.reduce((s, r) => s + r.presence, 0);
+        const presence = successfulResults.reduce((s, r) => s + r.presence, 0);
         const ourCov = presence / total;
         let bestCompCov = 0;
         const compHosts = new Set<string>();
-        for (const r of p.results) for (const m of r.competitorMentions ?? []) compHosts.add(m.host);
+        for (const r of successfulResults) {
+          for (const m of r.competitorMentions ?? []) {
+            const host = normalizeComparisonHost(m.host);
+            if (host) compHosts.add(host);
+          }
+          for (const hostRaw of r.competitorHosts ?? []) {
+            const host = normalizeComparisonHost(hostRaw);
+            if (host) compHosts.add(host);
+          }
+        }
         for (const host of compHosts) {
-          const cnt = p.results.filter((r) => (r.competitorMentions ?? []).some((m) => m.host === host)).length;
+          const cnt = successfulResults.filter((r) => resultMentionsCompetitor(r, host)).length;
           bestCompCov = Math.max(bestCompCov, cnt / total);
         }
         const gap = bestCompCov - ourCov;
@@ -1463,14 +1588,26 @@ export default function CompetitorsPage() {
       }
     }
 
-    const topInsights: string[] = (report?.opportunities ?? []).slice(0, 3).map((o) => o.title);
+    const priorityWeight: Record<ServerCompetitorInsight['priority'], number> = { high: 3, medium: 2, low: 1 };
+    const competitorInsights = analysisCompetitors
+      .flatMap((competitor) =>
+        (competitor.insights ?? []).map((insight) => ({
+          host: competitor.host,
+          mentions: competitor.mentions,
+          priority: insight.priority,
+          text: insight.insight,
+        }))
+      )
+      .sort((a, b) => priorityWeight[b.priority] - priorityWeight[a.priority] || b.mentions - a.mentions)
+      .map((insight) => `${insight.host}: ${insight.text}`);
+    const opportunityInsights = (report?.opportunities ?? []).slice(0, 3).map((o) => o.title);
+    const topInsights: string[] = competitorInsights.length > 0 ? competitorInsights.slice(0, 3) : opportunityInsights;
 
     return {
       visibility,
       visibilityComparison,
       competitorSOV,
       bestCompetitorHost: bestCompetitor?.host ?? null,
-      bestScore,
       bestScoreRaw,
       bestScoreDelta,
       largestGapPct: Math.round(largestGapPct * 100),
@@ -1482,13 +1619,15 @@ export default function CompetitorsPage() {
   const visibilityTrend = useMemo(() => {
     if (!trends || trends.runs.length < 2) return null;
     const runs = trends.runs;
-    const totalPromptsFor = (r: TrendsResponse['runs'][number]) =>
-      Object.values(r.perModel).reduce((s, x) => s + (x?.presenceCount ?? 0), 0);
-    const prev = totalPromptsFor(runs[runs.length - 2]);
-    const curr = totalPromptsFor(runs[runs.length - 1]);
-    if (prev === 0) return null;
-    const diff = ((curr - prev) / prev) * 100;
-    return { value: `${diff >= 0 ? '+' : ''}${diff.toFixed(1)}%`, positive: diff >= 0 };
+    const visibilityRateFor = (r: TrendsResponse['runs'][number]) => {
+      const totalResponses = Number(r.totalResponses ?? 0);
+      return totalResponses > 0 ? (r.brandMentions / totalResponses) * 100 : null;
+    };
+    const prev = visibilityRateFor(runs[runs.length - 2]);
+    const curr = visibilityRateFor(runs[runs.length - 1]);
+    if (prev === null || curr === null) return null;
+    const diff = curr - prev;
+    return { value: `${diff >= 0 ? '+' : ''}${diff.toFixed(1)} pts`, positive: diff >= 0 };
   }, [trends]);
 
   // Inline add: push an optimistic "loading" pill, POST to the backend
@@ -1542,6 +1681,7 @@ export default function CompetitorsPage() {
   // pre-audit copy) and the user wants to force the freshest numbers.
   const isRefreshing =
     reportQuery.isFetching ||
+    insightsQuery.isFetching ||
     analysisQuery.isFetching ||
     trendsQuery.isFetching ||
     competitorsQuery.isFetching;
@@ -1676,7 +1816,7 @@ export default function CompetitorsPage() {
     }
   }, [isCreatingWorksheet, newWorksheetName, pendingGeneration, queryClient, runGeneration]);
 
-  const hasRun = report?.runStatus === 'completed' && (analysis?.runId ?? null) !== null;
+  const hasRun = report?.runStatus === 'completed';
 
   return (
     <>
@@ -1727,22 +1867,26 @@ export default function CompetitorsPage() {
                     maxScore={100}
                     footer={headerMetrics.visibilityComparison}
                     trend={visibilityTrend ?? undefined}
+                    tooltipText="Brand-mentioned successful model responses divided by successful model responses in the latest audit."
                   />
                   <TopCompetitorCard
                     title="Top Competitor"
                     competitorHost={headerMetrics.bestCompetitorHost}
                     competitorScoreDelta={headerMetrics.bestScoreDelta}
+                    tooltipText="Competitor with the most mention events in the latest audit. Delta compares that competitor's share of all brand + competitor mention events against your brand share."
                   />
                   <ValueCard
                     title="Largest Prompt Gap"
                     value={headerMetrics.largestGapPct > 0 ? `${headerMetrics.largestGapPct}%` : '—'}
                     footer={headerMetrics.largestGapPrompt || 'No gap detected'}
                     badge="Prompt"
+                    tooltipText="Largest successful-response coverage gap where a competitor appeared more often than your brand on one prompt."
                   />
                   <ValueCard
                     title="Competitor SOV"
                     value={`${headerMetrics.competitorSOV}%`}
-                    footer="Avg. Share of voice (Top 3)"
+                    footer="Across all competitor mention events"
+                    tooltipText="Competitor mention events divided by brand + competitor mention events in the latest audit."
                   />
                   <InsightCard title="Top Insight" items={headerMetrics.topInsights} />
                 </div>
@@ -1754,6 +1898,7 @@ export default function CompetitorsPage() {
                 <TrendComparisonPanel trends={trends} />
                 <PromptGapPanel
                   opportunities={report?.opportunities ?? []}
+                  loading={promptGapsLoading}
                   onAiResponse={openPromptGapDrawer}
                   onGenerate={handleGenerateContent}
                 />

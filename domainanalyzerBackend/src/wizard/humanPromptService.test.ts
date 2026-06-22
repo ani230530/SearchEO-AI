@@ -10,24 +10,24 @@ const validationOptions = {
 describe('validateHumanPromptSet', () => {
   it('accepts a mixed human-like prompt set with commercial intent', () => {
     const prompts = [
-      'Anyone tracking AI citations yet?',
-      'Is AI search tracking worth paying for yet?',
-      'Ahrefs vs Semrush for AI citations - which is less messy?',
-      'I am still manually checking ChatGPT and Perplexity for clients. What are people using instead?',
-      'Do any cheaper tools show why an AI answer cites a competitor and not our site?',
-      'We use Sistrix and Semrush for regular SEO, but clients are asking about ChatGPT, Gemini, and Perplexity mentions now. Is there a budget-friendly way to track this without buying another huge SaaS dashboard?',
+      'Best AI citation tracking tools for agencies',
+      'What are the best brand mention tracking tools for client reports?',
+      'Who specializes in ChatGPT citation tracking for SEO teams?',
+      'Are there any good independent tools for Perplexity mentions?',
+      'I want a tool that can help with AI citations, competitor mentions, and client reporting.',
+      'What should I ask before choosing an AI search tracking tool?',
     ];
 
     const result = validateHumanPromptSet(prompts, validationOptions);
 
     expect(result.pass).toBe(true);
     expect(result.failures).toEqual([]);
-    expect(result.wordCounts).toEqual([5, 8, 11, 15, 16, 33]);
+    expect(result.wordCounts).toEqual([7, 11, 9, 9, 15, 11]);
     expect(result.buckets).toEqual({
-      under7: 1,
-      sevenTo13: 2,
-      fourteenTo28: 2,
-      twentyNineTo55: 1,
+      under7: 0,
+      sevenTo13: 5,
+      fourteenTo28: 1,
+      twentyNineTo55: 0,
     });
     expect(result.targetBrandCount).toBe(0);
     expect(result.duplicateCount).toBe(0);
@@ -50,7 +50,7 @@ describe('validateHumanPromptSet', () => {
     expect(result.failures).toContain('target brand leaked into prompt set');
     expect(result.failures).toContain('2 duplicate prompt(s)');
     expect(result.failures).toContain('AI-polished banned words found');
-    expect(result.failures).toContain('need at least one prompt from 29-55 words');
+    expect(result.failures).toContain('need at least one prompt from 14-28 words');
   });
 
   it('rejects human-sounding sets that collapse around one keyword angle', () => {
@@ -70,6 +70,7 @@ describe('validateHumanPromptSet', () => {
         ],
         constraints: ['team permissions', 'code review workflow', 'budget fit'],
         competitors: ['gitlab.com', 'bitbucket.org'],
+        locations: [],
         priceBand: 'freemium',
         year: '2026',
       },
@@ -112,18 +113,19 @@ describe('validateHumanPromptSet', () => {
         ],
         constraints: ['team permissions', 'code review workflow', 'budget fit'],
         competitors: ['gitlab.com', 'bitbucket.org'],
+        locations: [],
         priceBand: 'freemium',
         year: '2026',
       },
     });
 
     const prompts = [
-      'Code collaboration worth it yet?',
-      'Is version control worth paying for yet?',
-      'Anyone using pull request reviews for small teams, or are people still doing this by hand?',
-      'gitlab.com vs bitbucket.org when permissions matter - which feels less messy?',
-      "I'm comparing workflow automation options for code reviews. What are people actually using instead?",
-      'We need code collaboration for a small engineering team, but people keep asking about permissions, automation, and cost before we switch. Is there a budget-friendly version control option teams actually trust?',
+      'Best version control platforms for small teams',
+      'What are the best private repo tools for code reviews?',
+      'Who specializes in workflow automation for engineering teams?',
+      'Are there any good developer collaboration tools for permissions?',
+      'I want a tool that can help with code collaboration, CI/CD, and access control.',
+      'What should I ask before choosing a version control platform?',
     ];
 
     const result = validateHumanPromptSet(prompts, {

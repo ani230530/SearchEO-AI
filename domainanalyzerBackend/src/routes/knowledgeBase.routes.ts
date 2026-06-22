@@ -1,10 +1,9 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { PrismaClient } from '../../generated/prisma';
+import { prisma } from '../lib/prisma';
 import { authenticateToken, AuthenticatedRequest } from '../middleware/auth';
 import { cloudinary } from '../utils/cloudinary';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 const DRIVE_ROOT_NAME = 'Home';
 const CLOUDINARY_FOLDER_PREFIX = 'knowledge-base';

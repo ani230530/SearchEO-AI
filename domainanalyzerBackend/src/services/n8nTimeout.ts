@@ -1,7 +1,6 @@
-import { PrismaClient } from '../../generated/prisma';
+import { prisma } from '../lib/prisma';
 import { broadcastToUser } from './sseService';
 
-const prisma = new PrismaClient();
 
 // Timeout threshold: 10 minutes
 const TIMEOUT_MS = 10 * 60 * 1000;

@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import express from 'express';
 import axios from 'axios';
-import { PrismaClient } from '../../generated/prisma';
+import { prisma } from '../lib/prisma';
 import { authenticateToken, AuthenticatedRequest } from '../middleware/auth';
 import { encryptToken, decryptToken } from '../services/tokenEncryption';
 import {
@@ -14,7 +14,6 @@ import { parseSiteUrlInput } from '../utils/domainValidation';
 import { uploadImage } from '../utils/cloudinary';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 const REVIEW_WEBHOOK_URL =
   process.env.N8N_REVIEW_WEBHOOK_URL ||

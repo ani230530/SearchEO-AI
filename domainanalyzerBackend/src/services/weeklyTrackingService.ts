@@ -9,17 +9,22 @@
 // Scheduling is a BullMQ repeatable job (restart-safe, unlike setInterval).
 // The processor runs inside the existing n8n-queue worker (see queueService).
 
-import { PrismaClient } from '../../generated/prisma';
+import { prisma } from '../lib/prisma';
 import { n8nQueue, WEEKLY_TRACKING_JOB } from './queueService';
 import { runTrackedQueries } from '../wizard/runService';
 
-const prisma = new PrismaClient();
 
 // Stable scheduler id — upsert keeps restarts/redeploys from stacking
 // duplicate repeatables.
 const SCHEDULER_ID = 'weekly-tracking';
 // Every Monday at 03:00 UTC.
 const WEEKLY_CRON = '0 3 * * 1';
+// A weekly run should finish in minutes. If the process dies mid-run, a stale
+// AiRun(status='running') must not block every future weekly test forever.
+const WEEKLY_RUN_STALE_MINUTES = Math.max(
+  15,
+  Number(process.env.WEEKLY_RUN_STALE_MINUTES ?? 360),
+);
 
 /**
  * Register (idempotently) the weekly repeatable job. Called once at startup.
@@ -42,9 +47,26 @@ export async function registerWeeklyTracking(): Promise<void> {
 
 /** True if a weekly run is already running for this domain (dedupe). */
 async function weeklyRunInFlight(domainId: number): Promise<boolean> {
+  const staleCutoff = new Date(Date.now() - WEEKLY_RUN_STALE_MINUTES * 60 * 1000);
+  const stale = await prisma.aiRun.updateMany({
+    where: {
+      domainId,
+      kind: 'weekly',
+      status: 'running',
+      startedAt: { lt: staleCutoff },
+    },
+    data: {
+      status: 'failed',
+      endedAt: new Date(),
+    },
+  });
+  if (stale.count > 0) {
+    console.warn(`[weekly] marked ${stale.count} stale weekly run(s) failed for domain ${domainId}`);
+  }
+
   const existing = await prisma.aiRun.findFirst({
     where: { domainId, kind: 'weekly', status: 'running' },
-    select: { id: true },
+    select: { id: true, startedAt: true },
   });
   return existing !== null;
 }

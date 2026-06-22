@@ -1,10 +1,9 @@
 import express, { Request, Response } from 'express';
-import { PrismaClient } from '../../generated/prisma';
+import { prisma } from '../lib/prisma';
 import { authenticateToken, AuthenticatedRequest } from '../middleware/auth';
 import { decryptToken } from '../services/tokenEncryption';
 
 const router = express.Router();
-const prisma = new PrismaClient();
 
 const N8N_WEBHOOK_URL =
     process.env.N8N_ANALYTICS_REPORTING_WEBHOOK_URL ||

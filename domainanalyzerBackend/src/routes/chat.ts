@@ -11,7 +11,7 @@
 import express, { Request, Response, NextFunction } from 'express';
 import { streamText, convertToModelMessages, stepCountIs, type UIMessage } from 'ai';
 
-import { PrismaClient } from '../../generated/prisma';
+import { prisma } from '../lib/prisma';
 import { authenticateToken, AuthenticatedRequest } from '../middleware/auth';
 import { getAgentModel, isAgentConfigured } from '../chat/model';
 import { buildSystemPrompt } from '../chat/systemPrompt';
@@ -25,7 +25,6 @@ import {
 } from '../chat/persistence';
 
 const router = express.Router();
-const prisma = new PrismaClient();
 
 function asyncHandler(fn: (req: Request, res: Response, next: NextFunction) => Promise<void>) {
   return (req: Request, res: Response, next: NextFunction) => {

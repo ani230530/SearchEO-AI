@@ -57,9 +57,9 @@ export interface ScoreOutput {
    */
   relevance: number;
   /**
-   * -10..10 sentiment TOWARD THE BRAND. NULL when presence=0 — there's no
-   * sentiment to measure if the brand wasn't mentioned. Front-end shows
-   * "Not mentioned" instead of a fake Neutral/Negative badge.
+   * -10..10 sentiment TOWARD THE BRAND. NULL only when presence=0 — there's no
+   * sentiment to measure if the brand wasn't mentioned. When presence=1 and
+   * tone is factual/neutral/unclear, use 0.
    */
   sentiment: number | null;
   /**
@@ -186,7 +186,8 @@ export async function scoreResponse(input: ScoreInput): Promise<ScoreOutput | nu
     `Score strictly. Hard rules:`,
     `- presence=1 ONLY if the brand is explicitly named (by name, alias, or domain). Never inferred.`,
     `- relevance: 0..10 answer quality, independent of presence.`,
-    `- sentiment/accuracy are null if presence=0.`,
+    `- sentiment is null ONLY if presence=0. If presence=1, return a number from -10..10; use 0 for neutral/factual/unclear tone.`,
+    `- accuracy is null if presence=0, or if presence=1 but there are no factual claims about the brand to verify.`,
     `- overall is 0 if presence=0.`,
     `- rankPosition is the brand's 1-based position in an ordered list, else null.`,
     `- competitorMentions: known or newly mentioned companies only; max 8.`,
@@ -197,7 +198,7 @@ export async function scoreResponse(input: ScoreInput): Promise<ScoreOutput | nu
     `{`,
     `  "presence": 0|1,`,
     `  "relevance": 0..10,`,
-    `  "sentiment": -10..10 | null,`,
+    `  "sentiment": -10..10 | null, // null only when presence=0; use 0 for neutral when presence=1`,
     `  "overall": 0..10,`,
     `  "accuracy": 0..10 | null,`,
     `  "rankPosition": null | <1-based int>,`,
@@ -246,11 +247,13 @@ export async function scoreResponse(input: ScoreInput): Promise<ScoreOutput | nu
   };
 
   const presence = clamp(parsed.presence, 0, 1) ? 1 : 0;
-  // Enforce the "no presence → no sentiment/accuracy/overall" rule on the
-  // server side too, so even if the model violates the spec we don't leak
-  // misleading numbers to the dashboard.
-  const sentiment = presence === 1 && parsed.sentiment !== null && parsed.sentiment !== undefined
-    ? clamp(parsed.sentiment, -10, 10)
+  // Enforce the scorer invariant server-side:
+  // no presence -> no sentiment; presence -> numeric sentiment, with 0 as the
+  // honest neutral/factual fallback if the model omitted the field.
+  const sentiment = presence === 1
+    ? parsed.sentiment !== null && parsed.sentiment !== undefined
+      ? clamp(parsed.sentiment, -10, 10)
+      : 0
     : null;
   const accuracy = presence === 1 && parsed.accuracy !== null && parsed.accuracy !== undefined
     ? clamp(parsed.accuracy, 0, 10)

@@ -1,4 +1,4 @@
-import { PrismaClient } from '../../generated/prisma';
+import { prisma } from '../lib/prisma';
 import * as bcrypt from 'bcryptjs';
 import * as jwt from 'jsonwebtoken';
 import crypto from 'crypto';
@@ -6,7 +6,6 @@ import { v4 as uuidv4 } from 'uuid';
 import { authEnv } from '../config/authEnv';
 import { sendMail } from './mailer';
 
-const prisma = new PrismaClient();
 
 // Tuneables.
 const SALT_ROUNDS = 12;

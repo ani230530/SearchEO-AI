@@ -102,23 +102,24 @@ function buildFallbackSignals(input: CollectPromptSignalsInput, limit: number): 
   const personas = input.context.personas.slice(0, 3).map((p) => compactText(p, 4)).filter(Boolean);
   const useCases = input.context.useCases.slice(0, 3).map((u) => compactText(u, 7)).filter(Boolean);
   const constraints = input.context.constraints.slice(0, 3).map((c) => compactText(c, 7)).filter(Boolean);
+  const locations = (input.context.locations ?? []).slice(0, 3).map((l) => compactText(l, 5)).filter(Boolean);
 
   const rows = [
     {
-      title: `People compare ${category} options before buying`,
-      snippet: `Common buyer language should mention ${productContext}, ${competitors[0] ? `${competitors[0]}, alternatives, ` : ''}pricing, fit, and whether the result is worth paying for.`,
+      title: `People ask for the best ${category} before buying`,
+      snippet: `Common buyer language should sound like "best ${category} for ${personas[0] || 'my situation'}"${locations[0] ? `, "near ${locations[0]}"` : ''}, or "recommendations for ${productContext}".`,
     },
     {
-      title: `Customers ask messy first-person questions`,
-      snippet: `Useful prompts sound like "I'm looking for..." or "what are people using..." rather than polished category keywords.`,
+      title: `Customers ask specialist-fit questions`,
+      snippet: `Useful prompts ask who specializes in ${useCases[0] || productContext}, what kind of provider understands ${constraints[0] || 'their constraints'}, or who works with ${personas[0] || 'buyers like them'}.`,
     },
     {
-      title: `${personas[0] || 'Teams'} care about workflow and fit`,
-      snippet: `Prompts should include practical constraints like ${constraints[0] || 'budget'}, ${productContext || useCases[0] || 'daily workflow'}, and team or stakeholder pressure.`,
+      title: `${personas[0] || 'Buyers'} care about practical fit`,
+      snippet: `Prompts should include practical needs like ${constraints[0] || 'budget'}, ${useCases[1] || productContext || 'daily workflow'}, and whether the provider fits the buyer's situation.`,
     },
     {
-      title: `Short questions still matter`,
-      snippet: `Not every real prompt is long. Buyers also ask terse questions like "worth it?" or "any cheaper options?"`,
+      title: `Short recommendation questions still matter`,
+      snippet: `Not every real prompt is long. Buyers ask concise questions like "best ${category} for ${personas[1] || 'small teams'}" or "good ${category} ${locations[1] ? `near ${locations[1]}` : 'near me'}".`,
     },
     {
       title: `Comparison intent is commercially useful`,
@@ -127,8 +128,8 @@ function buildFallbackSignals(input: CollectPromptSignalsInput, limit: number): 
         : `Comparison prompts reveal which alternatives AI systems recommend.`,
     },
     {
-      title: `Long prompts carry context`,
-      snippet: `A realistic long prompt names the current workflow, pain point, budget concern, and what the user needs next${vertical ? ` in ${vertical}` : ''}.`,
+      title: `Buyer-advice prompts carry context`,
+      snippet: `A realistic prompt asks what to ask before choosing a ${category}, or says "I want someone/a tool that can help with ${useCases.slice(0, 3).join(', ') || productContext}"${vertical ? ` in ${vertical}` : ''}.`,
     },
   ];
 

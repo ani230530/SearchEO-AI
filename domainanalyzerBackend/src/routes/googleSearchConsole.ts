@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { PrismaClient } from '../../generated/prisma';
+import { prisma } from '../lib/prisma';
 import { authenticateToken, AuthenticatedRequest } from '../middleware/auth';
 import { getAuthUrl, exchangeCodeForTokens } from '../services/googleOAuthService';
 import { encryptToken } from '../services/tokenEncryption';
@@ -7,7 +7,6 @@ import { listProperties, querySearchAnalytics, SearchAnalyticsQuery, getSearchCo
 import crypto from 'crypto';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 function asyncHandler(fn: (req: Request, res: Response, next: any) => Promise<any>) {
   return function (req: Request, res: Response, next: any) {

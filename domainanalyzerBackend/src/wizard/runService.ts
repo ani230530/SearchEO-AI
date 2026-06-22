@@ -27,12 +27,19 @@ import {
 } from './scoreService';
 import { recordCompetitorMention } from './competitorService';
 import { extractHost } from './urlNormalize';
+import { invalidateReportCacheForDomain } from './reportCache';
 
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 const SERPAPI_KEY = process.env.SERP_API_KEY || process.env.SERPAPI_KEY;
 const SERPER_API_KEY = process.env.SERPER_API_KEY || process.env.SERPER_KEY;
 const APP_URL = process.env.OPENROUTER_REFERRER || 'http://localhost:3002';
 const APP_TITLE = 'AI Visibility Wizard';
+
+function invalidateRunReportCache(userId: number | null | undefined, domainId: number): void {
+  invalidateReportCacheForDomain(userId, domainId).catch((err) => {
+    console.warn(`[run:${domainId}] report cache invalidation failed`, err);
+  });
+}
 
 const router = OPENROUTER_API_KEY
   ? new OpenAI({
@@ -613,6 +620,21 @@ type FinalScore = {
   factualClaims: Array<{ claim: string; verdict: 'true' | 'false' | 'uncertain' }>;
 };
 
+function failedFinalScore(): FinalScore {
+  return {
+    presence: 0,
+    relevance: 0,
+    sentiment: null,
+    accuracy: null,
+    overall: 0,
+    rankPosition: null,
+    summary: '',
+    citations: [],
+    competitorMentions: [],
+    factualClaims: [],
+  };
+}
+
 function finalFromLlmOrHeuristic(args: {
   llm: Awaited<ReturnType<typeof llmScoreResponse>>;
   heuristic: ScoreOutput;
@@ -620,10 +642,16 @@ function finalFromLlmOrHeuristic(args: {
 }): FinalScore {
   const { llm, heuristic, competitorRoster } = args;
   if (llm) {
+    const sentiment = llm.presence === 1
+      ? llm.sentiment === null
+        ? heuristic.sentiment
+        : Math.round(llm.sentiment)
+      : null;
+
     return {
       presence: llm.presence,
       relevance: Math.round(llm.relevance),
-      sentiment: llm.sentiment === null ? null : Math.round(llm.sentiment),
+      sentiment,
       accuracy: llm.accuracy,
       overall: Number(llm.overall.toFixed(2)),
       rankPosition: llm.rankPosition,
@@ -699,6 +727,7 @@ function crawledPagesFromSnapshot(latestCrawl: { pages: unknown; pagesScanned?: 
 function buildRunSummaryFromRows(args: {
   rows: Array<{
     model: string;
+    status?: string | null;
     presence: number;
     relevance: number;
     sentiment: number | null;
@@ -712,14 +741,18 @@ function buildRunSummaryFromRows(args: {
   scoringProvisional: boolean;
   extra?: Record<string, unknown>;
 }): Record<string, unknown> {
-  const totalQueries = args.rows.length;
+  const attemptedQueries = args.rows.length;
+  const scoredRows = args.rows.filter((row) => row.status !== 'failed');
+  const totalQueries = scoredRows.length;
   const summaryAccum = { presence: 0, relevance: 0, sentiment: 0, sentimentCount: 0, overall: 0 };
+  const attemptedByModel = new Map<string, number>();
+  for (const row of args.rows) attemptedByModel.set(row.model, (attemptedByModel.get(row.model) ?? 0) + 1);
   const perModel: Record<string, { count: number; presence: number; overall: number; sentiment: number; sentimentCount: number }> = {};
   for (const m of ROSTER) perModel[m.id] = { count: 0, presence: 0, overall: 0, sentiment: 0, sentimentCount: 0 };
   const competitorRollup: Record<string, { mentions: number; sentimentSum: number; sentimentCount: number }> = {};
   const citationRollup: Record<string, { count: number; titles: string[] }> = {};
 
-  for (const row of args.rows) {
+  for (const row of scoredRows) {
     summaryAccum.presence += row.presence;
     summaryAccum.relevance += row.relevance;
     summaryAccum.overall += row.overall;
@@ -768,6 +801,9 @@ function buildRunSummaryFromRows(args: {
   return {
     ...(args.extra ?? {}),
     totalQueries,
+    attemptedQueries,
+    successfulQueries: totalQueries,
+    failedQueries: attemptedQueries - totalQueries,
     models: ROSTER.map((r) => r.id),
     presenceRate: totalQueries > 0 ? Number((summaryAccum.presence / totalQueries).toFixed(3)) : 0,
     avgRelevance: totalQueries > 0 ? Number((summaryAccum.relevance / totalQueries).toFixed(2)) : 0,
@@ -782,6 +818,8 @@ function buildRunSummaryFromRows(args: {
         model,
         {
           queries: m.count,
+          attemptedQueries: attemptedByModel.get(model) ?? m.count,
+          failedQueries: Math.max(0, (attemptedByModel.get(model) ?? m.count) - m.count),
           presenceRate: Number((m.presence / Math.max(1, m.count)).toFixed(3)),
           avgOverall: Number((m.overall / Math.max(1, m.count)).toFixed(2)),
           avgSentiment:
@@ -824,6 +862,7 @@ export interface RunProgress {
   currentResult?: {
     promptId: number;
     model: string;
+    status?: 'success' | 'failed';
     presence: number;
     relevance: number;
     sentiment: number | null;  // null when presence=0
@@ -883,6 +922,7 @@ export async function runDeepScoringForRun(args: {
     prisma.domain.findUnique({
       where: { id: domainId },
       select: {
+        userId: true,
         host: true,
         inferred: { select: { companyName: true, summary: true } },
         profile: { select: { country: true, state: true, targetLocation: true } },
@@ -903,6 +943,7 @@ export async function runDeepScoringForRun(args: {
         id: true,
         promptId: true,
         model: true,
+        status: true,
         response: true,
         prompt: { select: { text: true } },
       },
@@ -950,6 +991,8 @@ export async function runDeepScoringForRun(args: {
       let response = row.response ?? '';
       let latencyMs: number | null = null;
       let costUsd: number | null = null;
+      let resultStatus: 'success' | 'failed' = row.status === 'failed' ? 'failed' : 'success';
+      let errorMessage: string | null = null;
 
       if (!response.trim() && model) {
         try {
@@ -959,18 +1002,26 @@ export async function runDeepScoringForRun(args: {
           costUsd = retried.costUsd;
           if (!response.trim()) {
             console.warn(`[run:${runId}] ${model.id} returned an empty response during background retry for prompt ${row.promptId}`);
+            resultStatus = 'failed';
+            errorMessage = 'Empty response from provider';
+          } else {
+            resultStatus = 'success';
           }
         } catch (err) {
-          console.warn(`[run:${runId}] ${model.id} background retry failed for prompt ${row.promptId}: ${describeModelError(err)}`);
+          errorMessage = describeModelError(err);
+          console.warn(`[run:${runId}] ${model.id} background retry failed for prompt ${row.promptId}: ${errorMessage}`);
           response = '';
+          resultStatus = 'failed';
         }
       }
 
-      const heuristic = scoreResponse({
-        ownDomainHost: domainRow.host,
-        competitorHosts,
-        modelResponse: response,
-      });
+      const heuristic = resultStatus === 'success'
+        ? scoreResponse({
+            ownDomainHost: domainRow.host,
+            competitorHosts,
+            modelResponse: response,
+          })
+        : null;
 
       const scoreInput: LlmScoreInput = {
         prompt: row.prompt.text,
@@ -979,8 +1030,10 @@ export async function runDeepScoringForRun(args: {
         competitors: competitorRoster,
         brandFacts,
       };
-      const llm = response.trim() ? await scoreWithRetry(scoreInput) : null;
-      const final = finalFromLlmOrHeuristic({ llm, heuristic, competitorRoster });
+      const llm = resultStatus === 'success' && response.trim() ? await scoreWithRetry(scoreInput) : null;
+      const final = resultStatus === 'success' && heuristic
+        ? finalFromLlmOrHeuristic({ llm, heuristic, competitorRoster })
+        : failedFinalScore();
 
       if (llm) {
         for (const mention of llm.competitorMentions) {
@@ -999,6 +1052,8 @@ export async function runDeepScoringForRun(args: {
         where: { id: row.id },
         data: {
           response,
+          status: resultStatus,
+          errorMessage,
           presence: final.presence,
           relevance: final.relevance,
           sentiment: final.sentiment,
@@ -1023,6 +1078,7 @@ export async function runDeepScoringForRun(args: {
       where: { runId },
       select: {
         model: true,
+        status: true,
         presence: true,
         relevance: true,
         sentiment: true,
@@ -1048,6 +1104,7 @@ export async function runDeepScoringForRun(args: {
       where: { id: runId },
       data: { summary: summary as any },
     });
+    invalidateRunReportCache(domainRow.userId, domainId);
   } catch (err) {
     const latestRun = await prisma.aiRun.findUnique({ where: { id: runId }, select: { summary: true } });
     const preserved = (latestRun?.summary as Record<string, unknown> | null) ?? existingSummary;
@@ -1063,6 +1120,7 @@ export async function runDeepScoringForRun(args: {
         } as any,
       },
     }).catch(() => undefined);
+    invalidateRunReportCache(domainRow.userId, domainId);
     throw err;
   }
 }
@@ -1091,6 +1149,7 @@ export async function runQueries({
     prisma.domain.findUnique({
       where: { id: domainId },
       select: {
+        userId: true,
         host: true,
         inferred: { select: { companyName: true, summary: true } },
         // Pull the user-supplied profile so we can localize the LLM calls
@@ -1177,10 +1236,10 @@ export async function runQueries({
   };
   const perModel: Record<
     string,
-    { count: number; presence: number; overall: number; sentiment: number; sentimentCount: number }
+    { attempted: number; count: number; failed: number; presence: number; overall: number; sentiment: number; sentimentCount: number }
   > = {};
   for (const m of ROSTER) {
-    perModel[m.id] = { count: 0, presence: 0, overall: 0, sentiment: 0, sentimentCount: 0 };
+    perModel[m.id] = { attempted: 0, count: 0, failed: 0, presence: 0, overall: 0, sentiment: 0, sentimentCount: 0 };
   }
 
   // Per-competitor totals across the whole run — feeds the "competitor share-of-voice" UI.
@@ -1207,6 +1266,8 @@ export async function runQueries({
       let response = '';
       let latencyMs = 0;
       let costUsd: number | null = null;
+      let resultStatus: 'success' | 'failed' = 'success';
+      let errorMessage: string | null = null;
       try {
         const out = await callModel(item.model, item.prompt.text, userLocation);
         response = out.response;
@@ -1214,23 +1275,29 @@ export async function runQueries({
         costUsd = out.costUsd;
         if (!response.trim()) {
           console.warn(`[run:${run.id}] ${item.model.id} returned an empty response for prompt ${item.prompt.id}`);
+          resultStatus = 'failed';
+          errorMessage = 'Empty response from provider';
         }
       } catch (err) {
-        console.warn(`[run:${run.id}] ${item.model.id} failed for prompt ${item.prompt.id}: ${describeModelError(err)}`);
+        errorMessage = describeModelError(err);
+        console.warn(`[run:${run.id}] ${item.model.id} failed for prompt ${item.prompt.id}: ${errorMessage}`);
         response = '';
+        resultStatus = 'failed';
       }
       // Heuristic scoring is fast and runs unconditionally — used as the
       // baseline + safety net if the LLM scorer fails or times out.
-      const heuristic = scoreResponse({
-        ownDomainHost: domain!.host,
-        competitorHosts,
-        modelResponse: response,
-      });
+      const heuristic = resultStatus === 'success'
+        ? scoreResponse({
+            ownDomainHost: domain!.host,
+            competitorHosts,
+            modelResponse: response,
+          })
+        : null;
 
       // Foreground runs stay fast: write heuristic/provisional scores now.
       // Set DEEP_SCORING_IN_BACKGROUND=false to restore the old fully-inline
       // scorer behavior for debugging or one-off quality checks.
-      const llm = !DEEP_SCORING_IN_BACKGROUND && response.trim()
+      const llm = resultStatus === 'success' && !DEEP_SCORING_IN_BACKGROUND && response.trim()
         ? await scoreWithRetry({
             prompt: item.prompt.text,
             response,
@@ -1239,7 +1306,9 @@ export async function runQueries({
             brandFacts,
           })
         : null;
-      const final = finalFromLlmOrHeuristic({ llm, heuristic, competitorRoster });
+      const final = resultStatus === 'success' && heuristic
+        ? finalFromLlmOrHeuristic({ llm, heuristic, competitorRoster })
+        : failedFinalScore();
 
       // Auto-add any LLM-discovered competitor that isn't already tracked
       // for this domain — closes the AI-mention feedback loop.
@@ -1286,6 +1355,8 @@ export async function runQueries({
           runId: run.id,
           promptId: item.prompt.id,
           model: item.model.id,
+          status: resultStatus,
+          errorMessage,
           response,
           presence: final.presence,
           relevance: final.relevance,
@@ -1304,23 +1375,28 @@ export async function runQueries({
       });
 
       completedQueries++;
-      summaryAccum.presence += final.presence;
-      summaryAccum.relevance += final.relevance;
-      // Sentiment averages only across rows where the brand was actually
-      // mentioned — averaging in nulls/zeros from non-mention rows would
-      // mask the real sentiment signal.
-      if (final.sentiment !== null) {
-        summaryAccum.sentiment += final.sentiment;
-        summaryAccum.sentimentCount = (summaryAccum.sentimentCount ?? 0) + 1;
-      }
-      summaryAccum.overall += final.overall;
       const pm = perModel[item.model.id];
-      pm.count += 1;
-      pm.presence += final.presence;
-      pm.overall += final.overall;
-      if (final.sentiment !== null) {
-        pm.sentiment += final.sentiment;
-        pm.sentimentCount = (pm.sentimentCount ?? 0) + 1;
+      pm.attempted += 1;
+      if (resultStatus === 'failed') {
+        pm.failed += 1;
+      } else {
+        summaryAccum.presence += final.presence;
+        summaryAccum.relevance += final.relevance;
+        // Sentiment averages only across rows where the brand was actually
+        // mentioned — averaging in nulls/zeros from non-mention rows would
+        // mask the real sentiment signal.
+        if (final.sentiment !== null) {
+          summaryAccum.sentiment += final.sentiment;
+          summaryAccum.sentimentCount = (summaryAccum.sentimentCount ?? 0) + 1;
+        }
+        summaryAccum.overall += final.overall;
+        pm.count += 1;
+        pm.presence += final.presence;
+        pm.overall += final.overall;
+        if (final.sentiment !== null) {
+          pm.sentiment += final.sentiment;
+          pm.sentimentCount = (pm.sentimentCount ?? 0) + 1;
+        }
       }
 
       onProgress({
@@ -1331,6 +1407,7 @@ export async function runQueries({
           promptId: item.prompt.id,
           model: item.model.id,
           presence: final.presence,
+          status: resultStatus,
           relevance: final.relevance,
           sentiment: final.sentiment,
           overall: final.overall,
@@ -1344,11 +1421,16 @@ export async function runQueries({
   try {
     await Promise.all(Array.from({ length: MAX_PARALLEL }, worker));
 
+    const successfulQueries = Object.values(perModel).reduce((sum, m) => sum + m.count, 0);
+    const failedQueries = Math.max(0, totalQueries - successfulQueries);
     const summary = {
-      totalQueries,
+      totalQueries: successfulQueries,
+      attemptedQueries: totalQueries,
+      successfulQueries,
+      failedQueries,
       models: ROSTER.map((r) => r.id),
-      presenceRate: Number((summaryAccum.presence / totalQueries).toFixed(3)),
-      avgRelevance: Number((summaryAccum.relevance / totalQueries).toFixed(2)),
+      presenceRate: successfulQueries > 0 ? Number((summaryAccum.presence / successfulQueries).toFixed(3)) : 0,
+      avgRelevance: successfulQueries > 0 ? Number((summaryAccum.relevance / successfulQueries).toFixed(2)) : 0,
       // avgSentiment is null if no row had a measurable sentiment — better
       // than reporting 0 which the UI would interpret as "Neutral".
       avgSentiment:
@@ -1356,12 +1438,14 @@ export async function runQueries({
           ? Number((summaryAccum.sentiment / summaryAccum.sentimentCount).toFixed(2))
           : null,
       sentimentSampleSize: summaryAccum.sentimentCount,
-      avgOverall: Number((summaryAccum.overall / totalQueries).toFixed(2)),
+      avgOverall: successfulQueries > 0 ? Number((summaryAccum.overall / successfulQueries).toFixed(2)) : 0,
       perModel: Object.fromEntries(
         Object.entries(perModel).map(([model, m]) => [
           model,
           {
             queries: m.count,
+            attemptedQueries: m.attempted,
+            failedQueries: m.failed,
             presenceRate: Number((m.presence / Math.max(1, m.count)).toFixed(3)),
             avgOverall: Number((m.overall / Math.max(1, m.count)).toFixed(2)),
             // Same null-honest averaging here.
@@ -1381,7 +1465,7 @@ export async function runQueries({
           // sentiment averaged only across responses where the competitor was actually mentioned
           avgSentiment: Number(((v.sentimentSum / Math.max(1, v.sentimentCount))).toFixed(2)),
           // share = competitor mentions / total queries (not /total mentions — that double-counts)
-          shareOfVoice: Number((v.mentions / totalQueries).toFixed(3)),
+          shareOfVoice: successfulQueries > 0 ? Number((v.mentions / successfulQueries).toFixed(3)) : 0,
         }))
         .sort((a, b) => b.mentions - a.mentions),
       topCitedDomains: Object.entries(citationRollup)
@@ -1409,6 +1493,7 @@ export async function runQueries({
         data: { lastTrackedRunAt: new Date() },
       });
     }
+    invalidateRunReportCache(domain.userId, domainId);
     queueDeepScoringForRun({ prisma, domainId, runId: run.id });
     onProgress({ type: 'complete', runId: run.id, summary });
   } catch (err) {
@@ -1457,6 +1542,8 @@ export interface RunOnePromptResult {
   persistedResults: Array<{
     id: number;
     model: string;
+    status: 'success' | 'failed';
+    errorMessage: string | null;
     presence: number;
     overall: number;
     relevance: number;
@@ -1488,6 +1575,7 @@ export async function runOnePrompt(
     prisma.domain.findUnique({
       where: { id: domainId },
       select: {
+        userId: true,
         host: true,
         inferred: { select: { companyName: true, summary: true } },
         profile: { select: { country: true, state: true, targetLocation: true } },
@@ -1554,6 +1642,8 @@ export async function runOnePrompt(
       let response = '';
       let latencyMs = 0;
       let costUsd: number | null = null;
+      let resultStatus: 'success' | 'failed' = 'success';
+      let errorMessage: string | null = null;
       try {
         const out = await callModel(model, promptRow.text, userLocation);
         response = out.response;
@@ -1561,19 +1651,25 @@ export async function runOnePrompt(
         costUsd = out.costUsd;
         if (!response.trim()) {
           console.warn(`[run:${run.id}] ${model.id} returned an empty response for ad-hoc prompt ${promptRow.id}`);
+          resultStatus = 'failed';
+          errorMessage = 'Empty response from provider';
         }
       } catch (err) {
-        console.warn(`[run:${run.id}] ${model.id} failed for ad-hoc prompt ${promptRow.id}: ${describeModelError(err)}`);
+        errorMessage = describeModelError(err);
+        console.warn(`[run:${run.id}] ${model.id} failed for ad-hoc prompt ${promptRow.id}: ${errorMessage}`);
         response = '';
+        resultStatus = 'failed';
       }
 
-      const heuristic = scoreResponse({
-        ownDomainHost: domain.host,
-        competitorHosts,
-        modelResponse: response,
-      });
+      const heuristic = resultStatus === 'success'
+        ? scoreResponse({
+            ownDomainHost: domain.host,
+            competitorHosts,
+            modelResponse: response,
+          })
+        : null;
 
-      const llm = !DEEP_SCORING_IN_BACKGROUND && response.trim()
+      const llm = resultStatus === 'success' && !DEEP_SCORING_IN_BACKGROUND && response.trim()
         ? await scoreWithRetry({
             prompt: promptRow.text,
             response,
@@ -1582,7 +1678,9 @@ export async function runOnePrompt(
             brandFacts,
           })
         : null;
-      const final = finalFromLlmOrHeuristic({ llm, heuristic, competitorRoster });
+      const final = resultStatus === 'success' && heuristic
+        ? finalFromLlmOrHeuristic({ llm, heuristic, competitorRoster })
+        : failedFinalScore();
 
       const competitorHostsForRow = Array.from(
         new Set(final.competitorMentions.map((m) => m.host).filter(Boolean))
@@ -1593,6 +1691,8 @@ export async function runOnePrompt(
           runId: run.id,
           promptId: promptRow.id,
           model: model.id,
+          status: resultStatus,
+          errorMessage,
           response,
           presence: final.presence,
           relevance: final.relevance,
@@ -1612,6 +1712,8 @@ export async function runOnePrompt(
       persistedResults.push({
         id: created.id,
         model: model.id,
+        status: resultStatus,
+        errorMessage,
         presence: final.presence,
         overall: final.overall,
         relevance: final.relevance,
@@ -1628,23 +1730,30 @@ export async function runOnePrompt(
       });
 
       summaryPresence += final.presence;
-      summaryOverall += final.overall;
-      if (final.sentiment !== null) sentimentSamples.push(final.sentiment);
+      if (resultStatus === 'success') {
+        summaryOverall += final.overall;
+        if (final.sentiment !== null) sentimentSamples.push(final.sentiment);
+      }
       totalLatency += latencyMs;
       void costUsd; // accounted for elsewhere
     });
     await Promise.all(tasks);
 
-    const totalQueries = ROSTER.length;
+    const attemptedQueries = ROSTER.length;
+    const successfulQueries = persistedResults.filter((result) => result.status !== 'failed').length;
+    const failedQueries = attemptedQueries - successfulQueries;
     const avgSentiment =
       sentimentSamples.length > 0
         ? Number((sentimentSamples.reduce((s, n) => s + n, 0) / sentimentSamples.length).toFixed(2))
         : null;
     const summary = {
-      totalQueries,
+      totalQueries: successfulQueries,
+      attemptedQueries,
+      successfulQueries,
+      failedQueries,
       models: ROSTER.map((r) => r.id),
-      presenceRate: Number((summaryPresence / totalQueries).toFixed(3)),
-      avgOverall: Number((summaryOverall / totalQueries).toFixed(2)),
+      presenceRate: successfulQueries > 0 ? Number((summaryPresence / successfulQueries).toFixed(3)) : 0,
+      avgOverall: successfulQueries > 0 ? Number((summaryOverall / successfulQueries).toFixed(2)) : 0,
       avgSentiment,
       sentimentSampleSize: sentimentSamples.length,
       totalLatencyMs: totalLatency,
@@ -1657,6 +1766,7 @@ export async function runOnePrompt(
       where: { id: run.id },
       data: { status: 'completed', endedAt: new Date(), summary: summary as any },
     });
+    invalidateRunReportCache(domain.userId, domainId);
     queueDeepScoringForRun({ prisma, domainId, runId: run.id });
   } catch (err) {
     await prisma.aiRun

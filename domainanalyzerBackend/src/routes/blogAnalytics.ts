@@ -7,12 +7,11 @@
  * frontend callers in the current codebase and were not restored.
  */
 import { Router, Request, Response, NextFunction } from 'express';
-import { PrismaClient } from '../../generated/prisma';
+import { prisma } from '../lib/prisma';
 import { authenticateToken, AuthenticatedRequest } from '../middleware/auth';
 import { getSearchConsoleClient } from '../services/googleSearchConsoleService';
 
 const router: Router = Router();
-const prisma = new PrismaClient();
 
 function asyncHandler(fn: (req: Request, res: Response, next: NextFunction) => Promise<unknown>) {
   return (req: Request, res: Response, next: NextFunction) => {

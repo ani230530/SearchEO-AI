@@ -57,32 +57,45 @@ import {
 } from "@/components/ui/table";
 
 export type KeywordModelResult = {
-  accuracy?: number;
+  accuracy?: number | null;
   citations?: Array<{ title?: string; url: string; citedText?: string; snippet?: string; content?: string }>;
+  competitorHosts?: string[];
+  competitorMentions?: Array<{ host?: string; count?: number; rankPosition?: number | null; sentiment?: number | null }>;
   id: string;
   model: string;
-  overall?: number;
+  overall?: number | null;
   phrase?: string;
   presence?: number;
+  rankPosition?: number | null;
   relevance?: number;
   response?: string;
-  sentiment?: number;
+  sentiment?: number | null;
   sources?: string[];
+  status?: string | null;
 };
 
 export type KeywordTableRow = {
   /** 0..10 average across rows where the brand was mentioned. null when nothing was measurable. */
   avgSentiment: number | null;
+  aiSov?: string | null;
+  aiSovPercent?: number | null;
+  avgRankPosition?: number | null;
   bestRank: number;
+  brandMentionEvents?: number;
   competitorCount: number;
+  competitorMentionEvents?: number;
   competitors: string[];
   id: string;
   /** Raw DB id (Keyword.id) — used by the expanded row to fetch /history. */
   rawId?: number;
   mentions: number;
   phrase: string;
+  rankedResponses?: number;
+  rankingPosition?: number | null;
   results: KeywordModelResult[];
   sov: string;
+  successfulResponses?: number;
+  totalMentionEvents?: number;
   type: "prompt" | "keyword";
 };
 
@@ -125,19 +138,32 @@ const getKeywordVisibilityScore = (row: KeywordTableRow) => {
 };
 
 const getKeywordCoverageScore = (row: KeywordTableRow) => {
-  const total = Number(row.results?.length ?? 0);
+  const total = getSuccessfulResponseCount(row);
   if (!Number.isFinite(total) || total <= 0) return null;
   return Number(row.mentions ?? 0) / total;
 };
 
+const getSuccessfulResponseCount = (row: KeywordTableRow) => {
+  const direct = Number(row.successfulResponses);
+  if (Number.isFinite(direct) && direct >= 0) return direct;
+  return (row.results ?? []).filter((result) => result.status !== "failed").length;
+};
+
 const getKeywordRankingScore = (row: KeywordTableRow) => {
+  const direct = Number(row.rankingPosition ?? row.bestRank);
+  if (Number.isFinite(direct) && direct > 0) return direct;
   const positions = (row.results ?? [])
     .map((result) => Number((result as { rankPosition?: number | null }).rankPosition))
     .filter((position): position is number => Number.isFinite(position) && position > 0);
   return positions.length > 0 ? Math.min(...positions) : null;
 };
 
-const getKeywordVolumeScore = (row: KeywordTableRow) => Number(row.results?.length ?? 0);
+const getKeywordVolumeScore = (row: KeywordTableRow) => getSuccessfulResponseCount(row);
+
+const formatRankValue = (value: number | null | undefined) => {
+  if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) return null;
+  return Number.isInteger(value) ? `#${value}` : `#${value.toFixed(1)}`;
+};
 
 // detailGraphData / detailGraphTicks / detailGraphHighlight removed —
 // the keyword detail chart now derives from the live /history endpoint
@@ -922,16 +948,26 @@ export const KeywordTrackingTable = ({
                       </Badge>
                     </TableCell>
                     <TableCell className="px-2 py-3 text-[11px] font-medium text-slate-600">
-                      {row.bestRank}/{row.results.length}
+                      {(() => {
+                        const formatted = formatRankValue(getKeywordRankingScore(row));
+                        if (formatted) return <span>{formatted}</span>;
+                        if (row.mentions > 0) return <span className="text-emerald-600">Mentioned</span>;
+                        return <span className="text-slate-400">—</span>;
+                      })()}
                     </TableCell>
                     <TableCell className="px-2 py-3">
-                      <span className="text-[11px] font-medium text-slate-600">500</span>
+                      <span className="text-[11px] font-medium text-slate-600">
+                        {getSuccessfulResponseCount(row) || "—"}
+                      </span>
                     </TableCell>
                     <TableCell className="px-2 py-3">
-                      {row.avgSentiment === null || row.mentions === 0 ? (
-                        // Honest empty: no model mentioned the brand for this
-                        // keyword, so there's nothing to label Positive/Neg.
-                        <span className="text-[10px] font-medium text-slate-400 italic">Not mentioned</span>
+                      {row.avgSentiment === null ? (
+                        <span
+                          title={row.mentions > 0 ? "Brand was mentioned, but sentiment was not scored for this keyword." : "Brand was not mentioned for this keyword."}
+                          className="text-[10px] font-medium text-slate-400 italic"
+                        >
+                          {row.mentions > 0 ? "No sentiment" : "Not mentioned"}
+                        </span>
                       ) : (
                         <Badge
                           variant="outline"

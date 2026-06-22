@@ -61,6 +61,22 @@ class RedisService {
     }
   }
 
+  async delPattern(pattern: string): Promise<void> {
+    try {
+      if (!this.isConnected) return;
+      let cursor = '0';
+      do {
+        const [nextCursor, keys] = await this.client.scan(cursor, 'MATCH', pattern, 'COUNT', 100);
+        cursor = nextCursor;
+        if (keys.length > 0) {
+          await this.client.del(...keys);
+        }
+      } while (cursor !== '0');
+    } catch (err) {
+      console.error(`Redis DEL pattern error for ${pattern}:`, err);
+    }
+  }
+
   // Domain specific helpers
   getDashboardKey(domainId: number | string, type: 'overview' | 'metrics' | 'comps') {
     return `dash:${domainId}:${type}`;

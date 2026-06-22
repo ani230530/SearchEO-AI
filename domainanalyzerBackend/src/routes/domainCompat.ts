@@ -1,10 +1,9 @@
 import { Router, Request, Response } from 'express';
-import { PrismaClient } from '../../generated/prisma';
+import { prisma } from '../lib/prisma';
 import { authenticateToken, AuthenticatedRequest } from '../middleware/auth';
 import { parseDomainInput } from '../utils/domainValidation';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 const STEP_PHASES = ['crawl', 'profile', 'competitors', 'topics', 'select', 'run'] as const;
 

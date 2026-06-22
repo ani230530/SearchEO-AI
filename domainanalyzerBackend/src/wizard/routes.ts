@@ -19,7 +19,8 @@
 
 import crypto from 'crypto';
 import { Router, Request, Response } from 'express';
-import { Prisma, PrismaClient } from '../../generated/prisma';
+import { Prisma } from '../../generated/prisma';
+import { prisma } from '../lib/prisma';
 import { authenticateToken, AuthenticatedRequest } from '../middleware/auth';
 import {
   authenticateOrSession,
@@ -35,13 +36,17 @@ import { enrichDomainContext } from './enrichmentService';
 import { setPhase, readState } from './wizardState';
 import { queueDeepScoringForRun, runOnePrompt, runQueries } from './runService';
 import { computePhraseVisibility, computeOpportunities, computeCompetitorAnalysis } from './analyticsService';
-import { enrichOpportunities, type EnrichedOpportunity } from './opportunityEnrichment';
+import { enrichOpportunities, withDefaultBrief, type EnrichedOpportunity } from './opportunityEnrichment';
 import { enrichCompetitorInsights, type CompetitorInsight } from './competitorInsightEnrichment';
 import { scoreResponse as llmScoreResponse } from './scoreService';
 import { redisService } from '../services/RedisService';
 import { timed } from '../lib/timed';
+import {
+  REPORT_LITE_CACHE_TTL_SECONDS,
+  invalidateReportCacheForDomain,
+  reportCacheKey,
+} from './reportCache';
 
-const prisma = new PrismaClient();
 const router = Router();
 
 // ── helpers ────────────────────────────────────────────────────────────────
@@ -93,6 +98,8 @@ type AiResultRow = {
   id: number;
   promptId: number;
   model: string;
+  status?: string | null;
+  errorMessage?: string | null;
   response: string;
   presence: number;
   relevance: number;
@@ -119,16 +126,19 @@ type ResponseCitation = { title: string | null; url: string; host: string };
 
 // One entry per model for a prompt — the dashboard renders the per-model
 // breakdown without an extra round trip.
-function buildModelResults(rs: AiResultRow[]) {
+function buildModelResults(rs: AiResultRow[], options: { verbose?: boolean } = {}) {
+  const verbose = options.verbose ?? true;
   return rs.map((r) => {
     const cits = Array.isArray(r.citations) ? (r.citations as ResponseCitation[]) : [];
     const compMentions = Array.isArray(r.competitorMentions)
-      ? (r.competitorMentions as Array<{ host: string; count: number; sentiment: number | null }>)
+      ? (r.competitorMentions as Array<{ host: string; count: number; sentiment: number | null; rankPosition?: number | null }>)
       : [];
     const sentimentDisplay = toDisplaySentiment(r.sentiment);
     return {
       id: `res-${r.id}`,
       model: r.model,
+      status: r.status ?? 'success',
+      errorMessage: r.errorMessage ?? null,
       presence: r.presence,
       overall: r.overall,
       accuracy: r.accuracy,
@@ -136,14 +146,14 @@ function buildModelResults(rs: AiResultRow[]) {
       sentiment: sentimentDisplay === null ? null : Number(sentimentDisplay.toFixed(2)),
       sentimentRaw: r.sentiment,
       rankPosition: r.rankPosition,
-      scorerSummary: r.scorerSummary,
-      factualClaims: r.factualClaims ?? [],
-      response: r.response,
+      scorerSummary: verbose ? r.scorerSummary : null,
+      factualClaims: verbose ? (r.factualClaims ?? []) : [],
+      response: verbose ? r.response : '',
       citations: cits.map((c) => ({ title: c.title ?? c.host, url: c.url, snippet: c.host })),
       sources: Array.from(new Set(cits.map((c) => c.host))).filter(Boolean),
       competitorMentions: compMentions,
       competitorHosts: Array.isArray(r.competitorHosts) ? (r.competitorHosts as string[]) : [],
-      latencyMs: r.latencyMs,
+      latencyMs: verbose ? r.latencyMs : null,
     };
   });
 }
@@ -155,6 +165,294 @@ function rollupCompetitors(rs: ReturnType<typeof buildModelResults>) {
     for (const m of r.competitorMentions) set.add(m.host);
   }
   return Array.from(set);
+}
+
+function normalizeMetricHost(value: unknown): string {
+  return String(value ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/^https?:\/\//, '')
+    .replace(/^www\./, '')
+    .replace(/\/.*$/, '');
+}
+
+function asArray(value: unknown): unknown[] {
+  return Array.isArray(value) ? value : [];
+}
+
+type BuiltModelResult = ReturnType<typeof buildModelResults>[number];
+
+function isFailedAiResult(row: AiResultRow): boolean {
+  if (row.status === 'failed') return true;
+  const hasResponse = typeof row.response === 'string' && row.response.trim().length > 0;
+  const hasEvidence =
+    asArray(row.citations).length > 0 ||
+    asArray(row.competitorHosts).length > 0 ||
+    asArray(row.competitorMentions).length > 0 ||
+    (typeof row.scorerSummary === 'string' && row.scorerSummary.trim().length > 0);
+  // Legacy rows created before AiQueryResult.status used empty responses with
+  // zeroed scores for provider failures. Treat only fully-empty rows as failed;
+  // a real non-mention still has response text and relevance.
+  return !hasResponse && !hasEvidence && row.presence === 0 && row.overall === 0 && row.relevance <= 1;
+}
+
+function countCompetitorEventsFromValues(competitorMentions: unknown, competitorHosts: unknown, ownHost: string) {
+  let events = 0;
+  let ownExcluded = 0;
+  const seenResponseHosts = new Set<string>();
+  const mentions = asArray(competitorMentions) as Array<{ host?: unknown; name?: unknown; count?: unknown }>;
+
+  if (mentions.length > 0) {
+    for (const mention of mentions) {
+      const host = normalizeMetricHost(mention.host);
+      const count = typeof mention.count === 'number' && Number.isFinite(mention.count) && mention.count > 0
+        ? mention.count
+        : 1;
+      if (host && host === ownHost) {
+        ownExcluded += count;
+        continue;
+      }
+      if (host) {
+        events += count;
+        seenResponseHosts.add(host);
+      }
+    }
+  } else {
+    for (const rawHost of asArray(competitorHosts)) {
+      const host = normalizeMetricHost(rawHost);
+      if (!host) continue;
+      if (host === ownHost) {
+        ownExcluded += 1;
+        continue;
+      }
+      events += 1;
+      seenResponseHosts.add(host);
+    }
+  }
+
+  return { events, ownExcluded, responseHasCompetitor: seenResponseHosts.size > 0 };
+}
+
+function countCompetitorEvents(row: AiResultRow, ownHost: string) {
+  return countCompetitorEventsFromValues(row.competitorMentions, row.competitorHosts, ownHost);
+}
+
+function isSuccessfulBuiltResult(row: BuiltModelResult): boolean {
+  return row.status !== 'failed';
+}
+
+function rankPositionsForResults(rows: BuiltModelResult[]) {
+  return rows
+    .map((r) => Number(r.rankPosition))
+    .filter((rank): rank is number => Number.isFinite(rank) && rank > 0);
+}
+
+function average(values: number[]): number | null {
+  if (values.length === 0) return null;
+  return Number((values.reduce((sum, value) => sum + value, 0) / values.length).toFixed(2));
+}
+
+function buildPromptRowMetrics(built: BuiltModelResult[], ownDomainHost: string) {
+  const ownHost = normalizeMetricHost(ownDomainHost);
+  const successful = built.filter(isSuccessfulBuiltResult);
+  const successfulResponses = successful.length;
+  const mentions = successful.reduce((sum, row) => sum + (row.presence === 1 ? 1 : 0), 0);
+  const visibilityPct = successfulResponses > 0
+    ? Math.round((mentions / successfulResponses) * 100)
+    : 0;
+
+  const sentimentMeasurements = successful
+    .map((row) => row.sentiment)
+    .filter((sentiment): sentiment is number => typeof sentiment === 'number');
+  const avgSentiment = average(sentimentMeasurements);
+
+  const rankedPositions = rankPositionsForResults(successful);
+  const bestRankPosition = rankedPositions.length > 0 ? Math.min(...rankedPositions) : null;
+  const avgRankPosition = average(rankedPositions);
+
+  const competitorMentionEvents = successful.reduce((sum, row) => (
+    sum + countCompetitorEventsFromValues(row.competitorMentions, row.competitorHosts, ownHost).events
+  ), 0);
+  const brandMentionEvents = mentions;
+  const totalMentionEvents = brandMentionEvents + competitorMentionEvents;
+  const aiSovPct = totalMentionEvents > 0
+    ? Math.round((brandMentionEvents / totalMentionEvents) * 100)
+    : null;
+
+  const avgOverall = successfulResponses > 0
+    ? Number((successful.reduce((sum, row) => sum + (row.overall ?? 0), 0) / successfulResponses).toFixed(2))
+    : 0;
+
+  return {
+    totalResponses: built.length,
+    successfulResponses,
+    mentions,
+    visibilityPct,
+    avgSentiment,
+    bestRankPosition,
+    avgRankPosition,
+    rankedResponses: rankedPositions.length,
+    brandMentionEvents,
+    competitorMentionEvents,
+    totalMentionEvents,
+    aiSovPct,
+    aiSov: aiSovPct === null ? '—' : `${aiSovPct}%`,
+    avgOverall,
+  };
+}
+
+function buildCanonicalReportMetrics(args: {
+  rows: AiResultRow[];
+  ownDomainHost: string;
+  promptInventory: { generated: number; selected: number; run: number; tracked: number };
+}) {
+  const ownHost = normalizeMetricHost(args.ownDomainHost);
+  const attemptedResponses = args.rows.length;
+  const successfulRows = args.rows.filter((row) => !isFailedAiResult(row));
+  const successfulResponses = successfulRows.length;
+  const failedResponses = attemptedResponses - successfulResponses;
+
+  const brandMentionResponses = successfulRows.reduce((sum, row) => sum + (row.presence === 1 ? 1 : 0), 0);
+  const visibilityRate = successfulResponses > 0 ? Math.round((brandMentionResponses / successfulResponses) * 100) : 0;
+
+  let competitorMentionEvents = 0;
+  let competitorMentionResponses = 0;
+  let ownHostExcludedMentions = 0;
+  let totalCitations = 0;
+  let citedResponses = 0;
+  const sentimentSamples: number[] = [];
+  const accuracySamples: number[] = [];
+
+  const modelBuckets = new Map<string, {
+    attempted: number;
+    successful: number;
+    failed: number;
+    brandMentions: number;
+    citations: number;
+  }>();
+
+  for (const row of args.rows) {
+    const bucket = modelBuckets.get(row.model) ?? { attempted: 0, successful: 0, failed: 0, brandMentions: 0, citations: 0 };
+    bucket.attempted += 1;
+    if (isFailedAiResult(row)) {
+      bucket.failed += 1;
+      modelBuckets.set(row.model, bucket);
+      continue;
+    }
+
+    bucket.successful += 1;
+    bucket.brandMentions += row.presence === 1 ? 1 : 0;
+    const citations = asArray(row.citations);
+    bucket.citations += citations.length;
+    modelBuckets.set(row.model, bucket);
+
+    totalCitations += citations.length;
+    if (citations.length > 0) citedResponses += 1;
+
+    const competitorCounts = countCompetitorEvents(row, ownHost);
+    competitorMentionEvents += competitorCounts.events;
+    ownHostExcludedMentions += competitorCounts.ownExcluded;
+    if (competitorCounts.responseHasCompetitor) competitorMentionResponses += 1;
+
+    if (row.presence === 1 && typeof row.sentiment === 'number') sentimentSamples.push(row.sentiment);
+    if (row.presence === 1 && typeof row.accuracy === 'number') accuracySamples.push(row.accuracy);
+  }
+
+  const totalMentionEvents = brandMentionResponses + competitorMentionEvents;
+  const aiShareOfVoice = totalMentionEvents > 0
+    ? Math.round((brandMentionResponses / totalMentionEvents) * 100)
+    : 0;
+  const competitorResponseRate = successfulResponses > 0
+    ? Math.round((competitorMentionResponses / successfulResponses) * 100)
+    : 0;
+
+  const avgSentimentRaw = sentimentSamples.length > 0
+    ? Number((sentimentSamples.reduce((sum, value) => sum + value, 0) / sentimentSamples.length).toFixed(2))
+    : null;
+  const avgSentimentDisplay = avgSentimentRaw === null
+    ? null
+    : Number(Math.max(0, Math.min(10, (avgSentimentRaw + 10) / 2)).toFixed(2));
+  const sentimentLabel = avgSentimentDisplay === null
+    ? 'Not scored'
+    : avgSentimentDisplay >= 7
+      ? 'Positive'
+      : avgSentimentDisplay >= 4
+        ? 'Neutral'
+        : 'Negative';
+
+  const avgAccuracy = accuracySamples.length > 0
+    ? Number((accuracySamples.reduce((sum, value) => sum + value, 0) / accuracySamples.length).toFixed(2))
+    : null;
+  const accuracyPercent = avgAccuracy === null ? null : Math.round(avgAccuracy * 10);
+  const accuracyReliable = accuracySamples.length >= Math.min(3, Math.max(1, brandMentionResponses));
+
+  const preferredModelOrder = ['google-gre', 'gpt-4o-mini', 'claude-sonnet-4-5', 'gemini-2.0-flash'];
+  const modelPerformance = Array.from(modelBuckets.entries())
+    .sort(([a], [b]) => {
+      const ai = preferredModelOrder.indexOf(a);
+      const bi = preferredModelOrder.indexOf(b);
+      return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi) || a.localeCompare(b);
+    })
+    .map(([model, bucket]) => ({
+      model,
+      attemptedResponses: bucket.attempted,
+      successfulResponses: bucket.successful,
+      failedResponses: bucket.failed,
+      brandMentions: bucket.brandMentions,
+      visibilityRate: bucket.successful > 0 ? Math.round((bucket.brandMentions / bucket.successful) * 100) : null,
+      citationCount: bucket.citations,
+    }));
+
+  return {
+    responseHealth: {
+      attemptedResponses,
+      successfulResponses,
+      failedResponses,
+      excludedFromScoring: failedResponses,
+    },
+    modelPerformance,
+    promptInventory: args.promptInventory,
+    citations: {
+      total: totalCitations,
+      citedResponses,
+      successfulResponses,
+    },
+    mentions: {
+      brandMentionResponses,
+      brandResponseRate: visibilityRate,
+      competitorMentionEvents,
+      competitorMentionResponses,
+      competitorResponseRate,
+      ownHostExcludedMentions,
+    },
+    sentiment: {
+      label: sentimentLabel,
+      avgRaw: avgSentimentRaw,
+      avgDisplay: avgSentimentDisplay,
+      sampleSize: sentimentSamples.length,
+      brandMentionResponses,
+      status: sentimentSamples.length > 0 ? 'measured' : brandMentionResponses > 0 ? 'missing_scores' : 'no_brand_mentions',
+    },
+    accuracy: {
+      percent: accuracyPercent,
+      avg: avgAccuracy,
+      sampleSize: accuracySamples.length,
+      brandMentionResponses,
+      status: avgAccuracy === null ? 'missing_scores' : accuracyReliable ? 'measured' : 'low_sample',
+    },
+    aiShareOfVoice: {
+      percent: aiShareOfVoice,
+      brandMentionEvents: brandMentionResponses,
+      competitorMentionEvents,
+      totalMentionEvents,
+    },
+    visibility: {
+      percent: visibilityRate,
+      brandMentionResponses,
+      successfulResponses,
+      failedResponses,
+    },
+  };
 }
 
 // Next scheduled weekly run: the upcoming Monday 03:00 UTC (matches the
@@ -174,6 +472,39 @@ function nextWeeklyRunAt(): Date {
   return next;
 }
 
+function weeklyBucketStartUtc(date: Date): Date {
+  const start = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), 0, 0, 0, 0));
+  const daysSinceMonday = (start.getUTCDay() + 6) % 7;
+  start.setUTCDate(start.getUTCDate() - daysSinceMonday);
+  return start;
+}
+
+function weeklyBucketKey(date: Date): string {
+  return weeklyBucketStartUtc(date).toISOString().slice(0, 10);
+}
+
+function isWeeklyHistoryRequest(req: Request): boolean {
+  return typeof req.query.kind === 'string' && req.query.kind.toLowerCase() === 'weekly';
+}
+
+function collapseRunHistoryToWeeks<T extends { startedAt: Date | string; total?: number }>(runs: T[]): T[] {
+  const grouped = new Map<string, T[]>();
+  for (const run of runs) {
+    const date = run.startedAt instanceof Date ? run.startedAt : new Date(run.startedAt);
+    const key = weeklyBucketKey(date);
+    grouped.set(key, [...(grouped.get(key) ?? []), run]);
+  }
+
+  return [...grouped.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([, bucket]) => {
+      const sorted = [...bucket].sort(
+        (a, b) => new Date(a.startedAt).getTime() - new Date(b.startedAt).getTime(),
+      );
+      return [...sorted].reverse().find((run) => Number(run.total) > 0) ?? sorted[sorted.length - 1];
+    });
+}
+
 // A tracked prompt that has never been through a weekly run yet — zeroed
 // metrics so the table can render "Not yet tested".
 function emptyTrackedRow(p: { id: number; text: string; intent: string | null; source: string; keywordId: number | null; lastTrackedRunAt: Date | null }) {
@@ -187,13 +518,22 @@ function emptyTrackedRow(p: { id: number; text: string; intent: string | null; s
     source: p.source,
     keywordId: p.keywordId,
     sov: '0%',
+    aiSov: '—',
+    aiSovPercent: null as number | null,
     mentions: 0,
+    successfulResponses: 0,
     bestRank: 0,
+    rankingPosition: null as number | null,
+    avgRankPosition: null as number | null,
+    rankedResponses: 0,
+    brandMentionEvents: 0,
+    competitorMentionEvents: 0,
+    totalMentionEvents: 0,
     avgSentiment: null as number | null,
     competitors: [] as string[],
     competitorCount: 0,
     results: [] as ReturnType<typeof buildModelResults>,
-    metrics: { visibility: 0, avgOverall: 0, runs: 0 },
+    metrics: { visibility: 0, aiSov: null as number | null, avgOverall: 0, runs: 0, attemptedRuns: 0 },
     isTracked: true,
     lastTestedAt: p.lastTrackedRunAt,
     nextTestAt: nextWeeklyRunAt(),
@@ -227,6 +567,12 @@ const PHASE_STEP: Record<string, number> = {
 const domainsCacheKey = (userId: number) => `wizard:domains:${userId}`;
 const DOMAINS_CACHE_TTL_SECONDS = 60;
 
+function invalidateDomainReportCache(domain: { id: number; userId: number }): void {
+  invalidateReportCacheForDomain(domain.userId, domain.id).catch((err) => {
+    console.warn('[wizard/report] cache invalidation failed', err);
+  });
+}
+
 router.get('/domains', timed('GET /domains', 300), authenticateToken, async (req: Request, res: Response) => {
   const userId = authReq(req).user.userId;
 
@@ -253,6 +599,12 @@ router.get('/domains', timed('GET /domains', 300), authenticateToken, async (req
       profile: { select: { country: true, state: true, industry: true, targetLocation: true } },
       inferred: { select: { companyName: true, companySize: true, summary: true } },
       wizardState: { select: { phases: true } },
+      runs: {
+        where: { status: 'completed', kind: 'audit' },
+        orderBy: { startedAt: 'desc' },
+        take: 1,
+        select: { summary: true },
+      },
       _count: {
         select: {
           keywords: { where: { isSelected: true } },
@@ -265,8 +617,7 @@ router.get('/domains', timed('GET /domains', 300), authenticateToken, async (req
   });
 
   // Derive currentStep + visibilityScore per row.
-  const rows = await Promise.all(
-    domains.map(async (d) => {
+  const rows = domains.map((d) => {
       const phases = (d.wizardState?.phases as Record<string, string> | undefined) ?? {};
       let currentStep = 0;
       for (const [phase, status] of Object.entries(phases)) {
@@ -275,11 +626,7 @@ router.get('/domains', timed('GET /domains', 300), authenticateToken, async (req
         }
       }
 
-      const latestRun = await prisma.aiRun.findFirst({
-        where: { domainId: d.id, status: 'completed' },
-        orderBy: { startedAt: 'desc' },
-        select: { summary: true },
-      });
+      const latestRun = d.runs[0] ?? null;
       const summary = latestRun?.summary as Record<string, unknown> | null;
       const avgPresence = summary?.presenceRate as number | undefined;
       const avgOverall = summary?.avgOverall as number | undefined;
@@ -315,8 +662,7 @@ router.get('/domains', timed('GET /domains', 300), authenticateToken, async (req
           overallHealth,
         },
       };
-    })
-  );
+  });
 
   const payload = { domains: rows };
   // Best-effort write — don't block the response if Redis is degraded.
@@ -630,55 +976,90 @@ router.get('/domain/:id', authenticateOrSession(), async (req: Request, res: Res
 // AiRun and the user's selected keywords/prompts.
 
 router.get('/domain/:id/report', timed('GET /report', 800), authenticateToken, async (req: Request, res: Response) => {
-  const got = await ensureDomain(req, req.params.id);
-  if (!got.ok) return res.status(got.status).json({ error: got.error });
-  const { domain } = got;
-
   // ?runId= scopes every metric to a specific past run. Without it we use
   // the latest completed run for this domain (existing behaviour).
+  const domainIdParam = req.params.id ? Number(req.params.id) : NaN;
+  if (!domainIdParam || Number.isNaN(domainIdParam)) {
+    return res.status(400).json({ error: 'Invalid domainId' });
+  }
   const runIdParam = typeof req.query.runId === 'string' ? Number(req.query.runId) : NaN;
   const useSpecificRun = Number.isFinite(runIdParam) && runIdParam > 0;
   // Default to audit-kind runs so weekly tracked-prompt runs don't become the
   // "latest run" the dashboard renders. ?kind=weekly|all overrides.
   const kindFilter = runKindFilter(req);
+  const lite = req.query.lite === '1' || req.query.view === 'overview';
+  const refreshInsights = req.query.refreshInsights === '1';
+  const includeResultPayload = req.query.responses === '1' || req.query.verbose === '1';
+  const verboseResultPayload = !lite || includeResultPayload;
 
-  const latestRun = useSpecificRun
-    ? await prisma.aiRun.findFirst({
-        where: { id: runIdParam, domainId: domain.id, status: 'completed' },
+  const ownerId = getOwnerUserId(req);
+  const latestCacheScope = kindFilter.kind ?? 'all';
+  const liteCacheKey = lite && !includeResultPayload && ownerId
+    ? reportCacheKey(ownerId, domainIdParam, useSpecificRun ? runIdParam : `latest:${latestCacheScope}`, 'lite')
+    : null;
+  if (liteCacheKey) {
+    try {
+      const cached = await redisService.get(liteCacheKey);
+      if (cached) {
+        res.setHeader('X-Report-Cache', 'hit');
+        return res.json(JSON.parse(cached));
+      }
+    } catch (err) {
+      console.warn('[wizard/report] Redis read failed', err);
+    }
+  }
+
+  const domain = ownerId
+    ? await prisma.domain.findFirst({
+        where: { id: domainIdParam, userId: ownerId },
+        include: {
+          profile: true,
+          inferred: true,
+          runs: {
+            where: useSpecificRun
+              ? { id: runIdParam, status: 'completed' }
+              : { status: 'completed', ...kindFilter },
+            orderBy: { startedAt: 'desc' },
+            take: useSpecificRun ? 1 : 2,
+            select: { id: true, status: true, startedAt: true, endedAt: true, summary: true },
+          },
+        },
       })
-    : await prisma.aiRun.findFirst({
-        where: { domainId: domain.id, status: 'completed', ...kindFilter },
-        orderBy: { startedAt: 'desc' },
-      });
+    : null;
+  if (!domain) return res.status(404).json({ error: 'Domain not found' });
+
+  const latestRun = domain.runs[0] ?? null;
 
   const reportRunId = latestRun?.id ?? -1;
-  const [allResults, keywords, prompts] = await Promise.all([
+  const [rawResults, keywords, prompts] = await Promise.all([
     // Explicit select — every field listed is consumed below. Omits
     // costUsd / createdAt / runId which the report doesn't need (the query
     // planner skips reading them; in particular costUsd is only used by the
     // billing summary on AiRun, not per-row). Keeps the response/JSONB
     // columns we need (they're surfaced verbatim in the API response).
     prisma.aiQueryResult.findMany({
-      where: { runId: reportRunId, run: { domainId: domain.id } },
+      where: { runId: reportRunId },
       orderBy: { createdAt: 'desc' },
       take: 1000,
       select: {
         id: true,
         promptId: true,
         model: true,
-        response: true,
+        status: true,
+        errorMessage: true,
+        response: verboseResultPayload,
         presence: true,
         relevance: true,
         sentiment: true,
         accuracy: true,
         rankPosition: true,
         overall: true,
-        scorerSummary: true,
-        factualClaims: true,
+        scorerSummary: verboseResultPayload,
+        factualClaims: verboseResultPayload,
         competitorHosts: true,
         citations: true,
         competitorMentions: true,
-        latencyMs: true,
+        latencyMs: verboseResultPayload,
       },
     }),
     // Load ALL keywords for this domain (not just isSelected). Many AI-generated
@@ -691,13 +1072,15 @@ router.get('/domain/:id/report', timed('GET /report', 800), authenticateToken, a
       select: { id: true, term: true, intent: true, source: true },
     }),
     prisma.prompt.findMany({
-      where: { domainId: domain.id, isSelected: true },
+      where: { domainId: domain.id },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
       select: {
         id: true,
         text: true,
         intent: true,
         source: true,
         keywordId: true,
+        isSelected: true,
         category: true,
         intentStage: true,
         persona: true,
@@ -706,9 +1089,17 @@ router.get('/domain/:id/report', timed('GET /report', 800), authenticateToken, a
         competitorMentioned: true,
         isTracked: true,
         lastTrackedRunAt: true,
+        createdAt: true,
       },
     }),
   ]);
+  const allResults = rawResults.map((r: any) => ({
+    ...r,
+    response: typeof r.response === 'string' ? r.response : '',
+    scorerSummary: typeof r.scorerSummary === 'string' ? r.scorerSummary : null,
+    factualClaims: r.factualClaims ?? [],
+    latencyMs: typeof r.latencyMs === 'number' ? r.latencyMs : null,
+  })) as AiResultRow[];
 
   const summary = (latestRun?.summary as Record<string, unknown> | null) ?? null;
   if (
@@ -720,24 +1111,6 @@ router.get('/domain/:id/report', timed('GET /report', 800), authenticateToken, a
   ) {
     queueDeepScoringForRun({ prisma, domainId: domain.id, runId: latestRun.id });
   }
-  const perModelRaw = (summary?.perModel as Record<string, { presenceRate?: number; avgOverall?: number; avgSentiment?: number; queries?: number }> | undefined) ?? {};
-
-  // Per-model mention totals (count of presence=1) — the dashboard reads
-  // `modelStats[i].mentions` directly, so we surface it here.
-  const mentionsByModel = new Map<string, number>();
-  for (const r of allResults) {
-    mentionsByModel.set(r.model, (mentionsByModel.get(r.model) ?? 0) + r.presence);
-  }
-
-  const modelPerformance = Object.entries(perModelRaw).map(([model, m]) => ({
-    model,
-    visibility: Math.round(((m.presenceRate ?? 0) as number) * 100),
-    accuracy: Number((((m.avgOverall ?? 0) as number) * 10).toFixed(1)),
-    sentiment: Number(((m.avgSentiment ?? 0) as number).toFixed(2)),
-    queries: m.queries ?? 0,
-    mentions: mentionsByModel.get(model) ?? 0,
-  }));
-
   // Group AiQueryResult rows by prompt — each prompt gets a `results` array
   // (one entry per model) so the dashboard can render the per-model breakdown
   // without an extra round trip.
@@ -749,12 +1122,13 @@ router.get('/domain/:id/report', timed('GET /report', 800), authenticateToken, a
   }
 
   // Build the topPrompts list.
-  //   - Only return prompts that were actually queried in some run (skip
-  //     selected-but-never-run rows so the dashboard isn't padded with zeros).
-  //   - Include keywords whose child prompts were queried, so the keyword
-  //     table has rollup rows.
+  //   - Return every saved prompt for the domain so the dashboard table is a
+  //     true prompt inventory, not just the latest run's result set.
+  //   - Keep keyword rollups scoped to prompts with results, because keyword
+  //     rows are aggregate analytics and empty rollups add no signal.
   const queriedPromptIds = new Set(resultsByPrompt.keys());
   const queriedPrompts = prompts.filter((p) => queriedPromptIds.has(p.id));
+  const selectedPrompts = prompts.filter((p) => p.isSelected);
 
   const queriedKeywordIds = new Set<number>();
   for (const p of queriedPrompts) if (p.keywordId) queriedKeywordIds.add(p.keywordId);
@@ -775,17 +1149,8 @@ router.get('/domain/:id/report', timed('GET /report', 800), authenticateToken, a
     ...queriedKeywords.map((k) => {
       const childPromptIds = queriedPrompts.filter((p) => p.keywordId === k.id).map((p) => p.id);
       const childResults = childPromptIds.flatMap((pid) => resultsByPrompt.get(pid) ?? []);
-      const built = buildModelResults(childResults);
-      const mentions = built.reduce((s, r) => s + r.presence, 0);
-      const total = built.length;
-      const sovPct = total > 0 ? Math.round((mentions / total) * 100) : 0;
-      // Average sentiment only across rows where the brand was actually
-      // mentioned. Returns 5 (Neutral) only when there's literally a 5-score
-      // measurement; rows without measurement are excluded, not zeroed.
-      const sentimentMeasurements = built.map((r) => r.sentiment).filter((s): s is number => s !== null);
-      const avgSentiment = sentimentMeasurements.length > 0
-        ? Number((sentimentMeasurements.reduce((s, n) => s + n, 0) / sentimentMeasurements.length).toFixed(2))
-        : null;
+      const built = buildModelResults(childResults, { verbose: verboseResultPayload });
+      const promptMetrics = buildPromptRowMetrics(built, domain.host);
       const competitors = rollupCompetitors(built);
       // A keyword row is "tracked" when all its child prompts are tracked.
       // Tracking the keyword toggles every child prompt (see childPromptIds).
@@ -800,35 +1165,40 @@ router.get('/domain/:id/report', timed('GET /report', 800), authenticateToken, a
         text: k.term,
         intent: k.intent,
         source: k.source,
-        sov: `${sovPct}%`,
-        mentions,
-        bestRank: mentions,
-        avgSentiment,
+        // `sov` is retained as legacy visibility because other tracking UI
+        // consumes it that way. The report table reads the explicit aiSov fields.
+        sov: `${promptMetrics.visibilityPct}%`,
+        aiSov: promptMetrics.aiSov,
+        aiSovPercent: promptMetrics.aiSovPct,
+        mentions: promptMetrics.mentions,
+        successfulResponses: promptMetrics.successfulResponses,
+        bestRank: promptMetrics.bestRankPosition ?? 0,
+        rankingPosition: promptMetrics.bestRankPosition,
+        avgRankPosition: promptMetrics.avgRankPosition,
+        rankedResponses: promptMetrics.rankedResponses,
+        brandMentionEvents: promptMetrics.brandMentionEvents,
+        competitorMentionEvents: promptMetrics.competitorMentionEvents,
+        totalMentionEvents: promptMetrics.totalMentionEvents,
+        avgSentiment: promptMetrics.avgSentiment,
         competitors,
         competitorCount: competitors.length,
         results: built,
-        metrics: { visibility: sovPct, avgOverall: total > 0 ? Number((built.reduce((s, r) => s + r.overall, 0) / total).toFixed(2)) : 0, runs: total },
+        metrics: {
+          visibility: promptMetrics.visibilityPct,
+          aiSov: promptMetrics.aiSovPct,
+          avgOverall: promptMetrics.avgOverall,
+          runs: promptMetrics.successfulResponses,
+          attemptedRuns: promptMetrics.totalResponses,
+        },
         // Tracking a keyword tracks all its child prompts.
         childPromptIds,
         isTracked: keywordTracked,
       };
     }),
-    ...queriedPrompts.map((p) => {
+    ...prompts.map((p) => {
       const rs = resultsByPrompt.get(p.id) ?? [];
-      const built = buildModelResults(rs);
-      const mentions = built.reduce((s, r) => s + r.presence, 0);
-      const total = built.length;
-      const sovPct = total > 0 ? Math.round((mentions / total) * 100) : 0;
-      // Average sentiment only across rows where the brand was actually
-      // mentioned. Returns 5 (Neutral) only when there's literally a 5-score
-      // measurement; rows without measurement are excluded, not zeroed.
-      const sentimentMeasurements = built.map((r) => r.sentiment).filter((s): s is number => s !== null);
-      const avgSentiment = sentimentMeasurements.length > 0
-        ? Number((sentimentMeasurements.reduce((s, n) => s + n, 0) / sentimentMeasurements.length).toFixed(2))
-        : null;
-      const avgOverall = total > 0
-        ? Number((built.reduce((s, r) => s + r.overall, 0) / total).toFixed(2))
-        : 0;
+      const built = buildModelResults(rs, { verbose: verboseResultPayload });
+      const promptMetrics = buildPromptRowMetrics(built, domain.host);
       const competitors = rollupCompetitors(built);
       // Source keyword that produced this prompt — passed through so the
       // worksheet importer can seed the topic's primary keyword.
@@ -841,22 +1211,67 @@ router.get('/domain/:id/report', timed('GET /report', 800), authenticateToken, a
         text: p.text,
         intent: p.intent,
         source: p.source,
+        isSelected: p.isSelected,
         keywordId: p.keywordId,
         keyword: parentKw?.term ?? null,
         keywordIntent: parentKw?.intent ?? null,
-        sov: `${sovPct}%`,
-        mentions,
-        bestRank: mentions,
-        avgSentiment,
+        category: p.category,
+        intentStage: p.intentStage,
+        persona: p.persona,
+        useCase: p.useCase,
+        isBranded: p.isBranded,
+        competitorMentioned: p.competitorMentioned,
+        sov: `${promptMetrics.visibilityPct}%`,
+        aiSov: promptMetrics.aiSov,
+        aiSovPercent: promptMetrics.aiSovPct,
+        mentions: promptMetrics.mentions,
+        successfulResponses: promptMetrics.successfulResponses,
+        bestRank: promptMetrics.bestRankPosition ?? 0,
+        rankingPosition: promptMetrics.bestRankPosition,
+        avgRankPosition: promptMetrics.avgRankPosition,
+        rankedResponses: promptMetrics.rankedResponses,
+        brandMentionEvents: promptMetrics.brandMentionEvents,
+        competitorMentionEvents: promptMetrics.competitorMentionEvents,
+        totalMentionEvents: promptMetrics.totalMentionEvents,
+        avgSentiment: promptMetrics.avgSentiment,
         competitors,
         competitorCount: competitors.length,
         results: built,
-        metrics: { visibility: sovPct, avgOverall, runs: total },
+        metrics: {
+          visibility: promptMetrics.visibilityPct,
+          aiSov: promptMetrics.aiSovPct,
+          avgOverall: promptMetrics.avgOverall,
+          runs: promptMetrics.successfulResponses,
+          attemptedRuns: promptMetrics.totalResponses,
+        },
+        hasRun: promptMetrics.totalResponses > 0,
+        resultCount: promptMetrics.totalResponses,
         isTracked: p.isTracked,
         lastTestedAt: p.lastTrackedRunAt,
       };
     }),
   ];
+
+  const reportCards = buildCanonicalReportMetrics({
+    rows: allResults,
+    ownDomainHost: domain.host,
+    promptInventory: {
+      generated: prompts.length,
+      selected: selectedPrompts.length,
+      run: queriedPrompts.length,
+      tracked: prompts.filter((p) => p.isTracked).length,
+    },
+  });
+  const modelPerformance = reportCards.modelPerformance.map((model) => ({
+    model: model.model,
+    visibility: model.visibilityRate ?? 0,
+    accuracy: 0,
+    sentiment: 0,
+    queries: model.successfulResponses,
+    attemptedQueries: model.attemptedResponses,
+    failedQueries: model.failedResponses,
+    mentions: model.brandMentions,
+  }));
 
   // "New prompts added since the previous run" — count selected prompts whose
   // createdAt is after the SECOND-most-recent completed audit run started.
@@ -864,73 +1279,28 @@ router.get('/domain/:id/report', timed('GET /report', 800), authenticateToken, a
   // so the count is 0 (drives the "New Prompts" card on the All Prompts tab).
   // Always scoped to kind='audit' so weekly tracked-prompt runs don't move the
   // baseline, regardless of any ?kind override on this request.
-  const recentAuditRuns = await prisma.aiRun.findMany({
-    where: { domainId: domain.id, status: 'completed', kind: 'audit' },
-    orderBy: { startedAt: 'desc' },
-    take: 2,
-    select: { startedAt: true },
-  });
-  const previousAuditRunStartedAt = recentAuditRuns[1]?.startedAt ?? null;
+  const previousAuditRunStartedAt = useSpecificRun ? null : domain.runs[1]?.startedAt ?? null;
   const newPromptsSinceLastRun = previousAuditRunStartedAt
-    ? await prisma.prompt.count({
-        where: {
-          domainId: domain.id,
-          isSelected: true,
-          createdAt: { gt: previousAuditRunStartedAt },
-        },
-      })
+    ? selectedPrompts.filter((p) => p.createdAt > previousAuditRunStartedAt).length
     : 0;
 
-  // Brand vs competitor "share of voice" — count of presence vs competitor mentions.
-  const totalQueries = (summary?.totalQueries as number | undefined) ?? allResults.length;
-  const brandMentions = allResults.reduce((sum, r) => sum + r.presence, 0);
-  const competitorMentions = allResults.reduce((sum, r) => {
-    const arr = Array.isArray(r.competitorHosts) ? (r.competitorHosts as unknown[]) : [];
-    return sum + arr.length;
-  }, 0);
-  const totalMentions = brandMentions + competitorMentions;
-  const mentionRate = totalMentions > 0
-    ? Math.round((brandMentions / totalMentions) * 100)
-    : 0;
+  const totalQueries = reportCards.responseHealth.successfulResponses;
+  const brandMentions = reportCards.mentions.brandMentionResponses;
+  const competitorMentions = reportCards.mentions.competitorMentionEvents;
+  const mentionRate = reportCards.aiShareOfVoice.percent;
 
   // ── Phrase Visibility Map + Outrank Opportunities ─────────────────────
   // Pulled from the same data we already loaded above; no extra DB hits.
-  const selectedCompetitors = await prisma.competitor.findMany({
-    where: { domainId: domain.id, isSelected: true },
-    select: { competitorHost: true },
-  });
-  const phraseVisibility = computePhraseVisibility({
-    ownDomainHost: domain.host,
-    ownBrandName: domain.inferred?.companyName ?? null,
-    selectedCompetitorHosts: selectedCompetitors.map((c) => c.competitorHost),
-    keywords: keywords.map((k) => ({ id: k.id, term: k.term, intent: k.intent })),
-    prompts: queriedPrompts.map((p) => ({
-      id: p.id,
-      text: p.text,
-      intent: p.intent,
-      keywordId: p.keywordId,
-      category: p.category,
-      intentStage: p.intentStage,
-      persona: p.persona,
-      useCase: p.useCase,
-      isBranded: p.isBranded,
-      competitorMentioned: p.competitorMentioned,
-    })),
-    results: allResults.map((r) => ({
-      id: r.id,
-      promptId: r.promptId,
-      model: r.model,
-      presence: r.presence,
-      overall: r.overall,
-      sentiment: r.sentiment,
-      rankPosition: r.rankPosition,
-      competitorMentions: r.competitorMentions,
-      competitorHosts: r.competitorHosts,
-      citations: r.citations,
-    })),
-  });
-  const heuristicOpportunities = computeOpportunities(
-    {
+  let opportunities: EnrichedOpportunity[] = [];
+  let phraseVisibility: ReturnType<typeof computePhraseVisibility> = [];
+  let insightsStatus: 'deferred' | 'ready' | 'warming' = lite ? 'deferred' : 'ready';
+
+  if (!lite) {
+    const selectedCompetitors = await prisma.competitor.findMany({
+      where: { domainId: domain.id, isSelected: true },
+      select: { competitorHost: true },
+    });
+    const analyticsInput = {
       ownDomainHost: domain.host,
       ownBrandName: domain.inferred?.companyName ?? null,
       selectedCompetitorHosts: selectedCompetitors.map((c) => c.competitorHost),
@@ -955,26 +1325,23 @@ router.get('/domain/:id/report', timed('GET /report', 800), authenticateToken, a
         overall: r.overall,
         sentiment: r.sentiment,
         rankPosition: r.rankPosition,
-        competitorMentions: r.competitorMentions,
-        competitorHosts: r.competitorHosts,
-        citations: r.citations,
+        competitorMentions: r.competitorMentions as Prisma.JsonValue,
+        competitorHosts: r.competitorHosts as Prisma.JsonValue,
+        citations: r.citations as Prisma.JsonValue,
       })),
-    },
-    phraseVisibility
-  );
+    };
+    phraseVisibility = computePhraseVisibility(analyticsInput);
+    const heuristicOpportunities = computeOpportunities(analyticsInput, phraseVisibility);
 
-  // ── LLM enrichment with per-AiRun cache ────────────────────────────────
-  // The LLM rewrites the heuristic titles/rationales into specific, named
-  // action items + a real content brief. We cache the result on
-  // AiRun.summary.opportunities so subsequent /report loads are free.
-  // Cache key includes the heuristic keys so a re-run with different
-  // opportunities re-enriches.
-  let opportunities: EnrichedOpportunity[] = [];
-  if (heuristicOpportunities.length > 0) {
+    // ── LLM enrichment with per-AiRun cache ──────────────────────────────
+    // Never block /report on an LLM call. If the cache is missing/stale, return
+    // usable heuristic opportunities immediately and warm the enriched cache in
+    // the background for the next read.
     const cached = (summary?.opportunitiesEnriched as EnrichedOpportunity[] | undefined) ?? null;
     const cachedKeys = (summary?.opportunitiesEnrichedKeys as string[] | undefined) ?? null;
     const currentKeys = heuristicOpportunities.map((o) => o.key);
     const cacheValid =
+      !refreshInsights &&
       cached &&
       cachedKeys &&
       cachedKeys.length === currentKeys.length &&
@@ -989,6 +1356,8 @@ router.get('/domain/:id/report', timed('GET /report', 800), authenticateToken, a
         return e ? { ...o, title: e.title, rationale: e.rationale, recommendedAngle: e.recommendedAngle, brief: e.brief } : { ...o, recommendedAngle: '', brief: { audience: '', tone: 'Authoritative' as const, structure: '', keyPoints: [], wordCount: 1000, cta: '' } };
       });
     } else {
+      opportunities = heuristicOpportunities.map((o) => withDefaultBrief(o));
+      insightsStatus = 'warming';
       const promptsById = new Map(
         queriedPrompts.map((p) => [
           p.id,
@@ -1000,33 +1369,31 @@ router.get('/domain/:id/report', timed('GET /report', 800), authenticateToken, a
           },
         ])
       );
-      opportunities = await enrichOpportunities(heuristicOpportunities, {
-        brandName: domain.inferred?.companyName ?? domain.host,
-        brandHost: domain.host,
-        industry: domain.profile?.industry ?? null,
-        brandSummary: domain.inferred?.summary ?? null,
-        promptsById,
-      });
 
-      // Persist the enriched payload onto the latest run so future /report
-      // reads skip the LLM. Best-effort — don't fail the request if write
-      // fails (read-only fallback still works).
       if (latestRun?.id) {
         const existingSummary = (summary as Record<string, unknown> | null) ?? {};
-        const updatedSummary = {
-          ...existingSummary,
-          opportunitiesEnriched: opportunities,
-          opportunitiesEnrichedKeys: currentKeys,
-          opportunitiesEnrichedAt: new Date().toISOString(),
-        };
-        prisma.aiRun
-          .update({ where: { id: latestRun.id }, data: { summary: updatedSummary as any } })
-          .catch((err) => console.warn('[opportunities] cache write failed', err));
+        enrichOpportunities(heuristicOpportunities, {
+          brandName: domain.inferred?.companyName ?? domain.host,
+          brandHost: domain.host,
+          industry: domain.profile?.industry ?? null,
+          brandSummary: domain.inferred?.summary ?? null,
+          promptsById,
+        })
+          .then((enriched) => {
+            const updatedSummary = {
+              ...existingSummary,
+              opportunitiesEnriched: enriched,
+              opportunitiesEnrichedKeys: currentKeys,
+              opportunitiesEnrichedAt: new Date().toISOString(),
+            };
+            return prisma.aiRun.update({ where: { id: latestRun.id }, data: { summary: updatedSummary as any } });
+          })
+          .catch((err) => console.warn('[opportunities] background enrichment failed', err));
       }
     }
   }
 
-  return res.json({
+  const payload = {
     id: latestRun?.id ?? null,
     domainInfo: {
       id: domain.id,
@@ -1040,22 +1407,34 @@ router.get('/domain/:id/report', timed('GET /report', 800), authenticateToken, a
     runEndedAt: latestRun?.endedAt ?? null,
     summary,
     metrics: {
-      visibilityScore: Math.round(((summary?.presenceRate as number | undefined) ?? 0) * 100),
+      visibilityScore: reportCards.visibility.percent,
       avgOverall: (summary?.avgOverall as number | undefined) ?? 0,
       avgSentiment: (summary?.avgSentiment as number | undefined) ?? 0,
-      avgAccuracy: Math.round(((summary?.avgOverall as number | undefined) ?? 0) * 10),
+      avgAccuracy: reportCards.accuracy.percent ?? 0,
       mentionRate,
       brandPages: brandMentions,
       competitorPages: competitorMentions,
       totalQueries,
       newPromptsSinceLastRun,
+      promptInventory: {
+        ...reportCards.promptInventory,
+      },
+      reportCards,
       modelPerformance,
+      insightsStatus,
     },
     topPrompts,
     topAiSearchPrompts: topPrompts,
     phraseVisibility,
     opportunities,
-  });
+  };
+  if (liteCacheKey) {
+    res.setHeader('X-Report-Cache', 'miss');
+    redisService
+      .set(liteCacheKey, JSON.stringify(payload), REPORT_LITE_CACHE_TTL_SECONDS)
+      .catch((err) => console.warn('[wizard/report] Redis write failed', err));
+  }
+  return res.json(payload);
 });
 
 // ── GET /domain/:id/state ──────────────────────────────────────────────────
@@ -1103,6 +1482,7 @@ router.patch('/domain/:id/prompts/track', authenticateOrSession(), async (req: R
     where: { id: { in: promptIds }, domainId: domain.id },
     data: { isTracked: tracked },
   });
+  invalidateDomainReportCache(domain);
   return res.json({ updated: result.count, tracked });
 });
 
@@ -1152,6 +1532,7 @@ router.patch('/domain/:id/prompts/:promptId', authenticateOrSession(), async (re
     },
   });
 
+  invalidateDomainReportCache(domain);
   return res.json({ prompt: updated });
 });
 
@@ -1180,6 +1561,7 @@ router.patch('/domain/:id/prompts/:promptId/track', authenticateOrSession(), asy
     data: { isTracked: tracked },
     select: { id: true, isTracked: true },
   });
+  invalidateDomainReportCache(domain);
   return res.json({ prompt: updated });
 });
 
@@ -1204,12 +1586,14 @@ router.get('/domain/:id/tracked-prompts', authenticateToken, async (req: Request
   }
   const promptIds = trackedPrompts.map((p) => p.id);
 
-  // Recent weekly runs (newest first). [0] = latest, [1] = previous (for the
-  // delta); up to 12 power the sparkline.
+  // Recent weekly runs (newest first). We may have multiple runs inside the
+  // same calendar week because "Test tracked now" uses kind='weekly' too.
+  // Bucket by Monday-Sunday UTC week so the UI columns are truly week-wise,
+  // not "every manual run".
   const weeklyRuns = await prisma.aiRun.findMany({
     where: { domainId: domain.id, kind: 'weekly', status: 'completed' },
     orderBy: { startedAt: 'desc' },
-    take: 12,
+    take: 60,
     select: { id: true, startedAt: true },
   });
 
@@ -1223,15 +1607,32 @@ router.get('/domain/:id/tracked-prompts', authenticateToken, async (req: Request
     });
   }
 
-  const latestRunId = weeklyRuns[0].id;
-  const prevRunId = weeklyRuns[1]?.id ?? null;
-  const trendRunIds = weeklyRuns.map((r) => r.id);
+  type WeeklyRunBucket = {
+    key: string;
+    start: Date;
+    runs: typeof weeklyRuns;
+  };
+  const weeklyBuckets = [...weeklyRuns.reduce((map, run) => {
+    const key = weeklyBucketKey(run.startedAt);
+    const bucket = map.get(key) ?? {
+      key,
+      start: weeklyBucketStartUtc(run.startedAt),
+      runs: [] as typeof weeklyRuns,
+    };
+    bucket.runs.push(run);
+    map.set(key, bucket);
+    return map;
+  }, new Map<string, WeeklyRunBucket>()).values()]
+    .sort((a, b) => b.start.getTime() - a.start.getTime())
+    .slice(0, 12);
+  const bucketRunsNewestFirst = weeklyBuckets.flatMap((bucket) => bucket.runs);
+  const trendRunIds = bucketRunsNewestFirst.map((r) => r.id);
   const startedAtByRun = new Map(weeklyRuns.map((r) => [r.id, r.startedAt] as const));
 
   const results = await prisma.aiQueryResult.findMany({
     where: { promptId: { in: promptIds }, runId: { in: trendRunIds } },
     select: {
-      id: true, promptId: true, model: true, response: true, presence: true,
+      id: true, promptId: true, model: true, status: true, errorMessage: true, response: true, presence: true,
       relevance: true, sentiment: true, accuracy: true, rankPosition: true,
       overall: true, scorerSummary: true, factualClaims: true, competitorHosts: true,
       citations: true, competitorMentions: true, latencyMs: true,
@@ -1253,37 +1654,41 @@ router.get('/domain/:id/tracked-prompts', authenticateToken, async (req: Request
   const visibilityFor = (promptId: number, runId: number): number | null => {
     const rows = byPromptRun.get(promptId)?.get(runId);
     if (!rows || rows.length === 0) return null;
-    const mentions = rows.reduce((s, r) => s + r.presence, 0);
-    return Math.round((mentions / rows.length) * 100);
+    const metrics = buildPromptRowMetrics(buildModelResults(rows), domain.host);
+    return metrics.successfulResponses > 0 ? metrics.visibilityPct : null;
   };
 
   const latestRunAt = weeklyRuns[0].startedAt;
 
   const prompts = trackedPrompts.map((p) => {
-    const latestRows = byPromptRun.get(p.id)?.get(latestRunId) ?? [];
+    const latestRunForPrompt = bucketRunsNewestFirst.find((run) => {
+      const rows = byPromptRun.get(p.id)?.get(run.id);
+      return rows && rows.length > 0;
+    });
+    const latestRows = latestRunForPrompt ? (byPromptRun.get(p.id)?.get(latestRunForPrompt.id) ?? []) : [];
     const built = buildModelResults(latestRows);
-    const total = built.length;
-    const mentions = built.reduce((s, r) => s + r.presence, 0);
-    const sovPct = total > 0 ? Math.round((mentions / total) * 100) : 0;
-    const sentimentMeasurements = built.map((r) => r.sentiment).filter((s): s is number => s !== null);
-    const avgSentiment = sentimentMeasurements.length > 0
-      ? Number((sentimentMeasurements.reduce((s, n) => s + n, 0) / sentimentMeasurements.length).toFixed(2))
-      : null;
+    const promptMetrics = buildPromptRowMetrics(built, domain.host);
     const competitors = rollupCompetitors(built);
 
-    // Week-over-week deltas vs the previous weekly run.
-    const prevVis = prevRunId != null ? visibilityFor(p.id, prevRunId) : null;
-    const visibilityDelta = prevVis != null ? sovPct - prevVis : null;
-
-    // Sparkline: one point per weekly run that has data for this prompt,
-    // oldest → newest.
-    const trend = [...weeklyRuns]
+    // Sparkline: one point per UTC week that has data for this prompt,
+    // oldest → newest. If a week has multiple manual tests, use the newest
+    // scored run in that week.
+    const trend = [...weeklyBuckets]
       .reverse()
-      .map((run) => {
-        const vis = visibilityFor(p.id, run.id);
-        return vis == null ? null : { runId: run.id, startedAt: startedAtByRun.get(run.id)!, visibility: vis };
+      .map((bucket) => {
+        for (const run of bucket.runs) {
+          const vis = visibilityFor(p.id, run.id);
+          if (vis != null) {
+            return { runId: run.id, startedAt: bucket.start, visibility: vis };
+          }
+        }
+        return null;
       })
       .filter(Boolean);
+    const latestTrendPoint = trend[trend.length - 1] ?? null;
+    const prevTrendPoint = trend[trend.length - 2] ?? null;
+    const visibilityDelta =
+      latestTrendPoint && prevTrendPoint ? latestTrendPoint.visibility - prevTrendPoint.visibility : null;
 
     return {
       id: `pr-${p.id}`,
@@ -1294,19 +1699,34 @@ router.get('/domain/:id/tracked-prompts', authenticateToken, async (req: Request
       intent: p.intent,
       source: p.source,
       keywordId: p.keywordId,
-      sov: `${sovPct}%`,
-      mentions,
-      bestRank: mentions,
-      avgSentiment,
+      sov: `${promptMetrics.visibilityPct}%`,
+      aiSov: promptMetrics.aiSov,
+      aiSovPercent: promptMetrics.aiSovPct,
+      mentions: promptMetrics.mentions,
+      successfulResponses: promptMetrics.successfulResponses,
+      bestRank: promptMetrics.bestRankPosition ?? 0,
+      rankingPosition: promptMetrics.bestRankPosition,
+      avgRankPosition: promptMetrics.avgRankPosition,
+      rankedResponses: promptMetrics.rankedResponses,
+      brandMentionEvents: promptMetrics.brandMentionEvents,
+      competitorMentionEvents: promptMetrics.competitorMentionEvents,
+      totalMentionEvents: promptMetrics.totalMentionEvents,
+      avgSentiment: promptMetrics.avgSentiment,
       competitors,
       competitorCount: competitors.length,
       results: built,
-      metrics: { visibility: sovPct, avgOverall: total > 0 ? Number((built.reduce((s, r) => s + r.overall, 0) / total).toFixed(2)) : 0, runs: total },
+      metrics: {
+        visibility: promptMetrics.visibilityPct,
+        aiSov: promptMetrics.aiSovPct,
+        avgOverall: promptMetrics.avgOverall,
+        runs: promptMetrics.successfulResponses,
+        attemptedRuns: promptMetrics.totalResponses,
+      },
       // Tracking metadata.
       isTracked: true,
-      lastTestedAt: p.lastTrackedRunAt ?? latestRunAt,
+      lastTestedAt: p.lastTrackedRunAt ?? (latestRunForPrompt ? startedAtByRun.get(latestRunForPrompt.id) ?? latestRunAt : null),
       nextTestAt: nextWeeklyRunAt(),
-      weekTrend: { delta: visibilityDelta, lastVisibility: sovPct, points: trend },
+      weekTrend: { delta: visibilityDelta, lastVisibility: promptMetrics.visibilityPct, points: trend },
     };
   });
 
@@ -1364,6 +1784,7 @@ router.get('/domain/:id/prompts/:promptId/history', authenticateToken, async (re
     select: {
       runId: true,
       model: true,
+      status: true,
       presence: true,
       sentiment: true,
       run: { select: { startedAt: true } },
@@ -1377,6 +1798,8 @@ router.get('/domain/:id/prompts/:promptId/history', authenticateToken, async (re
   type Bucket = {
     runId: number;
     startedAt: Date;
+    attempted: number;
+    failed: number;
     mentions: number;
     total: number;
     sentSum: number;
@@ -1387,8 +1810,23 @@ router.get('/domain/:id/prompts/:promptId/history', authenticateToken, async (re
   for (const r of rows) {
     let b = byRun.get(r.runId);
     if (!b) {
-      b = { runId: r.runId, startedAt: r.run.startedAt, mentions: 0, total: 0, sentSum: 0, sentCount: 0, byModel: new Map() };
+      b = {
+        runId: r.runId,
+        startedAt: r.run.startedAt,
+        attempted: 0,
+        failed: 0,
+        mentions: 0,
+        total: 0,
+        sentSum: 0,
+        sentCount: 0,
+        byModel: new Map(),
+      };
       byRun.set(r.runId, b);
+    }
+    b.attempted += 1;
+    if (r.status === 'failed') {
+      b.failed += 1;
+      continue;
     }
     b.total += 1;
     b.mentions += r.presence;
@@ -1403,13 +1841,15 @@ router.get('/domain/:id/prompts/:promptId/history', authenticateToken, async (re
     }
   }
 
-  const runs = [...byRun.values()]
+  const runHistory = [...byRun.values()]
     .sort((a, b) => a.startedAt.getTime() - b.startedAt.getTime())
     .map((b) => ({
       runId: b.runId,
       startedAt: b.startedAt,
       presenceRate: b.total > 0 ? Math.round((b.mentions / b.total) * 100) : 0,
       mentions: b.mentions,
+      attempted: b.attempted,
+      failed: b.failed,
       total: b.total,
       avgSentiment: b.sentCount > 0 ? Number((b.sentSum / b.sentCount).toFixed(2)) : null,
       byModel: Object.fromEntries(
@@ -1419,6 +1859,7 @@ router.get('/domain/:id/prompts/:promptId/history', authenticateToken, async (re
         ]),
       ),
     }));
+  const runs = isWeeklyHistoryRequest(req) ? collapseRunHistoryToWeeks(runHistory) : runHistory;
 
   return res.json({ prompt, runs });
 });
@@ -1459,6 +1900,7 @@ router.get('/domain/:id/keywords/:keywordId/history', authenticateToken, async (
     select: {
       runId: true,
       model: true,
+      status: true,
       presence: true,
       sentiment: true,
       run: { select: { startedAt: true } },
@@ -1471,6 +1913,8 @@ router.get('/domain/:id/keywords/:keywordId/history', authenticateToken, async (
   type Bucket = {
     runId: number;
     startedAt: Date;
+    attempted: number;
+    failed: number;
     mentions: number;
     total: number;
     sentSum: number;
@@ -1481,8 +1925,23 @@ router.get('/domain/:id/keywords/:keywordId/history', authenticateToken, async (
   for (const r of rows) {
     let b = byRun.get(r.runId);
     if (!b) {
-      b = { runId: r.runId, startedAt: r.run.startedAt, mentions: 0, total: 0, sentSum: 0, sentCount: 0, byModel: new Map() };
+      b = {
+        runId: r.runId,
+        startedAt: r.run.startedAt,
+        attempted: 0,
+        failed: 0,
+        mentions: 0,
+        total: 0,
+        sentSum: 0,
+        sentCount: 0,
+        byModel: new Map(),
+      };
       byRun.set(r.runId, b);
+    }
+    b.attempted += 1;
+    if (r.status === 'failed') {
+      b.failed += 1;
+      continue;
     }
     b.total += 1;
     b.mentions += r.presence;
@@ -1496,13 +1955,15 @@ router.get('/domain/:id/keywords/:keywordId/history', authenticateToken, async (
     }
   }
 
-  const runs = [...byRun.values()]
+  const runHistory = [...byRun.values()]
     .sort((a, b) => a.startedAt.getTime() - b.startedAt.getTime())
     .map((b) => ({
       runId: b.runId,
       startedAt: b.startedAt,
       presenceRate: b.total > 0 ? Math.round((b.mentions / b.total) * 100) : 0,
       mentions: b.mentions,
+      attempted: b.attempted,
+      failed: b.failed,
       total: b.total,
       avgSentiment: b.sentCount > 0 ? Number((b.sentSum / b.sentCount).toFixed(2)) : null,
       byModel: Object.fromEntries(
@@ -1512,6 +1973,7 @@ router.get('/domain/:id/keywords/:keywordId/history', authenticateToken, async (
         ]),
       ),
     }));
+  const runs = isWeeklyHistoryRequest(req) ? collapseRunHistoryToWeeks(runHistory) : runHistory;
 
   return res.json({ keyword, runs });
 });
@@ -1605,7 +2067,12 @@ router.get('/domain/:id/trends', authenticateToken, async (req: Request, res: Re
   const selectResults = {
     runId: true,
     model: true,
+    status: true,
+    response: true,
     presence: true,
+    relevance: true,
+    overall: true,
+    scorerSummary: true,
     citations: true,
     competitorHosts: true,
     competitorMentions: true,
@@ -1634,17 +2101,47 @@ router.get('/domain/:id/trends', authenticateToken, async (req: Request, res: Re
       : base;
   };
 
+  const isTrendRowFailed = (row: {
+    status?: string | null;
+    response?: string | null;
+    presence: number;
+    relevance?: number | null;
+    overall?: number | null;
+    scorerSummary?: string | null;
+    citations: unknown;
+    competitorHosts: unknown;
+    competitorMentions: unknown;
+  }) => {
+    const hasResponse = typeof row.response === 'string' && row.response.trim().length > 0;
+    const hasEvidence =
+      asArray(row.citations).length > 0 ||
+      asArray(row.competitorHosts).length > 0 ||
+      asArray(row.competitorMentions).length > 0 ||
+      (typeof row.scorerSummary === 'string' && row.scorerSummary.trim().length > 0);
+    return (
+      row.status === 'failed' ||
+      (!hasResponse && !hasEvidence && row.presence === 0 && Number(row.overall ?? 0) === 0 && Number(row.relevance ?? 0) <= 1)
+    );
+  };
+
   const accumulateResult = (
     bucket: TrendRunBucket | TrendDayBucket,
     row: {
       model: string;
+      status?: string | null;
+      response?: string | null;
       presence: number;
+      relevance?: number | null;
+      overall?: number | null;
+      scorerSummary?: string | null;
       citations: unknown;
       competitorHosts: unknown;
       competitorMentions: unknown;
     },
     ownHost: string,
   ) => {
+    if (isTrendRowFailed(row)) return;
+
     bucket.totalResponses += 1;
     if (!bucket.perModel[row.model]) bucket.perModel[row.model] = { cites: 0, presenceCount: 0 };
     bucket.perModel[row.model].presenceCount += row.presence;
@@ -1659,7 +2156,7 @@ router.get('/domain/:id/trends', authenticateToken, async (req: Request, res: Re
     const compHosts = Array.isArray(row.competitorHosts) ? (row.competitorHosts as string[]) : [];
     if (compMentions.length > 0) {
       for (const mention of compMentions) {
-        const host = typeof mention.host === 'string' ? mention.host.trim().toLowerCase() : '';
+        const host = normalizeMetricHost(mention.host);
         if (!host || host === ownHost) continue;
         const count = Number.isFinite(mention.count) && typeof mention.count === 'number' ? mention.count : 1;
         bucket.competitorMentions += count;
@@ -1667,7 +2164,7 @@ router.get('/domain/:id/trends', authenticateToken, async (req: Request, res: Re
       }
     } else {
       for (const hostRaw of compHosts) {
-        const host = typeof hostRaw === 'string' ? hostRaw.trim().toLowerCase() : '';
+        const host = normalizeMetricHost(hostRaw);
         if (!host || host === ownHost) continue;
         bucket.competitorMentions += 1;
         bucket.perCompetitor[host] = (bucket.perCompetitor[host] ?? 0) + 1;
@@ -1675,7 +2172,7 @@ router.get('/domain/:id/trends', authenticateToken, async (req: Request, res: Re
     }
 
     for (const citation of citations as Array<{ host?: string }>) {
-      const host = typeof citation.host === 'string' ? citation.host.trim().toLowerCase() : '';
+      const host = normalizeMetricHost(citation.host);
       if (!host || host === ownHost) continue;
       bucket.perCompetitorCitations[host] = (bucket.perCompetitorCitations[host] ?? 0) + 1;
     }
@@ -1749,16 +2246,17 @@ router.get('/domain/:id/trends', authenticateToken, async (req: Request, res: Re
       const dayBucket = dayBuckets.get(dayKey);
       if (!dayBucket) continue;
 
-      accumulateResult(runBucket, row, domain.host);
-      accumulateResult(dayBucket, row, domain.host);
+      accumulateResult(runBucket, row, normalizeMetricHost(domain.host));
+      accumulateResult(dayBucket, row, normalizeMetricHost(domain.host));
+      if (isTrendRowFailed(row)) continue;
 
       const compMentions = Array.isArray(row.competitorMentions)
         ? (row.competitorMentions as Array<{ host?: string; count?: number }>)
         : [];
       if (compMentions.length > 0) {
         for (const mention of compMentions) {
-          const host = typeof mention.host === 'string' ? mention.host.trim().toLowerCase() : '';
-          if (!host || host === domain.host) continue;
+          const host = normalizeMetricHost(mention.host);
+          if (!host || host === normalizeMetricHost(domain.host)) continue;
           const count = Number.isFinite(mention.count) && typeof mention.count === 'number' ? mention.count : 1;
           const total = competitorTotals.get(host) ?? { mentions: 0, citations: 0 };
           total.mentions += count;
@@ -1767,16 +2265,16 @@ router.get('/domain/:id/trends', authenticateToken, async (req: Request, res: Re
       } else {
         const compHosts = Array.isArray(row.competitorHosts) ? (row.competitorHosts as string[]) : [];
         for (const hostRaw of compHosts) {
-          const host = typeof hostRaw === 'string' ? hostRaw.trim().toLowerCase() : '';
-          if (!host || host === domain.host) continue;
+          const host = normalizeMetricHost(hostRaw);
+          if (!host || host === normalizeMetricHost(domain.host)) continue;
           const total = competitorTotals.get(host) ?? { mentions: 0, citations: 0 };
           total.mentions += 1;
           competitorTotals.set(host, total);
         }
       }
       for (const citation of Array.isArray(row.citations) ? (row.citations as Array<{ host?: string }>) : []) {
-        const host = typeof citation.host === 'string' ? citation.host.trim().toLowerCase() : '';
-        if (!host || host === domain.host) continue;
+        const host = normalizeMetricHost(citation.host);
+        if (!host || host === normalizeMetricHost(domain.host)) continue;
         const total = competitorTotals.get(host) ?? { mentions: 0, citations: 0 };
         total.citations += 1;
         competitorTotals.set(host, total);
@@ -1844,7 +2342,7 @@ router.get('/domain/:id/trends', authenticateToken, async (req: Request, res: Re
   // when a run has hundreds of (prompt × model) results.
   const allResults = await prisma.aiQueryResult.findMany({
     where: { runId: { in: runIds } },
-    select: { runId: true, model: true, presence: true, citations: true, competitorHosts: true, competitorMentions: true },
+    select: selectResults,
   });
 
   type Bucket = {
@@ -1879,50 +2377,28 @@ router.get('/domain/:id/trends', authenticateToken, async (req: Request, res: Re
   for (const row of allResults) {
     const b = byRun.get(row.runId);
     if (!b) continue;
-    b.totalResponses += 1;
-    if (!b.perModel[row.model]) b.perModel[row.model] = { cites: 0, presenceCount: 0 };
-    b.perModel[row.model].presenceCount += row.presence;
-    const cits = Array.isArray(row.citations) ? row.citations : [];
-    b.perModel[row.model].cites += cits.length;
-    b.totalCitations += cits.length;
-    b.brandMentions += row.presence;
-    const compMentions = Array.isArray(row.competitorMentions)
-      ? (row.competitorMentions as Array<{ host?: string; count?: number }>)
-      : [];
-    const compHosts = Array.isArray(row.competitorHosts) ? (row.competitorHosts as string[]) : [];
-    if (compMentions.length > 0) {
-      for (const mention of compMentions) {
-        if (!mention.host) continue;
-        const host = mention.host.trim().toLowerCase();
-        if (!host || host === domain.host) continue;
-        const count = Number.isFinite(mention.count) && typeof mention.count === 'number' ? mention.count : 1;
-        b.competitorMentions += count;
-        b.perCompetitor[host] = (b.perCompetitor[host] ?? 0) + count;
-      }
-    } else {
-      b.competitorMentions += compHosts.length;
-      for (const h of compHosts) {
-        const host = typeof h === 'string' ? h.trim().toLowerCase() : '';
-        if (!host || host === domain.host) continue;
-        b.perCompetitor[host] = (b.perCompetitor[host] ?? 0) + 1;
-      }
-    }
-    for (const c of cits as Array<{ host?: string }>) {
-      const host = typeof c.host === 'string' ? c.host.trim().toLowerCase() : '';
-      if (!host || host === domain.host) continue;
-      b.perCompetitorCitations[host] = (b.perCompetitorCitations[host] ?? 0) + 1;
-    }
+    accumulateResult(b, row, normalizeMetricHost(domain.host));
   }
 
   // Top competitors = the 4 most-frequently-mentioned hosts in the LATEST
   // run, so the SoV chart legend reflects who actually competes today (not
   // who was relevant 6 audits ago). Falls back to whichever runs had data.
-  const latestBucket = [...byRun.values()].reverse().find((b) => Object.keys(b.perCompetitor).length > 0);
+  const latestBucket = [...byRun.values()]
+    .reverse()
+    .find((b) => Object.keys(b.perCompetitor).length > 0 || Object.keys(b.perCompetitorCitations).length > 0);
   const topCompetitors = latestBucket
-    ? Object.entries(latestBucket.perCompetitor)
-        .sort((a, b) => b[1] - a[1])
+    ? Array.from(new Set([
+        ...Object.keys(latestBucket.perCompetitor),
+        ...Object.keys(latestBucket.perCompetitorCitations),
+      ]))
+        .map((host) => ({
+          host,
+          mentions: latestBucket.perCompetitor[host] ?? 0,
+          citations: latestBucket.perCompetitorCitations[host] ?? 0,
+        }))
+        .sort((a, b) => (b.mentions + b.citations) - (a.mentions + a.citations) || b.mentions - a.mentions || b.citations - a.citations)
         .slice(0, 4)
-        .map(([host]) => host)
+        .map(({ host }) => host)
     : [];
 
   return res.json({
@@ -2536,6 +3012,7 @@ router.post('/domain/:id/competitors/add', timed('POST /competitors/add', 5000),
       data: { summary: rest as any },
     }).catch((err) => console.warn('[competitors/add] cache invalidation failed', err));
   }
+  invalidateDomainReportCache(domain);
 
   return res.json({
     host: newHost,
@@ -2560,12 +3037,18 @@ router.post('/domain/:id/topics', timed('POST /topics', 4000), authenticateOrSes
     : undefined;
   await setPhase(prisma, domain.id, 'topics', 'running');
   try {
-    const [latestCrawl, competitors] = await Promise.all([
+    const [latestCrawl, competitors, existingPrompts] = await Promise.all([
       prisma.crawlSnapshot.findFirst({ where: { domainId: domain.id }, orderBy: { createdAt: 'desc' } }),
       prisma.competitor.findMany({
         where: { domainId: domain.id, isSelected: true },
         select: { competitorHost: true },
       }),
+      append
+        ? prisma.prompt.findMany({
+            where: { domainId: domain.id },
+            select: { text: true },
+          })
+        : Promise.resolve([]),
     ]);
 
     // Stage 1 — enrich the crawl context into structured entities the
@@ -2590,6 +3073,7 @@ router.post('/domain/:id/topics', timed('POST /topics', 4000), authenticateOrSes
       host: domain.host,
       context: enriched,
       onlyCategories: categoryFilter,
+      avoidPrompts: existingPrompts.map((prompt) => prompt.text),
     });
 
     if (prompts.length === 0) {
@@ -2597,8 +3081,12 @@ router.post('/domain/:id/topics', timed('POST /topics', 4000), authenticateOrSes
       return res.status(500).json({ error: 'Generator returned no prompts' });
     }
 
-    await persistAuditPrompts({ prisma, domainId: domain.id, prompts, append });
+    const persisted = await persistAuditPrompts({ prisma, domainId: domain.id, prompts, append });
+    if (append && persisted.filter((item) => item.type === 'prompt').length === 0) {
+      console.warn(`[PROMPTS] append generated no new unique prompts for domain ${domain.id}; duplicates were skipped`);
+    }
     await setPhase(prisma, domain.id, 'topics', 'completed');
+    invalidateDomainReportCache(domain);
 
     // Canonical full list — both fresh and append modes return the same shape.
     const items = await listAllTopicItems(prisma, domain.id);
@@ -2675,6 +3163,7 @@ router.post('/domain/:id/keywords', authenticateToken, async (req: Request, res:
       replaceAi: true,
     });
     await setPhase(prisma, domain.id, 'select', 'completed');
+    invalidateDomainReportCache(domain);
 
     return res.json({ domainId: domain.id, keywords: persisted });
   } catch (err) {
@@ -2782,6 +3271,7 @@ router.post('/domain/:id/keywords/:kwId/prompts', authenticateToken, async (req:
       })
     )
   );
+  invalidateDomainReportCache(domain);
 
   const items = await listAllTopicItems(prisma, domain.id);
   return res.json({ domainId: domain.id, items, added: newPrompts.length });
@@ -2908,6 +3398,7 @@ router.post('/domain/:id/prompts/custom', authenticateOrSession(), async (req: R
 
   // Return the canonical updated list so the UI just replaces its state.
   const items = await listAllTopicItems(prisma, domain.id);
+  invalidateDomainReportCache(domain);
   return res.json({ domainId: domain.id, prompt: { id: created.id, keywordId: created.keywordId }, items });
 });
 
@@ -3044,6 +3535,7 @@ router.post('/domain/:id/prompts/analyze', authenticateToken, async (req: Reques
       isSelected: true,
     },
   });
+  invalidateDomainReportCache(domain);
 
   // 3. Run the prompt across ROSTER and persist results.
   let runResult: Awaited<ReturnType<typeof runOnePrompt>>;
@@ -3069,6 +3561,8 @@ router.post('/domain/:id/prompts/analyze', authenticateToken, async (req: Reques
   const built = runResult.persistedResults.map((r) => ({
     id: `res-${r.id}`,
     model: r.model,
+    status: r.status,
+    errorMessage: r.errorMessage,
     presence: r.presence,
     overall: r.overall,
     accuracy: r.accuracy,
@@ -3096,26 +3590,27 @@ router.post('/domain/:id/prompts/analyze', authenticateToken, async (req: Reques
           )
         )
       : [],
-    competitorMentions: r.competitorMentions ?? [],
+    competitorMentions: Array.isArray(r.competitorMentions)
+      ? (r.competitorMentions as Array<{ host?: string; count?: number; sentiment?: number | null; rankPosition?: number | null }>)
+          .map((mention) => ({
+            host: typeof mention.host === 'string' ? mention.host : '',
+            count: typeof mention.count === 'number' && Number.isFinite(mention.count) && mention.count > 0 ? mention.count : 1,
+            sentiment: typeof mention.sentiment === 'number' ? mention.sentiment : null,
+            rankPosition: typeof mention.rankPosition === 'number' && mention.rankPosition > 0 ? mention.rankPosition : null,
+          }))
+          .filter((mention) => mention.host)
+      : [],
     competitorHosts: Array.isArray(r.competitorHosts)
       ? (r.competitorHosts as string[])
       : [],
     latencyMs: r.latencyMs,
   }));
 
-  const mentions = built.reduce((s, r) => s + (r.presence ?? 0), 0);
-  const total = built.length;
-  const sovPct = total > 0 ? Math.round((mentions / total) * 100) : 0;
-  const sentimentMeasurements = built.map((r) => r.sentiment).filter((s): s is number => s !== null);
-  const avgSentiment =
-    sentimentMeasurements.length > 0
-      ? Number(
-          (sentimentMeasurements.reduce((s, n) => s + n, 0) / sentimentMeasurements.length).toFixed(2)
-        )
-      : null;
+  const promptMetrics = buildPromptRowMetrics(built, domain.host);
   const competitorsSet = new Set<string>();
   for (const r of built) {
     for (const h of r.competitorHosts) competitorsSet.add(h);
+    for (const m of r.competitorMentions ?? []) competitorsSet.add(m.host);
   }
   const competitors = Array.from(competitorsSet);
 
@@ -3128,20 +3623,28 @@ router.post('/domain/:id/prompts/analyze', authenticateToken, async (req: Reques
     intent: prompt.intent,
     source: prompt.source,
     keywordId: prompt.keywordId,
-    sov: `${sovPct}%`,
-    mentions,
-    bestRank: mentions,
-    avgSentiment,
+    sov: `${promptMetrics.visibilityPct}%`,
+    aiSov: promptMetrics.aiSov,
+    aiSovPercent: promptMetrics.aiSovPct,
+    mentions: promptMetrics.mentions,
+    successfulResponses: promptMetrics.successfulResponses,
+    bestRank: promptMetrics.bestRankPosition ?? 0,
+    rankingPosition: promptMetrics.bestRankPosition,
+    avgRankPosition: promptMetrics.avgRankPosition,
+    rankedResponses: promptMetrics.rankedResponses,
+    brandMentionEvents: promptMetrics.brandMentionEvents,
+    competitorMentionEvents: promptMetrics.competitorMentionEvents,
+    totalMentionEvents: promptMetrics.totalMentionEvents,
+    avgSentiment: promptMetrics.avgSentiment,
     competitors,
     competitorCount: competitors.length,
     results: built,
     metrics: {
-      visibility: sovPct,
-      avgOverall:
-        total > 0
-          ? Number((built.reduce((s, r) => s + (r.overall ?? 0), 0) / total).toFixed(2))
-          : 0,
-      runs: total,
+      visibility: promptMetrics.visibilityPct,
+      aiSov: promptMetrics.aiSovPct,
+      avgOverall: promptMetrics.avgOverall,
+      runs: promptMetrics.successfulResponses,
+      attemptedRuns: promptMetrics.totalResponses,
     },
   };
 
@@ -3261,7 +3764,9 @@ router.post('/domain/:id/select', authenticateOrSession(), async (req: Request, 
     ...(kwIds.length ? [prisma.keyword.updateMany({ where: { id: { in: kwIds }, domainId: domain.id }, data: { isSelected: true } })] : []),
     ...(prIds.length ? [prisma.prompt.updateMany({ where: { id: { in: prIds }, domainId: domain.id }, data: { isSelected: true } })] : []),
   ]);
+  console.log(`[PROMPTS] selected domain=${domain.id} prompts=${prIds.length} keywords=${kwIds.length}`);
   await setPhase(prisma, domain.id, 'select', 'completed');
+  invalidateDomainReportCache(domain);
   return res.json({ domainId: domain.id, selectedKeywords: kwIds.length, selectedPrompts: prIds.length });
 });
 

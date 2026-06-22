@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { authService, JWTPayload } from '../services/authService';
+import { prisma } from '../lib/prisma';
 
 // Extend Express Request interface to include user
 declare global {
@@ -72,10 +73,7 @@ export const checkDomainOwnership = async (req: Request, res: Response, next: Ne
       return res.status(400).json({ error: 'Invalid domain ID' });
     }
 
-    // Check if domain exists and belongs to user
-    const { PrismaClient } = require('../../generated/prisma');
-    const prisma = new PrismaClient();
-    
+    // Check if domain exists and belongs to user.
     const domain = await prisma.domain.findFirst({
       where: {
         id: domainId,

@@ -56,17 +56,23 @@ function createReportPrismaMock() {
     competitors: [] as AnyRow[],
   };
 
-  const sortRows = (rows: AnyRow[], orderBy?: AnyRow) => {
+  const sortRows = (rows: AnyRow[], orderBy?: AnyRow | AnyRow[]) => {
     if (!orderBy) return rows;
-    const [[field, direction]] = Object.entries(orderBy);
+    const orderEntries = Array.isArray(orderBy)
+      ? orderBy.flatMap((entry) => Object.entries(entry))
+      : Object.entries(orderBy);
+    if (orderEntries.length === 0) return rows;
     return [...rows].sort((a, b) => {
-      const av = a[field];
-      const bv = b[field];
-      const aTime = av instanceof Date ? av.getTime() : av;
-      const bTime = bv instanceof Date ? bv.getTime() : bv;
-      if (aTime === bTime) return 0;
-      const diff = aTime > bTime ? 1 : -1;
-      return direction === 'desc' ? -diff : diff;
+      for (const [field, direction] of orderEntries) {
+        const av = a[field];
+        const bv = b[field];
+        const aTime = av instanceof Date ? av.getTime() : av;
+        const bTime = bv instanceof Date ? bv.getTime() : bv;
+        if (aTime === bTime) continue;
+        const diff = aTime > bTime ? 1 : -1;
+        return direction === 'desc' ? -diff : diff;
+      }
+      return 0;
     });
   };
 
@@ -84,6 +90,16 @@ function createReportPrismaMock() {
     __db: db,
     domain: {
       findUnique: async ({ where }: any) => db.domains.find((row) => row.id === where.id) ?? null,
+      findFirst: async ({ where, include }: any = {}) => {
+        const row = db.domains.find((candidate) => matchesWhere(candidate, where));
+        if (!row) return null;
+        if (!include?.runs) return row;
+        const runInclude = include.runs;
+        let runs = db.runs.filter((run) => runMatches(run, { ...(runInclude.where ?? {}), domainId: row.id }));
+        runs = sortRows(runs, runInclude.orderBy);
+        if (typeof runInclude.take === 'number') runs = runs.slice(0, runInclude.take);
+        return { ...row, runs: projectMany(runs, runInclude.select) };
+      },
     },
     aiRun: {
       findFirst: async ({ where, orderBy, select }: any = {}) => {
@@ -186,6 +202,10 @@ vi.mock('../../generated/prisma', () => ({
       return state.prisma;
     }
   },
+}));
+
+vi.mock('../lib/prisma', () => ({
+  prisma: state.prisma,
 }));
 
 vi.mock('../middleware/auth', () => ({
@@ -532,5 +552,109 @@ describe('GET /api/wizard/domain/:id/trends', () => {
       perCompetitor: { 'alpha.com': 1 },
       perCompetitorCitations: { 'alpha.com': 1 },
     });
+  });
+
+  it('excludes failed provider rows and own-domain competitor echoes from trend rollups', async () => {
+    const db = state.prisma.__db;
+    db.domains.push({
+      id: 5,
+      userId: 1,
+      url: 'https://brand.example',
+      host: 'brand.example',
+      profile: { industry: 'SaaS' },
+      inferred: { companyName: 'Brand Example' },
+    });
+
+    const startedAt = makeDay(0, 11);
+    db.runs.push({
+      id: 51,
+      domainId: 5,
+      status: 'completed',
+      kind: 'audit',
+      startedAt,
+      endedAt: new Date(startedAt.getTime() + dayMs / 24),
+    });
+
+    db.results.push(
+      {
+        id: 501,
+        runId: 51,
+        promptId: 1,
+        model: 'gpt-4o-mini',
+        status: 'success',
+        response: 'brand.example and alpha.com appear',
+        presence: 1,
+        relevance: 8,
+        sentiment: 1,
+        accuracy: 8,
+        rankPosition: null,
+        overall: 8,
+        scorerSummary: 'scored',
+        factualClaims: [],
+        competitorHosts: ['brand.example', 'alpha.com'],
+        citations: [],
+        competitorMentions: [],
+        latencyMs: 100,
+        createdAt: startedAt,
+      },
+      {
+        id: 502,
+        runId: 51,
+        promptId: 2,
+        model: 'claude-sonnet-4-5',
+        status: 'failed',
+        response: '',
+        presence: 1,
+        relevance: 0,
+        sentiment: null,
+        accuracy: null,
+        rankPosition: null,
+        overall: 0,
+        scorerSummary: null,
+        factualClaims: [],
+        competitorHosts: ['alpha.com'],
+        citations: [{ host: 'alpha.com', url: 'https://alpha.com/failed', title: 'Should not count' }],
+        competitorMentions: [{ host: 'alpha.com', count: 9, sentiment: 0 }],
+        latencyMs: null,
+        createdAt: startedAt,
+      },
+      {
+        id: 503,
+        runId: 51,
+        promptId: 3,
+        model: 'gemini-2.0-flash',
+        response: '',
+        presence: 0,
+        relevance: 0,
+        sentiment: null,
+        accuracy: null,
+        rankPosition: null,
+        overall: 0,
+        scorerSummary: null,
+        factualClaims: [],
+        competitorHosts: [],
+        citations: [],
+        competitorMentions: [],
+        latencyMs: null,
+        createdAt: startedAt,
+      },
+    );
+
+    const response = await request('/api/wizard/domain/5/trends');
+    const json = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(json.runs).toHaveLength(1);
+    expect(json.runs[0]).toMatchObject({
+      brandMentions: 1,
+      competitorMentions: 1,
+      totalResponses: 1,
+      totalCitations: 0,
+      perCompetitor: { 'alpha.com': 1 },
+      perModel: {
+        'gpt-4o-mini': { presenceCount: 1, cites: 0 },
+      },
+    });
+    expect(json.topCompetitors).toEqual(['alpha.com']);
   });
 });

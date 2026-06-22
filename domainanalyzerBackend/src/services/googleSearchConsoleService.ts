@@ -1,8 +1,7 @@
 import { google } from 'googleapis';
 import { createOAuth2Client, refreshAccessToken, isTokenExpired } from './googleOAuthService';
-import { PrismaClient } from '../../generated/prisma';
+import { prisma } from '../lib/prisma';
 
-const prisma = new PrismaClient();
 
 /**
  * Gets authenticated Search Console client for a user

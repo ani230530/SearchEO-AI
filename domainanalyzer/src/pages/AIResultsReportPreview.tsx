@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { apiPatch, apiPost } from '../services/apiClient';
@@ -86,7 +86,7 @@ import {
 } from '@/components/ui/tooltip';
 import { useToast } from '@/components/ui/use-toast';
 import { useShellContext } from '@/features/ai-results/AIResultsShell';
-import { useCampaigns, useGscStatus, useReport, useRuns, useTrackedPrompts, useTrends } from '@/features/ai-results/queries';
+import { useCampaigns, useGscStatus, useReport, useRuns, useTrends } from '@/features/ai-results/queries';
 import { useQueryClient } from '@tanstack/react-query';
 import { aiResultsKeys } from '@/features/ai-results/queries';
 import type { PromptTableRow } from '@/features/ai-results/components/PromptTrackingTable';
@@ -162,20 +162,6 @@ const getModelIconNode = (model?: string, size: 'sm' | 'md' = 'sm') => {
   return <Bot className={`${dim} text-slate-400`} />;
 };
 
-const getModelPresenceSummary = (results?: any[]) => {
-  const byModel = new Map<string, { mentioned: boolean }>();
-  for (const result of results ?? []) {
-    const model = String(result?.model ?? '').trim().toLowerCase();
-    if (!model) continue;
-    const current = byModel.get(model) ?? { mentioned: false };
-    current.mentioned = current.mentioned || Number(result?.presence ?? 0) > 0;
-    byModel.set(model, current);
-  }
-  const total = byModel.size;
-  const mentions = Array.from(byModel.values()).filter((item) => item.mentioned).length;
-  return { mentions, total };
-};
-
 const sentimentTone = (sentiment?: number | null) => {
   if (sentiment == null || Number.isNaN(Number(sentiment))) {
     return 'border-slate-200 bg-white text-slate-600';
@@ -228,56 +214,6 @@ const getSentimentColor = (sentiment: string) => {
   if (s === 'negative') return 'bg-amber-50 text-amber-700 border-amber-100';
   return 'bg-gray-50 text-gray-700 border-slate-200';
 };
-
-
-
-const promptRows = [
-  {
-    prompt: 'Compare Semrush, Ahrefs, Advanced AI Results',
-    type: 'Prompt',
-    profile: 'Profile',
-    ranking: '2/15',
-    position: '12',
-    sov: '42%',
-    competitors: ['Semrush', 'Ahrefs', 'G2'],
-  },
-  {
-    prompt: 'Keyword research software',
-    type: 'Prompt',
-    profile: 'Profile',
-    ranking: '2/13',
-    position: '14',
-    sov: '42%',
-    competitors: ['Semrush', 'Ahrefs', 'Moz'],
-  },
-  {
-    prompt: 'SEO tools platform',
-    type: 'Prompt',
-    profile: 'Profile',
-    ranking: '2/15',
-    position: '12',
-    sov: '42%',
-    competitors: ['Semrush', 'Ahrefs', 'G2'],
-  },
-  {
-    prompt: 'Best local SEO app and plan',
-    type: 'Prompt',
-    profile: 'Profile',
-    ranking: '2/16',
-    position: '12',
-    sov: '42%',
-    competitors: ['Semrush', 'Ahrefs', 'G2'],
-  },
-  {
-    prompt: 'Digital marketing analytics',
-    type: 'Prompt',
-    profile: 'Profile',
-    ranking: '2/13',
-    position: '14',
-    sov: '42%',
-    competitors: ['Semrush', 'Ahrefs', 'G2'],
-  },
-];
 
 // Phrase Visibility Map + Opportunities are now derived from
 // reportData.phraseVisibility / reportData.opportunities — see
@@ -426,6 +362,132 @@ interface MetricCardData {
   details: MetricCardDetail[];
 }
 
+const normalizeReportHost = (value: unknown): string =>
+  String(value ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/^https?:\/\//, '')
+    .replace(/^www\./, '')
+    .replace(/\/.*$/, '');
+
+const asReportArray = (value: unknown): unknown[] => Array.isArray(value) ? value : [];
+
+const isSuccessfulPromptResult = (result: any): boolean => result?.status !== 'failed';
+
+const averageReportNumbers = (values: number[]): number | null => {
+  if (values.length === 0) return null;
+  return Number((values.reduce((sum, value) => sum + value, 0) / values.length).toFixed(2));
+};
+
+const countCompetitorMentionEvents = (result: any, ownHost?: string) => {
+  const own = normalizeReportHost(ownHost);
+  const hosts = new Set<string>();
+  let events = 0;
+  const mentions = asReportArray(result?.competitorMentions) as Array<{ host?: unknown; count?: unknown }>;
+
+  if (mentions.length > 0) {
+    for (const mention of mentions) {
+      const host = normalizeReportHost(mention.host);
+      if (!host || host === own) continue;
+      const count = typeof mention.count === 'number' && Number.isFinite(mention.count) && mention.count > 0
+        ? mention.count
+        : 1;
+      events += count;
+      hosts.add(host);
+    }
+  } else {
+    for (const rawHost of asReportArray(result?.competitorHosts)) {
+      const host = normalizeReportHost(rawHost);
+      if (!host || host === own) continue;
+      events += 1;
+      hosts.add(host);
+    }
+  }
+
+  return { events, hosts };
+};
+
+const recomputePromptRowForResults = (row: any, results: any[], ownHost?: string): PromptTableRow => {
+  const successfulResults = results.filter(isSuccessfulPromptResult);
+  const successfulResponses = successfulResults.length;
+  const mentions = successfulResults.reduce((sum, result) => sum + (Number(result?.presence ?? 0) > 0 ? 1 : 0), 0);
+  const visibilityPct = successfulResponses > 0 ? Math.round((mentions / successfulResponses) * 100) : 0;
+  const sentimentSamples = successfulResults
+    .filter((result) => Number(result?.presence ?? 0) > 0)
+    .map((result) => (typeof result?.sentiment === 'number' ? result.sentiment : null))
+    .filter((value): value is number => value !== null);
+  const avgSentiment = averageReportNumbers(sentimentSamples);
+  const rankPositions = successfulResults
+    .map((result) => Number(result?.rankPosition))
+    .filter((value): value is number => Number.isFinite(value) && value > 0);
+  const bestRank = rankPositions.length > 0 ? Math.min(...rankPositions) : 0;
+  const avgRankPosition = averageReportNumbers(rankPositions);
+  const competitorHosts = new Set<string>();
+  let competitorMentionEvents = 0;
+
+  for (const result of successfulResults) {
+    const stats = countCompetitorMentionEvents(result, ownHost);
+    competitorMentionEvents += stats.events;
+    stats.hosts.forEach((host) => competitorHosts.add(host));
+  }
+
+  const competitors = Array.from(competitorHosts);
+  const brandMentionEvents = mentions;
+  const totalMentionEvents = brandMentionEvents + competitorMentionEvents;
+  const aiSovPct = totalMentionEvents > 0 ? Math.round((brandMentionEvents / totalMentionEvents) * 100) : null;
+  const avgOverall = successfulResponses > 0
+    ? averageReportNumbers(successfulResults.map((result) => Number(result?.overall ?? 0))) ?? 0
+    : 0;
+
+  return {
+    ...row,
+    results,
+    mentions,
+    sov: `${visibilityPct}%`,
+    aiSov: aiSovPct === null ? '—' : `${aiSovPct}%`,
+    aiSovPercent: aiSovPct,
+    avgSentiment,
+    bestRank,
+    rankingPosition: bestRank || null,
+    avgRankPosition,
+    rankedResponses: rankPositions.length,
+    brandMentionEvents,
+    competitorMentionEvents,
+    totalMentionEvents,
+    competitors,
+    competitorCount: competitors.length,
+    successfulResponses,
+    metrics: {
+      ...(row?.metrics ?? {}),
+      visibility: visibilityPct,
+      aiSov: aiSovPct,
+      avgOverall,
+      runs: successfulResponses,
+      attemptedRuns: results.length,
+    },
+  } as PromptTableRow;
+};
+
+const scopePromptRows = (
+  rows: any[],
+  options: { modelFilter: Set<string>; categoryFilter: Set<string>; ownHost?: string },
+): PromptTableRow[] => {
+  let scoped = rows.filter((row) => String(row?.type ?? '').toLowerCase() === 'prompt');
+  if (options.categoryFilter.size > 0) {
+    scoped = scoped.filter((row) => row?.category && options.categoryFilter.has(row.category));
+  }
+
+  return scoped
+    .map((row) => {
+      const rawResults = Array.isArray(row?.results) ? row.results : [];
+      const results = options.modelFilter.size > 0
+        ? rawResults.filter((result: any) => options.modelFilter.has(result?.model))
+        : rawResults;
+      return recomputePromptRowForResults(row, results, options.ownHost);
+    })
+    .filter((row) => options.modelFilter.size === 0 || row.results.length > 0);
+};
+
 /**
  * Plain "i" badge — used as the trigger inside MetricInfoTooltip below.
  * Kept as a separate component so we can also drop a tip-less version for
@@ -473,17 +535,19 @@ const MetricInfoTooltip = ({ tip }: { tip: string }) => (
  */
 const CARD_TOOLTIPS: Record<string, string> = {
   'Performance Across AI Models':
-    'See how often your brand appears across AI platforms and which models mention you most.',
+    'Shows brand mentions by model using only successful model responses. Failed provider calls are excluded from scoring and shown in the scored-count note.',
   'Top AI Search Prompts':
-    'Total prompts tracked for your brand, including queries used to measure visibility across AI answers.',
+    'Run shows prompts queried in the selected report run. Generated shows all saved prompt candidates for this domain.',
+  'Citations':
+    'Counts citation URLs returned by successful model responses, plus how many responses included at least one citation.',
   'Mentions':
-    'Compares how often your brand is mentioned against competitor mentions across tracked AI prompts.',
+    'Counts brand response mentions and competitor mention events. These are counts, not forced percentages that must add to 100%.',
   'Overall Sentiment':
-    'Summarizes how AI responses describe your brand, based on positive, neutral, or negative language.',
+    'Uses only scored sentiment samples from responses that mentioned your brand. If the scorer did not produce sentiment, the card says so.',
   'Brand Accuracy Score':
-    'Measures how correctly AI platforms describe your brand, services, positioning, and key information.',
+    'Averages factual accuracy only where the scorer produced an accuracy score for a brand mention. Low sample sizes are called out.',
   'AI Share of Voice':
-    'Shows your brand’s share of visibility for this prompt compared with other mentioned brands.',
+    'Your brand mention events divided by brand plus competitor mention events, excluding failed provider calls and self-competitor matches.',
   'Opportunities to Outrank Competitors':
     'Suggested content ideas designed to help your brand appear more often than competitors in AI answers.',
 };
@@ -501,16 +565,16 @@ const CardTitleWithTip = ({ title, className }: { title: string; className?: str
 const TABLE_HEADER_TOOLTIPS: Record<string, string> = {
   Prompts: 'The AI search query used to check your brand visibility, sentiment, ranking, and competitor mentions.',
   Sentiment: 'Shows whether the AI response presents your brand in a positive, neutral, or negative way.',
-  Ranking: 'Shows your brand’s rank among all brands mentioned in the AI response for that prompt.',
-  Position: 'Placeholder tooltip copy for the position column. Replace this with final product copy.',
-  'AI SOV': 'Shows your brand’s share of visibility for this prompt compared with other mentioned brands..',
+  Ranking: 'Shows your best explicit rank when an AI response presents an ordered list for this prompt.',
+  Position: 'Shows your average explicit rank across ranked AI responses for this prompt.',
+  'AI SOV': 'Shows your brand mention events divided by brand plus competitor mention events for this prompt.',
   Competitors: 'Lists the competing brands that appear with your brand in the same AI response.',
   Action: 'Track prompt or draft content to improve visibility for that query.',
 };
 
 const TABLE_HEADER_TOOLTIPS_RESOLVED: Record<string, string> = {
   ...TABLE_HEADER_TOOLTIPS,
-  'AI SOV': 'Shows how visible your brand is within this specific prompt compared with other brands mentioned in the response.',
+  'AI SOV': 'Shows your brand mention events divided by brand plus competitor mention events for this prompt.',
 };
 
 type TableHeaderWithTipProps = {
@@ -575,7 +639,12 @@ const MetricCard = ({ card }: { card: MetricCardData }) => (
             >
               <div className="flex min-w-0 items-center gap-2">
                 {item.iconSrc ? <img src={item.iconSrc} alt="" className="h-4 w-4 shrink-0 object-contain" /> : null}
-                <span className="truncate text-[12px] font-medium leading-none text-[#535862]">{item.label}</span>
+                <span className="min-w-0">
+                  <span className="block truncate text-[12px] font-medium leading-none text-[#535862]">{item.label}</span>
+                  {item.subValue ? (
+                    <span className="mt-1 block truncate text-[9px] font-medium leading-none text-[#717680]">{item.subValue}</span>
+                  ) : null}
+                </span>
               </div>
               <div className="h-1.5 overflow-hidden rounded-full bg-[#D0D5DD]">
                 <div
@@ -597,6 +666,11 @@ const MetricCard = ({ card }: { card: MetricCardData }) => (
               <p className="mt-2 text-[27px] font-semibold leading-none tracking-normal text-[#3393F2]">
                 {item.value}
               </p>
+              {item.subValue ? (
+                <p className="mt-1 text-[10px] font-medium leading-[150%] tracking-normal text-[#717680]">
+                  {item.subValue}
+                </p>
+              ) : null}
             </div>
           ))}
         </div>
@@ -611,9 +685,11 @@ const MetricCard = ({ card }: { card: MetricCardData }) => (
                   {item.value}
                 </span>
               </div>
-              <p className="mt-1 text-[10px] font-normal leading-[150%] tracking-normal text-[#717680]">
-                Pages <span className="text-[#3393F2]">{item.subValue ?? '1'}</span>
-              </p>
+              {item.subValue ? (
+                <p className="mt-1 text-[10px] font-normal leading-[150%] tracking-normal text-[#717680]">
+                  {item.subValue}
+                </p>
+              ) : null}
             </div>
           ))}
         </div>
@@ -625,6 +701,11 @@ const MetricCard = ({ card }: { card: MetricCardData }) => (
               <p className="mt-2 text-[27px] font-semibold leading-[1] tracking-normal text-[#3393F2]">
                 {item.value}
               </p>
+              {item.subValue ? (
+                <p className="mt-1 text-[10px] font-medium leading-[150%] tracking-normal text-[#717680]">
+                  {item.subValue}
+                </p>
+              ) : null}
             </div>
           ))}
         </div>
@@ -836,27 +917,48 @@ const ExpandedDetails = ({ results }: { results: any[] }) => {
     const grouped: Record<string, any> = {};
     results.forEach(r => {
       if (!r || !r.model) return;
+      const successful = r.status !== 'failed';
+      const mentioned = successful && Number(r.presence ?? 0) > 0;
       if (!grouped[r.model]) {
         grouped[r.model] = {
           ...r,
-          _count: 1,
-          _mentionCount: r.presence > 0 ? 1 : 0,
-          relevance: r.presence > 0 ? (r.relevance || 0) : 0,
-          accuracy: r.presence > 0 ? (r.accuracy || 0) : 0,
-          sentiment: r.presence > 0 ? (r.sentiment || 0) : 0,
-          overall: r.presence > 0 ? (r.overall || 0) : 0,
+          _count: successful ? 1 : 0,
+          _mentionCount: mentioned ? 1 : 0,
+          _relevanceCount: mentioned && typeof r.relevance === 'number' ? 1 : 0,
+          _accuracyCount: mentioned && typeof r.accuracy === 'number' ? 1 : 0,
+          _sentimentCount: mentioned && typeof r.sentiment === 'number' ? 1 : 0,
+          _overallCount: mentioned && typeof r.overall === 'number' ? 1 : 0,
+          presence: successful ? Number(r.presence ?? 0) : 0,
+          relevance: mentioned && typeof r.relevance === 'number' ? r.relevance : 0,
+          accuracy: mentioned && typeof r.accuracy === 'number' ? r.accuracy : 0,
+          sentiment: mentioned && typeof r.sentiment === 'number' ? r.sentiment : 0,
+          overall: mentioned && typeof r.overall === 'number' ? r.overall : 0,
         };
       } else {
         const g = grouped[r.model];
-        g.presence = (g.presence || 0) + (r.presence || 0);
-        if (r.presence > 0) {
-          g.relevance = (g.relevance || 0) + (r.relevance || 0);
-          g.accuracy = (g.accuracy || 0) + (r.accuracy || 0);
-          g.sentiment = (g.sentiment || 0) + (r.sentiment || 0);
-          g.overall = (g.overall || 0) + (r.overall || 0);
+        if (successful) {
+          g.presence = (g.presence || 0) + Number(r.presence ?? 0);
+          g._count += 1;
+        }
+        if (mentioned) {
+          if (typeof r.relevance === 'number') {
+            g.relevance = (g.relevance || 0) + r.relevance;
+            g._relevanceCount += 1;
+          }
+          if (typeof r.accuracy === 'number') {
+            g.accuracy = (g.accuracy || 0) + r.accuracy;
+            g._accuracyCount += 1;
+          }
+          if (typeof r.sentiment === 'number') {
+            g.sentiment = (g.sentiment || 0) + r.sentiment;
+            g._sentimentCount += 1;
+          }
+          if (typeof r.overall === 'number') {
+            g.overall = (g.overall || 0) + r.overall;
+            g._overallCount += 1;
+          }
           g._mentionCount = (g._mentionCount || 0) + 1;
         }
-        g._count += 1;
       }
     });
 
@@ -879,7 +981,7 @@ const ExpandedDetails = ({ results }: { results: any[] }) => {
             : [];
         rawMentions.forEach((m: any) => {
           if (!m) return;
-          const brand = (m.brand || m.name || '').toString().trim();
+          const brand = (m.brand || m.name || m.host || '').toString().trim();
           if (!brand) return;
           const key = brand.toLowerCase();
           if (seenMentionKeys.has(key)) return;
@@ -932,12 +1034,12 @@ const ExpandedDetails = ({ results }: { results: any[] }) => {
         });
       });
 
-      const presence = g.presence / g._count;
+      const presence = g._count > 0 ? g.presence / g._count : 0;
       const mentionCount = g._mentionCount || 0;
       const mentioned = mentionCount > 0;
-      const displayRelevance = mentioned ? g.relevance / mentionCount : null;
-      const displayAccuracy = mentioned ? g.accuracy / mentionCount : null;
-      const displaySentiment = mentioned ? g.sentiment / mentionCount : null;
+      const displayRelevance = g._relevanceCount > 0 ? g.relevance / g._relevanceCount : null;
+      const displayAccuracy = g._accuracyCount > 0 ? g.accuracy / g._accuracyCount : null;
+      const displaySentiment = g._sentimentCount > 0 ? g.sentiment / g._sentimentCount : null;
       const overallInputs = [displayRelevance, displayAccuracy, displaySentiment].filter(
         (score): score is number => typeof score === 'number' && Number.isFinite(score),
       );
@@ -951,7 +1053,7 @@ const ExpandedDetails = ({ results }: { results: any[] }) => {
         displaySentiment,
         displayOverall: overallInputs.length > 0
           ? overallInputs.reduce((sum, score) => sum + score, 0) / overallInputs.length
-          : mentioned ? g.overall / mentionCount : null,
+          : g._overallCount > 0 ? g.overall / g._overallCount : null,
         sources: allSources.length > 0 ? allSources : null,
         citations: allCitations.length > 0 ? allCitations : null,
         competitorMentions: allMentions.length > 0 ? allMentions : []
@@ -960,6 +1062,23 @@ const ExpandedDetails = ({ results }: { results: any[] }) => {
   }, [results]);
 
   const [selectedModel, setSelectedModel] = useState(processedResults[0]?.model || '');
+  useEffect(() => {
+    if (processedResults.length === 0) return;
+    if (!processedResults.some((result: any) => result.model === selectedModel)) {
+      setSelectedModel(processedResults[0]?.model || '');
+    }
+  }, [processedResults, selectedModel]);
+
+  if (processedResults.length === 0) {
+    return (
+      <div className="flex min-h-[120px] items-center justify-center border-t border-dashed border-slate-200 bg-slate-50/60 px-6 py-8 text-center">
+        <div className="flex max-w-[360px] flex-col items-center gap-2">
+          <Info className="h-5 w-5 text-slate-400" />
+          <p className="text-[12px] font-semibold text-slate-500">No model responses yet.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="grid min-w-0 grid-cols-1 lg:grid-cols-[minmax(520px,0.62fr)_minmax(0,1.38fr)] lg:divide-x lg:divide-slate-300">
@@ -1178,24 +1297,61 @@ const getPromptTableSortLabel = (sort: SortState<PromptTableSortMetric>) => {
   return `${PROMPT_TABLE_SORT_LABELS[sort.metric]} ${sort.direction === 'asc' ? '↑' : '↓'}`;
 };
 
-const getPromptRankingScore = (row: PromptTableRow) => {
+const parsePercentValue = (value: unknown) => {
+  const parsed = Number.parseFloat(String(value ?? '').replace('%', ''));
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
+const getPromptBestRankPosition = (row: PromptTableRow) => {
+  const direct = Number((row as PromptTableRow & { rankingPosition?: number | null }).rankingPosition);
+  if (Number.isFinite(direct) && direct > 0) return direct;
+  const legacyBestRank = Number(row.bestRank);
+  if (Number.isFinite(legacyBestRank) && legacyBestRank > 0) return legacyBestRank;
   const positions = (row.results ?? [])
     .map((result) => Number((result as { rankPosition?: number | null }).rankPosition))
     .filter((position: number) => Number.isFinite(position) && position > 0);
   return positions.length > 0 ? Math.min(...positions) : null;
 };
 
+const getPromptAverageRankPosition = (row: PromptTableRow) => {
+  const direct = Number((row as PromptTableRow & { avgRankPosition?: number | null }).avgRankPosition);
+  if (Number.isFinite(direct) && direct > 0) return direct;
+  const positions = (row.results ?? [])
+    .map((result) => Number((result as { rankPosition?: number | null }).rankPosition))
+    .filter((position: number) => Number.isFinite(position) && position > 0);
+  if (positions.length === 0) return null;
+  return Number((positions.reduce((sum, position) => sum + position, 0) / positions.length).toFixed(2));
+};
+
+const getPromptRankingScore = (row: PromptTableRow) => {
+  return getPromptBestRankPosition(row);
+};
+
 const getPromptPositionScore = (row: PromptTableRow) => {
-  const rank = Number(row.bestRank);
-  return Number.isFinite(rank) && rank > 0 ? rank : null;
+  return getPromptAverageRankPosition(row) ?? getPromptBestRankPosition(row);
 };
 
 const getPromptSovScore = (row: PromptTableRow) => {
-  const value = Number.parseFloat(String(row.sov ?? '').replace('%', ''));
-  return Number.isFinite(value) ? value : null;
+  const direct = Number((row as PromptTableRow & { aiSovPercent?: number | null }).aiSovPercent);
+  if (Number.isFinite(direct)) return direct;
+  const metricValue = Number((row as PromptTableRow & { metrics?: { aiSov?: number | null } }).metrics?.aiSov);
+  if (Number.isFinite(metricValue)) return metricValue;
+  return parsePercentValue((row as PromptTableRow & { aiSov?: string | null }).aiSov) ?? parsePercentValue(row.sov);
 };
 
 const getPromptCompetitorScore = (row: PromptTableRow) => Number(row.competitorCount ?? 0);
+
+const formatRankValue = (value: number | null | undefined) => {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) return null;
+  return Number.isInteger(value) ? `#${value}` : `#${value.toFixed(1)}`;
+};
+
+const getPromptAiSovDisplay = (row: PromptTableRow) => {
+  const direct = (row as PromptTableRow & { aiSov?: string | null }).aiSov;
+  if (typeof direct === 'string' && direct.trim()) return direct;
+  const score = getPromptSovScore(row);
+  return score === null ? '—' : `${Math.round(score)}%`;
+};
 
 export const PromptTable = ({
   data,
@@ -1203,7 +1359,7 @@ export const PromptTable = ({
   onToggleRow,
   onSetSelectedRows,
   onOpenWorksheetModal,
-  title = 'Your Top Performing Prompts',
+  title = 'Your Prompt Inventory',
   reportRunId = null,
   domainId,
 }: PromptTableProps) => {
@@ -1232,18 +1388,6 @@ export const PromptTable = ({
     });
   };
   const [showAllQueries, setShowAllQueries] = useState(false);
-  const trackedPromptsQuery = useTrackedPrompts<{ prompts?: PromptTableRow[] }>(domainId ?? null);
-  const trackedPromptRows = useMemo(
-    () => (Array.isArray(trackedPromptsQuery.data?.prompts) ? trackedPromptsQuery.data!.prompts : []),
-    [trackedPromptsQuery.data],
-  );
-  const trackedRowsByRawId = useMemo(() => {
-    const map = new Map<number, PromptTableRow>();
-    for (const row of trackedPromptRows) {
-      if (typeof row.rawId === 'number') map.set(row.rawId, row);
-    }
-    return map;
-  }, [trackedPromptRows]);
 
   // Add & Analyze state.
   //   - `analyzeText`     the input value
@@ -1271,28 +1415,19 @@ export const PromptTable = ({
   const invalidateTracking = useCallback(() => {
     if (domainId == null) return;
     queryClient.invalidateQueries({ queryKey: aiResultsKeys.trackedPrompts(domainId) });
-    queryClient.invalidateQueries({ queryKey: aiResultsKeys.report(domainId, reportRunId) });
+    queryClient.invalidateQueries({ queryKey: aiResultsKeys.report(domainId, reportRunId, 'lite') });
+    queryClient.invalidateQueries({ queryKey: aiResultsKeys.report(domainId, reportRunId, 'responses') });
+    queryClient.invalidateQueries({ queryKey: aiResultsKeys.report(domainId, reportRunId, 'full') });
   }, [domainId, queryClient, reportRunId]);
 
   const mergeTrackedRow = useCallback(
     (row: any): PromptTableRow => {
-      const tracked = typeof row?.rawId === 'number' ? trackedRowsByRawId.get(row.rawId) : undefined;
-      const merged: PromptTableRow = tracked
-        ? {
-          ...row,
-          isTracked: tracked.isTracked ?? true,
-          lastTestedAt: tracked.lastTestedAt ?? row.lastTestedAt ?? null,
-          nextTestAt: tracked.nextTestAt ?? row.nextTestAt ?? null,
-          weekTrend: tracked.weekTrend ?? row.weekTrend ?? null,
-        }
-        : row;
-
       return {
-        ...merged,
-        isTracked: trackOverrides[merged.id] ?? merged.isTracked ?? false,
+        ...row,
+        isTracked: trackOverrides[row.id] ?? row.isTracked ?? false,
       };
     },
-    [trackOverrides, trackedRowsByRawId],
+    [trackOverrides],
   );
 
   const isRowTracked = useCallback(
@@ -1563,7 +1698,7 @@ return (
       <div className="flex flex-col gap-1">
         <CardTitle className="text-xl font-bold text-[#1e293b]">{title}</CardTitle>
         <p className="text-sm text-slate-500">
-          Compare how AI models respond, cite sources, and identify competitors across search queries
+          Review saved prompts, latest run metrics, citations, and competitors across search queries
         </p>
       </div>
 
@@ -1864,22 +1999,68 @@ return (
                     </div>
                   </TableCell>
                   <TableCell className="py-3 px-2">
-                    <Badge variant="outline" className={`rounded-full border-0 px-2.5 py-0.5 text-[10px] font-bold ${getSentimentColor(row.avgSentiment > 7 ? 'Positive' : row.avgSentiment > 4 ? 'Neutral' : 'Negative')}`}>
-                      {row.avgSentiment > 7 ? 'Positive' : row.avgSentiment > 4 ? 'Neutral' : 'Negative'}
-                    </Badge>
+                    {(() => {
+                      const resultCount = Array.isArray(row.results) ? row.results.length : 0;
+                      if (resultCount === 0) {
+                        return (
+                          <Badge variant="outline" className="rounded-full border-0 bg-slate-50 px-2.5 py-0.5 text-[10px] font-bold text-slate-500">
+                            Not run
+                          </Badge>
+                        );
+                      }
+                      if (row.avgSentiment == null) {
+                        const hasBrandMention = Number(row.mentions ?? 0) > 0;
+                        return (
+                          <Badge
+                            variant="outline"
+                            title={hasBrandMention ? 'Brand was mentioned, but sentiment was not scored for this prompt.' : 'Brand was not mentioned for this prompt.'}
+                            className="rounded-full border-0 bg-slate-50 px-2.5 py-0.5 text-[10px] font-bold text-slate-500"
+                          >
+                            {hasBrandMention ? 'No sentiment' : 'No mention'}
+                          </Badge>
+                        );
+                      }
+                      const label = row.avgSentiment > 7 ? 'Positive' : row.avgSentiment > 4 ? 'Neutral' : 'Negative';
+                      return (
+                        <Badge variant="outline" className={`rounded-full border-0 px-2.5 py-0.5 text-[10px] font-bold ${getSentimentColor(label)}`}>
+                          {label}
+                        </Badge>
+                      );
+                    })()}
                   </TableCell>
                   <TableCell className="py-3 px-2 text-[11px] font-medium text-slate-600">
                     {(() => {
-                      const modelPresence = getModelPresenceSummary(row.results);
-                      return `${modelPresence.mentions}/${modelPresence.total}`;
+                      const resultCount = Array.isArray(row.results) ? row.results.length : 0;
+                      if (resultCount === 0) return <span className="text-slate-400">—</span>;
+                      const bestRank = getPromptBestRankPosition(row);
+                      const formatted = formatRankValue(bestRank);
+                      if (formatted) return <span>{formatted}</span>;
+                      if (Number(row.mentions ?? 0) > 0) return <span className="text-emerald-600">Mentioned</span>;
+                      return <span className="text-slate-400">—</span>;
                     })()}
                   </TableCell>
                   <TableCell className="py-3 px-2">
-                    <Badge className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-[10px] font-bold text-emerald-600 hover:bg-emerald-50 border-0">
-                      #{row.bestRank || '-'}
-                    </Badge>
+                    {(() => {
+                      const resultCount = Array.isArray(row.results) ? row.results.length : 0;
+                      if (resultCount === 0) return <span className="text-[11px] font-medium text-slate-400">—</span>;
+                      const avgRank = getPromptAverageRankPosition(row);
+                      const formatted = formatRankValue(avgRank);
+                      if (formatted) {
+                        return (
+                          <Badge className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-[10px] font-bold text-emerald-600 hover:bg-emerald-50 border-0">
+                            {formatted}
+                          </Badge>
+                        );
+                      }
+                      if (Number(row.mentions ?? 0) > 0) {
+                        return <span className="text-[10px] font-medium text-slate-500">Unranked</span>;
+                      }
+                      return <span className="text-[11px] font-medium text-slate-400">—</span>;
+                    })()}
                   </TableCell>
-                  <TableCell className="py-3 px-2 text-[11px] font-medium text-slate-600">{row.sov}</TableCell>
+                  <TableCell className="py-3 px-2 text-[11px] font-medium text-slate-600">
+                    {Array.isArray(row.results) && row.results.length > 0 ? getPromptAiSovDisplay(row) : '—'}
+                  </TableCell>
                   <TableCell className="max-w-[160px] py-2 px-2">
                     <div className="flex flex-wrap items-center gap-1">
                       {row.competitors?.slice(0, 2).map((name: string) => {
@@ -2489,11 +2670,15 @@ const AIResultsReportPreview = () => {
   const [newWorksheetName, setNewWorksheetName] = useState('');
   const [createWorksheetError, setCreateWorksheetError] = useState<string | null>(null);
   const [isCreatingWorksheet, setIsCreatingWorksheet] = useState(false);
+  const [insightsEnabled, setInsightsEnabled] = useState(false);
+  const insightsSectionRef = useRef<HTMLDivElement | null>(null);
 
   // Campaigns + GSC status are both session-scoped (not domain-scoped) and
   // cached for 10 min via the queries module — moving here means we don't
   // refetch them when the user switches tabs.
-  const campaignsQuery = useCampaigns<{ campaigns: Array<{ id: number; title: string; description?: string | null }> }>();
+  const campaignsQuery = useCampaigns<{ campaigns: Array<{ id: number; title: string; description?: string | null }> }>({
+    enabled: isWorksheetModalOpen || isCreateWorksheetModalOpen,
+  });
   const worksheetOptions: WorksheetOption[] = useMemo(() => {
     const campaigns = Array.isArray(campaignsQuery.data?.campaigns) ? campaignsQuery.data!.campaigns : [];
     return campaigns.map((c) => ({
@@ -2508,19 +2693,55 @@ const AIResultsReportPreview = () => {
   );
   const worksheetOptionsLoading = campaignsQuery.isLoading;
 
-  const gscQuery = useGscStatus<{ connected?: boolean }>();
-  const gscConnected = Boolean(gscQuery.data?.connected);
-
   // Report / runs / trends flow through React Query — switching tabs hits
   // the cache instead of refetching, and other AI Checker pages that
   // request the same (domainId, runId) tuple reuse this data.
-  const reportQuery = useReport<any>(domainId, selectedRunId);
-  const runsQuery = useRuns<{ runs: Array<{ id: number; status: string; startedAt: string; visibilityScore: number | null; totalQueries: number | null }> }>(domainId);
-  const trendsQuery = useTrends<{ runs: TrendRun[]; topCompetitors: string[] }>(domainId);
+  const reportQuery = useReport<any>(domainId, selectedRunId, { includeInsights: false });
+  const reportReady = Boolean(reportQuery.data);
+  const insightsQuery = useReport<any>(domainId, selectedRunId, {
+    includeInsights: true,
+    enabled: reportReady && insightsEnabled,
+  });
+  const runsQuery = useRuns<{ runs: Array<{ id: number; status: string; startedAt: string; visibilityScore: number | null; totalQueries: number | null }> }>(domainId, {
+    enabled: reportReady,
+  });
+  const trendsQuery = useTrends<{ runs: TrendRun[]; topCompetitors: string[] }>(domainId, undefined, {
+    enabled: reportReady && insightsEnabled,
+  });
+  const gscQuery = useGscStatus<{ connected?: boolean }>({ enabled: reportReady });
+  const gscConnected = Boolean(gscQuery.data?.connected);
 
-  const reportData: any = reportQuery.data ?? null;
+  const insightsData: any = insightsQuery.data ?? null;
+  const reportData: any = insightsData ?? reportQuery.data ?? null;
+  const opportunities = (insightsData?.opportunities ?? []) as any[];
   const loading = reportQuery.isLoading;
   const reportPrompts = (reportData?.topAiSearchPrompts ?? reportData?.topPrompts ?? []) as any[];
+  useEffect(() => {
+    setInsightsEnabled(false);
+  }, [domainId, selectedRunId]);
+
+  useEffect(() => {
+    if (!reportReady || insightsEnabled) return;
+    const fallbackId = window.setTimeout(() => setInsightsEnabled(true), 1200);
+    const target = insightsSectionRef.current;
+    if (!target || typeof IntersectionObserver === 'undefined') {
+      return () => window.clearTimeout(fallbackId);
+    }
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          setInsightsEnabled(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: '700px 0px' },
+    );
+    observer.observe(target);
+    return () => {
+      window.clearTimeout(fallbackId);
+      observer.disconnect();
+    };
+  }, [insightsEnabled, reportReady]);
   const pastRuns = useMemo(
     () =>
       (runsQuery.data?.runs ?? [])
@@ -2548,19 +2769,19 @@ const AIResultsReportPreview = () => {
     () => [
       {
         title: 'Connect Website',
-        description: 'Integrate your website to automate content publishing and optimization.',
+        description: 'Automate publishing and optimization.',
         iconSrc: '/suggested-actions/connect-website.svg',
         onClick: () => navigate(resolveSidebarNavigation('integration').path),
       },
       {
         title: 'Explore Opportunities',
-        description: 'Discover high-impact prompts, uncover content gaps, and identify opportunities to improve AI visibility.',
+        description: 'Review prompt gaps and content opportunities.',
         iconSrc: '/suggested-actions/explore-opportunities.svg',
         onClick: () => scrollToSection('ai-results-opportunities'),
       },
       {
         title: 'Analyze Competitors',
-        description: 'Identify the content strategies helping competitors appear more frequently in AI-generated responses.',
+        description: 'Compare competitor visibility signals.',
         iconSrc: '/suggested-actions/analyze-competitors.svg',
         onClick: () => scrollToSection('ai-results-visibility-coverage'),
       },
@@ -2875,50 +3096,123 @@ const AIResultsReportPreview = () => {
   const metricCards = useMemo<MetricCardData[]>(() => {
     if (!reportData) return [];
 
-    const allItems = reportPrompts;
+    const filtersActive = modelFilter.size > 0 || categoryFilter.size > 0;
+    const scopedPrompts = scopePromptRows(reportPrompts, {
+      modelFilter,
+      categoryFilter,
+      ownHost: reportData?.domainInfo?.host,
+    });
+    const canonical = (reportData as any)?.metrics?.reportCards;
+    if (canonical && !filtersActive) {
+      const modelRows = Array.isArray(canonical.modelPerformance) ? canonical.modelPerformance : [];
+      const maxMentions = Math.max(1, ...modelRows.map((row: any) => Number(row.brandMentions ?? 0)));
+      const modelPerformanceDetails = modelRows.map((row: any) => {
+        const successful = Number(row.successfulResponses ?? 0);
+        const attempted = Number(row.attemptedResponses ?? successful);
+        const failed = Number(row.failedResponses ?? 0);
+        const mentions = Number(row.brandMentions ?? 0);
+        return {
+          label: getModelLabel(row.model),
+          value: successful === 0 && attempted > 0 ? '—' : mentions.toString(),
+          subValue: failed > 0 ? `${successful}/${attempted} scored` : `${successful} scored`,
+          iconSrc: getModelIconSrc(row.model),
+          barWidth: successful > 0 && mentions > 0 ? Math.max(8, Math.round((mentions / maxMentions) * 100)) : 0,
+        };
+      });
 
-    // Apply the same filter chain that PromptTable uses, so the cards and
-    // the table tell a consistent story.
-    let scoped = allItems.filter(
-      (p: any) => p.type?.toLowerCase() === 'prompt' && Array.isArray(p?.results) && p.results.length > 0,
-    );
-    if (categoryFilter.size > 0) scoped = scoped.filter((p: any) => p.category && categoryFilter.has(p.category));
-    if (modelFilter.size > 0) {
-      scoped = scoped
-        .map((p: any) => ({ ...p, results: (p.results ?? []).filter((r: any) => modelFilter.has(r.model)) }))
-        .filter((p: any) => p.results.length > 0);
+      const inventory = canonical.promptInventory ?? {};
+      const citations = canonical.citations ?? {};
+      const health = canonical.responseHealth ?? {};
+      const mentions = canonical.mentions ?? {};
+      const successfulResponses = Number(health.successfulResponses ?? citations.successfulResponses ?? 0);
+
+      return [
+        {
+          title: 'Performance Across AI Models',
+          kind: 'modelPerformance',
+          details: modelPerformanceDetails,
+        },
+        {
+          title: 'Top AI Search Prompts',
+          kind: 'promptSummary',
+          details: [
+            { label: 'Run', value: String(inventory.run ?? 0), subValue: 'latest run' },
+            { label: 'Generated', value: String(inventory.generated ?? 0), subValue: `${inventory.tracked ?? 0} tracked` },
+          ],
+        },
+        {
+          title: 'Citations',
+          kind: 'citations',
+          details: [
+            { label: 'Total', value: String(citations.total ?? 0), subValue: `${successfulResponses} scored responses` },
+            { label: 'Responses', value: String(citations.citedResponses ?? 0), subValue: 'with citations' },
+          ],
+        },
+        {
+          title: 'Mentions',
+          kind: 'summary',
+          details: [
+            {
+              label: 'Brand',
+              value: String(mentions.brandMentionResponses ?? 0),
+              subValue: `${mentions.brandResponseRate ?? 0}% responses`,
+            },
+            {
+              label: 'Competitors',
+              value: String(mentions.competitorMentionEvents ?? 0),
+              subValue: `${mentions.competitorMentionResponses ?? 0} responses`,
+            },
+          ],
+        },
+      ];
     }
 
-    const prompts = scoped.filter((p) => p.type === 'prompt');
+    const prompts = scopedPrompts;
     const trackedPrompts = prompts.filter((p: any) => Boolean(p.isTracked));
-    const totalPromptCount = prompts.length;
+    const totalPromptCount = prompts.filter((p) => (p.results ?? []).length > 0).length;
     const trackedPromptCount = trackedPrompts.length;
+    const generatedPromptCount = filtersActive
+      ? prompts.length
+      : Number((reportData as any)?.metrics?.promptInventory?.generated ?? prompts.length);
 
     // Visibility within the scoped set — recomputed from the rows the user
     // is actually looking at, not the static server-side rollup.
-    const allResults = scoped.flatMap((p: any) => p.results ?? []);
-    const presenceCount = allResults.reduce((s: number, r: any) => s + Number(r.presence ?? 0), 0);
-    const visibilityPct = allResults.length > 0
-      ? Math.round((presenceCount / allResults.length) * 100)
+    const allResults = prompts.flatMap((p: any) => p.results ?? []);
+    const successfulResults = allResults.filter(isSuccessfulPromptResult);
+    const brandMentionResponses = successfulResults.reduce((s: number, r: any) => s + (Number(r.presence ?? 0) > 0 ? 1 : 0), 0);
+    const visibilityPct = successfulResults.length > 0
+      ? Math.round((brandMentionResponses / successfulResults.length) * 100)
       : 0;
 
     // Mentions: brand presence count vs competitor host count across scoped rows.
-    const brandPages = presenceCount;
-    const competitorPages = allResults.reduce((s: number, r: any) => {
-      const arr = Array.isArray(r.competitorHosts) ? r.competitorHosts : [];
-      return s + arr.length;
-    }, 0);
-    const mentionsTotal = brandPages + competitorPages;
-    const brandSharePct = mentionsTotal > 0 ? Math.round((brandPages / mentionsTotal) * 100) : 0;
+    const brandPages = brandMentionResponses;
+    let competitorPages = 0;
+    let competitorMentionResponses = 0;
+    let citationTotal = 0;
+    let citedResponses = 0;
+    for (const result of successfulResults) {
+      const competitorStats = countCompetitorMentionEvents(result, reportData?.domainInfo?.host);
+      competitorPages += competitorStats.events;
+      if (competitorStats.hosts.size > 0) competitorMentionResponses += 1;
+      const citations = asReportArray(result?.citations);
+      citationTotal += citations.length;
+      if (citations.length > 0) citedResponses += 1;
+    }
+    const brandResponseRate = successfulResults.length > 0 ? Math.round((brandPages / successfulResults.length) * 100) : 0;
 
     const preferredModelOrder = ['google-gre', 'gpt-4o-mini', 'claude-sonnet-4-5', 'gemini-2.0-flash'];
-    const modelBuckets = new Map<string, { total: number; mentions: number }>();
+    const modelBuckets = new Map<string, { attempted: number; successful: number; failed: number; mentions: number }>();
     for (const result of allResults) {
       const model = String(result?.model ?? '').trim();
       if (!model) continue;
-      const bucket = modelBuckets.get(model) ?? { total: 0, mentions: 0 };
-      bucket.total += 1;
-      bucket.mentions += Number(result?.presence ?? 0);
+      const bucket = modelBuckets.get(model) ?? { attempted: 0, successful: 0, failed: 0, mentions: 0 };
+      bucket.attempted += 1;
+      if (isSuccessfulPromptResult(result)) {
+        bucket.successful += 1;
+        bucket.mentions += Number(result?.presence ?? 0) > 0 ? 1 : 0;
+      } else {
+        bucket.failed += 1;
+      }
       modelBuckets.set(model, bucket);
     }
     const orderedModels = Array.from(modelBuckets.keys()).sort((a, b) => {
@@ -2928,10 +3222,11 @@ const AIResultsReportPreview = () => {
     });
     const maxMentions = Math.max(1, ...Array.from(modelBuckets.values()).map((bucket) => bucket.mentions));
     const modelPerformanceDetails = orderedModels.map((model) => {
-      const bucket = modelBuckets.get(model) ?? { total: 0, mentions: 0 };
+      const bucket = modelBuckets.get(model) ?? { attempted: 0, successful: 0, failed: 0, mentions: 0 };
       return {
         label: getModelLabel(model),
-        value: bucket.mentions.toString(),
+        value: bucket.successful === 0 && bucket.attempted > 0 ? '—' : bucket.mentions.toString(),
+        subValue: bucket.failed > 0 ? `${bucket.successful}/${bucket.attempted} scored` : `${bucket.successful} scored`,
         iconSrc: getModelIconSrc(model),
         barWidth: bucket.mentions > 0 ? Math.max(8, Math.round((bucket.mentions / maxMentions) * 100)) : 0,
       };
@@ -2947,28 +3242,28 @@ const AIResultsReportPreview = () => {
         title: 'Top AI Search Prompts',
         kind: 'promptSummary',
         details: [
-          { label: 'Total', value: totalPromptCount.toString() },
-          { label: 'Tracked', value: trackedPromptCount.toString() },
+          { label: 'Run', value: totalPromptCount.toString(), subValue: filtersActive ? 'current scope' : 'latest run' },
+          { label: 'Generated', value: generatedPromptCount.toString(), subValue: `${trackedPromptCount} tracked` },
         ],
       },
       {
         title: 'Citations',
-        kind: 'summary',
+        kind: 'citations',
         details: [
-          { label: 'Total', value: prompts.length.toString(), subValue: trackedPrompts.length.toString() },
-          { label: 'Tracked', value: trackedPrompts.length > 0 ? `${visibilityPct}%` : '—', subValue: trackedPrompts.length > 0 ? `${trackedPrompts.length} of ${prompts.length}` : 'no run yet' },
+          { label: 'Total', value: String(citationTotal), subValue: `${successfulResults.length} scored responses` },
+          { label: 'Responses', value: String(citedResponses), subValue: 'with citations' },
         ],
       },
       {
         title: 'Mentions',
         kind: 'summary',
         details: [
-          { label: 'Brand', value: mentionsTotal > 0 ? `${brandSharePct}%` : '—', subValue: brandPages.toString() },
-          { label: 'Competitors', value: mentionsTotal > 0 ? `${100 - brandSharePct}%` : '—', subValue: competitorPages.toString() },
+          { label: 'Brand', value: String(brandPages), subValue: `${brandResponseRate}% responses` },
+          { label: 'Competitors', value: String(competitorPages), subValue: `${competitorMentionResponses} responses` },
         ],
       },
     ];
-  }, [reportData, categoryFilter, modelFilter]);
+  }, [reportData, reportPrompts, categoryFilter, modelFilter]);
 
 // Sentiment / Accuracy / Share of Voice cards — three single-number cards.
 // Threshold scale fix: backend returns avgSentiment on a 0-10 displayed
@@ -2977,22 +3272,66 @@ const AIResultsReportPreview = () => {
 const scoreCards = useMemo(() => {
   if (!reportData) return [];
 
-  // Apply same filter scope as metricCards so all dashboard headlines tell
-  // a single consistent story when the user narrows by model / category.
-  const allItems = reportPrompts;
-  let scoped = allItems.filter(
-    (p: any) => p.type?.toLowerCase() === 'prompt' && Array.isArray(p?.results) && p.results.length > 0,
-  );
-  if (categoryFilter.size > 0) scoped = scoped.filter((p: any) => p.category && categoryFilter.has(p.category));
-  if (modelFilter.size > 0) {
-    scoped = scoped
-      .map((p: any) => ({ ...p, results: (p.results ?? []).filter((r: any) => modelFilter.has(r.model)) }))
-      .filter((p: any) => p.results.length > 0);
+  const filtersActive = modelFilter.size > 0 || categoryFilter.size > 0;
+  const scopedPrompts = scopePromptRows(reportPrompts, {
+    modelFilter,
+    categoryFilter,
+    ownHost: reportData?.domainInfo?.host,
+  });
+  const canonical = (reportData as any)?.metrics?.reportCards;
+  if (canonical && !filtersActive) {
+    const sentiment = canonical.sentiment ?? {};
+    const accuracy = canonical.accuracy ?? {};
+    const sov = canonical.aiShareOfVoice ?? {};
+    const visibility = canonical.visibility ?? {};
+
+    const sentimentStatus = String(sentiment.status ?? '');
+    const sentimentValue = sentimentStatus === 'measured'
+      ? String(sentiment.label ?? 'Not scored')
+      : sentimentStatus === 'no_brand_mentions'
+        ? 'No mentions'
+        : 'Not scored';
+    const sentimentTone = sentimentValue === 'Positive'
+      ? 'text-emerald-600'
+      : sentimentValue === 'Neutral'
+        ? 'text-sky-600'
+        : sentimentValue === 'Negative'
+          ? 'text-amber-600'
+          : 'text-slate-400';
+    const sentimentNote = sentimentStatus === 'measured'
+      ? `Based on ${sentiment.sampleSize ?? 0} scored brand mention${Number(sentiment.sampleSize ?? 0) === 1 ? '' : 's'}`
+      : sentimentStatus === 'no_brand_mentions'
+        ? `0 of ${visibility.successfulResponses ?? 0} scored responses mentioned you`
+        : `0 sentiment scores across ${sentiment.brandMentionResponses ?? 0} brand mention${Number(sentiment.brandMentionResponses ?? 0) === 1 ? '' : 's'}`;
+
+    const accuracyStatus = String(accuracy.status ?? '');
+    const accuracyValue = typeof accuracy.percent === 'number'
+      ? `${accuracy.percent}%`
+      : 'Not scored';
+    const accuracyNote = accuracyStatus === 'low_sample'
+      ? `Low sample: ${accuracy.sampleSize ?? 0} of ${accuracy.brandMentionResponses ?? 0} brand mentions scored`
+      : accuracyStatus === 'measured'
+        ? `Based on ${accuracy.sampleSize ?? 0} scored brand mention${Number(accuracy.sampleSize ?? 0) === 1 ? '' : 's'}`
+        : `0 accuracy scores across ${accuracy.brandMentionResponses ?? 0} brand mention${Number(accuracy.brandMentionResponses ?? 0) === 1 ? '' : 's'}`;
+
+    const totalMentionEvents = Number(sov.totalMentionEvents ?? 0);
+    const sovNote = totalMentionEvents > 0
+      ? `${sov.brandMentionEvents ?? 0} of ${totalMentionEvents} brand + competitor mention events`
+      : 'No brand or competitor mentions scored';
+
+    return [
+      { label: 'Overall Sentiment', value: sentimentValue, tone: sentimentTone, note: sentimentNote },
+      { label: 'Brand Accuracy Score', value: accuracyValue, tone: accuracyStatus === 'low_sample' ? 'text-amber-600' : 'text-[#3393F2]', note: accuracyNote },
+      { label: 'AI Share of Voice', value: `${sov.percent ?? 0}%`, tone: 'text-[#3393F2]', note: sovNote },
+    ];
   }
 
-  const allResults = scoped.flatMap((p: any) => p.results ?? []);
-  const totalRows = allResults.length;
-  const presenceRows = allResults.filter((r: any) => Number(r.presence ?? 0) === 1);
+  // Apply same filter scope as metricCards so all dashboard headlines tell
+  // a single consistent story when the user narrows by model / category.
+  const allResults = scopedPrompts.flatMap((p: any) => p.results ?? []);
+  const successfulResults = allResults.filter(isSuccessfulPromptResult);
+  const totalRows = successfulResults.length;
+  const presenceRows = successfulResults.filter((r: any) => Number(r.presence ?? 0) === 1);
 
   // Sentiment: only rows where the brand was mentioned AND sentiment is
   // non-null contribute to the average. 0-10 scale per backend transform.
@@ -3011,7 +3350,9 @@ const scoreCards = useMemo(() => {
     sentimentTone = 'text-slate-400';
     sentimentNote = totalRows === 0
       ? 'No data in current filter scope'
-      : 'No prompt mentioned the brand in this scope';
+      : presenceRows.length === 0
+        ? 'No prompt mentioned the brand in this scope'
+        : `0 sentiment scores across ${presenceRows.length} brand mention${presenceRows.length === 1 ? '' : 's'}`;
   } else if (sentimentAvg >= 7) {
     sentimentLabel = 'Positive';
     sentimentTone = 'text-emerald-600';
@@ -3037,12 +3378,19 @@ const scoreCards = useMemo(() => {
   const accuracyValue = accuracyAvg === null ? '—' : `${Math.round(accuracyAvg * 10)}%`;
   const accuracyNote = presenceRows.length === 0
     ? 'No brand mentions to verify'
-    : `Across ${presenceRows.length} brand mention${presenceRows.length === 1 ? '' : 's'}`;
+    : accuracyMeasurements.length === 0
+      ? `0 accuracy scores across ${presenceRows.length} brand mention${presenceRows.length === 1 ? '' : 's'}`
+      : `Based on ${accuracyMeasurements.length} scored brand mention${accuracyMeasurements.length === 1 ? '' : 's'}`;
 
-  // Share of voice = brand presence rate within the scoped rows.
-  const visibility = totalRows > 0 ? Math.round((presenceRows.length / totalRows) * 100) : 0;
+  // Share of voice = brand mentions divided by brand + competitor mention events.
+  const competitorMentionEvents = successfulResults.reduce(
+    (sum: number, result: any) => sum + countCompetitorMentionEvents(result, reportData?.domainInfo?.host).events,
+    0,
+  );
+  const totalMentionEvents = presenceRows.length + competitorMentionEvents;
+  const visibility = totalMentionEvents > 0 ? Math.round((presenceRows.length / totalMentionEvents) * 100) : 0;
   const visibilityNote = totalRows > 0
-    ? `${presenceRows.length} of ${totalRows} response${totalRows === 1 ? '' : 's'} mentioned you`
+    ? `${presenceRows.length} brand mention${presenceRows.length === 1 ? '' : 's'} and ${competitorMentionEvents} competitor mention event${competitorMentionEvents === 1 ? '' : 's'}`
     : 'No data in current filter scope';
 
   return [
@@ -3050,7 +3398,7 @@ const scoreCards = useMemo(() => {
     { label: 'Brand Accuracy Score', value: accuracyValue, tone: 'text-[#3393F2]', note: accuracyNote },
     { label: 'AI Share of Voice', value: `${visibility}%`, tone: 'text-[#3393F2]', note: visibilityNote },
   ];
-}, [reportData, categoryFilter, modelFilter]);
+}, [reportData, reportPrompts, categoryFilter, modelFilter]);
 
 // ── Trend chart data ─────────────────────────────────────────────────────
 //
@@ -3149,30 +3497,11 @@ const trendEmptyMessage = (() => {
 
 const filteredPrompts = useMemo(() => {
   if (!reportPrompts.length) return [];
-  let items = [...reportPrompts];
-  // Hide rows that were never queried — empty `results` array means no
-  // AI calls ran for this prompt, so the metrics row is all zeros
-  // AI calls ran for this prompt, so the metrics row is all zeros
-  // and adds no signal. Only show items the user actually selected and ran.
-  items = items.filter(
-    (p: any) => p.type?.toLowerCase() === 'prompt' && Array.isArray(p?.results) && p.results.length > 0,
-  );
-
-  // Category filter (header Filters dropdown). Empty set = show all.
-  if (categoryFilter.size > 0) {
-    items = items.filter((p: any) => p.category && categoryFilter.has(p.category));
-  }
-
-  // Model filter — narrow each prompt's `results` array to only the selected
-  // models. If a prompt ends up with zero matching results it disappears.
-  if (modelFilter.size > 0) {
-    items = items
-      .map((p: any) => ({
-        ...p,
-        results: (p.results ?? []).filter((r: any) => modelFilter.has(r.model)),
-      }))
-      .filter((p: any) => p.results.length > 0);
-  }
+  const items = scopePromptRows(reportPrompts, {
+    modelFilter,
+    categoryFilter,
+    ownHost: reportData?.domainInfo?.host,
+  });
 
   return items.sort((a, b) => {
     if (promptSort === 'sentiment') {
@@ -3180,8 +3509,8 @@ const filteredPrompts = useMemo(() => {
     }
     if (promptSort === 'position') {
       const positionFor = (row: any) => {
-        const rank = Number(row?.bestRank);
-        return Number.isFinite(rank) && rank > 0 ? rank : Number.POSITIVE_INFINITY;
+        const rank = getPromptPositionScore(row as PromptTableRow);
+        return typeof rank === 'number' && Number.isFinite(rank) && rank > 0 ? rank : Number.POSITIVE_INFINITY;
       };
       return positionFor(a) - positionFor(b);
     }
@@ -3190,7 +3519,7 @@ const filteredPrompts = useMemo(() => {
     });
     return promptSort === 'alphabetical-desc' ? -alphabeticalCompare : alphabeticalCompare;
   });
-}, [reportPrompts, promptSort, categoryFilter, modelFilter]);
+}, [reportPrompts, promptSort, categoryFilter, modelFilter, reportData?.domainInfo?.host]);
 // Manual refetch for the "Retry" affordance on the opportunities card —
 // hits /report again so the LLM enrichment cache is exercised (or rebuilt
 // if the run summary was cleared).
@@ -3206,13 +3535,100 @@ const handleRetryOpportunities = useCallback(async () => {
   try {
     // Invalidate the cached /report for this domain+run; the useReport
     // hook above refetches automatically and updates reportData.
-    await queryClient.invalidateQueries({ queryKey: aiResultsKeys.report(domainId, selectedRunId) });
+    await queryClient.invalidateQueries({ queryKey: aiResultsKeys.report(domainId, selectedRunId, 'full') });
   } catch (err: any) {
     setRetryError(err?.message ?? 'Retry failed');
   } finally {
     setOpportunitiesRetrying(false);
   }
 }, [domainId, selectedRunId, queryClient]);
+
+const opportunitiesEmptyState = useMemo(() => {
+    const summary = (reportData?.summary ?? {}) as Record<string, any>;
+    const responseHealth = (reportData?.metrics?.reportCards?.responseHealth ?? {}) as Record<string, any>;
+    const successfulResponses = Number(
+      summary.successfulQueries ??
+      responseHealth.successfulResponses ??
+      reportData?.metrics?.totalQueries ??
+      0
+    );
+    const failedResponses = Number(
+      summary.failedQueries ??
+      responseHealth.failedResponses ??
+      0
+    );
+    const scoringStatus = typeof summary.scoringStatus === 'string' ? summary.scoringStatus : null;
+    const insightsStatus = typeof reportData?.metrics?.insightsStatus === 'string'
+      ? reportData.metrics.insightsStatus
+      : null;
+
+    if (insightsQuery.isError) {
+      return {
+        title: 'Could not load opportunity analysis',
+        body: 'The report loaded, but the full insights request failed. Retry the analysis to fetch the gap scan again.',
+        meta: null as string | null,
+      };
+    }
+
+    if (!reportData?.id) {
+      return {
+        title: 'Checking opportunity analysis',
+        body: 'The report shell is loaded while the full gap scan request resolves.',
+        meta: null as string | null,
+      };
+    }
+
+    if (reportData?.runStatus !== 'completed') {
+      return {
+        title: 'Run analysis to calculate opportunities',
+        body: 'Opportunities are generated only after a completed audit has successful model responses to score.',
+        meta: null as string | null,
+      };
+    }
+
+    if (insightsStatus === 'deferred') {
+      return {
+        title: 'Checking full opportunity analysis',
+        body: 'The summary report is loaded. Full gap detection is still loading, so this card will update once the complete insights payload arrives.',
+        meta: null as string | null,
+      };
+    }
+
+    if (successfulResponses === 0) {
+      return {
+        title: 'No successful model responses to analyze',
+        body: 'Every provider response in this scope failed or returned empty, so the gap detector has no reliable evidence.',
+        meta: failedResponses > 0 ? `${failedResponses} provider responses failed.` : null,
+      };
+    }
+
+    if (scoringStatus && scoringStatus !== 'completed') {
+      return {
+        title: 'Scoring is still finishing',
+        body: 'Opportunity detection waits for completed response scoring so ranking, citation, sentiment, and competitor gaps are not guessed.',
+        meta: `Current scoring status: ${scoringStatus}.`,
+      };
+    }
+
+    if (insightsStatus === 'warming') {
+      return {
+        title: 'No raw gap candidates in this run',
+        body: 'The deterministic gap scan returned no lost prompts, citation gaps, rank downgrades, negative sentiment, or brand-vs-competitor misses. Brief enrichment may still be warming, but there are no candidates to enrich yet.',
+        meta: `${successfulResponses} successful responses analyzed.`,
+      };
+    }
+
+    return {
+      title: 'No verified outrank gaps in this run',
+      body: 'The gap detector found no lost prompts, citation gaps, rank downgrades, negative sentiment, or brand-vs-competitor misses across successful responses.',
+      meta: `${successfulResponses} successful responses analyzed${failedResponses > 0 ? `; ${failedResponses} provider responses failed` : ''}.`,
+    };
+  }, [insightsQuery.isError, reportData]);
+
+  const opportunitiesAnalysisLoading = Boolean(
+    !insightsQuery.isError &&
+    !reportData?.id
+  );
 
 // SSE listener — flips running rows to done/failed when n8n pings back.
 useEffect(() => {
@@ -3264,7 +3680,7 @@ return (
     </div>
 
     <section className="flex w-full flex-col bg-white px-4 py-2 sm:px-6">
-      {!gscConnected && (
+      {gscQuery.isFetched && !gscConnected && (
         <div className="flex w-full flex-col gap-4 rounded-xl bg-[#F1F6FF] px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
           <div className="min-w-0">
             <h2 className="text-lg font-semibold leading-[1.35] tracking-normal text-[#7BA0E8] sm:text-xl">
@@ -3404,8 +3820,10 @@ return (
                 <div className="px-2 pb-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
                   Models
                 </div>
-                {(['gpt-4o-mini', 'claude-sonnet-4-5', 'gemini-2.0-flash'] as const).map((m) => {
-                  const label = m.includes('gpt') ? 'ChatGPT' : m.includes('claude') ? 'Claude' : 'Gemini';
+                {(['google-gre', 'gpt-4o-mini', 'claude-sonnet-4-5', 'gemini-2.0-flash'] as const).map((m) => {
+                  const label = m === 'google-gre'
+                    ? 'Google AI Overview'
+                    : m.includes('gpt') ? 'ChatGPT' : m.includes('claude') ? 'Claude' : 'Gemini';
                   const on = modelFilter.has(m);
                   return (
                     <DropdownMenuItem
@@ -3558,7 +3976,7 @@ return (
           )}
         </div>
 
-        <div id="ai-results-top-prompts" data-title="Top Performing Prompts">
+        <div id="ai-results-top-prompts" data-title="Prompt Inventory">
           {loading ? (
             <div className="h-[400px] w-full animate-pulse rounded-xl border border-slate-200 bg-gray-50" />
           ) : (
@@ -3576,7 +3994,10 @@ return (
       </div>
     </section>
 
-    <section className="grid w-full grid-cols-1 gap-6 bg-white px-4 py-0 sm:px-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
+    <section
+      ref={insightsSectionRef}
+      className="grid w-full grid-cols-1 gap-6 bg-white px-4 py-0 sm:px-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]"
+    >
 
         <Card id="ai-results-visibility-coverage" data-title="Visibility Insights" className="min-w-0 rounded-xl border border-[#D5D7DA] bg-white shadow-[0_1px_2px_0_#1018280D]">
         <CardHeader className="flex flex-col gap-3 px-4 pb-2 pt-4 sm:flex-row sm:items-center sm:justify-between">
@@ -3621,46 +4042,36 @@ return (
         </CardContent>
       </Card>
 
-      <div className="min-w-0 grid gap-6 xl:h-full xl:min-h-0 xl:grid-rows-[minmax(0,0.4fr)_minmax(0,0.6fr)]">
+      <div className="grid min-w-0 content-start gap-6">
 
-        <Card className="h-full rounded-xl border border-[#DDE7F5] bg-[#F1F6FF] shadow-[0_1px_2px_0_#1018280D]">
-          <CardHeader className="flex flex-row items-start justify-between px-4 pb-3 pt-4">
-            <div className="min-w-0">
-              <div className="flex items-center justify-between gap-3">
-                <h3 className="text-[18px] font-semibold leading-normal text-[#414651]">
-                  Suggested Next Actions
-                </h3>
-                <span aria-hidden="true" className="flex items-center gap-0.5 text-[#98A2B3]">
-                  <ChevronRight className="h-3.5 w-3.5 -translate-x-0.5" />
-                  <ChevronRight className="h-3.5 w-3.5 -translate-x-1.5" />
-                </span>
-              </div>
-            </div>
+        <Card className="rounded-xl border border-[#DDE7F5] bg-[#F1F6FF] shadow-[0_1px_2px_0_#1018280D]">
+          <CardHeader className="px-4 pb-2 pt-4">
+            <h3 className="text-base font-semibold leading-normal text-[#414651]">
+              Suggested Next Actions
+            </h3>
           </CardHeader>
-          <CardContent className="space-y-4 px-4 pb-4 pt-4">
+          <CardContent className="grid gap-2.5 px-4 pb-4 pt-2">
             {suggestedNextActions.map((action) => {
               return (
                 <button
                   key={action.title}
                   type="button"
                   onClick={action.onClick}
-                  className="group flex w-full items-center gap-3 rounded-2xl border border-[#E5EEF9] bg-white px-4 py-4 text-left shadow-[0_1px_2px_0_#1018280D] transition-all duration-200 hover:-translate-y-0.5 hover:border-[#D5D7DA] hover:shadow-[0_4px_12px_0_#10182814] focus:outline-none focus:ring-2 focus:ring-[#7BA0E8] focus:ring-offset-2"
+                  className="group flex w-full items-center gap-3 rounded-lg border border-[#E5EEF9] bg-white px-3 py-3 text-left shadow-[0_1px_2px_0_#1018280D] transition-all duration-200 hover:border-[#D5D7DA] hover:shadow-[0_4px_12px_0_#10182814] focus:outline-none focus:ring-2 focus:ring-[#7BA0E8] focus:ring-offset-2"
                 >
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#DDE7F5] bg-[#F7FAFF]">
-                    <img src={action.iconSrc} alt="" className="h-5 w-5 object-contain" />
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[#DDE7F5] bg-[#F7FAFF]">
+                    <img src={action.iconSrc} alt="" className="h-4 w-4 object-contain" />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-1.5">
-                      <span className="truncate text-[14px] font-medium leading-5 text-[#414651]">
-                        {action.title}
-                      </span>
-                    </div>
-                    <p className="mt-1 text-sm leading-6 text-[#667085]">
+                    <span className="block truncate text-[13px] font-semibold leading-5 text-[#414651]">
+                      {action.title}
+                    </span>
+                    <p className="mt-0.5 text-[12px] leading-5 text-[#667085]">
                       {action.description}
                     </p>
                   </div>
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#F8FAFD] text-[#4C74C2] transition-transform duration-200 group-hover:translate-x-0.5">
-                    <ChevronRight className="h-5 w-5" strokeWidth={2} />
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#F8FAFD] text-[#4C74C2] transition-transform duration-200 group-hover:translate-x-0.5">
+                    <ChevronRight className="h-4 w-4" strokeWidth={2} />
                   </span>
                 </button>
               );
@@ -3668,57 +4079,73 @@ return (
           </CardContent>
         </Card>
 
-        <Card id="ai-results-opportunities" data-title="Outrank Opportunities" className="h-full min-h-0 rounded-xl border border-[#D5D7DA] bg-white shadow-[0_1px_2px_0_#1018280D]">
-          <CardHeader className="flex flex-row items-start justify-between px-4 pb-3 pt-4">
-            <div className="min-w-0">
-              <CardTitleWithTip title="Opportunities to Outrank Competitors" />
-              <p className="mt-2 text-sm leading-[150%] text-[#535862]">
-                Prioritized recommendations to improve rankings, increase citations, and outperform competitors in Al search.
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
+        <Card id="ai-results-opportunities" data-title="Outrank Opportunities" className="rounded-xl border border-[#D5D7DA] bg-white shadow-[0_1px_2px_0_#1018280D]">
+          <CardHeader className="flex flex-col gap-3 px-4 pb-3 pt-4">
+            <div className="flex min-w-0 items-start justify-between gap-3">
+              <div className="min-w-0">
+                <CardTitleWithTip title="Opportunities to Outrank Competitors" />
+                <p className="mt-2 text-sm leading-[150%] text-[#535862]">
+                  Prioritized recommendations to improve rankings, increase citations, and outperform competitors in AI search.
+                </p>
+              </div>
               <button
                 type="button"
                 onClick={handleRetryOpportunities}
                 disabled={opportunitiesRetrying}
-                className="flex items-center gap-1 text-xs font-medium text-slate-600 hover:text-slate-900 disabled:opacity-50"
+                className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg border border-[#D5D7DA] bg-white px-2.5 text-xs font-medium text-slate-600 shadow-[0_1px_2px_0_#1018280D] hover:bg-slate-50 hover:text-slate-900 disabled:opacity-50"
                 title="Re-run analysis"
               >
                 <RefreshCw className={cn('h-3.5 w-3.5', opportunitiesRetrying && 'animate-spin')} />
                 Retry
               </button>
-              <button className="whitespace-nowrap text-xs font-medium text-blue-600">View all</button>
             </div>
+            {opportunities.length > 0 ? (
+              <div className="flex flex-wrap items-center gap-2">
+                <FilterPill label="Sort: By Models" icon="sort" />
+                <FilterPill label="Filters" icon="filter" />
+                <button className="h-8 whitespace-nowrap rounded-lg px-2 text-xs font-medium text-blue-600 hover:bg-blue-50">
+                  View all
+                </button>
+              </div>
+            ) : null}
           </CardHeader>
-          <CardContent className="space-y-2 px-4 pb-4 min-h-0">
-            <div className="flex flex-wrap gap-2">
-              <FilterPill label="Sort: By Models" icon="sort" />
-              <FilterPill label="Filters" icon="filter" />
-            </div>
+          <CardContent className="px-4 pb-4">
             {/* Inner scroll container — opportunity briefs can be long and
                  *  numerous; cap the card height so the layout doesn't push the
                  *  charts column off-screen. */}
             <div className="max-h-[560px] space-y-2 overflow-y-auto pr-1">
-              {(reportData?.opportunities ?? []).length === 0 ? (
-                <div className="flex flex-col items-start gap-2 rounded-md border border-dashed border-slate-200 bg-slate-50 px-3 py-3">
-                  <p className="text-xs text-slate-600">
-                    No outrank opportunities yet. This usually means the latest run hasn't completed enrichment, or selected competitors didn't appear in any answer.
-                  </p>
+              {opportunitiesAnalysisLoading ? (
+                <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-3">
+                  <div className="h-4 w-40 animate-pulse rounded bg-slate-200" />
+                  <div className="mt-2 h-3 w-64 animate-pulse rounded bg-slate-200" />
+                </div>
+              ) : opportunities.length === 0 ? (
+                <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-4 py-4">
+                  <div className="flex gap-3">
+                    <Info className="mt-0.5 h-4 w-4 shrink-0 text-slate-500" />
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold leading-5 text-[#2D4059]">{opportunitiesEmptyState.title}</p>
+                      <p className="mt-1 text-xs leading-5 text-slate-600">{opportunitiesEmptyState.body}</p>
+                      {opportunitiesEmptyState.meta ? (
+                        <p className="mt-1 text-[11px] leading-4 text-slate-500">{opportunitiesEmptyState.meta}</p>
+                      ) : null}
+                    </div>
+                  </div>
                   {retryError ? (
-                    <p className="text-xs text-rose-600">Error: {retryError}</p>
+                    <p className="mt-3 text-xs text-rose-600">Error: {retryError}</p>
                   ) : null}
                   <button
                     type="button"
                     onClick={handleRetryOpportunities}
                     disabled={opportunitiesRetrying}
-                    className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm hover:bg-slate-100 disabled:opacity-50"
+                    className="mt-3 inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm hover:bg-slate-100 disabled:opacity-50"
                   >
                     <RefreshCw className={cn('h-3.5 w-3.5', opportunitiesRetrying && 'animate-spin')} />
                     {opportunitiesRetrying ? 'Retrying…' : 'Retry analysis'}
                   </button>
                 </div>
               ) : null}
-              {(reportData?.opportunities ?? []).map((opp: any) => (
+              {opportunities.map((opp: any) => (
                 <OpportunityRow
                   key={opp.key}
                   title={opp.title}

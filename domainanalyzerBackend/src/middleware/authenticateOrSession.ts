@@ -33,7 +33,8 @@
  */
 
 import type { Request, Response, NextFunction } from 'express';
-import { PrismaClient, WizardSession } from '../../generated/prisma';
+import type { PrismaClient, WizardSession } from '../../generated/prisma';
+import { prisma } from '../lib/prisma';
 import { authService, JWTPayload } from '../services/authService';
 import {
   WIZARD_COOKIE_NAME,
@@ -45,7 +46,6 @@ import {
   touchSession,
 } from '../services/wizardSessionService';
 
-const prisma = new PrismaClient();
 
 export type WizardIdentity =
   | { kind: 'user'; userId: number; email: string }

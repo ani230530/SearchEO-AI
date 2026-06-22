@@ -1,10 +1,9 @@
 import { Request, Response } from 'express';
-import { PrismaClient } from '../../generated/prisma';
+import { prisma } from '../lib/prisma';
 import { exchangeCodeForTokens, getUserInfo, revokeToken } from '../services/googleOAuthService';
 import { encryptToken } from '../services/tokenEncryption';
 import crypto from 'crypto';
 
-const prisma = new PrismaClient();
 
 // Store state tokens temporarily (in production, use Redis or similar)
 const stateTokens = new Map<string, { userId: number; expiresAt: Date }>();

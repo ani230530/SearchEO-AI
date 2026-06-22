@@ -21,13 +21,12 @@ import blogAnalyticsRouter from './routes/blogAnalytics';
 import domainCompatRouter from './routes/domainCompat';
 import logoProxyRouter from './routes/logoProxy';
 
-import { PrismaClient } from '../generated/prisma';
+import { prisma } from './lib/prisma';
 import { authenticateToken, AuthenticatedRequest } from './middleware/auth';
 import { addSSEClient, removeSSEClient } from './services/sseService';
 import { startTimeoutChecker } from './services/n8nTimeout';
 
 const app = express();
-const prisma = new PrismaClient();
 
 const configuredOrigins = [
   authEnv.FRONTEND_URL,

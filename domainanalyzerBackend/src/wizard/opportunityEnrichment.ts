@@ -228,7 +228,7 @@ function buildPrompt(opportunities: OutrankOpportunity[], ctx: EnrichmentContext
 
 // ── Defaults / fallbacks ───────────────────────────────────────────────────
 
-function withDefaultBrief(o: OutrankOpportunity): EnrichedOpportunity {
+export function withDefaultBrief(o: OutrankOpportunity): EnrichedOpportunity {
   return {
     ...o,
     recommendedAngle: defaultAngle(o),

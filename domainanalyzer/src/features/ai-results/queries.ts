@@ -25,8 +25,8 @@ import { apiGet } from '@/services/apiClient';
 
 export const aiResultsKeys = {
   domains: () => ['ai-results', 'domains'] as const,
-  report: (domainId: number | string, runId?: number | null) =>
-    ['ai-results', 'report', domainId, runId ?? 'latest'] as const,
+  report: (domainId: number | string, runId?: number | null, view: 'lite' | 'full' | 'responses' = 'lite') =>
+    ['ai-results', 'report', domainId, runId ?? 'latest', view] as const,
   trends: (domainId: number | string, days?: number) =>
     ['ai-results', 'trends', domainId, days ?? 'legacy'] as const,
   runs: (domainId: number | string) =>
@@ -45,6 +45,16 @@ export const aiResultsKeys = {
   ) => ['ai-results', 'prompt-history', domainId, rowType, rawId, kind] as const,
   campaigns: () => ['ai-results', 'campaigns'] as const,
   gscStatus: () => ['ai-results', 'gsc-status'] as const,
+};
+
+type QueryControl = {
+  enabled?: boolean;
+  staleTime?: number;
+};
+
+type ReportQueryOptions = QueryControl & {
+  includeInsights?: boolean;
+  includeResponses?: boolean;
 };
 
 // ── Shared types ───────────────────────────────────────────────────────────
@@ -89,43 +99,54 @@ export function useDomains() {
   });
 }
 
-export function useReport<T = any>(domainId: number | null, runId?: number | null) {
+export function useReport<T = any>(
+  domainId: number | null,
+  runId?: number | null,
+  options: ReportQueryOptions = {},
+) {
+  const includeInsights = options.includeInsights === true;
+  const includeResponses = options.includeResponses === true;
+  const view = includeInsights ? 'full' : includeResponses ? 'responses' : 'lite';
   return useQuery<T>({
-    queryKey: aiResultsKeys.report(domainId ?? 'none', runId),
+    queryKey: aiResultsKeys.report(domainId ?? 'none', runId, view),
     queryFn: () => {
-      const path = runId
-        ? `/wizard/domain/${domainId}/report?runId=${runId}`
-        : `/wizard/domain/${domainId}/report`;
-      return apiGet<T>(path);
+      const params = new URLSearchParams();
+      if (runId) params.set('runId', String(runId));
+      if (!includeInsights) params.set('lite', '1');
+      if (includeResponses) params.set('responses', '1');
+      const query = params.toString();
+      return apiGet<T>(`/wizard/domain/${domainId}/report${query ? `?${query}` : ''}`);
     },
-    enabled: domainId != null,
+    enabled: domainId != null && (options.enabled ?? true),
     // The report is expensive to build server-side. Keep it fresh in cache so
     // switching between the AI dashboard tabs (which all read this) doesn't
     // refetch, and an alt-tab away/back doesn't re-hit it.
-    staleTime: 3 * 60 * 1000,
+    staleTime: options.staleTime ?? 3 * 60 * 1000,
   });
 }
 
-export function useTrends<T = any>(domainId: number | null, days?: number) {
+export function useTrends<T = any>(domainId: number | null, days?: number, options: QueryControl = {}) {
   return useQuery<T>({
     queryKey: aiResultsKeys.trends(domainId ?? 'none', days),
     queryFn: () => {
       const path = typeof days === 'number' ? `/wizard/domain/${domainId}/trends?days=${days}` : `/wizard/domain/${domainId}/trends`;
       return apiGet<T>(path);
     },
-    enabled: domainId != null,
+    enabled: domainId != null && (options.enabled ?? true),
+    staleTime: options.staleTime ?? 5 * 60 * 1000,
   });
 }
 
-export function useRuns<T = any>(domainId: number | null) {
+export function useRuns<T = any>(domainId: number | null, options: QueryControl = {}) {
   return useQuery<T>({
     queryKey: aiResultsKeys.runs(domainId ?? 'none'),
     queryFn: () => apiGet<T>(`/wizard/domain/${domainId}/runs`),
-    enabled: domainId != null,
+    enabled: domainId != null && (options.enabled ?? true),
+    staleTime: options.staleTime ?? 5 * 60 * 1000,
   });
 }
 
-export function useCompetitorAnalysis<T = any>(domainId: number | null, runId?: number | null) {
+export function useCompetitorAnalysis<T = any>(domainId: number | null, runId?: number | null, options: QueryControl = {}) {
   return useQuery<T>({
     queryKey: aiResultsKeys.competitorAnalysis(domainId ?? 'none', runId),
     queryFn: () => {
@@ -134,15 +155,17 @@ export function useCompetitorAnalysis<T = any>(domainId: number | null, runId?: 
         : `/wizard/domain/${domainId}/competitor-analysis`;
       return apiGet<T>(path);
     },
-    enabled: domainId != null,
+    enabled: domainId != null && (options.enabled ?? true),
+    staleTime: options.staleTime ?? 5 * 60 * 1000,
   });
 }
 
-export function useCompetitors<T = any>(domainId: number | null) {
+export function useCompetitors<T = any>(domainId: number | null, options: QueryControl = {}) {
   return useQuery<T>({
     queryKey: aiResultsKeys.competitors(domainId ?? 'none'),
     queryFn: () => apiGet<T>(`/wizard/domain/${domainId}/competitors`),
-    enabled: domainId != null,
+    enabled: domainId != null && (options.enabled ?? true),
+    staleTime: options.staleTime ?? 5 * 60 * 1000,
   });
 }
 
@@ -154,12 +177,12 @@ export function useCompetitors<T = any>(domainId: number | null) {
  *   { latestRunAt, nextTestAt, prompts: [{ ...PromptTableRow, isTracked,
  *     lastTestedAt, nextTestAt, weekTrend: { delta, lastVisibility, points } }] }
  */
-export function useTrackedPrompts<T = any>(domainId: number | null) {
+export function useTrackedPrompts<T = any>(domainId: number | null, options: QueryControl = {}) {
   return useQuery<T>({
     queryKey: aiResultsKeys.trackedPrompts(domainId ?? 'none'),
     queryFn: () => apiGet<T>(`/wizard/domain/${domainId}/tracked-prompts`),
-    enabled: domainId != null,
-    staleTime: 3 * 60 * 1000,
+    enabled: domainId != null && (options.enabled ?? true),
+    staleTime: options.staleTime ?? 3 * 60 * 1000,
   });
 }
 
@@ -172,13 +195,15 @@ export function usePromptHistory<T = any>(
   domainId: number | null,
   rawId: number | null,
   rowType: 'prompt' | 'keyword',
-  trackedView: boolean,
+  historyKindOrTrackedView: boolean | 'audit' | 'weekly',
 ) {
-  const kind = trackedView ? 'weekly' : 'audit';
+  const kind = typeof historyKindOrTrackedView === 'string'
+    ? historyKindOrTrackedView
+    : historyKindOrTrackedView ? 'weekly' : 'audit';
   return useQuery<T>({
     queryKey: aiResultsKeys.promptHistory(domainId ?? 'none', rowType, rawId ?? 'none', kind),
     queryFn: () => {
-      const kindQuery = trackedView ? '?kind=weekly' : '';
+      const kindQuery = kind === 'weekly' ? '?kind=weekly' : '';
       const path = rowType === 'keyword'
         ? `/wizard/domain/${domainId}/keywords/${rawId}/history${kindQuery}`
         : `/wizard/domain/${domainId}/prompts/${rawId}/history${kindQuery}`;
@@ -189,18 +214,20 @@ export function usePromptHistory<T = any>(
   });
 }
 
-export function useCampaigns<T = any>() {
+export function useCampaigns<T = any>(options: QueryControl = {}) {
   return useQuery<T>({
     queryKey: aiResultsKeys.campaigns(),
     queryFn: () => apiGet<T>('/campaigns'),
-    staleTime: 10 * 60 * 1000,
+    enabled: options.enabled ?? true,
+    staleTime: options.staleTime ?? 10 * 60 * 1000,
   });
 }
 
-export function useGscStatus<T = any>() {
+export function useGscStatus<T = any>(options: QueryControl = {}) {
   return useQuery<T>({
     queryKey: aiResultsKeys.gscStatus(),
     queryFn: () => apiGet<T>('/gsc/status'),
-    staleTime: 10 * 60 * 1000,
+    enabled: options.enabled ?? true,
+    staleTime: options.staleTime ?? 10 * 60 * 1000,
   });
 }

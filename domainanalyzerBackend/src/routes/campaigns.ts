@@ -12,7 +12,8 @@
  */
 
 import { Router, Request, Response } from 'express';
-import { Prisma, PrismaClient, CampaignNodeSource } from '../../generated/prisma';
+import { Prisma, CampaignNodeSource } from '../../generated/prisma';
+import { prisma } from '../lib/prisma';
 import { authenticateToken, AuthenticatedRequest } from '../middleware/auth';
 import {
   generateCampaignTopics,
@@ -37,7 +38,6 @@ import {
 import { serializeDraftContent } from '../services/contentFlowService';
 
 const router = Router();
-const prisma = new PrismaClient();
 const DEFAULT_KEYWORD_DIFFICULTY = 'Medium';
 
 /* ----------------------------------------------------------------------------
