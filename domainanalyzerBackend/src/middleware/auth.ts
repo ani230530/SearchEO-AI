@@ -2,6 +2,18 @@ import { Request, Response, NextFunction } from 'express';
 import { authService, JWTPayload } from '../services/authService';
 import { prisma } from '../lib/prisma';
 
+const AUTH_DB_TIMEOUT_MS = Number(process.env.AUTH_DB_TIMEOUT_MS) || 8000;
+
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_resolve, reject) => {
+    timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => {
+    if (timer) clearTimeout(timer);
+  });
+}
+
 // Extend Express Request interface to include user
 declare global {
   namespace Express {
@@ -25,10 +37,17 @@ export const authenticateToken = async (req: Request, res: Response, next: NextF
       return res.status(401).json({ error: 'Access token required' });
     }
 
-    const decoded = await authService.verifyToken(token);
+    const decoded = await withTimeout(authService.verifyToken(token), AUTH_DB_TIMEOUT_MS, 'verifyToken');
     req.user = decoded;
     next();
   } catch (error) {
+    if (error instanceof Error && error.message.includes('timed out')) {
+      console.error('[auth] token verification timed out', error.message);
+      return res.status(503).json({
+        error: 'Authentication service temporarily unavailable',
+        code: 'AUTH_DB_TIMEOUT',
+      });
+    }
     // Return 401 for expired/invalid tokens (not 403)
     // This allows frontend to distinguish between auth errors and permission errors
     if (error instanceof Error && error.message.includes('expired')) {

@@ -566,6 +566,17 @@ const PHASE_STEP: Record<string, number> = {
 /** Cache key for the user's domain list. Invalidated on POST /domain and DELETE /domain/:id. */
 const domainsCacheKey = (userId: number) => `wizard:domains:${userId}`;
 const DOMAINS_CACHE_TTL_SECONDS = 60;
+const DOMAINS_DB_TIMEOUT_MS = Number(process.env.DOMAINS_DB_TIMEOUT_MS) || 12000;
+
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_resolve, reject) => {
+    timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => {
+    if (timer) clearTimeout(timer);
+  });
+}
 
 function invalidateDomainReportCache(domain: { id: number; userId: number }): void {
   invalidateReportCacheForDomain(domain.userId, domain.id).catch((err) => {
@@ -593,7 +604,7 @@ router.get('/domains', timed('GET /domains', 300), authenticateToken, async (req
     console.warn('[wizard/domains] Redis read failed', err);
   }
 
-  const domains = await prisma.domain.findMany({
+  const domainsQuery = prisma.domain.findMany({
     where: { userId },
     include: {
       profile: { select: { country: true, state: true, industry: true, targetLocation: true } },
@@ -615,6 +626,23 @@ router.get('/domains', timed('GET /domains', 300), authenticateToken, async (req
     },
     orderBy: { updatedAt: 'desc' },
   });
+  let domains: Awaited<typeof domainsQuery>;
+  try {
+    domains = await withTimeout(
+      domainsQuery,
+      DOMAINS_DB_TIMEOUT_MS,
+      'wizard domains query',
+    );
+  } catch (err) {
+    if (err instanceof Error && err.message.includes('timed out')) {
+      console.error(`[wizard/domains] ${err.message}`);
+      return res.status(503).json({
+        error: 'Domain list is temporarily unavailable',
+        code: 'DOMAINS_DB_TIMEOUT',
+      });
+    }
+    throw err;
+  }
 
   // Derive currentStep + visibilityScore per row.
   const rows = domains.map((d) => {
