@@ -1745,9 +1745,7 @@ useEffect(() => {
         setGscSelectedProperty(data.selectedProperty || '');
         setGscLastSynced(data.lastSyncedAt ? new Date(data.lastSyncedAt) : null);
         
-        if (!data.selectedProperty) {
-          fetchGscProperties();
-        }
+        fetchGscProperties();
       } else {
         setGscConnected(false);
         setGscEmail("");
@@ -3103,4 +3101,3 @@ useEffect(() => {
 };
 
 export default SidebarDashboard;
-

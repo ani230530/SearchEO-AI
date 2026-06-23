@@ -256,11 +256,65 @@ export function AnalyticsIntegrationSection({
             ></iframe>
           </div>
           {gscConnected ? (
-            gscLastSynced && (
-              <p className="text-xs font-light text-gray-500 ">
-                Last synced: {new Date(gscLastSynced).toLocaleString()}
-              </p>
-            )
+            <div className="space-y-4">
+              {gscLastSynced && (
+                <p className="text-xs font-light text-gray-500 ">
+                  Last synced: {new Date(gscLastSynced).toLocaleString()}
+                </p>
+              )}
+
+              <div className="rounded-2xl border border-gray-100 bg-gray-50/70 p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 text-sm font-medium text-gray-900">
+                      <Globe className="h-4 w-4 text-gray-500" />
+                      Search Console property
+                    </div>
+                    <p className="mt-1 text-xs font-light text-gray-500">
+                      {gscSelectedProperty || "Select the verified property used for reports."}
+                    </p>
+                  </div>
+                  <button
+                    onClick={fetchGscProperties}
+                    disabled={gscLoading}
+                    className="h-9 px-3 rounded-md border border-gray-200 bg-white text-xs font-medium text-gray-700 hover:bg-gray-100 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {gscLoading ? "Loading..." : gscProperties.length > 0 ? "Refresh" : "Load properties"}
+                  </button>
+                </div>
+
+                <div className="mt-4">
+                  {gscProperties.length > 0 ? (
+                    <select
+                      value={gscSelectedProperty}
+                      onChange={(event) => {
+                        const property = event.target.value;
+                        if (property) {
+                          handleSelectProperty(property);
+                        } else {
+                          setGscSelectedProperty("");
+                        }
+                      }}
+                      className="w-full h-11 rounded-md border border-gray-200 bg-white px-3 text-sm text-gray-900 outline-none focus:border-[#2D4059] focus:ring-4 focus:ring-[#2D4059]/10"
+                    >
+                      <option value="">Select a property</option>
+                      {gscProperties.map((property) => (
+                        <option key={property.siteUrl} value={property.siteUrl}>
+                          {property.siteUrl}
+                          {property.permissionLevel ? ` · ${property.permissionLevel}` : ""}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <p className="text-sm font-light text-gray-500">
+                      {gscLoading
+                        ? "Loading your verified Search Console properties..."
+                        : "No properties loaded yet. Refresh to load the sites available to this Google account."}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
           ) : (
             <button
               onClick={handleConnectGsc}
