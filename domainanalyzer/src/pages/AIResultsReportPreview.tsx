@@ -1458,10 +1458,10 @@ export const PromptTable = ({
         }
         invalidateTracking();
         toast({
-          title: next ? 'Tracking weekly' : 'Tracking stopped',
+          title: next ? 'Tracking daily' : 'Tracking stopped',
           description: next
-            ? 'This prompt is re-tested automatically every week.'
-            : 'Removed from weekly tests.',
+            ? 'This prompt is re-tested automatically every day.'
+            : 'Removed from daily tests.',
         });
       } catch (err) {
         setTrackOverrides((p) => {
@@ -1516,7 +1516,7 @@ export const PromptTable = ({
         onSetSelectedRows(new Set());
         toast({
           title: next ? `Tracking ${promptIds.length} prompt${promptIds.length === 1 ? '' : 's'}` : 'Tracking stopped',
-          description: next ? 'Re-tested automatically every week.' : 'Removed from weekly tests.',
+          description: next ? 'Re-tested automatically every day.' : 'Removed from daily tests.',
         });
       } catch (err) {
         setTrackOverrides((p) => {

@@ -70,7 +70,7 @@ type PromptTabConfig =
       summaryCards: MetricCardConfig[];
     };
 
-type PerformanceRange = "weekly" | "monthly" | "quarterly";
+type PerformanceRange = "daily" | "monthly" | "quarterly";
 
 type PerformanceRowConfig = {
   label: string;
@@ -124,7 +124,7 @@ const METRIC_CARDS: MetricCardConfig[] = [
   },
   {
     label: "Visibility Drops",
-    tooltip: "Tracked prompts whose visibility declined compared with the previous weekly run.",
+    tooltip: "Tracked prompts whose visibility declined compared with the previous daily run.",
     subtitle: "Tracked prompts down",
     value: "0",
     trend: "",
@@ -164,8 +164,8 @@ const TAB_CONFIGS: Record<PromptsTabId, PromptTabConfig> = {
       },
       {
         label: "Prompts Gained",
-        tooltip: "The share of prompts that improved this week.",
-        subtitle: "This week",
+        tooltip: "The share of prompts that improved since the previous daily run.",
+        subtitle: "Daily trend",
         value: "0",
         trend: "",
         tone: "positive",
@@ -236,9 +236,9 @@ const PROMPT_TRACKING_PERFORMANCE: PerformanceConfig = {
   tooltip: "Each AI model's share of your brand mentions in the latest run.",
   // No time-bucketed history yet, so the range toggle is hidden (see
   // PromptTrackingKpiPanel, which passes toggle={[]}). Kept for when real
-  // weekly/monthly/quarterly aggregation lands.
+  // daily/monthly/quarterly aggregation lands.
   toggle: [
-    { id: "weekly", label: "Weekly" },
+    { id: "daily", label: "Daily" },
     { id: "monthly", label: "Monthly" },
     { id: "quarterly", label: "Quarterly" },
   ],
@@ -478,7 +478,7 @@ function PromptTrackingKpiSkeleton() {
 }
 
 function PromptTrackingKpiPanel({ loading, rows }: { loading: boolean; rows: PromptTableRow[] }) {
-  const [range, setRange] = useState<PerformanceRange>("weekly");
+  const [range, setRange] = useState<PerformanceRange>("daily");
 
   // All four cards are derived from real tracked-prompt data. Trend badges are
   // hidden — there's no stored period-over-period history for these totals.
@@ -493,8 +493,8 @@ function PromptTrackingKpiPanel({ loading, rows }: { loading: boolean; rows: Pro
     const avgVisibility = visibilityValues.length > 0
       ? Math.round(visibilityValues.reduce((s, n) => s + n, 0) / visibilityValues.length)
       : 0;
-    // Week-over-week movers among tracked prompts (delta is null until ≥2
-    // weekly runs exist, so those rows count toward neither gained nor lost).
+    // Day-over-day movers among tracked prompts (delta is null until at least
+    // two daily runs exist, so those rows count toward neither gained nor lost).
     const gained = rows.filter((r) => r.weekTrend?.delta != null && r.weekTrend.delta > 0).length;
     const lost = rows.filter((r) => r.weekTrend?.delta != null && r.weekTrend.delta < 0).length;
     return base.map((card) => {
@@ -550,32 +550,43 @@ function PromptTrackingKpiPanel({ loading, rows }: { loading: boolean; rows: Pro
   );
 }
 
-type WeeklyPromptCell = {
+type DailyPromptColumn = {
+  key: string;
+  label: string;
+};
+
+type DailyPromptCell = {
   label: string;
   tracked: boolean;
 };
 
-function getTrackedWeekCells(row: PromptTableRow): WeeklyPromptCell[] {
-  const points = [...(row.weekTrend?.points ?? [])]
-    .sort((a, b) => new Date(a.startedAt).getTime() - new Date(b.startedAt).getTime())
-    .slice(-4);
+function utcDayKey(value: string | Date): string {
+  const date = value instanceof Date ? value : new Date(value);
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()))
+    .toISOString()
+    .slice(0, 10);
+}
 
-  const fallbackVisibility = Number.parseInt(String(row.sov ?? ""), 10);
-  const fallback = points.length === 0 && row.lastTestedAt
-    ? [{
-        runId: row.rawId ?? 0,
-        startedAt: row.lastTestedAt,
-        visibility: Number.isFinite(fallbackVisibility) ? fallbackVisibility : row.weekTrend?.lastVisibility ?? 0,
-      }]
-    : [];
-
-  const trackedPoints = points.length > 0 ? points : fallback;
-  return Array.from({ length: 4 }).map((_, index) => {
-    const point = trackedPoints[index];
-    if (!point) return { label: `Week ${index + 1}`, tracked: false };
+function getTrackedDailyColumns(now = new Date()): DailyPromptColumn[] {
+  const todayUtc = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  return Array.from({ length: 7 }).map((_, index) => {
+    const day = new Date(todayUtc);
+    day.setUTCDate(todayUtc.getUTCDate() - (6 - index));
     return {
-      label: new Date(point.startedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" }),
-      tracked: true,
+      key: day.toISOString().slice(0, 10),
+      label: day.toLocaleDateString(undefined, { month: "short", day: "numeric", timeZone: "UTC" }),
+    };
+  });
+}
+
+function getTrackedDailyCells(row: PromptTableRow, columns: DailyPromptColumn[]): DailyPromptCell[] {
+  const pointKeys = new Set((row.weekTrend?.points ?? []).map((point) => utcDayKey(point.startedAt)));
+  const fallbackKey = pointKeys.size === 0 && row.lastTestedAt ? utcDayKey(row.lastTestedAt) : null;
+
+  return columns.map((day) => {
+    return {
+      label: day.label,
+      tracked: pointKeys.has(day.key) || fallbackKey === day.key,
     };
   });
 }
@@ -621,7 +632,7 @@ function getTrackedModel(row: PromptTableRow): { label: string; iconSrc: string 
   return { label, iconSrc };
 }
 
-function TrackedPromptsWeeklyTable({
+function TrackedPromptsDailyTable({
   domainId,
   rows,
   onDraftBlog,
@@ -637,6 +648,7 @@ function TrackedPromptsWeeklyTable({
   const [showAll, setShowAll] = useState(false);
   const [trackOverrides, setTrackOverrides] = useState<Record<string, boolean>>({});
   const [trackPending, setTrackPending] = useState<Record<string, boolean>>({});
+  const dayColumns = useMemo(() => getTrackedDailyColumns(), []);
 
   const visibleRows = showAll ? rows : rows.slice(0, 10);
   const visibleIds = visibleRows.map((row) => row.id);
@@ -672,10 +684,10 @@ function TrackedPromptsWeeklyTable({
       queryClient.invalidateQueries({ queryKey: aiResultsKeys.trackedPrompts(domainId) });
       queryClient.invalidateQueries({ queryKey: ["ai-results", "report", domainId] });
       toast({
-        title: next ? "Tracking weekly" : "Tracking stopped",
+        title: next ? "Tracking daily" : "Tracking stopped",
         description: next
-          ? "This prompt is re-tested automatically every week."
-          : "Removed from weekly tests.",
+          ? "This prompt is re-tested automatically every day."
+          : "Removed from daily tests.",
       });
     } catch (err) {
       setTrackOverrides((prev) => {
@@ -702,7 +714,7 @@ function TrackedPromptsWeeklyTable({
       <div className="mb-4 flex flex-col gap-1.5">
         <h2 className="text-[20px] font-bold text-[#334155]">Tracked Prompts</h2>
         <p className="text-[14px] text-[#64748b]">
-          Weekly tracking progress across the AI models used for each prompt.
+          Daily tracking progress across the AI models used for each prompt.
         </p>
       </div>
 
@@ -732,10 +744,10 @@ function TrackedPromptsWeeklyTable({
                     Prompts <Info className="h-[10px] w-[10px] text-slate-400" />
                   </div>
                 </TableHead>
-                {["Week 1", "Week 2", "Week 3", "Week 4"].map((week) => (
-                  <TableHead key={week} className="px-2 text-[11px] font-semibold text-[#31415f]">
+                {dayColumns.map((day) => (
+                  <TableHead key={day.key} className="px-2 text-[11px] font-semibold text-[#31415f]">
                     <div className="flex items-center gap-1">
-                      {week} <Info className="h-[10px] w-[10px] text-slate-400" />
+                      {day.label} <Info className="h-[10px] w-[10px] text-slate-400" />
                     </div>
                   </TableHead>
                 ))}
@@ -759,13 +771,13 @@ function TrackedPromptsWeeklyTable({
             <TableBody>
               {visibleRows.length === 0 ? (
                 <TableRow className="border-b border-slate-200">
-                  <TableCell colSpan={9} className="px-4 py-10 text-center text-[12px] text-slate-500">
+                  <TableCell colSpan={12} className="px-4 py-10 text-center text-[12px] text-slate-500">
                     No tracked prompts match these filters.
                   </TableCell>
                 </TableRow>
               ) : null}
               {visibleRows.map((row) => {
-                const weeks = getTrackedWeekCells(row);
+                const days = getTrackedDailyCells(row, dayColumns);
                 const runStatus = getTrackedRunStatus(row);
                 const model = getTrackedModel(row);
                 const expanded = expandedIds.has(row.id);
@@ -803,14 +815,14 @@ function TrackedPromptsWeeklyTable({
                           </span>
                         </div>
                       </TableCell>
-                      {weeks.map((week, index) => {
+                      {days.map((day, index) => {
                         return (
-                          <TableCell key={`${row.id}-week-${index}`} className="px-2 py-3">
+                          <TableCell key={`${row.id}-day-${index}`} className="px-2 py-3">
                             <span className={cn(
                               "text-[11px] font-medium",
-                              week.tracked ? "text-[#0d7c1c]" : "text-slate-500",
-                            )}>
-                              {week.tracked ? "Tested" : "No run"}
+                              day.tracked ? "text-[#0d7c1c]" : "text-slate-500",
+                            )} title={day.label}>
+                              {day.tracked ? "Tested" : "No run"}
                             </span>
                           </TableCell>
                         );
@@ -863,7 +875,7 @@ function TrackedPromptsWeeklyTable({
                     </TableRow>
                     {expanded ? (
                       <TableRow className="border-b border-slate-300 bg-white hover:bg-white">
-                        <TableCell colSpan={9} className="p-0">
+                        <TableCell colSpan={12} className="p-0">
                           <PromptExpandedDetails
                             results={row.results}
                             phrase={row.phrase}
@@ -1026,7 +1038,7 @@ function PromptsTabBody({
       {isTracking ? (
         <div className="flex items-center justify-between gap-3">
           <p className="text-[12px] text-slate-500">
-            Tracked prompts are automatically re-tested every week. Trends update after each weekly run.
+            Tracked prompts are automatically re-tested every day. Trends update after each daily run.
           </p>
           <button
             type="button"
@@ -1064,11 +1076,11 @@ function PromptsTabBody({
         <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-10 text-center shadow-sm">
           <p className="text-[13px] font-medium text-slate-600">No tracked prompts yet</p>
           <p className="mt-1 text-[12px] text-slate-500">
-            Mark prompts for weekly tracking from the All Prompts tab to start seeing week-over-week trends here.
+            Mark prompts for daily tracking from the All Prompts tab to start seeing day-over-day trends here.
           </p>
         </div>
       ) : isTracking ? (
-        <TrackedPromptsWeeklyTable
+        <TrackedPromptsDailyTable
           domainId={domainId}
           rows={rows}
           onDraftBlog={onDraftBlog ?? (() => undefined)}
@@ -1218,14 +1230,14 @@ const PromptsPage = () => {
     // Card 1 — prompts added since the previous audit run (server-computed; 0
     // when there's no prior run to diff against).
     const newPrompts = Number(reportData?.metrics?.newPromptsSinceLastRun ?? 0);
-    // Card 2 — prompts currently marked for weekly tracking.
+    // Card 2 — prompts currently marked for daily tracking.
     const trackedCount = trackedRows.length;
     // Card 3 — "gap" prompts: visibility (sov) below 30%.
     const gapCount = allPromptRows.filter((r) => {
       const v = Number.parseInt(String(r.sov ?? ""), 10);
       return Number.isFinite(v) && v < 30;
     }).length;
-    // Card 4 — tracked prompts whose visibility dropped week-over-week.
+    // Card 4 — tracked prompts whose visibility dropped day-over-day.
     const droppedCount = trackedRows.filter(
       (r) => r.weekTrend?.delta != null && r.weekTrend.delta < 0,
     ).length;
@@ -1285,7 +1297,7 @@ const PromptsPage = () => {
   const handleTestNow = async () => {
     if (!domainId || testingNow) return;
     setTestingNow(true);
-    // latestRunAt advances only when a weekly run COMPLETES, so it's our
+    // latestRunAt advances only when a tracked run COMPLETES, so it's our
     // completion signal. Capture the current value to diff against while polling.
     const startLatest = (trackedQuery.data?.latestRunAt ?? null) as string | null;
 

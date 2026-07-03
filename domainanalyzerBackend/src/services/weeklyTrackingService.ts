@@ -1,10 +1,10 @@
-// Weekly tracked-prompt re-testing.
+// Daily tracked-prompt re-testing.
 //
 // Users mark individual prompts for tracking (Prompt.isTracked=true). Once a
-// week the scheduler re-runs every domain's tracked prompts through the same
+// day the scheduler re-runs every domain's tracked prompts through the same
 // LLM roster + scorer as the wizard audit, tagging the resulting AiRun as
 // kind='weekly'. Results accumulate immutably, so the dashboard can show
-// week-over-week visibility/sentiment trends per prompt.
+// day-over-day visibility/sentiment trends per prompt.
 //
 // Scheduling is a BullMQ repeatable job (restart-safe, unlike setInterval).
 // The processor runs inside the existing n8n-queue worker (see queueService).
@@ -14,38 +14,39 @@ import { n8nQueue, WEEKLY_TRACKING_JOB } from './queueService';
 import { runTrackedQueries } from '../wizard/runService';
 
 
-// Stable scheduler id — upsert keeps restarts/redeploys from stacking
-// duplicate repeatables.
+// Stable legacy scheduler id — upsert keeps restarts/redeploys from stacking
+// duplicate repeatables. Keep the id even though the cadence is now daily so
+// Redis updates the existing repeatable instead of leaving an old weekly one.
 const SCHEDULER_ID = 'weekly-tracking';
-// Every Monday at 03:00 UTC.
-const WEEKLY_CRON = '0 3 * * 1';
-// A weekly run should finish in minutes. If the process dies mid-run, a stale
-// AiRun(status='running') must not block every future weekly test forever.
+// Every day at 03:00 UTC.
+export const TRACKED_PROMPT_CRON = '0 3 * * *';
+// A tracked run should finish in minutes. If the process dies mid-run, a stale
+// AiRun(status='running') must not block every future daily test forever.
 const WEEKLY_RUN_STALE_MINUTES = Math.max(
   15,
   Number(process.env.WEEKLY_RUN_STALE_MINUTES ?? 360),
 );
 
 /**
- * Register (idempotently) the weekly repeatable job. Called once at startup.
+ * Register (idempotently) the daily repeatable job. Called once at startup.
  * Only writes the schedule to Redis; the processor runs in the shared worker.
  */
 export async function registerWeeklyTracking(): Promise<void> {
   await n8nQueue.upsertJobScheduler(
     SCHEDULER_ID,
-    { pattern: WEEKLY_CRON, tz: 'UTC' },
+    { pattern: TRACKED_PROMPT_CRON, tz: 'UTC' },
     {
       name: WEEKLY_TRACKING_JOB,
       data: {},
       // The sweep isolates per-domain failures and returns normally, so it
-      // shouldn't throw — but if it does, don't retry-storm a weekly job.
+      // shouldn't throw — but if it does, don't retry-storm a daily job.
       opts: { removeOnComplete: true, removeOnFail: 50, attempts: 1 },
     },
   );
-  console.log(`[weekly] scheduled tracked-prompt sweep (${WEEKLY_CRON} UTC)`);
+  console.log(`[tracking] scheduled daily tracked-prompt sweep (${TRACKED_PROMPT_CRON} UTC)`);
 }
 
-/** True if a weekly run is already running for this domain (dedupe). */
+/** True if a tracked run is already running for this domain (dedupe). */
 async function weeklyRunInFlight(domainId: number): Promise<boolean> {
   const staleCutoff = new Date(Date.now() - WEEKLY_RUN_STALE_MINUTES * 60 * 1000);
   const stale = await prisma.aiRun.updateMany({
@@ -61,7 +62,7 @@ async function weeklyRunInFlight(domainId: number): Promise<boolean> {
     },
   });
   if (stale.count > 0) {
-    console.warn(`[weekly] marked ${stale.count} stale weekly run(s) failed for domain ${domainId}`);
+    console.warn(`[tracking] marked ${stale.count} stale tracked run(s) failed for domain ${domainId}`);
   }
 
   const existing = await prisma.aiRun.findFirst({
@@ -72,7 +73,7 @@ async function weeklyRunInFlight(domainId: number): Promise<boolean> {
 }
 
 /**
- * Run the weekly sweep across every domain that has at least one tracked
+ * Run the daily sweep across every domain that has at least one tracked
  * prompt. Domains are processed SEQUENTIALLY: each runTrackedQueries already
  * fans 6 workers internally against shared LLM rate limits, so running domains
  * concurrently would multiply cost and risk throttling. A single domain's
@@ -89,7 +90,7 @@ export async function runWeeklySweep(): Promise<{ domains: number; ok: number; f
   let failed = 0;
   let skipped = 0;
 
-  console.log(`[weekly] sweep starting: ${grouped.length} domain(s) with tracked prompts`);
+  console.log(`[tracking] daily sweep starting: ${grouped.length} domain(s) with tracked prompts`);
 
   for (const g of grouped) {
     try {
@@ -103,17 +104,17 @@ export async function runWeeklySweep(): Promise<{ domains: number; ok: number; f
       ok++;
     } catch (err) {
       failed++;
-      console.error(`[weekly] domain ${g.domainId} failed`, err);
+      console.error(`[tracking] domain ${g.domainId} failed`, err);
     }
   }
 
-  console.log(`[weekly] sweep done: ${ok} ok / ${failed} failed / ${skipped} skipped of ${grouped.length}`);
+  console.log(`[tracking] daily sweep done: ${ok} ok / ${failed} failed / ${skipped} skipped of ${grouped.length}`);
   return { domains: grouped.length, ok, failed, skipped };
 }
 
 /**
  * Run tracked prompts for a single domain on demand (the "Test tracked now"
- * button). Returns { skipped: true } if a weekly run is already in flight.
+ * button). Returns { skipped: true } if a tracked run is already in flight.
  */
 export async function runWeeklyForDomain(domainId: number): Promise<{ skipped: boolean }> {
   if (await weeklyRunInFlight(domainId)) {

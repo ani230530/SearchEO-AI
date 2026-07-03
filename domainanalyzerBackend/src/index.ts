@@ -188,8 +188,12 @@ app.listen(PORT, () => {
   // Worksheet generation stale-job sweeper (campaigns/blog flow).
   const { startStaleJobSweeper } = require('./services/generationJobService');
   startStaleJobSweeper();
-  // Weekly tracked-prompt re-test scheduler (BullMQ repeatable, idempotent).
-  const { registerWeeklyTracking } = require('./services/weeklyTrackingService');
-  registerWeeklyTracking().catch((e: unknown) =>
-    console.error('[startup] weekly tracking registration failed', e));
+  // Daily tracked-prompt re-test scheduler (BullMQ repeatable, idempotent).
+  if (process.env.DISABLE_TRACKED_PROMPT_SCHEDULER === 'true') {
+    console.log('[startup] tracked-prompt scheduler disabled by env');
+  } else {
+    const { registerWeeklyTracking } = require('./services/weeklyTrackingService');
+    registerWeeklyTracking().catch((e: unknown) =>
+      console.error('[startup] prompt tracking registration failed', e));
+  }
 });

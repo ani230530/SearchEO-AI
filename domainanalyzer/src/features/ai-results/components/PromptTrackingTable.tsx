@@ -87,7 +87,7 @@ export type PromptModelResult = {
 };
 
 export type PromptWeekTrend = {
-  /** Week-over-week visibility change in percentage points (null if <2 weekly runs). */
+  /** Day-over-day visibility change in percentage points (null if <2 tracked runs). */
   delta: number | null;
   lastVisibility: number;
   points: Array<{ runId: number; startedAt: string; visibility: number }>;
@@ -116,13 +116,13 @@ export type PromptTableRow = {
   successfulResponses?: number;
   totalMentionEvents?: number;
   type: "prompt" | "keyword";
-  /** True if the user marked this prompt for weekly tracking. */
+  /** True if the user marked this prompt for daily tracking. */
   isTracked?: boolean;
-  /** ISO timestamp of the most recent weekly run that included this prompt. */
+  /** ISO timestamp of the most recent tracked run that included this prompt. */
   lastTestedAt?: string | null;
-  /** ISO timestamp of the next scheduled weekly run. */
+  /** ISO timestamp of the next scheduled daily run. */
   nextTestAt?: string | null;
-  /** Week-over-week visibility trend (present on tracked-prompt rows). */
+  /** Day-over-day visibility trend (present on tracked-prompt rows). */
   weekTrend?: PromptWeekTrend | null;
   /** Which historical run family should drive the expanded detail chart. */
   historyKind?: "audit" | "weekly";
@@ -394,7 +394,7 @@ const PromptVisibilityComparisonGraph = ({
   domainId?: number | null;
   promptRawId?: number | null;
   rowType: "prompt" | "keyword";
-  /** When true, the chart shows the weekly-tracking series (kind=weekly runs). */
+  /** When true, the chart shows the tracked recurring series (kind=weekly runs). */
   trackedView?: boolean;
   historyKind?: "audit" | "weekly";
   /** Limit the chart to runs within the last N days (null = all history). */
@@ -408,8 +408,8 @@ const PromptVisibilityComparisonGraph = ({
   );
   // History is fetched through React Query (see usePromptHistory) so collapsing
   // and re-expanding a row is instant and shared across tabs. Same payload
-  // shape from the prompt and keyword endpoints; trackedView scopes to weekly
-  // runs so the chart is a clean week-over-week series.
+  // shape from the prompt and keyword endpoints; trackedView scopes to tracked
+  // recurring runs so the chart is a clean day-over-day series.
   const { data: historyData, isLoading: loadingHistory } = usePromptHistory<{
     runs: HistoryRun[];
   }>(domainId ?? null, promptRawId ?? null, rowType, historyKind ?? (trackedView ? "weekly" : "audit"));
@@ -447,7 +447,7 @@ const PromptVisibilityComparisonGraph = ({
     : loadingHistory
       ? "Loading history…"
       : history.length === 0
-        ? (weeklyHistory ? "No weekly history yet — runs every Monday" : "No audit history for this prompt yet")
+        ? (weeklyHistory ? "No daily history yet — runs every day" : "No audit history for this prompt yet")
         : windowed.length === 0
           ? "No runs in this time range"
           : chartData.length === 0
@@ -480,7 +480,7 @@ const PromptVisibilityComparisonGraph = ({
           {singleRun ? (
             <div className="pointer-events-none absolute bottom-3 left-3 z-10 max-w-[260px] rounded-[8px] border border-slate-200 bg-white/95 px-3 py-2 text-[11px] leading-snug text-slate-600 shadow-sm">
               <span className="font-semibold text-slate-800">
-                {weeklyHistory ? "Single weekly run" : "Single audit run"}: {singleRun.presence}% visibility.
+                {weeklyHistory ? "Single daily run" : "Single audit run"}: {singleRun.presence}% visibility.
               </span>{" "}
               Trend line appears after the next scored run.
               {singleRun.failed > 0 ? (
@@ -1013,7 +1013,7 @@ export const PromptTable = ({
   domainId?: number | null;
   showMonitorAllButton?: boolean;
   showPromptCategoryDropdown?: boolean;
-  /** When true (Prompt Tracking tab), only show tracked rows + weekly trends. */
+  /** When true (Prompt Tracking tab), only show tracked rows + daily trends. */
   trackedFilterOnly?: boolean;
 }) => {
   const { toast } = useToast();
@@ -1101,7 +1101,7 @@ export const PromptTable = ({
   const PAGE_SIZE = 10;
   const [currentPage, setCurrentPage] = useState(1);
 
-  // ── Weekly tracking ──────────────────────────────────────────────────────
+  // ── Daily tracking ───────────────────────────────────────────────────────
   // Source of truth is row.isTracked from the server; trackOverrides holds the
   // optimistic value so the toggle flips instantly. trackPending disables the
   // button mid-request. selectedIds drives the bulk "Track selected" action.
@@ -1227,10 +1227,10 @@ export const PromptTable = ({
       }
       invalidateTracking();
       toast({
-        title: next ? "Tracking weekly" : "Tracking stopped",
+        title: next ? "Tracking daily" : "Tracking stopped",
         description: next
-          ? "This prompt is re-tested automatically every week."
-          : "Removed from weekly tests.",
+          ? "This prompt is re-tested automatically every day."
+          : "Removed from daily tests.",
       });
     } catch (err) {
       // Revert the optimistic flip on failure.
@@ -1283,7 +1283,7 @@ export const PromptTable = ({
       setSelectedIds(new Set());
       toast({
         title: next ? `Tracking ${promptIds.length} prompt${promptIds.length === 1 ? "" : "s"}` : "Tracking stopped",
-        description: next ? "Re-tested automatically every week." : "Removed from weekly tests.",
+        description: next ? "Re-tested automatically every day." : "Removed from daily tests.",
       });
     } catch (err) {
       setTrackOverrides((p) => {

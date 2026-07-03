@@ -881,13 +881,13 @@ export interface RunOptions {
   onProgress: (event: RunProgress) => void;
   /**
    * Which prompts to run. 'selected' (default) uses the wizard audit set
-   * (isSelected=true). 'tracked' uses the weekly-tracking set (isTracked=true).
+   * (isSelected=true). 'tracked' uses the recurring tracking set (isTracked=true).
    */
   selection?: 'selected' | 'tracked';
   /**
    * How this run is tagged on AiRun.kind. 'audit' (default) is the manual
-   * wizard run; 'weekly' is the scheduled tracked-prompt re-test. Keeping them
-   * distinct prevents weekly runs from polluting the audit trend/runs charts.
+   * wizard run; 'weekly' is the tracked-prompt re-test family. Keeping them
+   * distinct prevents tracked runs from polluting the audit trend/runs charts.
    */
   kind?: 'audit' | 'weekly';
 }
@@ -1137,7 +1137,7 @@ export async function runQueries({
     return;
   }
 
-  // The only difference between an audit run and a weekly tracked run is which
+  // The only difference between an audit run and a tracked run is which
   // prompts we load — everything downstream (worker pool, scoring, summary) is
   // identical.
   const promptWhere =
@@ -1507,8 +1507,8 @@ export async function runQueries({
 
 /**
  * runTrackedQueries — convenience wrapper that re-tests the domain's
- * weekly-tracked prompts (isTracked=true) and tags the resulting AiRun as
- * kind='weekly'. Used by the weekly scheduler and the manual "Test tracked
+ * tracked prompts (isTracked=true) and tags the resulting AiRun as
+ * kind='weekly'. Used by the daily scheduler and the manual "Test tracked
  * now" trigger. onProgress defaults to a no-op for the headless scheduler.
  */
 export async function runTrackedQueries(

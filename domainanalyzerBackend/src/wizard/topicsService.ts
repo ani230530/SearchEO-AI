@@ -37,6 +37,7 @@ import type { EnrichedContext } from './enrichmentService';
 import { callJson, Models } from './llmClient';
 import { generateHumanAuditPrompts } from './humanPromptService';
 import { collectPromptSeedSignals } from './promptSignalsService';
+import { fetchN8nPromptResearchPrompts } from './n8nPromptResearchService';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -253,6 +254,8 @@ async function generateForCategory(args: {
 
 export interface GenerateAllInput {
   brand: string;
+  /** Canonical domain URL. Used by the n8n Reddit/community research workflow. */
+  url?: string;
   host?: string;
   context: EnrichedContext;
   /** Optional category subset (for "Load more" of a single category). Defaults to all. */
@@ -261,8 +264,37 @@ export interface GenerateAllInput {
   avoidPrompts?: string[];
 }
 
+const normalizePromptText = (value: string): string =>
+  value
+    .toLowerCase()
+    .replace(/https?:\/\/\S+/g, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+
+function filterGeneratedPrompts(prompts: GeneratedPrompt[], input: GenerateAllInput): GeneratedPrompt[] {
+  const categoryFiltered =
+    !input.onlyCategories || input.onlyCategories.length === 0
+      ? prompts
+      : prompts.filter((prompt) => input.onlyCategories?.includes(prompt.category));
+  const avoid = new Set((input.avoidPrompts ?? []).map(normalizePromptText).filter(Boolean));
+  if (avoid.size === 0) return categoryFiltered;
+  return categoryFiltered.filter((prompt) => !avoid.has(normalizePromptText(prompt.text)));
+}
+
 export async function generateAuditPrompts(input: GenerateAllInput): Promise<GeneratedPrompt[]> {
   const host = input.host ?? input.brand;
+  const n8nPrompts = filterGeneratedPrompts(
+    await fetchN8nPromptResearchPrompts({
+      brand: input.brand,
+      host,
+      url: input.url,
+      niche: input.context.category,
+      context: input.context,
+    }),
+    input
+  );
+  if (n8nPrompts.length > 0) return n8nPrompts;
+
   const signals = await collectPromptSeedSignals({
     brand: input.brand,
     host,
@@ -277,7 +309,7 @@ export async function generateAuditPrompts(input: GenerateAllInput): Promise<Gen
     avoidPrompts: input.avoidPrompts,
   });
   if (!input.onlyCategories || input.onlyCategories.length === 0) return prompts;
-  const filtered = prompts.filter((prompt) => input.onlyCategories?.includes(prompt.category));
+  const filtered = filterGeneratedPrompts(prompts, input);
   return filtered.length > 0 ? filtered : prompts;
 }
 

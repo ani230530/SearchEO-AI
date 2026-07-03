@@ -296,9 +296,9 @@ model Prompt {
   intent              String? // Informational | Commercial | Transactional | Navigational
   source              String // 'ai' | 'custom'
   isSelected          Boolean         @default(false)
-  /// True if the user marked this prompt for recurring weekly re-testing.
+  /// True if the user marked this prompt for recurring tracked re-testing.
   isTracked           Boolean         @default(false)
-  /// Timestamp of the most recent weekly run that included this prompt.
+  /// Timestamp of the most recent tracked run that included this prompt.
   lastTrackedRunAt    DateTime?
   // ── Audit-research metadata (Soar / Profound / Ahrefs taxonomy) ────────
   /// One of: unbranded_recommendation | top_n_listicle | alternatives_to_competitor
@@ -322,7 +322,7 @@ model Prompt {
   results             AiQueryResult[]
 
   @@index([domainId, isSelected])
-  // Weekly sweeper enumerates tracked prompts per domain.
+  // Daily sweeper enumerates tracked prompts per domain.
   @@index([domainId, isTracked])
   @@index([domainId, category])
   @@index([keywordId])
@@ -338,8 +338,8 @@ model AiRun {
   startedAt DateTime        @default(now())
   endedAt   DateTime?
   status    String          @default("running") // running | completed | failed
-  // How this run was triggered: 'audit' (manual wizard run) | 'weekly' (scheduled
-  // tracked-prompt re-test). Audit dashboards filter on kind='audit' so weekly
+  // How this run was triggered: 'audit' (manual wizard run) | 'weekly' (tracked
+  // prompt re-test family). Audit dashboards filter on kind='audit' so tracked
   // runs never pollute the existing trend/runs charts.
   kind      String          @default("audit")
   // Aggregate scores: { presenceRate, avgRelevance, avgSentiment, avgOverall, perModel }
@@ -352,7 +352,7 @@ model AiRun {
   // status: 'completed' } orderBy startedAt desc. Without this compound index
   // the planner narrows by domainId then sequentially scans on status.
   @@index([domainId, status, startedAt])
-  // "latest completed weekly run for domain" — used by the tracked-prompts
+  // "latest completed tracked run for domain" — used by the tracked-prompts
   // endpoint and the in-flight dedupe check.
   @@index([domainId, kind, status, startedAt])
 }

@@ -171,10 +171,10 @@ export function useCompetitors<T = any>(domainId: number | null, options: QueryC
 
 /**
  * Tracked prompts for the Prompt Tracking tab — one row per prompt the user
- * marked for weekly re-testing, carrying the latest weekly metrics plus a
- * week-over-week trend. Response shape mirrors /report's topPrompts (so the
+ * marked for daily re-testing, carrying the latest daily metrics plus a
+ * day-over-day trend. Response shape mirrors /report's topPrompts (so the
  * PromptTable renders it unchanged) with tracking metadata added:
- *   { latestRunAt, nextTestAt, prompts: [{ ...PromptTableRow, isTracked,
+ *   { cadence, latestRunAt, nextTestAt, prompts: [{ ...PromptTableRow, isTracked,
  *     lastTestedAt, nextTestAt, weekTrend: { delta, lastVisibility, points } }] }
  */
 export function useTrackedPrompts<T = any>(domainId: number | null, options: QueryControl = {}) {
@@ -189,7 +189,7 @@ export function useTrackedPrompts<T = any>(domainId: number | null, options: Que
 /**
  * Per-prompt (or per-keyword) visibility history for the expanded-row chart.
  * Cached so collapsing and re-expanding a row is instant. `trackedView`
- * scopes to weekly runs (Prompt Tracking tab) vs audit runs elsewhere.
+ * scopes to tracked recurring runs (Prompt Tracking tab) vs audit runs elsewhere.
  */
 export function usePromptHistory<T = any>(
   domainId: number | null,

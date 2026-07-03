@@ -81,10 +81,10 @@ async function ensureDomain(req: Request, idParam: string | undefined): Promise<
 }
 
 // Resolve the AiRun.kind filter for audit-facing endpoints from a `?kind=`
-// query param. Defaults to 'audit' so weekly tracked-prompt runs never leak
+// query param. Defaults to 'audit' so tracked-prompt runs never leak
 // into the audit dashboard's report/trends/runs/history (this is a no-op for
 // all pre-existing data, which is kind='audit'). Pass ?kind=weekly to scope to
-// weekly runs, or ?kind=all to include both.
+// tracked recurring runs, or ?kind=all to include both.
 function runKindFilter(req: Request): { kind?: string } {
   const raw = typeof req.query.kind === 'string' ? req.query.kind.toLowerCase() : 'audit';
   if (raw === 'all') return {};
@@ -455,43 +455,36 @@ function buildCanonicalReportMetrics(args: {
   };
 }
 
-// Next scheduled weekly run: the upcoming Monday 03:00 UTC (matches the
+const TRACKED_PROMPT_CADENCE = 'daily' as const;
+
+// Next scheduled tracked-prompt run: the next daily 03:00 UTC (matches the
 // scheduler cron in weeklyTrackingService). Returned to the UI as the "next
 // test" indicator.
-function nextWeeklyRunAt(): Date {
-  const now = new Date();
+export function nextDailyRunAt(now = new Date()): Date {
   const next = new Date(Date.UTC(
     now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 3, 0, 0, 0,
   ));
-  // Advance to the next Monday (getUTCDay: 0=Sun..1=Mon). If today is Monday
-  // but past 03:00, roll to next week.
-  const day = next.getUTCDay();
-  let add = (1 - day + 7) % 7; // days until Monday
-  if (add === 0 && now.getTime() >= next.getTime()) add = 7;
-  next.setUTCDate(next.getUTCDate() + add);
+  if (now.getTime() >= next.getTime()) next.setUTCDate(next.getUTCDate() + 1);
   return next;
 }
 
-function weeklyBucketStartUtc(date: Date): Date {
-  const start = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), 0, 0, 0, 0));
-  const daysSinceMonday = (start.getUTCDay() + 6) % 7;
-  start.setUTCDate(start.getUTCDate() - daysSinceMonday);
-  return start;
+function dailyBucketStartUtc(date: Date): Date {
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), 0, 0, 0, 0));
 }
 
-function weeklyBucketKey(date: Date): string {
-  return weeklyBucketStartUtc(date).toISOString().slice(0, 10);
+function dailyBucketKey(date: Date): string {
+  return dailyBucketStartUtc(date).toISOString().slice(0, 10);
 }
 
 function isWeeklyHistoryRequest(req: Request): boolean {
   return typeof req.query.kind === 'string' && req.query.kind.toLowerCase() === 'weekly';
 }
 
-function collapseRunHistoryToWeeks<T extends { startedAt: Date | string; total?: number }>(runs: T[]): T[] {
+function collapseRunHistoryToDays<T extends { startedAt: Date | string; total?: number }>(runs: T[]): T[] {
   const grouped = new Map<string, T[]>();
   for (const run of runs) {
     const date = run.startedAt instanceof Date ? run.startedAt : new Date(run.startedAt);
-    const key = weeklyBucketKey(date);
+    const key = dailyBucketKey(date);
     grouped.set(key, [...(grouped.get(key) ?? []), run]);
   }
 
@@ -505,7 +498,7 @@ function collapseRunHistoryToWeeks<T extends { startedAt: Date | string; total?:
     });
 }
 
-// A tracked prompt that has never been through a weekly run yet — zeroed
+// A tracked prompt that has never been through a tracked run yet — zeroed
 // metrics so the table can render "Not yet tested".
 function emptyTrackedRow(p: { id: number; text: string; intent: string | null; source: string; keywordId: number | null; lastTrackedRunAt: Date | null }) {
   return {
@@ -536,7 +529,7 @@ function emptyTrackedRow(p: { id: number; text: string; intent: string | null; s
     metrics: { visibility: 0, aiSov: null as number | null, avgOverall: 0, runs: 0, attemptedRuns: 0 },
     isTracked: true,
     lastTestedAt: p.lastTrackedRunAt,
-    nextTestAt: nextWeeklyRunAt(),
+    nextTestAt: nextDailyRunAt(),
     weekTrend: { delta: null as number | null, lastVisibility: 0, points: [] as Array<{ runId: number; startedAt: Date; visibility: number }> },
   };
 }
@@ -1012,7 +1005,7 @@ router.get('/domain/:id/report', timed('GET /report', 800), authenticateToken, a
   }
   const runIdParam = typeof req.query.runId === 'string' ? Number(req.query.runId) : NaN;
   const useSpecificRun = Number.isFinite(runIdParam) && runIdParam > 0;
-  // Default to audit-kind runs so weekly tracked-prompt runs don't become the
+  // Default to audit-kind runs so tracked-prompt runs don't become the
   // "latest run" the dashboard renders. ?kind=weekly|all overrides.
   const kindFilter = runKindFilter(req);
   const lite = req.query.lite === '1' || req.query.view === 'overview';
@@ -1305,7 +1298,7 @@ router.get('/domain/:id/report', timed('GET /report', 800), authenticateToken, a
   // createdAt is after the SECOND-most-recent completed audit run started.
   // With fewer than two audit runs there's no prior baseline to diff against,
   // so the count is 0 (drives the "New Prompts" card on the All Prompts tab).
-  // Always scoped to kind='audit' so weekly tracked-prompt runs don't move the
+  // Always scoped to kind='audit' so tracked-prompt runs don't move the
   // baseline, regardless of any ?kind override on this request.
   const previousAuditRunStartedAt = useSpecificRun ? null : domain.runs[1]?.startedAt ?? null;
   const newPromptsSinceLastRun = previousAuditRunStartedAt
@@ -1486,7 +1479,7 @@ router.get('/domain/:id/state', authenticateOrSession(), async (req: Request, re
 
 // ── PATCH /domain/:id/prompts/track  { promptIds: number[], tracked } ──────
 //
-// Bulk toggle weekly-tracking for several prompts at once (the "Track all" /
+// Bulk toggle recurring tracking for several prompts at once (the "Track all" /
 // "Track selected" toolbar actions). updateMany is scoped to { id in, domainId }
 // so a caller can't flip prompts on a domain they don't own.
 //
@@ -1566,8 +1559,8 @@ router.patch('/domain/:id/prompts/:promptId', authenticateOrSession(), async (re
 
 // ── PATCH /domain/:id/prompts/:promptId/track  { tracked: boolean } ────────
 //
-// Toggle a single prompt's weekly-tracking flag. Tracked prompts are re-tested
-// every week by the scheduler. Ownership scoped via ensureDomain; the prompt
+// Toggle a single prompt's recurring tracking flag. Tracked prompts are
+// re-tested every day by the scheduler. Ownership scoped via ensureDomain; the prompt
 // must belong to the domain.
 router.patch('/domain/:id/prompts/:promptId/track', authenticateOrSession(), async (req: Request, res: Response) => {
   const got = await ensureDomain(req, req.params.id);
@@ -1596,8 +1589,8 @@ router.patch('/domain/:id/prompts/:promptId/track', authenticateOrSession(), asy
 // ── GET /domain/:id/tracked-prompts ───────────────────────────────────────
 //
 // The Prompt Tracking tab. Returns one PromptTable-shaped row per tracked
-// prompt, built from the LATEST completed weekly run, plus a week-over-week
-// delta vs the previous weekly run and a sparkline trend across recent weekly
+// prompt, built from the LATEST completed tracked run, plus a day-over-day
+// delta vs the previous daily run and a sparkline trend across recent daily
 // runs. Shape mirrors /report's topPrompts so the existing table renders it
 // unchanged, with tracking metadata added.
 router.get('/domain/:id/tracked-prompts', authenticateToken, async (req: Request, res: Response) => {
@@ -1610,52 +1603,61 @@ router.get('/domain/:id/tracked-prompts', authenticateToken, async (req: Request
     select: { id: true, text: true, intent: true, source: true, keywordId: true, lastTrackedRunAt: true },
   });
   if (trackedPrompts.length === 0) {
-    return res.json({ prompts: [], latestRunAt: null, nextTestAt: nextWeeklyRunAt() });
+    return res.json({
+      cadence: TRACKED_PROMPT_CADENCE,
+      prompts: [],
+      latestRunAt: null,
+      nextTestAt: nextDailyRunAt(),
+    });
   }
   const promptIds = trackedPrompts.map((p) => p.id);
 
-  // Recent weekly runs (newest first). We may have multiple runs inside the
-  // same calendar week because "Test tracked now" uses kind='weekly' too.
-  // Bucket by Monday-Sunday UTC week so the UI columns are truly week-wise,
-  // not "every manual run".
-  const weeklyRuns = await prisma.aiRun.findMany({
+  // Recent tracked runs (newest first). We may have multiple runs inside the
+  // same UTC day because "Test tracked now" uses kind='weekly' too.
+  // Bucket by UTC day so the UI columns are truly daily, not "every manual run".
+  const trackedRuns = await prisma.aiRun.findMany({
     where: { domainId: domain.id, kind: 'weekly', status: 'completed' },
     orderBy: { startedAt: 'desc' },
     take: 60,
     select: { id: true, startedAt: true },
   });
 
-  if (weeklyRuns.length === 0) {
+  if (trackedRuns.length === 0) {
     // Tracked but never run yet — return rows with no metrics so the UI can
     // show "Not yet tested".
     return res.json({
+      cadence: TRACKED_PROMPT_CADENCE,
       latestRunAt: null,
-      nextTestAt: nextWeeklyRunAt(),
+      nextTestAt: nextDailyRunAt(),
       prompts: trackedPrompts.map((p) => emptyTrackedRow(p)),
     });
   }
 
-  type WeeklyRunBucket = {
+  type DailyRunBucket = {
     key: string;
     start: Date;
-    runs: typeof weeklyRuns;
+    runs: typeof trackedRuns;
   };
-  const weeklyBuckets = [...weeklyRuns.reduce((map, run) => {
-    const key = weeklyBucketKey(run.startedAt);
+  const dailyBuckets = [...trackedRuns.reduce((map, run) => {
+    const key = dailyBucketKey(run.startedAt);
     const bucket = map.get(key) ?? {
       key,
-      start: weeklyBucketStartUtc(run.startedAt),
-      runs: [] as typeof weeklyRuns,
+      start: dailyBucketStartUtc(run.startedAt),
+      runs: [] as typeof trackedRuns,
     };
     bucket.runs.push(run);
     map.set(key, bucket);
     return map;
-  }, new Map<string, WeeklyRunBucket>()).values()]
+  }, new Map<string, DailyRunBucket>()).values()]
+    .map((bucket) => ({
+      ...bucket,
+      runs: [...bucket.runs].sort((a, b) => b.startedAt.getTime() - a.startedAt.getTime()),
+    }))
     .sort((a, b) => b.start.getTime() - a.start.getTime())
-    .slice(0, 12);
-  const bucketRunsNewestFirst = weeklyBuckets.flatMap((bucket) => bucket.runs);
+    .slice(0, 7);
+  const bucketRunsNewestFirst = dailyBuckets.flatMap((bucket) => bucket.runs);
   const trendRunIds = bucketRunsNewestFirst.map((r) => r.id);
-  const startedAtByRun = new Map(weeklyRuns.map((r) => [r.id, r.startedAt] as const));
+  const startedAtByRun = new Map(trackedRuns.map((r) => [r.id, r.startedAt] as const));
 
   const results = await prisma.aiQueryResult.findMany({
     where: { promptId: { in: promptIds }, runId: { in: trendRunIds } },
@@ -1686,7 +1688,7 @@ router.get('/domain/:id/tracked-prompts', authenticateToken, async (req: Request
     return metrics.successfulResponses > 0 ? metrics.visibilityPct : null;
   };
 
-  const latestRunAt = weeklyRuns[0].startedAt;
+  const latestRunAt = trackedRuns[0].startedAt;
 
   const prompts = trackedPrompts.map((p) => {
     const latestRunForPrompt = bucketRunsNewestFirst.find((run) => {
@@ -1698,10 +1700,10 @@ router.get('/domain/:id/tracked-prompts', authenticateToken, async (req: Request
     const promptMetrics = buildPromptRowMetrics(built, domain.host);
     const competitors = rollupCompetitors(built);
 
-    // Sparkline: one point per UTC week that has data for this prompt,
-    // oldest → newest. If a week has multiple manual tests, use the newest
-    // scored run in that week.
-    const trend = [...weeklyBuckets]
+    // Sparkline: one point per UTC day that has data for this prompt,
+    // oldest → newest. If a day has multiple manual tests, use the newest
+    // scored run in that day.
+    const trend = [...dailyBuckets]
       .reverse()
       .map((bucket) => {
         for (const run of bucket.runs) {
@@ -1712,7 +1714,7 @@ router.get('/domain/:id/tracked-prompts', authenticateToken, async (req: Request
         }
         return null;
       })
-      .filter(Boolean);
+      .filter((point): point is { runId: number; startedAt: Date; visibility: number } => point !== null);
     const latestTrendPoint = trend[trend.length - 1] ?? null;
     const prevTrendPoint = trend[trend.length - 2] ?? null;
     const visibilityDelta =
@@ -1753,17 +1755,22 @@ router.get('/domain/:id/tracked-prompts', authenticateToken, async (req: Request
       // Tracking metadata.
       isTracked: true,
       lastTestedAt: p.lastTrackedRunAt ?? (latestRunForPrompt ? startedAtByRun.get(latestRunForPrompt.id) ?? latestRunAt : null),
-      nextTestAt: nextWeeklyRunAt(),
+      nextTestAt: nextDailyRunAt(),
       weekTrend: { delta: visibilityDelta, lastVisibility: promptMetrics.visibilityPct, points: trend },
     };
   });
 
-  return res.json({ latestRunAt, nextTestAt: nextWeeklyRunAt(), prompts });
+  return res.json({
+    cadence: TRACKED_PROMPT_CADENCE,
+    latestRunAt,
+    nextTestAt: nextDailyRunAt(),
+    prompts,
+  });
 });
 
 // ── POST /domain/:id/tracked-prompts/run-now ──────────────────────────────
 //
-// Manual "Test tracked now" trigger. Fire-and-forget: kicks the weekly run for
+// Manual "Test tracked now" trigger. Fire-and-forget: kicks the tracked run for
 // this domain and returns immediately (the LLM sweep takes minutes). 400 if
 // there are no tracked prompts.
 router.post('/domain/:id/tracked-prompts/run-now', authenticateToken, async (req: Request, res: Response) => {
@@ -1887,7 +1894,7 @@ router.get('/domain/:id/prompts/:promptId/history', authenticateToken, async (re
         ]),
       ),
     }));
-  const runs = isWeeklyHistoryRequest(req) ? collapseRunHistoryToWeeks(runHistory) : runHistory;
+  const runs = isWeeklyHistoryRequest(req) ? collapseRunHistoryToDays(runHistory) : runHistory;
 
   return res.json({ prompt, runs });
 });
@@ -2001,7 +2008,7 @@ router.get('/domain/:id/keywords/:keywordId/history', authenticateToken, async (
         ]),
       ),
     }));
-  const runs = isWeeklyHistoryRequest(req) ? collapseRunHistoryToWeeks(runHistory) : runHistory;
+  const runs = isWeeklyHistoryRequest(req) ? collapseRunHistoryToDays(runHistory) : runHistory;
 
   return res.json({ keyword, runs });
 });
@@ -2353,7 +2360,7 @@ router.get('/domain/:id/trends', authenticateToken, async (req: Request, res: Re
     });
   }
 
-  // Latest 12 completed runs gives ~3 months of weekly history without
+  // Latest 12 completed runs gives a compact tracked-run history without
   // overflowing the chart card. Ordered ascending so the chart reads L→R.
   const runs = await prisma.aiRun.findMany({
     where: { domainId: domain.id, status: 'completed', ...runKindFilter(req) },
@@ -2659,7 +2666,7 @@ router.get('/domain/:id/competitor-analysis', timed('GET /competitor-analysis', 
     useSpecificRun
       ? prisma.aiRun.findFirst({ where: { id: runIdParam, domainId: domain.id, status: 'completed' } })
       // Scope to kind='audit' (via runKindFilter) so the same single-prompt
-      // 'adhoc' / weekly-tracking runs that /report and /trends exclude can't
+      // tracked recurring runs that /report and /trends exclude can't
       // become the "latest run" here either. Without this filter a 1-prompt
       // re-test would define the competitor analysis and the page would read
       // "No competitors mentioned in this audit yet."
@@ -3098,6 +3105,7 @@ router.post('/domain/:id/topics', timed('POST /topics', 4000), authenticateOrSes
     // each filled with the real personas/use-cases/competitors from Stage 1.
     const prompts = await generateAuditPrompts({
       brand: domain.inferred?.companyName ?? domain.host,
+      url: domain.url,
       host: domain.host,
       context: enriched,
       onlyCategories: categoryFilter,

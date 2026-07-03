@@ -27,7 +27,7 @@ export function analysisTools(ctx: ToolContext) {
     }),
 
     getTrackedPrompts: tool({
-      description: 'List the prompts the user tracks weekly for a domain, with week-over-week visibility trend.',
+      description: 'List the prompts the user tracks daily for a domain, with day-over-day visibility trend.',
       inputSchema: z.object({ domainId: z.number().optional() }),
       execute: async (input) => {
         const id = resolveDomainId(input, ctx);

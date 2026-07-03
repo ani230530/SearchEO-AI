@@ -6,7 +6,7 @@ import { apiCall, resolveDomainId, type ToolContext } from './_shared';
 export function promptTools(ctx: ToolContext) {
   return {
     trackPrompt: tool({
-      description: 'Start weekly tracking for a prompt so its AI visibility is re-tested every week.',
+      description: 'Start daily tracking for a prompt so its AI visibility is re-tested every day.',
       inputSchema: z.object({ promptId: z.number(), domainId: z.number().optional() }),
       execute: async (input) => {
         const id = resolveDomainId(input, ctx);
@@ -16,7 +16,7 @@ export function promptTools(ctx: ToolContext) {
     }),
 
     untrackPrompt: tool({
-      description: 'Stop weekly tracking for a prompt.',
+      description: 'Stop daily tracking for a prompt.',
       inputSchema: z.object({ promptId: z.number(), domainId: z.number().optional() }),
       execute: async (input) => {
         const id = resolveDomainId(input, ctx);

@@ -25,8 +25,8 @@ export function TrackToggleButton({
       onClick={onClick}
       disabled={isDisabled}
       aria-pressed={tracked}
-      aria-label={tracked ? "Stop weekly tracking" : "Track weekly"}
-      title={tracked ? "Tracking weekly - click to stop" : "Track weekly"}
+      aria-label={tracked ? "Stop daily tracking" : "Track daily"}
+      title={tracked ? "Tracking daily - click to stop" : "Track daily"}
       aria-busy={loading || undefined}
       className={cn(
         "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[8px] border text-white shadow-[0_4px_14px_rgba(15,23,42,0.06)] transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7f9fe8] focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:opacity-50",

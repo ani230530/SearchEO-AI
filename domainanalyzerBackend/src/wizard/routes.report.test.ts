@@ -145,7 +145,17 @@ function createReportPrismaMock() {
         });
         rows = sortRows(rows, orderBy);
         if (typeof take === 'number') rows = rows.slice(0, take);
-        return projectMany(rows, select);
+        return rows.map((row) => {
+          if (!select?.run) return projectRow(row, select);
+          const run = db.runs.find((candidate) => candidate.id === row.runId);
+          return projectRow(
+            {
+              ...row,
+              run: run ? projectRow(run, select.run.select) : null,
+            },
+            select,
+          );
+        });
       },
     },
     keyword: {
@@ -158,6 +168,10 @@ function createReportPrismaMock() {
       findMany: async ({ where, select, orderBy }: any = {}) => {
         const rows = sortRows(db.prompts.filter((row) => matchesWhere(row, where)), orderBy);
         return projectMany(rows, select);
+      },
+      findFirst: async ({ where, select, orderBy }: any = {}) => {
+        const rows = sortRows(db.prompts.filter((row) => matchesWhere(row, where)), orderBy);
+        return rows[0] ? projectRow(rows[0], select) : null;
       },
       count: async ({ where }: any = {}) => db.prompts.filter((row) => matchesWhere(row, where)).length,
     },
@@ -231,7 +245,7 @@ vi.mock('./analyticsService', () => ({
   computeCompetitorAnalysis: state.computeCompetitorAnalysis,
 }));
 
-import wizardRouter from './routes';
+import wizardRouter, { nextDailyRunAt } from './routes';
 
 let server: Server | null = null;
 let baseUrl = '';
@@ -291,6 +305,18 @@ afterAll(async () => {
 
 beforeEach(() => {
   resetData();
+});
+
+describe('nextDailyRunAt', () => {
+  it('returns today at 03:00 UTC before the daily cutoff', () => {
+    expect(nextDailyRunAt(new Date('2026-06-24T02:59:59.000Z')).toISOString())
+      .toBe('2026-06-24T03:00:00.000Z');
+  });
+
+  it('returns tomorrow at 03:00 UTC once the daily cutoff has arrived', () => {
+    expect(nextDailyRunAt(new Date('2026-06-24T03:00:00.000Z')).toISOString())
+      .toBe('2026-06-25T03:00:00.000Z');
+  });
 });
 
 describe('GET /api/wizard/domain/:id/report', () => {
@@ -398,6 +424,117 @@ describe('GET /api/wizard/domain/:id/report', () => {
     expect(json.topPrompts).toEqual([]);
     expect(json.topAiSearchPrompts).toEqual([]);
     expect(json.runStatus).toBe('pending');
+  });
+});
+
+describe('GET /api/wizard/domain/:id/tracked-prompts', () => {
+  function seedDailyTrackedRuns() {
+    const db = state.prisma.__db;
+    db.domains.push({
+      id: 6,
+      userId: 1,
+      url: 'https://daily.example',
+      host: 'daily.example',
+      profile: { industry: 'SaaS' },
+      inferred: { companyName: 'Daily Co' },
+    });
+    db.prompts.push({
+      id: 601,
+      domainId: 6,
+      keywordId: null,
+      text: 'best daily ai tracking tools',
+      intent: 'Commercial',
+      source: 'ai',
+      isSelected: true,
+      isTracked: true,
+      lastTrackedRunAt: null,
+      category: 'unbranded_recommendation',
+      intentStage: 'consideration',
+      persona: 'SaaS manager',
+      useCase: 'tracking',
+      constraint: null,
+      isBranded: false,
+      competitorMentioned: null,
+      createdAt: new Date('2026-06-01T00:00:00.000Z'),
+    });
+
+    const runs = [
+      { id: 61, startedAt: new Date('2026-06-24T03:00:00.000Z') },
+      { id: 62, startedAt: new Date('2026-06-25T01:00:00.000Z') },
+      { id: 63, startedAt: new Date('2026-06-25T20:00:00.000Z') },
+      { id: 64, startedAt: new Date('2026-06-26T03:00:00.000Z') },
+    ];
+    db.runs.push(...runs.map((run) => ({
+      id: run.id,
+      domainId: 6,
+      status: 'completed',
+      kind: 'weekly',
+      startedAt: run.startedAt,
+      endedAt: new Date(run.startedAt.getTime() + 5 * 60 * 1000),
+    })));
+
+    const presenceByRun = new Map<number, number>([
+      [61, 0],
+      [62, 0],
+      [63, 1],
+      [64, 0],
+    ]);
+    db.results.push(...runs.map((run) => ({
+      id: 600 + run.id,
+      runId: run.id,
+      promptId: 601,
+      model: 'gpt-4o-mini',
+      status: 'success',
+      response: presenceByRun.get(run.id) === 1 ? 'Daily Co appears' : 'No brand mention',
+      presence: presenceByRun.get(run.id) ?? 0,
+      relevance: 8,
+      sentiment: presenceByRun.get(run.id) === 1 ? 2 : null,
+      accuracy: 7,
+      rankPosition: presenceByRun.get(run.id) === 1 ? 1 : null,
+      overall: 7,
+      scorerSummary: 'scored',
+      factualClaims: [],
+      competitorHosts: [],
+      citations: [],
+      competitorMentions: [],
+      latencyMs: 450,
+      createdAt: new Date(run.startedAt.getTime() + 60 * 1000),
+    })));
+  }
+
+  it('returns daily cadence and collapses multiple tracked runs on the same UTC day', async () => {
+    seedDailyTrackedRuns();
+
+    const response = await request('/api/wizard/domain/6/tracked-prompts');
+    const json = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(json.cadence).toBe('daily');
+    expect(new Date(json.nextTestAt).getUTCHours()).toBe(3);
+    expect(json.latestRunAt).toBe('2026-06-26T03:00:00.000Z');
+
+    const prompt = json.prompts[0];
+    expect(prompt.weekTrend.delta).toBe(-100);
+    expect(prompt.weekTrend.points).toEqual([
+      { runId: 61, startedAt: '2026-06-24T00:00:00.000Z', visibility: 0 },
+      { runId: 63, startedAt: '2026-06-25T00:00:00.000Z', visibility: 100 },
+      { runId: 64, startedAt: '2026-06-26T00:00:00.000Z', visibility: 0 },
+    ]);
+  });
+
+  it('keeps ?kind=weekly compatible while collapsing prompt history by UTC day', async () => {
+    seedDailyTrackedRuns();
+
+    const response = await request('/api/wizard/domain/6/prompts/601/history?kind=weekly');
+    const json = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(json.runs.map((run: any) => run.runId)).toEqual([61, 63, 64]);
+    expect(json.runs.map((run: any) => run.startedAt)).toEqual([
+      '2026-06-24T03:00:00.000Z',
+      '2026-06-25T20:00:00.000Z',
+      '2026-06-26T03:00:00.000Z',
+    ]);
   });
 });
 

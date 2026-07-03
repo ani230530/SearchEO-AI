@@ -450,7 +450,7 @@ function writeChip(toolName: string, output: any): React.ReactNode {
   if (output?.needsConfirmation) return null; // the model asks for confirmation in prose
   const started = (text: string) => <SuccessChip text={text} />;
   switch (toolName) {
-    case "trackPrompt": return <SuccessChip text="Now tracking this prompt weekly." />;
+    case "trackPrompt": return <SuccessChip text="Now tracking this prompt daily." />;
     case "untrackPrompt": return <SuccessChip text="Stopped tracking this prompt." />;
     case "createWorksheet": return <SuccessChip text={`Created the “${output?.title ?? "new"}” worksheet.`} />;
     case "updateWorksheet": return <SuccessChip text="Worksheet renamed." />;
