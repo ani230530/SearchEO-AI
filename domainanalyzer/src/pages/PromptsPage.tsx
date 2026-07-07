@@ -1395,7 +1395,7 @@ function TrackedPromptsDailyTable({
           </Table>
           </div>
         </div>
-        <div className="mt-2 flex flex-col gap-3 border-t border-slate-200 px-6 py-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="mt-2 flex flex-col gap-3 border-t border-slate-200 px-6 py-3 sm:flex-row sm:items-center sm:justify-between sm:pr-[12rem]">
           <div className="flex items-center gap-3">
             <span className="text-[11px] font-semibold tracking-tight text-gray-500">
               {totalCount === 0

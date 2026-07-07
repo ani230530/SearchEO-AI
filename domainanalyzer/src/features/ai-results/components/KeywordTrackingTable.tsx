@@ -969,7 +969,7 @@ export const KeywordTrackingTable = ({
             </TableBody>
           </Table>
         </div>
-        <div className="mt-2 flex items-center justify-between gap-3 border-t border-slate-200 px-6 py-3">
+        <div className="mt-2 flex items-center justify-between gap-3 border-t border-slate-200 px-6 py-3 sm:pr-[12rem]">
           <span className="text-[11px] font-medium tracking-tight text-[#64748b]">
             {totalCount === 0
               ? "No rows"
