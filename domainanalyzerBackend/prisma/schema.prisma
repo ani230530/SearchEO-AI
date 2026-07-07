@@ -28,6 +28,8 @@ model User {
   // Nullable for Google-only accounts that never set a local password.
   password                     String?
   name                         String?
+  // Coarse app-wide role. Blog writers/editors are checked at write time.
+  role                         String    @default("user")
   // Google "sub" / stable user id from OIDC. Set when the user signs in via
   // Google OAuth; matches happen by googleId first, then fall back to email.
   googleId                     String?   @unique
@@ -75,6 +77,12 @@ model User {
   // Shadow users have email = anon-{sessionId}@system.local and an
   // unusable password hash. They never log in via the normal auth path.
   wizardSessionsAnon   WizardSession[]                @relation("WizardSessionAnonUser")
+  blogPostsCreated     BlogPost[]                     @relation("BlogPostCreatedBy")
+  blogPostsUpdated     BlogPost[]                     @relation("BlogPostUpdatedBy")
+  blogCategoriesCreated BlogCategory[]                @relation("BlogCategoryCreatedBy")
+  blogCategoriesUpdated BlogCategory[]                @relation("BlogCategoryUpdatedBy")
+  blogTagsCreated      BlogTag[]                      @relation("BlogTagCreatedBy")
+  blogTagsUpdated      BlogTag[]                      @relation("BlogTagUpdatedBy")
   folders              Folder[]
   files                File[]
   chatThreads          ChatThread[]
@@ -394,6 +402,100 @@ model AiQueryResult {
 // (deprecated columns and frozen archive tables removed)
 // -----------------------------------------------------------------------------
 
+enum BlogPostStatus {
+  DRAFT
+  SCHEDULED
+  PUBLISHED
+  ARCHIVED
+}
+
+model BlogCategory {
+  id          Int       @id @default(autoincrement())
+  name        String
+  slug        String    @unique
+  description String?
+  sortOrder   Int       @default(0)
+  createdById  Int
+  updatedById  Int?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  createdBy   User      @relation("BlogCategoryCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  updatedBy   User?     @relation("BlogCategoryUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  posts       BlogPost[]
+
+  @@index([sortOrder])
+  @@index([createdById])
+}
+
+model BlogTag {
+  id          Int       @id @default(autoincrement())
+  name        String
+  slug        String    @unique
+  description String?
+  createdById  Int
+  updatedById  Int?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  createdBy   User      @relation("BlogTagCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  updatedBy   User?     @relation("BlogTagUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+
+  @@index([createdById])
+}
+
+model BlogPost {
+  id              Int             @id @default(autoincrement())
+  slug            String          @unique
+  title           String
+  excerpt         String?
+  contentHtml     String
+  heroImageUrl    String?
+  heroImageAlt    String?
+  seoTitle        String?
+  seoDescription  String?
+  status          BlogPostStatus   @default(DRAFT)
+  publishedAt     DateTime?
+  scheduledAt     DateTime?
+  readTimeMinutes Int             @default(0)
+  authorName      String?
+  authorTitle     String?
+  categoryId      Int?
+  tagIds          Int[]           @default([])
+  createdById     Int
+  updatedById     Int?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  category        BlogCategory?   @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  createdBy       User            @relation("BlogPostCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  updatedBy       User?           @relation("BlogPostUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+
+  @@index([status, publishedAt])
+  @@index([categoryId, status, publishedAt])
+  @@index([createdById])
+}
+
+enum PostStatus {
+  DRAFT
+  PUBLISHED
+  SCHEDULED
+}
+
+model Post {
+  id              String     @id @default(uuid())
+  title           String
+  slug            String     @unique
+  excerpt         String     @db.Text @default("")
+  body            Json
+  heroImage       String     @default("")
+  seoTitle        String     @default("")
+  seoDescription  String     @default("")
+  status          PostStatus @default(DRAFT)
+  publishedAt     DateTime?
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  @@index([status, publishedAt])
+}
+
 model Campaign {
   id          Int             @id @default(autoincrement())
   title       String
@@ -478,6 +580,8 @@ model WordpressPublishLog {
   title                    String?
   slug                     String?
   status                   String?
+  scheduledAt              DateTime?
+  publishedAt              DateTime?
   response                 Json?
   createdAt                DateTime              @default(now())
   updatedAt                DateTime              @default(now()) @updatedAt
@@ -490,6 +594,7 @@ model WordpressPublishLog {
   @@index([generationJobId])
   @@index([generationJobId, normalizedPrimaryKeyword])
   @@index([generationTopicId])
+  @@index([status, scheduledAt])
 }
 
 model GenerationJob {

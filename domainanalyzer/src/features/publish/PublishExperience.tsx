@@ -26,6 +26,7 @@ import { Sheet, SheetContent } from '@/components/ui/sheet';
 import { useToast } from '@/components/ui/use-toast';
 import PublishOverviewCard from './PublishOverviewCard';
 import PublishHistoryTable from './PublishHistoryTable';
+import WordpressIntegrationModal from './WordpressIntegrationModal';
 import Tippy from '@tippyjs/react';
 import 'tippy.js/dist/tippy.css';
 import 'tippy.js/themes/light.css';
@@ -200,6 +201,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
    * cleared by applyTerminalPublishState on the resulting SSE event.
    */
   const [isPublishing, setIsPublishing] = useState(false);
+  const [wordpressSetupOpen, setWordpressSetupOpen] = useState(false);
   const [selectedText, setSelectedText] = useState('');
   const [textEditNote, setTextEditNote] = useState('');
   const [textEditing, setTextEditing] = useState(false);
@@ -1142,7 +1144,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
     return (
       <button
         type="button"
-        onClick={handlePublishToWordpress}
+        onClick={() => void handlePublishToWordpress()}
         disabled={cfg.disabled || !publishResult}
         title={cfg.title}
         className={`${base} ${cfg.tone} disabled:opacity-60 disabled:cursor-not-allowed`}
@@ -2120,7 +2122,7 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
     }
   }, [publishResult, selectedImage, imageEditNote, toast, extractEditedImage, isEditMode, currentHtmlContent, handleHtmlEditorChange]);
 
-  const handlePublishToWordpress = async () => {
+  const handlePublishToWordpress = async (options?: { skipIntegrationCheck?: boolean }) => {
     if (!publishResult || !currentHtmlContent) {
       toast({
         title: 'No Draft',
@@ -2130,12 +2132,8 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
       return;
     }
 
-    if (!hasWordpressIntegration) {
-      toast({
-        title: 'Connect WordPress',
-        description: 'Add your WordPress credentials in the Integration tab',
-        variant: 'destructive',
-      });
+    if (!options?.skipIntegrationCheck && !hasWordpressIntegration) {
+      setWordpressSetupOpen(true);
       return;
     }
 
@@ -2619,6 +2617,15 @@ const PublishExperience: React.FC<PublishExperienceProps> = ({
 
   return (
     <>
+      <WordpressIntegrationModal
+        open={wordpressSetupOpen}
+        onClose={() => setWordpressSetupOpen(false)}
+        onConnected={async () => {
+          await Promise.resolve(onRefreshWordpressIntegration?.());
+          void handlePublishToWordpress({ skipIntegrationCheck: true });
+        }}
+        submitLabel="Connect and publish"
+      />
 
       {showPreviewStage && (
           // Render preview content directly without overlay wrapper (for embedded use)

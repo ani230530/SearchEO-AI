@@ -1,3 +1,4 @@
+import { Loader2, RefreshCw } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import type { AiResponseAnalysisData, PromptGapContext } from './aiResponseAnalysisData';
@@ -6,6 +7,9 @@ interface AiResponseAnalysisProps {
   data: AiResponseAnalysisData | null;
   prompt?: PromptGapContext | null;
   loading?: boolean;
+  onRetry?: () => void;
+  retrying?: boolean;
+  retryError?: string | null;
 }
 
 const appendUtmSource = (value: string): string => {
@@ -89,15 +93,53 @@ function RankingRow({
 }
 
 function PerformanceRow({ item }: { item: AiResponseAnalysisData['performance'][number] }) {
+  const statusClass =
+    item.status === 'failed'
+      ? 'border-rose-200 bg-rose-50 text-rose-700'
+      : item.mentioned
+        ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+        : 'border-slate-200 bg-slate-50 text-slate-600';
+  const statusLabel = item.status === 'failed' ? 'Failed' : item.mentioned ? 'Mentioned' : 'Not mentioned';
+
   return (
     <div className="space-y-2.5">
       <div className="flex items-center justify-between gap-4">
-        <span className="text-[14px] font-medium text-[#2D4059]">{item.name}</span>
-        <span className="text-[14px] font-medium text-[#2D4059]">{item.value}</span>
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+          <span className="truncate text-[14px] font-medium text-[#2D4059]">{item.name}</span>
+          <span className={cn('rounded-full border px-2 py-0.5 text-[10px] font-semibold', statusClass)}>
+            {statusLabel}
+          </span>
+          {item.rankPosition ? (
+            <span className="rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-700">
+              Rank #{item.rankPosition}
+            </span>
+          ) : null}
+        </div>
+        <span className="shrink-0 text-[14px] font-medium text-[#2D4059]">{item.value}</span>
       </div>
       <div className="h-2 rounded-full bg-slate-200">
         <div className="h-2 rounded-full bg-[#6D8ED8]" style={{ width: `${item.barWidth}%` }} />
       </div>
+      {item.competitors.length > 0 ? (
+        <p className="text-[11px] text-slate-500">
+          Competitors detected: {item.competitors.slice(0, 4).join(', ')}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+function ModelResponseCard({ item }: { item: AiResponseAnalysisData['performance'][number] }) {
+  const excerpt = item.status === 'failed'
+    ? item.errorMessage ?? 'Provider failed before returning a usable answer.'
+    : item.response.trim() || 'No response text was stored for this model.';
+  return (
+    <div className="rounded-lg border border-slate-200 bg-white px-3 py-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm font-semibold text-slate-800">{item.name}</p>
+        <p className="text-xs font-medium text-slate-500">{item.value}</p>
+      </div>
+      <p className="mt-2 line-clamp-4 text-xs leading-5 text-slate-600">{excerpt}</p>
     </div>
   );
 }
@@ -121,9 +163,13 @@ function PromptInsightsCard({ insights }: { insights: string[] }) {
 function AnalysisHeader({
   title,
   subtitle,
+  onRetry,
+  retrying,
 }: {
   title: string;
   subtitle: string;
+  onRetry?: () => void;
+  retrying?: boolean;
 }) {
   return (
     <div className="flex items-start justify-between gap-4">
@@ -131,6 +177,17 @@ function AnalysisHeader({
         <h2 className="text-xl font-semibold text-slate-900">{title}</h2>
         <p className="mt-1 text-sm text-slate-500">{subtitle}</p>
       </div>
+      {onRetry ? (
+        <button
+          type="button"
+          onClick={onRetry}
+          disabled={retrying}
+          className="inline-flex h-9 shrink-0 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600 shadow-sm transition hover:border-blue-200 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {retrying ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+          {retrying ? 'Retrying' : 'Retry'}
+        </button>
+      ) : null}
     </div>
   );
 }
@@ -144,13 +201,15 @@ function PromptContextLine({ prompt, fallback }: { prompt?: PromptGapContext | n
   );
 }
 
-export function AiResponseAnalysis({ data, prompt, loading }: AiResponseAnalysisProps) {
+export function AiResponseAnalysis({ data, prompt, loading, onRetry, retrying = false, retryError }: AiResponseAnalysisProps) {
   if (loading || !data) {
     return (
       <div className="flex min-h-full flex-col px-4 py-4 sm:px-5">
         <AnalysisHeader
           title={loading ? 'Loading AI Response Analysis…' : 'AI Response Analysis'}
           subtitle={loading ? 'Aggregating mentions, sentiment, and ranking across this prompt.' : 'No response data available for this opportunity yet.'}
+          onRetry={onRetry}
+          retrying={retrying}
         />
         {prompt ? (
           <div className="mt-3">
@@ -168,10 +227,18 @@ export function AiResponseAnalysis({ data, prompt, loading }: AiResponseAnalysis
 
   return (
     <div className="flex min-h-full flex-col px-4 py-4 sm:px-5">
-      <AnalysisHeader title={data.title} subtitle={data.subtitle} />
+      <AnalysisHeader title={data.title} subtitle={data.subtitle} onRetry={data.sourcePromptId ? onRetry : undefined} retrying={retrying} />
+      {retryError ? (
+        <p className="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-medium text-rose-700">
+          {retryError}
+        </p>
+      ) : null}
 
       <div className="mt-3">
         <PromptContextLine prompt={prompt} fallback={data.promptLabel} />
+        <p className="mt-1 text-xs text-slate-500">
+          {data.successfulResponses} successful of {data.attemptedResponses} attempted model responses analyzed.
+        </p>
       </div>
 
       <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -181,10 +248,15 @@ export function AiResponseAnalysis({ data, prompt, loading }: AiResponseAnalysis
       </div>
 
       <section className="mt-5 rounded-xl border border-slate-200 bg-white px-3 py-3 shadow-sm">
-        <h3 className="text-base font-medium text-slate-800">Competitive Ranking - Prompts tracking</h3>
-        <div className="mt-2 divide-y divide-slate-100">
-          {data.rankings.map((item) => (
-            <div key={item.domain} className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.8fr)_56px] items-center gap-3 py-3">
+        <h3 className="text-base font-medium text-slate-800">Competitors Detected In Responses</h3>
+        {data.rankings.length === 0 ? (
+          <p className="mt-3 rounded-lg border border-dashed border-slate-200 bg-slate-50 px-3 py-4 text-sm leading-6 text-slate-500">
+            {data.emptyState ?? 'No competitor mentions were detected in the successful model responses for this prompt.'}
+          </p>
+        ) : (
+          <div className="mt-2 divide-y divide-slate-100">
+            {data.rankings.map((item) => (
+              <div key={item.domain} className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.8fr)_56px] items-center gap-3 py-3">
               <div className="flex min-w-0 items-center gap-3">
                 <span className="grid h-8 w-8 shrink-0 place-items-center overflow-hidden rounded-md border border-slate-200 bg-white">
                   <img src={item.logo} alt="" className="h-6 w-6 object-contain" />
@@ -209,18 +281,40 @@ export function AiResponseAnalysis({ data, prompt, loading }: AiResponseAnalysis
               <div className="flex justify-end">
                 <StatusBadge status={item.status} tone={item.statusTone} />
               </div>
-            </div>
-          ))}
-        </div>
+              </div>
+            ))}
+          </div>
+        )}
       </section>
 
       <section className="mt-5 rounded-xl border border-slate-200 bg-white px-4 py-4 shadow-sm">
-        <h3 className="text-base font-medium text-slate-800">Performance Metrics</h3>
-        <div className="mt-4 space-y-6">
-          {data.performance.map((item) => (
-            <PerformanceRow key={item.name} item={item} />
-          ))}
-        </div>
+        <h3 className="text-base font-medium text-slate-800">Model-Level Brand Visibility</h3>
+        {data.performance.length === 0 ? (
+          <p className="mt-3 rounded-lg border border-dashed border-slate-200 bg-slate-50 px-3 py-4 text-sm leading-6 text-slate-500">
+            No model-level responses are stored for this prompt yet.
+          </p>
+        ) : (
+          <div className="mt-4 space-y-6">
+            {data.performance.map((item) => (
+              <PerformanceRow key={item.name} item={item} />
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section className="mt-5 rounded-xl border border-slate-200 bg-white px-4 py-4 shadow-sm">
+        <h3 className="text-base font-medium text-slate-800">Model Responses</h3>
+        {data.performance.length === 0 ? (
+          <p className="mt-3 rounded-lg border border-dashed border-slate-200 bg-slate-50 px-3 py-4 text-sm leading-6 text-slate-500">
+            Use Retry to collect fresh model responses for the linked prompt.
+          </p>
+        ) : (
+          <div className="mt-3 grid gap-3">
+            {data.performance.map((item) => (
+              <ModelResponseCard key={`${item.name}-response`} item={item} />
+            ))}
+          </div>
+        )}
       </section>
 
       <section className="mt-5">

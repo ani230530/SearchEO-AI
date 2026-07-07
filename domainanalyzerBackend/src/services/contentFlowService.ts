@@ -21,6 +21,8 @@ export interface CanonicalDraftContent {
   primaryKeyword: string;
   longtailKeywords: string;
   status: string;
+  scheduledAt: string | null;
+  publishedAt: string | null;
   wordpressUrl: string | null;
   error: string | null;
   updatedAt: string;
@@ -165,6 +167,12 @@ const firstArray = (...values: unknown[]): string[] => {
     }
   }
   return [];
+};
+
+const toIsoString = (value: Date | string | null | undefined): string | null => {
+  if (!value) return null;
+  const date = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
 };
 
 export const normalizeFeaturedImageEnabled = (value: unknown, fallback = true): boolean => {
@@ -398,6 +406,8 @@ export const serializeDraftContent = (draft: WordpressPublishLog): CanonicalDraf
     response.featuredImageEnabled ?? response.featured_image_enabled ?? response['Featured Image Enabled'],
     Boolean(featuredImageUrl)
   );
+  const scheduledAt = response.scheduledAt as Date | string | null | undefined;
+  const publishedAt = response.publishedAt as Date | string | null | undefined;
 
   return {
     htmlContent: firstString(response.htmlContent, response['Html Content']),
@@ -407,12 +417,46 @@ export const serializeDraftContent = (draft: WordpressPublishLog): CanonicalDraf
     wordpressPostId: firstNumber(draft.wordpressPostId, response.wordpressPostId, response['WordPress Post ID'], response.id),
     featuredImageEnabled,
     featuredImageUrl,
-    primaryKeyword: firstString(draft.primaryKeyword, response.primaryKeyword, response['Primary Keyword']),
+    primaryKeyword: firstString(response.primaryKeyword, response['Primary Keyword'], draft.primaryKeyword),
     longtailKeywords: firstString(response.longtailKeywords, response['longtail keywords']),
     status: firstString(draft.status, response.status) || 'draft',
+    scheduledAt: toIsoString((draft as { scheduledAt?: Date | string | null }).scheduledAt ?? scheduledAt ?? (response.scheduled_at as Date | string | null | undefined)),
+    publishedAt: toIsoString((draft as { publishedAt?: Date | string | null }).publishedAt ?? publishedAt ?? (response.published_at as Date | string | null | undefined)),
     wordpressUrl: firstString(draft.wordpressUrl, response.wordpressUrl, response['wordpress url']) || null,
     error: firstString(response.error) || null,
     updatedAt: draft.updatedAt.toISOString(),
+  };
+};
+
+export const getWordpressPublishJobId = (draftId: number): string => `wordpress-publish-${draftId}`;
+
+export const buildWordpressPublishPayload = (
+  draft: WordpressPublishLog,
+  credentials: {
+    username: string;
+    password: string;
+    siteUrl: string;
+  },
+) => {
+  const draftContent = serializeDraftContent(draft);
+
+  return {
+    draftContent,
+    payload: [
+      {
+        Username: credentials.username,
+        Password: credentials.password,
+        'wordpress url': credentials.siteUrl,
+        'Primary Keyword': draftContent.primaryKeyword,
+        'Html Content': draftContent.htmlContent,
+        'Featured Image':
+          normalizeFeaturedImageUrl(draftContent.featuredImageUrl) ||
+          (normalizeFeaturedImageEnabled(draftContent.featuredImageEnabled, true) ? 'yes' : 'no'),
+        Title: draftContent.title,
+        'Meta Description': draftContent.metaDescription,
+        slug: draftContent.slug,
+      },
+    ],
   };
 };
 
@@ -421,6 +465,8 @@ export const normalizePublishGenerateResponse = (
   integration: { siteUrl: string } | null
 ): CanonicalDraftContent => {
   const entry = Array.isArray(response) ? ((response[0] || {}) as UnknownRecord) : ((response || {}) as UnknownRecord);
+  const entryScheduledAt = entry.scheduledAt as Date | string | null | undefined;
+  const entryPublishedAt = entry.publishedAt as Date | string | null | undefined;
   const featuredImageUrl = normalizeFeaturedImageUrl(
     entry.featuredImageUrl ?? entry.featured_image_url ?? entry['Featured Image'] ?? entry.featuredImage ?? entry.image
   );
@@ -443,6 +489,8 @@ export const normalizePublishGenerateResponse = (
       '',
     longtailKeywords: firstString(entry['longtail keywords'], entry.longtailKeywords),
     status: firstString(entry.status) || 'draft',
+    scheduledAt: toIsoString(entryScheduledAt ?? (entry.scheduled_at as Date | string | null | undefined)),
+    publishedAt: toIsoString(entryPublishedAt ?? (entry.published_at as Date | string | null | undefined)),
     error: firstString(entry.error) || null,
     updatedAt: new Date().toISOString(),
   };

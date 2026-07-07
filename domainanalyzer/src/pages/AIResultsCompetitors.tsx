@@ -2,8 +2,10 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ArrowDownRight,
   ArrowUpRight,
+  Check,
   ChevronDown,
   ChevronRight,
+  Filter,
   Info,
   Loader2,
   Plus,
@@ -28,6 +30,13 @@ import {
 import { Drawer } from '@/components/Drawer';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { CompetitorDetail } from '@/components/competitors/CompetitorDetail';
 import { AiResponseAnalysis } from '@/components/competitors/AiResponseAnalysis';
 import { cn } from '@/lib/utils';
@@ -166,17 +175,107 @@ interface ReportPayload {
     text: string;
     competitors: string[];
     results: Array<{
+      id?: string;
       model: string;
       status?: string;
+      errorMessage?: string | null;
       presence: number;
+      overall?: number | null;
+      relevance?: number | null;
+      accuracy?: number | null;
       sentiment: number | null;
       rankPosition: number | null;
+      response?: string;
+      latencyMs?: number | null;
       competitorHosts?: string[];
       competitorMentions: Array<{ host: string; count: number; sentiment: number | null; rankPosition?: number | null }>;
     }>;
+    metrics?: {
+      avgOverall?: number | null;
+      visibility?: number | null;
+      aiSov?: number | null;
+      runs?: number | null;
+      attemptedRuns?: number | null;
+    };
   }>;
   opportunities: ReportOpportunity[];
 }
+
+type OpportunitySeverityFilter = 'all' | 'critical' | 'high' | 'medium' | 'low';
+type OpportunitySort = 'priority' | 'impact' | 'title';
+type CompetitorThreatFilter = 'all' | 'High' | 'Medium' | 'Low';
+type CompetitorSort = 'threat' | 'mentions' | 'coverage' | 'rank';
+
+const OPPORTUNITY_SEVERITY_OPTIONS: Array<{ value: OpportunitySeverityFilter; label: string }> = [
+  { value: 'all', label: 'All priorities' },
+  { value: 'critical', label: 'Critical' },
+  { value: 'high', label: 'High' },
+  { value: 'medium', label: 'Medium' },
+  { value: 'low', label: 'Low' },
+];
+
+const OPPORTUNITY_SORT_OPTIONS: Array<{ value: OpportunitySort; label: string }> = [
+  { value: 'priority', label: 'Priority' },
+  { value: 'impact', label: 'Impact' },
+  { value: 'title', label: 'Title A-Z' },
+];
+
+const COMPETITOR_THREAT_OPTIONS: Array<{ value: CompetitorThreatFilter; label: string }> = [
+  { value: 'all', label: 'All threats' },
+  { value: 'High', label: 'High threat' },
+  { value: 'Medium', label: 'Medium threat' },
+  { value: 'Low', label: 'Low threat' },
+];
+
+const COMPETITOR_SORT_OPTIONS: Array<{ value: CompetitorSort; label: string }> = [
+  { value: 'threat', label: 'Threat' },
+  { value: 'mentions', label: 'Mentions' },
+  { value: 'coverage', label: 'Coverage' },
+  { value: 'rank', label: 'Rank' },
+];
+
+const opportunitySeverityWeight = (severity?: string | null) => {
+  switch (severity) {
+    case 'critical':
+      return 4;
+    case 'high':
+      return 3;
+    case 'medium':
+      return 2;
+    case 'low':
+      return 1;
+    default:
+      return 0;
+  }
+};
+
+const opportunityTrafficWeight = (traffic?: string | null) => {
+  switch (traffic) {
+    case 'very_high':
+      return 4;
+    case 'high':
+      return 3;
+    case 'medium':
+      return 2;
+    case 'low':
+      return 1;
+    default:
+      return 0;
+  }
+};
+
+const competitorThreatWeight = (threatLevel: CompetitorAnalysisRow['threatLevel']) => {
+  switch (threatLevel) {
+    case 'High':
+      return 3;
+    case 'Medium':
+      return 2;
+    case 'Low':
+      return 1;
+    default:
+      return 0;
+  }
+};
 
 interface TrendsResponse {
   runs: Array<{
@@ -1016,7 +1115,51 @@ function PromptGapPanel({
   onAiResponse: (o: ReportOpportunity) => void;
   onGenerate: (o: ReportOpportunity) => void;
 }) {
-  const shown = opportunities.slice(0, 4);
+  const PAGE_SIZE = 4;
+  const [severityFilter, setSeverityFilter] = useState<OpportunitySeverityFilter>('all');
+  const [sortBy, setSortBy] = useState<OpportunitySort>('priority');
+  const [currentPage, setCurrentPage] = useState(1);
+
+  const filtered = useMemo(() => {
+    return opportunities
+      .filter((item) => severityFilter === 'all' || item.severity === severityFilter)
+      .sort((a, b) => {
+        if (sortBy === 'impact') {
+          return (
+            opportunityTrafficWeight(b.trafficPotential) - opportunityTrafficWeight(a.trafficPotential) ||
+            opportunitySeverityWeight(b.severity) - opportunitySeverityWeight(a.severity) ||
+            a.title.localeCompare(b.title)
+          );
+        }
+        if (sortBy === 'title') {
+          return a.title.localeCompare(b.title, undefined, { sensitivity: 'base' });
+        }
+        return (
+          opportunitySeverityWeight(b.severity) - opportunitySeverityWeight(a.severity) ||
+          Number(b.severityScore ?? 0) - Number(a.severityScore ?? 0) ||
+          opportunityTrafficWeight(b.trafficPotential) - opportunityTrafficWeight(a.trafficPotential) ||
+          a.title.localeCompare(b.title)
+        );
+      });
+  }, [opportunities, severityFilter, sortBy]);
+
+  const totalCount = filtered.length;
+  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
+  const pageResetKey = useMemo(() => filtered.map((item) => item.key).join('|'), [filtered]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [pageResetKey, severityFilter, sortBy]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(totalPages);
+  }, [currentPage, totalPages]);
+
+  const shown = useMemo(() => {
+    const start = (currentPage - 1) * PAGE_SIZE;
+    return filtered.slice(start, start + PAGE_SIZE);
+  }, [currentPage, filtered]);
+
   return (
     <section id="competitors-gaps" data-title="Prompt Gaps Opportunities" className="min-w-0 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
       <div className="flex items-start justify-between gap-4">
@@ -1024,13 +1167,58 @@ function PromptGapPanel({
           <h3 className="text-xl font-semibold leading-none text-[#2D4059]">Prompt Gaps Opportunities</h3>
           <p className="mt-3 text-base text-[#7B8494]">Identify missed prompts and turn them into content opportunities.</p>
         </div>
-        <button
-          type="button"
-          className="inline-flex h-10 shrink-0 items-center gap-3 rounded-md border border-[#D7DDE6] bg-white px-4 text-xs font-semibold text-[#7B8494] shadow-sm"
-        >
-          View all
-          <ChevronDown className="h-3.5 w-3.5 -rotate-90" />
-        </button>
+        {opportunities.length > 0 ? (
+          <div className="flex shrink-0 flex-wrap justify-end gap-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className="inline-flex h-10 items-center gap-2 rounded-md border border-[#D7DDE6] bg-white px-3 text-xs font-semibold text-[#7B8494] shadow-sm transition hover:bg-slate-50"
+                >
+                  <ArrowDownRight className="h-3.5 w-3.5" />
+                  {OPPORTUNITY_SORT_OPTIONS.find((option) => option.value === sortBy)?.label ?? 'Priority'}
+                  <ChevronDown className="h-3.5 w-3.5" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-[160px] p-1">
+                {OPPORTUNITY_SORT_OPTIONS.map((option) => (
+                  <DropdownMenuItem
+                    key={option.value}
+                    onClick={() => setSortBy(option.value)}
+                    className="flex cursor-pointer items-center justify-between rounded-md px-2 py-1.5 text-[12px]"
+                  >
+                    {option.label}
+                    {sortBy === option.value ? <Check className="h-3.5 w-3.5 text-blue-600" /> : null}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className="inline-flex h-10 items-center gap-2 rounded-md border border-[#D7DDE6] bg-white px-3 text-xs font-semibold text-[#7B8494] shadow-sm transition hover:bg-slate-50"
+                >
+                  <Filter className="h-3.5 w-3.5" />
+                  {OPPORTUNITY_SEVERITY_OPTIONS.find((option) => option.value === severityFilter)?.label ?? 'All priorities'}
+                  <ChevronDown className="h-3.5 w-3.5" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-[180px] p-1">
+                {OPPORTUNITY_SEVERITY_OPTIONS.map((option) => (
+                  <DropdownMenuItem
+                    key={option.value}
+                    onClick={() => setSeverityFilter(option.value)}
+                    className="flex cursor-pointer items-center justify-between rounded-md px-2 py-1.5 text-[12px]"
+                  >
+                    {option.label}
+                    {severityFilter === option.value ? <Check className="h-3.5 w-3.5 text-blue-600" /> : null}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        ) : null}
       </div>
 
       <div className="mt-8 space-y-6">
@@ -1040,7 +1228,9 @@ function PromptGapPanel({
           </p>
         ) : shown.length === 0 ? (
           <p className="rounded-md border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-center text-sm text-slate-500">
-            No prompt gaps yet — you're holding your own across the tracked prompts.
+            {opportunities.length === 0
+              ? "No prompt gaps yet — you're holding your own across the tracked prompts."
+              : 'No prompt gaps match the current filters.'}
           </p>
         ) : (
           shown.map((item) => (
@@ -1053,6 +1243,36 @@ function PromptGapPanel({
           ))
         )}
       </div>
+      {opportunities.length > 0 ? (
+        <div className="mt-6 flex items-center justify-between gap-3 border-t border-slate-200 pt-3">
+          <span className="text-[11px] font-semibold tracking-tight text-gray-500">
+            {totalCount === 0
+              ? 'No rows'
+              : `Showing ${(currentPage - 1) * PAGE_SIZE + 1}–${Math.min(currentPage * PAGE_SIZE, totalCount)} of ${totalCount}`}
+          </span>
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+              disabled={currentPage <= 1}
+              className="rounded-md border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-medium text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Prev
+            </button>
+            <span className="px-2 text-[11px] font-medium text-slate-500 tabular-nums">
+              {currentPage} / {totalPages}
+            </span>
+            <button
+              type="button"
+              onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+              disabled={currentPage >= totalPages}
+              className="rounded-md border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-medium text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -1126,47 +1346,194 @@ function AICompetitorAnalysisResults({
   competitors: CompetitorAnalysisRow[];
   onOpenDetail: (c: CompetitorAnalysisRow) => void;
 }) {
+  const PAGE_SIZE = 6;
+  const [query, setQuery] = useState('');
+  const [threatFilter, setThreatFilter] = useState<CompetitorThreatFilter>('all');
+  const [sortBy, setSortBy] = useState<CompetitorSort>('threat');
+  const [currentPage, setCurrentPage] = useState(1);
+
   const visibleCompetitors = useMemo(() => {
-    const threatRank = (threatLevel: CompetitorAnalysisRow['threatLevel']) => {
-      switch (threatLevel) {
-        case 'High':
-          return 0;
-        case 'Medium':
-          return 1;
-        case 'Low':
-          return 2;
-        default:
-          return 3;
-      }
-    };
+    const q = query.trim().toLowerCase();
 
     return competitors
       .map((competitor, index) => ({ competitor, index }))
+      .filter(({ competitor }) => {
+        if (threatFilter !== 'all' && competitor.threatLevel !== threatFilter) return false;
+        if (!q) return true;
+        const haystack = [
+          competitor.host,
+          competitor.industry,
+          competitor.companySize,
+          competitor.strongestPromptCluster?.category,
+          ...(competitor.insights ?? []).map((insight) => insight.insight),
+        ]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase();
+        return haystack.includes(q);
+      })
       .sort(
-        (a, b) =>
-          threatRank(a.competitor.threatLevel) - threatRank(b.competitor.threatLevel) ||
-          a.index - b.index
+        (a, b) => {
+          if (sortBy === 'mentions') {
+            return b.competitor.mentions - a.competitor.mentions || a.index - b.index;
+          }
+          if (sortBy === 'coverage') {
+            return b.competitor.promptCoverage - a.competitor.promptCoverage || a.index - b.index;
+          }
+          if (sortBy === 'rank') {
+            return (
+              (a.competitor.rank ?? Number.MAX_SAFE_INTEGER) -
+              (b.competitor.rank ?? Number.MAX_SAFE_INTEGER) ||
+              a.index - b.index
+            );
+          }
+          return (
+            competitorThreatWeight(b.competitor.threatLevel) - competitorThreatWeight(a.competitor.threatLevel) ||
+            b.competitor.mentions - a.competitor.mentions ||
+            a.index - b.index
+          );
+        }
       )
       .map(({ competitor }) => competitor);
-  }, [competitors]);
+  }, [competitors, query, sortBy, threatFilter]);
+
+  const totalCount = visibleCompetitors.length;
+  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
+  const pageResetKey = useMemo(() => visibleCompetitors.map((competitor) => competitor.host).join('|'), [visibleCompetitors]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [pageResetKey, query, sortBy, threatFilter]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(totalPages);
+  }, [currentPage, totalPages]);
+
+  const pageCompetitors = useMemo(() => {
+    const start = (currentPage - 1) * PAGE_SIZE;
+    return visibleCompetitors.slice(start, start + PAGE_SIZE);
+  }, [currentPage, visibleCompetitors]);
 
   return (
     <section id="competitors-analysis" data-title="AI-Based Competitor Analysis Results" className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-      <div>
-        <h3 className="text-lg font-semibold leading-none text-[#2D4059]">AI-Based Competitor Analysis Results</h3>
-        <p className="mt-3 text-sm text-[#7B8494]">Compare AI analysis of competitor performance and visibility.</p>
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div>
+          <h3 className="text-lg font-semibold leading-none text-[#2D4059]">AI-Based Competitor Analysis Results</h3>
+          <p className="mt-3 text-sm text-[#7B8494]">Compare AI analysis of competitor performance and visibility.</p>
+        </div>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <input
+            type="search"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Search competitors"
+            className="h-9 w-full rounded-md border border-slate-200 px-3 text-xs outline-none transition focus:border-slate-300 focus:ring-1 focus:ring-slate-300 sm:w-[210px]"
+          />
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className="inline-flex h-9 items-center justify-center gap-2 rounded-md border border-slate-200 bg-white px-3 text-xs font-semibold text-[#5F6877] shadow-sm transition hover:bg-slate-50"
+              >
+                <ArrowDownRight className="h-3.5 w-3.5" />
+                {COMPETITOR_SORT_OPTIONS.find((option) => option.value === sortBy)?.label ?? 'Threat'}
+                <ChevronDown className="h-3.5 w-3.5" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-[150px] p-1">
+              {COMPETITOR_SORT_OPTIONS.map((option) => (
+                <DropdownMenuItem
+                  key={option.value}
+                  onClick={() => setSortBy(option.value)}
+                  className="flex cursor-pointer items-center justify-between rounded-md px-2 py-1.5 text-[12px]"
+                >
+                  {option.label}
+                  {sortBy === option.value ? <Check className="h-3.5 w-3.5 text-blue-600" /> : null}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className="inline-flex h-9 items-center justify-center gap-2 rounded-md border border-slate-200 bg-white px-3 text-xs font-semibold text-[#5F6877] shadow-sm transition hover:bg-slate-50"
+              >
+                <Filter className="h-3.5 w-3.5" />
+                {COMPETITOR_THREAT_OPTIONS.find((option) => option.value === threatFilter)?.label ?? 'All threats'}
+                <ChevronDown className="h-3.5 w-3.5" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-[170px] p-1">
+              {COMPETITOR_THREAT_OPTIONS.map((option) => (
+                <DropdownMenuItem
+                  key={option.value}
+                  onClick={() => setThreatFilter(option.value)}
+                  className="flex cursor-pointer items-center justify-between rounded-md px-2 py-1.5 text-[12px]"
+                >
+                  {option.label}
+                  {threatFilter === option.value ? <Check className="h-3.5 w-3.5 text-blue-600" /> : null}
+                </DropdownMenuItem>
+              ))}
+              {(threatFilter !== 'all' || query.trim()) ? (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={() => {
+                      setThreatFilter('all');
+                      setQuery('');
+                    }}
+                    className="cursor-pointer rounded-md px-2 py-1.5 text-[12px] text-slate-500"
+                  >
+                    Clear filters
+                  </DropdownMenuItem>
+                </>
+              ) : null}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
 
       <div className="mt-5 flex max-h-[700px] flex-col gap-4 overflow-y-auto pr-1 border">
-        {visibleCompetitors.length === 0 ? (
+        {pageCompetitors.length === 0 ? (
           <p className="rounded-md border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-center text-sm text-slate-500">
-            No competitors mentioned in this audit yet. Re-run the audit, or add competitors in the wizard.
+            {competitors.length === 0
+              ? 'No competitors mentioned in this audit yet. Re-run the audit, or add competitors in the wizard.'
+              : 'No competitors match the current filters.'}
           </p>
         ) : (
-          visibleCompetitors.map((c) => (
+          pageCompetitors.map((c) => (
             <AnalysisResultCard key={c.host} competitor={c} onOpenDetail={onOpenDetail} />
           ))
         )}
+      </div>
+      <div className="mt-3 flex items-center justify-between gap-3 border-t border-slate-200 pt-3">
+        <span className="text-[11px] font-semibold tracking-tight text-gray-500">
+          {totalCount === 0
+            ? 'No rows'
+            : `Showing ${(currentPage - 1) * PAGE_SIZE + 1}–${Math.min(currentPage * PAGE_SIZE, totalCount)} of ${totalCount}`}
+        </span>
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+            disabled={currentPage <= 1}
+            className="rounded-md border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-medium text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            Prev
+          </button>
+          <span className="px-2 text-[11px] font-medium text-slate-500 tabular-nums">
+            {currentPage} / {totalPages}
+          </span>
+          <button
+            type="button"
+            onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+            disabled={currentPage >= totalPages}
+            className="rounded-md border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-medium text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            Next
+          </button>
+        </div>
       </div>
     </section>
   );
@@ -1309,49 +1676,124 @@ function ContentOpportunitiesToCreate({
   opportunities: ReportOpportunity[];
   onGenerate: (item: ReportOpportunity) => void;
 }) {
-  // Use bottom-half (after the 4 surfaced in Prompt Gaps) — same pool, no duplicates.
-  const list = opportunities.slice(4, 9);
+  const PAGE_SIZE = 5;
+  const [currentPage, setCurrentPage] = useState(1);
+  // Use bottom-half (after the first page surfaced in Prompt Gaps) — same pool, no duplicates.
+  const list = useMemo(() => opportunities.slice(4), [opportunities]);
+  const totalCount = list.length;
+  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
+  const pageResetKey = useMemo(() => list.map((item) => item.key).join('|'), [list]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [pageResetKey]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(totalPages);
+  }, [currentPage, totalPages]);
+
+  const visibleList = useMemo(() => {
+    const start = (currentPage - 1) * PAGE_SIZE;
+    return list.slice(start, start + PAGE_SIZE);
+  }, [currentPage, list]);
+
   return (
     <section id="competitors-content" data-title="Content Opportunities to Create" className="min-w-0 rounded-xl border border-slate-200 bg-white p-6">
       <div className="flex items-start justify-between gap-4">
         <h3 className="text-xl font-semibold leading-none text-[#2D4059]">Content Opportunities to Create</h3>
       </div>
       <div className="mt-6 space-y-4">
-        {list.length === 0 ? (
+        {visibleList.length === 0 ? (
           <p className="rounded-md border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-center text-sm text-slate-500">
             No additional content opportunities right now.
           </p>
         ) : (
-          list.map((item) => <ContentOpportunityCard key={item.key} item={item} onGenerate={onGenerate} />)
+          visibleList.map((item) => <ContentOpportunityCard key={item.key} item={item} onGenerate={onGenerate} />)
         )}
       </div>
+      {list.length > 0 ? (
+        <div className="mt-4 flex items-center justify-between gap-3 border-t border-slate-200 pt-3">
+          <span className="text-[11px] font-semibold tracking-tight text-gray-500">
+            Showing {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, totalCount)} of {totalCount}
+          </span>
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+              disabled={currentPage <= 1}
+              className="rounded-md border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-medium text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Prev
+            </button>
+            <span className="px-2 text-[11px] font-medium text-slate-500 tabular-nums">
+              {currentPage} / {totalPages}
+            </span>
+            <button
+              type="button"
+              onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+              disabled={currentPage >= totalPages}
+              className="rounded-md border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-medium text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }
 
 // ── Build AiResponseAnalysisData from selected opportunity ─────────────────
 
-function buildAiResponseAnalysis(opp: ReportOpportunity, report: ReportPayload | null): AiResponseAnalysisData {
+type PromptResultRow = ReportPayload['topPrompts'][number];
+type PromptResultModel = PromptResultRow['results'][number];
+
+function normalizeHostLabel(value: string) {
+  return value.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/.*$/, '');
+}
+
+function isSuccessfulModelResult(result: PromptResultModel) {
+  return result.status !== 'failed';
+}
+
+function getPromptVisibility(row: PromptResultRow) {
+  const successful = row.results.filter(isSuccessfulModelResult);
+  if (successful.length === 0) return Number.POSITIVE_INFINITY;
+  const mentions = successful.filter((result) => result.presence === 1).length;
+  return mentions / successful.length;
+}
+
+function pickPrimaryPromptRow(rows: PromptResultRow[]) {
+  return [...rows].sort((a, b) => getPromptVisibility(a) - getPromptVisibility(b) || a.rawId - b.rawId)[0] ?? null;
+}
+
+function buildAiResponseAnalysis(
+  opp: ReportOpportunity,
+  report: ReportPayload | null,
+  overrideRow?: PromptResultRow | null,
+): AiResponseAnalysisData {
   const promptIdSet = new Set(opp.promptIds);
-  const relevantPrompts = (report?.topPrompts ?? []).filter((p) => p.type === 'prompt' && promptIdSet.has(p.rawId));
-  const allResults = relevantPrompts.flatMap((p) => p.results);
+  const relevantPrompts = overrideRow
+    ? [overrideRow]
+    : (report?.topPrompts ?? []).filter((p) => p.type === 'prompt' && promptIdSet.has(p.rawId));
+  const primaryPrompt = pickPrimaryPromptRow(relevantPrompts);
+  const allResults = primaryPrompt?.results ?? [];
+  const successfulResults = allResults.filter(isSuccessfulModelResult);
+  const attemptedResponses = allResults.length;
+  const successfulResponses = successfulResults.length;
+  const brandName = report?.domainInfo?.companyName ?? report?.domainInfo?.host ?? 'your brand';
 
-  // Mentions / sentiment aggregates
-  const competitorMentions = allResults.flatMap((r) => r.competitorMentions ?? []);
-  const totalMentions = competitorMentions.reduce((s, m) => s + (m.count ?? 1), 0);
-  let positive = 0, negative = 0, neutral = 0;
-  for (const m of competitorMentions) {
-    if (typeof m.sentiment !== 'number') { neutral += 1; continue; }
-    if (m.sentiment > 3) positive += 1;
-    else if (m.sentiment < -3) negative += 1;
-    else neutral += 1;
-  }
-  const sentimentTotal = positive + negative + neutral || 1;
+  const brandMentions = successfulResults.filter((result) => result.presence === 1).length;
+  const sentimentSamples = successfulResults
+    .filter((result) => result.presence === 1 && typeof result.sentiment === 'number')
+    .map((result) => result.sentiment as number);
+  const sentimentTotal = sentimentSamples.length;
 
-  // Competitor ranking — coverage × bestPosition heuristic.
+  // Competitor ranking — exact mention count in the selected prompt's model responses.
+  const competitorMentions = successfulResults.flatMap((r) => r.competitorMentions ?? []);
   const compStats = new Map<string, { mentions: number; bestPos: number | null; sentimentSum: number; sentimentCount: number }>();
   for (const m of competitorMentions) {
-    const host = m.host?.toLowerCase();
+    const host = normalizeHostLabel(m.host ?? '');
     if (!host) continue;
     const cur = compStats.get(host) ?? { mentions: 0, bestPos: null, sentimentSum: 0, sentimentCount: 0 };
     cur.mentions += m.count ?? 1;
@@ -1364,17 +1806,19 @@ function buildAiResponseAnalysis(opp: ReportOpportunity, report: ReportPayload |
     }
     compStats.set(host, cur);
   }
-  const totalCompMentions = [...compStats.values()].reduce((s, v) => s + v.mentions, 0) || 1;
+  const totalCompMentions = [...compStats.values()].reduce((s, v) => s + v.mentions, 0);
+  const aiSov = brandMentions + totalCompMentions > 0
+    ? Math.round((brandMentions / (brandMentions + totalCompMentions)) * 100)
+    : null;
   const rankings = [...compStats.entries()].slice(0, 8).map(([host, v]) => {
-    const share = v.mentions / totalCompMentions; // 0..1
-    const score5 = Math.round(share * 5 * 10) / 10; // 0..5 with one decimal
+    const share = totalCompMentions > 0 ? v.mentions / totalCompMentions : 0;
     const avgSentiment = v.sentimentCount > 0 ? v.sentimentSum / v.sentimentCount : 0;
-    const status: 'Strong' | 'Medium' | 'Low' = avgSentiment > 3 ? 'Strong' : avgSentiment < -3 ? 'Low' : 'Medium';
+    const status: 'Strong' | 'Medium' | 'Low' = share >= 0.5 || avgSentiment > 3 ? 'Strong' : share >= 0.2 ? 'Medium' : 'Low';
     return {
       name: host,
       domain: host,
       logo: competitorLogo(host, 64),
-      score: `${score5.toFixed(1)} / 5`,
+      score: `${v.mentions} ${v.mentions === 1 ? 'mention' : 'mentions'}`,
       status,
       statusTone: (status === 'Strong' ? 'green' : status === 'Low' ? 'red' : 'yellow') as 'green' | 'red' | 'yellow',
       barWidth: Math.max(8, Math.round(share * 100)),
@@ -1382,49 +1826,79 @@ function buildAiResponseAnalysis(opp: ReportOpportunity, report: ReportPayload |
   });
   rankings.sort((a, b) => b.barWidth - a.barWidth);
 
-  // Per-model performance: average presence × normalized sentiment.
-  const perModel = new Map<string, { presenceSum: number; count: number; sentimentSum: number; sentimentCount: number }>();
-  for (const r of allResults) {
-    const m = perModel.get(r.model) ?? { presenceSum: 0, count: 0, sentimentSum: 0, sentimentCount: 0 };
-    m.presenceSum += r.presence;
-    m.count += 1;
-    if (typeof r.sentiment === 'number') {
-      m.sentimentSum += r.sentiment;
-      m.sentimentCount += 1;
-    }
-    perModel.set(r.model, m);
-  }
-  const performance = [...perModel.entries()].map(([name, v]) => {
-    const presence = v.count > 0 ? v.presenceSum / v.count : 0; // 0..1
-    const sentiment = v.sentimentCount > 0 ? v.sentimentSum / v.sentimentCount : 0; // -10..10
-    const score5 = ((presence * 5) + ((sentiment + 10) / 20) * 5) / 2; // average of presence & sentiment-scaled
+  const avgOverall = successfulResults.length > 0
+    ? successfulResults.reduce((sum, result) => sum + (typeof result.overall === 'number' ? result.overall : 0), 0) / successfulResults.length
+    : 0;
+
+  const performance = allResults.map((result) => {
+    const competitors = Array.from(new Set([
+      ...(result.competitorHosts ?? []),
+      ...(result.competitorMentions ?? []).map((mention) => mention.host),
+    ].map(normalizeHostLabel).filter(Boolean)));
+    const overall = typeof result.overall === 'number' ? Math.max(0, Math.min(10, result.overall)) : 0;
     return {
-      name,
-      value: `${score5.toFixed(1)} / 5`,
-      barWidth: Math.round((score5 / 5) * 100),
+      name: result.model,
+      value: result.status === 'failed' ? 'Failed' : `${overall.toFixed(1)} / 10`,
+      barWidth: result.status === 'failed' ? 0 : Math.round(overall * 10),
+      status: result.status === 'failed' ? 'failed' as const : 'success' as const,
+      mentioned: result.presence === 1,
+      rankPosition: typeof result.rankPosition === 'number' && result.rankPosition > 0 ? result.rankPosition : null,
+      competitors,
+      response: result.response ?? '',
+      errorMessage: result.errorMessage ?? null,
+      latencyMs: result.latencyMs ?? null,
     };
   });
 
   const insights: string[] = [];
-  insights.push(opp.rationale);
-  if (opp.recommendedAngle) insights.push(opp.recommendedAngle);
+  if (!primaryPrompt) {
+    insights.push('This opportunity is not tied to a saved prompt row yet, so there are no model responses to inspect.');
+  } else if (successfulResponses === 0) {
+    insights.push('No successful model responses are stored for this prompt yet. Use Retry to run this prompt again.');
+  } else if (brandMentions === 0) {
+    insights.push(`Lost on this prompt — ${successfulResponses} successful models answered without mentioning ${brandName}.`);
+  } else {
+    insights.push(`${brandName} was mentioned by ${brandMentions} of ${successfulResponses} successful models for this prompt.`);
+  }
+  if (totalCompMentions > 0) {
+    const topCompetitors = rankings.slice(0, 3).map((item) => item.domain).join(', ');
+    insights.push(`Competitors appeared ${totalCompMentions} times in this prompt's answers${topCompetitors ? `, led by ${topCompetitors}` : ''}.`);
+  } else if (successfulResponses > 0) {
+    insights.push('No competitors were detected in the successful responses for this prompt.');
+  }
+  if (sentimentTotal === 0 && successfulResponses > 0) {
+    insights.push('No brand sentiment is shown because the brand was not mentioned by any successful model response.');
+  }
+  if (opp.rationale) insights.push(opp.rationale);
+  if (opp.recommendedAngle) insights.push(`Recommended angle: ${opp.recommendedAngle}`);
   if (opp.brief?.keyPoints && opp.brief.keyPoints.length > 0) {
     insights.push(`Cover: ${opp.brief.keyPoints.slice(0, 3).join('; ')}`);
   }
 
   return {
     title: 'AI Response Analysis',
-    subtitle: 'Understand how AI interprets each competitor for this prompt cluster.',
-    promptLabel: opp.title,
+    subtitle: primaryPrompt
+      ? 'Exact model responses and scoring for the lowest-visibility prompt tied to this opportunity.'
+      : 'No saved prompt responses are available for this opportunity yet.',
+    promptLabel: primaryPrompt?.phrase ?? primaryPrompt?.text ?? opp.title,
+    sourcePromptId: primaryPrompt?.rawId ?? null,
+    sourcePromptText: primaryPrompt?.phrase ?? primaryPrompt?.text ?? null,
+    attemptedResponses,
+    successfulResponses,
+    brandName,
     metrics: [
-      { label: 'Total Mentions', value: String(totalMentions), tone: 'blue' },
-      { label: 'Positive Sentiment', value: `${Math.round((positive / sentimentTotal) * 100)}%`, tone: 'green' },
-      { label: 'Negative Sentiment', value: `${Math.round((negative / sentimentTotal) * 100)}%`, tone: 'red' },
-      { label: 'Neutral Sentiment', value: `${Math.round((neutral / sentimentTotal) * 100)}%`, tone: 'blue' },
+      { label: 'Brand Mentions', value: `${brandMentions}/${successfulResponses}`, tone: 'blue' },
+      { label: 'Competitor Mentions', value: String(totalCompMentions), tone: 'slate' },
+      { label: 'AI Share of Voice', value: aiSov === null ? '—' : `${aiSov}%`, tone: brandMentions > 0 ? 'green' : 'red' },
+      { label: 'Avg Brand Score', value: `${avgOverall.toFixed(1)}/10`, tone: avgOverall >= 7 ? 'green' : avgOverall >= 4 ? 'blue' : 'red' },
     ],
     rankings,
     performance,
     insights,
+    emptyState:
+      primaryPrompt && successfulResponses > 0
+        ? 'No competitor mentions were detected in the successful model responses for this prompt.'
+        : 'No successful model responses are available yet. Retry this prompt to collect fresh responses.',
   };
 }
 
@@ -1488,7 +1962,10 @@ export default function CompetitorsPage() {
 
   const [selectedCompetitor, setSelectedCompetitor] = useState<CompetitorDetailData | null>(null);
   const [selectedPromptGap, setSelectedPromptGap] = useState<PromptGapContext | null>(null);
+  const [selectedPromptOpportunity, setSelectedPromptOpportunity] = useState<ReportOpportunity | null>(null);
   const [selectedAnalysisData, setSelectedAnalysisData] = useState<AiResponseAnalysisData | null>(null);
+  const [analysisRetrying, setAnalysisRetrying] = useState(false);
+  const [analysisRetryError, setAnalysisRetryError] = useState<string | null>(null);
   const [activeDrawer, setActiveDrawer] = useState<'competitor' | 'prompt-gap' | null>(null);
   const [activeWorksheetId, setActiveWorksheetId] = useState<string | null>(null);
   const [isWorksheetModalOpen, setIsWorksheetModalOpen] = useState(false);
@@ -1700,12 +2177,17 @@ export default function CompetitorsPage() {
     setActiveDrawer(null);
     setSelectedCompetitor(null);
     setSelectedPromptGap(null);
+    setSelectedPromptOpportunity(null);
     setSelectedAnalysisData(null);
+    setAnalysisRetrying(false);
+    setAnalysisRetryError(null);
   };
 
   const openCompetitorDrawer = (c: CompetitorAnalysisRow) => {
     setSelectedPromptGap(null);
+    setSelectedPromptOpportunity(null);
     setSelectedAnalysisData(null);
+    setAnalysisRetryError(null);
     setSelectedCompetitor(buildCompetitorDetail(c));
     setActiveDrawer('competitor');
   };
@@ -1713,9 +2195,34 @@ export default function CompetitorsPage() {
   const openPromptGapDrawer = (o: ReportOpportunity) => {
     setSelectedCompetitor(null);
     setSelectedPromptGap(buildPromptGapContext(o));
+    setSelectedPromptOpportunity(o);
     setSelectedAnalysisData(buildAiResponseAnalysis(o, report));
+    setAnalysisRetryError(null);
     setActiveDrawer('prompt-gap');
   };
+
+  const handleRetryPromptAnalysis = useCallback(async () => {
+    if (!domainId || !selectedPromptOpportunity || !selectedAnalysisData?.sourcePromptId) return;
+    setAnalysisRetrying(true);
+    setAnalysisRetryError(null);
+    try {
+      const res = await apiPost<{
+        row: PromptResultRow;
+        prompt?: { id: number; keywordId: number | null; text: string };
+      }>(`/wizard/domain/${domainId}/prompts/${selectedAnalysisData.sourcePromptId}/rerun`);
+      setSelectedAnalysisData(buildAiResponseAnalysis(selectedPromptOpportunity, report, res.row));
+      void queryClient.invalidateQueries({
+        predicate: (query) =>
+          Array.isArray(query.queryKey) &&
+          query.queryKey[0] === 'ai-results' &&
+          query.queryKey[2] === domainId,
+      });
+    } catch (err) {
+      setAnalysisRetryError(err instanceof Error ? err.message : 'Could not retry this prompt. Please try again.');
+    } finally {
+      setAnalysisRetrying(false);
+    }
+  }, [domainId, queryClient, report, selectedAnalysisData?.sourcePromptId, selectedPromptOpportunity]);
 
   const handleGenerateContent = useCallback((item: ReportOpportunity) => {
     if (!report?.domainInfo?.id) return;
@@ -1894,14 +2401,8 @@ export default function CompetitorsPage() {
 
               <CompetitorSelector competitors={selected} onAdd={handleAddCompetitor} onRemove={handleRemoveCompetitor} />
 
-              <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.45fr)_minmax(360px,0.85fr)]">
+              <div className="grid grid-cols-1 gap-5">
                 <TrendComparisonPanel trends={trends} />
-                <PromptGapPanel
-                  opportunities={report?.opportunities ?? []}
-                  loading={promptGapsLoading}
-                  onAiResponse={openPromptGapDrawer}
-                  onGenerate={handleGenerateContent}
-                />
               </div>
 
               <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
@@ -1921,7 +2422,13 @@ export default function CompetitorsPage() {
           <CompetitorDetail competitor={selectedCompetitor} />
         ) : null}
         {activeDrawer === 'prompt-gap' && selectedPromptGap ? (
-          <AiResponseAnalysis data={selectedAnalysisData} prompt={selectedPromptGap} />
+          <AiResponseAnalysis
+            data={selectedAnalysisData}
+            prompt={selectedPromptGap}
+            onRetry={selectedAnalysisData?.sourcePromptId ? handleRetryPromptAnalysis : undefined}
+            retrying={analysisRetrying}
+            retryError={analysisRetryError}
+          />
         ) : null}
       </Drawer>
       <WorksheetPickerModal

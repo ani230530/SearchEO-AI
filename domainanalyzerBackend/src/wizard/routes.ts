@@ -63,6 +63,13 @@ type EnsureResult =
   | { ok: true; domain: NonNullable<DomainWithRelations> }
   | { ok: false; error: string; status: 400 | 404 };
 
+const competitorWarmups = new Map<number, Promise<void>>();
+
+type PromptRunMetadata = {
+  hasRun: boolean;
+  lastRunAt: Date | null;
+};
+
 async function ensureDomain(req: Request, idParam: string | undefined): Promise<EnsureResult> {
   const id = idParam ? Number(idParam) : NaN;
   if (!id || Number.isNaN(id)) return { ok: false, error: 'Invalid domainId', status: 400 };
@@ -78,6 +85,254 @@ async function ensureDomain(req: Request, idParam: string | undefined): Promise<
     return { ok: false, error: 'Domain not found', status: 404 };
   }
   return { ok: true, domain: domain as NonNullable<DomainWithRelations> };
+}
+
+async function getPromptRunMetadata(prismaClient: typeof prisma, promptIds: number[]) {
+  const ids = Array.from(new Set(promptIds.filter((id) => Number.isFinite(id))));
+  const meta = new Map<number, PromptRunMetadata>();
+  for (const id of ids) {
+    meta.set(id, { hasRun: false, lastRunAt: null });
+  }
+  if (ids.length === 0) return meta;
+
+  const rows = await prismaClient.aiQueryResult.findMany({
+    where: { promptId: { in: ids } },
+    select: { promptId: true, createdAt: true },
+    orderBy: { createdAt: 'desc' },
+  });
+  for (const row of rows) {
+    const existing = meta.get(row.promptId);
+    if (!existing || existing.hasRun) continue;
+    meta.set(row.promptId, { hasRun: true, lastRunAt: row.createdAt });
+  }
+  return meta;
+}
+
+function formatCompetitorRows(rows: Array<{
+  competitorHost: string;
+  similarityScore: number | null;
+  threatLevel: string | null;
+  rank: number | null;
+  reasoning: string | null;
+  industry: string | null;
+  location: string | null;
+  companySize: string | null;
+  source: string;
+}>) {
+  return rows.map((c) => ({
+    name: c.competitorHost,
+    domain: c.competitorHost,
+    url: `https://${c.competitorHost}`,
+    logoUrl: `https://img.logo.dev/${c.competitorHost}?token=pk_DTdFFG1JT9WOCjATvZEzIA&size=64`,
+    competitorHost: c.competitorHost,
+    similarityScore: c.similarityScore,
+    threatLevel: c.threatLevel,
+    rank: c.rank,
+    reasoning: c.reasoning,
+    industry: c.industry,
+    location: c.location,
+    companySize: c.companySize,
+    source: c.source,
+  }));
+}
+
+function queueCompetitorWarmup(args: { domain: NonNullable<DomainWithRelations>; seedKeywords: string[] }) {
+  const existing = competitorWarmups.get(args.domain.id);
+  if (existing) return existing;
+
+  const promise = (async () => {
+    try {
+      const result = await runCompetitorPipeline({
+        prisma,
+        domainId: args.domain.id,
+        ownDomainHost: args.domain.host,
+        ownDomainSummary: '',
+        ownEmbedding: null,
+        ownSeedKeywords: args.seedKeywords,
+        ownLocation: { country: args.domain.profile?.country ?? null, state: args.domain.profile?.state ?? null },
+        ownSize: null,
+        industry: args.domain.profile?.industry ?? null,
+        companyName: null,
+        products: [],
+      });
+      await persistCompetitors(prisma, args.domain.id, result);
+    } finally {
+      competitorWarmups.delete(args.domain.id);
+    }
+  })();
+
+  competitorWarmups.set(args.domain.id, promise);
+  return promise;
+}
+
+function parseIdList(value: unknown): number[] {
+  if (!Array.isArray(value)) return [];
+  const out: number[] = [];
+  const seen = new Set<number>();
+  const push = (raw: unknown) => {
+    const num = typeof raw === 'number' ? raw : typeof raw === 'string' && raw.trim() ? Number(raw) : NaN;
+    if (!Number.isFinite(num) || seen.has(num)) return;
+    seen.add(num);
+    out.push(num);
+  };
+  for (const entry of value) {
+    if (typeof entry === 'number' || typeof entry === 'string') {
+      push(entry);
+      continue;
+    }
+    if (entry && typeof entry === 'object') {
+      const record = entry as Record<string, unknown>;
+      if ('id' in record) push(record.id);
+      if ('promptId' in record) push(record.promptId);
+      if ('keywordId' in record) push(record.keywordId);
+      if ('promptIds' in record) for (const nested of parseIdList(record.promptIds)) push(nested);
+      if ('selectedPromptIds' in record) for (const nested of parseIdList(record.selectedPromptIds)) push(nested);
+      if ('selectedPrompts' in record) for (const nested of parseIdList(record.selectedPrompts)) push(nested);
+      if ('prompts' in record) for (const nested of parseIdList(record.prompts)) push(nested);
+      if ('items' in record) for (const nested of parseIdList(record.items)) push(nested);
+      if ('selected' in record) for (const nested of parseIdList(record.selected)) push(nested);
+      if ('selection' in record) for (const nested of parseIdList(record.selection)) push(nested);
+    }
+  }
+  return out;
+}
+
+const CUSTOM_KEYWORD_STOP_WORDS = new Set([
+  'a',
+  'an',
+  'and',
+  'are',
+  'as',
+  'best',
+  'for',
+  'from',
+  'how',
+  'in',
+  'is',
+  'me',
+  'of',
+  'on',
+  'or',
+  'recommend',
+  'should',
+  'the',
+  'to',
+  'tool',
+  'tools',
+  'what',
+  'which',
+  'with',
+]);
+
+function normalizePromptSeed(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/https?:\/\/\S+/g, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
+function keywordTokens(value: string): Set<string> {
+  return new Set(
+    normalizePromptSeed(value)
+      .split(/\s+/)
+      .filter((word) => word.length > 2 && !CUSTOM_KEYWORD_STOP_WORDS.has(word))
+  );
+}
+
+function deriveCustomKeywordTerm(prompt: string): string {
+  const words = Array.from(keywordTokens(prompt)).slice(0, 4);
+  return (words.length > 0 ? words.join(' ') : normalizePromptSeed(prompt).split(/\s+/).slice(0, 4).join(' ')).slice(0, 80) || 'custom prompt';
+}
+
+async function persistCustomPromptSeeds(prismaClient: typeof prisma, domainId: number, rawPrompts: string[]) {
+  const prompts = Array.from(
+    new Set(
+      rawPrompts
+        .map((prompt) => prompt.trim())
+        .filter(Boolean)
+        .map((prompt) => prompt.slice(0, 800))
+    )
+  );
+  if (prompts.length === 0) return [];
+
+  const [keywordRows, existingPromptRows] = await Promise.all([
+    prismaClient.keyword.findMany({
+      where: { domainId },
+      select: { id: true, term: true, intent: true },
+    }),
+    prismaClient.prompt.findMany({
+      where: { domainId },
+      select: { id: true, text: true, source: true },
+    }),
+  ]);
+
+  const keywords = [...keywordRows];
+  const existingByText = new Map<string, { id: number; text: string; source: string }>();
+  for (const row of existingPromptRows) {
+    const key = normalizePromptSeed(row.text);
+    if (key) existingByText.set(key, row);
+  }
+  const createdIds: number[] = [];
+
+  for (const text of prompts) {
+    const promptKey = normalizePromptSeed(text);
+    if (!promptKey) continue;
+
+    const existing = existingByText.get(promptKey);
+    if (existing) {
+      if (existing.source === 'custom') {
+        await prismaClient.prompt.update({
+          where: { id: existing.id },
+          data: { isSelected: true },
+        });
+      }
+      continue;
+    }
+
+    const promptTokens = keywordTokens(text);
+    const bestMatch = keywords
+      .map((keyword) => {
+        const tokens = keywordTokens(keyword.term);
+        let score = 0;
+        for (const token of promptTokens) if (tokens.has(token)) score += 1;
+        return { keyword, score };
+      })
+      .sort((a, b) => b.score - a.score)[0];
+    let assignedKeyword = bestMatch && bestMatch.score > 0 ? bestMatch.keyword : undefined;
+
+    if (!assignedKeyword) {
+      const term = deriveCustomKeywordTerm(text);
+      assignedKeyword = await prismaClient.keyword.upsert({
+        where: { domainId_term: { domainId, term } },
+        update: {},
+        create: {
+          domainId,
+          term,
+          intent: 'Commercial',
+          source: 'custom',
+          isSelected: false,
+        },
+      });
+      keywords.push(assignedKeyword);
+    }
+
+    const created = await prismaClient.prompt.create({
+      data: {
+        domainId,
+        keywordId: assignedKeyword.id,
+        text,
+        intent: assignedKeyword.intent ?? 'Commercial',
+        source: 'custom',
+        isSelected: true,
+      },
+      select: { id: true, text: true, source: true },
+    });
+    existingByText.set(promptKey, created);
+    createdIds.push(created.id);
+  }
+
+  return createdIds;
 }
 
 // Resolve the AiRun.kind filter for audit-facing endpoints from a `?kind=`
@@ -298,6 +553,62 @@ function buildPromptRowMetrics(built: BuiltModelResult[], ownDomainHost: string)
     aiSovPct,
     aiSov: aiSovPct === null ? '—' : `${aiSovPct}%`,
     avgOverall,
+  };
+}
+
+type PromptForResultRow = {
+  id: number;
+  keywordId: number | null;
+  text: string;
+  intent: string | null;
+  source: string;
+};
+
+function buildPromptTableRowForSingleRun(
+  prompt: PromptForResultRow,
+  persistedResults: Awaited<ReturnType<typeof runOnePrompt>>['persistedResults'],
+  ownDomainHost: string,
+) {
+  const rows: AiResultRow[] = persistedResults.map((result) => ({
+    ...result,
+    promptId: prompt.id,
+  }));
+  const built = buildModelResults(rows);
+  const promptMetrics = buildPromptRowMetrics(built, ownDomainHost);
+  const competitors = rollupCompetitors(built);
+
+  return {
+    id: `pr-${prompt.id}`,
+    rawId: prompt.id,
+    type: 'prompt' as const,
+    phrase: prompt.text,
+    text: prompt.text,
+    intent: prompt.intent,
+    source: prompt.source,
+    keywordId: prompt.keywordId,
+    sov: `${promptMetrics.visibilityPct}%`,
+    aiSov: promptMetrics.aiSov,
+    aiSovPercent: promptMetrics.aiSovPct,
+    mentions: promptMetrics.mentions,
+    successfulResponses: promptMetrics.successfulResponses,
+    bestRank: promptMetrics.bestRankPosition ?? 0,
+    rankingPosition: promptMetrics.bestRankPosition,
+    avgRankPosition: promptMetrics.avgRankPosition,
+    rankedResponses: promptMetrics.rankedResponses,
+    brandMentionEvents: promptMetrics.brandMentionEvents,
+    competitorMentionEvents: promptMetrics.competitorMentionEvents,
+    totalMentionEvents: promptMetrics.totalMentionEvents,
+    avgSentiment: promptMetrics.avgSentiment,
+    competitors,
+    competitorCount: competitors.length,
+    results: built,
+    metrics: {
+      visibility: promptMetrics.visibilityPct,
+      aiSov: promptMetrics.aiSovPct,
+      avgOverall: promptMetrics.avgOverall,
+      runs: promptMetrics.successfulResponses,
+      attemptedRuns: promptMetrics.totalResponses,
+    },
   };
 }
 
@@ -876,6 +1187,21 @@ router.post('/domain', authenticateOrSession(), async (req: Request, res: Respon
       create: { domainId: domain.id, country: country ?? null, state: state ?? null, industry: industry ?? null, targetLocation: targetLocation ?? null, customSeeds: seeds as any },
     });
 
+    void queueCompetitorWarmup({
+      domain: {
+        ...domain,
+        profile: {
+          country: country ?? null,
+          state: state ?? null,
+          industry: industry ?? null,
+          targetLocation: targetLocation ?? null,
+          customSeeds: seeds as any,
+        },
+        inferred: null,
+      } as NonNullable<DomainWithRelations>,
+      seedKeywords: seeds.keywords,
+    }).catch((err) => console.warn('[wizard/domain] competitor warmup failed', err));
+
     // Phase: crawl.
     await setPhase(prisma, domain.id, 'crawl', 'running');
     send({ type: 'progress', phase: 'crawl', progress: 5, step: 'Discovering pages…' });
@@ -895,6 +1221,26 @@ router.post('/domain', authenticateOrSession(), async (req: Request, res: Respon
       send({ type: 'progress', phase: 'crawl', progress: 70, step: `Scanned ${crawl.pagesScanned} pages` });
     }
 
+    // Start the embedding work before the crawl snapshot write. The input is
+    // already final, and the DB write is independent, so this saves a small
+    // serial wait without changing the crawl/profile output.
+    const embedSource = crawl.rawText.slice(0, 8000);
+    const crawlHash = crypto.createHash('sha256').update(embedSource).digest('hex');
+    const embeddingPromise = prisma.domainInferred
+      .findUnique({
+        where: { domainId: domain.id },
+        select: { embedding: true, crawlHash: true },
+      })
+      .then((existingInferred) => {
+        const cachedEmbedding = Array.isArray(existingInferred?.embedding)
+          ? (existingInferred!.embedding as number[])
+          : null;
+        if (cachedEmbedding && existingInferred?.crawlHash === crawlHash) {
+          return cachedEmbedding;
+        }
+        return embedText(embedSource);
+      });
+
     await prisma.crawlSnapshot.create({
       data: {
         domainId: domain.id,
@@ -913,25 +1259,9 @@ router.post('/domain', authenticateOrSession(), async (req: Request, res: Respon
     await setPhase(prisma, domain.id, 'profile', 'running');
     send({ type: 'progress', phase: 'profile', progress: 85, step: 'Inferring profile…' });
 
-    // Skip the embedding call when the crawl text is byte-identical to the
+    // Skips the embedding call when the crawl text is byte-identical to the
     // previous run for this domain — saves an OpenAI request and ~1–2 s.
-    // Hash only the slice we actually feed into the embedder so a noisy
-    // tail (e.g. a date footer) doesn't bust the cache.
-    const embedSource = crawl.rawText.slice(0, 8000);
-    const crawlHash = crypto.createHash('sha256').update(embedSource).digest('hex');
-    const existingInferred = await prisma.domainInferred.findUnique({
-      where: { domainId: domain.id },
-      select: { embedding: true, crawlHash: true },
-    });
-    let embedding: number[] | null;
-    const cachedEmbedding = Array.isArray(existingInferred?.embedding)
-      ? (existingInferred!.embedding as number[])
-      : null;
-    if (cachedEmbedding && existingInferred?.crawlHash === crawlHash) {
-      embedding = cachedEmbedding;
-    } else {
-      embedding = await embedText(embedSource);
-    }
+    const embedding = await embeddingPromise;
 
     const companySize = inferCompanySize(crawl.rawText);
     await prisma.domainInferred.upsert({
@@ -987,7 +1317,18 @@ router.get('/domain/:id', authenticateOrSession(), async (req: Request, res: Res
     prisma.prompt.findMany({ where: { domainId: domain.id } }),
     prisma.aiRun.findMany({ where: { domainId: domain.id }, orderBy: { startedAt: 'desc' }, take: 5 }),
   ]);
-  return res.json({ domain, crawls, competitors, keywords, prompts, runs });
+  const promptRunMeta = await getPromptRunMetadata(prisma, prompts.map((prompt) => prompt.id));
+  return res.json({
+    domain,
+    crawls,
+    competitors,
+    keywords,
+    prompts: prompts.map((prompt) => ({
+      ...prompt,
+      ...(promptRunMeta.get(prompt.id) ?? { hasRun: false, lastRunAt: null }),
+    })),
+    runs,
+  });
 });
 
 // ── GET /domain/:id/report ─────────────────────────────────────────────────
@@ -1314,103 +1655,116 @@ router.get('/domain/:id/report', timed('GET /report', 800), authenticateToken, a
   // Pulled from the same data we already loaded above; no extra DB hits.
   let opportunities: EnrichedOpportunity[] = [];
   let phraseVisibility: ReturnType<typeof computePhraseVisibility> = [];
-  let insightsStatus: 'deferred' | 'ready' | 'warming' = lite ? 'deferred' : 'ready';
+  let insightsStatus: 'deferred' | 'ready' | 'warming' | 'error' = lite ? 'deferred' : 'ready';
+  let insightsError: string | null = null;
 
   if (!lite) {
-    const selectedCompetitors = await prisma.competitor.findMany({
-      where: { domainId: domain.id, isSelected: true },
-      select: { competitorHost: true },
-    });
-    const analyticsInput = {
-      ownDomainHost: domain.host,
-      ownBrandName: domain.inferred?.companyName ?? null,
-      selectedCompetitorHosts: selectedCompetitors.map((c) => c.competitorHost),
-      keywords: keywords.map((k) => ({ id: k.id, term: k.term, intent: k.intent })),
-      prompts: queriedPrompts.map((p) => ({
-        id: p.id,
-        text: p.text,
-        intent: p.intent,
-        keywordId: p.keywordId,
-        category: p.category,
-        intentStage: p.intentStage,
-        persona: p.persona,
-        useCase: p.useCase,
-        isBranded: p.isBranded,
-        competitorMentioned: p.competitorMentioned,
-      })),
-      results: allResults.map((r) => ({
-        id: r.id,
-        promptId: r.promptId,
-        model: r.model,
-        presence: r.presence,
-        overall: r.overall,
-        sentiment: r.sentiment,
-        rankPosition: r.rankPosition,
-        competitorMentions: r.competitorMentions as Prisma.JsonValue,
-        competitorHosts: r.competitorHosts as Prisma.JsonValue,
-        citations: r.citations as Prisma.JsonValue,
-      })),
-    };
-    phraseVisibility = computePhraseVisibility(analyticsInput);
-    const heuristicOpportunities = computeOpportunities(analyticsInput, phraseVisibility);
-
-    // ── LLM enrichment with per-AiRun cache ──────────────────────────────
-    // Never block /report on an LLM call. If the cache is missing/stale, return
-    // usable heuristic opportunities immediately and warm the enriched cache in
-    // the background for the next read.
-    const cached = (summary?.opportunitiesEnriched as EnrichedOpportunity[] | undefined) ?? null;
-    const cachedKeys = (summary?.opportunitiesEnrichedKeys as string[] | undefined) ?? null;
-    const currentKeys = heuristicOpportunities.map((o) => o.key);
-    const cacheValid =
-      !refreshInsights &&
-      cached &&
-      cachedKeys &&
-      cachedKeys.length === currentKeys.length &&
-      cachedKeys.every((k, i) => k === currentKeys[i]);
-
-    if (cacheValid) {
-      // Hydrate cached enrichment back onto the freshly-computed opportunities
-      // so volatile fields (severityScore, promptIds) reflect the latest data.
-      const enrichedByKey = new Map(cached.map((c) => [c.key, c]));
-      opportunities = heuristicOpportunities.map((o) => {
-        const e = enrichedByKey.get(o.key);
-        return e ? { ...o, title: e.title, rationale: e.rationale, recommendedAngle: e.recommendedAngle, brief: e.brief } : { ...o, recommendedAngle: '', brief: { audience: '', tone: 'Authoritative' as const, structure: '', keyPoints: [], wordCount: 1000, cta: '' } };
+    try {
+      const selectedCompetitors = await prisma.competitor.findMany({
+        where: { domainId: domain.id, isSelected: true },
+        select: { competitorHost: true },
       });
-    } else {
-      opportunities = heuristicOpportunities.map((o) => withDefaultBrief(o));
-      insightsStatus = 'warming';
-      const promptsById = new Map(
-        queriedPrompts.map((p) => [
-          p.id,
-          {
-            text: p.text,
-            persona: p.persona,
-            useCase: p.useCase,
-            category: p.category,
-          },
-        ])
-      );
+      const analyticsInput = {
+        ownDomainHost: domain.host,
+        ownBrandName: domain.inferred?.companyName ?? null,
+        selectedCompetitorHosts: selectedCompetitors.map((c) => c.competitorHost),
+        keywords: keywords.map((k) => ({ id: k.id, term: k.term, intent: k.intent })),
+        prompts: queriedPrompts.map((p) => ({
+          id: p.id,
+          text: p.text,
+          intent: p.intent,
+          keywordId: p.keywordId,
+          category: p.category,
+          intentStage: p.intentStage,
+          persona: p.persona,
+          useCase: p.useCase,
+          isBranded: p.isBranded,
+          competitorMentioned: p.competitorMentioned,
+        })),
+        results: allResults.map((r) => ({
+          id: r.id,
+          promptId: r.promptId,
+          model: r.model,
+          presence: r.presence,
+          overall: r.overall,
+          sentiment: r.sentiment,
+          rankPosition: r.rankPosition,
+          competitorMentions: r.competitorMentions as Prisma.JsonValue,
+          competitorHosts: r.competitorHosts as Prisma.JsonValue,
+          citations: r.citations as Prisma.JsonValue,
+        })),
+      };
+      phraseVisibility = computePhraseVisibility(analyticsInput);
+      const heuristicOpportunities = computeOpportunities(analyticsInput, phraseVisibility);
 
-      if (latestRun?.id) {
-        const existingSummary = (summary as Record<string, unknown> | null) ?? {};
-        enrichOpportunities(heuristicOpportunities, {
-          brandName: domain.inferred?.companyName ?? domain.host,
-          brandHost: domain.host,
-          industry: domain.profile?.industry ?? null,
-          brandSummary: domain.inferred?.summary ?? null,
-          promptsById,
-        })
-          .then((enriched) => {
-            const updatedSummary = {
-              ...existingSummary,
-              opportunitiesEnriched: enriched,
-              opportunitiesEnrichedKeys: currentKeys,
-              opportunitiesEnrichedAt: new Date().toISOString(),
-            };
-            return prisma.aiRun.update({ where: { id: latestRun.id }, data: { summary: updatedSummary as any } });
+      // ── LLM enrichment with per-AiRun cache ──────────────────────────────
+      // Never block /report on an LLM call. If the cache is missing/stale, return
+      // usable heuristic opportunities immediately and warm the enriched cache in
+      // the background for the next read.
+      const cached = (summary?.opportunitiesEnriched as EnrichedOpportunity[] | undefined) ?? null;
+      const cachedKeys = (summary?.opportunitiesEnrichedKeys as string[] | undefined) ?? null;
+      const currentKeys = heuristicOpportunities.map((o) => o.key);
+      const cacheValid =
+        !refreshInsights &&
+        cached &&
+        cachedKeys &&
+        cachedKeys.length === currentKeys.length &&
+        cachedKeys.every((k, i) => k === currentKeys[i]);
+
+      if (cacheValid) {
+        // Hydrate cached enrichment back onto the freshly-computed opportunities
+        // so volatile fields (severityScore, promptIds) reflect the latest data.
+        const enrichedByKey = new Map(cached.map((c) => [c.key, c]));
+        opportunities = heuristicOpportunities.map((o) => {
+          const e = enrichedByKey.get(o.key);
+          return e ? { ...o, title: e.title, rationale: e.rationale, recommendedAngle: e.recommendedAngle, brief: e.brief } : { ...o, recommendedAngle: '', brief: { audience: '', tone: 'Authoritative' as const, structure: '', keyPoints: [], wordCount: 1000, cta: '' } };
+        });
+      } else {
+        opportunities = heuristicOpportunities.map((o) => withDefaultBrief(o));
+        insightsStatus = 'warming';
+        const promptsById = new Map(
+          queriedPrompts.map((p) => [
+            p.id,
+            {
+              text: p.text,
+              persona: p.persona,
+              useCase: p.useCase,
+              category: p.category,
+            },
+          ])
+        );
+
+        if (latestRun?.id) {
+          const existingSummary = (summary as Record<string, unknown> | null) ?? {};
+          enrichOpportunities(heuristicOpportunities, {
+            brandName: domain.inferred?.companyName ?? domain.host,
+            brandHost: domain.host,
+            industry: domain.profile?.industry ?? null,
+            brandSummary: domain.inferred?.summary ?? null,
+            promptsById,
           })
-          .catch((err) => console.warn('[opportunities] background enrichment failed', err));
+            .then((enriched) => {
+              const updatedSummary = {
+                ...existingSummary,
+                opportunitiesEnriched: enriched,
+                opportunitiesEnrichedKeys: currentKeys,
+                opportunitiesEnrichedAt: new Date().toISOString(),
+              };
+              return prisma.aiRun.update({ where: { id: latestRun.id }, data: { summary: updatedSummary as any } });
+            })
+            .catch((err) => console.warn('[opportunities] background enrichment failed', err));
+        }
       }
+    } catch (err) {
+      insightsStatus = 'error';
+      insightsError = err instanceof Error ? err.message : 'Opportunity analysis failed';
+      phraseVisibility = [];
+      opportunities = [];
+      console.warn('[wizard/report] opportunity insights failed', {
+        domainId: domain.id,
+        runId: latestRun?.id ?? null,
+        error: insightsError,
+      });
     }
   }
 
@@ -1443,6 +1797,7 @@ router.get('/domain/:id/report', timed('GET /report', 800), authenticateToken, a
       reportCards,
       modelPerformance,
       insightsStatus,
+      insightsError,
     },
     topPrompts,
     topAiSearchPrompts: topPrompts,
@@ -2461,11 +2816,12 @@ router.get('/domain/:id/trends', authenticateToken, async (req: Request, res: Re
 //                        reset phases so the wizard runs fresh from Step 2.
 //   from='competitors' — keep crawl/profile, but wipe competitors + topics
 //                        + prompts + runs so the user restarts at Step 3.
-//   from='topics'      — wipe only topics+select+run; keep crawl + competitors
-//                        so the user re-picks prompts on top of existing data.
+//   from='topics'      — keep crawl, competitors, and prompt inventory; clear
+//                        prompt selection state so the user can re-pick prompts.
 //
-// User-supplied selections (Competitor.isSelected, custom prompts/keywords)
-// are preserved on a 'topics' restart; both kinds are wiped on 'crawl'.
+// User-supplied competitors/custom prompts are preserved on a 'topics'
+// restart; generated prompt rows are also preserved so historical reports,
+// the Prompt Inventory, and already-ran badges do not disappear.
 // ── POST /domain/:id/resync-context ──────────────────────────────────────
 //
 // Re-runs the LLM context synthesis from the latest CrawlSnapshot's raw text
@@ -2567,29 +2923,12 @@ router.post('/domain/:id/restart', authenticateToken, async (req: Request, res: 
       }),
     ]);
   } else {
-    // Soft reset — keep crawl, competitors, custom prompts/keywords.
-    // Drop AI-source prompts/keywords + every run.
-    const aiKeywords = await prisma.keyword.findMany({
-      where: { domainId: domain.id, source: 'ai' },
-      select: { id: true },
-    });
-    const aiKwIds = aiKeywords.map((k) => k.id);
-
-    // Soft reset: drop AI prompts/keywords. We deliberately keep AiRun rows
-    // (and let AiQueryResult cascade-delete via the prompt FK) so the
-    // dashboard's "latest completed run" lookup still finds the previous
-    // run's summary.avgOverall while the user re-picks prompts. Without this,
-    // the Domain History card flips from "Visibility 72%" to "Pick prompts"
-    // the moment the user enters Step 4 from the AI Dashboard, which is
-    // disorienting — the prior result hasn't been replaced yet.
+    // Soft reset: preserve prompt inventory and historical AiQueryResult rows.
+    // We only clear generated prompt selections so the next Step 4 visit loads
+    // the saved inventory and lets the user pick a fresh audit set.
     await prisma.$transaction([
-      prisma.prompt.deleteMany({
-        where: {
-          domainId: domain.id,
-          OR: [{ source: 'ai' }, { keywordId: { in: aiKwIds } }],
-        },
-      }),
-      prisma.keyword.deleteMany({ where: { id: { in: aiKwIds } } }),
+      prisma.keyword.updateMany({ where: { domainId: domain.id, source: 'ai' }, data: { isSelected: false } }),
+      prisma.prompt.updateMany({ where: { domainId: domain.id, source: 'ai' }, data: { isSelected: false } }),
       // Drop topics/select/run phases; keep crawl + profile + competitors.
       prisma.wizardState.upsert({
         where: { domainId: domain.id },
@@ -2819,6 +3158,19 @@ router.post('/domain/:id/competitors', timed('POST /competitors', 5000), authent
   if (!got.ok) return res.status(got.status).json({ error: got.error });
   const { domain } = got;
   await setPhase(prisma, domain.id, 'competitors', 'running');
+  const warmup = competitorWarmups.get(domain.id);
+  if (warmup) await warmup.catch(() => undefined);
+  const existingRows = await prisma.competitor.findMany({
+    where: { domainId: domain.id },
+    orderBy: { rank: 'asc' },
+  });
+  if (existingRows.length > 0) {
+    return res.json({
+      domainId: domain.id,
+      competitors: formatCompetitorRows(existingRows as any),
+      stats: { discovered: existingRows.length, verified: 0, ranked: existingRows.length },
+    });
+  }
   try {
     const seedKw = await prisma.keyword.findMany({ where: { domainId: domain.id }, select: { term: true }, take: 30 });
     const result = await runCompetitorPipeline({
@@ -2868,7 +3220,7 @@ router.post('/domain/:id/competitors', timed('POST /competitors', 5000), authent
     return res.json({
       domainId: domain.id,
       competitors: enriched,
-      stats: { discovered: result.candidates.length, verified: result.verified.length, ranked: result.ranked.length },
+      stats: { discovered: result.candidates.length, verified: result.verified.length, ranked: enriched.length },
     });
   } catch (err) {
     await setPhase(prisma, domain.id, 'competitors', 'failed');
@@ -3118,6 +3470,12 @@ router.post('/domain/:id/topics', timed('POST /topics', 4000), authenticateOrSes
     }
 
     const persisted = await persistAuditPrompts({ prisma, domainId: domain.id, prompts, append });
+    const customPromptSeeds = Array.isArray(domain.profile?.customSeeds?.prompts)
+      ? domain.profile.customSeeds.prompts.filter((prompt: unknown): prompt is string => typeof prompt === 'string')
+      : [];
+    if (customPromptSeeds.length > 0) {
+      await persistCustomPromptSeeds(prisma, domain.id, customPromptSeeds);
+    }
     if (append && persisted.filter((item) => item.type === 'prompt').length === 0) {
       console.warn(`[PROMPTS] append generated no new unique prompts for domain ${domain.id}; duplicates were skipped`);
     }
@@ -3428,7 +3786,7 @@ router.post('/domain/:id/prompts/custom', authenticateOrSession(), async (req: R
       text,
       intent: assignedIntent ?? 'Commercial',
       source: 'custom',
-      isSelected: false,
+      isSelected: true,
     },
   });
 
@@ -3436,6 +3794,47 @@ router.post('/domain/:id/prompts/custom', authenticateOrSession(), async (req: R
   const items = await listAllTopicItems(prisma, domain.id);
   invalidateDomainReportCache(domain);
   return res.json({ domainId: domain.id, prompt: { id: created.id, keywordId: created.keywordId }, items });
+});
+
+/**
+ * POST /api/wizard/domain/:id/prompts/:promptId/rerun
+ *
+ * Re-runs one existing prompt across the model roster and returns the same
+ * PromptTableRow-shaped payload used by /prompts/analyze. Unlike /analyze,
+ * this does not create a duplicate custom prompt; it keeps the inventory stable
+ * and gives the UI fresh per-model responses for retry buttons.
+ */
+router.post('/domain/:id/prompts/:promptId/rerun', authenticateToken, async (req: Request, res: Response) => {
+  const got = await ensureDomain(req, req.params.id);
+  if (!got.ok) return res.status(got.status).json({ error: got.error });
+  const { domain } = got;
+  const promptId = Number(req.params.promptId);
+  if (!Number.isFinite(promptId)) return res.status(400).json({ error: 'Invalid promptId' });
+
+  const prompt = await prisma.prompt.findFirst({
+    where: { id: promptId, domainId: domain.id },
+    select: { id: true, keywordId: true, text: true, intent: true, source: true },
+  });
+  if (!prompt) return res.status(404).json({ error: 'Prompt not found for this domain' });
+
+  let runResult: Awaited<ReturnType<typeof runOnePrompt>>;
+  try {
+    runResult = await runOnePrompt(prisma, { domainId: domain.id, promptId: prompt.id });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'AI analysis failed';
+    return res.status(502).json({
+      error: 'Analysis service unavailable — please try again.',
+      details: message,
+      prompt: { id: prompt.id, keywordId: prompt.keywordId, text: prompt.text },
+    });
+  }
+
+  invalidateDomainReportCache(domain);
+  return res.json({
+    runId: runResult.runId,
+    prompt: { id: prompt.id, keywordId: prompt.keywordId, text: prompt.text },
+    row: buildPromptTableRowForSingleRun(prompt, runResult.persistedResults, domain.host),
+  });
 });
 
 /**
@@ -3589,105 +3988,10 @@ router.post('/domain/:id/prompts/analyze', authenticateToken, async (req: Reques
     });
   }
 
-  // 4. Build a PromptTableRow-shaped response. Same construction as the
-  //    /report endpoint's per-prompt loop, but for just this one prompt.
-  const toDisplaySentiment = (raw: number | null): number | null =>
-    raw === null ? null : Math.max(0, Math.min(10, (raw + 10) / 2));
-
-  const built = runResult.persistedResults.map((r) => ({
-    id: `res-${r.id}`,
-    model: r.model,
-    status: r.status,
-    errorMessage: r.errorMessage,
-    presence: r.presence,
-    overall: r.overall,
-    accuracy: r.accuracy,
-    relevance: r.relevance,
-    sentiment:
-      toDisplaySentiment(r.sentiment) === null
-        ? null
-        : Number((toDisplaySentiment(r.sentiment) as number).toFixed(2)),
-    sentimentRaw: r.sentiment,
-    rankPosition: r.rankPosition,
-    scorerSummary: r.scorerSummary,
-    factualClaims: r.factualClaims ?? [],
-    response: r.response,
-    citations: Array.isArray(r.citations)
-      ? (r.citations as Array<{ title?: string | null; url: string; host: string }>).map((c) => ({
-          title: c.title ?? c.host,
-          url: c.url,
-          snippet: c.host,
-        }))
-      : [],
-    sources: Array.isArray(r.citations)
-      ? Array.from(
-          new Set(
-            (r.citations as Array<{ host: string }>).map((c) => c.host).filter(Boolean)
-          )
-        )
-      : [],
-    competitorMentions: Array.isArray(r.competitorMentions)
-      ? (r.competitorMentions as Array<{ host?: string; count?: number; sentiment?: number | null; rankPosition?: number | null }>)
-          .map((mention) => ({
-            host: typeof mention.host === 'string' ? mention.host : '',
-            count: typeof mention.count === 'number' && Number.isFinite(mention.count) && mention.count > 0 ? mention.count : 1,
-            sentiment: typeof mention.sentiment === 'number' ? mention.sentiment : null,
-            rankPosition: typeof mention.rankPosition === 'number' && mention.rankPosition > 0 ? mention.rankPosition : null,
-          }))
-          .filter((mention) => mention.host)
-      : [],
-    competitorHosts: Array.isArray(r.competitorHosts)
-      ? (r.competitorHosts as string[])
-      : [],
-    latencyMs: r.latencyMs,
-  }));
-
-  const promptMetrics = buildPromptRowMetrics(built, domain.host);
-  const competitorsSet = new Set<string>();
-  for (const r of built) {
-    for (const h of r.competitorHosts) competitorsSet.add(h);
-    for (const m of r.competitorMentions ?? []) competitorsSet.add(m.host);
-  }
-  const competitors = Array.from(competitorsSet);
-
-  const row = {
-    id: `pr-${prompt.id}`,
-    rawId: prompt.id,
-    type: 'prompt' as const,
-    phrase: prompt.text,
-    text: prompt.text,
-    intent: prompt.intent,
-    source: prompt.source,
-    keywordId: prompt.keywordId,
-    sov: `${promptMetrics.visibilityPct}%`,
-    aiSov: promptMetrics.aiSov,
-    aiSovPercent: promptMetrics.aiSovPct,
-    mentions: promptMetrics.mentions,
-    successfulResponses: promptMetrics.successfulResponses,
-    bestRank: promptMetrics.bestRankPosition ?? 0,
-    rankingPosition: promptMetrics.bestRankPosition,
-    avgRankPosition: promptMetrics.avgRankPosition,
-    rankedResponses: promptMetrics.rankedResponses,
-    brandMentionEvents: promptMetrics.brandMentionEvents,
-    competitorMentionEvents: promptMetrics.competitorMentionEvents,
-    totalMentionEvents: promptMetrics.totalMentionEvents,
-    avgSentiment: promptMetrics.avgSentiment,
-    competitors,
-    competitorCount: competitors.length,
-    results: built,
-    metrics: {
-      visibility: promptMetrics.visibilityPct,
-      aiSov: promptMetrics.aiSovPct,
-      avgOverall: promptMetrics.avgOverall,
-      runs: promptMetrics.successfulResponses,
-      attemptedRuns: promptMetrics.totalResponses,
-    },
-  };
-
   return res.json({
     runId: runResult.runId,
     prompt: { id: prompt.id, keywordId: prompt.keywordId, text: prompt.text },
-    row,
+    row: buildPromptTableRowForSingleRun(prompt, runResult.persistedResults, domain.host),
   });
 });
 
@@ -3712,6 +4016,7 @@ async function listAllTopicItems(prismaClient: typeof prisma, domainId: number) 
     text: string;
     intent: string | null;
     source: 'ai' | 'custom';
+    isSelected?: boolean;
     parentKeywordId?: number;
     category?: string | null;
     intentStage?: string | null;
@@ -3720,8 +4025,11 @@ async function listAllTopicItems(prismaClient: typeof prisma, domainId: number) 
     constraint?: string | null;
     isBranded?: boolean;
     competitorMentioned?: string | null;
+    hasRun?: boolean;
+    lastRunAt?: Date | null;
   }> = [];
   const keywordById = new Map(keywords.map((k) => [k.id, k]));
+  const promptRunMeta = await getPromptRunMetadata(prismaClient, prompts.map((prompt) => prompt.id));
   for (const k of keywords) {
     items.push({
       id: k.id,
@@ -3732,12 +4040,14 @@ async function listAllTopicItems(prismaClient: typeof prisma, domainId: number) 
     });
   }
   for (const p of prompts) {
+    const runMeta = promptRunMeta.get(p.id);
     items.push({
       id: p.id,
       type: 'prompt',
       text: p.text,
       intent: p.intent,
       source: (p.source as 'ai' | 'custom') ?? 'ai',
+      isSelected: p.isSelected,
       parentKeywordId: p.keywordId && keywordById.has(p.keywordId) ? p.keywordId : undefined,
       category: p.category ?? null,
       intentStage: p.intentStage ?? null,
@@ -3746,6 +4056,8 @@ async function listAllTopicItems(prismaClient: typeof prisma, domainId: number) 
       constraint: p.constraint ?? null,
       isBranded: p.isBranded ?? false,
       competitorMentioned: p.competitorMentioned ?? null,
+      hasRun: runMeta?.hasRun ?? false,
+      lastRunAt: runMeta?.lastRunAt ?? null,
     });
   }
   return items;
@@ -3757,10 +4069,12 @@ router.patch('/domain/:id/draft', authenticateOrSession(), async (req: Request, 
   const got = await ensureDomain(req, req.params.id);
   if (!got.ok) return res.status(got.status).json({ error: got.error });
   const { domain } = got;
-  const { keywordIds, promptIds } = (req.body ?? {}) as { keywordIds?: number[]; promptIds?: number[] };
   const draft = {
-    keywordIds: Array.isArray(keywordIds) ? keywordIds.filter((n): n is number => Number.isFinite(n)) : [],
-    promptIds: Array.isArray(promptIds) ? promptIds.filter((n): n is number => Number.isFinite(n)) : [],
+    keywordIds: parseIdList((req.body as { keywordIds?: unknown; selectedKeywordIds?: unknown } | null)?.keywordIds)
+      .concat(parseIdList((req.body as { keywordIds?: unknown; selectedKeywordIds?: unknown } | null)?.selectedKeywordIds)),
+    promptIds: parseIdList((req.body as { promptIds?: unknown; selectedPromptIds?: unknown } | null)?.promptIds)
+      .concat(parseIdList((req.body as { promptIds?: unknown; selectedPromptIds?: unknown } | null)?.selectedPromptIds))
+      .concat(parseIdList((req.body as { selectedPrompts?: unknown } | null)?.selectedPrompts)),
   };
   await prisma.wizardState.upsert({
     where: { domainId: domain.id },
@@ -3776,9 +4090,34 @@ router.post('/domain/:id/select', authenticateOrSession(), async (req: Request, 
   const got = await ensureDomain(req, req.params.id);
   if (!got.ok) return res.status(got.status).json({ error: got.error });
   const { domain } = got;
-  const { keywordIds, promptIds } = (req.body ?? {}) as { keywordIds?: number[]; promptIds?: number[] };
-  const kwIdsRaw = Array.isArray(keywordIds) ? keywordIds.filter((n): n is number => Number.isFinite(n)) : [];
-  const prIds = Array.isArray(promptIds) ? promptIds.filter((n): n is number => Number.isFinite(n)) : [];
+  const body = (req.body ?? {}) as {
+    keywordIds?: unknown;
+    selectedKeywordIds?: unknown;
+    promptIds?: unknown;
+    selectedPromptIds?: unknown;
+    selectedPrompts?: unknown;
+    prompts?: unknown;
+    items?: unknown;
+    selection?: unknown;
+  };
+  const kwIdsRaw = parseIdList(body.keywordIds).concat(parseIdList(body.selectedKeywordIds));
+  let prIds = parseIdList(body.promptIds)
+    .concat(parseIdList(body.selectedPromptIds))
+    .concat(parseIdList(body.selectedPrompts))
+    .concat(parseIdList(body.prompts))
+    .concat(parseIdList(body.items))
+    .concat(parseIdList(body.selection));
+  if (prIds.length === 0) {
+    const state = await prisma.wizardState.findUnique({
+      where: { domainId: domain.id },
+      select: { selectionDraft: true },
+    });
+    const draft = state?.selectionDraft as { keywordIds?: unknown; promptIds?: unknown } | null;
+    if (draft) {
+      prIds = prIds.concat(parseIdList(draft.promptIds));
+      kwIdsRaw.push(...parseIdList(draft.keywordIds));
+    }
+  }
   // The wizard only collects prompt selections — derive the keyword ids from
   // the selected prompts so Keyword.isSelected accurately reflects which
   // keywords drove the run. Otherwise the dashboard's "Top Keywords" count

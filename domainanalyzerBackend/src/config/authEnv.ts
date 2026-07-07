@@ -76,13 +76,42 @@ if (JWT_REFRESH_SECRET === JWT_SECRET) {
   throw new Error('[authEnv] JWT_REFRESH_SECRET must differ from JWT_SECRET');
 }
 
+const rawBackendPublicUrl = process.env.BACKEND_PUBLIC_URL?.trim();
 const BACKEND_PUBLIC_URL = withoutTrailingSlash(
-  process.env.BACKEND_PUBLIC_URL?.trim() ||
-    `http://localhost:${Number(process.env.PORT) || 3002}`,
+  rawBackendPublicUrl || `http://localhost:${Number(process.env.PORT) || 3002}`,
 );
+
+function defaultGoogleAuthRedirectUri(): string {
+  if (rawBackendPublicUrl) {
+    return `${BACKEND_PUBLIC_URL}/api/auth/google/auth-callback`;
+  }
+
+  const connectorRedirect = process.env.GOOGLE_REDIRECT_URI?.trim();
+  if (connectorRedirect) {
+    try {
+      const url = new URL(connectorRedirect);
+      const authPath = url.pathname.replace(
+        /\/api\/auth\/google\/callback\/?$/,
+        '/api/auth/google/auth-callback',
+      );
+      if (authPath !== url.pathname) {
+        url.pathname = authPath;
+        url.search = '';
+        url.hash = '';
+        return url.toString();
+      }
+    } catch {
+      // Fall through to the localhost/dev default below. Invalid explicit
+      // auth redirect values are still validated by assertNoLocalhostRedirect.
+    }
+  }
+
+  return `${BACKEND_PUBLIC_URL}/api/auth/google/auth-callback`;
+}
+
 const GOOGLE_AUTH_REDIRECT_URI = optional(
   'GOOGLE_AUTH_REDIRECT_URI',
-  `${BACKEND_PUBLIC_URL}/api/auth/google/auth-callback`,
+  defaultGoogleAuthRedirectUri(),
 );
 assertNoLocalhostRedirect('GOOGLE_AUTH_REDIRECT_URI', GOOGLE_AUTH_REDIRECT_URI);
 

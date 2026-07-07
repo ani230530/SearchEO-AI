@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as bcrypt from 'bcryptjs';
+import * as jwt from 'jsonwebtoken';
 import { createPrismaMock, PrismaMock } from '../testSupport/prismaMock';
 import { authEnv } from '../config/authEnv';
 
@@ -30,6 +31,7 @@ const createUser = async (input: {
   email: string;
   password: string;
   emailVerified: boolean;
+  role?: string;
 }) => {
   const hashedPassword = await bcrypt.hash(input.password, 12);
   return state.prisma!.user.create({
@@ -42,6 +44,7 @@ const createUser = async (input: {
       emailVerificationTokenExpiry: null,
       tokenVersion: 0,
       loginFailureCount: 0,
+      ...(input.role ? { role: input.role } : {}),
     },
   });
 };
@@ -74,6 +77,7 @@ describe('authService.login', () => {
       email: 'verified@example.com',
       name: undefined,
       emailVerified: true,
+      role: 'user',
     });
     expect(result.token).toBeTruthy();
     expect(result.refreshToken).toBeTruthy();
@@ -100,6 +104,32 @@ describe('authService.login', () => {
     expect(result.user?.id).toBe(user.id);
     expect(result.token).toBeTruthy();
     expect(result.refreshToken).toBeTruthy();
+    expect(result.user?.role).toBe('user');
+  });
+
+  it('keeps an admin user flagged as admin in both payload and JWT', async () => {
+    const user = await createUser({
+      email: 'admin@example.com',
+      password: 'password123',
+      emailVerified: true,
+      role: 'admin',
+    });
+
+    const result = await authService.login({
+      email: 'admin@example.com',
+      password: 'password123',
+    });
+
+    expect(result.user).toEqual({
+      id: user.id,
+      email: 'admin@example.com',
+      name: undefined,
+      emailVerified: true,
+      role: 'admin',
+    });
+
+    const decoded = jwt.verify(result.token!, authEnv.JWT_SECRET) as { role?: string };
+    expect(decoded.role).toBe('admin');
   });
 
   it('rotates refresh tokens and keeps the 1-day TTL on the child token', async () => {

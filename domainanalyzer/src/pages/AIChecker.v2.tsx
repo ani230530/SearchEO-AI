@@ -163,7 +163,7 @@ export default function AICheckerV2() {
   // right step using the canResumeAt → step map.
   //
   // ?restart=crawl  → wipe everything downstream of the profile, kick Step 2
-  // ?restart=topics → keep crawl + competitors, regenerate prompts, kick Step 4
+  // ?restart=topics → keep crawl + competitors + prompt inventory, kick Step 4
   useEffect(() => {
     const idParam = searchParams.get("domain");
     if (!idParam) return;
@@ -181,10 +181,10 @@ export default function AICheckerV2() {
         // canResumeAt would land us at the wrong step.
         if (restart === 'crawl' || restart === 'competitors' || restart === 'topics') {
           await apiPost(`/wizard/domain/${id}/restart`, { from: restart });
-          // The restart wiped runs (and, for crawl/competitors, the whole
-          // downstream pipeline) server-side. Any AI Results data still cached
-          // from before the restart is now stale/orphaned — drop it so the
-          // dashboard can't flash deleted runs if the user backs out mid-wizard.
+          // The restart changes the next audit selection state. Any AI
+          // Results data still cached from before the restart is stale — drop
+          // it so the dashboard can't flash old selection state if the user
+          // backs out mid-wizard.
           void queryClient.invalidateQueries({ queryKey: ['ai-results'] });
           // Strip the param from the URL so a refresh doesn't re-restart.
           setSearchParams(
@@ -523,8 +523,5 @@ export default function AICheckerV2() {
     </WizardShell>
   );
 }
-
-
-
 
 

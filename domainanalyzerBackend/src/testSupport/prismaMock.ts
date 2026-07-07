@@ -18,9 +18,10 @@
  */
 
 import type { PrismaClient } from '../../generated/prisma';
+import crypto from 'crypto';
 
 interface Row {
-  id: number;
+  id: number | string;
   createdAt: Date;
   updatedAt: Date;
   [k: string]: any;
@@ -28,13 +29,15 @@ interface Row {
 
 const now = () => new Date();
 
-const makeStore = () => {
-  const rows = new Map<number, Row>();
+const makeStore = (makeId: () => number | string = (() => {
   let nextId = 1;
+  return () => nextId++;
+})()) => {
+  const rows = new Map<number | string, Row>();
   return {
     rows,
     insert: (data: Record<string, any>): Row => {
-      const id = nextId++;
+      const id = data.id ?? makeId();
       const t = now();
       const row: Row = {
         id,
@@ -45,7 +48,7 @@ const makeStore = () => {
       rows.set(id, row);
       return row;
     },
-    update: (id: number, patch: Record<string, any>): Row | null => {
+    update: (id: number | string, patch: Record<string, any>): Row | null => {
       const row = rows.get(id);
       if (!row) return null;
       const updated: Row = { ...row, ...patch, updatedAt: now() };
@@ -68,6 +71,13 @@ export const createPrismaMock = (): PrismaMock => {
     wizardRunCache: makeStore(),
     folder: makeStore(),
     file: makeStore(),
+    blogCategory: makeStore(),
+    blogTag: makeStore(),
+    blogPost: makeStore(),
+    campaignTopic: makeStore(),
+    wordpressIntegration: makeStore(),
+    wordpressPublishLog: makeStore(),
+    post: makeStore(() => crypto.randomUUID()),
   };
 
   const projectRow = (row: Row, select: any) => {
@@ -79,7 +89,7 @@ export const createPrismaMock = (): PrismaMock => {
     return out;
   };
 
-  const deleteFolderTree = (folderId: number) => {
+  const deleteFolderTree = (folderId: number | string) => {
     for (const child of stores.folder.all().filter((row) => row.parentId === folderId)) {
       deleteFolderTree(child.id);
     }
@@ -227,17 +237,297 @@ export const createPrismaMock = (): PrismaMock => {
         if (where.email !== undefined) return rows.find((r) => r.email === where.email) ?? null;
         return null;
       },
-      create: async ({ data }: any) =>
-        stores.user.insert({
+      create: async ({ data }: any) => {
+        const row = {
           wizardRunsAllowed: 1,
           lastWizardRunAt: null,
           suspicious: false,
           ...data,
-        }),
+        };
+        if (row.role === undefined) row.role = 'user';
+        return stores.user.insert(row);
+      },
+      upsert: async ({ where, create, update }: any) => {
+        const existing = await mock.user.findUnique({ where });
+        if (existing) {
+          return stores.user.update(existing.id, update);
+        }
+        const row = {
+          wizardRunsAllowed: 1,
+          lastWizardRunAt: null,
+          suspicious: false,
+          ...create,
+        };
+        if (row.role === undefined) row.role = 'user';
+        return stores.user.insert(row);
+      },
       update: async ({ where, data }: any) => stores.user.update(where.id, data),
       delete: async ({ where }: any) => {
         const row = stores.user.rows.get(where.id);
         stores.user.rows.delete(where.id);
+        return row;
+      },
+    },
+
+    // -------------------------------------------------------------------------
+    // blogCategory
+    // -------------------------------------------------------------------------
+    blogCategory: {
+      findUnique: async ({ where }: any) => {
+        const rows = stores.blogCategory.all();
+        if (where.id !== undefined) return rows.find((r) => r.id === where.id) ?? null;
+        if (where.slug !== undefined) return rows.find((r) => r.slug === where.slug) ?? null;
+        return null;
+      },
+      findFirst: async ({ where }: any = {}) => {
+        return stores.blogCategory.all().find((r) => matchWhere(r, where ?? {})) ?? null;
+      },
+      findMany: async ({ where }: any = {}) => stores.blogCategory.all().filter((r) => matchWhere(r, where ?? {})),
+      create: async ({ data }: any) =>
+        stores.blogCategory.insert({
+          description: null,
+          sortOrder: 0,
+          ...data,
+        }),
+      update: async ({ where, data }: any) => stores.blogCategory.update(where.id, data),
+      delete: async ({ where }: any) => {
+        const row = stores.blogCategory.rows.get(where.id);
+        stores.blogCategory.rows.delete(where.id);
+        return row;
+      },
+    },
+
+    // -------------------------------------------------------------------------
+    // blogTag
+    // -------------------------------------------------------------------------
+    blogTag: {
+      findUnique: async ({ where }: any) => {
+        const rows = stores.blogTag.all();
+        if (where.id !== undefined) return rows.find((r) => r.id === where.id) ?? null;
+        if (where.slug !== undefined) return rows.find((r) => r.slug === where.slug) ?? null;
+        return null;
+      },
+      findFirst: async ({ where }: any = {}) => {
+        return stores.blogTag.all().find((r) => matchWhere(r, where ?? {})) ?? null;
+      },
+      findMany: async ({ where }: any = {}) => stores.blogTag.all().filter((r) => matchWhere(r, where ?? {})),
+      create: async ({ data }: any) =>
+        stores.blogTag.insert({
+          description: null,
+          ...data,
+        }),
+      update: async ({ where, data }: any) => stores.blogTag.update(where.id, data),
+      delete: async ({ where }: any) => {
+        const row = stores.blogTag.rows.get(where.id);
+        stores.blogTag.rows.delete(where.id);
+        return row;
+      },
+    },
+
+    // -------------------------------------------------------------------------
+    // blogPost
+    // -------------------------------------------------------------------------
+    blogPost: {
+      findUnique: async ({ where }: any) => {
+        const rows = stores.blogPost.all();
+        let post = null;
+        if (where.id !== undefined) post = rows.find((r) => r.id === where.id) ?? null;
+        else if (where.slug !== undefined) post = rows.find((r) => r.slug === where.slug) ?? null;
+        if (post && post.categoryId) {
+          post.category = stores.blogCategory.all().find((c) => c.id === post.categoryId) ?? null;
+        }
+        return post;
+      },
+      findFirst: async ({ where }: any = {}) => {
+        const post = stores.blogPost.all().find((r) => matchWhere(r, where ?? {})) ?? null;
+        if (post && post.categoryId) {
+          post.category = stores.blogCategory.all().find((c) => c.id === post.categoryId) ?? null;
+        }
+        return post;
+      },
+      findMany: async ({ where }: any = {}) => {
+        const posts = stores.blogPost.all().filter((r) => matchWhere(r, where ?? {}));
+        for (const post of posts) {
+          if (post.categoryId) {
+            post.category = stores.blogCategory.all().find((c) => c.id === post.categoryId) ?? null;
+          }
+        }
+        return posts;
+      },
+      create: async ({ data }: any) => {
+        const post = stores.blogPost.insert({
+          excerpt: null,
+          heroImageUrl: null,
+          heroImageAlt: null,
+          seoTitle: null,
+          seoDescription: null,
+          status: 'DRAFT',
+          publishedAt: null,
+          scheduledAt: null,
+          readTimeMinutes: 0,
+          authorName: null,
+          authorTitle: null,
+          categoryId: null,
+          tagIds: [],
+          ...data,
+        });
+        if (post && post.categoryId) {
+          post.category = stores.blogCategory.all().find((c) => c.id === post.categoryId) ?? null;
+        }
+        return post;
+      },
+      update: async ({ where, data }: any) => {
+        const post = stores.blogPost.update(where.id, data);
+        if (post && post.categoryId) {
+          post.category = stores.blogCategory.all().find((c) => c.id === post.categoryId) ?? null;
+        }
+        return post;
+      },
+      delete: async ({ where }: any) => {
+        const row = stores.blogPost.rows.get(where.id);
+        stores.blogPost.rows.delete(where.id);
+        return row;
+      },
+    },
+
+    // -------------------------------------------------------------------------
+    // post
+    // -------------------------------------------------------------------------
+    post: {
+      findUnique: async ({ where, select }: any) => {
+        const rows = stores.post.all();
+        let row = null;
+        if (where.id !== undefined) row = rows.find((r) => r.id === where.id) ?? null;
+        if (!row && where.slug !== undefined) row = rows.find((r) => r.slug === where.slug) ?? null;
+        return row ? projectRow(row, select) : null;
+      },
+      findFirst: async ({ where, select }: any = {}) => {
+        const row = stores.post.all().find((r) => matchWhere(r, where ?? {})) ?? null;
+        return row ? projectRow(row, select) : null;
+      },
+      findMany: async ({ where, select }: any = {}) => {
+        const rows = stores.post.all().filter((r) => matchWhere(r, where ?? {}));
+        return rows.map((row) => projectRow(row, select));
+      },
+      create: async ({ data }: any) =>
+        stores.post.insert({
+          excerpt: '',
+          body: { type: 'doc', content: [] },
+          heroImage: '',
+          seoTitle: '',
+          seoDescription: '',
+          status: 'DRAFT',
+          publishedAt: null,
+          ...data,
+        }),
+      update: async ({ where, data }: any) => stores.post.update(where.id, data),
+      delete: async ({ where }: any) => {
+        const row = stores.post.rows.get(where.id);
+        stores.post.rows.delete(where.id);
+        return row;
+      },
+    },
+
+    // -------------------------------------------------------------------------
+    // campaignTopic
+    // -------------------------------------------------------------------------
+    campaignTopic: {
+      findUnique: async ({ where }: any) => {
+        const rows = stores.campaignTopic.all();
+        if (where.id !== undefined) return rows.find((r) => r.id === where.id) ?? null;
+        return null;
+      },
+      findFirst: async ({ where }: any = {}) => {
+        return stores.campaignTopic.all().find((r) => matchWhere(r, where ?? {})) ?? null;
+      },
+      findMany: async ({ where }: any = {}) => stores.campaignTopic.all().filter((r) => matchWhere(r, where ?? {})),
+      create: async ({ data }: any) =>
+        stores.campaignTopic.insert({
+          latestDraftId: null,
+          ...data,
+        }),
+      update: async ({ where, data }: any) => stores.campaignTopic.update(where.id, data),
+      delete: async ({ where }: any) => {
+        const row = stores.campaignTopic.rows.get(where.id);
+        stores.campaignTopic.rows.delete(where.id);
+        return row;
+      },
+    },
+
+    // -------------------------------------------------------------------------
+    // wordpressIntegration
+    // -------------------------------------------------------------------------
+    wordpressIntegration: {
+      findUnique: async ({ where }: any) => {
+        const rows = stores.wordpressIntegration.all();
+        if (where.id !== undefined) return rows.find((r) => r.id === where.id) ?? null;
+        if (where.userId !== undefined) return rows.find((r) => r.userId === where.userId) ?? null;
+        return null;
+      },
+      findFirst: async ({ where }: any = {}) => {
+        return stores.wordpressIntegration.all().find((r) => matchWhere(r, where ?? {})) ?? null;
+      },
+      findMany: async ({ where }: any = {}) => stores.wordpressIntegration.all().filter((r) => matchWhere(r, where ?? {})),
+      create: async ({ data }: any) =>
+        stores.wordpressIntegration.insert({
+          siteUrl: '',
+          username: '',
+          password: '',
+          lastPublishedAt: null,
+          ...data,
+        }),
+      update: async ({ where, data }: any) => stores.wordpressIntegration.update(where.id ?? where.userId, data),
+      upsert: async ({ where, create, update }: any) => {
+        const existing = await mock.wordpressIntegration.findUnique({ where });
+        if (existing) {
+          return stores.wordpressIntegration.update(existing.id, update);
+        }
+        return stores.wordpressIntegration.insert({
+          lastPublishedAt: null,
+          ...create,
+        });
+      },
+      delete: async ({ where }: any) => {
+        const row = stores.wordpressIntegration.rows.get(where.id ?? where.userId);
+        stores.wordpressIntegration.rows.delete(where.id ?? where.userId);
+        return row;
+      },
+    },
+
+    // -------------------------------------------------------------------------
+    // wordpressPublishLog
+    // -------------------------------------------------------------------------
+    wordpressPublishLog: {
+      findUnique: async ({ where }: any) => {
+        const rows = stores.wordpressPublishLog.all();
+        if (where.id !== undefined) return rows.find((r) => r.id === where.id) ?? null;
+        return null;
+      },
+      findFirst: async ({ where }: any = {}) => {
+        return stores.wordpressPublishLog.all().find((r) => matchWhere(r, where ?? {})) ?? null;
+      },
+      findMany: async ({ where }: any = {}) => stores.wordpressPublishLog.all().filter((r) => matchWhere(r, where ?? {})),
+      create: async ({ data }: any) =>
+        stores.wordpressPublishLog.insert({
+          wordpressUrl: '',
+          wordpressPostId: null,
+          primaryKeyword: null,
+          normalizedPrimaryKeyword: null,
+          generationJobId: null,
+          generationTopicId: null,
+          title: null,
+          slug: null,
+          status: 'draft',
+          scheduledAt: null,
+          publishedAt: null,
+          response: null,
+          integrationId: null,
+          ...data,
+        }),
+      update: async ({ where, data }: any) => stores.wordpressPublishLog.update(where.id, data),
+      delete: async ({ where }: any) => {
+        const row = stores.wordpressPublishLog.rows.get(where.id);
+        stores.wordpressPublishLog.rows.delete(where.id);
         return row;
       },
     },
@@ -463,6 +753,14 @@ function matchWhere(row: Row, where: any): boolean {
     }
     if ('in' in c) {
       if (!c.in.includes(row[key])) return false;
+    }
+    if ('has' in c) {
+      const rv = row[key];
+      if (!Array.isArray(rv) || !rv.includes(c.has)) return false;
+    }
+    if ('hasSome' in c) {
+      const rv = row[key];
+      if (!Array.isArray(rv) || !c.hasSome.some((item: any) => rv.includes(item))) return false;
     }
     if ('not' in c) {
       if (row[key] === c.not) return false;

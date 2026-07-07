@@ -15,12 +15,14 @@ interface Step4Props {
    * for fast resumes.
    */
   forceRefresh?: boolean;
+  forceRefreshMode?: "replace" | "append";
+  onForceRefreshComplete?: () => void;
 }
 
 const HEAVY_RUN_THRESHOLD = 20;
 const VISIBLE_PROMPT_LIMIT = 6;
 const AUTO_SELECT_LIMIT = 6;
-const MAX_VISIBLE_PROMPT_LIMIT = 12;
+const MAX_GENERATED_PROMPT_LIMIT = 48;
 const AUDIT_MODEL_COUNT = 4;
 
 const PROMPT_RESEARCH_STEPS = [
@@ -55,7 +57,21 @@ interface PromptCard {
   prompt: WizardItem;
 }
 
-export function Step4SelectTopics({ domainId, initialDraft, onContinue, forceRefresh = false }: Step4Props) {
+function ranPromptTitle(lastRunAt?: string | null) {
+  if (!lastRunAt) return "Ran in a previous audit";
+  const date = new Date(lastRunAt);
+  if (Number.isNaN(date.getTime())) return "Ran in a previous audit";
+  return `Ran in a previous audit on ${date.toLocaleString()}`;
+}
+
+export function Step4SelectTopics({
+  domainId,
+  initialDraft,
+  onContinue,
+  forceRefresh = false,
+  forceRefreshMode = "replace",
+  onForceRefreshComplete,
+}: Step4Props) {
   const [items, setItems] = useState<WizardItem[]>([]);
   const [visiblePromptLimit, setVisiblePromptLimit] = useState(VISIBLE_PROMPT_LIMIT);
   const [loading, setLoading] = useState(true);
@@ -80,6 +96,10 @@ export function Step4SelectTopics({ domainId, initialDraft, onContinue, forceRef
   const promptCards = useMemo(() => {
     return items
       .filter((it): it is WizardItem & { type: "prompt" } => it.type === "prompt")
+      .sort((a, b) => {
+        if (a.source !== b.source) return a.source === "custom" ? -1 : 1;
+        return a.id - b.id;
+      })
       .map((prompt) => ({ prompt }));
   }, [items]);
 
@@ -90,9 +110,25 @@ export function Step4SelectTopics({ domainId, initialDraft, onContinue, forceRef
 
   const loadingStep = PROMPT_RESEARCH_STEPS[loadingStepIndex % PROMPT_RESEARCH_STEPS.length];
   const hasHiddenPrompts = promptCards.length > visiblePromptLimit;
-  const canGenerateMorePrompts = promptCards.length > 0 && promptCards.length < MAX_VISIBLE_PROMPT_LIMIT;
+  const canGenerateMorePrompts = promptCards.length > 0 && promptCards.length < MAX_GENERATED_PROMPT_LIMIT;
 
-  const generate = async (mode: "fresh" | "append") => {
+  const applyItems = (nextItems: WizardItem[], mode: "fresh" | "append" | "refreshAppend" | "custom" | "load") => {
+    setItems(nextItems);
+    if (mode === "append") return;
+    const selectedFromServer = nextItems
+      .filter((item): item is WizardItem & { type: "prompt" } => item.type === "prompt")
+      .filter((item) => item.isSelected || item.source === "custom")
+      .map((item) => item.id);
+    if (selectedFromServer.length === 0) return;
+    setSelectedPr((prev) => {
+      if (mode === "fresh" && prev.size === 0) return new Set(selectedFromServer);
+      const next = new Set(prev);
+      for (const id of selectedFromServer) next.add(id);
+      return next;
+    });
+  };
+
+  const generate = async (mode: "fresh" | "append", applyMode: "fresh" | "append" | "refreshAppend" = mode) => {
     if (mode === "fresh") {
       setLoadingStepIndex(0);
       setLoading(true);
@@ -107,7 +143,7 @@ export function Step4SelectTopics({ domainId, initialDraft, onContinue, forceRef
           ? `/wizard/domain/${domainId}/topics?append=true`
           : `/wizard/domain/${domainId}/topics`;
       const res = await apiPost<TopicsResponse>(path);
-      setItems(res.items);
+      applyItems(res.items, applyMode);
       return res.items;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not generate prompts");
@@ -122,7 +158,12 @@ export function Step4SelectTopics({ domainId, initialDraft, onContinue, forceRef
     let alive = true;
     const loadOrGenerate = async () => {
       if (forceRefresh) {
-        await generate("fresh");
+        if (forceRefreshMode === "append") {
+          await generate("append", "refreshAppend");
+        } else {
+          await generate("fresh");
+        }
+        if (alive) onForceRefreshComplete?.();
         return;
       }
       try {
@@ -130,7 +171,15 @@ export function Step4SelectTopics({ domainId, initialDraft, onContinue, forceRef
         if (!alive) return;
         const storedKeywords = Array.isArray(data?.keywords) ? data.keywords : [];
         const storedPrompts = Array.isArray(data?.prompts) ? data.prompts : [];
-        if (storedKeywords.length > 0 || storedPrompts.length > 0) {
+        const hasGeneratedPrompts = storedPrompts.some((prompt) => {
+          if (!prompt || typeof prompt !== "object") return true;
+          const source = (prompt as { source?: unknown }).source;
+          return source !== "custom";
+        });
+        // Older topics restarts could leave only custom prompts behind. If
+        // that is the only saved state, generate a fresh AI prompt set and
+        // keep the custom prompts with it.
+        if (hasGeneratedPrompts) {
           const next: WizardItem[] = [];
           for (const keyword of storedKeywords as Array<{ id: number; term: string; intent: string | null; source: string }>) {
             next.push({
@@ -146,6 +195,7 @@ export function Step4SelectTopics({ domainId, initialDraft, onContinue, forceRef
             text: string;
             intent: string | null;
             source: string;
+            isSelected?: boolean | null;
             keywordId: number | null;
             category?: string | null;
             intentStage?: string | null;
@@ -154,6 +204,8 @@ export function Step4SelectTopics({ domainId, initialDraft, onContinue, forceRef
             constraint?: string | null;
             isBranded?: boolean | null;
             competitorMentioned?: string | null;
+            hasRun?: boolean | null;
+            lastRunAt?: string | null;
           }>) {
             next.push({
               id: prompt.id,
@@ -161,6 +213,7 @@ export function Step4SelectTopics({ domainId, initialDraft, onContinue, forceRef
               text: prompt.text,
               intent: prompt.intent,
               source: (prompt.source as "ai" | "custom") ?? "ai",
+              isSelected: !!prompt.isSelected,
               parentKeywordId: prompt.keywordId ?? undefined,
               category: (prompt.category as PromptCategory | null | undefined) ?? null,
               intentStage: (prompt.intentStage as WizardItem["intentStage"]) ?? null,
@@ -169,9 +222,11 @@ export function Step4SelectTopics({ domainId, initialDraft, onContinue, forceRef
               constraint: prompt.constraint ?? null,
               isBranded: !!prompt.isBranded,
               competitorMentioned: prompt.competitorMentioned ?? null,
+              hasRun: !!prompt.hasRun,
+              lastRunAt: prompt.lastRunAt ?? null,
             });
           }
-          setItems(next);
+          applyItems(next, "load");
           setLoading(false);
           return;
         }
@@ -263,13 +318,13 @@ export function Step4SelectTopics({ domainId, initialDraft, onContinue, forceRef
 
   const handleLoadMore = async () => {
     if (hasHiddenPrompts) {
-      setVisiblePromptLimit((prev) => Math.min(MAX_VISIBLE_PROMPT_LIMIT, prev + VISIBLE_PROMPT_LIMIT));
+      setVisiblePromptLimit((prev) => prev + VISIBLE_PROMPT_LIMIT);
       return;
     }
     const nextItems = await generate("append");
     if (!nextItems) return;
     const nextPromptCount = nextItems.filter((item) => item.type === "prompt").length;
-    setVisiblePromptLimit((prev) => Math.min(MAX_VISIBLE_PROMPT_LIMIT, Math.min(prev + VISIBLE_PROMPT_LIMIT, nextPromptCount)));
+    setVisiblePromptLimit((prev) => Math.min(prev + VISIBLE_PROMPT_LIMIT, nextPromptCount));
   };
 
   const handleAddCustom = async () => {
@@ -282,9 +337,9 @@ export function Step4SelectTopics({ domainId, initialDraft, onContinue, forceRef
         `/wizard/domain/${domainId}/prompts/custom`,
         { text }
       );
-      setItems(res.items);
+      applyItems(res.items, "custom");
       const nextPromptCount = res.items.filter((item) => item.type === "prompt").length;
-      setVisiblePromptLimit((prev) => Math.min(MAX_VISIBLE_PROMPT_LIMIT, Math.min(prev + 1, nextPromptCount)));
+      setVisiblePromptLimit((prev) => Math.min(Math.max(prev, 1), nextPromptCount));
       setCustomText("");
       if (res.prompt?.id) {
         setSelectedPr((prev) => new Set(prev).add(res.prompt.id));
@@ -321,7 +376,7 @@ export function Step4SelectTopics({ domainId, initialDraft, onContinue, forceRef
   };
 
   const totalPrompts = visiblePromptCards.length;
-  const allSelected = totalPrompts > 0 && selectedPr.size === totalPrompts;
+  const allSelected = totalPrompts > 0 && visiblePromptCards.every((card) => selectedPr.has(card.prompt.id));
   const noneSelected = selectedPr.size === 0;
   const canContinue = selectedPr.size > 0 && !submitting && !loading;
 
@@ -489,17 +544,27 @@ export function Step4SelectTopics({ domainId, initialDraft, onContinue, forceRef
                           <p className="flex-1 break-words text-[12px] font-medium italic leading-[150%] text-slate-900 align-middle">
                             {prompt.text}
                           </p>
-                          <button
-                            type="button"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              startEdit(prompt.id, prompt.text);
-                            }}
-                            aria-label="Edit prompt"
-                            className="shrink-0 rounded-md p-1 text-slate-400 opacity-0 transition-opacity hover:bg-slate-100 hover:text-slate-700 focus:opacity-100 group-hover/prompt:opacity-100"
-                          >
-                            <Pencil className="h-3.5 w-3.5" />
-                          </button>
+                          <div className="flex shrink-0 items-center gap-1">
+                            {prompt.hasRun ? (
+                              <span
+                                className="rounded-full border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-emerald-700"
+                                title={ranPromptTitle(prompt.lastRunAt)}
+                              >
+                                Ran
+                              </span>
+                            ) : null}
+                            <button
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                startEdit(prompt.id, prompt.text);
+                              }}
+                              aria-label="Edit prompt"
+                              className="rounded-md p-1 text-slate-400 opacity-0 transition-opacity hover:bg-slate-100 hover:text-slate-700 focus:opacity-100 group-hover/prompt:opacity-100"
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
                         </div>
                       )}
                     </div>

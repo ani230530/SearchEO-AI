@@ -27,6 +27,17 @@ export interface AuthenticatedRequest extends Request {
   user: JWTPayload;
 }
 
+export const isAdmin = (req: Request, res: Response, next: NextFunction) => {
+  const user = req.user;
+  if (!user) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+  if (user.role !== 'admin') {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
+  return next();
+};
+
 // Middleware to verify JWT token
 export const authenticateToken = async (req: Request, res: Response, next: NextFunction) => {
   try {

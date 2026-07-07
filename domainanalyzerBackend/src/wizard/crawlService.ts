@@ -414,18 +414,21 @@ export async function inferDomainFromHomepage(rawUrl: string): Promise<CrawlOutp
   let html = '';
   let via: 'http' | 'browser' = 'http';
   const fetchStart = Date.now();
-  for (const url of candidates) {
-    const httpRes = await fetchHttp(url);
-    if (httpRes.ok && httpRes.html && !looksThin(httpRes.html)) {
-      html = httpRes.html;
-      break;
-    }
-    // HTTP failed or content is thin/SPA — try Puppeteer for this URL.
-    const browserRes = await fetchBrowser(url);
-    if (browserRes.ok && browserRes.html) {
-      html = browserRes.html;
+  const httpResults = await Promise.all(candidates.map(async (url) => ({ url, result: await fetchHttp(url) })));
+  const httpHit = httpResults.find(({ result }) => result.ok && result.html && !looksThin(result.html));
+  if (httpHit) {
+    html = httpHit.result.html;
+  } else {
+    // HTTP failed or content is thin/SPA — try Puppeteer for each candidate in
+    // parallel. There are at most two candidates (bare + www), so this removes
+    // a worst-case serial wait without increasing crawl breadth.
+    const browserResults = await Promise.all(
+      candidates.map(async (url) => ({ url, result: await fetchBrowser(url) }))
+    );
+    const browserHit = browserResults.find(({ result }) => result.ok && result.html);
+    if (browserHit) {
+      html = browserHit.result.html;
       via = 'browser';
-      break;
     }
   }
   console.log(`[PERF] crawl.fastpath.fetch ${Date.now() - fetchStart}ms via=${via}`);
@@ -469,8 +472,10 @@ export async function crawlDomain(rawUrl: string, opts: CrawlOptions = {}): Prom
   if (!norm) throw new Error(`Invalid URL: ${rawUrl}`);
   const maxPages = Math.max(1, Math.min(MAX_PAGES, opts.maxPages ?? MAX_PAGES));
 
-  const robots = await fetchRobots(norm.origin);
-  const sitemap = await discoverSitemap(norm.origin);
+  const [robots, sitemap] = await Promise.all([
+    fetchRobots(norm.origin),
+    discoverSitemap(norm.origin),
+  ]);
   const targetUrls = pickPriorityUrls(norm.origin, sitemap, maxPages);
 
   const policy: CrawlPolicy = {

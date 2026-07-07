@@ -33,6 +33,7 @@ export interface AuthResponse {
     email: string;
     name?: string;
     emailVerified: boolean;
+    role: string;
   };
   token?: string;
   refreshToken?: string;
@@ -45,6 +46,7 @@ export interface AuthResponse {
 export interface JWTPayload {
   userId: number;
   email: string;
+  role?: string;
   tv: number;
   iat?: number;
   exp?: number;
@@ -93,10 +95,10 @@ export class AuthService {
         emailVerified: true,
         passwordChangedAt: new Date(),
       },
-      select: { id: true, email: true, name: true, emailVerified: true, tokenVersion: true },
+      select: { id: true, email: true, name: true, emailVerified: true, role: true, tokenVersion: true },
     });
 
-    const accessToken = this.generateAccessToken(user.id, user.email, user.tokenVersion);
+    const accessToken = this.generateAccessToken(user.id, user.email, user.role, user.tokenVersion);
     const refreshToken = await this.issueRefreshToken(user.id, null, ctx);
 
     return {
@@ -105,6 +107,7 @@ export class AuthService {
         email: user.email,
         name: user.name ?? undefined,
         emailVerified: user.emailVerified,
+        role: user.role,
       },
       token: accessToken,
       refreshToken,
@@ -144,7 +147,7 @@ export class AuthService {
       },
     });
 
-    const accessToken = this.generateAccessToken(user.id, user.email, user.tokenVersion);
+    const accessToken = this.generateAccessToken(user.id, user.email, user.role, user.tokenVersion);
     const refreshToken = await this.issueRefreshToken(user.id, null, ctx);
 
     return {
@@ -153,6 +156,7 @@ export class AuthService {
         email: user.email,
         name: user.name ?? undefined,
         emailVerified: user.emailVerified,
+        role: user.role,
       },
       token: accessToken,
       refreshToken,
@@ -316,9 +320,9 @@ export class AuthService {
   }
 
   // ── Access token (JWT) ───────────────────────────────────────────────────
-  private generateAccessToken(userId: number, email: string, tokenVersion: number): string {
+  private generateAccessToken(userId: number, email: string, role: string, tokenVersion: number): string {
     return jwt.sign(
-      { userId, email, tv: tokenVersion } satisfies Omit<JWTPayload, 'iat' | 'exp'>,
+      { userId, email, role, tv: tokenVersion } satisfies Omit<JWTPayload, 'iat' | 'exp'>,
       authEnv.JWT_SECRET,
       { expiresIn: authEnv.ACCESS_TOKEN_TTL as jwt.SignOptions['expiresIn'] },
     );
@@ -339,6 +343,9 @@ export class AuthService {
     if (!user) throw new Error('Invalid token');
     if (typeof decoded.tv !== 'number' || decoded.tv !== user.tokenVersion) {
       throw new Error('Token version mismatch');
+    }
+    if (typeof decoded.role !== 'string' || !decoded.role.trim()) {
+      throw new Error('Invalid token');
     }
     return decoded;
   }
@@ -406,7 +413,7 @@ export class AuthService {
 
     const user = await prisma.user.findUnique({
       where: { id: row.userId },
-      select: { id: true, email: true, name: true, emailVerified: true, tokenVersion: true },
+      select: { id: true, email: true, name: true, emailVerified: true, role: true, tokenVersion: true },
     });
     if (!user) throw new Error('Invalid refresh token');
 
@@ -416,7 +423,7 @@ export class AuthService {
       data: { revokedAt: new Date() },
     });
     const newRefreshToken = await this.issueRefreshToken(user.id, row.id, ctx);
-    const newAccessToken = this.generateAccessToken(user.id, user.email, user.tokenVersion);
+    const newAccessToken = this.generateAccessToken(user.id, user.email, user.role, user.tokenVersion);
 
     return {
       user: {
@@ -424,6 +431,7 @@ export class AuthService {
         email: user.email,
         name: user.name ?? undefined,
         emailVerified: user.emailVerified,
+        role: user.role,
       },
       token: newAccessToken,
       refreshToken: newRefreshToken,
@@ -458,6 +466,7 @@ export class AuthService {
         email: true,
         name: true,
         emailVerified: true,
+        role: true,
         googleId: true,
         createdAt: true,
         domains: {
@@ -543,7 +552,7 @@ export class AuthService {
       });
     }
 
-    const accessToken = this.generateAccessToken(user.id, user.email, user.tokenVersion);
+    const accessToken = this.generateAccessToken(user.id, user.email, user.role, user.tokenVersion);
     const refreshToken = await this.issueRefreshToken(user.id, null, ctx);
 
     await prisma.user.update({
@@ -557,6 +566,7 @@ export class AuthService {
         email: user.email,
         name: user.name ?? undefined,
         emailVerified: user.emailVerified,
+        role: user.role,
       },
       token: accessToken,
       refreshToken,

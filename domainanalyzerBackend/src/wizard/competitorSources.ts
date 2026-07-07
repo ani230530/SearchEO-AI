@@ -18,6 +18,7 @@
  */
 
 import axios from 'axios';
+import crypto from 'crypto';
 import OpenAI from 'openai';
 import type { PrismaClient } from '../../generated/prisma';
 import type { CompetitorCandidate } from './types';
@@ -63,6 +64,7 @@ function isBlocked(host: string): boolean {
  * candidate mapping logic runs locally on hit.
  */
 const SERPAPI_CACHE_TTL_SECONDS = 7 * 24 * 60 * 60; // 7 days
+const LLM_COMPETITOR_CACHE_TTL_SECONDS = 7 * 24 * 60 * 60; // 7 days
 type SerpOrganicResult = { link?: string; title?: string; snippet?: string };
 
 export async function fromSerpApi(
@@ -200,39 +202,60 @@ export async function fromLlmContext(args: {
   ].filter(Boolean).join('\n');
 
   let payload: { competitors?: Array<{ host?: unknown; name?: unknown; reason?: unknown }> } = {};
+  const cacheHash = crypto.createHash('sha256').update(profileLines).digest('hex').slice(0, 24);
+  const cacheKey = `competitors:llm:${args.ownDomainHost}:${cacheHash}`;
+  let cacheHit = false;
+
   try {
-    console.log(`[COMPETITOR] Calling OpenRouter for ${args.ownDomainHost}...`);
-    const completion = await router.chat.completions.create({
-      model: 'openai/gpt-4o-mini',
-      messages: [
-        {
-          role: 'system',
-          content:
-            'You identify direct competitors of a target company. ' +
-            'Return real, verifiable companies that operate in the same market and serve a similar audience. ' +
-            'Use lowercase host names without "www." (e.g. "stripe.com"). ' +
-            'No marketplaces (amazon, ebay, walmart), no social platforms, no review aggregators. ' +
-            'No fictional or generic names. ' +
-            'Output strict JSON.',
-        },
-        {
-          role: 'user',
-          content: [
-            'Propose 8–12 direct competitors for this company.',
-            '',
-            profileLines,
-            '',
-            'Return JSON: { "competitors": [ { "host": "example.com", "name": "Example Inc", "reason": "one sentence on why they compete" } ] }',
-          ].join('\n'),
-        },
-      ],
-      response_format: { type: 'json_object' },
-      temperature: 0.2,
-      max_tokens: 1500,
-    });
-    const text = completion.choices[0]?.message?.content ?? '';
-    console.log(`[COMPETITOR] LLM response for ${args.ownDomainHost}: ${text.slice(0, 200)}...`);
-    payload = JSON.parse(text);
+    const cached = await redisService.get(cacheKey);
+    if (cached) {
+      payload = JSON.parse(cached);
+      cacheHit = Array.isArray(payload.competitors);
+    }
+  } catch {
+    /* fall through to live LLM */
+  }
+
+  try {
+    if (cacheHit) {
+      console.log(`[COMPETITOR] LLM cache hit for ${args.ownDomainHost}`);
+    } else {
+      console.log(`[COMPETITOR] Calling OpenRouter for ${args.ownDomainHost}...`);
+      const completion = await router.chat.completions.create({
+        model: 'openai/gpt-4o-mini',
+        messages: [
+          {
+            role: 'system',
+            content:
+              'You identify direct competitors of a target company. ' +
+              'Return real, verifiable companies that operate in the same market and serve a similar audience. ' +
+              'Use lowercase host names without "www." (e.g. "stripe.com"). ' +
+              'No marketplaces (amazon, ebay, walmart), no social platforms, no review aggregators. ' +
+              'No fictional or generic names. ' +
+              'Output strict JSON.',
+          },
+          {
+            role: 'user',
+            content: [
+              'Propose 8–12 direct competitors for this company.',
+              '',
+              profileLines,
+              '',
+              'Return JSON: { "competitors": [ { "host": "example.com", "name": "Example Inc", "reason": "one sentence on why they compete" } ] }',
+            ].join('\n'),
+          },
+        ],
+        response_format: { type: 'json_object' },
+        temperature: 0.2,
+        max_tokens: 1500,
+      });
+      const text = completion.choices[0]?.message?.content ?? '';
+      console.log(`[COMPETITOR] LLM response for ${args.ownDomainHost}: ${text.slice(0, 200)}...`);
+      payload = JSON.parse(text);
+      redisService
+        .set(cacheKey, JSON.stringify({ competitors: payload.competitors ?? [] }), LLM_COMPETITOR_CACHE_TTL_SECONDS)
+        .catch((err) => console.warn('[COMPETITOR] LLM cache write failed', err));
+    }
   } catch (err) {
     console.error(`[COMPETITOR] ERROR discovering competitors for ${args.ownDomainHost}:`, err instanceof Error ? err.message : String(err));
     return [];

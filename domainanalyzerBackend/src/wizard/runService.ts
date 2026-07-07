@@ -1177,7 +1177,36 @@ export async function runQueries({
     onProgress({ type: 'error', error: 'Domain not found' });
     return;
   }
-  if (selectedPrompts.length === 0) {
+  let effectiveSelectedPrompts = selectedPrompts;
+  if (effectiveSelectedPrompts.length === 0 && selection !== 'tracked') {
+    const state = await prisma.wizardState.findUnique({
+      where: { domainId },
+      select: { selectionDraft: true },
+    });
+    const draft = state?.selectionDraft as { promptIds?: unknown } | null;
+    const promptIds = Array.isArray(draft?.promptIds)
+      ? draft!.promptIds
+          .map((entry) => {
+            if (typeof entry === 'number') return entry;
+            if (typeof entry === 'string' && entry.trim()) return Number(entry);
+            if (entry && typeof entry === 'object') {
+              const record = entry as { id?: unknown; promptId?: unknown };
+              const maybeId = record.id ?? record.promptId;
+              return typeof maybeId === 'number' ? maybeId : typeof maybeId === 'string' ? Number(maybeId) : NaN;
+            }
+            return NaN;
+          })
+          .filter((n): n is number => Number.isFinite(n))
+      : [];
+    if (promptIds.length > 0) {
+      effectiveSelectedPrompts = await prisma.prompt.findMany({
+        where: { domainId, id: { in: promptIds } },
+        select: { id: true, text: true },
+      });
+    }
+  }
+
+  if (effectiveSelectedPrompts.length === 0) {
     onProgress({
       type: 'error',
       error: selection === 'tracked' ? 'No prompts tracked' : 'No prompts selected',
@@ -1209,7 +1238,7 @@ export async function runQueries({
     city: domain.profile?.targetLocation ?? null,
     timezone: null,
   };
-  const totalQueries = selectedPrompts.length * ROSTER.length;
+  const totalQueries = effectiveSelectedPrompts.length * ROSTER.length;
   const crawledPages = crawledPagesFromSnapshot(latestCrawl);
 
   const run = await prisma.aiRun.create({ data: { domainId, status: 'running', kind } });
@@ -1255,7 +1284,7 @@ export async function runQueries({
     model: ModelDef;
   }
   const queue: WorkItem[] = [];
-  for (const prompt of selectedPrompts) for (const model of ROSTER) queue.push({ prompt, model });
+  for (const prompt of effectiveSelectedPrompts) for (const model of ROSTER) queue.push({ prompt, model });
 
   let completedQueries = 0;
 
@@ -1489,7 +1518,7 @@ export async function runQueries({
     // "last tested" without re-deriving it from run history.
     if (kind === 'weekly') {
       await prisma.prompt.updateMany({
-        where: { id: { in: selectedPrompts.map((p) => p.id) } },
+        where: { id: { in: effectiveSelectedPrompts.map((p) => p.id) } },
         data: { lastTrackedRunAt: new Date() },
       });
     }

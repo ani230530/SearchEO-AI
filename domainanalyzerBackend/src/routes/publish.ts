@@ -10,6 +10,10 @@ import {
   normalizePublishGenerateResponse,
   serializeDraftContent,
 } from '../services/contentFlowService';
+import {
+  cancelWordpressPublishSchedule,
+  scheduleWordpressPublish,
+} from '../services/wordpressPublishScheduler';
 import { parseSiteUrlInput } from '../utils/domainValidation';
 import { uploadImage } from '../utils/cloudinary';
 
@@ -38,6 +42,56 @@ const asyncHandler =
   (fn: (req: Request, res: Response, next: any) => Promise<any>) =>
     (req: Request, res: Response, next: any) =>
       Promise.resolve(fn(req, res, next)).catch(next);
+
+const parseIsoDate = (value: unknown): Date | null => {
+  if (typeof value !== 'string' || !value.trim()) return null;
+  const date = new Date(value.trim());
+  return Number.isNaN(date.getTime()) ? null : date;
+};
+
+const normalizeLongtailKeywords = (value: unknown): string => {
+  if (Array.isArray(value)) {
+    return value
+      .map((entry) => (typeof entry === 'string' ? entry.trim() : ''))
+      .filter(Boolean)
+      .join(', ');
+  }
+  if (typeof value === 'string') {
+    return value.trim();
+  }
+  return '';
+};
+
+const buildDraftResponseSnapshot = (input: {
+  primaryKeyword?: string | null;
+  htmlContent?: string | null;
+  featuredImageEnabled: boolean;
+  featuredImageUrl?: string | null;
+  title?: string | null;
+  metaDescription?: string | null;
+  slug?: string | null;
+  wordpressUrl?: string | null;
+  longtailKeywords?: unknown;
+  status: string;
+  scheduledAt?: Date | string | null;
+  publishedAt?: Date | string | null;
+  error?: string | null;
+}) => ({
+  primaryKeyword: input.primaryKeyword ?? null,
+  htmlContent: input.htmlContent ?? null,
+  featuredImageEnabled: input.featuredImageEnabled,
+  featuredImageUrl: input.featuredImageUrl ?? null,
+  title: input.title ?? null,
+  metaDescription: input.metaDescription ?? null,
+  slug: input.slug ?? null,
+  wordpressUrl: input.wordpressUrl ?? null,
+  longtailKeywords: normalizeLongtailKeywords(input.longtailKeywords),
+  status: input.status,
+  scheduledAt: input.scheduledAt ? new Date(input.scheduledAt).toISOString() : null,
+  publishedAt: input.publishedAt ? new Date(input.publishedAt).toISOString() : null,
+  error: input.error ?? null,
+  savedAt: new Date().toISOString(),
+});
 
 const callWebhook = async (url: string, payload: any) => {
   if (process.env.NODE_ENV !== 'production') {
@@ -504,6 +558,7 @@ router.post(
           wordpressUrl: resolvedWordpressUrl,
           wordpressPostId: (mergedStoredData.wordpressPostId as number | null) ?? draft.wordpressPostId,
           status: 'published',
+          publishedAt: draft.publishedAt ?? new Date(),
           response: {
             ...mergedStoredData,
             editAfterPublishResponse: webhookResponse,
@@ -597,38 +652,44 @@ router.post(
       });
     }
 
-    let decryptedPassword: string;
-    try {
-      decryptedPassword = decryptToken(integration.password);
-    } catch (error) {
-      return res.status(400).json({
-        success: false,
-        error: 'WordPress integration password cannot be decrypted.'
-      });
+    if (existingDraft?.status === 'scheduled') {
+      try {
+        await cancelWordpressPublishSchedule(existingDraft.id);
+      } catch (error: any) {
+        return res.status(409).json({
+          success: false,
+          error: error?.message || 'Scheduled publish is already running',
+        });
+      }
     }
 
-    const payload = [
-      {
-        Username: integration.username,
-        Password: decryptedPassword,
-        'wordpress url': integration.siteUrl,
-        'Primary Keyword': primaryKeyword,
-        'Html Content': htmlContent,
-        'Featured Image': normalizeFeaturedImageUrl(featuredImageUrl) || (normalizeFeaturedImageEnabled(featuredImageEnabled, true) ? 'yes' : 'no'),
-        Title: title,
-        'Meta Description': metaDescription,
-        slug,
-      },
-    ];
-
     // Create or Update Draft (Status: generating / queued)
-    // We use 'generating' so UI shows spinner
+    // We persist the latest draft snapshot so delayed or retried jobs can
+    // rebuild the payload from the stored row instead of stale request data.
+    const draftSnapshot = buildDraftResponseSnapshot({
+      primaryKeyword,
+      htmlContent,
+      featuredImageEnabled: normalizeFeaturedImageEnabled(featuredImageEnabled, true),
+      featuredImageUrl: normalizeFeaturedImageUrl(featuredImageUrl),
+      title,
+      metaDescription,
+      slug,
+      wordpressUrl: existingDraft?.wordpressUrl || integration.siteUrl || 'draft://generating',
+      longtailKeywords: storedContent?.longtailKeywords,
+      status: 'generating',
+      scheduledAt: null,
+      publishedAt: null,
+    });
+
     const updateData = {
-      wordpressUrl: existingDraft?.wordpressUrl || 'draft://generating',
+      wordpressUrl: existingDraft?.wordpressUrl || integration.siteUrl || 'draft://generating',
       primaryKeyword,
       title,
       slug,
       status: 'generating',
+      scheduledAt: null,
+      publishedAt: null,
+      response: draftSnapshot,
       integrationId: integration.id,
     };
 
@@ -661,15 +722,11 @@ router.post(
     const finalPageId: number | undefined = undefined;
 
     // Add to Queue
-    // We need to pass necessary meta info for the worker to update DB later
+    // The worker now rebuilds the WordPress payload from the saved draft row
+    // so delayed jobs always publish the latest persisted content.
     const { addN8nJob, JOB_TYPES } = await import('../services/queueService');
     await addN8nJob(JOB_TYPES.PUBLISH, {
-      url: PUBLISH_WEBHOOK_URL,
-      payload,
-      headers: {
-        'Content-Type': 'application/json',
-        [N8N_API_KEY_HEADER]: N8N_API_KEY,
-      },
+      draftId: savedDraft.id,
       meta: {
         draftId: savedDraft.id,
         userId,
@@ -692,6 +749,234 @@ router.post(
 
 
 
+router.post(
+  '/schedule',
+  authenticateToken,
+  asyncHandler(async (req: Request, res: Response) => {
+    const authReq = req as AuthenticatedRequest;
+    const userId = authReq.user.userId;
+    const {
+      draftId,
+      primaryKeyword: bodyPrimaryKeyword,
+      htmlContent: bodyHtmlContent,
+      featuredImageEnabled: bodyFeaturedImageEnabled,
+      featuredImageUrl: bodyFeaturedImageUrl,
+      title: bodyTitle,
+      metaDescription: bodyMetaDescription,
+      slug: bodySlug,
+      scheduledAt: scheduledAtInput,
+      topicId,
+    } = req.body;
+
+    const scheduledAt = parseIsoDate(scheduledAtInput);
+    if (!scheduledAt) {
+      return res.status(400).json({
+        success: false,
+        error: 'scheduledAt must be a valid ISO date',
+      });
+    }
+
+    if (scheduledAt.getTime() <= Date.now()) {
+      return res.status(400).json({
+        success: false,
+        error: 'scheduledAt must be in the future',
+      });
+    }
+
+    let integration;
+    try {
+      integration = await getIntegrationOrThrow(userId);
+    } catch (error: any) {
+      return res.status(400).json({
+        success: false,
+        error: error.message,
+      });
+    }
+
+    let existingDraft: any = null;
+    let storedContent: ReturnType<typeof serializeDraftContent> | null = null;
+    if (draftId) {
+      existingDraft = await prisma.wordpressPublishLog.findFirst({
+        where: { id: Number(draftId), userId },
+      });
+      if (!existingDraft) {
+        return res.status(404).json({
+          success: false,
+          error: 'Draft not found',
+        });
+      }
+      storedContent = serializeDraftContent(existingDraft);
+    }
+
+    const primaryKeyword = bodyPrimaryKeyword || storedContent?.primaryKeyword;
+    const htmlContent = bodyHtmlContent || storedContent?.htmlContent;
+    const title = bodyTitle ?? storedContent?.title;
+    const metaDescription = bodyMetaDescription ?? storedContent?.metaDescription;
+    const slug = bodySlug ?? storedContent?.slug;
+    const featuredImageUrl =
+      bodyFeaturedImageUrl ?? storedContent?.featuredImageUrl ?? undefined;
+    const featuredImageEnabled =
+      bodyFeaturedImageEnabled !== undefined
+        ? bodyFeaturedImageEnabled
+        : storedContent?.featuredImageEnabled ?? true;
+
+    if (!primaryKeyword || !htmlContent) {
+      return res.status(400).json({
+        success: false,
+        error: 'Primary keyword and HTML content are required',
+      });
+    }
+
+    if (existingDraft?.status === 'scheduled') {
+      try {
+        await cancelWordpressPublishSchedule(existingDraft.id);
+      } catch (error: any) {
+        return res.status(409).json({
+          success: false,
+          error: error?.message || 'Scheduled publish is already running',
+        });
+      }
+    }
+
+    const draftSnapshot = buildDraftResponseSnapshot({
+      primaryKeyword,
+      htmlContent,
+      featuredImageEnabled: normalizeFeaturedImageEnabled(featuredImageEnabled, true),
+      featuredImageUrl: normalizeFeaturedImageUrl(featuredImageUrl),
+      title,
+      metaDescription,
+      slug,
+      wordpressUrl: existingDraft?.wordpressUrl || integration.siteUrl || 'draft://scheduled',
+      longtailKeywords: storedContent?.longtailKeywords,
+      status: 'scheduled',
+      scheduledAt,
+      publishedAt: null,
+    });
+
+    const updateData = {
+      wordpressUrl: existingDraft?.wordpressUrl || integration.siteUrl || 'draft://scheduled',
+      primaryKeyword,
+      title,
+      slug,
+      status: 'scheduled',
+      scheduledAt,
+      publishedAt: null,
+      response: draftSnapshot,
+      integrationId: integration.id,
+    };
+
+    let savedDraft;
+    if (existingDraft) {
+      savedDraft = await prisma.wordpressPublishLog.update({
+        where: { id: existingDraft.id },
+        data: updateData,
+      });
+    } else {
+      savedDraft = await prisma.wordpressPublishLog.create({
+        data: {
+          userId,
+          ...updateData,
+        },
+      });
+    }
+
+    if (topicId) {
+      await prisma.campaignTopic.update({
+        where: { id: Number(topicId) },
+        data: { latestDraftId: savedDraft.id },
+      }).catch((err: unknown) => console.error('[Publish] Failed to link scheduled draft to topic:', err));
+    }
+
+    const finalPageId: number | undefined = undefined;
+
+    await scheduleWordpressPublish(savedDraft.id, scheduledAt, {
+      draftId: savedDraft.id,
+      userId,
+      integrationId: integration.id,
+      primaryKeyword,
+      title,
+      slug,
+      pageId: finalPageId
+    });
+
+    res.json({
+      success: true,
+      message: 'Publish job scheduled',
+      draftId: savedDraft.id,
+      status: 'scheduled',
+      scheduledAt: scheduledAt.toISOString(),
+      draft: serializeDraftContent(savedDraft),
+    });
+  })
+);
+
+
+
+router.delete(
+  '/schedule/:draftId',
+  authenticateToken,
+  asyncHandler(async (req: Request, res: Response) => {
+    const authReq = req as AuthenticatedRequest;
+    const userId = authReq.user.userId;
+    const draftId = Number(req.params.draftId);
+
+    if (!Number.isFinite(draftId)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid draft ID',
+      });
+    }
+
+    const draft = await prisma.wordpressPublishLog.findFirst({
+      where: { id: draftId, userId },
+    });
+
+    if (!draft) {
+      return res.status(404).json({
+        success: false,
+        error: 'Draft not found',
+      });
+    }
+
+    if (draft.status !== 'scheduled') {
+      return res.status(400).json({
+        success: false,
+        error: 'Draft is not scheduled',
+      });
+    }
+
+    try {
+      await cancelWordpressPublishSchedule(draft.id);
+    } catch (error: any) {
+      return res.status(409).json({
+        success: false,
+        error: error?.message || 'Scheduled publish could not be canceled',
+      });
+    }
+
+    const currentResponse = ((draft.response as Record<string, unknown> | null) || {}) as Record<string, unknown>;
+    const updated = await prisma.wordpressPublishLog.update({
+      where: { id: draft.id },
+      data: {
+        status: 'draft',
+        scheduledAt: null,
+        publishedAt: null,
+        response: {
+          ...currentResponse,
+          status: 'draft',
+          scheduledAt: null,
+          canceledAt: new Date().toISOString(),
+        },
+      },
+    });
+
+    res.json({
+      success: true,
+      message: 'Scheduled publish canceled',
+      draft: serializeDraftContent(updated),
+    });
+  })
+);
 
 router.post(
   '/drafts',
@@ -768,6 +1053,17 @@ router.post(
           });
         }
 
+        if (existing.status === 'scheduled') {
+          try {
+            await cancelWordpressPublishSchedule(existing.id);
+          } catch (error: any) {
+            return res.status(409).json({
+              success: false,
+              error: error?.message || 'Scheduled publish is already running',
+            });
+          }
+        }
+
         const updated = await prisma.wordpressPublishLog.update({
           where: { id: Number(draftId) },
           data: {
@@ -776,6 +1072,8 @@ router.post(
             slug,
             wordpressUrl: resolvedWordpressUrl,
             status: 'draft',
+            scheduledAt: null,
+            publishedAt: null,
             response: responsePayload,
             integrationId: integration?.id,
           },
@@ -803,6 +1101,8 @@ router.post(
           title,
           slug,
           status: 'draft',
+          scheduledAt: null,
+          publishedAt: null,
           response: responsePayload,
           integrationId: integration?.id,
         },
@@ -932,6 +1232,7 @@ router.post(
         where: { id: Number(draftId) },
         data: {
           status: 'published',
+          publishedAt: draft.publishedAt ?? new Date(),
           wordpressUrl: finalUrl,
           wordpressPostId: finalPostId,
           response: response || { link: finalUrl, wordpressPostId: finalPostId },
