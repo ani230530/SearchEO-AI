@@ -1,0 +1,31 @@
+<svg width="240" height="146" viewBox="0 0 240 146" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="surfaceGlow" x1="24" y1="8" x2="212" y2="146" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF"/>
+      <stop offset="0.58" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#F4F7FB"/>
+    </linearGradient>
+    <radialGradient id="highlight" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(210 20) rotate(105) scale(138 92)">
+      <stop stop-color="#F8FAFF" stop-opacity="0.85"/>
+      <stop offset="0.55" stop-color="#F8FAFF" stop-opacity="0.18"/>
+      <stop offset="1" stop-color="#F8FAFF" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect x="1" y="1" width="238" height="144" rx="18" fill="url(#surfaceGlow)"/>
+  <rect x="1" y="1" width="238" height="144" rx="18" fill="url(#highlight)"/>
+
+  <text x="22" y="36" fill="#545B66" font-family="Inter, Arial, sans-serif" font-size="18" font-weight="600" letter-spacing="-0.02em">
+    AI Share of Voice
+  </text>
+  <circle cx="181" cy="30" r="7.5" fill="none" stroke="#7B828D" stroke-width="1.4"/>
+  <text x="181" y="34.1" text-anchor="middle" fill="#7B828D" font-family="Inter, Arial, sans-serif" font-size="10.5" font-weight="700">
+    i
+  </text>
+
+  <text x="22" y="69" fill="#5E6672" font-family="Inter, Arial, sans-serif" font-size="16" font-weight="600" letter-spacing="-0.02em">
+    Across all AI Models
+  </text>
+  <text x="22" y="107" fill="#3390FF" font-family="Inter, Arial, sans-serif" font-size="29" font-weight="700" letter-spacing="-0.03em">
+    34%
+  </text>
+</svg>

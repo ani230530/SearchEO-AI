@@ -1,5 +1,12 @@
 import React from 'react';
-import { Eye, FileText, Info, Loader2, Send } from 'lucide-react';
+import { Clock3, ChevronDown, Eye, FileText, Info, Loader2, Send } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { RowState } from './api';
 
 /* ----------------------------------------------------------------------------
@@ -127,16 +134,25 @@ export interface RowActionHandlers {
    *  intent: 'publish' so the publish action auto-fires once the draft
    *  loads. The user can still cancel from inside the overlay. */
   onPublishDirectly: (draftId: number) => void;
+  onScheduleBlog: (draftId: number, title: string, existingScheduledAtIso?: string) => void;
+  onCancelSchedule: (draftId: number) => void;
   onRetry: () => void;
 }
 
 export function RowAction({
   state,
   handlers,
+  topicTitle = '',
+  scheduledInfo = null,
   isOpeningDraft = false,
 }: {
   state: RowState;
   handlers: RowActionHandlers;
+  topicTitle?: string;
+  scheduledInfo?: {
+    scheduledAtIso: string;
+    scheduledAtLabel: string;
+  } | null;
   /** True briefly between an "open draft" click and the drawer mounting,
    *  so the action button can render its own loading state. */
   isOpeningDraft?: boolean;
@@ -170,13 +186,23 @@ export function RowAction({
       );
 
     case 'completed':
+      if (scheduledInfo) {
+        return (
+          <ScheduledPublishState
+            scheduledAtLabel={scheduledInfo.scheduledAtLabel}
+            onCancel={() => handlers.onCancelSchedule(state.draftId)}
+            onReschedule={() =>
+              handlers.onScheduleBlog(state.draftId, topicTitle, scheduledInfo.scheduledAtIso)
+            }
+          />
+        );
+      }
+
       return (
-        <ActionPill
-          label="Publish"
-          onClick={() => handlers.onPublishDirectly(state.draftId)}
+        <PublishDropdown
           disabled={draftSpinner}
-          variant="primary"
-          icon={<Send className="h-4 w-4" />}
+          onPublishNow={() => handlers.onPublishDirectly(state.draftId)}
+          onScheduleBlog={() => handlers.onScheduleBlog(state.draftId, topicTitle)}
         />
       );
 
@@ -264,5 +290,104 @@ function ActionPill({
       {icon}
       <span>{label}</span>
     </button>
+  );
+}
+
+function PublishDropdown({
+  disabled,
+  onPublishNow,
+  onScheduleBlog,
+}: {
+  disabled?: boolean;
+  onPublishNow: () => void;
+  onScheduleBlog: () => void;
+}) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          disabled={disabled}
+          className="inline-flex h-11 min-w-[150px] items-center justify-between gap-3 rounded-[20px] bg-[#2D4059] px-4 text-sm font-medium text-white shadow-sm transition hover:bg-[#243449] disabled:cursor-not-allowed disabled:bg-[#94a3b8] disabled:opacity-60 focus:outline-none focus:ring-2 focus:ring-[#4C74C2] focus:ring-offset-2"
+        >
+          <span className="inline-flex items-center gap-2">
+            <Send className="h-4 w-4" />
+            <span>Publish</span>
+          </span>
+          <ChevronDown className="h-4 w-4 shrink-0" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent
+        align="start"
+        side="bottom"
+        sideOffset={10}
+        className="min-w-[252px] rounded-[20px] border border-[#c7d4e8] bg-[#d8e3f2] p-2 shadow-[0_18px_40px_rgba(45,64,89,0.18)]"
+      >
+        <DropdownMenuItem
+          onSelect={(event) => {
+            event.preventDefault();
+            onScheduleBlog();
+          }}
+          className="flex cursor-pointer items-center gap-3 rounded-[16px] px-4 py-3 text-[17px] font-medium text-[#2f4667] outline-none transition-colors focus:bg-[#c8d7ec] focus:text-[#243b5a] data-[highlighted]:bg-[#c8d7ec]"
+        >
+          <Clock3 className="h-5 w-5" />
+          <span>Schedule Blog</span>
+        </DropdownMenuItem>
+        <DropdownMenuSeparator className="my-1.5 bg-white/70" />
+        <DropdownMenuItem
+          onSelect={(event) => {
+            event.preventDefault();
+            onPublishNow();
+          }}
+          className="flex cursor-pointer items-center gap-3 rounded-[16px] px-4 py-3 text-[17px] font-medium text-[#2f4667] outline-none transition-colors focus:bg-[#c8d7ec] focus:text-[#243b5a] data-[highlighted]:bg-[#c8d7ec]"
+        >
+          <Send className="h-5 w-5" />
+          <span>Publish Now</span>
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+function ScheduledPublishState({
+  scheduledAtLabel,
+  onCancel,
+  onReschedule,
+}: {
+  scheduledAtLabel: string;
+  onCancel: () => void;
+  onReschedule: () => void;
+}) {
+  return (
+    <div className="inline-flex w-full max-w-[280px] flex-col gap-3 rounded-[20px] border border-[#c7d4e8] bg-[#edf3fb] p-3 text-left shadow-sm">
+      <div className="flex items-start gap-3">
+        <span className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-[#2D4059] shadow-sm">
+          <Clock3 className="h-4 w-4" />
+        </span>
+        <div className="min-w-0">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#5b6f8d]">
+            Scheduled
+          </p>
+          <p className="mt-1 text-sm font-semibold leading-5 text-[#243b5a]">{scheduledAtLabel}</p>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={onCancel}
+          className="inline-flex h-9 flex-1 items-center justify-center rounded-xl border border-[#c8d4e7] bg-white px-3 text-xs font-semibold text-[#415a7a] transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-[#4C74C2] focus:ring-offset-2"
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          onClick={onReschedule}
+          className="inline-flex h-9 flex-1 items-center justify-center rounded-xl bg-[linear-gradient(90deg,#2D4059_0%,#4C74C2_100%)] px-3 text-xs font-semibold text-white transition hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-[#4C74C2] focus:ring-offset-2"
+        >
+          Reschedule
+        </button>
+      </div>
+    </div>
   );
 }

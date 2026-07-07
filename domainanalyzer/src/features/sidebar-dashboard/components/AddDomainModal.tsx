@@ -60,6 +60,7 @@ interface TopicItem {
 }
 
 const API_BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3002';
+const MAX_COMPETITORS_PER_DOMAIN = 5;
 
 function authHeaders(): Record<string, string> {
   const token = localStorage.getItem('authToken');
@@ -208,6 +209,7 @@ export function AddDomainModal({
   const [selectedPromptIds, setSelectedPromptIds] = useState<Set<number>>(new Set());
 
   const abortRef = useRef<AbortController | null>(null);
+  const topicsPrefetchPromiseRef = useRef<Promise<TopicItem[]> | null>(null);
 
   useEffect(() => {
     if (initialUrl !== undefined) setUrl(initialUrl);
@@ -222,6 +224,7 @@ export function AddDomainModal({
       setError(null);
       setProgressPct(0);
       setProgressStep('');
+      topicsPrefetchPromiseRef.current = null;
     }
   }, [open]);
 
@@ -275,8 +278,15 @@ export function AddDomainModal({
         {},
         ctrl.signal
       );
-      setCompetitors(compResp.competitors ?? []);
-      setSelectedHosts(new Set((compResp.competitors ?? []).slice(0, 5).map((c) => c.competitorHost)));
+      const cappedCompetitors = (compResp.competitors ?? []).slice(0, MAX_COMPETITORS_PER_DOMAIN);
+      setCompetitors(cappedCompetitors);
+      setSelectedHosts(new Set());
+      topicsPrefetchPromiseRef.current = postJson<{ items: TopicItem[] }>(
+        `/api/wizard/domain/${id}/topics`,
+        {}
+      )
+        .then((response) => response.items ?? [])
+        .catch(() => []);
     } catch (err) {
       if ((err as Error).name === 'AbortError') return;
       setPhase('error');
@@ -290,18 +300,20 @@ export function AddDomainModal({
     setProgressStep('Saving competitor selection…');
     try {
       await postJson(`/api/wizard/domain/${domainId}/competitors/select`, {
-        hosts: Array.from(selectedHosts),
+        hosts: Array.from(selectedHosts).slice(0, MAX_COMPETITORS_PER_DOMAIN),
       });
       setPhase('topics');
       setProgressStep('Generating topics…');
-      const topicsResp = await postJson<{ items: TopicItem[] }>(
-        `/api/wizard/domain/${domainId}/topics`,
-        {}
-      );
-      setTopics(topicsResp.items ?? []);
-      // Default-select all generated items.
-      setSelectedKeywordIds(new Set(topicsResp.items.filter((i) => i.type === 'keyword').map((i) => i.id)));
-      setSelectedPromptIds(new Set(topicsResp.items.filter((i) => i.type === 'prompt').map((i) => i.id)));
+      const prefetchedTopics = await (topicsPrefetchPromiseRef.current ?? Promise.resolve<TopicItem[]>([]));
+      const nextTopics = prefetchedTopics.length > 0
+        ? prefetchedTopics
+        : (await postJson<{ items: TopicItem[] }>(
+            `/api/wizard/domain/${domainId}/topics`,
+            {}
+          )).items ?? [];
+      setTopics(nextTopics);
+      setSelectedKeywordIds(new Set());
+      setSelectedPromptIds(new Set());
     } catch (err) {
       setPhase('error');
       setError(err instanceof Error ? err.message : 'Topics generation failed');
@@ -424,7 +436,10 @@ export function AddDomainModal({
                     checked={selectedHosts.has(c.competitorHost)}
                     onChange={(e) => {
                       const next = new Set(selectedHosts);
-                      if (e.target.checked) next.add(c.competitorHost);
+                      if (e.target.checked) {
+                        if (next.size >= MAX_COMPETITORS_PER_DOMAIN) return;
+                        next.add(c.competitorHost);
+                      }
                       else next.delete(c.competitorHost);
                       setSelectedHosts(next);
                     }}

@@ -40,6 +40,11 @@ import { enrichOpportunities, withDefaultBrief, type EnrichedOpportunity } from 
 import { enrichCompetitorInsights, type CompetitorInsight } from './competitorInsightEnrichment';
 import { scoreResponse as llmScoreResponse } from './scoreService';
 import { redisService } from '../services/RedisService';
+import {
+  getTrackedPromptSchedule,
+  serializeTrackedPromptSchedule,
+  TRACKED_PROMPT_SCHEDULE_OPTIONS,
+} from '../services/trackedPromptSchedule';
 import { timed } from '../lib/timed';
 import {
   REPORT_LITE_CACHE_TTL_SECONDS,
@@ -766,11 +771,8 @@ function buildCanonicalReportMetrics(args: {
   };
 }
 
-const TRACKED_PROMPT_CADENCE = 'daily' as const;
-
-// Next scheduled tracked-prompt run: the next daily 03:00 UTC (matches the
-// scheduler cron in weeklyTrackingService). Returned to the UI as the "next
-// test" indicator.
+// Legacy helper kept for route tests and older imports. Dynamic schedule reads
+// should use getTrackedPromptScheduleMeta below.
 export function nextDailyRunAt(now = new Date()): Date {
   const next = new Date(Date.UTC(
     now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 3, 0, 0, 0,
@@ -779,12 +781,35 @@ export function nextDailyRunAt(now = new Date()): Date {
   return next;
 }
 
+async function getTrackedPromptScheduleMeta(now = new Date()) {
+  const schedule = await getTrackedPromptSchedule(prisma as any, now);
+  const serialized = serializeTrackedPromptSchedule(schedule);
+  return {
+    cadence: serialized.cadence,
+    nextTestAt: serialized.nextTestAt,
+    schedule: serialized,
+    scheduleOptions: TRACKED_PROMPT_SCHEDULE_OPTIONS,
+  };
+}
+
 function dailyBucketStartUtc(date: Date): Date {
   return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), 0, 0, 0, 0));
 }
 
 function dailyBucketKey(date: Date): string {
   return dailyBucketStartUtc(date).toISOString().slice(0, 10);
+}
+
+function weeklyBucketStartUtc(date: Date): Date {
+  const start = dailyBucketStartUtc(date);
+  const day = start.getUTCDay();
+  const daysSinceMonday = day === 0 ? 6 : day - 1;
+  start.setUTCDate(start.getUTCDate() - daysSinceMonday);
+  return start;
+}
+
+function weeklyBucketKey(date: Date): string {
+  return weeklyBucketStartUtc(date).toISOString().slice(0, 10);
 }
 
 function isWeeklyHistoryRequest(req: Request): boolean {
@@ -811,7 +836,10 @@ function collapseRunHistoryToDays<T extends { startedAt: Date | string; total?: 
 
 // A tracked prompt that has never been through a tracked run yet — zeroed
 // metrics so the table can render "Not yet tested".
-function emptyTrackedRow(p: { id: number; text: string; intent: string | null; source: string; keywordId: number | null; lastTrackedRunAt: Date | null }) {
+function emptyTrackedRow(
+  p: { id: number; text: string; intent: string | null; source: string; keywordId: number | null; lastTrackedRunAt: Date | null },
+  nextTestAt: Date,
+) {
   return {
     id: `pr-${p.id}`,
     rawId: p.id,
@@ -840,7 +868,7 @@ function emptyTrackedRow(p: { id: number; text: string; intent: string | null; s
     metrics: { visibility: 0, aiSov: null as number | null, avgOverall: 0, runs: 0, attemptedRuns: 0 },
     isTracked: true,
     lastTestedAt: p.lastTrackedRunAt,
-    nextTestAt: nextDailyRunAt(),
+    nextTestAt,
     weekTrend: { delta: null as number | null, lastVisibility: 0, points: [] as Array<{ runId: number; startedAt: Date; visibility: number }> },
   };
 }
@@ -964,7 +992,7 @@ router.get('/domains', timed('GET /domains', 300), authenticateToken, async (req
       const avgOverall = summary?.avgOverall as number | undefined;
       const avgSentiment = summary?.avgSentiment as number | undefined;
       const totalQueries = summary?.totalQueries as number | undefined;
-      
+
       const visibilityScore = avgPresence !== undefined ? Math.round(avgPresence * 100) : (avgOverall ?? null);
       const brandAccuracy = avgOverall !== undefined ? Math.round(avgOverall * 10) : null;
       const shareOfVoice = avgPresence !== undefined ? Math.round(avgPresence * 100) : null;
@@ -1952,6 +1980,7 @@ router.get('/domain/:id/tracked-prompts', authenticateToken, async (req: Request
   const got = await ensureDomain(req, req.params.id);
   if (!got.ok) return res.status(got.status).json({ error: got.error });
   const { domain } = got;
+  const scheduleMeta = await getTrackedPromptScheduleMeta();
 
   const trackedPrompts = await prisma.prompt.findMany({
     where: { domainId: domain.id, isTracked: true },
@@ -1959,10 +1988,9 @@ router.get('/domain/:id/tracked-prompts', authenticateToken, async (req: Request
   });
   if (trackedPrompts.length === 0) {
     return res.json({
-      cadence: TRACKED_PROMPT_CADENCE,
+      ...scheduleMeta,
       prompts: [],
       latestRunAt: null,
-      nextTestAt: nextDailyRunAt(),
     });
   }
   const promptIds = trackedPrompts.map((p) => p.id);
@@ -1981,10 +2009,9 @@ router.get('/domain/:id/tracked-prompts', authenticateToken, async (req: Request
     // Tracked but never run yet — return rows with no metrics so the UI can
     // show "Not yet tested".
     return res.json({
-      cadence: TRACKED_PROMPT_CADENCE,
+      ...scheduleMeta,
       latestRunAt: null,
-      nextTestAt: nextDailyRunAt(),
-      prompts: trackedPrompts.map((p) => emptyTrackedRow(p)),
+      prompts: trackedPrompts.map((p) => emptyTrackedRow(p, scheduleMeta.nextTestAt)),
     });
   }
 
@@ -1993,24 +2020,36 @@ router.get('/domain/:id/tracked-prompts', authenticateToken, async (req: Request
     start: Date;
     runs: typeof trackedRuns;
   };
-  const dailyBuckets = [...trackedRuns.reduce((map, run) => {
-    const key = dailyBucketKey(run.startedAt);
-    const bucket = map.get(key) ?? {
-      key,
-      start: dailyBucketStartUtc(run.startedAt),
-      runs: [] as typeof trackedRuns,
-    };
-    bucket.runs.push(run);
-    map.set(key, bucket);
-    return map;
-  }, new Map<string, DailyRunBucket>()).values()]
-    .map((bucket) => ({
-      ...bucket,
-      runs: [...bucket.runs].sort((a, b) => b.startedAt.getTime() - a.startedAt.getTime()),
-    }))
+  const shouldUseRawRuns =
+    scheduleMeta.schedule.cadence === 'every_6_hours' ||
+    scheduleMeta.schedule.cadence === 'every_12_hours' ||
+    scheduleMeta.schedule.cadence === 'custom';
+  const groupedBuckets = shouldUseRawRuns
+    ? trackedRuns.map((run) => ({ key: `run-${run.id}`, start: run.startedAt, runs: [run] }))
+    : [...trackedRuns.reduce((map, run) => {
+        const key = scheduleMeta.schedule.cadence === 'weekly'
+          ? weeklyBucketKey(run.startedAt)
+          : dailyBucketKey(run.startedAt);
+        const bucket = map.get(key) ?? {
+          key,
+          start: scheduleMeta.schedule.cadence === 'weekly'
+            ? weeklyBucketStartUtc(run.startedAt)
+            : dailyBucketStartUtc(run.startedAt),
+          runs: [] as typeof trackedRuns,
+        };
+        bucket.runs.push(run);
+        map.set(key, bucket);
+        return map;
+      }, new Map<string, DailyRunBucket>()).values()]
+      .map((bucket) => ({
+        ...bucket,
+        runs: [...bucket.runs].sort((a, b) => b.startedAt.getTime() - a.startedAt.getTime()),
+      }));
+
+  const historyBuckets = groupedBuckets
     .sort((a, b) => b.start.getTime() - a.start.getTime())
-    .slice(0, 7);
-  const bucketRunsNewestFirst = dailyBuckets.flatMap((bucket) => bucket.runs);
+    .slice(0, 14);
+  const bucketRunsNewestFirst = historyBuckets.flatMap((bucket) => bucket.runs);
   const trendRunIds = bucketRunsNewestFirst.map((r) => r.id);
   const startedAtByRun = new Map(trackedRuns.map((r) => [r.id, r.startedAt] as const));
 
@@ -2058,7 +2097,7 @@ router.get('/domain/:id/tracked-prompts', authenticateToken, async (req: Request
     // Sparkline: one point per UTC day that has data for this prompt,
     // oldest → newest. If a day has multiple manual tests, use the newest
     // scored run in that day.
-    const trend = [...dailyBuckets]
+    const trend = [...historyBuckets]
       .reverse()
       .map((bucket) => {
         for (const run of bucket.runs) {
@@ -2110,17 +2149,43 @@ router.get('/domain/:id/tracked-prompts', authenticateToken, async (req: Request
       // Tracking metadata.
       isTracked: true,
       lastTestedAt: p.lastTrackedRunAt ?? (latestRunForPrompt ? startedAtByRun.get(latestRunForPrompt.id) ?? latestRunAt : null),
-      nextTestAt: nextDailyRunAt(),
+      nextTestAt: scheduleMeta.nextTestAt,
       weekTrend: { delta: visibilityDelta, lastVisibility: promptMetrics.visibilityPct, points: trend },
     };
   });
 
   return res.json({
-    cadence: TRACKED_PROMPT_CADENCE,
+    ...scheduleMeta,
     latestRunAt,
-    nextTestAt: nextDailyRunAt(),
     prompts,
   });
+});
+
+// ── PATCH /domain/:id/tracked-prompts/schedule ────────────────────────────
+//
+// Updates the BullMQ repeatable schedule for the tracked-prompt sweeper. The
+// current worker has one sweeper that processes all domains with tracked
+// prompts, so this setting is global even though the route is scoped through a
+// domain for ownership/auth consistency with the Prompt Tracking tab.
+router.patch('/domain/:id/tracked-prompts/schedule', authenticateToken, async (req: Request, res: Response) => {
+  const got = await ensureDomain(req, req.params.id);
+  if (!got.ok) return res.status(got.status).json({ error: got.error });
+
+  const { updateWeeklyTrackingSchedule } = require('../services/weeklyTrackingService');
+
+  try {
+    const schedule = await updateWeeklyTrackingSchedule(req.body ?? {});
+    const serialized = serializeTrackedPromptSchedule(schedule);
+    return res.json({
+      cadence: serialized.cadence,
+      nextTestAt: serialized.nextTestAt,
+      schedule: serialized,
+      scheduleOptions: TRACKED_PROMPT_SCHEDULE_OPTIONS,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Invalid tracked prompt schedule';
+    return res.status(400).json({ error: message });
+  }
 });
 
 // ── POST /domain/:id/tracked-prompts/run-now ──────────────────────────────

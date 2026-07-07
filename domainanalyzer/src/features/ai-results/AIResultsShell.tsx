@@ -20,7 +20,7 @@
  *     here, not in every page.
  */
 
-import { Suspense, useEffect, useMemo } from 'react';
+import { Fragment, Suspense, useEffect, useMemo } from 'react';
 import { Outlet, useLocation, useNavigate, useOutletContext, useParams } from 'react-router-dom';
 import { AIResultsLayout } from './components/AIResultsLayout';
 import { useDomains, type DomainRow } from './queries';
@@ -132,7 +132,9 @@ export function AIResultsShell({ activeItem, title }: ShellProps) {
           spinner while a tab's chunk downloads; the sidebar + header stay
           mounted, preserving the "tab switch is instant" UX promise. */}
       <Suspense fallback={<OutletFallback />}>
-        <Outlet context={ctx} />
+        <Fragment key={ctx.maskedDomainId ?? 'no-domain'}>
+          <Outlet context={ctx} />
+        </Fragment>
       </Suspense>
     </AIResultsLayout>
   );

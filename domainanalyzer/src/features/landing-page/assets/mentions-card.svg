@@ -1,0 +1,54 @@
+<svg width="290" height="163" viewBox="0 0 290 163" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="mentionsSurface" x1="18" y1="8" x2="272" y2="163" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF"/>
+      <stop offset="0.6" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#F4F7FB"/>
+    </linearGradient>
+    <radialGradient id="mentionsHighlight" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(256 18) rotate(108) scale(150 98)">
+      <stop stop-color="#F8FAFF" stop-opacity="0.84"/>
+      <stop offset="0.58" stop-color="#F8FAFF" stop-opacity="0.18"/>
+      <stop offset="1" stop-color="#F8FAFF" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <rect x="1" y="1" width="288" height="161" rx="18" fill="url(#mentionsSurface)"/>
+  <rect x="1" y="1" width="288" height="161" rx="18" fill="url(#mentionsHighlight)"/>
+  <rect x="1" y="1" width="288" height="161" rx="18" stroke="#E5E7EB"/>
+
+  <text x="22" y="34.5" fill="#545B66" font-family="Inter, Arial, sans-serif" font-size="20" font-weight="600" letter-spacing="-0.02em">
+    Mentions
+  </text>
+  <circle cx="128.5" cy="29.8" r="7.5" fill="none" stroke="#7B828D" stroke-width="1.4"/>
+  <text x="128.5" y="33.9" text-anchor="middle" fill="#7B828D" font-family="Inter, Arial, sans-serif" font-size="10.5" font-weight="700">
+    i
+  </text>
+
+  <text x="22" y="70" fill="#545B66" font-family="Inter, Arial, sans-serif" font-size="15" font-weight="600" letter-spacing="-0.01em">
+    Brand
+  </text>
+  <text x="150" y="70" fill="#545B66" font-family="Inter, Arial, sans-serif" font-size="15" font-weight="600" letter-spacing="-0.01em">
+    Competitors
+  </text>
+
+  <text x="22" y="108" fill="#3390FF" font-family="Inter, Arial, sans-serif" font-size="29" font-weight="700" letter-spacing="-0.03em">
+    36%
+  </text>
+  <text x="150" y="108" fill="#3390FF" font-family="Inter, Arial, sans-serif" font-size="29" font-weight="700" letter-spacing="-0.03em">
+    64%
+  </text>
+
+  <text x="22" y="136" fill="#717680" font-family="Inter, Arial, sans-serif" font-size="10.5" font-weight="500" letter-spacing="-0.01em">
+    No. of Pages
+  </text>
+  <text x="22" y="150" fill="#3390FF" font-family="Inter, Arial, sans-serif" font-size="10.5" font-weight="500" letter-spacing="-0.01em">
+    45
+  </text>
+
+  <text x="150" y="136" fill="#717680" font-family="Inter, Arial, sans-serif" font-size="10.5" font-weight="500" letter-spacing="-0.01em">
+    No. of Pages
+  </text>
+  <text x="150" y="150" fill="#3390FF" font-family="Inter, Arial, sans-serif" font-size="10.5" font-weight="500" letter-spacing="-0.01em">
+    354
+  </text>
+</svg>

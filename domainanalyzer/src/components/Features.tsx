@@ -1,16 +1,16 @@
 export function Features() {
-    const videoUrl =
+    const fallbackVideoUrl =
         import.meta.env.VITE_FEATURES_VIDEO_URL ||
         "https://res.cloudinary.com/ta2uztdv/video/upload/v1783195911/Browser_Tool-_6-compressed_1_1_ws3z2v.mp4";
 
     return (
-        <section className="overflow-hidden py-24 md:py-40" style={{ 
+        <section className="overflow-hidden py-24 md:py-40" style={{
             fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Inter", "Helvetica Neue", Helvetica, Arial, sans-serif',
             background: '#f5f5f7'
         }}>
             <div className="mx-auto max-w-6xl space-y-16 px-6 md:space-y-20">
                 <div className="relative z-10 max-w-3xl mx-auto text-center">
-                    <h2 style={{ 
+                    <h2 style={{
                         fontSize: 'clamp(40px, 5vw, 72px)',
                         fontWeight: '200',
                         letterSpacing: '-0.003em',
@@ -18,7 +18,7 @@ export function Features() {
                         color: '#1d1d1f',
                         margin: '0 0 24px 0'
                     }}>Comprehensive AI Brand Analysis</h2>
-                    <p style={{ 
+                    <p style={{
                         fontSize: 'clamp(19px, 2.5vw, 28px)',
                         fontWeight: '300',
                         letterSpacing: '0.011em',
@@ -48,8 +48,8 @@ export function Features() {
                                     disablePictureInPicture
                                     controlsList="nodownload noplaybackrate noremoteplayback"
                                 >
-                                    <source src={videoUrl} type="video/mp4" />
                                     <source src="/features2.mp4" type="video/mp4" />
+                                    <source src={fallbackVideoUrl} type="video/mp4" />
                                     Your browser does not support the video tag.
                                 </video>
                             </div>
@@ -58,9 +58,9 @@ export function Features() {
                 </div>
                 <div className="relative mx-auto grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-4">
                     <div style={{ textAlign: 'center', padding: '24px' }}>
-                        <div style={{ 
-                            width: '48px', 
-                            height: '48px', 
+                        <div style={{
+                            width: '48px',
+                            height: '48px',
                             margin: '0 auto 16px auto',
                             display: 'flex',
                             alignItems: 'center',
@@ -73,14 +73,14 @@ export function Features() {
                                 <path d="m21 21-4.35-4.35"/>
                             </svg>
                         </div>
-                        <h3 style={{ 
+                        <h3 style={{
                             fontSize: '21px',
                             fontWeight: '400',
                             letterSpacing: '-0.022em',
                             color: '#1d1d1f',
                             margin: '0 0 8px 0'
                         }}>Domain Analysis</h3>
-                        <p style={{ 
+                        <p style={{
                             fontSize: '17px',
                             fontWeight: '300',
                             letterSpacing: '0.011em',
@@ -90,9 +90,9 @@ export function Features() {
                         }}>Extract and analyze your website content to understand your brand's digital footprint.</p>
                     </div>
                     <div style={{ textAlign: 'center', padding: '24px' }}>
-                        <div style={{ 
-                            width: '48px', 
-                            height: '48px', 
+                        <div style={{
+                            width: '48px',
+                            height: '48px',
                             margin: '0 auto 16px auto',
                             display: 'flex',
                             alignItems: 'center',
@@ -106,14 +106,14 @@ export function Features() {
                                 <circle cx="12" cy="12" r="2"/>
                             </svg>
                         </div>
-                        <h3 style={{ 
+                        <h3 style={{
                             fontSize: '21px',
                             fontWeight: '400',
                             letterSpacing: '-0.022em',
                             color: '#1d1d1f',
                             margin: '0 0 8px 0'
                         }}>Keyword Discovery</h3>
-                        <p style={{ 
+                        <p style={{
                             fontSize: '17px',
                             fontWeight: '300',
                             letterSpacing: '0.011em',
@@ -123,9 +123,9 @@ export function Features() {
                         }}>AI-powered keyword research with volume, difficulty, and CPC data for strategic insights.</p>
                     </div>
                     <div style={{ textAlign: 'center', padding: '24px' }}>
-                        <div style={{ 
-                            width: '48px', 
-                            height: '48px', 
+                        <div style={{
+                            width: '48px',
+                            height: '48px',
                             margin: '0 auto 16px auto',
                             display: 'flex',
                             alignItems: 'center',
@@ -138,14 +138,14 @@ export function Features() {
                                 <path d="M9 9h6v6H9z"/>
                             </svg>
                         </div>
-                        <h3 style={{ 
+                        <h3 style={{
                             fontSize: '21px',
                             fontWeight: '400',
                             letterSpacing: '-0.022em',
                             color: '#1d1d1f',
                             margin: '0 0 8px 0'
                         }}>Multi-Model Testing</h3>
-                        <p style={{ 
+                        <p style={{
                             fontSize: '17px',
                             fontWeight: '300',
                             letterSpacing: '0.011em',
@@ -155,9 +155,9 @@ export function Features() {
                         }}>Test your phrases against GPT-4o, Claude 3, and Gemini 1.5 for comprehensive coverage.</p>
                     </div>
                     <div style={{ textAlign: 'center', padding: '24px' }}>
-                        <div style={{ 
-                            width: '48px', 
-                            height: '48px', 
+                        <div style={{
+                            width: '48px',
+                            height: '48px',
                             margin: '0 auto 16px auto',
                             display: 'flex',
                             alignItems: 'center',
@@ -170,14 +170,14 @@ export function Features() {
                                 <path d="M18.7 8l-5.1 5.2-2.8-2.7L7 14.3"/>
                             </svg>
                         </div>
-                        <h3 style={{ 
+                        <h3 style={{
                             fontSize: '21px',
                             fontWeight: '400',
                             letterSpacing: '-0.022em',
                             color: '#1d1d1f',
                             margin: '0 0 8px 0'
                         }}>Competitive Intelligence</h3>
-                        <p style={{ 
+                        <p style={{
                             fontSize: '17px',
                             fontWeight: '300',
                             letterSpacing: '0.011em',

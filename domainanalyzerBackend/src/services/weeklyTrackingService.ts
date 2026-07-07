@@ -11,6 +11,12 @@
 
 import { prisma } from '../lib/prisma';
 import { n8nQueue, WEEKLY_TRACKING_JOB } from './queueService';
+import {
+  DEFAULT_TRACKED_PROMPT_CRON,
+  getTrackedPromptSchedule,
+  setTrackedPromptSchedule,
+  type TrackedPromptSchedule,
+} from './trackedPromptSchedule';
 import { runTrackedQueries } from '../wizard/runService';
 
 
@@ -18,8 +24,8 @@ import { runTrackedQueries } from '../wizard/runService';
 // duplicate repeatables. Keep the id even though the cadence is now daily so
 // Redis updates the existing repeatable instead of leaving an old weekly one.
 const SCHEDULER_ID = 'weekly-tracking';
-// Every day at 03:00 UTC.
-export const TRACKED_PROMPT_CRON = '0 3 * * *';
+// Default: every day at 03:00 UTC.
+export const TRACKED_PROMPT_CRON = DEFAULT_TRACKED_PROMPT_CRON;
 // A tracked run should finish in minutes. If the process dies mid-run, a stale
 // AiRun(status='running') must not block every future daily test forever.
 const WEEKLY_RUN_STALE_MINUTES = Math.max(
@@ -32,9 +38,14 @@ const WEEKLY_RUN_STALE_MINUTES = Math.max(
  * Only writes the schedule to Redis; the processor runs in the shared worker.
  */
 export async function registerWeeklyTracking(): Promise<void> {
+  const schedule = await getTrackedPromptSchedule();
+  await upsertTrackedPromptScheduler(schedule);
+}
+
+async function upsertTrackedPromptScheduler(schedule: TrackedPromptSchedule): Promise<void> {
   await n8nQueue.upsertJobScheduler(
     SCHEDULER_ID,
-    { pattern: TRACKED_PROMPT_CRON, tz: 'UTC' },
+    { pattern: schedule.cron, tz: 'UTC' },
     {
       name: WEEKLY_TRACKING_JOB,
       data: {},
@@ -43,7 +54,13 @@ export async function registerWeeklyTracking(): Promise<void> {
       opts: { removeOnComplete: true, removeOnFail: 50, attempts: 1 },
     },
   );
-  console.log(`[tracking] scheduled daily tracked-prompt sweep (${TRACKED_PROMPT_CRON} UTC)`);
+  console.log(`[tracking] scheduled tracked-prompt sweep (${schedule.label}; ${schedule.cron} UTC)`);
+}
+
+export async function updateWeeklyTrackingSchedule(input: unknown): Promise<TrackedPromptSchedule> {
+  const schedule = await setTrackedPromptSchedule(input);
+  await upsertTrackedPromptScheduler(schedule);
+  return schedule;
 }
 
 /** True if a tracked run is already running for this domain (dedupe). */

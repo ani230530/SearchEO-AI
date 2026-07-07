@@ -2,7 +2,7 @@
 // providers); only renders for authenticated users. The launcher toggles a
 // bottom-right panel that renders data inline and can drive the app.
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { MessageSquare, X } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -11,6 +11,12 @@ import { ChatPanel } from "./ChatPanel";
 export function ChatWidget() {
   const { user } = useAuth();
   const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    const openChat = () => setOpen(true);
+    window.addEventListener("open-ai-chatbot", openChat as EventListener);
+    return () => window.removeEventListener("open-ai-chatbot", openChat as EventListener);
+  }, []);
 
   // Only for signed-in users (tools are user-scoped).
   if (!user) return null;

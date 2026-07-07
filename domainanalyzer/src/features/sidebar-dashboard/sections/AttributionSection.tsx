@@ -1,15 +1,32 @@
 export function AttributionSection() {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-      <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Attribution</p>
-      <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">
-        Attribution
-      </h2>
-      <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600">
-        This section is reserved for attribution-related insights and workflows.
-      </p>
-      <div className="mt-6 rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-5 text-sm text-slate-500">
-        Attribution content will appear here.
+    <div className="pl-6 shadow-sm">
+
+
+      <div className="mt-8 max-w-2xl">
+        <h3 className="text-[24px] font-semibold tracking-tight text-slate-900">
+          Attribution Setup Required
+        </h3>
+        <p className="mt-3 text-sm leading-6 text-slate-500">
+          To access this dashboard, our team will help you connect your attribution data. Reach out to support to get
+          started.
+        </p>
+
+        <div className="mt-6">
+          <p className="text-[15px] font-semibold text-slate-800">What you’ll get once enabled</p>
+          <ul className="mt-3 list-disc space-y-1 pl-5 text-sm leading-6 text-slate-500">
+            <li>Real-time event and revenue insights</li>
+            <li>Campaign and source-level performance</li>
+            <li>Visual user journey tracking</li>
+          </ul>
+        </div>
+
+        <button
+          type="button"
+          className="mt-6 inline-flex h-10 items-center rounded-lg bg-[#334763] px-4 text-sm font-semibold text-white transition hover:bg-[#2B3C54]"
+        >
+          Request Setup
+        </button>
       </div>
     </div>
   );

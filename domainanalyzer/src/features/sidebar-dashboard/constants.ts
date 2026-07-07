@@ -11,7 +11,7 @@ import {
   Lightbulb,
   Send,
   Settings,
-  Route, 
+  Route,
   Sparkles,
   Target,
   User,
@@ -30,12 +30,13 @@ export const DASHBOARD_TABS: DashboardTabConfig[] = [
   { id: "competitor-intelligence", label: "Competitor Intelligence", icon: Target },
   { id: "knowledge-base", label: "Knowledge Base", icon: Lightbulb },
   { id: "domain-history", label: "Domain History", icon: Lightbulb },
+  { id: "support", label: "Support", icon: User },
   { id: "projects", label: "All Projects", icon: Send },
   { id: "gsc-analytics", label: "GSC Analytics", icon: ChartPie },
   { id: "audit", label: "Website Audit", icon: Globe },
   { id: "analytics-report", label: "Performance Reports", icon: ChartColumnBig },
   { id: "settings", label: "Settings", icon: Settings },
-  
+
 ];
 
 export const TOOLTIP_INFO = {

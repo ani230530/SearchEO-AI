@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ArrowUpRight, Check, Loader2, Plus } from "lucide-react";
 
 import { apiGet, apiPost } from "@/services/apiClient";
@@ -28,12 +28,36 @@ interface CompetitorRow extends WizardCompetitor {
   selected: boolean;
 }
 
+const MAX_COMPETITORS_PER_DOMAIN = 5;
+type StoredCompetitor = {
+  competitorHost: string;
+  reasoning?: string | null;
+  threatLevel?: string | null;
+  isSelected?: boolean;
+  rank?: number | null;
+};
+
 export function Step3Competitors({ domainId, initialSelected = [], onContinue, forceRefresh = false }: Step3Props) {
   const [competitors, setCompetitors] = useState<CompetitorRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [newCompetitor, setNewCompetitor] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const topicsWarmupStartedRef = useRef(false);
+
+  const warmTopicsInBackground = async () => {
+    if (topicsWarmupStartedRef.current) return;
+    topicsWarmupStartedRef.current = true;
+    try {
+      const data = await apiGet<{ keywords?: unknown[]; prompts?: unknown[] }>(`/wizard/domain/${domainId}`);
+      const storedKeywords = Array.isArray(data?.keywords) ? data.keywords : [];
+      const storedPrompts = Array.isArray(data?.prompts) ? data.prompts : [];
+      if (storedKeywords.length > 0 || storedPrompts.length > 0) return;
+      await apiPost(`/wizard/domain/${domainId}/topics`);
+    } catch {
+      topicsWarmupStartedRef.current = false;
+    }
+  };
 
   /**
    * Map a backend competitor row (from /wizard/domain/:id) into the
@@ -65,13 +89,14 @@ export function Step3Competitors({ domainId, initialSelected = [], onContinue, f
     try {
       const res = await apiPost<CompetitorsResponse>(`/wizard/domain/${domainId}/competitors`);
       const initialSet = new Set(initialSelected);
-      const seedSelectAll = initialSet.size === 0;
+      const cappedCompetitors = (res.competitors ?? []).slice(0, MAX_COMPETITORS_PER_DOMAIN);
       setCompetitors(
-        res.competitors.map((c) => ({
+        cappedCompetitors.map((c) => ({
           ...c,
-          selected: seedSelectAll ? true : initialSet.has(c.url),
+          selected: initialSet.has(c.url),
         }))
       );
+      void warmTopicsInBackground();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not load competitors");
     } finally {
@@ -96,13 +121,16 @@ export function Step3Competitors({ domainId, initialSelected = [], onContinue, f
         return;
       }
       try {
-        const data = await apiGet<{ competitors?: any[] }>(`/wizard/domain/${domainId}`);
+        const data = await apiGet<{ competitors?: StoredCompetitor[] }>(`/wizard/domain/${domainId}`);
         if (!alive) return;
         const stored = Array.isArray(data?.competitors) ? data!.competitors : [];
-        const ranked = stored.filter((c: any) => typeof c?.rank === "number");
+        const ranked = stored
+          .filter((c) => typeof c?.rank === "number")
+          .slice(0, MAX_COMPETITORS_PER_DOMAIN);
         if (ranked.length > 0) {
           setCompetitors(ranked.map(adaptStoredCompetitor));
           setLoading(false);
+          void warmTopicsInBackground();
           return;
         }
       } catch {
@@ -138,6 +166,10 @@ export function Step3Competitors({ domainId, initialSelected = [], onContinue, f
       if (prev.some((c) => c.url === url)) {
         return prev.map((c) => (c.url === url ? { ...c, selected: true } : c));
       }
+      if (prev.length >= MAX_COMPETITORS_PER_DOMAIN) {
+        setError(`You can track up to ${MAX_COMPETITORS_PER_DOMAIN} competitors per domain.`);
+        return prev;
+      }
       return [
         ...prev,
         {
@@ -156,8 +188,12 @@ export function Step3Competitors({ domainId, initialSelected = [], onContinue, f
     setSubmitting(true);
     setError(null);
     try {
+      const selectedUrls = competitors
+        .filter((c) => c.selected)
+        .slice(0, MAX_COMPETITORS_PER_DOMAIN)
+        .map((c) => c.url);
       await apiPost(`/wizard/domain/${domainId}/competitors/select`, {
-        urls: competitors.filter((c) => c.selected).map((c) => c.url),
+        urls: selectedUrls,
       });
       onContinue();
     } catch (err) {

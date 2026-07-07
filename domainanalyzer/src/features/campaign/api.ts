@@ -359,6 +359,84 @@ export async function publishDraft(draftId: number): Promise<PublishDraftResult>
   return handle<PublishDraftResult>(res);
 }
 
+export interface PublishDraftSnapshot {
+  htmlContent: string;
+  title: string;
+  metaDescription: string;
+  slug: string;
+  featuredImageEnabled: boolean;
+  featuredImageUrl: string | null;
+  primaryKeyword: string;
+  longtailKeywords: string;
+  status: string;
+  scheduledAt: string | null;
+  publishedAt: string | null;
+  wordpressUrl: string | null;
+  error: string | null;
+  updatedAt: string;
+}
+
+export interface PublishDraftRecordResponse {
+  success: boolean;
+  draft: PublishDraftSnapshot;
+}
+
+export interface SchedulePublishDraftPayload {
+  draftId?: number;
+  primaryKeyword: string;
+  htmlContent: string;
+  featuredImageEnabled: boolean;
+  featuredImageUrl?: string | null;
+  title?: string | null;
+  metaDescription?: string | null;
+  slug?: string | null;
+  scheduledAt: string;
+  topicId?: number;
+}
+
+export interface SchedulePublishDraftResult {
+  success: boolean;
+  message?: string;
+  draftId?: number;
+  status?: 'scheduled';
+  scheduledAt?: string;
+  draft?: PublishDraftSnapshot;
+  error?: string;
+}
+
+export interface CancelScheduledPublishResult {
+  success: boolean;
+  message?: string;
+  draft?: PublishDraftSnapshot;
+  error?: string;
+}
+
+export async function schedulePublishDraft(
+  payload: SchedulePublishDraftPayload
+): Promise<SchedulePublishDraftResult> {
+  const res = await fetch(`${API_BASE_URL}/api/publish/schedule`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify(payload),
+  });
+  return handle<SchedulePublishDraftResult>(res);
+}
+
+export async function cancelScheduledPublish(draftId: number): Promise<CancelScheduledPublishResult> {
+  const res = await fetch(`${API_BASE_URL}/api/publish/schedule/${draftId}`, {
+    method: 'DELETE',
+    headers: authHeaders(),
+  });
+  return handle<CancelScheduledPublishResult>(res);
+}
+
+export async function getPublishDraft(draftId: number): Promise<PublishDraftRecordResponse> {
+  const res = await fetch(`${API_BASE_URL}/api/publish/drafts/${draftId}`, {
+    headers: authHeaders(),
+  });
+  return handle<PublishDraftRecordResponse>(res);
+}
+
 /* ---------- Generate (universal n8n template) ---------- */
 
 export type TemplateType =

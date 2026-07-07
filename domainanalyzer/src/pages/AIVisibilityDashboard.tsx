@@ -41,8 +41,8 @@ const AIVisibilityDashboard = () => {
   return (
     <div className="max-w-[1590px] py-4 mx-auto w-full flex-1">
       {/* Hero Banner */}
-      <div className="bg-[#F9F9F9] rounded-[12px] px-10 py-10 mb-6 flex flex-col items-center justify-center text-center">
-        <div className="flex-shrink-0 flex items-center justify-center mb-6">
+      <div className="bg-[#F9F9F9] rounded-[12px] px-10 py-10 mb-6 flex flex-col lg:flex-row items-center justify-center gap-8 text-center lg:text-left">
+        <div className="flex-shrink-0 flex items-center justify-center">
           <img
             src="/searcheo-logo.png"
             alt="SearchEO AI Logo"
@@ -50,11 +50,11 @@ const AIVisibilityDashboard = () => {
           />
         </div>
 
-        <div className="w-full max-w-2xl flex flex-col items-center">
+        <div className="w-full max-w-4xl flex flex-col items-center lg:items-start">
           <h2 className="text-[28px] font-semibold text-[#2D3748] tracking-tight mb-2">See how AI ranks your domain</h2>
           <p className="text-[14px] text-[#718096] mb-6 font-normal">Uncover how your content appears in AI search, which keywords you're visible for, and where you're missing opportunities.</p>
 
-          <div className="flex flex-col sm:flex-row gap-3 items-center justify-center w-full max-w-[560px]">
+          <div className="flex flex-col sm:flex-row gap-1 items-center justify-center lg:justify-start w-full max-w-3xl">
             <div className="relative flex-1 w-full">
               <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
                 <Globe className={`w-5 h-5 ${error ? 'text-red-400' : 'text-[#A0AEC0]'}`} />
@@ -70,12 +70,12 @@ const AIVisibilityDashboard = () => {
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') handleCheckDomain();
                 }}
-                className={`w-full pl-11 pr-4 py-3 bg-white border ${error ? 'border-red-500 placeholder:text-red-500 focus:ring-red-500' : 'border-[#E2E8F0] placeholder:text-[#A0AEC0] focus:ring-[#3B5B9C]'} rounded-[8px] text-[15px] text-[#2D3748] focus:outline-none focus:ring-2 focus:border-transparent transition-all shadow-sm leading-normal h-12`}
+                className={`w-full pl-11 pr-4 py-3 bg-white border ${error ? 'border-red-500 placeholder:text-red-500 focus:ring-red-500' : 'border-[#E2E8F0] placeholder:text-[#A0AEC0] focus:ring-[#3B5B9C]'} rounded-[8px] text-[15px] text-[#2D3748] focus:outline-none focus:ring-2 focus:border-transparent transition-all shadow-sm leading-normal h-10`}
               />
             </div>
-            <button 
+            <button
               onClick={handleCheckDomain}
-              className="px-6 h-12 text-white text-[15px] font-medium rounded-[8px] transition-opacity hover:opacity-90 flex items-center justify-center gap-2 flex-shrink-0"
+              className="px-6 h-10 text-white text-[15px] font-medium rounded-[8px] transition-opacity hover:opacity-90 flex items-center justify-center gap-2 flex-shrink-0"
               style={{
                 background: 'linear-gradient(90deg, #2D4059 0%, #4C74C2 100%)',
                 boxShadow: '0px 1px 2px 0px #1018280D',
@@ -135,7 +135,7 @@ const AIVisibilityDashboard = () => {
               const accuracy = d.metrics?.brandAccuracy ?? 0;
               const mentions = d.metrics?.mentions ?? 0;
               const sentimentVal = d.metrics?.brandSentiment ?? 5;
-              
+
               let sentimentText = 'Neutral';
               let sentimentColor = 'text-gray-900';
               if (sentimentVal > 6) {
@@ -169,43 +169,49 @@ const AIVisibilityDashboard = () => {
                               <ChevronDown className="w-4 h-4 text-gray-400 group-hover:text-blue-500 transition-colors" />
                             </div>
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent className="w-64 p-2 rounded-xl border border-gray-100 shadow-lg" align="start" onClick={(e) => e.stopPropagation()}>
-                            <div className="flex justify-between items-center px-2 py-2 mb-1 border-b border-gray-50">
-                              <span className="text-sm font-semibold text-gray-900">{d.companyName || d.host || d.url}</span>
-                              <DropdownMenuItem className="p-1 cursor-pointer rounded-full hover:bg-gray-100 flex-shrink-0 !h-auto" onSelect={(e) => e.preventDefault()}>
-                                <X className="w-4 h-4 text-gray-500" />
-                              </DropdownMenuItem>
-                            </div>
-                            <DropdownMenuItem 
-                              className="flex items-center gap-3 px-2 py-2.5 text-sm font-medium text-gray-700 cursor-pointer rounded-lg hover:bg-blue-50 hover:text-blue-600 transition-colors"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                navigate(resolveAIResultsNavigation("ai-results", buildDomainSlug(d)));
-                              }}
-                            >
-                              <Sparkles className="w-4 h-4 text-gray-400" />
-                              AI Results
-                            </DropdownMenuItem>
-                            <DropdownMenuItem 
-                              className="flex items-center gap-3 px-2 py-2.5 text-sm font-medium text-gray-700 cursor-pointer rounded-lg hover:bg-blue-50 hover:text-blue-600 transition-colors"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                navigate(resolveAIResultsNavigation("competitors", buildDomainSlug(d)));
-                              }}
-                            >
-                              <Users className="w-4 h-4 text-gray-400" />
-                              Competitor Intelligence
-                            </DropdownMenuItem>
-                            <DropdownMenuItem 
-                              className="flex items-center gap-3 px-2 py-2.5 text-sm font-medium text-gray-700 cursor-pointer rounded-lg hover:bg-blue-50 hover:text-blue-600 transition-colors"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                navigate(resolveAIResultsNavigation("prompts", buildDomainSlug(d)));
-                              }}
-                            >
-                              <MessageSquareText className="w-4 h-4 text-gray-400" />
-                              Prompts Research
-                            </DropdownMenuItem>
+                           <DropdownMenuContent
+                             className="w-52 p-1.5 rounded-lg border border-gray-100 shadow-lg"
+                             side="right"
+                             align="start"
+                             sideOffset={10}
+                             onClick={(e) => e.stopPropagation()}
+                           >
+                             <div className="flex items-center justify-between gap-2 px-2 py-1.5 mb-1 border-b border-gray-50">
+                               <span className="truncate text-xs font-semibold text-gray-900">{d.companyName || d.host || d.url}</span>
+                               <DropdownMenuItem className="h-auto flex-shrink-0 cursor-pointer rounded-full p-1 hover:bg-gray-100" onSelect={(e) => e.preventDefault()}>
+                                 <X className="w-3.5 h-3.5 text-gray-500" />
+                               </DropdownMenuItem>
+                             </div>
+                             <DropdownMenuItem
+                               className="flex items-center gap-2 px-2 py-2 text-xs font-medium text-gray-700 cursor-pointer rounded-md hover:bg-blue-50 hover:text-blue-600 transition-colors"
+                               onClick={(e) => {
+                                 e.stopPropagation();
+                                 navigate(resolveAIResultsNavigation("ai-results", buildDomainSlug(d)));
+                               }}
+                             >
+                               <Sparkles className="w-3.5 h-3.5 text-gray-400" />
+                               AI Results
+                             </DropdownMenuItem>
+                             <DropdownMenuItem
+                               className="flex items-center gap-2 px-2 py-2 text-xs font-medium text-gray-700 cursor-pointer rounded-md hover:bg-blue-50 hover:text-blue-600 transition-colors"
+                               onClick={(e) => {
+                                 e.stopPropagation();
+                                 navigate(resolveAIResultsNavigation("competitors", buildDomainSlug(d)));
+                               }}
+                             >
+                               <Users className="w-3.5 h-3.5 text-gray-400" />
+                               Competitor Intelligence
+                             </DropdownMenuItem>
+                             <DropdownMenuItem
+                               className="flex items-center gap-2 px-2 py-2 text-xs font-medium text-gray-700 cursor-pointer rounded-md hover:bg-blue-50 hover:text-blue-600 transition-colors"
+                               onClick={(e) => {
+                                 e.stopPropagation();
+                                 navigate(resolveAIResultsNavigation("prompts", buildDomainSlug(d)));
+                               }}
+                             >
+                               <MessageSquareText className="w-3.5 h-3.5 text-gray-400" />
+                               Prompts Research
+                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
                         <a href={d.url} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="inline-flex items-center gap-1 mt-1 text-[11px] text-blue-500 font-medium bg-blue-50 hover:bg-blue-100 transition-colors px-2 py-0.5 rounded">
@@ -220,39 +226,39 @@ const AIVisibilityDashboard = () => {
                         <div className="w-4 h-4 border-2 border-yellow-400 border-t-transparent rounded-full animate-spin"></div>
                       </div>
                     ) : (
-                      <div className="w-8 h-8 rounded-full bg-green-50 flex items-center justify-center border border-green-100">
-                        <Check className="w-5 h-5 text-green-500" />
+                      <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center border border-green-600">
+                        <Check className="w-5 h-5 text-green-700" />
                       </div>
                     )}
                   </div>
 
-                  <div className="grid grid-cols-5 gap-6 pt-6 border-t border-gray-100">
-                    <div className="col-span-2">
-                      <div className="flex justify-between items-end mb-2">
+                  <div className="grid grid-cols-5 gap-8 pt-6 border-t border-gray-300">
+                    <div className="col-span-1 min-w-0 px-1">
+                      <div className="flex items-end justify-between gap-3 mb-2">
                         <span className="text-xs font-semibold text-gray-600">Overall Website health</span>
                         <span className="text-xl font-bold text-[#4361EE]">{health}%</span>
                       </div>
-                      <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden">
+                      <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden mt-3">
                         <div className="h-full bg-[#4361EE] rounded-full" style={{ width: `${health}%` }}></div>
                       </div>
                     </div>
 
-                    <div className="flex flex-col justify-between">
+                    <div className="min-w-0 px-1 flex flex-col items-end justify-between text-right">
                       <span className="text-xs font-semibold text-gray-600">Share Of Voice</span>
                       <span className="text-xl font-bold text-gray-900 mt-1">{sov}</span>
                     </div>
 
-                    <div className="flex flex-col justify-between">
+                    <div className="min-w-0 px-1 flex flex-col items-end justify-between text-right">
                       <span className="text-xs font-semibold text-gray-600">Brand Sentiment</span>
                       <span className={`text-xl font-bold ${sentimentColor} mt-1`}>{sentimentText}</span>
                     </div>
 
-                    <div className="flex flex-col justify-between">
+                    <div className="min-w-0 px-1 flex flex-col items-end justify-between text-right">
                       <span className="text-xs font-semibold text-gray-600">Brand accuracy</span>
                       <span className="text-xl font-bold text-gray-600 mt-1">{accuracy}%</span>
                     </div>
 
-                    <div className="flex flex-col justify-between text-right">
+                    <div className="min-w-0 px-1 flex flex-col items-end justify-between text-right">
                       <span className="text-xs font-semibold text-gray-600">Mentions</span>
                       <span className="text-xl font-bold text-gray-600 mt-1">{mentions}</span>
                     </div>

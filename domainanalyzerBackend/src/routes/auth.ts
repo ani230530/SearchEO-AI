@@ -390,6 +390,20 @@ function clearOauthStateCookie(res: Response) {
   res.setHeader('Set-Cookie', attrs.join('; '));
 }
 
+function isGoogleInvalidGrant(error: unknown): boolean {
+  const err = error as {
+    code?: number;
+    status?: number;
+    response?: { data?: { error?: string } };
+    cause?: { message?: string };
+  };
+  return (
+    err?.response?.data?.error === 'invalid_grant' ||
+    err?.cause?.message === 'invalid_grant' ||
+    (err?.code === 400 && err?.status === 400)
+  );
+}
+
 function startGoogleAuth(mode: 'login' | 'signup') {
   return (req: Request, res: Response) => {
     try {
@@ -464,7 +478,12 @@ router.post(
       }
       res.json({ ...result, wizardLink });
     } catch (error) {
-      console.error('[auth/google/exchange] failed', error);
+      if (isGoogleInvalidGrant(error)) {
+        console.warn('[auth/google/exchange] stale or duplicate Google auth code');
+        res.status(400).json({ error: 'Google sign-in expired. Please try again.' });
+        return;
+      }
+      console.error('[auth/google/exchange] failed', error instanceof Error ? error.message : error);
       res.status(500).json({ error: 'Google code exchange failed' });
     }
   }),

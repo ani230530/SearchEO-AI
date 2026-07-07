@@ -22,7 +22,7 @@ import {
   ResponsiveContainer,
   Scatter,
   ScatterChart,
-  Tooltip,
+  Tooltip as RechartsTooltip,
   XAxis,
   YAxis,
   ZAxis,
@@ -37,6 +37,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { CompetitorDetail } from '@/components/competitors/CompetitorDetail';
 import { AiResponseAnalysis } from '@/components/competitors/AiResponseAnalysis';
 import { cn } from '@/lib/utils';
@@ -460,14 +461,24 @@ function GenerateContentButton({ className = '', onClick }: { className?: string
 
 function InfoIcon({ label }: { label: string }) {
   return (
-    <button
-      type="button"
-      aria-label={label}
-      title={label}
-      className="inline-flex h-4 w-4 shrink-0 items-center justify-center text-[#7B8494] transition hover:text-[#2D4059]"
-    >
-      <Info className="h-3 w-3" strokeWidth={2} />
-    </button>
+    <Tooltip delayDuration={150}>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          aria-label={label}
+          className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[#7B8494] transition hover:text-[#2D4059] focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
+        >
+          <Info className="h-3 w-3" strokeWidth={2} />
+        </button>
+      </TooltipTrigger>
+      <TooltipContent
+        side="top"
+        align="start"
+        className="max-w-[280px] rounded-lg bg-white px-3 py-2 text-[12px] font-normal leading-relaxed text-[#414651] shadow-xl"
+      >
+        {label}
+      </TooltipContent>
+    </Tooltip>
   );
 }
 
@@ -603,13 +614,13 @@ function ValueCard({
   );
 }
 
-function InsightCard({ title, items }: { title: string; items: string[] }) {
+function InsightCard({ title, items, tooltipText }: { title: string; items: string[]; tooltipText?: string }) {
   const shown = items.slice(0, 2);
   return (
     <article className="flex h-full min-h-0 min-w-0 flex-col rounded-lg border border-slate-200 bg-white px-6 py-4">
       <div className="flex items-start justify-between gap-3">
         <h3 className="truncate text-sm font-medium leading-5 text-[#5F6877]">{title}</h3>
-        <InfoIcon label={title} />
+        <InfoIcon label={tooltipText ?? title} />
       </div>
       <ul className="mt-3 list-disc space-y-1 pl-4 text-[11px] font-semibold leading-[1.25] text-[#2D4059]">
         {shown.length > 0
@@ -926,13 +937,17 @@ function TrendComparisonPanel({ trends }: { trends: TrendsResponse | null }) {
         </p>
       ) : (
         <div className="mt-3 space-y-6">
-          <ChartBlock title="AI Visibility Trend" subtitle="Compare brand and competitor mention events across scored AI responses.">
+          <ChartBlock
+            title="AI Visibility Trend"
+            subtitle="Compare brand and competitor mention events across scored AI responses."
+            tooltipText="Tracks competitor visibility changes across prompts, responses, and citations."
+          >
             <ResponsiveContainer width="100%" height={240}>
               <LineChart syncId="competitorTrends" data={visibilityData} margin={{ top: 10, right: 10, bottom: 0, left: -20 }}>
                 <CartesianGrid stroke="#EEF1F5" strokeDasharray="3 3" />
                 <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#98A2B3' }} />
                 <YAxis tick={{ fontSize: 10, fill: '#98A2B3' }} />
-                <Tooltip
+                <RechartsTooltip
                   contentStyle={{
                     fontSize: '12px'
                   }}
@@ -950,13 +965,17 @@ function TrendComparisonPanel({ trends }: { trends: TrendsResponse | null }) {
             </ResponsiveContainer>
           </ChartBlock>
 
-          <ChartBlock title="Citation Share Comparison" subtitle="See which competitors are earning cited-source authority.">
+          <ChartBlock
+            title="Citation Share Comparison"
+            subtitle="See which competitors are earning cited-source authority."
+            tooltipText="Compares how often each competitor earns citations in AI responses."
+          >
             <ResponsiveContainer width="100%" height={240}>
               <LineChart syncId="competitorTrends" data={citationData} margin={{ top: 10, right: 10, bottom: 0, left: -20 }}>
                 <CartesianGrid stroke="#EEF1F5" strokeDasharray="3 3" />
                 <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#98A2B3' }} />
                 <YAxis tick={{ fontSize: 10, fill: '#98A2B3' }} />
-                <Tooltip
+                <RechartsTooltip
                   contentStyle={{
                     fontSize: '12px'
                   }}
@@ -978,13 +997,17 @@ function TrendComparisonPanel({ trends }: { trends: TrendsResponse | null }) {
             </ResponsiveContainer>
           </ChartBlock>
 
-          <ChartBlock title="Share of Voice" subtitle="Evaluate competitor visibility and market presence.">
+          <ChartBlock
+            title="Share of Voice"
+            subtitle="Evaluate competitor visibility and market presence."
+            tooltipText="Measures each competitor’s presence across AI search results and responses."
+          >
             <ResponsiveContainer width="100%" height={240}>
               <LineChart syncId="competitorTrends" data={sovData} margin={{ top: 10, right: 10, bottom: 0, left: -20 }}>
                 <CartesianGrid stroke="#EEF1F5" strokeDasharray="3 3" />
                 <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#98A2B3' }} />
                 <YAxis unit="%" tick={{ fontSize: 10, fill: '#98A2B3' }} />
-                <Tooltip
+                <RechartsTooltip
                   contentStyle={{
                     fontSize: '12px'
                   }}
@@ -1017,18 +1040,23 @@ function TrendComparisonPanel({ trends }: { trends: TrendsResponse | null }) {
 function ChartBlock({
   title,
   subtitle,
+  tooltipText,
   children,
   dataTitle,
 }: {
   title: string;
   subtitle: string;
+  tooltipText?: string;
   children: React.ReactNode;
   dataTitle?: string;
 }) {
   return (
     <div className="min-w-0" data-title={dataTitle ?? title}>
       <div className="mb-2">
-        <h4 className="text-sm font-semibold text-[#2D4059]">{title}</h4>
+        <div className="flex items-center gap-2">
+          <h4 className="text-sm font-semibold text-[#2D4059]">{title}</h4>
+          {tooltipText ? <InfoIcon label={tooltipText} /> : null}
+        </div>
         <p className="text-xs text-[#7B8494]">{subtitle}</p>
       </div>
       {children}
@@ -1599,7 +1627,7 @@ function PositioningComparison({ analysis }: { analysis: CompetitorAnalysisRespo
                   label={{ value: 'Sentiment %', angle: -90, position: 'insideLeft', fill: '#2D5B93', fontSize: 12 }}
                 />
                 <ZAxis type="number" dataKey="z" range={[60, 400]} />
-                <Tooltip
+                <RechartsTooltip
                   cursor={{ strokeDasharray: '3 3' }}
                   content={({ active, payload }) => {
                     if (!active || !payload || payload.length === 0) return null;
@@ -2328,20 +2356,8 @@ export default function CompetitorsPage() {
   return (
     <>
       <div className="w-full bg-white">
-        <div className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/90">
-          <div className="mx-auto flex w-full max-w-[1530px] items-center px-5 py-3">
-            <AIResultsBreadcrumbs
-              mode="static"
-              prefixLabel="AI Visibility"
-              prefixHref={resolveSidebarNavigation('ai-visibility').path}
-              pageLabel="Competitors Intelligence"
-              pageHref={maskedDomainId ? resolveAIResultsNavigation('competitors', maskedDomainId) : undefined}
-              currentLabel={currentCompetitorSectionTitle ?? 'Tracked Competitors'}
-            />
-          </div>
-        </div>
 
-        <div className="mx-auto flex w-full max-w-[1530px] flex-col gap-5 px-5 py-3 pb-6">
+        <div className="flex w-full flex-col gap-5 px-4 py-3 pb-6 sm:px-6">
           {loading ? (
             <LoadingSkeleton />
           ) : error ? (
@@ -2374,28 +2390,32 @@ export default function CompetitorsPage() {
                     maxScore={100}
                     footer={headerMetrics.visibilityComparison}
                     trend={visibilityTrend ?? undefined}
-                    tooltipText="Brand-mentioned successful model responses divided by successful model responses in the latest audit."
+                    tooltipText="Measures how often your brand appears and performs in AI generated answers."
                   />
                   <TopCompetitorCard
                     title="Top Competitor"
                     competitorHost={headerMetrics.bestCompetitorHost}
                     competitorScoreDelta={headerMetrics.bestScoreDelta}
-                    tooltipText="Competitor with the most mention events in the latest audit. Delta compares that competitor's share of all brand + competitor mention events against your brand share."
+                    tooltipText="Shows the competitor with the strongest overall AI search visibility."
                   />
                   <ValueCard
                     title="Largest Prompt Gap"
                     value={headerMetrics.largestGapPct > 0 ? `${headerMetrics.largestGapPct}%` : '—'}
                     footer={headerMetrics.largestGapPrompt || 'No gap detected'}
                     badge="Prompt"
-                    tooltipText="Largest successful-response coverage gap where a competitor appeared more often than your brand on one prompt."
+                    tooltipText="Highlights prompts where competitors rank but your brand is missing."
                   />
                   <ValueCard
                     title="Competitor SOV"
                     value={`${headerMetrics.competitorSOV}%`}
                     footer="Across all competitor mention events"
-                    tooltipText="Competitor mention events divided by brand + competitor mention events in the latest audit."
+                    tooltipText="Shows competitors’ share of voice across top AI responses."
                   />
-                  <InsightCard title="Top Insight" items={headerMetrics.topInsights} />
+                  <InsightCard
+                    title="Insights"
+                    items={headerMetrics.topInsights}
+                    tooltipText="Summarizes key competitor trends, risks, and visibility opportunities."
+                  />
                 </div>
               </section>
 

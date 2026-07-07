@@ -130,7 +130,7 @@ const MODEL_ICON_SRC: Array<{ match: RegExp; src: string; label: string }> = [
   { match: /(gpt|chatgpt|openai)/i, src: '/report-icons/chat-gpt.svg', label: 'ChatGPT' },
   { match: /claude/i, src: '/report-icons/claude.svg', label: 'Claude' },
   { match: /gemini/i, src: '/report-icons/gemini.svg', label: 'Gemini' },
-  { match: /(google|gre|overview)/i, src: '/report-icons/google.svg', label: 'Google AI Overview' },
+  { match: /(google|gre|overview)/i, src: '/report-icons/google.svg', label: 'AI Overview' },
 ];
 
 const resolveModelMeta = (model?: string) => {
@@ -589,20 +589,20 @@ const MetricInfoTooltip = ({ tip }: { tip: string }) => (
  */
 const CARD_TOOLTIPS: Record<string, string> = {
   'Performance Across AI Models':
-    'Shows brand mentions by model using only successful model responses. Failed provider calls are excluded from scoring and shown in the scored-count note.',
+    'See how often your brand appears across AI platforms and which models mention you most.',
   'Top AI Search Prompts':
-    'Run shows prompts queried in the selected report run. Generated shows all saved prompt candidates for this domain.',
+    'Total prompts tracked for your brand, including queries used to measure visibility across AI answers.',
   'Citations':
-    'Counts citation URLs returned by successful model responses, plus how many responses included at least one citation.',
+    'Shows how often AI platforms cite your website or related sources in generated responses.',
   'Mentions':
-    'Counts brand response mentions and competitor mention events. These are counts, not forced percentages that must add to 100%.',
+    'Compares how often your brand is mentioned against competitor mentions across tracked AI prompts.',
   'Overall Sentiment':
-    'Uses only scored sentiment samples from responses that mentioned your brand. If the scorer did not produce sentiment, the card says so.',
+    'Summarizes how AI responses describe your brand, based on positive, neutral, or negative language.',
   'Brand Accuracy Score':
-    'Averages factual accuracy only where the scorer produced an accuracy score for a brand mention. Low sample sizes are called out.',
+    'Measures how correctly AI platforms describe your brand, services, positioning, and key information.',
   'AI Share of Voice':
-    'Your brand mention events divided by brand plus competitor mention events, excluding failed provider calls and self-competitor matches.',
-  'Verified AI Visibility Gaps':
+    'Shows your brand’s visibility compared with competitors across tracked AI search prompts.',
+  'Opportunities to Outrank Competitors':
     'Shows only gaps found in completed, scored audit responses: lost prompts, citation gaps, rank downgrades, negative sentiment, and brand-vs-competitor misses.',
 };
 
@@ -619,16 +619,16 @@ const CardTitleWithTip = ({ title, className }: { title: string; className?: str
 const TABLE_HEADER_TOOLTIPS: Record<string, string> = {
   Prompts: 'The AI search query used to check your brand visibility, sentiment, ranking, and competitor mentions.',
   Sentiment: 'Shows whether the AI response presents your brand in a positive, neutral, or negative way.',
-  Ranking: 'Shows your best explicit rank when an AI response presents an ordered list for this prompt.',
-  Position: 'Shows your average explicit rank across ranked AI responses for this prompt.',
-  'AI SOV': 'Shows your brand mention events divided by brand plus competitor mention events for this prompt.',
+  Ranking: 'Shows your brand’s rank among all brands mentioned in the AI response for that prompt.',
+  Position: 'Shows the exact placement of your brand mention within the AI generated answer.',
+  'AI SOV': 'Shows your brand’s share of visibility for this prompt compared with other mentioned brands.',
   Competitors: 'Lists the competing brands that appear with your brand in the same AI response.',
   Action: 'Track prompt or draft content to improve visibility for that query.',
 };
 
 const TABLE_HEADER_TOOLTIPS_RESOLVED: Record<string, string> = {
   ...TABLE_HEADER_TOOLTIPS,
-  'AI SOV': 'Shows your brand mention events divided by brand plus competitor mention events for this prompt.',
+  'AI SOV': 'Shows your brand’s share of visibility for this prompt compared with other mentioned brands.',
 };
 
 type TableHeaderWithTipProps = {
@@ -3470,7 +3470,7 @@ const citationsChart = useMemo(() => {
     { key: 'chatgpt', label: 'ChatGPT', stroke: '#E9897E', match: 'gpt' },
     { key: 'claude', label: 'Claude', stroke: '#79A7F2', match: 'claude' },
     { key: 'gemini', label: 'Gemini', stroke: '#8DD9E8', match: 'gemini' },
-    { key: 'google', label: 'Google AI Overview', stroke: '#4285F4', match: 'google-gre' },
+    { key: 'google', label: 'AI Overview', stroke: '#4285F4', match: 'google-gre' },
   ] as const;
   // Drop series the user has filtered out via the modelFilter pill (header).
   const visibleSeries = modelFilter.size === 0
@@ -3795,18 +3795,6 @@ useEffect(() => {
 
 return (
   <>
-    <div className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur">
-      <div className="mx-auto flex w-full max-w-[1530px] items-center px-4 py-3 sm:px-6">
-        <AIResultsBreadcrumbs
-          mode="static"
-          prefixLabel="AI Visibility"
-          prefixHref={resolveSidebarNavigation('ai-visibility').path}
-          pageLabel="AI Results"
-          pageHref={maskedDomainId ? resolveAIResultsNavigation('ai-results', maskedDomainId) : undefined}
-          currentLabel={currentReportSectionTitle ?? 'Overview'}
-        />
-      </div>
-    </div>
 
     <section className="flex w-full flex-col bg-white px-4 py-2 sm:px-6">
       {gscQuery.isFetched && !gscConnected && (
@@ -3951,7 +3939,7 @@ return (
                 </div>
                 {(['google-gre', 'gpt-4o-mini', 'claude-sonnet-4-5', 'gemini-2.0-flash'] as const).map((m) => {
                   const label = m === 'google-gre'
-                    ? 'Google AI Overview'
+                    ? 'AI Overview'
                     : m.includes('gpt') ? 'ChatGPT' : m.includes('claude') ? 'Claude' : 'Gemini';
                   const on = modelFilter.has(m);
                   return (
@@ -4227,9 +4215,9 @@ return (
           <CardHeader className="flex flex-col gap-3 px-4 pb-3 pt-4">
             <div className="flex min-w-0 items-start justify-between gap-3">
               <div className="min-w-0">
-                <CardTitleWithTip title="Verified AI Visibility Gaps" />
+                <CardTitleWithTip title="Opportunities to Outrank Competitors" />
                 <p className="mt-2 text-sm leading-[150%] text-[#535862]">
-                  Generated from the latest completed audit's scored responses: lost prompts, citation gaps, rank downgrades, negative sentiment, and brand-vs-competitor misses.
+                  Prioritized recommendations to improve rankings, increase citations, and outperform competitors in AI search.
                 </p>
               </div>
               <button

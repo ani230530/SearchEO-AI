@@ -2,11 +2,12 @@ import { lazy, Suspense } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { ChatWidget } from "@/features/chat/ChatWidget";
+import { queryClient } from "@/lib/queryClient";
 import { resolveSidebarNavigation } from "@/features/sidebar-dashboard/navigation";
 import type { TabId } from "@/features/sidebar-dashboard/types";
 import type { SettingsSubTab } from "@/features/sidebar-dashboard/sections/settings/types";
@@ -14,7 +15,9 @@ import type { SettingsSubTab } from "@/features/sidebar-dashboard/sections/setti
 // Eager — needed for first paint or are tiny / part of the auth funnel.
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
-import LandingPage from "./pages/LandingPage";
+import LandingPage from "./features/landing-page/LandingPage";
+import BlogsPage from "./pages/BlogsPage";
+import BlogPostPage from "./pages/BlogPostPage";
 import AIVisibilityRedirect from "./pages/AIVisibilityRedirect";
 import { AIResultsShell } from "./features/ai-results/AIResultsShell";
 
@@ -27,22 +30,7 @@ const AIResultsCompetitors = lazy(() => import("./pages/AIResultsCompetitors"));
 const PromptsPage = lazy(() => import("./pages/PromptsPage"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const VerifyEmailPending = lazy(() => import("./pages/VerifyEmailPending"));
-
-// Tab-switching inside the AI Checker reuses cached query data for ~5 min
-// instead of refetching on every mount. gcTime=30min keeps results around
-// for back-navigation; refetchOnWindowFocus is disabled so the user doesn't
-// see surprise spinners when alt-tabbing back to the page.
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 5 * 60 * 1000,
-      gcTime: 30 * 60 * 1000,
-      refetchOnWindowFocus: false,
-      refetchOnReconnect: 'always',
-      retry: 1,
-    },
-  },
-});
+const AdminDashboard = lazy(() => import("./pages/AdminDashboard"));
 
 /** Minimal route-level fallback. Renders while a lazy chunk is downloading. */
 const RouteFallback = () => (
@@ -120,6 +108,8 @@ const App = () => (
             <Routes>
               {/* Public routes */}
               <Route path="/" element={<RootRoute />} />
+              <Route path="/blogs" element={<BlogsPage />} />
+              <Route path="/blogs/:slug" element={<BlogPostPage />} />
               {/* Anonymous AI Visibility audit. Same component as the
                   authenticated dashboard wizard — runs against the wizard
                   cookie identity when no JWT is present. Steps 1-4 work
@@ -141,6 +131,11 @@ const App = () => (
               } />
 
               {/* Protected routes */}
+              <Route path="/admin/dashboard" element={
+                <ProtectedRoute>
+                  <AdminDashboard />
+                </ProtectedRoute>
+              } />
               <Route path="/dashboard" element={
                 <ProtectedRoute>
                   <DashboardRoute />

@@ -8,6 +8,7 @@ import { DomainHistorySection } from "@/features/sidebar-dashboard/sections/Doma
 import CompetitorPage from "@/features/sidebar-dashboard/sections/CompetitorPage";
 import { OverviewSection } from "@/features/sidebar-dashboard/sections/OverviewSection";
 import { SettingsSection } from "@/features/sidebar-dashboard/sections/SettingsSection";
+import Support from "@/features/sidebar-dashboard/sections/Support";
 import AIVisibilityDashboard from "@/pages/AIVisibilityDashboard";
 import type { DashboardContentRouterProps } from "@/features/sidebar-dashboard/types";
 // CompetitorPage was deleted in the foundational rewrite — competitor data
@@ -44,6 +45,8 @@ export function DashboardContentRouter({
       return <CompetitorPage {...competitorIntelligence} />;
     case "knowledge-base":
       return <KnowledgeBaseSection />;
+    case "support":
+      return <Support />;
     case "domain-history":
       return <DomainHistorySection onMenuItemClick={onMenuItemClick} />;
     case "settings":

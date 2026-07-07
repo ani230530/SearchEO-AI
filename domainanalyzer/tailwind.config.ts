@@ -69,6 +69,13 @@ export default {
 					'accent-foreground': 'hsl(var(--sidebar-accent-foreground))',
 					border: 'hsl(var(--sidebar-border))',
 					ring: 'hsl(var(--sidebar-ring))'
+				},
+				brand: {
+					dark: '#05070A',      // Background from Figma
+					text: '#FFFFFF',      // Main headline color
+					purple: '#8B5CF6',    // The SearchEO Purple
+					blue: '#3B82F6',      // The SearchEO Blue
+					muted: '#94A3B8',     // Grey text color
 				}
 			},
 			borderRadius: {

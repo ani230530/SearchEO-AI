@@ -1,6 +1,16 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback, ReactNode } from 'react';
 import { isTokenExpired, getTimeUntilExpiration } from '@/services/tokenService';
 import { getWizardSessionToken, tokenManager, apiRequest } from '@/services/apiClient';
+import { queryClient } from '@/lib/queryClient';
+import {
+  ACTIVE_TAB_STORAGE_KEY,
+  AI_VISIBILITY_LAST_DOMAIN_SLUG,
+  DOMAIN_ID_MAPPING_KEY,
+  DRAFT_OVERLAY_HANDOFF_KEY,
+  PENDING_AUTO_AUDIT_RUN_KEY,
+  WORKSHEET_IMPORT_KEY,
+  WORKSHEET_TARGET_KEY,
+} from '@/lib/sessionStorageKeys';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3002';
 
@@ -50,6 +60,7 @@ export interface User {
   name?: string;
   emailVerified?: boolean;
   googleId?: string | null;
+  role?: string;
 }
 
 /**
@@ -74,7 +85,7 @@ export interface AuthContextType {
   register: (email: string, password: string, name?: string) => Promise<RegisterResult>;
   startGoogleAuth: (mode: 'login' | 'signup') => Promise<void>;
   exchangeGoogleCode: (code: string) => Promise<RegisterResult>;
-  logout: () => void;
+  logout: () => Promise<void>;
   updateProfile: (name: string) => Promise<void>;
   changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
   requestPasswordReset: (email: string) => Promise<void>;
@@ -104,6 +115,44 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const refreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const currentUserIdRef = useRef<number | null>(null);
+  const currentUserId = user?.id ?? null;
+
+  useEffect(() => {
+    currentUserIdRef.current = currentUserId;
+  }, [currentUserId]);
+
+  const clearUserScopedStorage = useCallback(() => {
+    const keysToClear = [
+      AI_VISIBILITY_LAST_DOMAIN_SLUG,
+      ACTIVE_TAB_STORAGE_KEY,
+      PENDING_AUTO_AUDIT_RUN_KEY,
+      DOMAIN_ID_MAPPING_KEY,
+      WORKSHEET_IMPORT_KEY,
+      WORKSHEET_TARGET_KEY,
+      DRAFT_OVERLAY_HANDOFF_KEY,
+    ];
+
+    for (const key of keysToClear) {
+      try {
+        sessionStorage.removeItem(key);
+        localStorage.removeItem(key);
+      } catch {
+        // Ignore storage failures in privacy-restricted environments.
+      }
+    }
+  }, []);
+
+  const resetTransientAppState = useCallback(async () => {
+    try {
+      await queryClient.cancelQueries();
+    } catch {
+      // Ignore cancellation errors during logout/login transitions.
+    }
+
+    queryClient.clear();
+    clearUserScopedStorage();
+  }, [clearUserScopedStorage]);
 
   const applyAuthResponse = useCallback((data: AuthResponseBody) => {
     if (!data.user || !data.token) {
@@ -221,7 +270,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       if (timeUntilExpiration && timeUntilExpiration > 0) {
         // Refresh 5 minutes before expiration
         const refreshTime = Math.max(timeUntilExpiration - 5 * 60 * 1000, 60000); // At least 1 minute
-        
+
         refreshIntervalRef.current = setTimeout(async () => {
           try {
             await refreshToken();
@@ -310,7 +359,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const login = async (email: string, password: string) => {
     setError(null);
     setLoading(true);
-    
+
     try {
       const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
         method: 'POST',
@@ -328,6 +377,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       if (!data.user || !data.token) {
         throw new Error('Login failed. Please try again.');
+      }
+
+      if (currentUserIdRef.current != null && currentUserIdRef.current !== data.user.id) {
+        await resetTransientAppState();
       }
 
       setUser(data.user);
@@ -373,6 +426,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }
 
       if (data.token && data.user) {
+        if (currentUserIdRef.current != null && currentUserIdRef.current !== data.user.id) {
+          await resetTransientAppState();
+        }
         setUser(data.user);
         setToken(data.token);
         tokenManager.setTokens(data.token, data.refreshToken);
@@ -438,6 +494,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         throw new Error('Google sign-in failed');
       }
 
+      if (currentUserIdRef.current != null && currentUserIdRef.current !== data.user.id) {
+        await resetTransientAppState();
+      }
+
       setUser(data.user);
       setToken(data.token);
       tokenManager.setTokens(data.token, data.refreshToken);
@@ -455,6 +515,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       const currentToken = tokenManager.getAuthToken();
       const currentRefreshToken = tokenManager.getRefreshToken();
+      await resetTransientAppState();
       if (currentToken) {
         try {
           await fetch(`${API_BASE_URL}/api/auth/logout`, {
@@ -575,4 +636,4 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       {children}
     </AuthContext.Provider>
   );
-}; 
+};

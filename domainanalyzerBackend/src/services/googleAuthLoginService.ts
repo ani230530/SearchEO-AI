@@ -1,4 +1,5 @@
 import { google } from 'googleapis';
+import crypto from 'crypto';
 import { authEnv } from '../config/authEnv';
 
 export const GOOGLE_AUTH_CONFIG_ERROR = 'Google OAuth credentials not configured';
@@ -10,6 +11,12 @@ export interface GoogleAuthProfile {
   name?: string | null;
 }
 
+const GOOGLE_CODE_CACHE_TTL_MS = 2 * 60 * 1000;
+const googleCodeExchangeCache = new Map<
+  string,
+  { expiresAt: number; promise: Promise<GoogleAuthProfile> }
+>();
+
 function createOAuth2Client() {
   return new google.auth.OAuth2(
     authEnv.GOOGLE_CLIENT_ID,
@@ -18,16 +25,11 @@ function createOAuth2Client() {
   );
 }
 
-export function getGoogleAuthLoginUrl(state: string): string {
-  return createOAuth2Client().generateAuthUrl({
-    access_type: 'online',
-    prompt: 'select_account',
-    scope: ['openid', 'email', 'profile'],
-    state,
-  });
+function googleCodeCacheKey(code: string): string {
+  return crypto.createHash('sha256').update(code).digest('hex');
 }
 
-export async function exchangeGoogleAuthCode(code: string): Promise<GoogleAuthProfile> {
+async function exchangeGoogleAuthCodeWithGoogle(code: string): Promise<GoogleAuthProfile> {
   const oauth2Client = createOAuth2Client();
   const { tokens } = await oauth2Client.getToken(code);
 
@@ -54,4 +56,35 @@ export async function exchangeGoogleAuthCode(code: string): Promise<GoogleAuthPr
     emailVerified: userInfo.data.verified_email === true,
     name: userInfo.data.name ?? null,
   };
+}
+
+export function getGoogleAuthLoginUrl(state: string): string {
+  return createOAuth2Client().generateAuthUrl({
+    access_type: 'online',
+    prompt: 'select_account',
+    scope: ['openid', 'email', 'profile'],
+    state,
+  });
+}
+
+export async function exchangeGoogleAuthCode(code: string): Promise<GoogleAuthProfile> {
+  const now = Date.now();
+  const key = googleCodeCacheKey(code);
+  const cached = googleCodeExchangeCache.get(key);
+  if (cached && cached.expiresAt > now) {
+    return cached.promise;
+  }
+  if (cached) {
+    googleCodeExchangeCache.delete(key);
+  }
+
+  const promise = exchangeGoogleAuthCodeWithGoogle(code).catch((error) => {
+    googleCodeExchangeCache.delete(key);
+    throw error;
+  });
+  googleCodeExchangeCache.set(key, {
+    expiresAt: now + GOOGLE_CODE_CACHE_TTL_MS,
+    promise,
+  });
+  return promise;
 }

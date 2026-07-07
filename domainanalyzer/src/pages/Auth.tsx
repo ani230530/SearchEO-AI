@@ -3,10 +3,17 @@ import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import Login from '@/components/auth/Login';
 import { resolveDashboardPath } from '@/features/sidebar-dashboard/navigation';
+import { WizardHeroVisual } from '@/features/wizard-v2/WizardShell';
 
 interface FromLocation {
   from?: { pathname?: string; search?: string; hash?: string };
 }
+
+const AuthSideVisual: React.FC = () => (
+  <div className="flex h-full w-full items-center justify-center overflow-hidden bg-white">
+    <WizardHeroVisual className="w-[128%] max-w-none shrink-0 scale-[1.04]" />
+  </div>
+);
 
 /**
  * /auth - sign-in page for existing users. Signup is still handled by the
@@ -30,6 +37,9 @@ const Auth: React.FC = () => {
   // the older localStorage flag, then the canonical dashboard URL.
   const computeRedirect = useMemo(() => {
     return (): string => {
+      if (user?.role === 'admin') {
+        return '/admin/dashboard';
+      }
       const fromState = (location.state as FromLocation | null)?.from;
       if (fromState?.pathname && fromState.pathname !== '/auth') {
         return `${fromState.pathname}${fromState.search ?? ''}${fromState.hash ?? ''}`;
@@ -41,7 +51,7 @@ const Auth: React.FC = () => {
       }
       return resolveDashboardPath('overview');
     };
-  }, [location.state]);
+  }, [location.state, user]);
 
   useEffect(() => {
     const code = searchParams.get('googleCode');
@@ -103,12 +113,7 @@ const Auth: React.FC = () => {
         <main className="flex min-h-[calc(100vh-4rem)] items-center justify-center">
           <section className="grid w-full max-w-[1000px] overflow-hidden rounded-[14px] bg-white shadow-[0_22px_70px_rgba(17,24,39,0.12)] lg:grid-cols-[1fr_1fr]">
             <div className="hidden min-h-[638px] lg:block">
-              <img
-                src="/auth-side-visual.svg"
-                alt=""
-                aria-hidden="true"
-                className="h-full w-full object-cover"
-              />
+              <AuthSideVisual />
             </div>
 
             <div className="flex min-h-[560px] w-full flex-col px-6 py-9 sm:px-8 lg:min-h-[638px] lg:px-10">
@@ -153,12 +158,7 @@ const Auth: React.FC = () => {
       <main className="flex min-h-[calc(100vh-4rem)] items-center justify-center">
         <section className="grid w-full max-w-[1000px] overflow-hidden rounded-[14px] bg-white shadow-[0_22px_70px_rgba(17,24,39,0.12)] lg:grid-cols-[1fr_1fr]">
           <div className="hidden min-h-[638px] lg:block">
-            <img
-              src="/auth-side-visual.svg"
-              alt=""
-              aria-hidden="true"
-              className="h-full w-full object-cover"
-            />
+            <AuthSideVisual />
           </div>
 
           <div className="flex min-h-[560px] flex-col items-stretch lg:min-h-[638px]">

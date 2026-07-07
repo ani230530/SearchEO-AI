@@ -13,7 +13,7 @@ const DASHBOARD_SECTION_PATHS: Record<TabId, string> = {
   overview: "/dashboard/overview",
   analytics: "/dashboard/company",
   integration: "/dashboard/integration",
-  "domain-history": "/dashboard/domain-history",
+  "domain-history": "/dashboard/ai-visibility",
   projects: "/dashboard/campaigns",
   settings: "/dashboard/settings/profile",
   "ai-visibility": "/dashboard/ai-visibility",
@@ -23,6 +23,7 @@ const DASHBOARD_SECTION_PATHS: Record<TabId, string> = {
   "analytics-report": "/dashboard/performance-reports",
   "competitor-intelligence": "/dashboard/competitor-intelligence",
   "knowledge-base": "/dashboard/knowledge-base",
+  support: "/dashboard/support",
 };
 
 const SETTINGS_SUBTAB_PATHS: Record<SettingsSubTab, string> = {

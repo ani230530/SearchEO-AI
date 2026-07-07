@@ -28,6 +28,7 @@ import { useState, type FormEvent } from 'react';
 import { AlertCircle, ArrowRight, Eye, EyeOff, Loader2, X } from 'lucide-react';
 
 import { useAuth, type RegisterResult } from '@/contexts/AuthContext';
+import { saveGoogleSignupResume } from './googleSignupResume';
 
 interface SignupWallModalProps {
   /** Host being audited — shown in the headline copy so the wall feels
@@ -36,13 +37,16 @@ interface SignupWallModalProps {
   /** Close handler — dismisses the modal without signing up. The wizard
    *  stays on Step 4 with the user's prompt selections intact. */
   onClose: () => void;
+  /** Domain currently being audited. Persisted before Google redirect so
+   *  the wizard can resume after returning from the OAuth round-trip. */
+  resumeDomainId?: number | null;
   /** Fired after successful registration. The wizard advances to Step 5;
    *  the parent passes through wizardLink so a redirect can target the
    *  bound Domain id if needed. */
   onRegistered: (result: RegisterResult) => void;
 }
 
-export function SignupWallModal({ host, onClose, onRegistered }: SignupWallModalProps) {
+export function SignupWallModal({ host, onClose, resumeDomainId, onRegistered }: SignupWallModalProps) {
   const { register, startGoogleAuth, loading } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -87,6 +91,7 @@ export function SignupWallModal({ host, onClose, onRegistered }: SignupWallModal
   const onGoogleSignup = async () => {
     setError(null);
     try {
+      saveGoogleSignupResume(resumeDomainId);
       await startGoogleAuth('signup');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Google sign up failed.');

@@ -5,7 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { resolveDashboardPath } from "@/features/sidebar-dashboard/navigation";
 import type { WizardStep } from "./types";
 
-const DOMAIN_ANALYSIS_VIDEO_URL =
+const DOMAIN_ANALYSIS_FALLBACK_VIDEO_URL =
   import.meta.env.VITE_DOMAIN_ANALYSIS_VIDEO_URL ||
   import.meta.env.VITE_FEATURES_VIDEO_URL ||
   "https://res.cloudinary.com/ta2uztdv/video/upload/v1783195911/Browser_Tool-_6-compressed_1_1_ws3z2v.mp4";
@@ -168,10 +168,10 @@ export function WizardShell({
   );
 }
 
-function WizardHeroVisual() {
+export function WizardHeroVisual({ className = "" }: { className?: string }) {
   return (
     <div
-      className="relative mx-auto aspect-[1.03/1] w-full max-w-[47rem] select-none overflow-visible [container-type:inline-size]"
+      className={`relative mx-auto aspect-[1.03/1] w-full max-w-[47rem] select-none overflow-visible [container-type:inline-size] ${className}`}
       aria-hidden
     >
       <div className="absolute inset-[4%] opacity-70">
@@ -204,14 +204,14 @@ function WizardHeroVisual() {
           loop
           muted
           playsInline
-          preload="metadata"
+          preload="auto"
           poster="/ai-checker.png"
           disablePictureInPicture
           controlsList="nodownload noplaybackrate noremoteplayback"
           style={{ mixBlendMode: "multiply" }}
         >
-          <source src={DOMAIN_ANALYSIS_VIDEO_URL} type="video/mp4" />
           <source src="/features2.mp4" type="video/mp4" />
+          <source src={DOMAIN_ANALYSIS_FALLBACK_VIDEO_URL} type="video/mp4" />
         </video>
       </div>
 

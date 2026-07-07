@@ -1,4 +1,5 @@
-# AI Visibility Project - Phrase Score Insight
+ # AI Visibility Project -  Phrase Score Insight
+
 
 A comprehensive AI-powered web application for analyzing domain visibility, keyword discovery, and competitive intelligence. This project helps businesses understand their online presence, discover relevant keywords, generate optimized phrases, and analyze competitor strategies using advanced AI models.
 
@@ -89,7 +90,7 @@ A comprehensive AI-powered web application for analyzing domain visibility, keyw
    ```
 
 4. **Environment Configuration**
-   
+
    Create `.env` files in both root and backend directories:
 
    **Root `.env`:**

@@ -16,6 +16,7 @@ import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { apiGet } from '@/services/apiClient';
 import { buildDomainSlug, maskDomainId } from '@/lib/domainUtils';
+import { aiResultsKeys } from '@/features/ai-results/queries';
 import { WizardStatusRow } from './WizardShell';
 
 interface Props {
@@ -226,7 +227,20 @@ export function Step5RunQueries({ domainId, onError }: Props) {
             void queryClient.invalidateQueries({ queryKey: ['ai-results'] });
             // Brief pause so the user sees the final tick before navigating.
             setTimeout(() => {
-              void getReadableDomainSlug(domainId).then((slug) => navigate(`/ai-results/${slug}`));
+              void apiGet<{ domains?: Array<{ id: number; url?: string; host?: string }> }>('/wizard/domains')
+                .then((data) => {
+                  queryClient.setQueryData(aiResultsKeys.domains(), data);
+                  const domain = data.domains?.find((item) => item.id === domainId);
+                  const slug = domain ? buildDomainSlug(domain) : maskDomainId(domainId);
+                  localStorage.setItem('ai-visibility:lastDomainSlug', slug);
+                  navigate(`/ai-results/${slug}`);
+                })
+                .catch(() => {
+                  void getReadableDomainSlug(domainId).then((slug) => {
+                    localStorage.setItem('ai-visibility:lastDomainSlug', slug);
+                    navigate(`/ai-results/${slug}`);
+                  });
+                });
             }, 800);
             break;
           case 'error':

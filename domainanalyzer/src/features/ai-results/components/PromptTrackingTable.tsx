@@ -306,7 +306,7 @@ const MODEL_LABELS: Record<string, string> = {
   "gemini-2.0-flash": "Gemini",
   "gemini-1.5-flash": "Gemini",
   "google/gemini-2.0-flash-001": "Gemini",
-  "google-gre": "Google AI Overview",
+  "google-gre": "AI Overview",
 };
 
 const getModelLabel = (model?: string): string => {
@@ -315,7 +315,7 @@ const getModelLabel = (model?: string): string => {
   const lower = model.toLowerCase();
   if (/gpt|openai/.test(lower)) return "ChatGPT";
   if (/claude|anthropic/.test(lower)) return "Claude";
-  if (/google-gre|google.*overview|overview|serpapi/.test(lower)) return "Google AI Overview";
+  if (/google-gre|google.*overview|overview|serpapi/.test(lower)) return "AI Overview";
   if (/gemini/.test(lower)) return "Gemini";
   if (/deep/.test(lower)) return "DeepSeek";
   // last resort: humanise the slug

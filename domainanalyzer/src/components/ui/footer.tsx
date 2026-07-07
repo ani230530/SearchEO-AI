@@ -25,10 +25,80 @@ const links = [
     },
 ]
 
-export default function FooterSection() {
+const blogsLinks = [
+    { title: 'Privacy Policy', href: '#' },
+    { title: 'AI Transparency Policy', href: '#' },
+    { title: 'Pricing', href: '#' },
+    { title: 'Terms & Conditions', href: '#' },
+    { title: 'Blog', href: '#' },
+    { title: 'Contact Us', href: '#' },
+]
+
+type FooterSectionProps = {
+    variant?: 'default' | 'blogs'
+}
+
+export default function FooterSection({ variant = 'default' }: FooterSectionProps) {
+    const innerClassName =
+        variant === 'blogs'
+            ? 'blogs-page__footer-shell'
+            : 'mx-auto max-w-5xl px-6'
+    const footerClassName =
+        variant === 'blogs' ? 'py-8 bg-[#2D4059]' : 'bg-muted py-16'
+
+    if (variant === 'blogs') {
+        return (
+            <footer className={footerClassName}>
+                <div className={innerClassName}>
+                    <div className="blogs-footer-info">
+                        <div className="blogs-footer-info__copy">
+                            <h2 className="blogs-footer-info__title">Information</h2>
+                            <div className="blogs-footer-info__links" aria-label="Footer information links">
+                                {blogsLinks.map((link) => (
+                                    <a
+                                        key={link.title}
+                                        href={link.href}
+                                        className="blogs-footer-info__link"
+                                    >
+                                        {link.title}
+                                    </a>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="blogs-footer-info__actions">
+                            <a href="/audit" className="blogs-footer-info__button">
+                                Book Demo
+                            </a>
+
+                            <div className="blogs-footer-info__contact">
+                                <p className="blogs-footer-info__contact-line">
+                                    <span className="blogs-footer-info__contact-label">Call us:</span>{' '}
+                                    <span>+1(999) 999-99-99</span>
+                                </p>
+                                <p className="blogs-footer-info__contact-line">
+                                    <span className="blogs-footer-info__contact-label">Email Us:</span>{' '}
+                                    <span>info@searcheo.ai</span>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="blogs-footer-divider" aria-hidden="true" />
+
+                    <div className="blogs-footer-copyright">
+                        <p className="blogs-footer-copyright__text">
+                            Copyright 2026. All Rights Reserved. SeachEO AI
+                        </p>
+                    </div>
+                </div>
+            </footer>
+        )
+    }
+
     return (
-        <footer className="bg-muted py-16">
-            <div className="mx-auto max-w-5xl px-6">
+        <footer className={footerClassName}>
+            <div className={innerClassName}>
                 <a
                     href="/dashboard"
                     aria-label="go home"

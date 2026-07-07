@@ -17,7 +17,8 @@ export type TabId =
   | "audit"
   | "analytics-report"
   | "competitor-intelligence"
-  | "knowledge-base";
+  | "knowledge-base"
+  | "support";
 
 export type CompanySubTabId = "company-info" | "integration";
 

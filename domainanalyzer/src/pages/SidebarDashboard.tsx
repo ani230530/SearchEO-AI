@@ -106,6 +106,7 @@ import { useCompetitorAnalysis } from "@/features/ai-results/queries";
 
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3002";
+const GSC_RETURN_TO_INTEGRATION_KEY = "dashboard:gsc:returnToIntegration";
 
 const formatDashboardCount = (value: number | null | undefined) => {
   if (typeof value !== "number" || Number.isNaN(value)) {
@@ -157,7 +158,9 @@ useEffect(() => {
 }, [activeTab]);
 
   const [activeCompanySubTab, setActiveCompanySubTab] =
-    useState<CompanySubTabId>(searchState.activeCompanySubTab ?? "company-info");
+    useState<CompanySubTabId>(
+      searchState.activeCompanySubTab ?? (searchState.activeTab === "integration" ? "integration" : "company-info")
+    );
   const [activeGscSubTab, setActiveGscSubTab] = useState<GscSubTabId>("whole-analytics");
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [companyDomain, setCompanyDomain] = useState("");
@@ -364,12 +367,12 @@ const toggleSection = (idx: number) => {
   const companyCarouselRef = useRef<HTMLDivElement | null>(null);
   const [companyCurrentIndex, setCompanyCurrentIndex] = useState(0);
   const [companySectionsCount, setCompanySectionsCount] = useState(0);
-  
+
   const extractOrgName = (context: string) => {
     if (!context) return "";
     const lines = context.split('\n');
     for (const line of lines) {
-      const match = line.match(/(?:Organization|Company|Brand)\s*:\s*([^\n]+)/i) || 
+      const match = line.match(/(?:Organization|Company|Brand)\s*:\s*([^\n]+)/i) ||
                     line.match(/###\s*(?:Brand Analysis for|Company Profile:)\s*([^\n]+)/i);
       if (match && match[1]) {
         return match[1].trim().replace(/\*+/g, '');
@@ -377,7 +380,7 @@ const toggleSection = (idx: number) => {
     }
     return "";
   };
-  
+
   const companyCarouselCleanupRef = useRef<(() => void) | null>(null);
   const setCompanyCarouselRef = useCallback((el: HTMLDivElement | null) => {
     if (companyCarouselCleanupRef.current) {
@@ -614,7 +617,7 @@ const handleAnalyze = async () => {
     );
 
     const pageData = await pageRes.json();
-    setImprovedContent(pageData.html); 
+    setImprovedContent(pageData.html);
 
   } catch (err) {
     console.error(err);
@@ -742,7 +745,7 @@ const overallScore =
 
 //Handle Run Audit
 const handleRunAudit = async (url?: string) => {
-  const token = localStorage.getItem("authToken");   
+  const token = localStorage.getItem("authToken");
 
   if (!url || !token) {
     console.error("Missing URL or token");
@@ -885,7 +888,7 @@ const handleSendToN8n = async () => {
         title: 'Processing',
         description: 'N8n is processing your request',
       });
-      
+
       // Connect to SSE for real-time updates
       connectSSE(token, data.requestId);
     }
@@ -914,7 +917,7 @@ const connectSSE = (token: string, requestId: string) => {
       const data = JSON.parse(event.data);
       if (data.type === 'n8n_update' && data.data?.requestId === requestId) {
         setN8nStatus(data.data.status);
-        
+
         if (data.data.status === 'completed') {
           setN8nResults({
             sheetsUrl: data.data.googleSheetsUrl,
@@ -1029,7 +1032,8 @@ useEffect(() => {
       setActiveTab(nextTab);
     }
 
-    const nextCompanySubTab = searchState.activeCompanySubTab ?? "company-info";
+    const nextCompanySubTab =
+      searchState.activeCompanySubTab ?? (nextTab === "integration" ? "integration" : "company-info");
     if (nextCompanySubTab !== activeCompanySubTab) {
       setActiveCompanySubTab(nextCompanySubTab);
     }
@@ -1091,7 +1095,7 @@ useEffect(() => {
     return () => clearInterval(interval);
   }, [loadingSteps]);
 
-  /* 
+  /*
     Updated fetchCompanyDomain to be more robust:
     1. It doesn't clear keywords on error, preserving previous state if a transient error occurs.
     2. It only runs when necessary.
@@ -1102,7 +1106,7 @@ useEffect(() => {
     if (awaitingNewDomain && !force) {
       return;
     }
-    
+
     try {
       setCompanyDomainLoading(true);
       setCompanyDomainFetchError(null);
@@ -1138,13 +1142,13 @@ useEffect(() => {
         // Company domain exists - show results
         setCompanyDomain(data.domain.url);
         setDomainContext(data.domain.context || "");
-        
+
         // IMPORTANT: Only update keywords if we received them, or if the list is explicitly empty but valid.
         // This prevents overwriting with empty array if backend has an issue returning keywords but returns domain.
         if (data.keywords) {
              setKeywords(data.keywords);
         }
-        
+
         setCreatedDomainId(data.domain.id);
         setGoogleAnalyticsId(data.domain.googleAnalyticsId || "");
         setShowResults(true);
@@ -1171,7 +1175,7 @@ useEffect(() => {
   // Fetch all campaign tab data in parallel when campaign tab is active
   const fetchCampaignTabData = useCallback(async () => {
     if (activeTab !== 'projects') return;
-    
+
     setCampaignTabDataLoading(true);
     try {
       // Fetch all required data in parallel
@@ -1244,7 +1248,7 @@ useEffect(() => {
       if (shouldFetch) {
           fetchCompanyDomain();
       }
-  }, [activeTab, fetchCompanyDomain]); 
+  }, [activeTab, fetchCompanyDomain]);
 
   // Fetch audit when audit tab is active
   useEffect(() => {
@@ -1707,7 +1711,7 @@ useEffect(() => {
       }
 
       const data = await response.json();
-      
+
       if (data.success) {
         setGscProperties(data.properties || []);
       }
@@ -1744,7 +1748,7 @@ useEffect(() => {
         setGscEmail(data.email || '');
         setGscSelectedProperty(data.selectedProperty || '');
         setGscLastSynced(data.lastSyncedAt ? new Date(data.lastSyncedAt) : null);
-        
+
         fetchGscProperties();
       } else {
         setGscConnected(false);
@@ -1765,7 +1769,17 @@ useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const success = urlParams.get('success');
     const error = urlParams.get('error');
-      
+    const shouldReturnToIntegration = sessionStorage.getItem(GSC_RETURN_TO_INTEGRATION_KEY) === "true";
+
+    if (shouldReturnToIntegration) {
+      sessionStorage.removeItem(GSC_RETURN_TO_INTEGRATION_KEY);
+      if (location.pathname !== resolveDashboardPath("integration")) {
+        navigate(resolveDashboardPath("integration"), { replace: true });
+      }
+      setActiveTab("integration");
+      setActiveCompanySubTab("integration");
+    }
+
     if (activeTab === 'integration' || (activeTab === 'analytics' && activeCompanySubTab === 'integration')) {
       if (success === 'true') {
       toast({
@@ -1789,10 +1803,11 @@ useEffect(() => {
         window.history.replaceState({}, '', newUrl.toString());
     }
     }
-  }, [activeTab, activeCompanySubTab, toast, fetchGscStatus]);
+  }, [activeTab, activeCompanySubTab, location.pathname, navigate, toast, fetchGscStatus]);
 
   const handleConnectGsc = async () => {
     try {
+      sessionStorage.setItem(GSC_RETURN_TO_INTEGRATION_KEY, "true");
       const response = await fetch(
         `${import.meta.env.VITE_API_URL}/api/gsc/auth/initiate`,
         {
@@ -2038,7 +2053,7 @@ useEffect(() => {
   useEffect(() => {
       fetchGscStatus();
       fetchWordpressIntegration();
-    
+
     // Also refresh campaign tab data if we're on campaign tab and WordPress integration might have changed
     if (activeTab === 'projects' && activeCompanySubTab === 'integration') {
       fetchCampaignTabData();
@@ -2822,7 +2837,7 @@ useEffect(() => {
     },
     gscAnalytics: {
       activeGscSubTab,
-      onConnectGsc: () => setActiveTab("integration"),
+      onConnectGsc: handleConnectGsc,
     },
     settings: {
       confirmUpdateOpen,

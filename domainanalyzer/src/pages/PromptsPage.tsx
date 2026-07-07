@@ -7,6 +7,7 @@ import {
   Calendar,
   Check,
   ChevronDown,
+  ChevronLeft,
   ChevronRight,
   FileText,
   Filter,
@@ -127,7 +128,7 @@ const PROMPT_TABS: Array<{ id: PromptsTabId; label: string }> = [
 const METRIC_CARDS: MetricCardConfig[] = [
   {
     label: "New Prompt Opportunities",
-    tooltip: "How many new prompts were added to the current list.",
+    tooltip: "Shows newly discovered prompts your brand can target for stronger AI visibility.",
     subtitle: "New Prompts added",
     value: "0",
     trend: "",
@@ -137,7 +138,7 @@ const METRIC_CARDS: MetricCardConfig[] = [
   },
   {
     label: "Tracked Prompts",
-    tooltip: "How many prompts are currently being monitored.",
+    tooltip: "Displays prompts currently monitored for ranking, citations, and visibility changes.",
     subtitle: "Prompts tracked",
     value: "0",
     trend: "",
@@ -147,7 +148,7 @@ const METRIC_CARDS: MetricCardConfig[] = [
   },
   {
     label: "Competitive Visibility Gaps",
-    tooltip: "Prompts where coverage is weaker than expected this week.",
+    tooltip: "Highlights percentage where competitors appear more often than your brand in AI Search.",
     subtitle: "This week",
     value: "0",
     trend: "",
@@ -222,7 +223,7 @@ const TAB_CONFIGS: Record<PromptsTabId, PromptTabConfig> = {
     kpis: [
       {
         label: "Content Gaps Found",
-        tooltip: "How many content opportunities are missing coverage.",
+        tooltip: "Shows missing content areas where your brand can improve AI visibility.",
         subtitle: "Missing content opportunities",
         value: "0",
         trend: "",
@@ -304,7 +305,7 @@ function prettyModel(model: string): string {
   if (/gpt|openai|chatgpt/.test(lower)) return "ChatGPT";
   if (/claude|anthropic/.test(lower)) return "Claude";
   if (/gemini/.test(lower)) return "Gemini";
-  if (/google-gre|overview|serpapi/.test(lower)) return "Google AI Overview";
+  if (/google-gre|overview|serpapi/.test(lower)) return "AI Overview";
   if (/deep/.test(lower)) return "Deep Seek";
   return model.replace(/[-_/]/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
 }
@@ -623,37 +624,142 @@ function PromptTrackingKpiPanel({ loading, rows }: { loading: boolean; rows: Pro
 }
 
 type TrackedHistoryCell = {
-  label: string;
+  column: TrackedHistoryColumn;
   tracked: boolean;
   delta: number | null;
   startedAt: string | null;
   visibility: number | null;
 };
 
-const TRACKED_HISTORY_COLUMNS = ["Week 1", "Week 2", "Week 3", "Week 4"];
+type TrackedHistoryColumn = {
+  key: string;
+  label: string;
+  title: string;
+};
 
-function formatTrackedPointDate(value?: string | null): string {
+const TRACKED_HISTORY_COLUMN_COUNT = 4;
+type TrackedHistoryPoint = NonNullable<PromptTableRow["weekTrend"]>["points"][number];
+
+function formatTrackedPointDateTime(value?: string | null): string {
   if (!value) return "Not tracked";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "Not tracked";
-  return date.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+  return date.toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 }
 
-function getTrackedHistoryCells(row: PromptTableRow, windowDays: number): TrackedHistoryCell[] {
-  const cutoff = Date.now() - windowDays * 24 * 60 * 60 * 1000;
-  const points = [...(row.weekTrend?.points ?? [])]
-    .filter((point) => {
-      const time = new Date(point.startedAt).getTime();
-      return Number.isFinite(time) && time >= cutoff;
-    })
-    .sort((a, b) => new Date(a.startedAt).getTime() - new Date(b.startedAt).getTime())
-    .slice(-TRACKED_HISTORY_COLUMNS.length);
+function getHistoryColumnKey(value: string | Date): string | null {
+  const date = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+}
 
-  return TRACKED_HISTORY_COLUMNS.map((label, index) => {
-    const point = points[index] ?? null;
+function getHistoryPointColumnKey(point: TrackedHistoryPoint, schedule: TrackedPromptSchedule | undefined): string | null {
+  if (schedule?.cadence === "daily" || schedule?.cadence === "weekly") {
+    return getHistoryColumnKey(point.startedAt);
+  }
+  if (Number.isFinite(point.runId)) return `run-${point.runId}`;
+  return getHistoryColumnKey(point.startedAt);
+}
+
+function getScheduleFallbackColumnLabel(schedule: TrackedPromptSchedule | undefined, index: number): string {
+  if (schedule?.cadence === "weekly") return `Week ${index + 1}`;
+  if (schedule?.cadence === "daily") return `Day ${index + 1}`;
+  return `Run ${index + 1}`;
+}
+
+function getSchedulePointColumnLabel(schedule: TrackedPromptSchedule | undefined, value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Run";
+  if (schedule?.cadence === "weekly") {
+    return `Week of ${date.toLocaleDateString(undefined, { month: "short", day: "numeric" })}`;
+  }
+  if (schedule?.cadence === "daily") {
+    return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  }
+  return `${date.toLocaleDateString(undefined, { month: "short", day: "numeric" })}, ${date.toLocaleTimeString(undefined, {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  })}`;
+}
+
+function buildTrackedHistoryColumns(
+  rows: PromptTableRow[],
+  windowDays: number,
+  schedule: TrackedPromptSchedule | undefined,
+): TrackedHistoryColumn[] {
+  const cutoff = Date.now() - windowDays * 24 * 60 * 60 * 1000;
+  const pointByKey = new Map<string, { key: string; sortTime: number; startedAt: string }>();
+  for (const row of rows) {
+    for (const point of row.weekTrend?.points ?? []) {
+      const key = getHistoryPointColumnKey(point, schedule);
+      if (!key) continue;
+      const time = new Date(point.startedAt).getTime();
+      if (!Number.isFinite(time) || time < cutoff) continue;
+      const existing = pointByKey.get(key);
+      if (!existing || time < existing.sortTime) {
+        pointByKey.set(key, { key, sortTime: time, startedAt: String(point.startedAt) });
+      }
+    }
+  }
+
+  const baseColumns = Array.from(pointByKey.values())
+    .sort((a, b) => a.sortTime - b.sortTime)
+    .slice(-TRACKED_HISTORY_COLUMN_COUNT)
+    .map((point) => ({
+      key: point.key,
+      label: getSchedulePointColumnLabel(schedule, point.startedAt),
+      title: formatTrackedPointDateTime(point.startedAt),
+    }));
+  const labelCounts = baseColumns.reduce((map, column) => {
+    map.set(column.label, (map.get(column.label) ?? 0) + 1);
+    return map;
+  }, new Map<string, number>());
+  const seenLabels = new Map<string, number>();
+  const columns = baseColumns.map((column) => {
+    if ((labelCounts.get(column.label) ?? 0) <= 1) return column;
+    const index = (seenLabels.get(column.label) ?? 0) + 1;
+    seenLabels.set(column.label, index);
+    return {
+      ...column,
+      label: `${column.label} #${index}`,
+    };
+  });
+
+  while (columns.length < TRACKED_HISTORY_COLUMN_COUNT) {
+    const index = columns.length;
+    columns.push({
+      key: `placeholder-${index}`,
+      label: getScheduleFallbackColumnLabel(schedule, index),
+      title: "No run in this slot yet",
+    });
+  }
+
+  return columns;
+}
+
+function getTrackedHistoryCells(
+  row: PromptTableRow,
+  columns: TrackedHistoryColumn[],
+  schedule: TrackedPromptSchedule | undefined,
+): TrackedHistoryCell[] {
+  const points = [...(row.weekTrend?.points ?? [])]
+    .map((point) => ({ ...point, key: getHistoryPointColumnKey(point, schedule) }))
+    .filter((point): point is typeof point & { key: string } => Boolean(point.key))
+    .sort((a, b) => new Date(a.startedAt).getTime() - new Date(b.startedAt).getTime());
+  const pointByKey = points.reduce((map, point) => {
+    const existing = map.get(point.key);
+    if (!existing || new Date(point.startedAt).getTime() > new Date(existing.startedAt).getTime()) {
+      map.set(point.key, point);
+    }
+    return map;
+  }, new Map<string, (typeof points)[number]>());
+
+  return columns.map((column) => {
+    const point = pointByKey.get(column.key) ?? null;
+    const index = point ? points.findIndex((candidate) => candidate.key === point.key) : -1;
     const previous = index > 0 ? points[index - 1] ?? null : null;
     return {
-      label,
+      column,
       tracked: Boolean(point),
       delta: point && previous ? point.visibility - previous.visibility : null,
       startedAt: point ? String(point.startedAt) : null,
@@ -710,10 +816,12 @@ function getTrackedModel(row: PromptTableRow): { label: string; iconSrc: string 
 function TrackedPromptsDailyTable({
   domainId,
   rows,
+  schedule,
   onDraftBlog,
 }: {
   domainId: number | null;
   rows: PromptTableRow[];
+  schedule?: TrackedPromptSchedule;
   onDraftBlog: (rowId: string) => void;
 }) {
   const queryClient = useQueryClient();
@@ -724,18 +832,22 @@ function TrackedPromptsDailyTable({
   const [currentPage, setCurrentPage] = useState(1);
   const [trackOverrides, setTrackOverrides] = useState<Record<string, boolean>>({});
   const [trackPending, setTrackPending] = useState<Record<string, boolean>>({});
+  const tableScrollRef = useRef<HTMLDivElement | null>(null);
 
   // ── Figma filter bar state ────────────────────────────────────────────────
   // query doubles as search (live-filters the visible rows) and as the text for
-  // "Monitor new Prompt". windowDays drives how many daily columns render.
+  // "Monitor new Prompt". windowDays limits how far back schedule-based columns look.
   const [query, setQuery] = useState("");
   const [modelFilter, setModelFilter] = useState<string | null>(null);
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
   const [windowDays, setWindowDays] = useState(TRACKED_WINDOW_OPTIONS[0].days);
   const [monitoring, setMonitoring] = useState(false);
-
-  const historyColumns = TRACKED_HISTORY_COLUMNS;
-  const colSpan = historyColumns.length + 5; // checkbox + prompt + 4 history slots + model + status + actions
+  const autoTestScheduleText =
+    schedule?.key === "custom"
+      ? "the custom schedule"
+      : schedule?.label
+        ? schedule.label.toLowerCase()
+        : "the selected schedule";
 
   // Filter options derived from the real rows (models actually run, categories present).
   const modelOptions = useMemo(() => {
@@ -773,6 +885,12 @@ function TrackedPromptsDailyTable({
       return true;
     });
   }, [rows, query, categoryFilter, modelFilter]);
+
+  const historyColumns = useMemo(
+    () => buildTrackedHistoryColumns(filteredRows, windowDays, schedule),
+    [filteredRows, windowDays, schedule?.cadence, schedule?.cron, schedule?.key],
+  );
+  const colSpan = historyColumns.length + 5; // checkbox + prompt + history slots + model + status + actions
 
   const totalCount = filteredRows.length;
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
@@ -814,7 +932,7 @@ function TrackedPromptsDailyTable({
       queryClient.invalidateQueries({ queryKey: ["ai-results", "report", domainId] });
       toast({
         title: "Prompt added to monitoring",
-        description: "It's now tracked and re-tested automatically every day.",
+        description: `It's now tracked and re-tested on ${autoTestScheduleText}.`,
       });
     } catch (err) {
       toast({
@@ -846,6 +964,16 @@ function TrackedPromptsDailyTable({
     });
   };
 
+  const scrollTrackedTable = (direction: "left" | "right") => {
+    const scroller = tableScrollRef.current;
+    if (!scroller) return;
+    const distance = Math.max(320, scroller.clientWidth * 0.7);
+    scroller.scrollBy({
+      left: direction === "left" ? -distance : distance,
+      behavior: "smooth",
+    });
+  };
+
   const isRowTracked = (row: PromptTableRow) => trackOverrides[row.id] ?? row.isTracked ?? true;
 
   const toggleTracking = async (row: PromptTableRow, next: boolean) => {
@@ -860,10 +988,10 @@ function TrackedPromptsDailyTable({
       queryClient.invalidateQueries({ queryKey: aiResultsKeys.trackedPrompts(domainId) });
       queryClient.invalidateQueries({ queryKey: ["ai-results", "report", domainId] });
       toast({
-        title: next ? "Tracking daily" : "Tracking stopped",
+        title: next ? "Tracking enabled" : "Tracking stopped",
         description: next
-          ? "This prompt is re-tested automatically every day."
-          : "Removed from daily tests.",
+          ? `This prompt is re-tested on ${autoTestScheduleText}.`
+          : "Removed from automatic tests.",
       });
     } catch (err) {
       setTrackOverrides((prev) => {
@@ -886,7 +1014,7 @@ function TrackedPromptsDailyTable({
   };
 
   return (
-    <Card className="border-none bg-transparent shadow-none">
+    <Card className="w-full min-w-0 border-none bg-transparent shadow-none">
       <div className="mb-4 flex flex-col gap-1.5">
         <h2 className="text-[20px] font-bold text-[#334155]">Prompt Monitor</h2>
         <p className="text-[14px] text-[#64748b]">
@@ -894,7 +1022,7 @@ function TrackedPromptsDailyTable({
         </p>
       </div>
 
-      <CardContent className="rounded-2xl border border-slate-200 bg-white px-0 pb-3 shadow-sm">
+      <CardContent className="w-full min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white px-0 pb-3 shadow-sm">
         <div className="flex flex-col gap-3 border-b border-slate-200 px-6 py-4 lg:flex-row lg:items-center lg:justify-between">
           {/* Search doubles as "add a prompt to monitor" (matches the Figma). */}
           <div className="flex w-full items-center gap-2 lg:max-w-[520px]">
@@ -1039,7 +1167,33 @@ function TrackedPromptsDailyTable({
             ) : null}
           </div>
         </div>
-        <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-gray-200">
+        <div className="flex justify-end border-b border-slate-100 px-6 py-2">
+          <div className="inline-flex overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+            <button
+              type="button"
+              aria-label="Scroll table left"
+              title="Scroll table left"
+              onClick={() => scrollTrackedTable("left")}
+              className="inline-flex h-8 w-8 items-center justify-center text-slate-500 transition hover:bg-slate-50 hover:text-slate-700"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              aria-label="Scroll table right"
+              title="Scroll table right"
+              onClick={() => scrollTrackedTable("right")}
+              className="inline-flex h-8 w-8 items-center justify-center border-l border-slate-200 text-slate-500 transition hover:bg-slate-50 hover:text-slate-700"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+        <div
+          ref={tableScrollRef}
+          className="max-w-full overflow-x-auto overscroll-x-contain scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-slate-100"
+        >
+          <div className="min-w-[1240px]">
           <Table>
             <TableHeader>
               <TableRow className="border-b-0 bg-[#f1f1f1] hover:bg-[#f1f1f1]">
@@ -1064,10 +1218,11 @@ function TrackedPromptsDailyTable({
                     Prompts <Info className="h-[10px] w-[10px] text-slate-400" />
                   </div>
                 </TableHead>
-                {historyColumns.map((label) => (
-                  <TableHead key={label} className="px-2 text-[11px] font-semibold text-[#31415f]">
+                {historyColumns.map((column) => (
+                  <TableHead key={column.key} className="min-w-[118px] px-2 text-[11px] font-semibold text-[#31415f]">
                     <div className="flex items-center gap-1">
-                      {label} <Info className="h-[10px] w-[10px] text-slate-400" />
+                      <span className="whitespace-nowrap" title={column.title}>{column.label}</span>
+                      <Info className="h-[10px] w-[10px] text-slate-400" />
                     </div>
                   </TableHead>
                 ))}
@@ -1097,7 +1252,7 @@ function TrackedPromptsDailyTable({
                 </TableRow>
               ) : null}
               {visibleRows.map((row) => {
-                const historyCells = getTrackedHistoryCells(row, windowDays);
+                const historyCells = getTrackedHistoryCells(row, historyColumns, schedule);
                 const runStatus = getTrackedRunStatus(row);
                 const model = getTrackedModel(row);
                 const expanded = expandedIds.has(row.id);
@@ -1141,7 +1296,7 @@ function TrackedPromptsDailyTable({
                         return (
                           <TableCell key={`${row.id}-day-${index}`} className="px-2 py-3">
                             {cell.tracked ? (
-                              <div className="inline-flex items-center gap-2" title={formatTrackedPointDate(cell.startedAt)}>
+                              <div className="inline-flex items-center gap-2" title={formatTrackedPointDateTime(cell.startedAt)}>
                                 <span className="text-[12px] font-semibold text-[#30343b]">
                                   {Math.round(cell.visibility ?? 0)}%
                                 </span>
@@ -1158,7 +1313,7 @@ function TrackedPromptsDailyTable({
                                 </span>
                               </div>
                             ) : (
-                              <span className="text-[11px] font-medium text-slate-400" title={cell.label}>
+                              <span className="text-[11px] font-medium text-slate-400" title={cell.column.title}>
                                 Not Tracked
                               </span>
                             )}
@@ -1238,6 +1393,7 @@ function TrackedPromptsDailyTable({
               })}
             </TableBody>
           </Table>
+          </div>
         </div>
         <div className="mt-2 flex flex-col gap-3 border-t border-slate-200 px-6 py-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
@@ -1304,8 +1460,156 @@ type PromptReportData = {
 };
 
 type TrackedPromptsData = {
+  cadence?: string;
+  nextTestAt?: string | null;
   prompts?: PromptTableRow[];
+  schedule?: TrackedPromptSchedule | null;
+  scheduleOptions?: TrackedPromptScheduleOption[];
 };
+
+type TrackedPromptScheduleOption = {
+  cadence: string;
+  cron: string;
+  key: string;
+  label: string;
+};
+
+type TrackedPromptSchedule = TrackedPromptScheduleOption & {
+  nextTestAt?: string | null;
+};
+
+type TrackedPromptScheduleResponse = {
+  cadence: string;
+  nextTestAt: string | null;
+  schedule: TrackedPromptSchedule;
+  scheduleOptions: TrackedPromptScheduleOption[];
+};
+
+type TrackedPromptScheduleChange = {
+  cron?: string;
+  scheduleKey: string;
+};
+
+type CustomScheduleMode = "hours" | "daily" | "weekly" | "advanced";
+
+const FALLBACK_TRACKED_PROMPT_SCHEDULE_OPTIONS: TrackedPromptScheduleOption[] = [
+  { key: "every_6_hours", label: "Every 6 hours", cadence: "every_6_hours", cron: "0 */6 * * *" },
+  { key: "every_12_hours", label: "Every 12 hours", cadence: "every_12_hours", cron: "0 */12 * * *" },
+  { key: "daily_0300_utc", label: "Daily at 03:00 UTC", cadence: "daily", cron: "0 3 * * *" },
+  { key: "weekly_monday_0300_utc", label: "Weekly on Monday at 03:00 UTC", cadence: "weekly", cron: "0 3 * * 1" },
+];
+
+const CUSTOM_TRACKED_PROMPT_SCHEDULE_OPTION: TrackedPromptScheduleOption = {
+  key: "custom",
+  label: "Custom timing",
+  cadence: "custom",
+  cron: "Set your own timing",
+};
+
+const CUSTOM_SCHEDULE_MODES: Array<{ id: CustomScheduleMode; label: string }> = [
+  { id: "hours", label: "Every few hours" },
+  { id: "daily", label: "Daily" },
+  { id: "weekly", label: "Weekly" },
+  { id: "advanced", label: "Advanced" },
+];
+
+const WEEKDAY_OPTIONS = [
+  { label: "Monday", value: "1" },
+  { label: "Tuesday", value: "2" },
+  { label: "Wednesday", value: "3" },
+  { label: "Thursday", value: "4" },
+  { label: "Friday", value: "5" },
+  { label: "Saturday", value: "6" },
+  { label: "Sunday", value: "0" },
+];
+
+function parseTimeValue(value: string): { hour: number; minute: number } | null {
+  const match = /^(\d{2}):(\d{2})$/.exec(value);
+  if (!match) return null;
+  const hour = Number(match[1]);
+  const minute = Number(match[2]);
+  if (!Number.isInteger(hour) || !Number.isInteger(minute) || hour < 0 || hour > 23 || minute < 0 || minute > 59) {
+    return null;
+  }
+  return { hour, minute };
+}
+
+function buildCustomTimingCron({
+  advancedCron,
+  everyHours,
+  mode,
+  time,
+  weekday,
+}: {
+  advancedCron: string;
+  everyHours: string;
+  mode: CustomScheduleMode;
+  time: string;
+  weekday: string;
+}): string | null {
+  if (mode === "hours") {
+    const hours = Number(everyHours);
+    if (!Number.isInteger(hours) || hours < 1 || hours > 23) return null;
+    return `0 */${hours} * * *`;
+  }
+
+  if (mode === "advanced") {
+    const normalized = advancedCron.trim().replace(/\s+/g, " ");
+    return normalized.split(" ").length === 5 ? normalized : null;
+  }
+
+  const parsedTime = parseTimeValue(time);
+  if (!parsedTime) return null;
+  if (mode === "daily") return `${parsedTime.minute} ${parsedTime.hour} * * *`;
+
+  const day = Number(weekday);
+  if (!Number.isInteger(day) || day < 0 || day > 6) return null;
+  return `${parsedTime.minute} ${parsedTime.hour} * * ${day}`;
+}
+
+function getTrackedPromptSchedule(data: TrackedPromptsData | undefined): TrackedPromptSchedule {
+  return (
+    data?.schedule ?? {
+      ...FALLBACK_TRACKED_PROMPT_SCHEDULE_OPTIONS[2],
+      nextTestAt: data?.nextTestAt ?? null,
+    }
+  );
+}
+
+function getTrackedPromptScheduleOptions(data: TrackedPromptsData | undefined): TrackedPromptScheduleOption[] {
+  const options = Array.isArray(data?.scheduleOptions) && data.scheduleOptions.length > 0
+    ? data.scheduleOptions
+    : FALLBACK_TRACKED_PROMPT_SCHEDULE_OPTIONS;
+  return options.some((option) => option.key === "custom")
+    ? options
+    : [...options, CUSTOM_TRACKED_PROMPT_SCHEDULE_OPTION];
+}
+
+function getTrackedPromptScheduleLabel(schedule?: TrackedPromptSchedule): string {
+  if (!schedule) return "Auto-test timing";
+  if (schedule.key === "custom") return "Custom timing";
+  return schedule.label;
+}
+
+function getScheduleOptionHint(option: TrackedPromptScheduleOption): string {
+  if (option.key === "every_6_hours") return "Runs 4 times per day";
+  if (option.key === "every_12_hours") return "Runs 2 times per day";
+  if (option.key === "daily_0300_utc") return "Runs once per day";
+  if (option.key === "weekly_monday_0300_utc") return "Runs once per week";
+  return "Set hours, days, or weeks";
+}
+
+function formatNextTrackedRun(value?: string | null): string {
+  if (!value) return "Next run pending";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Next run pending";
+  return `Next run ${date.toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  })}`;
+}
 
 type WorksheetPromptRow = PromptTableRow & {
   keyword?: string | null;
@@ -1396,8 +1700,12 @@ function PromptsTabBody({
   rows,
   onRetry,
   onTestNow,
+  onScheduleChange,
   onDraftBlog,
   testingNow,
+  schedule,
+  scheduleOptions,
+  scheduleUpdating,
   kpiOverride,
 }: {
   tabId: PromptsTabId;
@@ -1407,8 +1715,12 @@ function PromptsTabBody({
   rows: PromptTableRow[];
   onRetry: () => void;
   onTestNow?: () => void;
+  onScheduleChange?: (change: TrackedPromptScheduleChange) => void;
   onDraftBlog?: (rowId: string) => void;
   testingNow?: boolean;
+  schedule?: TrackedPromptSchedule;
+  scheduleOptions?: TrackedPromptScheduleOption[];
+  scheduleUpdating?: boolean;
   // Real, data-derived KPI cards for the "cards" tabs. When provided, these
   // replace the static template cards in TAB_CONFIGS (see PromptsPage).
   kpiOverride?: MetricCardConfig[];
@@ -1416,9 +1728,33 @@ function PromptsTabBody({
   const tabConfig = TAB_CONFIGS[tabId];
   const isTracking = tabId === "prompt-tracking";
   const kpis = kpiOverride ?? (tabConfig.kind === "cards" ? tabConfig.kpis : []);
+  const [customCronOpen, setCustomCronOpen] = useState(false);
+  const [customMode, setCustomMode] = useState<CustomScheduleMode>("daily");
+  const [customEveryHours, setCustomEveryHours] = useState("6");
+  const [customTime, setCustomTime] = useState("03:00");
+  const [customWeekday, setCustomWeekday] = useState("1");
+  const [advancedCron, setAdvancedCron] = useState(schedule?.key === "custom" ? schedule.cron : "0 3 * * *");
+
+  useEffect(() => {
+    if (schedule?.key === "custom") setAdvancedCron(schedule.cron);
+  }, [schedule?.key, schedule?.cron]);
+
+  const customCron = buildCustomTimingCron({
+    advancedCron,
+    everyHours: customEveryHours,
+    mode: customMode,
+    time: customTime,
+    weekday: customWeekday,
+  });
+
+  const submitCustomCron = () => {
+    const cron = customCron?.trim();
+    if (!cron || scheduleUpdating) return;
+    onScheduleChange?.({ scheduleKey: "custom", cron });
+  };
 
   return (
-    <div className="space-y-6">
+    <div className="min-w-0 max-w-full space-y-6 overflow-x-hidden">
       <TooltipProvider delayDuration={120}>
         {tabConfig.kind === "tracking" ? (
           <PromptTrackingKpiPanel loading={loading} rows={rows} />
@@ -1436,19 +1772,183 @@ function PromptsTabBody({
       </TooltipProvider>
 
       {isTracking ? (
-        <div className="flex items-center justify-between gap-3">
-          <p className="text-[12px] text-slate-500">
-            Tracked prompts are automatically re-tested every day. Trends update after each daily run.
+        <div className="flex min-w-0 flex-col gap-3 overflow-hidden rounded-2xl border border-slate-200 bg-white p-4 shadow-sm lg:flex-row lg:items-start lg:justify-between">
+          <p className="min-w-0 flex-1 text-[12px] text-slate-500">
+            Tracked prompts are automatically re-tested {schedule?.key === "custom" ? "on custom timing" : schedule?.label ? schedule.label.toLowerCase() : "on schedule"}.
+            {" "}
+            <span className="font-medium text-slate-600">{formatNextTrackedRun(schedule?.nextTestAt)}</span>
           </p>
-          <button
-            type="button"
-            onClick={onTestNow}
-            disabled={testingNow || rows.length === 0}
-            className="inline-flex items-center gap-1.5 rounded-[10px] border border-[#cdd9f3] bg-white px-3 py-2 text-[12px] font-medium text-[#2f5fd1] transition hover:bg-[#eef4ff] disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {testingNow ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
-            Test tracked now
-          </button>
+          <div className="flex w-full min-w-0 flex-col gap-3 lg:w-auto lg:items-end">
+          <div className="flex flex-wrap items-center justify-start gap-2 lg:justify-end">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  disabled={scheduleUpdating}
+                  className="inline-flex items-center gap-1.5 rounded-[10px] border border-slate-200 bg-white px-3 py-2 text-[12px] font-medium text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {scheduleUpdating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Calendar className="h-3.5 w-3.5" />}
+                  <span className="max-w-[220px] truncate">{getTrackedPromptScheduleLabel(schedule)}</span>
+                  <ChevronDown className="h-3.5 w-3.5 opacity-60" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-[250px] p-1">
+                {(scheduleOptions ?? FALLBACK_TRACKED_PROMPT_SCHEDULE_OPTIONS).map((option) => (
+                  <DropdownMenuItem
+                    key={option.key}
+                    onClick={() => {
+                      if (option.key === "custom") {
+                        setCustomCronOpen(true);
+                        setAdvancedCron(schedule?.key === "custom" ? schedule.cron : advancedCron);
+                        return;
+                      }
+                      setCustomCronOpen(false);
+                      onScheduleChange?.({ scheduleKey: option.key });
+                    }}
+                    disabled={scheduleUpdating || (option.key !== "custom" && option.key === schedule?.key)}
+                    className="flex cursor-pointer items-center justify-between rounded-md px-2 py-1.5 text-[12px]"
+                  >
+                    <span className="min-w-0">
+                      <span className="block truncate font-medium text-slate-700">{option.label}</span>
+                      <span className="block truncate text-[10px] text-slate-400">
+                        {getScheduleOptionHint(option)}
+                      </span>
+                    </span>
+                    {option.key === schedule?.key ? <Check className="h-3.5 w-3.5 shrink-0 text-blue-600" /> : null}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <button
+              type="button"
+              onClick={onTestNow}
+              disabled={testingNow || rows.length === 0}
+              className="inline-flex items-center gap-1.5 rounded-[10px] border border-[#cdd9f3] bg-white px-3 py-2 text-[12px] font-medium text-[#2f5fd1] transition hover:bg-[#eef4ff] disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {testingNow ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+              Test tracked now
+            </button>
+          </div>
+          {customCronOpen ? (
+            <div className="w-full max-w-full space-y-3 border-t border-slate-100 pt-3 lg:w-[560px]">
+              <div className="flex flex-wrap gap-1 rounded-lg bg-slate-50 p-1">
+                {CUSTOM_SCHEDULE_MODES.map((mode) => {
+                  const active = customMode === mode.id;
+                  return (
+                    <button
+                      key={mode.id}
+                      type="button"
+                      onClick={() => setCustomMode(mode.id)}
+                      className={cn(
+                        "rounded-md px-3 py-1.5 text-[12px] font-medium transition",
+                        active ? "bg-white text-[#2f5fd1] shadow-sm" : "text-slate-500 hover:text-slate-700",
+                      )}
+                    >
+                      {mode.label}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {customMode === "hours" ? (
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-[12px] font-medium text-slate-600">Run every</span>
+                  <input
+                    type="number"
+                    min={1}
+                    max={23}
+                    value={customEveryHours}
+                    onChange={(event) => setCustomEveryHours(event.target.value)}
+                    className="h-9 w-20 rounded-lg border border-slate-200 px-3 text-[12px] font-medium text-slate-700 outline-none focus:border-slate-300 focus:ring-1 focus:ring-slate-300"
+                  />
+                  <span className="text-[12px] font-medium text-slate-600">hours</span>
+                </div>
+              ) : null}
+
+              {customMode === "daily" ? (
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-[12px] font-medium text-slate-600">Run daily at</span>
+                  <input
+                    type="time"
+                    value={customTime}
+                    onChange={(event) => setCustomTime(event.target.value)}
+                    className="h-9 rounded-lg border border-slate-200 px-3 text-[12px] font-medium text-slate-700 outline-none focus:border-slate-300 focus:ring-1 focus:ring-slate-300"
+                  />
+                  <span className="text-[12px] font-medium text-slate-500">UTC</span>
+                </div>
+              ) : null}
+
+              {customMode === "weekly" ? (
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-[12px] font-medium text-slate-600">Run every</span>
+                  <select
+                    value={customWeekday}
+                    onChange={(event) => setCustomWeekday(event.target.value)}
+                    className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-[12px] font-medium text-slate-700 outline-none focus:border-slate-300 focus:ring-1 focus:ring-slate-300"
+                  >
+                    {WEEKDAY_OPTIONS.map((day) => (
+                      <option key={day.value} value={day.value}>{day.label}</option>
+                    ))}
+                  </select>
+                  <span className="text-[12px] font-medium text-slate-600">at</span>
+                  <input
+                    type="time"
+                    value={customTime}
+                    onChange={(event) => setCustomTime(event.target.value)}
+                    className="h-9 rounded-lg border border-slate-200 px-3 text-[12px] font-medium text-slate-700 outline-none focus:border-slate-300 focus:ring-1 focus:ring-slate-300"
+                  />
+                  <span className="text-[12px] font-medium text-slate-500">UTC</span>
+                </div>
+              ) : null}
+
+              {customMode === "advanced" ? (
+                <div className="min-w-0">
+                  <label htmlFor="tracked-custom-cron" className="sr-only">Advanced cron expression</label>
+                  <input
+                    id="tracked-custom-cron"
+                    type="text"
+                    value={advancedCron}
+                    onChange={(event) => setAdvancedCron(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        event.preventDefault();
+                        submitCustomCron();
+                      }
+                    }}
+                    placeholder="15 4 * * 1-5"
+                    className="h-9 w-full rounded-lg border border-slate-200 px-3 font-mono text-[12px] text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-slate-300 focus:ring-1 focus:ring-slate-300"
+                  />
+                  <p className="mt-1 text-[10px] text-slate-400">
+                    UTC, 5 fields: minute hour day month weekday.
+                  </p>
+                </div>
+              ) : null}
+
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={submitCustomCron}
+                  disabled={scheduleUpdating || !customCron}
+                  className="inline-flex h-9 items-center justify-center rounded-lg bg-[#2d3748] px-3 text-[12px] font-medium text-white transition hover:bg-[#1a202c] disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  Apply
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCustomCronOpen(false)}
+                  className="inline-flex h-9 items-center justify-center rounded-lg border border-slate-200 bg-white px-3 text-[12px] font-medium text-slate-500 transition hover:bg-slate-50"
+                >
+                  Close
+                </button>
+                {customCron && customMode === "advanced" ? (
+                  <span className="text-[10px] font-medium text-slate-400">
+                    {customCron} UTC
+                  </span>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
+        </div>
         </div>
       ) : null}
 
@@ -1476,7 +1976,7 @@ function PromptsTabBody({
         <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-10 text-center shadow-sm">
           <p className="text-[13px] font-medium text-slate-600">No tracked prompts yet</p>
           <p className="mt-1 text-[12px] text-slate-500">
-            Mark prompts for daily tracking from the Content Opportunities tab to start seeing day-over-day trends here.
+            Mark prompts for tracking from the Content Opportunities tab to start seeing schedule-based trends here.
           </p>
         </div>
       ) : tabId === "content-opportunities" ? (
@@ -1491,6 +1991,7 @@ function PromptsTabBody({
         <TrackedPromptsDailyTable
           domainId={domainId}
           rows={rows}
+          schedule={schedule}
           onDraftBlog={onDraftBlog ?? (() => undefined)}
         />
       ) : (
@@ -1512,6 +2013,7 @@ const PromptsPage = () => {
   const domainId = currentDomain?.id ?? null;
   const [activeTab, setActiveTab] = useState<PromptsTabId>("content-opportunities");
   const [testingNow, setTestingNow] = useState(false);
+  const [scheduleUpdating, setScheduleUpdating] = useState(false);
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -1547,6 +2049,8 @@ const PromptsPage = () => {
 
   const reportRows = useMemo(() => mapReportRows(reportData), [reportData]);
   const trackedRows = useMemo(() => mapTrackedRows(trackedQuery.data), [trackedQuery.data]);
+  const trackedSchedule = useMemo(() => getTrackedPromptSchedule(trackedQuery.data), [trackedQuery.data]);
+  const trackedScheduleOptions = useMemo(() => getTrackedPromptScheduleOptions(trackedQuery.data), [trackedQuery.data]);
   const allPromptRows = useMemo(
     () => mergeTrackedResultsIntoPromptInventory(reportRows, trackedRows),
     [reportRows, trackedRows],
@@ -1763,6 +2267,45 @@ const PromptsPage = () => {
     setTimeout(poll, POLL_MS);
   };
 
+  const handleScheduleChange = async (change: TrackedPromptScheduleChange) => {
+    if (!domainId || scheduleUpdating) return;
+    if (change.scheduleKey !== "custom" && change.scheduleKey === trackedSchedule.key) return;
+    if (change.scheduleKey === "custom" && change.cron?.trim() === trackedSchedule.cron) return;
+    setScheduleUpdating(true);
+    try {
+      const updated = await apiPatch<TrackedPromptScheduleResponse>(
+        `/wizard/domain/${domainId}/tracked-prompts/schedule`,
+        change.scheduleKey === "custom"
+          ? { scheduleKey: "custom", cron: change.cron?.trim() }
+          : { scheduleKey: change.scheduleKey },
+      );
+      queryClient.setQueryData<TrackedPromptsData | undefined>(
+        aiResultsKeys.trackedPrompts(domainId),
+        (previous) => ({
+          ...(previous ?? {}),
+          cadence: updated.cadence,
+          nextTestAt: updated.nextTestAt,
+          schedule: updated.schedule,
+          scheduleOptions: updated.scheduleOptions,
+          prompts: previous?.prompts ?? [],
+        }),
+      );
+      await queryClient.invalidateQueries({ queryKey: aiResultsKeys.trackedPrompts(domainId) });
+      toast({
+        title: "Auto-test timing updated",
+        description: `${updated.schedule.label}. ${formatNextTrackedRun(updated.schedule.nextTestAt)}.`,
+      });
+    } catch (err) {
+      toast({
+        title: "Couldn't update timing",
+        description: err instanceof Error ? err.message : "Try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setScheduleUpdating(false);
+    }
+  };
+
   const handleDraftBlog = (rowId: string) => {
     if (!domainId) {
       toast({
@@ -1813,8 +2356,8 @@ const PromptsPage = () => {
   };
 
   return (
-    <section className="w-full bg-white px-6 pb-6 pt-2">
-      <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as PromptsTabId)} className="space-y-6">
+    <section className="w-full min-w-0 overflow-x-hidden bg-white px-6 pb-6 pt-2">
+      <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as PromptsTabId)} className="min-w-0 space-y-6">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <TabsList className="h-auto gap-1 rounded-[14px] bg-transparent p-0">
             {PROMPT_TABS.map((tab) => (
@@ -1834,7 +2377,7 @@ const PromptsPage = () => {
         {PROMPT_TABS.map((tab) => {
           const { rows, loading, isError, onRetry } = tabData(tab.id);
           return (
-            <TabsContent key={tab.id} value={tab.id} className="mt-0">
+            <TabsContent key={tab.id} value={tab.id} className="mt-0 min-w-0">
               <PromptsTabBody
                 tabId={tab.id}
                 domainId={domainId}
@@ -1843,8 +2386,12 @@ const PromptsPage = () => {
                 rows={rows}
                 onRetry={onRetry}
                 onTestNow={tab.id === "prompt-tracking" ? handleTestNow : undefined}
+                onScheduleChange={tab.id === "prompt-tracking" ? handleScheduleChange : undefined}
                 onDraftBlog={tab.id === "prompt-tracking" ? handleDraftBlog : undefined}
                 testingNow={testingNow}
+                schedule={tab.id === "prompt-tracking" ? trackedSchedule : undefined}
+                scheduleOptions={tab.id === "prompt-tracking" ? trackedScheduleOptions : undefined}
+                scheduleUpdating={scheduleUpdating}
                 kpiOverride={
                   tab.id === "content-opportunities"
                     ? [...allPromptsCards, ...contentOppsCards]

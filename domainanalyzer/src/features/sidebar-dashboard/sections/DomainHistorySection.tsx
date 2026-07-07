@@ -85,6 +85,13 @@ const getDisplayName = (domain: DashboardDomain) => {
 
 const MAX_DOMAIN_HISTORY_RETRIES = 6;
 const DOMAIN_HISTORY_RETRY_DELAY_MS = 450;
+const MAX_WIZARD_STEPS = 5;
+
+const clampPercent = (value: number) => Math.min(100, Math.max(0, Math.round(value)));
+
+const normalizeVisibilityScore = (value: number) => {
+  return clampPercent(value <= 10 ? value * 10 : value);
+};
 
 const hasRenderableDomainDetails = (domain: DashboardDomain) => {
   return (
@@ -158,6 +165,7 @@ export function DomainHistorySection({ onMenuItemClick }: DomainHistorySectionPr
   const navigate = useNavigate();
   const [openMenuId, setOpenMenuId] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [historyView, setHistoryView] = useState<"list" | "grid">("list");
   const [state, setState] = useState<FetchState>({ status: "loading" });
   const [retryUrl, setRetryUrl] = useState<string | null>(null);
   const requestIdRef = useRef(0);
@@ -306,6 +314,10 @@ export function DomainHistorySection({ onMenuItemClick }: DomainHistorySectionPr
 
   const hasDomains = items.length > 0;
 
+  const handleViewReport = useCallback((domain: DomainItem) => {
+    navigate(`/ai-results/${buildDomainSlug(domain)}`);
+  }, [navigate]);
+
   if (state.status === "loading") {
     return <DomainHistoryLoader />;
   }
@@ -415,10 +427,14 @@ export function DomainHistorySection({ onMenuItemClick }: DomainHistorySectionPr
           <div className="flex items-center gap-2">
             <button
               type="button"
-              className="inline-flex h-9 items-center gap-1.5 rounded-md border border-[#d7dbe3] bg-white px-3 text-xs font-medium text-[#6b7382]"
+              onClick={() => setHistoryView((prev) => (prev === "grid" ? "list" : "grid"))}
+              className={`inline-flex h-9 items-center gap-1.5 rounded-md border px-3 text-xs font-medium transition ${historyView === "grid"
+                  ? "border-[#c8d5f0] bg-[#eef3ff] text-[#4e76c7]"
+                  : "border-[#d7dbe3] bg-white text-[#6b7382]"
+                }`}
             >
               <Grid2x2 className="h-3.5 w-3.5" />
-              Grid
+              {historyView === "grid" ? "List" : "Grid"}
             </button>
             <div className="relative">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#9aa3b2]" />
@@ -433,7 +449,7 @@ export function DomainHistorySection({ onMenuItemClick }: DomainHistorySectionPr
           </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+        <div className={historyView === "grid" ? "grid grid-cols-1 gap-4 xl:grid-cols-3" : "flex flex-col gap-4"}>
           {state.status === "error" ? (
             <div className="col-span-full rounded-xl border border-[#fad4d4] bg-[#fff5f5] p-8 text-center text-sm text-[#cf3d3d]">
               <p>{state.message}</p>
@@ -454,12 +470,16 @@ export function DomainHistorySection({ onMenuItemClick }: DomainHistorySectionPr
             </div>
           ) : (
             filteredDomains.map((domain) => (
-              <div key={domain.id} className="rounded-xl border border-[#e2e6ee] bg-white p-4">
+              <div
+                key={domain.id}
+                className={`rounded-xl border border-[#e2e6ee] bg-white p-4 ${historyView === "list" ? "w-full" : ""
+                  }`}
+              >
                 <div className="mb-3 flex items-start justify-between">
                   <div className="relative min-w-0">
                     <div className="flex items-start gap-4">
                       <span className="inline-flex h-19 w-19 items-center justify-center rounded-md">
-                        <img src={getLogoUrl(domain.url)} alt={`${domain.name} icon`} className="h-11 w-11 object-contain" loading="lazy"/>
+                        <img src={getLogoUrl(domain.url)} alt={`${domain.name} icon`} className="h-11 w-11 object-contain" loading="lazy" />
                       </span>
                       <div className="min-w-0 flex flex-col items-start">
                         <div className="flex items-center gap-2">
@@ -506,13 +526,12 @@ export function DomainHistorySection({ onMenuItemClick }: DomainHistorySectionPr
                   </div>
 
                   <div
-                    className={`flex h-8 w-8 items-center justify-center rounded-lg ${
-                      domain.status === "success"
+                    className={`flex h-8 w-8 items-center justify-center rounded-lg ${domain.status === "success"
                         ? "bg-[#eaf7e9]"
                         : domain.status === "inprogress"
                           ? "bg-[#fff7e5]"
                           : "bg-[#ffeef0]"
-                    }`}
+                      }`}
                   >
                     {domain.status === "success" ? (
                       <Check className="h-4 w-4 text-[#4e9f2d]" />
@@ -525,7 +544,7 @@ export function DomainHistorySection({ onMenuItemClick }: DomainHistorySectionPr
                 </div>
 
                 {domain.status === "retry" ? (
-                  <div className="flex h-[145px] flex-col items-center justify-center">
+                  <div className={`flex flex-col items-center justify-center ${historyView === "list" ? "min-h-[120px]" : "h-[145px]"}`}>
                     <p className="text-[20px] font-semibold text-[#414651]">Run analysis</p>
                     <button
                       type="button"
@@ -542,9 +561,9 @@ export function DomainHistorySection({ onMenuItemClick }: DomainHistorySectionPr
                     onClick={() => navigate(`/ai-checker-v2?domain=${domain.id}`)}
                     className="block w-full text-left"
                   >
-                    <div className="mb-2 border-t border-[#edf1f7] pt-3">
+                    <div className={`mb-2 border-t border-[#edf1f7] pt-3 ${historyView === "list" ? "max-w-3xl" : ""}`}>
                       <p className="mb-1 text-[13px] font-medium uppercase tracking-wide text-[#7f8795]">
-                        Resume at step {Math.min(5, domain.currentStep + 1)} of 5
+                        Resume at step {Math.min(MAX_WIZARD_STEPS, domain.currentStep + 1)} of {MAX_WIZARD_STEPS}
                       </p>
                       <p className="text-[20px] font-semibold text-[#414651]">
                         {NEXT_STEP_LABEL[domain.currentStep] ?? "Continue"}
@@ -552,7 +571,7 @@ export function DomainHistorySection({ onMenuItemClick }: DomainHistorySectionPr
                       <div className="mt-3 h-2 rounded-full bg-[#d6dbe5]">
                         <div
                           className="h-2 rounded-full bg-[#6f8fc9] transition-all"
-                          style={{ width: `${(domain.currentStep / 5) * 100}%` }}
+                          style={{ width: `${clampPercent((domain.currentStep / MAX_WIZARD_STEPS) * 100)}%` }}
                         />
                       </div>
                     </div>
@@ -567,25 +586,31 @@ export function DomainHistorySection({ onMenuItemClick }: DomainHistorySectionPr
                     onClick={() => handleViewReport(domain)}
                     className="block w-full text-left"
                   >
-                    <div className="mb-2 border-t border-[#edf1f7] pt-3">
-                      <p className="mb-2 text-[19px] font-semibold text-[#414651]">Visibility Score</p>
-                      <div className="flex items-center gap-3">
-                        <div className="h-2 flex-1 rounded-full bg-[#d6dbe5]">
-                          <div className="h-2 rounded-full bg-[#6f8fc9]" style={{ width: `${domain.visibility ?? 0}%` }} />
+                    <div
+                      className={`border-t border-[#edf1f7] pt-3 ${historyView === "list" ? "flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between" : ""
+                        }`}
+                    >
+                      <div className={historyView === "list" ? "min-w-0 flex-1" : ""}>
+                        <p className="mb-2 text-[19px] font-semibold text-[#414651]">Visibility Score</p>
+                        <div className="flex items-center gap-3">
+                          <div className="h-2 flex-1 rounded-full bg-[#d6dbe5]">
+                            <div className="h-2 rounded-full bg-[#6f8fc9]" style={{ width: `${domain.visibility ?? 0}%` }} />
+                          </div>
+                          <span className="text-4xl font-semibold leading-none text-[#6f8fc9]">{domain.visibility ?? 0}%</span>
                         </div>
-                        <span className="text-4xl font-semibold leading-none text-[#6f8fc9]">{domain.visibility ?? 0}%</span>
+                      </div>
+                      <div className={`grid grid-cols-2 gap-3 ${historyView === "list" ? "lg:min-w-[280px]" : "mt-3"}`}>
+                        <div>
+                          <p className="pb-2 text-[18px] font-semibold text-[#5f6878]">Top Keywords</p>
+                          <p className="text-[30px] font-medium leading-none text-[#3d83df]">{domain.topKeywords ?? 0}</p>
+                        </div>
+                        <div>
+                          <p className="pb-2 text-[18px] font-semibold text-[#5f6878]">Prompts</p>
+                          <p className="text-[30px] font-medium leading-none text-[#3d83df]">{domain.topPrompts ?? 0}</p>
+                        </div>
                       </div>
                     </div>
-                    <div className="mt-3 grid grid-cols-2 gap-3">
-                      <div>
-                        <p className="text-[18px] font-semibold text-[#5f6878] pb-2">Top Keywords</p>
-                        <p className="text-[30px] font-medium leading-none text-[#3d83df]">{domain.topKeywords ?? 0}</p>
-                      </div>
-                      <div>
-                        <p className="text-[18px] font-semibold text-[#5f6878] pb-2">Prompts</p>
-                        <p className="text-[30px] font-medium leading-none text-[#3d83df]">{domain.topPrompts ?? 0}</p>
-                      </div>
-                    </div>
+                    {historyView === "grid" ? null : <div className="mt-3 text-xs text-[#7f8795]">Click to view report</div>}
                   </button>
                 )}
               </div>
