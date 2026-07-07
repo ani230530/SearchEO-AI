@@ -34,7 +34,7 @@ router.post('/error', async (req: Request, res: Response) => {
         // We need to find them to get the userId (if not provided) and to update them
         const allDrafts = await prisma.wordpressPublishLog.findMany({
             where: {
-                status: { in: ['generating', 'draft'] }
+                status: { in: ['generating', 'draft', 'scheduled'] }
             }
         });
 

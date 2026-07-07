@@ -319,7 +319,7 @@ export interface PersistArgs {
   prisma: PrismaClient;
   domainId: number;
   prompts: GeneratedPrompt[];
-  /** If true, KEEP existing AI-source rows and append on top. */
+  /** If true, keep current selection state while appending new prompt rows. */
   append?: boolean;
 }
 
@@ -341,21 +341,14 @@ export interface PersistedTopicsItem {
 }
 
 export async function persistAuditPrompts(args: PersistArgs): Promise<PersistedTopicsItem[]> {
-  // Fresh regen wipes AI-source rows; append mode keeps them.
+  // Fresh regen used to delete AI-source rows. That made the dashboard Prompt
+  // Inventory lose historical prompts/results during a re-audit. Keep the rows
+  // and only clear their selection state; append mode leaves selection alone.
   if (!args.append) {
-    const aiKeywords = await args.prisma.keyword.findMany({
-      where: { domainId: args.domainId, source: 'ai' },
-      select: { id: true },
-    });
-    const aiKeywordIds = aiKeywords.map((k) => k.id);
-    if (aiKeywordIds.length > 0) {
-      await args.prisma.prompt.deleteMany({
-        where: { domainId: args.domainId, OR: [{ keywordId: { in: aiKeywordIds } }, { keywordId: null, source: 'ai' }] },
-      });
-      await args.prisma.keyword.deleteMany({ where: { id: { in: aiKeywordIds } } });
-    } else {
-      await args.prisma.prompt.deleteMany({ where: { domainId: args.domainId, source: 'ai', keywordId: null } });
-    }
+    await args.prisma.$transaction([
+      args.prisma.keyword.updateMany({ where: { domainId: args.domainId, source: 'ai' }, data: { isSelected: false } }),
+      args.prisma.prompt.updateMany({ where: { domainId: args.domainId, source: 'ai' }, data: { isSelected: false } }),
+    ]);
   }
 
   const out: PersistedTopicsItem[] = [];

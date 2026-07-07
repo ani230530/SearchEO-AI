@@ -1,4 +1,8 @@
 export function Features() {
+    const videoUrl =
+        import.meta.env.VITE_FEATURES_VIDEO_URL ||
+        "https://res.cloudinary.com/ta2uztdv/video/upload/v1783195911/Browser_Tool-_6-compressed_1_1_ws3z2v.mp4";
+
     return (
         <section className="overflow-hidden py-24 md:py-40" style={{ 
             fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Inter", "Helvetica Neue", Helvetica, Arial, sans-serif',
@@ -41,7 +45,10 @@ export function Features() {
                                     muted
                                     playsInline
                                     preload="metadata"
+                                    disablePictureInPicture
+                                    controlsList="nodownload noplaybackrate noremoteplayback"
                                 >
+                                    <source src={videoUrl} type="video/mp4" />
                                     <source src="/features2.mp4" type="video/mp4" />
                                     Your browser does not support the video tag.
                                 </video>

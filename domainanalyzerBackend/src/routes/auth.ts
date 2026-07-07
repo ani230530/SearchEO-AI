@@ -411,23 +411,32 @@ router.get('/google/signup', googleAuthLimiter, startGoogleAuth('signup'));
 router.get('/google/auth-callback', (req: Request, res: Response) => {
   const { code, state, error } = req.query;
   const frontendUrl = authEnv.FRONTEND_URL;
+  const parsedState = typeof state === 'string' ? parseOauthState(state) : null;
+  const callbackPath = parsedState?.mode === 'signup' ? '/audit' : '/auth';
 
   if (error) {
     clearOauthStateCookie(res);
-    return res.redirect(`${frontendUrl}/auth?google=failed&reason=${error}`);
+    return res.redirect(
+      `${frontendUrl}${callbackPath}?google=failed&reason=${encodeURIComponent(String(error))}`,
+    );
   }
 
   const cookieState = (req as any).cookies?.[OAUTH_STATE_COOKIE];
-  if (!cookieState || cookieState !== state || !parseOauthState(String(state))) {
+  if (!cookieState || cookieState !== state || !parsedState) {
     clearOauthStateCookie(res);
-    return res.redirect(`${frontendUrl}/auth?google=failed&reason=state_mismatch`);
+    return res.redirect(`${frontendUrl}${callbackPath}?google=failed&reason=state_mismatch`);
   }
 
   // Pass code + state to the frontend, which will POST to /exchange.
   // Clearing the state cookie here means /exchange relies only on the
   // browser already having proven possession by completing the round-trip.
   clearOauthStateCookie(res);
-  res.redirect(`${frontendUrl}/auth?googleCode=${code}&state=${state}`);
+  const params = new URLSearchParams({
+    googleCode: String(code),
+    googleMode: parsedState.mode,
+    state: String(state),
+  });
+  res.redirect(`${frontendUrl}${callbackPath}?${params.toString()}`);
 });
 
 // POST /api/auth/google/exchange

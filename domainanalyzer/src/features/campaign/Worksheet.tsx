@@ -46,6 +46,7 @@ import {
 import WorksheetGenerateDrawer from './WorksheetGenerateDrawer';
 import InlineEditable from './InlineEditable';
 import { RowStatus, RowAction } from './WorksheetRowState';
+import WordpressIntegrationModal from '@/features/publish/WordpressIntegrationModal';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   clearWorksheetHandoff,
@@ -87,6 +88,9 @@ const saveKeywordSettings = (snapshot: KeywordSettingsSnapshot) => {
     /* ignore persistence failures */
   }
 };
+
+const isWordpressIntegrationMissingError = (message: string): boolean =>
+  /wordpress integration not configured/i.test(message);
 
 const parseKeywordLimit = (value: string) => {
   const parsed = Number.parseInt(value, 10);
@@ -141,6 +145,11 @@ export default function Worksheet({
   const [optimisticPublishingTopicIds, setOptimisticPublishingTopicIds] = useState<
     Set<number>
   >(new Set());
+  const [wordpressSetupOpen, setWordpressSetupOpen] = useState(false);
+  const [pendingPublishAfterConnect, setPendingPublishAfterConnect] = useState<{
+    topicId: number;
+    draftId: number;
+  } | null>(null);
 
   // ── Row selection (the table's checkboxes) ────────────────────────────
   //
@@ -685,6 +694,76 @@ export default function Worksheet({
     batchCancelRef.current = true;
   };
 
+  const clearOptimisticPublishing = useCallback((topicId: number) => {
+    setOptimisticPublishingTopicIds((prev) => {
+      if (!prev.has(topicId)) return prev;
+      const next = new Set(prev);
+      next.delete(topicId);
+      return next;
+    });
+  }, []);
+
+  const openWordpressSetupForPublish = useCallback(
+    (topicId: number, draftId: number) => {
+      clearOptimisticPublishing(topicId);
+      setPendingPublishAfterConnect({ topicId, draftId });
+      setWordpressSetupOpen(true);
+      setError(null);
+    },
+    [clearOptimisticPublishing]
+  );
+
+  const handlePublishFailure = useCallback(
+    (topicId: number, draftId: number, message: string) => {
+      if (isWordpressIntegrationMissingError(message)) {
+        openWordpressSetupForPublish(topicId, draftId);
+        return;
+      }
+      clearOptimisticPublishing(topicId);
+      setError(message || 'Publish failed.');
+    },
+    [clearOptimisticPublishing, openWordpressSetupForPublish]
+  );
+
+  const publishTopicDraft = useCallback(
+    async (topicId: number, draftId: number) => {
+      setOptimisticPublishingTopicIds((prev) => {
+        if (prev.has(topicId)) return prev;
+        const next = new Set(prev);
+        next.add(topicId);
+        return next;
+      });
+
+      try {
+        const result = await publishDraft(draftId);
+        if (result.status === 'failed') {
+          handlePublishFailure(topicId, draftId, result.error || 'Publish failed.');
+        }
+      } catch (err) {
+        handlePublishFailure(
+          topicId,
+          draftId,
+          err instanceof Error ? err.message : 'Publish failed.'
+        );
+      }
+    },
+    [handlePublishFailure]
+  );
+
+  const closeWordpressSetup = useCallback(() => {
+    setWordpressSetupOpen(false);
+    setPendingPublishAfterConnect(null);
+  }, []);
+
+  const handleWordpressConnected = useCallback(() => {
+    const pending = pendingPublishAfterConnect;
+    setPendingPublishAfterConnect(null);
+    setNotice('WordPress connected. Publishing draft...');
+    if (pending) {
+      void publishTopicDraft(pending.topicId, pending.draftId);
+    }
+  }, [pendingPublishAfterConnect, publishTopicDraft]);
+
   const runBatchPublish = useCallback(async () => {
     const queue = [...publishCandidates];
     if (queue.length === 0) return;
@@ -711,12 +790,14 @@ export default function Worksheet({
       try {
         const result = await publishDraft(topic.draftId);
         if (result.status === 'failed') {
-          errors.push({ topicId: topic.id, title: topic.title, error: result.error || 'Publish failed' });
-          setOptimisticPublishingTopicIds((prev) => {
-            const next = new Set(prev);
-            next.delete(topic.id);
-            return next;
-          });
+          const message = result.error || 'Publish failed';
+          if (isWordpressIntegrationMissingError(message)) {
+            openWordpressSetupForPublish(topic.id, topic.draftId);
+            errors.push({ topicId: topic.id, title: topic.title, error: 'Connect WordPress to continue publishing' });
+            break;
+          }
+          errors.push({ topicId: topic.id, title: topic.title, error: message });
+          clearOptimisticPublishing(topic.id);
           continue;
         }
         // Wait for the publish channel to confirm before moving on, so the
@@ -731,16 +812,18 @@ export default function Worksheet({
         }
         if (outcome === 'cancelled') break;
       } catch (err) {
+        const message = err instanceof Error ? err.message : 'Publish failed';
+        if (isWordpressIntegrationMissingError(message)) {
+          openWordpressSetupForPublish(topic.id, topic.draftId);
+          errors.push({ topicId: topic.id, title: topic.title, error: 'Connect WordPress to continue publishing' });
+          break;
+        }
         errors.push({
           topicId: topic.id,
           title: topic.title,
-          error: err instanceof Error ? err.message : 'Publish failed',
+          error: message,
         });
-        setOptimisticPublishingTopicIds((prev) => {
-          const next = new Set(prev);
-          next.delete(topic.id);
-          return next;
-        });
+        clearOptimisticPublishing(topic.id);
       }
     }
     setBatchProgress(null);
@@ -761,7 +844,7 @@ export default function Worksheet({
     // Force a structure refetch so the rows reflect the new published state
     // even if some SSE events were missed.
     reload({ silent: true });
-  }, [publishCandidates, reload, waitForPublishTerminal]);
+  }, [clearOptimisticPublishing, openWordpressSetupForPublish, publishCandidates, reload, waitForPublishTerminal]);
 
   /**
    * Batch generate runner. The WorksheetGenerateDrawer collects ONE
@@ -966,32 +1049,7 @@ export default function Worksheet({
   };
 
   const handlePublishFromMore = async (topicId: number, draftId: number) => {
-    setOptimisticPublishingTopicIds((prev) => {
-      if (prev.has(topicId)) return prev;
-      const next = new Set(prev);
-      next.add(topicId);
-      return next;
-    });
-    try {
-      const result = await publishDraft(draftId);
-      if (result.status === 'failed') {
-        setOptimisticPublishingTopicIds((prev) => {
-          if (!prev.has(topicId)) return prev;
-          const next = new Set(prev);
-          next.delete(topicId);
-          return next;
-        });
-        setError(result.error || 'Publish failed.');
-      }
-    } catch (err) {
-      setOptimisticPublishingTopicIds((prev) => {
-        if (!prev.has(topicId)) return prev;
-        const next = new Set(prev);
-        next.delete(topicId);
-        return next;
-      });
-      setError(err instanceof Error ? err.message : 'Publish failed.');
-    }
+    await publishTopicDraft(topicId, draftId);
   };
 
   /* ---------- Import / Export ---------- */
@@ -1620,44 +1678,7 @@ export default function Worksheet({
                                 setTimeout(() => setOpeningDraftRowId(null), 350);
                               },
                               onPublishDirectly: async (draftId) => {
-                                // Optimistic: flip the row into `publishing`
-                                // immediately. The reconciliation effect
-                                // clears it on SSE / structure terminal.
-                                setOptimisticPublishingTopicIds((prev) => {
-                                  if (prev.has(topic.id)) return prev;
-                                  const next = new Set(prev);
-                                  next.add(topic.id);
-                                  return next;
-                                });
-                                // Direct fire — no overlay, all state lives
-                                // on the row. The publish endpoint accepts
-                                // just { draftId } and pulls metadata from
-                                // the persisted draft. Status converges
-                                // back via SSE to sharedPublishStatuses.
-                                try {
-                                  const result = await publishDraft(draftId);
-                                  if (result.status === 'failed') {
-                                    setOptimisticPublishingTopicIds((prev) => {
-                                      if (!prev.has(topic.id)) return prev;
-                                      const next = new Set(prev);
-                                      next.delete(topic.id);
-                                      return next;
-                                    });
-                                    setError(result.error || 'Publish failed.');
-                                  }
-                                } catch (err) {
-                                  setOptimisticPublishingTopicIds((prev) => {
-                                    if (!prev.has(topic.id)) return prev;
-                                    const next = new Set(prev);
-                                    next.delete(topic.id);
-                                    return next;
-                                  });
-                                  setError(
-                                    err instanceof Error
-                                      ? err.message
-                                      : 'Publish failed.'
-                                  );
-                                }
+                                await publishTopicDraft(topic.id, draftId);
                               },
                             }}
                           />
@@ -1751,6 +1772,13 @@ export default function Worksheet({
           </div>
         </div>
       </div>
+
+      <WordpressIntegrationModal
+        open={wordpressSetupOpen}
+        onClose={closeWordpressSetup}
+        onConnected={handleWordpressConnected}
+        submitLabel={pendingPublishAfterConnect ? 'Connect and publish' : 'Connect WordPress'}
+      />
 
       {/* Keyword editor modal */}
       {keywordEditor && (

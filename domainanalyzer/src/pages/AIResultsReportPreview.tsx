@@ -50,7 +50,6 @@ import {
   Users,
   Info,
   TrendingUp,
-  X,
   FileText,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -234,6 +233,61 @@ const TRAFFIC_LABEL: Record<string, string> = {
   high: 'High',
   medium: 'Medium',
   low: 'Low',
+};
+
+type OpportunitySeverityFilter = 'all' | 'critical' | 'high' | 'medium' | 'low';
+type OpportunitySort = 'priority' | 'impact' | 'title';
+type TrendWindowDays = 7 | 30 | 90 | null;
+
+const OPPORTUNITY_SEVERITY_OPTIONS: Array<{ value: OpportunitySeverityFilter; label: string }> = [
+  { value: 'all', label: 'All priorities' },
+  { value: 'critical', label: 'Critical' },
+  { value: 'high', label: 'High' },
+  { value: 'medium', label: 'Medium' },
+  { value: 'low', label: 'Low' },
+];
+
+const OPPORTUNITY_SORT_OPTIONS: Array<{ value: OpportunitySort; label: string }> = [
+  { value: 'priority', label: 'Highest severity' },
+  { value: 'impact', label: 'Traffic potential' },
+  { value: 'title', label: 'Title A-Z' },
+];
+
+const TREND_WINDOW_OPTIONS: Array<{ value: TrendWindowDays; label: string }> = [
+  { value: null, label: 'All runs' },
+  { value: 7, label: '7 days' },
+  { value: 30, label: '30 days' },
+  { value: 90, label: '90 days' },
+];
+
+const opportunitySeverityWeight = (severity?: string | null) => {
+  switch (severity) {
+    case 'critical':
+      return 4;
+    case 'high':
+      return 3;
+    case 'medium':
+      return 2;
+    case 'low':
+      return 1;
+    default:
+      return 0;
+  }
+};
+
+const opportunityTrafficWeight = (traffic?: string | null) => {
+  switch (traffic) {
+    case 'very_high':
+      return 4;
+    case 'high':
+      return 3;
+    case 'medium':
+      return 2;
+    case 'low':
+      return 1;
+    default:
+      return 0;
+  }
 };
 
 // Trend chart data is now derived from /trends inside the page component —
@@ -548,8 +602,8 @@ const CARD_TOOLTIPS: Record<string, string> = {
     'Averages factual accuracy only where the scorer produced an accuracy score for a brand mention. Low sample sizes are called out.',
   'AI Share of Voice':
     'Your brand mention events divided by brand plus competitor mention events, excluding failed provider calls and self-competitor matches.',
-  'Opportunities to Outrank Competitors':
-    'Suggested content ideas designed to help your brand appear more often than competitors in AI answers.',
+  'Verified AI Visibility Gaps':
+    'Shows only gaps found in completed, scored audit responses: lost prompts, citation gaps, rank downgrades, negative sentiment, and brand-vs-competitor misses.',
 };
 
 /** Convenience — wraps a card title + tip badge inline. */
@@ -1596,8 +1650,7 @@ export const PromptTable = ({
   };
 
   // ───────────────────────────────────────────────────────────────────────
-  // Pagination. We replaced the prior "View all / Show less" toggle with
-  // page-based controls so users can navigate large result sets in a
+  // Pagination. Page-based controls let users navigate large result sets in a
   // predictable way (Prev / Next / page indicator) rather than dumping
   // everything into one infinite-scrolling card.
   //
@@ -1662,13 +1715,17 @@ export const PromptTable = ({
 
   const totalCount = fullSortedData.length;
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
+  const pageResetKey = useMemo(
+    () => fullSortedData.map((row) => String(row.id)).join('|'),
+    [fullSortedData],
+  );
 
   // Clamp currentPage if filter/sort shrinks the list below it. Also
   // reset to page 1 when filter/sort changes so the user lands on the
   // top of the new view.
   useEffect(() => {
     setCurrentPage(1);
-  }, [tableSort]);
+  }, [tableSort, pageResetKey]);
 useEffect(() => {
   if (currentPage > totalPages) setCurrentPage(totalPages);
 }, [currentPage, totalPages]);
@@ -2165,30 +2222,6 @@ return (
 );
 };
 
-const FilterPill = ({
-  label,
-  icon,
-  removable = false,
-}: {
-  label: string;
-  icon?: 'sort' | 'filter';
-  removable?: boolean;
-}) => (
-  <Button
-    variant="outline"
-    className="h-8 rounded-lg border border-[#D5D7DA] bg-white px-2.5 text-[11px] font-normal text-[#717680] shadow-[0_1px_2px_0_#1018280D] hover:bg-white"
-  >
-    {icon === 'sort' ? (
-      <img src="/report-icons/ascending-arrow.svg" alt="" className="mr-1.5 h-3.5 w-3.5 shrink-0" />
-    ) : icon === 'filter' ? (
-      <Filter className="mr-1.5 h-3.5 w-3.5 shrink-0 text-[#717680]" strokeWidth={1.8} />
-    ) : null}
-    {label}
-    {icon ? <ChevronDown className="ml-1.5 h-3.5 w-3.5 shrink-0 text-[#717680]" strokeWidth={1.8} /> : null}
-    {removable ? <X className="ml-1.5 h-3.5 w-3.5 shrink-0 text-[#717680]" strokeWidth={1.8} /> : null}
-  </Button>
-);
-
 type GenerationState =
   | { kind: 'idle' }
   | { kind: 'submitting' }
@@ -2350,7 +2383,7 @@ const OpportunityRow = ({
           ) : null}
         </div>
         {onAction ? (
-          <GenerateInlineButton onClick={onAction} state={generation ?? { kind: 'idle' }} label="Generate Content" />
+          <GenerateInlineButton onClick={onAction} state={generation ?? { kind: 'idle' }} label="Add to worksheet" />
         ) : null}
       </div>
     </div>
@@ -2385,7 +2418,7 @@ const GenerateInlineButton = ({
   if (state.kind === 'done') {
     return (
       <span className="inline-flex h-[37px] items-center gap-1.5 rounded-lg bg-emerald-50 px-3 text-[12px] font-medium text-emerald-700">
-        <CheckCircle2 className="h-3.5 w-3.5" /> Draft ready
+        <CheckCircle2 className="h-3.5 w-3.5" /> Added to worksheet
       </span>
     );
   }
@@ -2648,6 +2681,10 @@ const AIResultsReportPreview = () => {
   const [selectedRunId, setSelectedRunId] = useState<number | null>(null);
   const [modelFilter, setModelFilter] = useState<Set<string>>(new Set()); // empty = all
   const [categoryFilter, setCategoryFilter] = useState<Set<string>>(new Set()); // empty = all
+  const [trendWindowDays, setTrendWindowDays] = useState<TrendWindowDays>(null);
+  const [opportunitySort, setOpportunitySort] = useState<OpportunitySort>('priority');
+  const [opportunitySeverityFilter, setOpportunitySeverityFilter] = useState<OpportunitySeverityFilter>('all');
+  const [opportunitiesPage, setOpportunitiesPage] = useState(1);
 
   // Per-run trend data for the three Visibility-section charts. Fetched
   // separately from /trends so the page can render the static cards before
@@ -2756,6 +2793,16 @@ const AIResultsReportPreview = () => {
     }),
     [trendsQuery.data],
   );
+  const trendRuns = useMemo(() => {
+    if (!trendWindowDays) return trendsData.runs;
+    const cutoff = Date.now() - trendWindowDays * 24 * 60 * 60 * 1000;
+    return trendsData.runs.filter((run) => {
+      const startedAt = new Date(run.startedAt).getTime();
+      return Number.isFinite(startedAt) && startedAt >= cutoff;
+    });
+  }, [trendWindowDays, trendsData.runs]);
+  const trendWindowLabel =
+    TREND_WINDOW_OPTIONS.find((option) => option.value === trendWindowDays)?.label ?? 'All runs';
 
   const selectedCount = selectedRowIds.size;
 
@@ -2768,22 +2815,25 @@ const AIResultsReportPreview = () => {
   const suggestedNextActions = useMemo(
     () => [
       {
-        title: 'Connect Website',
-        description: 'Automate publishing and optimization.',
-        iconSrc: '/suggested-actions/connect-website.svg',
-        onClick: () => navigate(resolveSidebarNavigation('integration').path),
+        title: 'Connect WordPress',
+        description: 'Set up WordPress credentials for one-click publishing.',
+        iconSrc: '/suggested-actions/wordpress.svg',
+        onClick: () => navigate(`${resolveSidebarNavigation('integration').path}?wordpress=1`),
       },
       {
-        title: 'Explore Opportunities',
-        description: 'Review prompt gaps and content opportunities.',
+        title: 'Review Outrank Opportunities',
+        description: 'See the scored gaps found from your latest AI visibility run.',
         iconSrc: '/suggested-actions/explore-opportunities.svg',
         onClick: () => scrollToSection('ai-results-opportunities'),
       },
       {
-        title: 'Analyze Competitors',
-        description: 'Compare competitor visibility signals.',
+        title: 'Review Competitor Mentions',
+        description: 'Sort prompts by competitor mentions to see where rivals appear.',
         iconSrc: '/suggested-actions/analyze-competitors.svg',
-        onClick: () => scrollToSection('ai-results-visibility-coverage'),
+        onClick: () => {
+          setTableSort({ metric: 'competitors', direction: 'desc' });
+          scrollToSection('ai-results-top-prompts');
+        },
       },
     ],
     [navigate, scrollToSection],
@@ -3429,7 +3479,7 @@ const citationsChart = useMemo(() => {
       for (const m of modelFilter) if (m.toLowerCase().includes(s.match)) return true;
       return false;
     });
-  const data = trendsData.runs.map((run) => {
+  const data = trendRuns.map((run) => {
     const row: Record<string, string | number> = { date: formatRunDate(run.startedAt) };
     for (const s of visibleSeries) {
       // Find any model id containing the matcher (gpt-4o-mini, claude-sonnet-4.5...).
@@ -3439,7 +3489,7 @@ const citationsChart = useMemo(() => {
     return row;
   });
   return { data, series: visibleSeries.map(({ key, label, stroke }) => ({ key, label, stroke })) };
-}, [trendsData, modelFilter]);
+}, [trendRuns, modelFilter]);
 
 // Mentions rate trend — brand vs total competitor mentions per run.
 const mentionsChart = useMemo(() => {
@@ -3447,13 +3497,13 @@ const mentionsChart = useMemo(() => {
     { key: 'brand', label: 'Brand mentions', stroke: '#6EA8FF' },
     { key: 'competitors', label: 'Competitors Mentions', stroke: '#7BD8EB' },
   ] as const;
-  const data = trendsData.runs.map((run) => ({
+  const data = trendRuns.map((run) => ({
     date: formatRunDate(run.startedAt),
     brand: run.brandMentions,
     competitors: run.competitorMentions,
   }));
   return { data, series };
-}, [trendsData]);
+}, [trendRuns]);
 
 // Share of Voice — brand + the top 4 competitors observed in the latest
 // run. Each series shows that host's mention count per run, so users see
@@ -3475,7 +3525,7 @@ const shareOfVoiceChart = useMemo(() => {
     })),
   ];
 
-  const data = trendsData.runs.map((run) => {
+  const data = trendRuns.map((run) => {
     const row: Record<string, string | number> = { date: formatRunDate(run.startedAt) };
     row[brandKey] = run.brandMentions;
     compKeys.forEach((host, i) => {
@@ -3484,14 +3534,15 @@ const shareOfVoiceChart = useMemo(() => {
     return row;
   });
   return { data, series };
-}, [trendsData, reportData]);
+}, [trendsData.topCompetitors, trendRuns, reportData]);
 
 // Empty-state copy shared by all three trend charts. Uses the same phrasing
 // so the message blends with the rest of the dashboard's "honest empty"
 // language elsewhere.
 const trendEmptyMessage = (() => {
   if (trendsData.runs.length === 0) return 'Run an audit to see trend data';
-  if (trendsData.runs.length === 1) return 'One audit so far - run another audit to compare';
+  if (trendRuns.length === 0) return 'No runs in this time range';
+  if (trendRuns.length === 1) return 'One audit so far - run another audit to compare';
   return undefined;
 })();
 
@@ -3525,6 +3576,7 @@ const filteredPrompts = useMemo(() => {
 // if the run summary was cleared).
 const [opportunitiesRetrying, setOpportunitiesRetrying] = useState(false);
 const [retryError, setRetryError] = useState<string | null>(null);
+const refetchInsights = insightsQuery.refetch;
 const handleRetryOpportunities = useCallback(async () => {
   if (!domainId) {
     setRetryError('No domain selected.');
@@ -3534,14 +3586,17 @@ const handleRetryOpportunities = useCallback(async () => {
   setRetryError(null);
   try {
     // Invalidate the cached /report for this domain+run; the useReport
-    // hook above refetches automatically and updates reportData.
+    // hook above refetches automatically and updates reportData. Then force
+    // the full insights query so the button visibly recovers from an error.
     await queryClient.invalidateQueries({ queryKey: aiResultsKeys.report(domainId, selectedRunId, 'full') });
+    const result = await refetchInsights();
+    if (result.error) throw result.error;
   } catch (err: any) {
     setRetryError(err?.message ?? 'Retry failed');
   } finally {
     setOpportunitiesRetrying(false);
   }
-}, [domainId, selectedRunId, queryClient]);
+}, [domainId, selectedRunId, queryClient, refetchInsights]);
 
 const opportunitiesEmptyState = useMemo(() => {
     const summary = (reportData?.summary ?? {}) as Record<string, any>;
@@ -3561,12 +3616,32 @@ const opportunitiesEmptyState = useMemo(() => {
     const insightsStatus = typeof reportData?.metrics?.insightsStatus === 'string'
       ? reportData.metrics.insightsStatus
       : null;
+    const insightsError = typeof reportData?.metrics?.insightsError === 'string'
+      ? reportData.metrics.insightsError
+      : null;
+    const queryError = insightsQuery.error instanceof Error ? insightsQuery.error.message : null;
+
+    if (insightsQuery.isFetching && !insightsData) {
+      return {
+        title: 'Checking opportunity analysis',
+        body: 'The report loaded. The full scored gap scan is still being fetched.',
+        meta: null as string | null,
+      };
+    }
 
     if (insightsQuery.isError) {
       return {
         title: 'Could not load opportunity analysis',
         body: 'The report loaded, but the full insights request failed. Retry the analysis to fetch the gap scan again.',
-        meta: null as string | null,
+        meta: queryError,
+      };
+    }
+
+    if (insightsStatus === 'error') {
+      return {
+        title: 'Opportunity analysis could not complete',
+        body: 'The report metrics loaded, but the scored gap scan hit an internal error. Retry the analysis to run it again.',
+        meta: insightsError,
       };
     }
 
@@ -3619,16 +3694,70 @@ const opportunitiesEmptyState = useMemo(() => {
     }
 
     return {
-      title: 'No verified outrank gaps in this run',
+      title: 'No verified AI visibility gaps in this run',
       body: 'The gap detector found no lost prompts, citation gaps, rank downgrades, negative sentiment, or brand-vs-competitor misses across successful responses.',
       meta: `${successfulResponses} successful responses analyzed${failedResponses > 0 ? `; ${failedResponses} provider responses failed` : ''}.`,
     };
-  }, [insightsQuery.isError, reportData]);
+  }, [insightsData, insightsQuery.error, insightsQuery.isError, insightsQuery.isFetching, reportData]);
 
   const opportunitiesAnalysisLoading = Boolean(
     !insightsQuery.isError &&
     !reportData?.id
   );
+
+  const opportunityCategoryFilterKey = useMemo(
+    () => Array.from(categoryFilter).sort().join('|'),
+    [categoryFilter],
+  );
+  const sortedFilteredOpportunities = useMemo(() => {
+    const scoped = opportunities.filter((opp: any) => {
+      if (opportunitySeverityFilter !== 'all' && opp?.severity !== opportunitySeverityFilter) return false;
+      if (categoryFilter.size > 0) {
+        const category = typeof opp?.category === 'string' ? opp.category : null;
+        if (!category || !categoryFilter.has(category)) return false;
+      }
+      return true;
+    });
+
+    return scoped.sort((a: any, b: any) => {
+      if (opportunitySort === 'impact') {
+        return (
+          opportunityTrafficWeight(b?.trafficPotential) - opportunityTrafficWeight(a?.trafficPotential) ||
+          opportunitySeverityWeight(b?.severity) - opportunitySeverityWeight(a?.severity) ||
+          String(a?.title ?? '').localeCompare(String(b?.title ?? ''))
+        );
+      }
+      if (opportunitySort === 'title') {
+        return String(a?.title ?? '').localeCompare(String(b?.title ?? ''), undefined, { sensitivity: 'base' });
+      }
+      return (
+        opportunitySeverityWeight(b?.severity) - opportunitySeverityWeight(a?.severity) ||
+        Number(b?.severityScore ?? 0) - Number(a?.severityScore ?? 0) ||
+        opportunityTrafficWeight(b?.trafficPotential) - opportunityTrafficWeight(a?.trafficPotential) ||
+        String(a?.title ?? '').localeCompare(String(b?.title ?? ''))
+      );
+    });
+  }, [categoryFilter, opportunities, opportunityCategoryFilterKey, opportunitySeverityFilter, opportunitySort]);
+  const OPPORTUNITY_PAGE_SIZE = 5;
+  const opportunityTotalCount = sortedFilteredOpportunities.length;
+  const opportunityTotalPages = Math.max(1, Math.ceil(opportunityTotalCount / OPPORTUNITY_PAGE_SIZE));
+  const opportunityResetKey = useMemo(
+    () => sortedFilteredOpportunities.map((opp: any) => String(opp?.key ?? opp?.title ?? '')).join('|'),
+    [sortedFilteredOpportunities],
+  );
+
+  useEffect(() => {
+    setOpportunitiesPage(1);
+  }, [opportunityResetKey, opportunitySeverityFilter, opportunitySort, opportunityCategoryFilterKey]);
+
+  useEffect(() => {
+    if (opportunitiesPage > opportunityTotalPages) setOpportunitiesPage(opportunityTotalPages);
+  }, [opportunitiesPage, opportunityTotalPages]);
+
+  const paginatedOpportunities = useMemo(() => {
+    const start = (opportunitiesPage - 1) * OPPORTUNITY_PAGE_SIZE;
+    return sortedFilteredOpportunities.slice(start, start + OPPORTUNITY_PAGE_SIZE);
+  }, [opportunitiesPage, sortedFilteredOpportunities]);
 
 // SSE listener — flips running rows to done/failed when n8n pings back.
 useEffect(() => {
@@ -4003,15 +4132,30 @@ return (
         <CardHeader className="flex flex-col gap-3 px-4 pb-2 pt-4 sm:flex-row sm:items-center sm:justify-between">
           <CardTitle className="text-base font-semibold text-[#2D4059]">Visibility Insights</CardTitle>
           <div className="flex flex-wrap items-center gap-2">
-            <Button
-              variant="outline"
-              className="h-8 rounded-lg border border-[#D5D7DA] bg-white px-3 text-[11px] text-[#717680] shadow-[0_1px_2px_0_#1018280D] hover:bg-white"
-            >
-              <Calendar className="mr-1.5 h-3.5 w-3.5 text-[#717680]" strokeWidth={1.8} />
-              7 days
-              <ChevronDown className="ml-1.5 h-3.5 w-3.5 text-[#717680]" strokeWidth={1.8} />
-            </Button>
-            <FilterPill label="Sort" icon="sort" />
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  className="h-8 rounded-lg border border-[#D5D7DA] bg-white px-3 text-[11px] text-[#717680] shadow-[0_1px_2px_0_#1018280D] hover:bg-white"
+                >
+                  <Calendar className="mr-1.5 h-3.5 w-3.5 text-[#717680]" strokeWidth={1.8} />
+                  {trendWindowLabel}
+                  <ChevronDown className="ml-1.5 h-3.5 w-3.5 text-[#717680]" strokeWidth={1.8} />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-[150px] p-1">
+                {TREND_WINDOW_OPTIONS.map((option) => (
+                  <DropdownMenuItem
+                    key={option.label}
+                    onClick={() => setTrendWindowDays(option.value)}
+                    className="flex cursor-pointer items-center justify-between rounded-md px-2 py-1.5 text-[12px]"
+                  >
+                    {option.label}
+                    {trendWindowDays === option.value ? <Check className="h-3.5 w-3.5 text-blue-600" /> : null}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </CardHeader>
         <CardContent className="space-y-8 px-4 pb-4">
@@ -4079,33 +4223,93 @@ return (
           </CardContent>
         </Card>
 
-        <Card id="ai-results-opportunities" data-title="Outrank Opportunities" className="rounded-xl border border-[#D5D7DA] bg-white shadow-[0_1px_2px_0_#1018280D]">
+        <Card id="ai-results-opportunities" data-title="AI Visibility Gaps" className="rounded-xl border border-[#D5D7DA] bg-white shadow-[0_1px_2px_0_#1018280D]">
           <CardHeader className="flex flex-col gap-3 px-4 pb-3 pt-4">
             <div className="flex min-w-0 items-start justify-between gap-3">
               <div className="min-w-0">
-                <CardTitleWithTip title="Opportunities to Outrank Competitors" />
+                <CardTitleWithTip title="Verified AI Visibility Gaps" />
                 <p className="mt-2 text-sm leading-[150%] text-[#535862]">
-                  Prioritized recommendations to improve rankings, increase citations, and outperform competitors in AI search.
+                  Generated from the latest completed audit's scored responses: lost prompts, citation gaps, rank downgrades, negative sentiment, and brand-vs-competitor misses.
                 </p>
               </div>
               <button
                 type="button"
-                onClick={handleRetryOpportunities}
-                disabled={opportunitiesRetrying}
-                className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg border border-[#D5D7DA] bg-white px-2.5 text-xs font-medium text-slate-600 shadow-[0_1px_2px_0_#1018280D] hover:bg-slate-50 hover:text-slate-900 disabled:opacity-50"
-                title="Re-run analysis"
+                onClick={() => navigate(resolveSidebarNavigation('competitor-intelligence').path)}
+                className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg bg-[#F1F6FF] px-3 text-xs font-semibold text-[#2F80ED] transition-colors hover:bg-[#E7F0FF]"
               >
-                <RefreshCw className={cn('h-3.5 w-3.5', opportunitiesRetrying && 'animate-spin')} />
-                Retry
+                View all
+                <ChevronRight className="h-3.5 w-3.5" strokeWidth={2} />
               </button>
             </div>
             {opportunities.length > 0 ? (
               <div className="flex flex-wrap items-center gap-2">
-                <FilterPill label="Sort: By Models" icon="sort" />
-                <FilterPill label="Filters" icon="filter" />
-                <button className="h-8 whitespace-nowrap rounded-lg px-2 text-xs font-medium text-blue-600 hover:bg-blue-50">
-                  View all
-                </button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className="h-8 rounded-lg border border-[#D5D7DA] bg-white px-2.5 text-[11px] font-normal text-[#717680] shadow-[0_1px_2px_0_#1018280D] hover:bg-white"
+                    >
+                      <img src="/report-icons/ascending-arrow.svg" alt="" className="mr-1.5 h-3.5 w-3.5 shrink-0" />
+                      Sort: {OPPORTUNITY_SORT_OPTIONS.find((option) => option.value === opportunitySort)?.label ?? 'Highest severity'}
+                      <ChevronDown className="ml-1.5 h-3.5 w-3.5 shrink-0 text-[#717680]" strokeWidth={1.8} />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="w-[160px] p-1">
+                    {OPPORTUNITY_SORT_OPTIONS.map((option) => (
+                      <DropdownMenuItem
+                        key={option.value}
+                        onClick={() => setOpportunitySort(option.value)}
+                        className="flex cursor-pointer items-center justify-between rounded-md px-2 py-1.5 text-[12px]"
+                      >
+                        {option.label}
+                        {opportunitySort === option.value ? <Check className="h-3.5 w-3.5 text-blue-600" /> : null}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className="h-8 rounded-lg border border-[#D5D7DA] bg-white px-2.5 text-[11px] font-normal text-[#717680] shadow-[0_1px_2px_0_#1018280D] hover:bg-white"
+                    >
+                      <Filter className="mr-1.5 h-3.5 w-3.5 shrink-0 text-[#717680]" strokeWidth={1.8} />
+                      {OPPORTUNITY_SEVERITY_OPTIONS.find((option) => option.value === opportunitySeverityFilter)?.label ?? 'Filters'}
+                      {categoryFilter.size > 0 ? (
+                        <span className="ml-1.5 inline-flex h-4 min-w-[16px] items-center justify-center rounded-full bg-blue-600 px-1 text-[10px] font-semibold text-white">
+                          {categoryFilter.size}
+                        </span>
+                      ) : null}
+                      <ChevronDown className="ml-1.5 h-3.5 w-3.5 shrink-0 text-[#717680]" strokeWidth={1.8} />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="w-[190px] p-1">
+                    {OPPORTUNITY_SEVERITY_OPTIONS.map((option) => (
+                      <DropdownMenuItem
+                        key={option.value}
+                        onClick={() => setOpportunitySeverityFilter(option.value)}
+                        className="flex cursor-pointer items-center justify-between rounded-md px-2 py-1.5 text-[12px]"
+                      >
+                        {option.label}
+                        {opportunitySeverityFilter === option.value ? <Check className="h-3.5 w-3.5 text-blue-600" /> : null}
+                      </DropdownMenuItem>
+                    ))}
+                    {(opportunitySeverityFilter !== 'all' || categoryFilter.size > 0) ? (
+                      <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          onClick={() => {
+                            setOpportunitySeverityFilter('all');
+                            setCategoryFilter(new Set());
+                          }}
+                          className="cursor-pointer rounded-md px-2 py-1.5 text-[12px] text-slate-500"
+                        >
+                          Clear opportunity filters
+                        </DropdownMenuItem>
+                      </>
+                    ) : null}
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
             ) : null}
           </CardHeader>
@@ -4145,7 +4349,15 @@ return (
                   </button>
                 </div>
               ) : null}
-              {opportunities.map((opp: any) => (
+              {!opportunitiesAnalysisLoading && opportunities.length > 0 && paginatedOpportunities.length === 0 ? (
+                <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-4 py-4">
+                  <p className="text-sm font-semibold leading-5 text-[#2D4059]">No opportunities match the current filters.</p>
+                  <p className="mt-1 text-xs leading-5 text-slate-600">
+                    Clear the priority or category filters to review the full opportunity list.
+                  </p>
+                </div>
+              ) : null}
+              {paginatedOpportunities.map((opp: any) => (
                 <OpportunityRow
                   key={opp.key}
                   title={opp.title}
@@ -4172,6 +4384,36 @@ return (
                 />
               ))}
             </div>
+            {opportunities.length > 0 ? (
+              <div className="mt-3 flex items-center justify-between gap-3 border-t border-slate-200 pt-3">
+                <span className="text-[11px] font-medium tracking-tight text-gray-500">
+                  {opportunityTotalCount === 0
+                    ? 'No rows'
+                    : `Showing ${(opportunitiesPage - 1) * OPPORTUNITY_PAGE_SIZE + 1}–${Math.min(opportunitiesPage * OPPORTUNITY_PAGE_SIZE, opportunityTotalCount)} of ${opportunityTotalCount}`}
+                </span>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setOpportunitiesPage((page) => Math.max(1, page - 1))}
+                    disabled={opportunitiesPage <= 1}
+                    className="rounded-md border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-medium text-slate-600 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    Prev
+                  </button>
+                  <span className="px-2 text-[11px] font-medium text-slate-500 tabular-nums">
+                    {opportunitiesPage} / {opportunityTotalPages}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setOpportunitiesPage((page) => Math.min(opportunityTotalPages, page + 1))}
+                    disabled={opportunitiesPage >= opportunityTotalPages}
+                    className="rounded-md border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-medium text-slate-600 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            ) : null}
           </CardContent>
         </Card>
       </div>

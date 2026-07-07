@@ -18,13 +18,11 @@ import {
 import {
   AlignLeft,
   Bot,
-  Calendar,
   ChevronDown,
   ChevronRight,
   Download,
   ExternalLink,
   FileText,
-  Filter,
   Globe2,
   Info,
   Languages,
@@ -526,22 +524,6 @@ const KeywordExpandedDetails = ({
     <div className="bg-[#fcfcfd] px-4 py-4">
       <div className="mb-2 flex items-center justify-between">
         <h4 className="text-[15px] font-medium text-[#3f4754]">Detailed keyword analysis</h4>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            className="h-8 rounded-[8px] border-[#d7dde7] bg-white px-3 text-[11px] font-medium text-[#717b8b] shadow-none"
-          >
-            7 days
-            <ChevronDown className="ml-2 h-3.5 w-3.5" />
-          </Button>
-          <Button
-            variant="outline"
-            className="h-8 rounded-[8px] border-[#d7dde7] bg-white px-3 text-[11px] font-medium text-[#717b8b] shadow-none"
-          >
-            Models
-            <ChevronDown className="ml-2 h-3.5 w-3.5" />
-          </Button>
-        </div>
       </div>
       <div className="grid grid-cols-[1fr_2.4fr] gap-3 border-t border-[#eef2f6] pt-4">
         <KeywordVisibilityComparisonGraph
@@ -585,8 +567,7 @@ export const KeywordTrackingTable = ({
       return { metric, direction: "asc" };
     });
   };
-  // Page-based pagination (10 rows / page). Replaces the prior
-  // View all / Show less toggle.
+  // Page-based pagination (10 rows / page).
   const PAGE_SIZE = 10;
   const [currentPage, setCurrentPage] = useState(1);
 
@@ -698,10 +679,14 @@ export const KeywordTrackingTable = ({
 
   const totalCount = fullSortedData.length;
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
+  const pageResetKey = useMemo(
+    () => fullSortedData.map((row) => String(row.id)).join("|"),
+    [fullSortedData],
+  );
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [tableSort]);
+  }, [tableSort, pageResetKey]);
   useEffect(() => {
     if (currentPage > totalPages) setCurrentPage(totalPages);
   }, [currentPage, totalPages]);
@@ -743,36 +728,7 @@ export const KeywordTrackingTable = ({
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" className="h-[38px] gap-2 rounded-lg border-slate-200 px-3 text-slate-600 shadow-none hover:bg-gray-50">
-                  <Calendar className="h-[16px] w-[16px]" />
-                  <span className="text-[13px] font-medium">7 days</span>
-                  <ChevronDown className="ml-1 h-3.5 w-3.5 opacity-60" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-[150px]">
-                <DropdownMenuItem>7 days</DropdownMenuItem>
-                <DropdownMenuItem>14 days</DropdownMenuItem>
-                <DropdownMenuItem>30 days</DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="h-[38px] gap-2 rounded-lg border-slate-200 px-3 capitalize text-slate-600 shadow-none hover:bg-gray-50">
                   <AlignLeft className="h-[16px] w-[16px]" />
-                  <span className="text-[13px] font-medium">Sort</span>
-                  <ChevronDown className="ml-1 h-3.5 w-3.5 opacity-60" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-[150px]">
-                <DropdownMenuItem>Sort by Relevance</DropdownMenuItem>
-                <DropdownMenuItem>Sort by Sentiment</DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="h-[38px] gap-2 rounded-lg border-slate-200 px-3 text-slate-600 shadow-none hover:bg-gray-50">
-                  <Filter className="h-[16px] w-[16px]" />
                   <span className="text-[13px] font-medium">{getKeywordSortLabel(tableSort)}</span>
                   <ChevronDown className="ml-1 h-3.5 w-3.5 opacity-60" />
                 </Button>

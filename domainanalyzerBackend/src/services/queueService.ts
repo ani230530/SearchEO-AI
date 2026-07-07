@@ -3,6 +3,8 @@ import IORedis from 'ioredis';
 import axios from 'axios';
 import { prisma } from '../lib/prisma';
 import { formatRedisError, getRedisUrl } from '../lib/redisConfig';
+import { decryptToken } from './tokenEncryption';
+import { buildWordpressPublishPayload } from './contentFlowService';
 
 
 // Redis Connection
@@ -17,6 +19,26 @@ connection.on('error', (error) => {
 
 // Queue Name
 const N8N_QUEUE_NAME = 'n8n-queue';
+const PUBLISH_WEBHOOK_URL =
+    process.env.N8N_PUBLISH_WEBHOOK_URL ||
+    'https://n8n.srv891599.hstgr.cloud/webhook/a30fde1b-f254-4ff9-86b7-ba83f9bef42f';
+const N8N_API_KEY = process.env.N8N_API_KEY || '1234';
+const N8N_API_KEY_HEADER = process.env.N8N_API_KEY_HEADER || 'key';
+const N8N_TIMEOUT_MS = Number(process.env.N8N_TIMEOUT_MS) || 300000;
+
+const getStringValue = (val: any): string | undefined => {
+    if (typeof val === 'string' && val.trim()) return val.trim();
+    return undefined;
+};
+
+const getNumberValue = (val: any): number | undefined => {
+    if (typeof val === 'number' && Number.isFinite(val)) return Math.trunc(val);
+    if (typeof val === 'string' && val.trim()) {
+        const parsed = Number(val.trim());
+        if (!Number.isNaN(parsed)) return Math.trunc(parsed);
+    }
+    return undefined;
+};
 
 // Job Types
 export const JOB_TYPES = {
@@ -47,7 +69,7 @@ const worker = new Worker(
         }
 
         try {
-            const { url, payload, headers, timeout, meta } = job.data;
+            const { url, payload, headers, timeout, meta } = await resolvePublishJobExecution(job);
 
             if (!url) {
                 throw new Error('Missing webhook URL');
@@ -114,7 +136,7 @@ const worker = new Worker(
             console.error(`[Queue] Job ${job.id} failed:`, error.message);
 
             if (job.name === JOB_TYPES.PUBLISH) {
-                await handlePublishFailure(job, error, job.data.meta);
+                await handlePublishFailure(job, error, await resolvePublishFailureMeta(job));
             } else if (job.name === JOB_TYPES.CAMPAIGN_GENERATION) {
                 await handleCampaignGenerationFailure(job, error, job.data.meta);
             }
@@ -134,6 +156,116 @@ const worker = new Worker(
         }
     }
 );
+
+async function resolvePublishJobExecution(job: Job): Promise<{
+    url: string;
+    payload: any;
+    headers: Record<string, string>;
+    timeout: number;
+    meta: any;
+}> {
+    const draftId = getNumberValue(job.data?.draftId);
+    if (draftId) {
+        const draft = await prisma.wordpressPublishLog.findUnique({
+            where: { id: draftId },
+        });
+        if (!draft) {
+            throw new Error(`Draft ${draftId} not found`);
+        }
+
+        const integrationId = draft.integrationId ?? getNumberValue(job.data?.meta?.integrationId);
+        if (!integrationId) {
+            throw new Error('WordPress integration not configured');
+        }
+
+        const integration = await prisma.wordpressIntegration.findUnique({
+            where: { id: integrationId },
+        });
+        if (!integration) {
+            throw new Error('WordPress integration not configured');
+        }
+
+        const decryptedPassword = decryptToken(integration.password);
+        const { payload, draftContent } = buildWordpressPublishPayload(draft, {
+            username: integration.username,
+            password: decryptedPassword,
+            siteUrl: integration.siteUrl,
+        });
+
+        if (draft.status === 'scheduled') {
+            await prisma.wordpressPublishLog.update({
+                where: { id: draft.id },
+                data: {
+                    status: 'generating',
+                    response: {
+                        ...(((draft.response as Record<string, unknown> | null) || {}) as Record<string, unknown>),
+                        status: 'generating',
+                    },
+                },
+            });
+            const { broadcastToUser } = await import('./sseService');
+            broadcastToUser(draft.userId, {
+                type: 'publish_update',
+                draftId: draft.id,
+                pageId: getNumberValue(job.data?.meta?.pageId),
+                status: 'generating',
+            });
+        }
+
+        return {
+            url: PUBLISH_WEBHOOK_URL,
+            payload,
+            headers: {
+                'Content-Type': 'application/json',
+                [N8N_API_KEY_HEADER]: N8N_API_KEY,
+            },
+            timeout: N8N_TIMEOUT_MS,
+            meta: {
+                draftId: draft.id,
+                userId: draft.userId,
+                integrationId: integration.id,
+                primaryKeyword: draftContent.primaryKeyword,
+                title: draftContent.title,
+                slug: draftContent.slug,
+                pageId: getNumberValue(job.data?.meta?.pageId),
+            },
+        };
+    }
+
+    const { url, payload, headers, timeout, meta } = job.data || {};
+    return {
+        url: getStringValue(url) || PUBLISH_WEBHOOK_URL,
+        payload,
+        headers: headers || {
+            'Content-Type': 'application/json',
+            [N8N_API_KEY_HEADER]: N8N_API_KEY,
+        },
+        timeout: timeout || N8N_TIMEOUT_MS,
+        meta,
+    };
+}
+
+async function resolvePublishFailureMeta(job: Job): Promise<any> {
+    const draftId = getNumberValue(job.data?.draftId);
+    if (!draftId) {
+        return job.data?.meta;
+    }
+
+    const draft = await prisma.wordpressPublishLog.findUnique({
+        where: { id: draftId },
+        select: { id: true, userId: true, integrationId: true },
+    });
+    if (!draft) {
+        return job.data?.meta ?? { draftId };
+    }
+
+    return {
+        ...(job.data?.meta || {}),
+        draftId: draft.id,
+        userId: draft.userId,
+        integrationId: draft.integrationId,
+    };
+}
 
 // Helper for Publish Success
 async function handlePublishCompletion(job: Job, responseData: any, meta: any) {
@@ -220,6 +352,7 @@ async function handlePublishCompletion(job: Job, responseData: any, meta: any) {
                 wordpressUrl: finalUrl,
                 wordpressPostId: wordpressPostId ?? null,
                 status: finalStatus,
+                publishedAt: new Date(),
                 response: mergedResponse,
                 slug: entry?.slug ?? slug,
             }
@@ -290,15 +423,29 @@ worker.on('failed', async (job: Job | undefined, err: Error) => {
     console.error(`[Queue] Job ${job?.id} failed permanently: ${err.message}`);
 });
 
-export const addN8nJob = async (type: string, data: any) => {
+export interface AddN8nJobOptions {
+    jobId?: string;
+    delay?: number;
+    attempts?: number;
+    backoff?: {
+        type: 'exponential' | 'fixed';
+        delay: number;
+    };
+    removeOnComplete?: boolean | number;
+    removeOnFail?: boolean | number;
+}
+
+export const addN8nJob = async (type: string, data: any, options: AddN8nJobOptions = {}) => {
     return n8nQueue.add(type, data, {
-        attempts: 3,
-        backoff: {
+        jobId: options.jobId,
+        delay: options.delay,
+        attempts: options.attempts ?? 3,
+        backoff: options.backoff ?? {
             type: 'exponential',
             delay: 1000,
         },
-        removeOnComplete: true, // Keep Redis clean
-        removeOnFail: false, // Keep failed jobs for inspection
+        removeOnComplete: options.removeOnComplete ?? true, // Keep Redis clean
+        removeOnFail: options.removeOnFail ?? false, // Keep failed jobs for inspection
     });
 };
 

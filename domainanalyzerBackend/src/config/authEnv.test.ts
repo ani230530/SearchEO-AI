@@ -12,6 +12,7 @@ const TRACKED_KEYS = [
   ...REQUIRED_KEYS,
   'REFRESH_TOKEN_TTL_MINUTES',
   'BACKEND_PUBLIC_URL',
+  'GOOGLE_REDIRECT_URI',
   'GOOGLE_AUTH_REDIRECT_URI',
   'NODE_ENV',
   'PORT',
@@ -35,6 +36,7 @@ function seedRequiredAuthEnv(extra: Record<string, string | undefined> = {}) {
 
   delete process.env.REFRESH_TOKEN_TTL_MINUTES;
   delete process.env.BACKEND_PUBLIC_URL;
+  delete process.env.GOOGLE_REDIRECT_URI;
   delete process.env.GOOGLE_AUTH_REDIRECT_URI;
   delete process.env.NODE_ENV;
   delete process.env.PORT;
@@ -93,6 +95,16 @@ describe('authEnv', () => {
   it('derives the Google auth callback from BACKEND_PUBLIC_URL', async () => {
     process.env.NODE_ENV = 'production';
     process.env.BACKEND_PUBLIC_URL = 'https://myapibackend.girlpowerx.com/';
+    vi.resetModules();
+    const { authEnv } = await import('./authEnv');
+    expect(authEnv.GOOGLE_AUTH_REDIRECT_URI).toBe(
+      'https://myapibackend.girlpowerx.com/api/auth/google/auth-callback',
+    );
+  });
+
+  it('derives the Google auth callback from the GSC redirect host when BACKEND_PUBLIC_URL is omitted', async () => {
+    process.env.NODE_ENV = 'production';
+    process.env.GOOGLE_REDIRECT_URI = 'https://myapibackend.girlpowerx.com/api/auth/google/callback';
     vi.resetModules();
     const { authEnv } = await import('./authEnv');
     expect(authEnv.GOOGLE_AUTH_REDIRECT_URI).toBe(

@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState, type ComponentPropsWithoutRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { apiPatch, apiPost } from "@/services/apiClient";
@@ -21,11 +21,13 @@ import {
   ArrowUp,
   Bot,
   Calendar,
+  Check,
   ChevronDown,
   ChevronRight,
   Download,
   ExternalLink,
   FileText,
+  Filter,
   Globe2,
   Info,
   LayoutGrid,
@@ -44,6 +46,7 @@ import {
   CartesianGrid,
   ReferenceDot,
   ResponsiveContainer,
+  Tooltip as ChartTooltip,
   XAxis,
   YAxis,
 } from "recharts";
@@ -147,7 +150,8 @@ type PromptSortMetric =
   | "coverage"
   | "ranking"
   | "volume"
-  | "sentiment";
+  | "sentiment"
+  | "trending";
 
 const PROMPT_SORT_LABELS: Record<PromptSortMetric, string> = {
   prompts: "Prompts",
@@ -156,12 +160,69 @@ const PROMPT_SORT_LABELS: Record<PromptSortMetric, string> = {
   ranking: "Ranking",
   volume: "Volume",
   sentiment: "Sentiment",
+  trending: "Trending",
 };
 
 const getPromptSortLabel = (sort: SortState<PromptSortMetric>) => {
   if (!sort) return "Sort";
   return `${PROMPT_SORT_LABELS[sort.metric]} ${sort.direction === "asc" ? "↑" : "↓"}`;
 };
+
+// The Figma "Sort" popover exposes four business-friendly options; each maps to
+// a real metric we already compute (no invented "impact/gap" numbers — see the
+// data-honesty note). Impact = search volume, Trending = day-over-day delta,
+// Gap score = lowest visibility first, Brand accuracy = sentiment.
+type PromptSortPreset = {
+  key: string;
+  label: string;
+  metric: PromptSortMetric;
+  direction: "asc" | "desc";
+};
+
+const PROMPT_SORT_PRESETS: PromptSortPreset[] = [
+  { key: "impact", label: "Impact", metric: "volume", direction: "desc" },
+  { key: "trending", label: "Trending", metric: "trending", direction: "desc" },
+  { key: "gap", label: "Gap score", metric: "visibility", direction: "asc" },
+  { key: "accuracy", label: "Brand accuracy", metric: "sentiment", direction: "desc" },
+];
+
+// The Figma "Filters" popover lists six checkboxes. We only wire the four that
+// map to real per-row data; "Prompts"/"Keywords" have no meaning in this
+// prompts-only table, so they're rendered disabled rather than faked.
+type PromptFilterOption = {
+  key: string;
+  label: string;
+  /** null → shown disabled (no backing data in this view). */
+  predicate: ((row: PromptTableRow) => boolean) | null;
+};
+
+const PROMPT_FILTER_OPTIONS: PromptFilterOption[] = [
+  {
+    key: "mention_rate",
+    label: "Mention rate",
+    predicate: (row) => Number(row.mentions ?? 0) > 0,
+  },
+  {
+    key: "citations",
+    label: "Citations",
+    predicate: (row) => (row.results ?? []).some((r) => (r.citations?.length ?? 0) > 0),
+  },
+  { key: "prompts", label: "Prompts", predicate: null },
+  { key: "keywords", label: "Keywords", predicate: null },
+  {
+    key: "gap_score",
+    label: "Gap score",
+    predicate: (row) => {
+      const v = Number.parseFloat(String(row.sov ?? "").replace("%", ""));
+      return Number.isFinite(v) && v < 30;
+    },
+  },
+  {
+    key: "brand_accuracy",
+    label: "Brand accuracy",
+    predicate: (row) => typeof row.avgSentiment === "number" && row.avgSentiment >= 7,
+  },
+];
 
 const CATEGORY_LABELS: Record<string, string> = {
   unbranded_recommendation: "Unbranded recommendation",
@@ -316,7 +377,7 @@ const getHref = (value: string) => {
 };
 
 const markdownLinkComponents = {
-  a: ({ href, children, ...props }: any) => {
+  a: ({ href, children, ...props }: ComponentPropsWithoutRef<"a">) => {
     const resolvedHref = getHref(typeof href === "string" ? href : "");
     return (
       <a href={resolvedHref} target="_blank" rel="noopener noreferrer" {...props}>
@@ -368,6 +429,7 @@ type HistoryRun = {
   attempted?: number;
   failed?: number;
   total: number;
+  avgSentiment?: number | null;
   byModel?: Record<string, { mentions: number; total: number; presenceRate: number }>;
 };
 
@@ -380,6 +442,36 @@ const GRAPH_TIME_WINDOWS: Array<{ label: string; days: number | null }> = [
   { label: "90 days", days: 90 },
 ];
 
+const TRACKED_DETAIL_SLOTS = ["Week 1", "Week 2", "Week 3", "Week 4"];
+
+const formatHistoryDate = (value?: string | Date | null) => {
+  if (!value) return "Not tracked";
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return "Not tracked";
+  return date.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+};
+
+const getLatestHistorySlots = (runs: HistoryRun[]) => {
+  const ordered = [...runs]
+    .filter((run) => Number.isFinite(new Date(run.startedAt).getTime()))
+    .sort((a, b) => new Date(a.startedAt).getTime() - new Date(b.startedAt).getTime())
+    .slice(-TRACKED_DETAIL_SLOTS.length);
+
+  return TRACKED_DETAIL_SLOTS.map((label, index) => {
+    const run = ordered[index] ?? null;
+    const previous = index > 0 ? ordered[index - 1] ?? null : null;
+    const delta = run && previous ? run.presenceRate - previous.presenceRate : null;
+    return { label, run, delta };
+  });
+};
+
+const getHistoryRunModels = (run?: HistoryRun | null) => {
+  if (!run?.byModel) return [];
+  return Object.entries(run.byModel)
+    .map(([model, stats]) => ({ model, ...stats }))
+    .sort((a, b) => getModelLabel(a.model).localeCompare(getModelLabel(b.model)));
+};
+
 const PromptVisibilityComparisonGraph = ({
   results,
   domainId,
@@ -389,6 +481,7 @@ const PromptVisibilityComparisonGraph = ({
   historyKind,
   timeWindowDays = null,
   modelFilter = null,
+  wide = false,
 }: {
   results: ProcessedPromptResult[];
   domainId?: number | null;
@@ -401,6 +494,8 @@ const PromptVisibilityComparisonGraph = ({
   timeWindowDays?: number | null;
   /** Plot a single model's presence (raw model key) instead of the aggregate. */
   modelFilter?: string | null;
+  /** Expanded tracking graph tab uses the full row width instead of split-panel chrome. */
+  wide?: boolean;
 }) => {
   // When a single model is selected, scope the per-model summary box to it too.
   const presenceRows = buildModelPresenceRows(results).filter(
@@ -456,7 +551,7 @@ const PromptVisibilityComparisonGraph = ({
   const singleRun = chartData.length === 1 ? chartData[0] : null;
 
   return (
-    <div className="relative border-r border-[#e7ebf2] pr-3">
+    <div className={`relative ${wide ? "" : "border-r border-[#e7ebf2] pr-3"}`}>
       {/* Real per-model presence summary — one row per model with the live
           mention/total ratio for this prompt. Falls back to nothing if no
           results were captured. */}
@@ -517,6 +612,33 @@ const PromptVisibilityComparisonGraph = ({
               type="number"
             />
             <YAxis axisLine={false} domain={[0, 100]} hide tickLine={false} />
+            <ChartTooltip
+              cursor={{ stroke: "#83a9da", strokeWidth: 1 }}
+              content={({ active, payload }) => {
+                if (!active || !payload?.length) return null;
+                const point = payload[0]?.payload as
+                  | {
+                      label?: string;
+                      presence?: number;
+                      mentions?: number;
+                      total?: number;
+                      attempted?: number;
+                      failed?: number;
+                    }
+                  | undefined;
+                if (!point) return null;
+                return (
+                  <div className="min-w-[190px] rounded-[10px] border border-slate-200 bg-white px-3 py-2 text-[11px] shadow-[0_10px_30px_rgba(15,23,42,0.12)]">
+                    <p className="font-semibold text-slate-900">{point.label ?? "Tracked run"}</p>
+                    <div className="mt-1 space-y-0.5 text-slate-600">
+                      <p>Visibility: <span className="font-semibold text-slate-900">{point.presence ?? 0}%</span></p>
+                      <p>Mentions: {point.mentions ?? 0} of {point.total ?? 0} scored responses</p>
+                      {point.failed ? <p>Failed provider attempts: {point.failed}</p> : null}
+                    </div>
+                  </div>
+                );
+              }}
+            />
             <Area dataKey="presence" fill="url(#prompt-detail-fill)" stroke="#83a9da" strokeWidth={1.5} type="monotone" />
             {lastIdx >= 0 ? (
               <ReferenceDot
@@ -884,7 +1006,21 @@ export const PromptExpandedDetails = ({
   const [windowIdx, setWindowIdx] = useState(0); // default: All time
   const [graphModel, setGraphModel] = useState<string | null>(null); // default: All models
   const graphModelLabel = graphModel ? getModelLabel(graphModel) : "All models";
-  const weeklyHistory = (historyKind ?? (trackedView ? "weekly" : "audit")) === "weekly";
+  const effectiveHistoryKind = historyKind ?? (trackedView ? "weekly" : "audit");
+  const weeklyHistory = effectiveHistoryKind === "weekly";
+  const [detailTab, setDetailTab] = useState<"table" | "graph">("table");
+  const { data: historyData, isLoading: loadingHistory } = usePromptHistory<{
+    runs: HistoryRun[];
+  }>(domainId ?? null, rawId ?? null, rowType, effectiveHistoryKind);
+  const historyRuns = useMemo(() => historyData?.runs ?? [], [historyData?.runs]);
+  const historyRunsInWindow = useMemo(() => {
+    const days = GRAPH_TIME_WINDOWS[windowIdx].days;
+    if (!days) return historyRuns;
+    const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
+    return historyRuns.filter((run) => new Date(run.startedAt).getTime() >= cutoff);
+  }, [historyRuns, windowIdx]);
+  const historySlots = useMemo(() => getLatestHistorySlots(historyRunsInWindow), [historyRunsInWindow]);
+  const mentionPills = useMemo(() => buildModelPresenceRows(processedResults), [processedResults]);
 
   if (processedResults.length === 0) {
     return (
@@ -910,23 +1046,47 @@ export const PromptExpandedDetails = ({
   }
 
   return (
-    <div className="bg-[#fcfcfd] px-4 py-4">
-      <div className="mb-2 flex items-center justify-between">
-        <h4 className="text-[15px] font-medium text-[#3f4754]">Detailed prompt analysis</h4>
-        <div className="flex items-center gap-2">
-          {weeklyHistory ? (
-            <span className="inline-flex items-center gap-1.5 rounded-[8px] border border-[#d7dde7] bg-white px-3 h-8 text-[11px] font-medium text-[#717b8b]">
-              <Calendar className="h-3.5 w-3.5" />
-              {fmtDate(lastTestedAt) ? `Last tested ${fmtDate(lastTestedAt)}` : "Not yet tested"}
-              {fmtDate(nextTestAt) ? ` · Next ${fmtDate(nextTestAt)}` : ""}
-            </span>
-          ) : (
+    <div className="bg-white px-4 py-4">
+      <div className="rounded-[12px] border border-[#e5ebf4] bg-white p-4 shadow-[0_1px_4px_rgba(15,23,42,0.04)]">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="min-w-0">
+            <h4 className="text-[17px] font-semibold text-[#3f4754]">Prompt position trend</h4>
+            <p className="mt-2 text-[12px] font-medium text-slate-600">
+              Prompt: <span className="font-normal italic text-[#58606f]">{phrase}</span>
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {mentionPills.length > 0 ? (
+                mentionPills.map((item) => (
+                  <span
+                    key={item.model}
+                    className="inline-flex h-8 items-center gap-1.5 rounded-[8px] border border-[#d9e2f2] bg-white px-2.5 text-[11px] font-medium text-[#47608a]"
+                  >
+                    {getModelIcon(item.model, "sm")}
+                    {item.label} mentions <span className="font-semibold text-[#2f6bff]">{item.score}</span>
+                  </span>
+                ))
+              ) : (
+                <span className="inline-flex h-8 items-center rounded-[8px] border border-dashed border-slate-200 bg-slate-50 px-2.5 text-[11px] text-slate-500">
+                  No model mention data
+                </span>
+              )}
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+            {weeklyHistory ? (
+              <span className="inline-flex h-8 items-center gap-1.5 rounded-[8px] bg-[#0d7c1c] px-3 text-[11px] font-semibold text-white">
+                <Check className="h-3.5 w-3.5" />
+                Tracked
+              </span>
+            ) : null}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
                   variant="outline"
                   className="h-8 rounded-[8px] border-[#d7dde7] bg-white px-3 text-[11px] font-medium text-[#717b8b] shadow-none"
                 >
+                  <Calendar className="mr-1.5 h-3.5 w-3.5" />
                   {GRAPH_TIME_WINDOWS[windowIdx].label}
                   <ChevronDown className="ml-2 h-3.5 w-3.5" />
                 </Button>
@@ -943,57 +1103,157 @@ export const PromptExpandedDetails = ({
                 ))}
               </DropdownMenuContent>
             </DropdownMenu>
-          )}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="outline"
-                className="h-8 rounded-[8px] border-[#d7dde7] bg-white px-3 text-[11px] font-medium text-[#717b8b] shadow-none"
-              >
-                {graphModelLabel}
-                <ChevronDown className="ml-2 h-3.5 w-3.5" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-[180px] p-1">
-              <DropdownMenuItem
-                onClick={() => setGraphModel(null)}
-                className={`rounded-md px-2 py-1.5 text-[12px] font-medium ${graphModel === null ? "bg-slate-50" : ""}`}
-              >
-                All models
-              </DropdownMenuItem>
-              {processedResults.map((result) => (
+            <span className="inline-flex h-8 items-center rounded-[8px] border border-[#d7dde7] bg-white px-3 text-[11px] font-medium text-[#717b8b]">
+              {fmtDate(lastTestedAt) ? `Last ${fmtDate(lastTestedAt)}` : "No completed run"}
+              {weeklyHistory && fmtDate(nextTestAt) ? ` · Next ${fmtDate(nextTestAt)}` : ""}
+            </span>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  className="h-8 rounded-[8px] border-[#d7dde7] bg-white px-3 text-[11px] font-medium text-[#717b8b] shadow-none"
+                >
+                  {graphModelLabel}
+                  <ChevronDown className="ml-2 h-3.5 w-3.5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-[180px] p-1">
                 <DropdownMenuItem
-                  key={result.model}
-                  onClick={() => setGraphModel(result.model)}
-                  className={`flex items-center gap-2 rounded-md px-2 py-1.5 text-[12px] font-medium ${
-                    result.model === graphModel ? "bg-slate-50" : ""
+                  onClick={() => setGraphModel(null)}
+                  className={`rounded-md px-2 py-1.5 text-[12px] font-medium ${graphModel === null ? "bg-slate-50" : ""}`}
+                >
+                  All models
+                </DropdownMenuItem>
+                {processedResults.map((result) => (
+                  <DropdownMenuItem
+                    key={result.model}
+                    onClick={() => setGraphModel(result.model)}
+                    className={`flex items-center gap-2 rounded-md px-2 py-1.5 text-[12px] font-medium ${
+                      result.model === graphModel ? "bg-slate-50" : ""
+                    }`}
+                  >
+                    {getModelIcon(result.model, "sm")}
+                    {getModelLabel(result.model)}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <div className="inline-flex h-8 rounded-[8px] bg-slate-100 p-0.5">
+              {(["table", "graph"] as const).map((tab) => (
+                <button
+                  key={tab}
+                  type="button"
+                  onClick={() => setDetailTab(tab)}
+                  className={`rounded-[7px] px-3 text-[11px] font-semibold capitalize transition ${
+                    detailTab === tab
+                      ? "bg-[#7395dd] text-white shadow-sm"
+                      : "text-slate-500 hover:text-slate-700"
                   }`}
                 >
-                  {getModelIcon(result.model, "sm")}
-                  {getModelLabel(result.model)}
-                </DropdownMenuItem>
+                  {tab}
+                </button>
               ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
+            </div>
+          </div>
         </div>
-      </div>
-      <div className="grid grid-cols-[0.98fr_1.08fr] gap-3 border-t border-[#eef2f6] pt-4">
-        <PromptVisibilityComparisonGraph
-          results={processedResults}
-          domainId={domainId}
-          promptRawId={rawId}
-          rowType={rowType}
-          trackedView={trackedView}
-          historyKind={historyKind}
-          timeWindowDays={GRAPH_TIME_WINDOWS[windowIdx].days}
-          modelFilter={graphModel}
-        />
-        <PromptAIResponsePanel
-          phrase={phrase}
-          results={processedResults}
-          selectedModel={selectedModel}
-          setSelectedModel={setSelectedModel}
-        />
+
+        <div className="mt-4 border-t border-dashed border-[#e5ebf4] pt-4">
+          {detailTab === "table" ? (
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+              {historySlots.map(({ label, run, delta }) => {
+                const models = getHistoryRunModels(run);
+                const tracked = Boolean(run);
+                return (
+                  <div key={label} className="min-h-[132px] rounded-[12px] border border-[#edf1f7] bg-[#fbfcff] p-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <p className="text-[12px] font-semibold text-[#1f2937]">{label}</p>
+                        <p className="mt-1 text-[10px] text-slate-400">{formatHistoryDate(run?.startedAt)}</p>
+                      </div>
+                      {tracked ? (
+                        <span
+                          className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                            delta == null || delta >= 0
+                              ? "bg-emerald-50 text-emerald-700"
+                              : "bg-rose-50 text-rose-700"
+                          }`}
+                        >
+                          {delta == null || delta >= 0 ? (
+                            <ArrowUp className="h-3 w-3" />
+                          ) : (
+                            <ArrowDownRight className="h-3 w-3" />
+                          )}
+                          {delta == null ? "Tracked" : `${Math.abs(delta)}%`}
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-500">
+                          Not tracked
+                        </span>
+                      )}
+                    </div>
+                    {tracked ? (
+                      <>
+                        <div className="mt-3 flex items-baseline gap-2">
+                          <span className="text-[22px] font-semibold leading-none text-[#2d3748]">{run?.presenceRate ?? 0}%</span>
+                          <span className="text-[10px] font-medium text-slate-500">
+                            {run?.mentions ?? 0}/{run?.total ?? 0} cited
+                          </span>
+                        </div>
+                        <div className="mt-3 space-y-2">
+                          {models.length > 0 ? (
+                            models.slice(0, 3).map((model) => (
+                              <div key={model.model} className="flex items-center justify-between gap-2 text-[10px] text-slate-600">
+                                <span className="flex min-w-0 items-center gap-1.5">
+                                  {model.presenceRate > 0 ? (
+                                    <Check className="h-3.5 w-3.5 shrink-0 rounded-full bg-[#0d7c1c] p-0.5 text-white" />
+                                  ) : (
+                                    <span className="h-3.5 w-3.5 shrink-0 rounded-full border border-rose-300" />
+                                  )}
+                                  {getModelIcon(model.model, "sm")}
+                                  <span className="truncate">{getModelLabel(model.model)}</span>
+                                </span>
+                                <span className="shrink-0 font-semibold text-[#47608a]">{model.presenceRate}%</span>
+                              </div>
+                            ))
+                          ) : (
+                            <p className="text-[11px] text-slate-400">No per-model breakdown saved.</p>
+                          )}
+                        </div>
+                      </>
+                    ) : (
+                      <div className="mt-6 rounded-[8px] border border-dashed border-slate-200 bg-white px-3 py-4 text-center text-[11px] text-slate-400">
+                        {loadingHistory ? "Loading run history..." : "No completed tracked run in this slot."}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="rounded-[12px] border border-[#edf1f7] bg-[#fbfcff] p-3">
+              <PromptVisibilityComparisonGraph
+                results={processedResults}
+                domainId={domainId}
+                promptRawId={rawId}
+                rowType={rowType}
+                trackedView={trackedView}
+                historyKind={effectiveHistoryKind}
+                timeWindowDays={GRAPH_TIME_WINDOWS[windowIdx].days}
+                modelFilter={graphModel}
+                wide
+              />
+            </div>
+          )}
+        </div>
+
+        <div className="mt-4">
+          <PromptAIResponsePanel
+            phrase={phrase}
+            results={processedResults}
+            selectedModel={selectedModel}
+            setSelectedModel={setSelectedModel}
+          />
+        </div>
       </div>
     </div>
   );
@@ -1067,7 +1327,8 @@ export const PromptTable = ({
   const togglePhrase = (id: string) =>
     setOpenPhrases((prev) => {
       const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
       return next;
     });
   const [tableSort, setTableSort] = useState<SortState<PromptSortMetric>>(null);
@@ -1094,11 +1355,11 @@ export const PromptTable = ({
       return { metric, direction: "asc" };
     });
   };
-  // Page-based pagination (10 rows / page). Replaces the prior
-  // View all / Show less toggle — both because page navigation is more
-  // predictable for large lists, and because the parent flow can now
-  // create many new rows via Analyze Prompt.
-  const PAGE_SIZE = 10;
+  // Page-based pagination with a user-selectable page size ("how many prompts
+  // in the table"). Page navigation is predictable for large lists and for rows
+  // created via Analyze Prompt.
+  const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
+  const [pageSize, setPageSize] = useState(PAGE_SIZE_OPTIONS[0]);
   const [currentPage, setCurrentPage] = useState(1);
 
   // ── Daily tracking ───────────────────────────────────────────────────────
@@ -1392,6 +1653,8 @@ export const PromptTable = ({
             return compareNumbers(getPromptVolumeScore(a), getPromptVolumeScore(b), tableSort.direction);
           case "sentiment":
             return compareNumbers(a.avgSentiment, b.avgSentiment, tableSort.direction);
+          case "trending":
+            return compareNumbers(a.weekTrend?.delta ?? null, b.weekTrend?.delta ?? null, tableSort.direction);
           default:
             return 0;
         }
@@ -1420,25 +1683,48 @@ export const PromptTable = ({
     return baseItems;
   }, [categoryFilter, data, tableSort, newlyAnalyzedRows, trackedFilterOnly, trackOverrides]);
 
-  const totalCount = fullSortedData.length;
-  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
+  // Figma "Filters" popover — active filter keys, AND-combined against the
+  // already-sorted list. Only keys with a real predicate narrow anything.
+  const [activeFilters, setActiveFilters] = useState<Set<string>>(new Set());
+  const toggleFilter = (key: string) =>
+    setActiveFilters((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+
+  const filteredData = useMemo(() => {
+    const preds = PROMPT_FILTER_OPTIONS.filter(
+      (option) => activeFilters.has(option.key) && option.predicate,
+    ).map((option) => option.predicate!);
+    if (preds.length === 0) return fullSortedData;
+    return fullSortedData.filter((row) => preds.every((predicate) => predicate(row)));
+  }, [fullSortedData, activeFilters]);
+
+  const totalCount = filteredData.length;
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+  const pageResetKey = useMemo(
+    () => filteredData.map((row) => String(row.id)).join("|"),
+    [filteredData],
+  );
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [tableSort, categoryFilter]);
+  }, [tableSort, categoryFilter, trackedFilterOnly, pageResetKey, pageSize]);
   useEffect(() => {
     if (currentPage > totalPages) setCurrentPage(totalPages);
   }, [currentPage, totalPages]);
 
   const displayData = useMemo(() => {
-    const start = (currentPage - 1) * PAGE_SIZE;
-    return fullSortedData.slice(start, start + PAGE_SIZE);
-  }, [fullSortedData, currentPage]);
+    const start = (currentPage - 1) * pageSize;
+    return filteredData.slice(start, start + pageSize);
+  }, [filteredData, currentPage, pageSize]);
 
   // Rows on the current page that are selected (for the bulk action).
   const selectedRows = useMemo(
-    () => fullSortedData.filter((r) => selectedIds.has(r.id)),
-    [fullSortedData, selectedIds],
+    () => filteredData.filter((r) => selectedIds.has(r.id)),
+    [filteredData, selectedIds],
   );
 
   return (
@@ -1480,6 +1766,72 @@ export const PromptTable = ({
               <span className="text-[13px] font-medium">Current result set</span>
             </Button>
 
+            {/* Filters popover (funnel) — multi-select, stays open while checking. */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="relative h-[38px] w-[38px] rounded-lg border-slate-200 text-slate-600 shadow-none hover:bg-gray-50"
+                  aria-label="Filters"
+                >
+                  <Filter className="h-[16px] w-[16px]" />
+                  {activeFilters.size > 0 ? (
+                    <span className="absolute -right-1 -top-1 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-[#4b6eb8] px-1 text-[9px] font-semibold text-white">
+                      {activeFilters.size}
+                    </span>
+                  ) : null}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-[240px] p-0">
+                <div className="flex items-center justify-between px-3 py-2.5">
+                  <span className="text-[13px] font-semibold text-slate-700">Filters</span>
+                  <button
+                    type="button"
+                    onClick={() => setActiveFilters(new Set())}
+                    className="text-[11px] font-medium text-slate-400 transition hover:text-slate-600"
+                  >
+                    Clear All
+                  </button>
+                </div>
+                <DropdownMenuSeparator className="my-0" />
+                <div className="p-1.5">
+                  {PROMPT_FILTER_OPTIONS.map((option) => {
+                    const disabled = option.predicate == null;
+                    const checked = activeFilters.has(option.key);
+                    return (
+                      <DropdownMenuItem
+                        key={option.key}
+                        disabled={disabled}
+                        onSelect={(event) => {
+                          event.preventDefault();
+                          if (!disabled) toggleFilter(option.key);
+                        }}
+                        className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-[12px]"
+                      >
+                        <span
+                          className={`flex h-4 w-4 items-center justify-center rounded border ${
+                            checked ? "border-[#4b6eb8] bg-[#4b6eb8] text-white" : "border-slate-300 bg-white"
+                          }`}
+                        >
+                          {checked ? <Check className="h-3 w-3" /> : null}
+                        </span>
+                        <span className={disabled ? "text-slate-400" : "text-slate-700"}>
+                          {option.label}
+                          {disabled ? <span className="ml-1 text-[10px] text-slate-400">(n/a here)</span> : null}
+                        </span>
+                      </DropdownMenuItem>
+                    );
+                  })}
+                </div>
+                <DropdownMenuSeparator className="my-0" />
+                <div className="px-3 py-2 text-[11px] font-medium text-slate-500">
+                  Selected ({activeFilters.size})
+                </div>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* Sort popover (sliders) — single choice, maps to a real metric. */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" className="h-[38px] gap-2 rounded-lg border-slate-200 px-3 text-slate-600 shadow-none hover:bg-gray-50">
@@ -1488,13 +1840,29 @@ export const PromptTable = ({
                   <ChevronDown className="ml-1 h-3.5 w-3.5 opacity-60" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-[180px]">
-                <DropdownMenuItem onClick={() => setTableSort(null)}>Default order</DropdownMenuItem>
+              <DropdownMenuContent align="end" className="w-[190px] p-1">
+                <div className="px-2 py-1.5 text-[13px] font-semibold text-slate-700">Sort</div>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => setTableSort({ metric: "prompts", direction: "asc" })}>Prompts A-Z</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setTableSort({ metric: "prompts", direction: "desc" })}>Prompts Z-A</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setTableSort({ metric: "sentiment", direction: "desc" })}>Sentiment</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setTableSort({ metric: "ranking", direction: "asc" })}>Position</DropdownMenuItem>
+                {PROMPT_SORT_PRESETS.map((preset) => {
+                  const active = tableSort?.metric === preset.metric && tableSort?.direction === preset.direction;
+                  return (
+                    <DropdownMenuItem
+                      key={preset.key}
+                      onClick={() => setTableSort({ metric: preset.metric, direction: preset.direction })}
+                      className="flex cursor-pointer items-center justify-between rounded-md px-2 py-1.5 text-[12px]"
+                    >
+                      {preset.label}
+                      {active ? <Check className="h-3.5 w-3.5 text-blue-600" /> : null}
+                    </DropdownMenuItem>
+                  );
+                })}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={() => setTableSort(null)}
+                  className="cursor-pointer rounded-md px-2 py-1.5 text-[12px] text-slate-500"
+                >
+                  Default order
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
 
@@ -1656,22 +2024,6 @@ export const PromptTable = ({
                 </TableHead>
                 <TableHead className="px-2 text-[11px] font-semibold text-[#31415f]">
                   <SortableTableHeader
-                    label="Visibility"
-                    tooltip={<Info className="h-[10px] w-[10px] text-slate-400" />}
-                    activeDirection={tableSort?.metric === "visibility" ? tableSort.direction : null}
-                    onToggleSort={() => toggleTableSort("visibility")}
-                  />
-                </TableHead>
-                <TableHead className="px-2 text-[11px] font-semibold text-[#31415f]">
-                  <SortableTableHeader
-                    label="Coverage"
-                    tooltip={<Info className="h-[10px] w-[10px] text-slate-400" />}
-                    activeDirection={tableSort?.metric === "coverage" ? tableSort.direction : null}
-                    onToggleSort={() => toggleTableSort("coverage")}
-                  />
-                </TableHead>
-                <TableHead className="px-2 text-[11px] font-semibold text-[#31415f]">
-                  <SortableTableHeader
                     label="Ranking"
                     tooltip={<Info className="h-[10px] w-[10px] text-slate-400" />}
                     activeDirection={tableSort?.metric === "ranking" ? tableSort.direction : null}
@@ -1688,11 +2040,32 @@ export const PromptTable = ({
                 </TableHead>
                 <TableHead className="px-2 text-[11px] font-semibold text-[#31415f]">
                   <SortableTableHeader
+                    label="Coverage"
+                    tooltip={<Info className="h-[10px] w-[10px] text-slate-400" />}
+                    activeDirection={tableSort?.metric === "coverage" ? tableSort.direction : null}
+                    onToggleSort={() => toggleTableSort("coverage")}
+                  />
+                </TableHead>
+                <TableHead className="px-2 text-[11px] font-semibold text-[#31415f]">
+                  <SortableTableHeader
+                    label="Visibility"
+                    tooltip={<Info className="h-[10px] w-[10px] text-slate-400" />}
+                    activeDirection={tableSort?.metric === "visibility" ? tableSort.direction : null}
+                    onToggleSort={() => toggleTableSort("visibility")}
+                  />
+                </TableHead>
+                <TableHead className="px-2 text-[11px] font-semibold text-[#31415f]">
+                  <SortableTableHeader
                     label="Sentiment"
                     tooltip={<Info className="h-[10px] w-[10px] text-slate-400" />}
                     activeDirection={tableSort?.metric === "sentiment" ? tableSort.direction : null}
                     onToggleSort={() => toggleTableSort("sentiment")}
                   />
+                </TableHead>
+                <TableHead className="px-2 text-[11px] font-semibold text-[#31415f]">
+                  <div className="flex items-center gap-1">
+                    Model <Info className="h-[10px] w-[10px] text-slate-400" />
+                  </div>
                 </TableHead>
                 <TableHead className="px-4 text-right text-[11px] font-semibold text-[#31415f] rounded-tr-lg">
                   <div className="flex items-center justify-end gap-1">
@@ -1728,7 +2101,7 @@ export const PromptTable = ({
                       </span>
                     </div>
                   </TableCell>
-                  <TableCell colSpan={6} className="px-2 py-3">
+                  <TableCell colSpan={7} className="px-2 py-3">
                     <div className="flex items-center gap-2 text-[12px] font-light text-slate-400">
                       <Loader2 className="h-3 w-3 animate-spin" />
                       Running across models — typically 15–30s
@@ -1788,19 +2161,25 @@ export const PromptTable = ({
                       </div>
                     </TableCell>
                     <TableCell className="px-2 py-3 text-[11px] font-medium text-slate-600">
-                      <span className="inline-flex items-center gap-1">
-                        {row.sov}
-                        {(() => {
-                          const delta = row.weekTrend?.delta;
-                          if (typeof delta !== "number" || delta === 0) return null;
-                          const up = delta > 0;
-                          return (
-                            <span className={`inline-flex items-center text-[10px] font-semibold ${up ? "text-emerald-600" : "text-rose-600"}`}>
-                              {up ? <ArrowUp className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
-                              {Math.abs(delta)}%
-                            </span>
-                          );
-                        })()}
+                      {/* Ranking column with three honest states:
+                          1. Brand IS in a ranked list (rankPosition > 0) → "#N" (best)
+                          2. Brand mentioned but never in a ranked list → "Mentioned"
+                             (most prose AI responses fall here)
+                          3. Brand not mentioned anywhere → "—"
+                          Previous version collapsed cases 2 + 3 into a single
+                          "—" which made the column look uniformly broken. */}
+                      {(() => {
+                        const formatted = formatRankValue(getPromptRankingScore(row));
+                        if (formatted) return <span>{formatted}</span>;
+                        if (row.mentions > 0) {
+                          return <span className="text-emerald-600">Mentioned</span>;
+                        }
+                        return <span className="text-slate-400">—</span>;
+                      })()}
+                    </TableCell>
+                    <TableCell className="px-2 py-3">
+                      <span className="text-[11px] font-medium text-slate-600">
+                        {getSuccessfulResponseCount(row) || "—"}
                       </span>
                     </TableCell>
                     <TableCell className="px-2 py-3">
@@ -1829,25 +2208,19 @@ export const PromptTable = ({
                       })()}
                     </TableCell>
                     <TableCell className="px-2 py-3 text-[11px] font-medium text-slate-600">
-                      {/* Ranking column with three honest states:
-                          1. Brand IS in a ranked list (rankPosition > 0) → "#N" (best)
-                          2. Brand mentioned but never in a ranked list → "Mentioned"
-                             (most prose AI responses fall here)
-                          3. Brand not mentioned anywhere → "—"
-                          Previous version collapsed cases 2 + 3 into a single
-                          "—" which made the column look uniformly broken. */}
-                      {(() => {
-                        const formatted = formatRankValue(getPromptRankingScore(row));
-                        if (formatted) return <span>{formatted}</span>;
-                        if (row.mentions > 0) {
-                          return <span className="text-emerald-600">Mentioned</span>;
-                        }
-                        return <span className="text-slate-400">—</span>;
-                      })()}
-                    </TableCell>
-                    <TableCell className="px-2 py-3">
-                      <span className="text-[11px] font-medium text-slate-600">
-                        {getSuccessfulResponseCount(row) || "—"}
+                      <span className="inline-flex items-center gap-1">
+                        {row.sov}
+                        {(() => {
+                          const delta = row.weekTrend?.delta;
+                          if (typeof delta !== "number" || delta === 0) return null;
+                          const up = delta > 0;
+                          return (
+                            <span className={`inline-flex items-center text-[10px] font-semibold ${up ? "text-emerald-600" : "text-rose-600"}`}>
+                              {up ? <ArrowUp className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
+                              {Math.abs(delta)}%
+                            </span>
+                          );
+                        })()}
                       </span>
                     </TableCell>
                     <TableCell className="px-2 py-3">
@@ -1868,6 +2241,25 @@ export const PromptTable = ({
                           {row.avgSentiment > 7 ? "Positive" : row.avgSentiment >= 4 ? "Neutral" : "Negative"}
                         </Badge>
                       )}
+                    </TableCell>
+                    <TableCell className="px-2 py-3">
+                      <div className="flex items-center gap-1">
+                        {(() => {
+                          const models = Array.from(
+                            new Set(
+                              (row.results ?? [])
+                                .filter((result) => result.status !== "failed" && result.model)
+                                .map((result) => result.model),
+                            ),
+                          );
+                          if (models.length === 0) return <span className="text-[11px] text-slate-400">—</span>;
+                          return models.slice(0, 3).map((model) => (
+                            <span key={model} title={getModelLabel(model)}>
+                              {getModelIcon(model)}
+                            </span>
+                          ));
+                        })()}
+                      </div>
                     </TableCell>
                     <TableCell className="px-4 py-3 text-right">
                       <div className="flex justify-end gap-2">
@@ -1895,14 +2287,14 @@ export const PromptTable = ({
                           className="h-[38px] rounded-[14px] border-[#e8eef8] bg-[#eff4ff] px-3.5 text-[11px] font-semibold text-[#3b5d9c] shadow-none hover:bg-[#e7efff]"
                         >
                           <FileText className="mr-1.5 h-3.5 w-3.5" />
-                          Generate
+                          Draft Blog
                         </Button>
                       </div>
                     </TableCell>
                   </TableRow>
                   {expandedId === row.id ? (
                     <TableRow className="border-b border-slate-300 bg-white hover:bg-white">
-                      <TableCell colSpan={8} className="p-0">
+                      <TableCell colSpan={9} className="p-0">
                         <PromptExpandedDetails
                           results={row.results}
                           phrase={row.phrase}
@@ -1922,12 +2314,37 @@ export const PromptTable = ({
             </TableBody>
           </Table>
         </div>
-        <div className="mt-2 flex items-center justify-between gap-3 border-t border-slate-200 px-6 py-3">
-          <span className="text-[11px] font-medium tracking-tight text-gray-500">
-            {totalCount === 0
-              ? "No rows"
-              : `Showing ${(currentPage - 1) * PAGE_SIZE + 1}–${Math.min(currentPage * PAGE_SIZE, totalCount)} of ${totalCount}`}
-          </span>
+        <div className="mt-2 flex flex-col gap-3 border-t border-slate-200 px-6 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-3">
+            <span className="text-[11px] font-medium tracking-tight text-gray-500">
+              {totalCount === 0
+                ? "No rows"
+                : `Showing ${(currentPage - 1) * pageSize + 1}–${Math.min(currentPage * pageSize, totalCount)} of ${totalCount}`}
+            </span>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className="inline-flex h-7 items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2 text-[11px] font-medium text-slate-600 transition-colors hover:bg-slate-50"
+                  aria-label="Rows per page"
+                >
+                  {pageSize} / page
+                  <ChevronDown className="h-3 w-3 opacity-60" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-[120px]">
+                {PAGE_SIZE_OPTIONS.map((size) => (
+                  <DropdownMenuItem
+                    key={size}
+                    onClick={() => setPageSize(size)}
+                    className={size === pageSize ? "bg-slate-50" : ""}
+                  >
+                    {size} / page
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
           <div className="flex items-center gap-1">
             <button
               type="button"

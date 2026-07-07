@@ -17,6 +17,7 @@ import knowledgeBaseRouter from './routes/knowledgeBase.routes';
 import wizardRouter from './wizard/routes';
 import chatRouter from './routes/chat';
 import userRouter from './routes/user';
+import blogRouter from './routes/blog';
 import blogAnalyticsRouter from './routes/blogAnalytics';
 import domainCompatRouter from './routes/domainCompat';
 import logoProxyRouter from './routes/logoProxy';
@@ -25,6 +26,7 @@ import { prisma } from './lib/prisma';
 import { authenticateToken, AuthenticatedRequest } from './middleware/auth';
 import { addSSEClient, removeSSEClient } from './services/sseService';
 import { startTimeoutChecker } from './services/n8nTimeout';
+import { seedAdminAccountOnStartup } from './services/adminBootstrap';
 
 const app = express();
 
@@ -50,6 +52,8 @@ const allowedOrigins = new Set([
   'https://domainanalyzer-rosy.vercel.app',
   'https://seo-gpt-teal.vercel.app',
   'https://search-eo-ai.vercel.app',
+  'https://searcheo.ai',
+  'https://www.searcheo.ai',
   ...configuredOrigins,
 ]);
 
@@ -112,6 +116,7 @@ app.use('/api/user', userRouter);
 app.use('/api/domain', domainCompatRouter);
 app.use('/api/wizard', wizardRouter);
 app.use('/api/chat', chatRouter);
+app.use('/api/blog', blogRouter);
 app.use('/api/blog-analytics', blogAnalyticsRouter);
 app.use('/api/gsc', googleSearchConsoleRouter);
 app.use('/api/campaigns', campaignsRouter);
@@ -181,19 +186,34 @@ if (NODE_ENV === 'production') {
   }
 }
 
-app.listen(PORT, () => {
-  console.log(`Server running in ${NODE_ENV} mode on port ${PORT}`);
-  console.log(`Health check: http://localhost:${PORT}/api/health`);
-  startTimeoutChecker();
-  // Worksheet generation stale-job sweeper (campaigns/blog flow).
-  const { startStaleJobSweeper } = require('./services/generationJobService');
-  startStaleJobSweeper();
-  // Daily tracked-prompt re-test scheduler (BullMQ repeatable, idempotent).
+async function bootstrap() {
+  await seedAdminAccountOnStartup();
+
+  app.listen(PORT, () => {
+    console.log(`Server running in ${NODE_ENV} mode on port ${PORT}`);
+    console.log(`Health check: http://localhost:${PORT}/api/health`);
+    startTimeoutChecker();
+    // Worksheet generation stale-job sweeper (campaigns/blog flow).
+    const { startStaleJobSweeper } = require('./services/generationJobService');
+    startStaleJobSweeper();
+    // Company blog scheduler auto-publishes scheduled posts.
+    const { startBlogScheduler } = require('./services/blogService');
+    startBlogScheduler();
+    // WordPress publish scheduler rehydrates delayed publish jobs after restarts.
+    const { startWordpressPublishScheduler } = require('./services/wordpressPublishScheduler');
+    startWordpressPublishScheduler();
+    // Daily tracked-prompt re-test scheduler (BullMQ repeatable, idempotent).
   if (process.env.DISABLE_TRACKED_PROMPT_SCHEDULER === 'true') {
     console.log('[startup] tracked-prompt scheduler disabled by env');
   } else {
-    const { registerWeeklyTracking } = require('./services/weeklyTrackingService');
-    registerWeeklyTracking().catch((e: unknown) =>
-      console.error('[startup] prompt tracking registration failed', e));
+      const { registerWeeklyTracking } = require('./services/weeklyTrackingService');
+      registerWeeklyTracking().catch((e: unknown) =>
+        console.error('[startup] prompt tracking registration failed', e));
   }
+  });
+}
+
+void bootstrap().catch((error: unknown) => {
+  console.error('[startup] bootstrap failed', error);
+  process.exitCode = 1;
 });

@@ -44,7 +44,7 @@ export const env = {
   STREAMING_BASE_URL: requireInProduction('STREAMING_BASE_URL'),
   WEBHOOK_SIGNING_SECRET: getRequired('WEBHOOK_SIGNING_SECRET'),
   WEBHOOK_REPLAY_WINDOW_SECONDS: Number(process.env.WEBHOOK_REPLAY_WINDOW_SECONDS || 300),
-  N8N_API_KEY: getRequired('N8N_API_KEY'),
+  N8N_API_KEY: getOptional('N8N_API_KEY'),
   N8N_API_KEY_HEADER: getOptional('N8N_API_KEY_HEADER', 'key')!,
   N8N_TIMEOUT_MS: Number(process.env.N8N_TIMEOUT_MS || 300000),
   /** @deprecated Replaced by the universal webhook in the worksheet refactor. Optional for backwards compatibility. */
@@ -54,19 +54,34 @@ export const env = {
     'N8N_UNIVERSAL_WEBHOOK_URL',
     'https://n8n.srv891599.hstgr.cloud/webhook/universal%20workflow'
   ),
-  N8N_REVIEW_WEBHOOK_URL: getRequired('N8N_REVIEW_WEBHOOK_URL'),
-  N8N_PUBLISH_WEBHOOK_URL: getRequired('N8N_PUBLISH_WEBHOOK_URL'),
-  N8N_EDIT_TEXT_WEBHOOK_URL: getRequired('N8N_EDIT_TEXT_WEBHOOK_URL'),
-  N8N_EDIT_IMAGE_WEBHOOK_URL: getRequired('N8N_EDIT_IMAGE_WEBHOOK_URL'),
-  N8N_AUDIT_WEBHOOK_URL: getRequired('N8N_AUDIT_WEBHOOK_URL'),
+  N8N_REVIEW_WEBHOOK_URL: getOptional('N8N_REVIEW_WEBHOOK_URL'),
+  N8N_PUBLISH_WEBHOOK_URL: getOptional('N8N_PUBLISH_WEBHOOK_URL'),
+  N8N_EDIT_TEXT_WEBHOOK_URL: getOptional('N8N_EDIT_TEXT_WEBHOOK_URL'),
+  N8N_EDIT_IMAGE_WEBHOOK_URL: getOptional('N8N_EDIT_IMAGE_WEBHOOK_URL'),
+  N8N_AUDIT_WEBHOOK_URL: getOptional('N8N_AUDIT_WEBHOOK_URL'),
+  N8N_BLOG_GENERATION_WEBHOOK_URL: getOptional('N8N_BLOG_GENERATION_WEBHOOK_URL'),
+  N8N_BLOG_GENERATION_USERNAME: getOptional('N8N_BLOG_GENERATION_USERNAME'),
+  N8N_BLOG_GENERATION_PASSWORD: getOptional('N8N_BLOG_GENERATION_PASSWORD'),
 };
 
 if (!Number.isFinite(env.WEBHOOK_REPLAY_WINDOW_SECONDS) || env.WEBHOOK_REPLAY_WINDOW_SECONDS <= 0) {
   throw new Error('[config] WEBHOOK_REPLAY_WINDOW_SECONDS must be a positive number');
 }
 
+function isLocalhostUrl(value: string): boolean {
+  try {
+    const hostname = new URL(value).hostname;
+    return hostname === 'localhost' || hostname === '127.0.0.1';
+  } catch {
+    return false;
+  }
+}
+
 if (env.isProduction) {
   if (!env.CALLBACK_BASE_URL || !env.STREAMING_BASE_URL) {
     throw new Error('[config] CALLBACK_BASE_URL and STREAMING_BASE_URL are required in production');
+  }
+  if (isLocalhostUrl(env.CALLBACK_BASE_URL) || isLocalhostUrl(env.STREAMING_BASE_URL)) {
+    throw new Error('[config] CALLBACK_BASE_URL and STREAMING_BASE_URL must not point to localhost in production');
   }
 }

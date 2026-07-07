@@ -1,288 +1,16 @@
 /**
- * competitorService — orchestrates the 4-stage competitor pipeline.
+ * competitorService — discovery-only competitor pipeline.
  *
- *   A. discoverCandidates  (competitorSources.ts)         → CompetitorCandidate[]
- *   B. verifyCandidates    (re-crawl + reject markets)    → VerifiedCompetitor[]
- *   C. scoreCandidates     (deterministic, no LLM)        → ScoredCompetitor[]
- *   D. rankWithLlm         (LLM ranks ONLY supplied list) → RankedCompetitor[]
- *
- * The LLM never invents names. It ranks, labels threat level, and writes a
- * one-line reasoning grounded in the verified signals. Same inputs → same
- * candidate set (with caching by seed-keyword hash).
+ * The hot path now stops after candidate discovery so competitor fetching can
+ * run in parallel with crawl work instead of waiting on validation, scoring,
+ * and ranking.
  */
 
 import type { PrismaClient } from '../../generated/prisma';
-import {
-  CompetitorCandidate,
-  CompanySize,
-  RankedCompetitor,
-  ScoredCompetitor,
-  ThreatLevel,
-  VerifiedCompetitor,
-} from './types';
-import { crawlDomain, inferCompanySize } from './crawlService';
+import { CompanySize, CompetitorCandidate, RankedCompetitor, ThreatLevel, VerifiedCompetitor } from './types';
 import { discoverCandidates } from './competitorSources';
-import { embedText, callJson, Models } from './llmClient';
-import { scoreCandidate, topN } from './scoring';
 
-const MAX_VERIFY_CONCURRENCY = 6;
-const MAX_VERIFIED = 15;
-
-/** Quick page check + mini-crawl (3 pages, no LLM synthesis) per candidate. */
-async function verifyOne(host: string, source: string): Promise<VerifiedCompetitor | null> {
-  try {
-    const result = await crawlDomain(`https://${host}`, { maxPages: 3, skipSynthesis: true });
-    if (result.pagesScanned === 0) return null;
-    const text = result.rawText;
-    if (!text || text.length < 200) return null;
-    return {
-      competitorHost: host,
-      source: source as VerifiedCompetitor['source'],
-      rawSignals: {},
-      verified: true,
-      industry: result.contextJson?.industry ?? null,
-      location: result.contextJson?.location ?? null,
-      companySize: inferCompanySize(text),
-      candidateText: text.slice(0, 4000),
-    };
-  } catch {
-    return null;
-  }
-}
-
-interface LlmVerifyContext {
-  ownDomainHost: string;
-  ownDomainSummary: string;
-  industry: string | null;
-  location: string | null;
-}
-
-interface LlmVerifyEntry {
-  competitorHost: string;
-  knownToModel: boolean;
-  fitScore: number;          // 0..1
-  industry: string | null;
-  location: string | null;
-  companySize: CompanySize | null;
-  description: string;       // 1–2 sentences; becomes candidateText for embedding
-}
-
-const VALID_SIZES: CompanySize[] = ['solo', 'smb', 'mid', 'enterprise'];
-
-/**
- * Ask the LLM to verify a batch of candidate hosts in ONE call instead of
- * doing 15 × 3-page mini-crawls. For well-known brands the model already
- * knows industry/location/size + can describe them; we only fall back to a
- * real mini-crawl for the ones it flags `knownToModel: false`.
- *
- * Expected effect: competitor verify drops from 30–60s to 3–8s on the happy
- * path. The LLM is constrained to "only mark knownToModel=true if you'd
- * recognize this brand without guessing" so hallucinations show up as
- * `knownToModel: false` and route to the crawler.
- */
-async function llmVerifyBatch(
-  candidates: CompetitorCandidate[],
-  ctx: LlmVerifyContext
-): Promise<Map<string, LlmVerifyEntry>> {
-  if (!candidates.length) return new Map();
-
-  const hostList = candidates.map((c, i) => `${i + 1}. ${c.competitorHost}`).join('\n');
-  const allowedHosts = new Set(candidates.map((c) => c.competitorHost.toLowerCase()));
-
-  try {
-    const payload = await callJson<{ entries: LlmVerifyEntry[] }>({
-      model: Models.competitors,
-      system:
-        'You verify whether candidate domains are real competitors of a target company. For each host, only set knownToModel=true if you genuinely recognize the brand and can describe it without guessing. If you would have to invent details, set knownToModel=false and leave fields null. Output strict JSON.',
-      user: [
-        `Target company host: ${ctx.ownDomainHost}`,
-        `Target industry: ${ctx.industry ?? 'unknown'}`,
-        `Target location: ${ctx.location ?? 'unknown'}`,
-        `Target summary: ${ctx.ownDomainSummary.slice(0, 1500) || '(no summary)'}`,
-        '',
-        'Candidate hosts:',
-        hostList,
-        '',
-        'For EACH host listed above, return one entry with this shape:',
-        '{ "competitorHost": <one of the listed hosts>,',
-        '  "knownToModel": boolean,',
-        '  "fitScore": number 0..1 (how strongly this is a real competitor of the target),',
-        '  "industry": string|null,',
-        '  "location": string|null (city/country if known),',
-        '  "companySize": "solo"|"smb"|"mid"|"enterprise"|null,',
-        '  "description": string (1–2 sentences describing what this company does — empty string if unknown) }',
-        '',
-        'Return strict JSON: { "entries": [ ... ] }. Include every candidate host exactly once.',
-      ].join('\n'),
-      temperature: 0.1,
-      maxTokens: 2200,
-    });
-    const map = new Map<string, LlmVerifyEntry>();
-    for (const e of payload.entries ?? []) {
-      if (!e || typeof e.competitorHost !== 'string') continue;
-      const host = e.competitorHost.toLowerCase().trim();
-      if (!allowedHosts.has(host)) continue; // drop hallucinated hosts
-      map.set(host, {
-        competitorHost: host,
-        knownToModel: Boolean(e.knownToModel),
-        fitScore: typeof e.fitScore === 'number' ? Math.max(0, Math.min(1, e.fitScore)) : 0,
-        industry: typeof e.industry === 'string' && e.industry.trim() ? e.industry.trim() : null,
-        location: typeof e.location === 'string' && e.location.trim() ? e.location.trim() : null,
-        companySize: VALID_SIZES.includes(e.companySize as CompanySize) ? (e.companySize as CompanySize) : null,
-        description: typeof e.description === 'string' ? e.description.trim() : '',
-      });
-    }
-    return map;
-  } catch {
-    return new Map();
-  }
-}
-
-async function verifyCandidates(
-  candidates: CompetitorCandidate[],
-  ctx: LlmVerifyContext
-): Promise<VerifiedCompetitor[]> {
-  const t0 = Date.now();
-  // Pass 1: batch-ask the LLM. Cheap (one call), no crawls.
-  const llmMap = await llmVerifyBatch(candidates, ctx);
-  console.log(`[PERF] competitor.verify.llm ${Date.now() - t0}ms candidates=${candidates.length} known=${[...llmMap.values()].filter((e) => e.knownToModel && e.description.length > 40).length}`);
-
-  const out: VerifiedCompetitor[] = [];
-  const needsCrawl: CompetitorCandidate[] = [];
-
-  for (const c of candidates) {
-    const entry = llmMap.get(c.competitorHost.toLowerCase());
-    // Accept LLM result only if it's confident AND produced a usable
-    // description (which becomes the embedding source). Otherwise fall back
-    // to a real mini-crawl.
-    if (entry && entry.knownToModel && entry.description.length >= 40) {
-      out.push({
-        competitorHost: c.competitorHost,
-        source: c.source,
-        rawSignals: { ...c.rawSignals, verifiedVia: 'llm' },
-        verified: true,
-        industry: entry.industry,
-        location: entry.location,
-        companySize: entry.companySize,
-        candidateText: entry.description,
-      });
-    } else {
-      needsCrawl.push(c);
-    }
-  }
-
-  // Pass 2: crawl the unknowns in parallel — usually 0–4 of 30.
-  if (needsCrawl.length > 0) {
-    const t1 = Date.now();
-    const queue = [...needsCrawl];
-    async function worker() {
-      while (queue.length) {
-        const c = queue.shift();
-        if (!c) return;
-        const v = await verifyOne(c.competitorHost, c.source);
-        if (v) out.push({ ...v, rawSignals: { ...c.rawSignals, verifiedVia: 'crawl' } });
-      }
-    }
-    await Promise.all(Array.from({ length: MAX_VERIFY_CONCURRENCY }, worker));
-    console.log(`[PERF] competitor.verify.crawl ${Date.now() - t1}ms crawled=${needsCrawl.length}`);
-  }
-
-  return out;
-}
-
-interface RankInputs {
-  ownDomainHost: string;
-  ownDomainSummary: string;
-  scored: ScoredCompetitor[];
-}
-
-interface LlmRankPayload {
-  rankings: Array<{
-    competitorHost: string;
-    rank: number;
-    threatLevel: ThreatLevel;
-    reasoning: string;
-  }>;
-}
-
-const VALID_THREATS: ThreatLevel[] = ['High', 'Medium', 'Low'];
-
-async function rankWithLlm({ ownDomainHost, ownDomainSummary, scored }: RankInputs): Promise<RankedCompetitor[]> {
-  if (!scored.length) return [];
-
-  // Constrained list — LLM is forbidden from adding hosts.
-  const candidateBlock = scored
-    .map((c, i) => {
-      return [
-        `${i + 1}. ${c.competitorHost}`,
-        `   industry: ${c.industry ?? 'unknown'}`,
-        `   location: ${c.location ?? 'unknown'}`,
-        `   size: ${c.companySize ?? 'unknown'}`,
-        `   similarity: ${c.similarityScore.toFixed(2)}`,
-        `   sources: ${(c.rawSignals.sources as string[] | undefined)?.join(',') ?? 'none'}`,
-      ].join('\n');
-    })
-    .join('\n\n');
-
-  const allowedHosts = new Set(scored.map((c) => c.competitorHost));
-
-  let payload: LlmRankPayload;
-  try {
-    payload = await callJson<LlmRankPayload>({
-      model: Models.competitors,
-      system:
-        'You rank verified competitor candidates. You may only output hosts from the supplied list. You must NEVER invent or add new hosts. Output strict JSON.',
-      user: [
-        `Target company: ${ownDomainHost}`,
-        `Summary: ${ownDomainSummary || '(no summary available)'}`,
-        '',
-        'Candidates:',
-        candidateBlock,
-        '',
-        'Return JSON: { "rankings": [{ "competitorHost": <one of the listed hosts>, "rank": 1..N, "threatLevel": "High"|"Medium"|"Low", "reasoning": "one sentence grounded in the supplied signals" }] }. Order matters: rank 1 = strongest competitor.',
-      ].join('\n'),
-      temperature: 0.1,
-      maxTokens: 1500,
-    });
-  } catch {
-    // Fallback: rank purely by similarityScore if LLM fails.
-    return scored.map((c, i) => ({
-      ...c,
-      rank: i + 1,
-      threatLevel: 'Medium' as ThreatLevel,
-      reasoning: `Ranked by deterministic similarity score (${c.similarityScore.toFixed(2)}).`,
-    }));
-  }
-
-  const seen = new Set<string>();
-  const ranked: RankedCompetitor[] = [];
-  for (const r of payload.rankings ?? []) {
-    if (!r || typeof r.competitorHost !== 'string') continue;
-    const host = r.competitorHost.toLowerCase().trim();
-    if (!allowedHosts.has(host) || seen.has(host)) continue; // drop hallucinations + dupes
-    const candidate = scored.find((c) => c.competitorHost === host);
-    if (!candidate) continue;
-    seen.add(host);
-    ranked.push({
-      ...candidate,
-      rank: ranked.length + 1,
-      threatLevel: VALID_THREATS.includes(r.threatLevel) ? r.threatLevel : 'Medium',
-      reasoning: typeof r.reasoning === 'string' && r.reasoning.trim().length > 0 ? r.reasoning.trim() : 'Ranked by similarity to your domain.',
-    });
-  }
-  // Append any candidates the LLM dropped, in original score order.
-  for (const c of scored) {
-    if (!seen.has(c.competitorHost)) {
-      ranked.push({
-        ...c,
-        rank: ranked.length + 1,
-        threatLevel: 'Medium',
-        reasoning: 'Auto-included by similarity score; LLM did not return a label.',
-      });
-    }
-  }
-  return ranked;
-}
+const MAX_COMPETITORS = 12;
 
 export interface RunCompetitorPipelineArgs {
   prisma: PrismaClient;
@@ -306,9 +34,27 @@ export interface CompetitorPipelineResult {
   ranked: RankedCompetitor[];
 }
 
+function candidateReasoning(candidate: CompetitorCandidate): string {
+  const signals = candidate.rawSignals ?? {};
+  if (typeof signals.llmReason === 'string' && signals.llmReason.trim()) return signals.llmReason.trim();
+  if (typeof signals.firstSeenSnippet === 'string' && signals.firstSeenSnippet.trim()) {
+    return signals.firstSeenSnippet.trim().slice(0, 240);
+  }
+  if (typeof signals.aiMentionCount === 'number' && signals.aiMentionCount > 0) {
+    return `Already appeared in ${signals.aiMentionCount} AI response${signals.aiMentionCount === 1 ? '' : 's'} for this domain.`;
+  }
+  const sources = Array.isArray(signals.sources) ? signals.sources.join(', ') : candidate.source;
+  return `Discovered from ${sources} competitor signals.`;
+}
+
+function threatForRank(rank: number): ThreatLevel {
+  if (rank <= 3) return 'High';
+  if (rank <= 8) return 'Medium';
+  return 'Low';
+}
+
 export async function runCompetitorPipeline(args: RunCompetitorPipelineArgs): Promise<CompetitorPipelineResult> {
-  // Stage A — discover. LLM-context proposer is the always-on baseline; the
-  // other sources layer on top when their keys are configured.
+  // Stage A — discover only. No verification, scoring, or ranking here.
   const tDiscover = Date.now();
   const ownLocationStr =
     [args.ownLocation?.country, args.ownLocation?.state].filter(Boolean).join(', ') || null;
@@ -328,46 +74,20 @@ export async function runCompetitorPipeline(args: RunCompetitorPipelineArgs): Pr
     console.error('[COMPETITOR] WARNING: No candidates discovered. Check OPENROUTER_API_KEY and LLM response.');
   }
 
-  // Stage B — verify. Batch LLM check first; mini-crawl only the unknowns.
-  const tVerify = Date.now();
-  const verified = await verifyCandidates(candidates, {
-    ownDomainHost: args.ownDomainHost,
-    ownDomainSummary: args.ownDomainSummary,
+  const ranked: RankedCompetitor[] = candidates.slice(0, MAX_COMPETITORS).map((candidate, index) => ({
+    ...candidate,
+    verified: true,
     industry: args.industry,
     location: ownLocationStr,
-  });
-  console.log(`[PERF] competitor.verify.total ${Date.now() - tVerify}ms verified=${verified.length}`);
+    companySize: args.ownSize,
+    candidateText: candidateReasoning(candidate),
+    similarityScore: Number(Math.max(0.5, 1 - index * 0.04).toFixed(2)),
+    rank: index + 1,
+    threatLevel: threatForRank(index + 1),
+    reasoning: candidateReasoning(candidate),
+  }));
 
-  // Stage C — score deterministically (with embeddings if we have them).
-  const tScore = Date.now();
-  const scored: ScoredCompetitor[] = [];
-  for (const v of verified) {
-    const candidateEmbedding = args.ownEmbedding ? await embedText(v.candidateText) : null;
-    scored.push(
-      scoreCandidate({
-        domainEmbedding: args.ownEmbedding,
-        domainSeedKeywords: args.ownSeedKeywords,
-        domainLocation: args.ownLocation,
-        domainSize: args.ownSize,
-        candidate: v,
-        candidateEmbedding,
-        candidateSeedKeywords: [], // we don't extract candidate seed keywords yet — future work
-      })
-    );
-  }
-  const top = topN(scored, MAX_VERIFIED);
-  console.log(`[PERF] competitor.score ${Date.now() - tScore}ms top=${top.length}`);
-
-  // Stage D — LLM ranks only.
-  const tRank = Date.now();
-  const ranked = await rankWithLlm({
-    ownDomainHost: args.ownDomainHost,
-    ownDomainSummary: args.ownDomainSummary,
-    scored: top,
-  });
-  console.log(`[PERF] competitor.rank ${Date.now() - tRank}ms ranked=${ranked.length}`);
-
-  return { candidates, verified, ranked };
+  return { candidates, verified: [], ranked };
 }
 
 /** Persist a competitor pipeline result. Replaces previous Competitor rows for this domain. */

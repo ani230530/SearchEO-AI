@@ -34,6 +34,9 @@ export interface WizardItem {
   text: string;
   intent: string | null;
   source: 'ai' | 'custom';
+  isSelected?: boolean;
+  hasRun?: boolean;
+  lastRunAt?: string | null;
   parentKeywordId?: number;
   // Audit-research metadata (prompts only).
   category?: PromptCategory | null;

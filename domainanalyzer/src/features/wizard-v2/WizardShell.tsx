@@ -5,6 +5,11 @@ import { useAuth } from "@/contexts/AuthContext";
 import { resolveDashboardPath } from "@/features/sidebar-dashboard/navigation";
 import type { WizardStep } from "./types";
 
+const DOMAIN_ANALYSIS_VIDEO_URL =
+  import.meta.env.VITE_DOMAIN_ANALYSIS_VIDEO_URL ||
+  import.meta.env.VITE_FEATURES_VIDEO_URL ||
+  "https://res.cloudinary.com/ta2uztdv/video/upload/v1783195911/Browser_Tool-_6-compressed_1_1_ws3z2v.mp4";
+
 interface WizardShellProps {
   step: WizardStep;
   totalSteps?: number;
@@ -193,12 +198,21 @@ function WizardHeroVisual() {
       </div>
 
       <div className="absolute left-[18%] top-[42%] aspect-[1.58/1] w-[80%] overflow-hidden rounded-[6px] border border-slate-200 bg-white shadow-[0_18px_44px_rgba(15,23,42,0.08)]">
-        <img
-          src="/ai-checker.png"
-          alt=""
-          className="h-full w-full scale-[1.72] object-cover object-[58%_61%] opacity-90"
+        <video
+          className="h-full w-full scale-[1.08] object-cover object-[58%_61%] opacity-90"
+          autoPlay
+          loop
+          muted
+          playsInline
+          preload="metadata"
+          poster="/ai-checker.png"
+          disablePictureInPicture
+          controlsList="nodownload noplaybackrate noremoteplayback"
           style={{ mixBlendMode: "multiply" }}
-        />
+        >
+          <source src={DOMAIN_ANALYSIS_VIDEO_URL} type="video/mp4" />
+          <source src="/features2.mp4" type="video/mp4" />
+        </video>
       </div>
 
       <MetricCard
