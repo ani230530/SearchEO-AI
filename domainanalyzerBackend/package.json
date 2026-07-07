@@ -12,6 +12,7 @@
     "test:coverage": "vitest run --coverage",
     "typecheck": "tsc --noEmit",
     "db:seed": "prisma db seed",
+    "sync:prompt-catalog": "node scripts/sync-prompt-catalog-from-sheet.cjs",
     "backup:blogs": "ts-node-dev --transpile-only scripts/backup-blogs.ts",
     "restore:blogs": "ts-node-dev --transpile-only scripts/restore-blogs.ts",
     "postinstall": "prisma generate"

@@ -25,6 +25,49 @@ model AppSetting {
   updatedAt DateTime @updatedAt
 }
 
+model PromptCatalogNiche {
+  id            String                @id @db.Uuid
+  canonicalName String                @unique
+  aliases       Json                  @default("[]")
+  description   String?
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
+  prompts       PromptCatalogPrompt[]
+  domainMappings DomainPromptCatalogNiche[]
+
+  @@index([canonicalName])
+}
+
+model PromptCatalogPrompt {
+  id           String             @id @db.Uuid
+  nicheId      String             @db.Uuid
+  prompt       String
+  intent       String
+  source       String?
+  qualityScore Float              @default(0)
+  createdAt    DateTime           @default(now())
+  lastSeenAt   DateTime?
+  niche        PromptCatalogNiche @relation(fields: [nicheId], references: [id], onDelete: Cascade)
+  domainPrompts Prompt[]
+
+  @@unique([nicheId, prompt])
+  @@index([nicheId])
+  @@index([intent])
+}
+
+model DomainPromptCatalogNiche {
+  domainId    Int
+  nicheId     String             @db.Uuid
+  matchReason String
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+  domain      Domain             @relation(fields: [domainId], references: [id], onDelete: Cascade)
+  niche       PromptCatalogNiche @relation(fields: [nicheId], references: [id], onDelete: Cascade)
+
+  @@id([domainId, nicheId])
+  @@index([nicheId])
+}
+
 // -----------------------------------------------------------------------------
 // User
 // -----------------------------------------------------------------------------
@@ -177,6 +220,7 @@ model Domain {
   runs        AiRun[]
   campaigns   Campaign[]
   auditResult AuditResult?
+  promptCatalogMappings DomainPromptCatalogNiche[]
 
   @@unique([userId, host])
   @@index([userId])
@@ -331,9 +375,11 @@ model Prompt {
   isBranded           Boolean         @default(false)
   /// Competitor host explicitly named in the prompt (alternatives / vs queries).
   competitorMentioned String?
+  catalogPromptId     String?         @db.Uuid
   createdAt           DateTime        @default(now())
   domain              Domain          @relation(fields: [domainId], references: [id], onDelete: Cascade)
   keyword             Keyword?        @relation(fields: [keywordId], references: [id], onDelete: SetNull)
+  catalogPrompt       PromptCatalogPrompt? @relation(fields: [catalogPromptId], references: [id], onDelete: SetNull)
   results             AiQueryResult[]
 
   @@index([domainId, isSelected])
@@ -341,6 +387,8 @@ model Prompt {
   @@index([domainId, isTracked])
   @@index([domainId, category])
   @@index([keywordId])
+  @@unique([domainId, catalogPromptId])
+  @@index([catalogPromptId])
   // Soft-reset deletes AI-generated prompts via (domainId, source='ai').
   @@index([domainId, source])
 }

@@ -202,14 +202,18 @@ async function bootstrap() {
     // WordPress publish scheduler rehydrates delayed publish jobs after restarts.
     const { startWordpressPublishScheduler } = require('./services/wordpressPublishScheduler');
     startWordpressPublishScheduler();
+    // Google Sheet prompt catalog sync: imports catalog rows and propagates
+    // new prompts to domains mapped to each niche.
+    const { startPromptCatalogSheetSyncScheduler } = require('./services/promptCatalogSheetSyncScheduler');
+    startPromptCatalogSheetSyncScheduler();
     // Daily tracked-prompt re-test scheduler (BullMQ repeatable, idempotent).
-  if (process.env.DISABLE_TRACKED_PROMPT_SCHEDULER === 'true') {
-    console.log('[startup] tracked-prompt scheduler disabled by env');
-  } else {
+    if (process.env.DISABLE_TRACKED_PROMPT_SCHEDULER === 'true') {
+      console.log('[startup] tracked-prompt scheduler disabled by env');
+    } else {
       const { registerWeeklyTracking } = require('./services/weeklyTrackingService');
       registerWeeklyTracking().catch((e: unknown) =>
         console.error('[startup] prompt tracking registration failed', e));
-  }
+    }
   });
 }
 
