@@ -21,6 +21,7 @@ import blogRouter from './routes/blog';
 import blogAnalyticsRouter from './routes/blogAnalytics';
 import domainCompatRouter from './routes/domainCompat';
 import logoProxyRouter from './routes/logoProxy';
+import adminUsageRouter from './routes/adminUsage';
 
 import { prisma } from './lib/prisma';
 import { authenticateToken, AuthenticatedRequest } from './middleware/auth';
@@ -118,6 +119,7 @@ app.use('/api/wizard', wizardRouter);
 app.use('/api/chat', chatRouter);
 app.use('/api/blog', blogRouter);
 app.use('/api/blog-analytics', blogAnalyticsRouter);
+app.use('/api/admin/usage', adminUsageRouter);
 app.use('/api/gsc', googleSearchConsoleRouter);
 app.use('/api/campaigns', campaignsRouter);
 app.use('/api/publish', publishRouter);
@@ -189,10 +191,14 @@ if (NODE_ENV === 'production') {
 async function bootstrap() {
   await seedAdminAccountOnStartup();
 
-  app.listen(PORT, () => {
-    console.log(`Server running in ${NODE_ENV} mode on port ${PORT}`);
-    console.log(`Health check: http://localhost:${PORT}/api/health`);
-    startTimeoutChecker();
+	  app.listen(PORT, () => {
+	    console.log(`Server running in ${NODE_ENV} mode on port ${PORT}`);
+	    console.log(`Health check: http://localhost:${PORT}/api/health`);
+	    if (process.env.DISABLE_BACKGROUND_JOBS === 'true') {
+	      console.log('[startup] background jobs disabled by env');
+	      return;
+	    }
+	    startTimeoutChecker();
     // Worksheet generation stale-job sweeper (campaigns/blog flow).
     const { startStaleJobSweeper } = require('./services/generationJobService');
     startStaleJobSweeper();

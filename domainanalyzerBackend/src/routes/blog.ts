@@ -13,6 +13,7 @@ import {
   serializePost,
   slugify,
 } from '../services/blogService';
+import { logExternalUsage } from '../services/externalUsageClient';
 
 const router = Router();
 const DEFAULT_BLOG_N8N_WEBHOOK_URL = 'https://n8n.srv891599.hstgr.cloud/webhook/';
@@ -446,6 +447,7 @@ router.post(
     };
 
     try {
+      const n8nStartedAt = Date.now();
       const n8nApiKey = process.env.N8N_API_KEY || '1234';
       const n8nApiKeyHeader = process.env.N8N_API_KEY_HEADER || 'key';
       const n8nTimeout = Number(process.env.N8N_TIMEOUT_MS) || 300000;
@@ -466,7 +468,17 @@ router.post(
       }
 
       console.log(`[blog-generation] POST ${webhookUrl} for draft ${draft.id}`);
-      await axios.post(webhookUrl, n8nPayload, axiosConfig);
+      const response = await axios.post(webhookUrl, n8nPayload, axiosConfig);
+      await logExternalUsage({
+        provider: 'n8n',
+        feature: 'blog_generation',
+        operation: 'trigger_blog_generation',
+        context: { userId },
+        status: 'success',
+        latencyMs: Date.now() - n8nStartedAt,
+        httpStatus: response.status,
+        metadata: { draftId: draft.id, topic: topic.trim() },
+      });
 
       return res.status(200).json({
         success: true,
@@ -475,6 +487,17 @@ router.post(
       });
     } catch (error: any) {
       console.error('[blog-generation] Failed to trigger n8n:', error?.response?.data || error.message);
+      await logExternalUsage({
+        provider: 'n8n',
+        feature: 'blog_generation',
+        operation: 'trigger_blog_generation',
+        context: { userId },
+        status: error?.code === 'ECONNABORTED' ? 'timeout' : 'failed',
+        httpStatus: error?.response?.status ?? null,
+        errorCode: error?.code ?? null,
+        errorMessage: error?.message ?? null,
+        metadata: { draftId: draft.id, topic: topic.trim() },
+      });
       await prisma.blogPost.update({
         where: { id: draft.id },
         data: {

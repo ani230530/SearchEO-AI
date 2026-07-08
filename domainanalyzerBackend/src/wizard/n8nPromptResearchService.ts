@@ -2,6 +2,7 @@ import axios from 'axios';
 import type { EnrichedContext } from './enrichmentService';
 import type { Intent } from './types';
 import type { GeneratedPrompt, IntentStage, PromptCategory } from './topicsService';
+import { logExternalUsage } from '../services/externalUsageClient';
 
 type N8nPromptGroup = 'problem_statement' | 'top_n' | 'alternatives' | 'recommendation';
 
@@ -195,6 +196,16 @@ export async function fetchN8nPromptResearchPrompts(input: N8nPromptResearchInpu
       timeout: N8N_PROMPT_RESEARCH_TIMEOUT_MS,
     });
     const prompts = mapN8nPromptResearchResponse(response.data, input);
+    await logExternalUsage({
+      provider: 'n8n',
+      feature: 'prompt_research',
+      operation: 'n8n_prompt_research',
+      context: { domainHost: input.host },
+      status: 'success',
+      latencyMs: Date.now() - startedAt,
+      httpStatus: response.status,
+      metadata: { mode: input.url ? 'url' : 'niche', prompts: prompts.length },
+    });
     console.log(
       `[PROMPTS:n8n] fetched ${prompts.length} prompts in ${Date.now() - startedAt}ms ` +
       `via=${input.url ? 'url' : 'niche'} status=${response.status}`
@@ -206,6 +217,18 @@ export async function fetchN8nPromptResearchPrompts(input: N8nPromptResearchInpu
       error?.response?.data?.message ||
       error?.message ||
       'unknown error';
+    await logExternalUsage({
+      provider: 'n8n',
+      feature: 'prompt_research',
+      operation: 'n8n_prompt_research',
+      context: { domainHost: input.host },
+      status: error?.code === 'ECONNABORTED' ? 'timeout' : 'failed',
+      latencyMs: Date.now() - startedAt,
+      httpStatus: error?.response?.status ?? null,
+      errorCode: error?.code ?? null,
+      errorMessage: detail,
+      metadata: { mode: input.url ? 'url' : 'niche' },
+    });
     console.warn(
       `[PROMPTS:n8n] prompt research failed after ${Date.now() - startedAt}ms; ` +
       `falling back to local generator: ${detail}`

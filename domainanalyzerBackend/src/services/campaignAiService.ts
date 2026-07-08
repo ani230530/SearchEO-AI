@@ -9,11 +9,10 @@
  * No pillar/subpage concept anywhere — each topic is a single content unit.
  */
 
-import OpenAI from 'openai';
+import { callOpenAiJson as callLoggedOpenAiJson, isOpenAiConfigured } from './openAiClient';
+import type { UsageContext } from './usageLedgerService';
 
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const CAMPAIGN_AI_MODEL = process.env.CAMPAIGN_AI_MODEL || 'gpt-4o-mini';
-const openai = OPENAI_API_KEY ? new OpenAI({ apiKey: OPENAI_API_KEY }) : null;
 
 export type GeneratedKeyword = {
   term: string;
@@ -37,6 +36,7 @@ type BaseAiContext = {
   locationContext?: string | null;
   brandVoice?: any;
   targetAudience?: any;
+  usageContext?: Omit<UsageContext, 'provider' | 'callType' | 'modelRequested'>;
 };
 
 const DEFAULT_DIFFICULTY = 'Medium';
@@ -100,16 +100,6 @@ export function isKeywordShaped(candidate: string): boolean {
   return true;
 }
 
-const extractJsonFromResponse = (response: string): any => {
-  const trimmed = response.trim();
-  if (!trimmed) return null;
-  const fenceMatch = trimmed.match(/```(?:json)?([\s\S]*?)```/);
-  const jsonText = fenceMatch ? fenceMatch[1] : trimmed;
-  const jsonMatch = jsonText.match(/\{[\s\S]*\}/);
-  const candidate = jsonMatch ? jsonMatch[0] : jsonText;
-  return JSON.parse(candidate);
-};
-
 interface OpenAiJsonOptions {
   /** Override the default content-strategist system prompt. Used by the
    *  keyword-suggest path which needs an SEO-analyst persona instead.
@@ -122,6 +112,7 @@ interface OpenAiJsonOptions {
    *  values are useful for short structured outputs (keywords) where
    *  verbosity is failure. */
   maxTokens?: number;
+  usageContext?: Omit<UsageContext, 'provider' | 'callType' | 'modelRequested'>;
 }
 
 const callOpenAiJson = async <T>(
@@ -129,27 +120,18 @@ const callOpenAiJson = async <T>(
   fallback: () => T,
   options: OpenAiJsonOptions = {}
 ): Promise<T> => {
-  if (!openai) return fallback();
+  if (!isOpenAiConfigured()) return fallback();
   try {
-    const completion = await openai.chat.completions.create({
+    const parsed = await callLoggedOpenAiJson<T>({
       model: CAMPAIGN_AI_MODEL,
+      system:
+        options.systemPrompt ??
+        'You are an expert content marketing strategist. Generate creative, diverse, and unique ideas. Always return valid JSON that matches the requested schema.',
+      user: prompt,
       temperature: options.temperature ?? 0.8,
-      max_tokens: options.maxTokens,
-      response_format: { type: 'json_object' },
-      messages: [
-        {
-          role: 'system',
-          content:
-            options.systemPrompt ??
-            'You are an expert content marketing strategist. Generate creative, diverse, and unique ideas. Always return valid JSON that matches the requested schema.',
-        },
-        { role: 'user', content: prompt },
-      ],
+      maxTokens: options.maxTokens,
+      context: options.usageContext,
     });
-
-    const content = completion.choices[0].message?.content || '';
-    if (!content) return fallback();
-    const parsed = extractJsonFromResponse(content);
     if (!parsed) return fallback();
     return parsed as T;
   } catch (error) {
@@ -215,6 +197,7 @@ export async function generateCampaignTopics(
     locationContext,
     brandVoice,
     targetAudience,
+    usageContext,
   } = context;
 
   const exclusionPrompt = excludeTopics.length
@@ -291,7 +274,13 @@ Only return JSON. Ensure titles are distinct from the excluded list.`;
     }),
   });
 
-  const aiResponse = await callOpenAiJson<{ topics: any[] }>(prompt, fallback);
+  const aiResponse = await callOpenAiJson<{ topics: any[] }>(prompt, fallback, {
+    usageContext: {
+      ...(usageContext ?? {}),
+      feature: usageContext?.feature ?? 'campaign',
+      operation: 'generate_campaign_topics',
+    },
+  });
   const topics =
     Array.isArray(aiResponse?.topics) && aiResponse.topics.length > 0
       ? aiResponse.topics
@@ -329,6 +318,7 @@ export async function generateTopicTitleSuggestion(
     locationContext,
     brandVoice,
     targetAudience,
+    usageContext,
   } = context;
 
   const geoContext = location
@@ -378,7 +368,14 @@ Only return JSON.`;
 
   const aiResponse = await callOpenAiJson<{ title?: string; summary?: string }>(
     prompt,
-    fallback
+    fallback,
+    {
+      usageContext: {
+        ...(usageContext ?? {}),
+        feature: usageContext?.feature ?? 'campaign',
+        operation: 'suggest_topic_title',
+      },
+    }
   );
   const title = (aiResponse?.title || '').trim() || fallback().title;
   const summary = (aiResponse?.summary || '').trim() || '';
@@ -432,6 +429,7 @@ export async function generateKeywordsSuggestion(
     locationContext,
     brandVoice,
     targetAudience,
+    usageContext,
   } = context;
 
   const geoContext = location
@@ -526,7 +524,16 @@ Return JSON only:
   const firstPass = await callOpenAiJson<{ keywords: any[] }>(
     buildPrompt(),
     fallback,
-    { systemPrompt: seoSystemPrompt, temperature: 0.3, maxTokens: 400 }
+    {
+      systemPrompt: seoSystemPrompt,
+      temperature: 0.3,
+      maxTokens: 400,
+      usageContext: {
+        ...(usageContext ?? {}),
+        feature: usageContext?.feature ?? 'campaign',
+        operation: 'generate_keyword_suggestions',
+      },
+    }
   );
 
   // Validate + de-dupe against existing.
@@ -561,7 +568,16 @@ Return JSON only:
     const secondPass = await callOpenAiJson<{ keywords: any[] }>(
       buildPrompt(rejected.slice(0, 8)),
       () => ({ keywords: [] }),
-      { systemPrompt: seoSystemPrompt, temperature: 0.2, maxTokens: 400 }
+      {
+        systemPrompt: seoSystemPrompt,
+        temperature: 0.2,
+        maxTokens: 400,
+        usageContext: {
+          ...(usageContext ?? {}),
+          feature: usageContext?.feature ?? 'campaign',
+          operation: 'generate_keyword_suggestions_retry',
+        },
+      }
     );
     consider(
       Array.isArray(secondPass?.keywords) && secondPass.keywords.length > 0

@@ -8,10 +8,9 @@
  *   - Tests can swap in a fake by passing `client` overrides.
  */
 
-import OpenAI from 'openai';
-
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
-const sharedClient = OPENAI_API_KEY ? new OpenAI({ apiKey: OPENAI_API_KEY }) : null;
+import type OpenAI from 'openai';
+import { callOpenAiJson, embedTextWithUsage } from '../services/openAiClient';
+import type { UsageContext } from '../services/usageLedgerService';
 
 export interface LlmCallOptions {
   model: string;
@@ -19,6 +18,7 @@ export interface LlmCallOptions {
   user: string;
   temperature?: number;
   maxTokens?: number;
+  context?: Omit<UsageContext, 'provider' | 'callType' | 'modelRequested'>;
   /** Override the shared client (testing). */
   client?: OpenAI | null;
 }
@@ -30,65 +30,31 @@ export class LlmError extends Error {
   }
 }
 
-const DEFAULT_TIMEOUT_MS = 60_000;
-const MAX_ATTEMPTS = 3;
-
-async function withRetry<T>(fn: () => Promise<T>, attempts = MAX_ATTEMPTS): Promise<T> {
-  let lastErr: unknown;
-  for (let i = 0; i < attempts; i++) {
-    try {
-      return await fn();
-    } catch (err) {
-      lastErr = err;
-      const wait = 200 * (i + 1) + Math.random() * 200;
-      await new Promise((r) => setTimeout(r, wait));
-    }
-  }
-  throw lastErr;
-}
-
 /** Call the LLM and parse a JSON object from the response. Throws LlmError on failure. */
 export async function callJson<T = unknown>(opts: LlmCallOptions): Promise<T> {
-  const client = opts.client ?? sharedClient;
-  if (!client) throw new LlmError('OPENAI_API_KEY not configured');
-  const response = await withRetry(async () => {
-    return client.chat.completions.create(
-      {
-        model: opts.model,
-        messages: [
-          { role: 'system', content: opts.system },
-          { role: 'user', content: opts.user },
-        ],
-        response_format: { type: 'json_object' },
-        temperature: opts.temperature ?? 0.2,
-        max_tokens: opts.maxTokens ?? 2000,
-      },
-      { timeout: DEFAULT_TIMEOUT_MS }
-    );
-  });
-  const text = response.choices[0]?.message?.content ?? '';
   try {
-    return JSON.parse(text) as T;
+    return await callOpenAiJson<T>({
+      model: opts.model,
+      system: opts.system,
+      user: opts.user,
+      temperature: opts.temperature,
+      maxTokens: opts.maxTokens,
+      context: opts.context,
+      client: opts.client,
+    });
   } catch (err) {
-    throw new LlmError(`LLM did not return valid JSON: ${text.slice(0, 200)}`, err);
+    const message = err instanceof Error ? err.message : String(err);
+    throw new LlmError(message, err);
   }
 }
 
 /** Embed a single text. Returns null if no API key is configured (so tests + offline runs degrade gracefully). */
 export async function embedText(
   text: string,
-  client: OpenAI | null = sharedClient
+  client?: OpenAI | null,
+  context?: Omit<UsageContext, 'provider' | 'callType' | 'modelRequested'>
 ): Promise<number[] | null> {
-  if (!client) return null;
-  const trimmed = text.slice(0, 8000); // OpenAI 8k token limit, conservatively
-  if (!trimmed.trim()) return null;
-  const response = await withRetry(() =>
-    client.embeddings.create(
-      { model: 'text-embedding-3-small', input: trimmed },
-      { timeout: DEFAULT_TIMEOUT_MS }
-    )
-  );
-  return response.data[0]?.embedding ?? null;
+  return embedTextWithUsage({ text, client, context });
 }
 
 export const Models = {

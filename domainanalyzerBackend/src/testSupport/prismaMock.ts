@@ -68,6 +68,9 @@ export const createPrismaMock = (): PrismaMock => {
     user: makeStore(),
     refreshToken: makeStore(),
     apiSpendLog: makeStore(),
+    usageLedgerEntry: makeStore(),
+    aiRun: makeStore(),
+    prompt: makeStore(),
     wizardRunCache: makeStore(),
     folder: makeStore(),
     file: makeStore(),
@@ -262,6 +265,10 @@ export const createPrismaMock = (): PrismaMock => {
         return stores.user.insert(row);
       },
       update: async ({ where, data }: any) => stores.user.update(where.id, data),
+      findMany: async ({ where, select }: any = {}) => {
+        const rows = stores.user.all().filter((r) => matchWhere(r, where ?? {}));
+        return rows.map((row) => projectRow(row, select));
+      },
       delete: async ({ where }: any) => {
         const row = stores.user.rows.get(where.id);
         stores.user.rows.delete(where.id);
@@ -586,6 +593,134 @@ export const createPrismaMock = (): PrismaMock => {
     },
 
     // -------------------------------------------------------------------------
+    // usageLedgerEntry
+    // -------------------------------------------------------------------------
+    usageLedgerEntry: {
+      create: async ({ data }: any) =>
+        stores.usageLedgerEntry.insert({
+          userId: null,
+          sessionId: null,
+          domainId: null,
+          domainHost: null,
+          runId: null,
+          promptId: null,
+          aiQueryResultId: null,
+          modelRequested: null,
+          modelUsed: null,
+          providerGenerationId: null,
+          promptTokens: null,
+          completionTokens: null,
+          totalTokens: null,
+          cachedTokens: null,
+          reasoningTokens: null,
+          latencyMs: null,
+          httpStatus: null,
+          errorCode: null,
+          errorMessage: null,
+          metadata: null,
+          ...data,
+        }),
+      update: async ({ where, data }: any) => stores.usageLedgerEntry.update(where.id, data),
+      count: async ({ where }: any = {}) =>
+        stores.usageLedgerEntry.all().filter((r) => matchWhere(r, where ?? {}, stores)).length,
+      aggregate: async ({ _count, _sum, where }: any) => {
+        const rows = stores.usageLedgerEntry.all().filter((r) => matchWhere(r, where ?? {}, stores));
+        const result: any = {};
+        if (_count) {
+          result._count = {};
+          if (_count.id) result._count.id = rows.length;
+        }
+        if (_sum) {
+          result._sum = {};
+          for (const key of Object.keys(_sum)) {
+            if (_sum[key]) {
+              result._sum[key] = rows.reduce((sum, row) => sum + Number(row[key] ?? 0), 0);
+            }
+          }
+        }
+        return result;
+      },
+      findMany: async ({ where, orderBy, skip = 0, take, select, distinct }: any = {}) => {
+        let rows = stores.usageLedgerEntry.all().filter((r) => matchWhere(r, where ?? {}, stores));
+        if (orderBy?.createdAt) {
+          const dir = orderBy.createdAt === 'desc' ? -1 : 1;
+          rows = [...rows].sort((a, b) => dir * (a.createdAt.getTime() - b.createdAt.getTime()));
+        }
+        if (Array.isArray(distinct) && distinct.length) {
+          const seen = new Set<string>();
+          rows = rows.filter((row) => {
+            const key = distinct.map((field) => String(row[field])).join('\u0000');
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
+          });
+        }
+        rows = rows.slice(skip, take === undefined ? undefined : skip + take);
+        return rows.map((row) => projectRow(row, select));
+      },
+      groupBy: async ({ by, where, _count, _sum }: any) => {
+        const rows = stores.usageLedgerEntry.all().filter((r) => matchWhere(r, where ?? {}, stores));
+        const fields = Array.isArray(by) ? by : [by];
+        const groups = new Map<string, Row[]>();
+        for (const row of rows) {
+          const key = fields.map((field) => String(row[field] ?? '')).join('\u0000');
+          groups.set(key, [...(groups.get(key) ?? []), row]);
+        }
+        return Array.from(groups.values()).map((groupRows) => {
+          const first = groupRows[0];
+          const out: any = {};
+          for (const field of fields) out[field] = first[field] ?? null;
+          if (_count) {
+            out._count = {};
+            if (_count.id) out._count.id = groupRows.length;
+          }
+          if (_sum) {
+            out._sum = {};
+            for (const key of Object.keys(_sum)) {
+              if (_sum[key]) {
+                out._sum[key] = groupRows.reduce((sum, row) => sum + Number(row[key] ?? 0), 0);
+              }
+            }
+          }
+          return out;
+        });
+      },
+    },
+
+    // -------------------------------------------------------------------------
+    // aiRun
+    // -------------------------------------------------------------------------
+    aiRun: {
+      create: async ({ data }: any) =>
+        stores.aiRun.insert({
+          kind: 'audit',
+          status: 'queued',
+          ...data,
+        }),
+      count: async ({ where }: any = {}) =>
+        stores.aiRun.all().filter((r) => matchWhere(r, where ?? {}, stores)).length,
+    },
+
+    // -------------------------------------------------------------------------
+    // prompt
+    // -------------------------------------------------------------------------
+    prompt: {
+      create: async ({ data }: any) => stores.prompt.insert(data),
+      findMany: async ({ where, select }: any = {}) => {
+        const rows = stores.prompt.all().filter((r) => matchWhere(r, where ?? {}, stores));
+        return rows.map((row) => {
+          const withRelations = {
+            ...row,
+            domain: row.domainId
+              ? stores.domain.all().find((domain) => domain.id === row.domainId) ?? null
+              : null,
+          };
+          return projectRow(withRelations, select);
+        });
+      },
+    },
+
+    // -------------------------------------------------------------------------
     // wizardRunCache
     // -------------------------------------------------------------------------
     wizardRunCache: {
@@ -724,9 +859,24 @@ export const createPrismaMock = (): PrismaMock => {
  * Tiny Prisma-where matcher. Supports equality, `gte`, `lte`, `in`, and
  * nested AND-of-fields. Returns true for empty `where`.
  */
-function matchWhere(row: Row, where: any): boolean {
+function matchWhere(row: Row, where: any, stores?: Record<string, ReturnType<typeof makeStore>>): boolean {
   if (!where || typeof where !== 'object') return true;
   for (const [key, cond] of Object.entries(where)) {
+    if (key === 'OR' && Array.isArray(cond)) {
+      if (!cond.some((item) => matchWhere(row, item, stores))) return false;
+      continue;
+    }
+    if (key === 'AND' && Array.isArray(cond)) {
+      if (!cond.every((item) => matchWhere(row, item, stores))) return false;
+      continue;
+    }
+    if (key === 'domain' && stores) {
+      const domain = row.domainId
+        ? stores.domain.all().find((candidate) => candidate.id === row.domainId)
+        : null;
+      if (!domain || !matchWhere(domain, cond, stores)) return false;
+      continue;
+    }
     if (cond === null || cond === undefined) {
       if (row[key] !== cond) return false;
       continue;

@@ -834,6 +834,14 @@ router.post(
       locationContext: (domain as any).profile?.targetLocation ?? null,
       brandVoice,
       targetAudience,
+      usageContext: {
+        userId,
+        domainId: domain.id,
+        domainHost: domain.host,
+        feature: 'campaign',
+        operation: 'generate_campaign_topics',
+        metadata: { campaignId: campaign.id },
+      },
     });
 
     await prisma.$transaction(async (tx) => {
@@ -925,6 +933,14 @@ router.post(
       locationContext: (topic.campaign.domain as any).profile?.targetLocation ?? null,
       brandVoice,
       targetAudience,
+      usageContext: {
+        userId,
+        domainId: topic.campaign.domain.id,
+        domainHost: topic.campaign.domain.host,
+        feature: 'campaign',
+        operation: 'suggest_topic_title',
+        metadata: { campaignId: topic.campaignId, topicId: topic.id },
+      },
     });
 
     await prisma.campaignTopic.update({
@@ -1103,6 +1119,14 @@ router.post(
       locationContext: (topic.campaign.domain as any).profile?.targetLocation ?? null,
       brandVoice,
       targetAudience,
+      usageContext: {
+        userId,
+        domainId: topic.campaign.domain.id,
+        domainHost: topic.campaign.domain.host,
+        feature: 'campaign',
+        operation: 'generate_keyword_suggestions',
+        metadata: { campaignId: topic.campaignId, topicId: topic.id },
+      },
     });
 
     if (!suggestions.length) {

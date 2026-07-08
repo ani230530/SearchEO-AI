@@ -112,7 +112,7 @@ afterEach(() => {
 describe('publish scheduling routes', () => {
   it('creates a scheduled draft and queues a delayed publish job', async () => {
     const prisma = scheduleState.prisma!;
-    await prisma.wordpressIntegration.create({
+    const integration = await prisma.wordpressIntegration.create({
       data: {
         userId: 1,
         siteUrl: 'https://example.com',
@@ -143,7 +143,18 @@ describe('publish scheduling routes', () => {
     expect(json.draft.status).toBe('scheduled');
     expect(json.draft.scheduledAt).toBe(scheduledAt);
     expect(scheduleState.scheduleWordpressPublish).toHaveBeenCalledTimes(1);
-    expect(scheduleState.scheduleWordpressPublish).toHaveBeenCalledWith(expect.any(Number), expect.any(Date));
+    expect(scheduleState.scheduleWordpressPublish).toHaveBeenCalledWith(
+      expect.any(Number),
+      expect.any(Date),
+      expect.objectContaining({
+        draftId: json.draftId,
+        userId: 1,
+        integrationId: integration.id,
+        title: 'Scheduled Article',
+        slug: 'scheduled-article',
+        primaryKeyword: 'schedule keyword',
+      }),
+    );
 
     const saved = await prisma.wordpressPublishLog.findUnique({ where: { id: json.draftId } });
     expect(saved?.status).toBe('scheduled');

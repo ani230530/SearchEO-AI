@@ -5,6 +5,7 @@ import { prisma } from '../lib/prisma';
 import { formatRedisError, getRedisUrl } from '../lib/redisConfig';
 import { decryptToken } from './tokenEncryption';
 import { buildWordpressPublishPayload } from './contentFlowService';
+import { logExternalUsage } from './externalUsageClient';
 
 
 // Redis Connection
@@ -40,6 +41,21 @@ const getNumberValue = (val: any): number | undefined => {
     return undefined;
 };
 
+const getWebhookHost = (url: string | undefined): string | null => {
+    if (!url) return null;
+    try {
+        return new URL(url).host;
+    } catch {
+        return null;
+    }
+};
+
+const n8nFeatureForJob = (jobName: string): string => {
+    if (jobName === JOB_TYPES.PUBLISH) return 'wordpress_publish';
+    if (jobName === JOB_TYPES.CAMPAIGN_GENERATION) return 'campaign_generation';
+    return 'n8n_queue';
+};
+
 // Job Types
 export const JOB_TYPES = {
     PUBLISH: 'publish',
@@ -59,6 +75,7 @@ const worker = new Worker(
     N8N_QUEUE_NAME,
     async (job: Job) => {
         console.log(`[Queue] Processing job ${job.id} of type ${job.name}`);
+        let ledgerContext: { url?: string; meta?: any } = {};
 
         // Daily tracked-prompt sweep — not an n8n webhook job, so it bypasses
         // the url/payload handling below. Lazy require breaks the import cycle
@@ -70,6 +87,7 @@ const worker = new Worker(
 
         try {
             const { url, payload, headers, timeout, meta } = await resolvePublishJobExecution(job);
+            ledgerContext = { url, meta };
 
             if (!url) {
                 throw new Error('Missing webhook URL');
@@ -93,10 +111,25 @@ const worker = new Worker(
             console.log('[Queue] Payload:', JSON.stringify(maskSecrets(payload), null, 2));
 
             if (job.name === JOB_TYPES.CAMPAIGN_GENERATION) {
+                const startedAt = Date.now();
                 try {
                     const kickoffResponse = await axios.post(url, payload, {
                         headers,
                         timeout: Math.min(timeout || 30000, 30000),
+                    });
+                    await logExternalUsage({
+                        provider: 'n8n',
+                        feature: n8nFeatureForJob(job.name),
+                        operation: job.name,
+                        context: {
+                            userId: getNumberValue(meta?.userId),
+                            domainId: getNumberValue(meta?.domainId),
+                            domainHost: getStringValue(meta?.domainHost),
+                        },
+                        status: 'success',
+                        latencyMs: Date.now() - startedAt,
+                        httpStatus: kickoffResponse.status,
+                        metadata: { jobId: job.id, webhookHost: getWebhookHost(url) },
                     });
 
                     console.log(`[Queue] Campaign kickoff ${job.id} accepted. Status: ${kickoffResponse.status}`);
@@ -107,6 +140,21 @@ const worker = new Worker(
                 } catch (error: any) {
                     const isTimeout = axios.isAxiosError(error) && (error.code === 'ECONNABORTED' || error.message?.includes('timeout'));
                     if (isTimeout) {
+                        await logExternalUsage({
+                            provider: 'n8n',
+                            feature: n8nFeatureForJob(job.name),
+                            operation: job.name,
+                            context: {
+                                userId: getNumberValue(meta?.userId),
+                                domainId: getNumberValue(meta?.domainId),
+                                domainHost: getStringValue(meta?.domainHost),
+                            },
+                            status: 'timeout',
+                            latencyMs: Date.now() - startedAt,
+                            errorCode: error?.code ?? null,
+                            errorMessage: error?.message ?? null,
+                            metadata: { jobId: job.id, webhookHost: getWebhookHost(url) },
+                        });
                         console.warn(`[Queue] Campaign kickoff ${job.id} timed out waiting for HTTP response; keeping job active because completion is callback-driven.`);
                         return {
                             accepted: true,
@@ -118,9 +166,24 @@ const worker = new Worker(
             }
 
             // Perform the actual n8n call
+            const startedAt = Date.now();
             const response = await axios.post(url, payload, {
                 headers,
                 timeout: timeout || 300000, // Default 5 mins
+            });
+            await logExternalUsage({
+                provider: 'n8n',
+                feature: n8nFeatureForJob(job.name),
+                operation: job.name,
+                context: {
+                    userId: getNumberValue(meta?.userId),
+                    domainId: getNumberValue(meta?.domainId),
+                    domainHost: getStringValue(meta?.domainHost),
+                },
+                status: 'success',
+                latencyMs: Date.now() - startedAt,
+                httpStatus: response.status,
+                metadata: { jobId: job.id, webhookHost: getWebhookHost(url) },
             });
 
             console.log(`[Queue] Job ${job.id} completed. Status: ${response.status}`);
@@ -134,6 +197,21 @@ const worker = new Worker(
             return response.data;
         } catch (error: any) {
             console.error(`[Queue] Job ${job.id} failed:`, error.message);
+            await logExternalUsage({
+                provider: 'n8n',
+                feature: n8nFeatureForJob(job.name),
+                operation: job.name,
+                context: {
+                    userId: getNumberValue(ledgerContext.meta?.userId),
+                    domainId: getNumberValue(ledgerContext.meta?.domainId),
+                    domainHost: getStringValue(ledgerContext.meta?.domainHost),
+                },
+                status: error?.code === 'ECONNABORTED' ? 'timeout' : 'failed',
+                httpStatus: error?.response?.status ?? null,
+                errorCode: error?.code ?? null,
+                errorMessage: error?.message ?? null,
+                metadata: { jobId: job.id, webhookHost: getWebhookHost(ledgerContext.url) },
+            });
 
             if (job.name === JOB_TYPES.PUBLISH) {
                 await handlePublishFailure(job, error, await resolvePublishFailureMeta(job));

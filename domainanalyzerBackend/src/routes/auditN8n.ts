@@ -2,6 +2,7 @@ import express, { Request, Response } from 'express';
 import { prisma } from '../lib/prisma';
 import { authenticateToken, AuthenticatedRequest } from '../middleware/auth';
 import { decryptToken } from '../services/tokenEncryption';
+import { logExternalUsage } from '../services/externalUsageClient';
 
 const router = express.Router();
 
@@ -27,6 +28,13 @@ router.post('/send', authenticateToken, async (req: Request, res: Response) => {
     const authReq = req as AuthenticatedRequest;
     const userId = authReq.user.userId;
     const { reportMonth, analyticsProperty, orgName, name } = req.body;
+    let n8nStartedAt: number | null = null;
+    let ledgerInfo: {
+        domainId?: number;
+        domainHost?: string;
+        requestId?: string;
+        reportMonth?: string;
+    } = {};
 
     if (!reportMonth || !analyticsProperty) {
         return res.status(400).json({
@@ -68,6 +76,11 @@ router.post('/send', authenticateToken, async (req: Request, res: Response) => {
                 error: 'No audit results found. Please run an audit first.'
             });
         }
+        ledgerInfo = {
+            domainId: companyDomain.id,
+            domainHost: companyDomain.host,
+            reportMonth: getReportMonth(reportMonth),
+        };
 
         const gscConnection = await prisma.googleSearchConsoleConnection.findUnique({
             where: { userId }
@@ -114,6 +127,7 @@ router.post('/send', authenticateToken, async (req: Request, res: Response) => {
                 requestPayload: n8nPayload as any,
             }
         });
+        ledgerInfo.requestId = n8nRequest.requestId;
 
         // Add the ID and callback URL to the payload
         const finalPayload = {
@@ -127,6 +141,7 @@ router.post('/send', authenticateToken, async (req: Request, res: Response) => {
         };
 
         // Send to n8n webhook
+        n8nStartedAt = Date.now();
         const n8nResponse = await fetch(N8N_WEBHOOK_URL, {
             method: 'POST',
             headers: {
@@ -162,6 +177,18 @@ router.post('/send', authenticateToken, async (req: Request, res: Response) => {
         });
 
         if (!n8nResponse.ok) {
+            await logExternalUsage({
+                provider: 'n8n',
+                feature: 'domain_audit',
+                operation: 'analytics_reporting',
+                context: { userId, domainId: ledgerInfo.domainId, domainHost: ledgerInfo.domainHost },
+                status: 'failed',
+                latencyMs: Date.now() - n8nStartedAt,
+                httpStatus: n8nResponse.status,
+                errorCode: 'n8n_webhook_error',
+                errorMessage: n8nResponse.statusText,
+                metadata: { requestId: ledgerInfo.requestId, reportMonth: ledgerInfo.reportMonth },
+            });
             return res.status(500).json({
                 success: false,
                 error: 'Failed to send data to n8n webhook',
@@ -170,6 +197,16 @@ router.post('/send', authenticateToken, async (req: Request, res: Response) => {
                 n8nResponse: responseData
             });
         }
+        await logExternalUsage({
+            provider: 'n8n',
+            feature: 'domain_audit',
+            operation: 'analytics_reporting',
+            context: { userId, domainId: ledgerInfo.domainId, domainHost: ledgerInfo.domainHost },
+            status: 'success',
+            latencyMs: Date.now() - n8nStartedAt,
+            httpStatus: n8nResponse.status,
+            metadata: { requestId: ledgerInfo.requestId, reportMonth: ledgerInfo.reportMonth },
+        });
 
         const googleSheetsUrl =
             (responseData as any)['Sheet URL'] ||
@@ -219,8 +256,21 @@ router.post('/send', authenticateToken, async (req: Request, res: Response) => {
             response: responseData
         });
 
-    } catch (error) {
+    } catch (error: any) {
         console.error('Error sending to n8n:', error);
+        if (ledgerInfo.requestId || n8nStartedAt) {
+            await logExternalUsage({
+                provider: 'n8n',
+                feature: 'domain_audit',
+                operation: 'analytics_reporting',
+                context: { userId, domainId: ledgerInfo.domainId, domainHost: ledgerInfo.domainHost },
+                status: error?.name === 'AbortError' ? 'timeout' : 'failed',
+                latencyMs: n8nStartedAt ? Date.now() - n8nStartedAt : null,
+                errorCode: error?.code ?? error?.name ?? null,
+                errorMessage: error?.message ?? null,
+                metadata: { requestId: ledgerInfo.requestId, reportMonth: ledgerInfo.reportMonth },
+            });
+        }
         return res.status(500).json({
             success: false,
             error: 'Failed to send audit data to n8n',

@@ -16,18 +16,8 @@
  * Cost: ~$0.0001 per scored response (gpt-4o-mini @ ~700 input + ~250 output).
  */
 
-import OpenAI from 'openai';
-
-const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
-const APP_URL = process.env.OPENROUTER_REFERRER || 'http://localhost:3002';
-
-const router = OPENROUTER_API_KEY
-  ? new OpenAI({
-      apiKey: OPENROUTER_API_KEY,
-      baseURL: 'https://openrouter.ai/api/v1',
-      defaultHeaders: { 'HTTP-Referer': APP_URL, 'X-Title': 'AI Visibility Wizard / Scorer' },
-    })
-  : null;
+import { callOpenRouterChat, isOpenRouterConfigured } from '../services/openRouterClient';
+import type { UsageContext } from '../services/usageLedgerService';
 
 const SCORER_MODEL = process.env.SCORER_MODEL || 'openai/gpt-4o-mini';
 const SCORER_TIMEOUT_MS = Number(process.env.SCORER_TIMEOUT_MS ?? 15_000);
@@ -153,8 +143,11 @@ export function shouldUseLlmScorer(input: ScoreInput): boolean {
  * Score one response. If OPENROUTER_API_KEY is missing or the call fails,
  * returns null and the caller should fall back to the heuristic scorer.
  */
-export async function scoreResponse(input: ScoreInput): Promise<ScoreOutput | null> {
-  if (!router) return null;
+export async function scoreResponse(
+  input: ScoreInput,
+  usageContext?: Omit<UsageContext, 'provider' | 'callType' | 'modelRequested'>
+): Promise<ScoreOutput | null> {
+  if (!isOpenRouterConfigured()) return null;
   if (!input.response.trim()) return null;
   if (!shouldUseLlmScorer(input)) return null;
 
@@ -212,8 +205,8 @@ export async function scoreResponse(input: ScoreInput): Promise<ScoreOutput | nu
 
   let parsed: any = null;
   try {
-    const completion = await Promise.race([
-      router.chat.completions.create({
+    const completion = await callOpenRouterChat({
+      payload: {
         model: SCORER_MODEL,
         messages: [
           {
@@ -229,10 +222,17 @@ export async function scoreResponse(input: ScoreInput): Promise<ScoreOutput | nu
         response_format: { type: 'json_object' },
         temperature: 0.0,
         max_tokens: 650,
-      }),
-      new Promise<never>((_, rej) => setTimeout(() => rej(new Error('scorer timeout')), SCORER_TIMEOUT_MS)),
-    ]);
-    const text = completion.choices[0]?.message?.content ?? '';
+      },
+      timeoutMs: SCORER_TIMEOUT_MS,
+      context: {
+        ...(usageContext ?? {}),
+        feature: usageContext?.feature ?? 'scorer',
+        operation: usageContext?.operation ?? 'score_response',
+        modelRequested: SCORER_MODEL,
+        callType: 'json_chat_completion',
+      },
+    });
+    const text = completion.content ?? '';
     parsed = JSON.parse(text);
   } catch {
     return null;

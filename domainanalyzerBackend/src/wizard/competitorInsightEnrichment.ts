@@ -10,22 +10,8 @@
  *   - cached on AiRun.summary.competitorInsights so subsequent reads are free
  */
 
-import OpenAI from 'openai';
 import type { CompetitorAnalysisRow } from './analyticsService';
-
-const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
-const APP_URL = process.env.OPENROUTER_REFERRER || 'http://localhost:3002';
-
-const router = OPENROUTER_API_KEY
-  ? new OpenAI({
-      apiKey: OPENROUTER_API_KEY,
-      baseURL: 'https://openrouter.ai/api/v1',
-      defaultHeaders: {
-        'HTTP-Referer': APP_URL,
-        'X-Title': 'AI Visibility / Competitor insight enrichment',
-      },
-    })
-  : null;
+import { callOpenRouterChat, isOpenRouterConfigured } from '../services/openRouterClient';
 
 const MODEL = 'openai/gpt-4o-mini';
 const TIMEOUT_MS = 30_000;
@@ -71,7 +57,7 @@ export async function enrichCompetitorInsights(
   // Only enrich competitors with at least one mention — the LLM has nothing
   // to ground "Strength" / "Weakness" claims on for zero-mention rows.
   const enrichable = competitors.filter((c) => c.mentions > 0);
-  if (enrichable.length === 0 || !router) {
+  if (enrichable.length === 0 || !isOpenRouterConfigured()) {
     const out: Record<string, CompetitorInsight[]> = {};
     for (const c of competitors) out[c.host] = heuristicInsights(c);
     return out;
@@ -81,8 +67,8 @@ export async function enrichCompetitorInsights(
   let parsed: LlmInsightResponse | null = null;
 
   try {
-    const completion = await Promise.race([
-      router.chat.completions.create({
+    const completion = await callOpenRouterChat({
+      payload: {
         model: MODEL,
         messages: [
           {
@@ -95,10 +81,16 @@ export async function enrichCompetitorInsights(
         response_format: { type: 'json_object' },
         temperature: 0.4,
         max_tokens: 4500,
-      }),
-      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('insight enrichment timeout')), TIMEOUT_MS)),
-    ]);
-    const text = completion.choices[0]?.message?.content ?? '';
+      },
+      timeoutMs: TIMEOUT_MS,
+      context: {
+        domainHost: context.brandHost,
+        feature: 'competitor_intelligence',
+        operation: 'enrich_competitor_insights',
+        modelRequested: MODEL,
+      },
+    });
+    const text = completion.content ?? '';
     parsed = JSON.parse(text) as LlmInsightResponse;
   } catch {
     const out: Record<string, CompetitorInsight[]> = {};

@@ -17,7 +17,6 @@
  * regen builds on real-world signal.
  */
 
-import OpenAI from 'openai';
 import axios from 'axios';
 import type { PrismaClient } from '../../generated/prisma';
 import {
@@ -28,30 +27,17 @@ import {
 import { recordCompetitorMention } from './competitorService';
 import { extractHost } from './urlNormalize';
 import { invalidateReportCacheForDomain } from './reportCache';
+import { callOpenRouterChat, isOpenRouterConfigured } from '../services/openRouterClient';
+import { logExternalUsage } from '../services/externalUsageClient';
 
-const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 const SERPAPI_KEY = process.env.SERP_API_KEY || process.env.SERPAPI_KEY;
 const SERPER_API_KEY = process.env.SERPER_API_KEY || process.env.SERPER_KEY;
-const APP_URL = process.env.OPENROUTER_REFERRER || 'http://localhost:3002';
-const APP_TITLE = 'AI Visibility Wizard';
 
 function invalidateRunReportCache(userId: number | null | undefined, domainId: number): void {
   invalidateReportCacheForDomain(userId, domainId).catch((err) => {
     console.warn(`[run:${domainId}] report cache invalidation failed`, err);
   });
 }
-
-const router = OPENROUTER_API_KEY
-  ? new OpenAI({
-      apiKey: OPENROUTER_API_KEY,
-      baseURL: 'https://openrouter.ai/api/v1',
-      // OpenRouter requires these headers for analytics + ranking on their end.
-      defaultHeaders: {
-        'HTTP-Referer': APP_URL,
-        'X-Title': APP_TITLE,
-      },
-    })
-  : null;
 
 const QUERY_TIMEOUT_MS = 60_000;
 const DEEP_SCORING_IN_BACKGROUND = process.env.DEEP_SCORING_IN_BACKGROUND !== 'false';
@@ -140,13 +126,6 @@ const ROSTER: ReadonlyArray<ModelDef> = [
   },
 ];
 
-function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
-  return Promise.race([
-    p,
-    new Promise<T>((_, reject) => setTimeout(() => reject(new Error(`Timeout after ${ms}ms`)), ms)),
-  ]);
-}
-
 function describeModelError(err: unknown): string {
   if (axios.isAxiosError(err)) {
     const status = err.response?.status;
@@ -195,6 +174,17 @@ interface CallOutcome {
   response: string;
   latencyMs: number;
   costUsd: number | null;
+  usageLedgerEntryId?: number | null;
+}
+
+interface ModelUsageContext {
+  userId: number | null;
+  domainId: number;
+  domainHost: string;
+  runId: number;
+  promptId: number;
+  feature: string;
+  operation: string;
 }
 
 /**
@@ -339,12 +329,18 @@ function buildRequestPayload(
   return base;
 }
 
-async function callModel(model: ModelDef, promptText: string, loc: UserLocation): Promise<CallOutcome> {
+async function callModel(
+  model: ModelDef,
+  promptText: string,
+  loc: UserLocation,
+  usageContext: ModelUsageContext
+): Promise<CallOutcome> {
   const startedAt = Date.now();
 
   if (model.webSearchMode === 'serpapi_sge') {
     const iso = isoCountry(loc.country);
     let responseText = '';
+    let provider: 'serpapi' | 'serper' = 'serpapi';
     if (SERPAPI_KEY) {
       const res = await axios.get('https://serpapi.com/search', {
         params: {
@@ -358,6 +354,7 @@ async function callModel(model: ModelDef, promptText: string, loc: UserLocation)
       });
       responseText = searchResultText(res.data);
     } else if (SERPER_API_KEY) {
+      provider = 'serper';
       const res = await axios.post(
         'https://google.serper.dev/search',
         { q: promptText, gl: iso?.toLowerCase() || 'us', hl: 'en', num: 6 },
@@ -370,15 +367,33 @@ async function callModel(model: ModelDef, promptText: string, loc: UserLocation)
     } else {
       throw new Error('SERP_API_KEY or SERPER_API_KEY not configured for Google AI Overview');
     }
+    const latencyMs = Date.now() - startedAt;
+    const ledgerEntry = await logExternalUsage({
+      provider,
+      feature: usageContext.feature,
+      operation: usageContext.operation,
+      status: 'success',
+      latencyMs,
+      context: {
+        userId: usageContext.userId,
+        domainId: usageContext.domainId,
+        domainHost: usageContext.domainHost,
+        runId: usageContext.runId,
+        promptId: usageContext.promptId,
+        modelRequested: model.id,
+      },
+      metadata: { model: model.id, gl: iso?.toLowerCase() || 'us' },
+    });
 
     return {
       response: responseText,
-      latencyMs: Date.now() - startedAt,
+      latencyMs,
       costUsd: SERPAPI_KEY ? 0.005 : 0.001,
+      usageLedgerEntryId: ledgerEntry?.id ?? null,
     };
   }
 
-  if (!router) throw new Error('OPENROUTER_API_KEY not configured');
+  if (!isOpenRouterConfigured()) throw new Error('OPENROUTER_API_KEY not configured');
   const today = new Date().toLocaleDateString('en-US', {
     weekday: 'long',
     year: 'numeric',
@@ -386,14 +401,30 @@ async function callModel(model: ModelDef, promptText: string, loc: UserLocation)
     day: 'numeric',
   });
   const payload = buildRequestPayload(model, promptText, today, loc);
-  // We deliberately use the raw client.post rather than chat.completions.create
+  // Keep the prompt payload small: this call is latency-sensitive in the run worker.
   // because OpenRouter's `tools`/`plugins` fields don't strictly match the
   // OpenAI SDK type definitions, and we want the request shape to be
   // verbatim what each provider expects.
-  const completion = (await withTimeout(
-    (router as any).chat.completions.create(payload),
-    QUERY_TIMEOUT_MS
-  )) as { choices?: Array<{ message?: { content?: string; annotations?: unknown[] } }>; usage?: { cost?: number }; citations?: unknown[] };
+  const out = await callOpenRouterChat<{
+    choices?: Array<{ message?: { content?: string; annotations?: unknown[] } }>;
+    usage?: { cost?: number };
+    citations?: unknown[];
+  }>({
+    payload,
+    timeoutMs: QUERY_TIMEOUT_MS,
+    context: {
+      userId: usageContext.userId,
+      domainId: usageContext.domainId,
+      domainHost: usageContext.domainHost,
+      runId: usageContext.runId,
+      promptId: usageContext.promptId,
+      feature: usageContext.feature,
+      operation: usageContext.operation,
+      modelRequested: model.openrouterModel,
+      metadata: { displayModel: model.id, webSearchMode: model.webSearchMode },
+    },
+  });
+  const completion = out.completion;
   const choice = completion.choices?.[0];
   const response = choice?.message?.content ?? '';
   // Some providers attach `annotations` (OpenAI web_search) or `citations`
@@ -421,10 +452,12 @@ async function callModel(model: ModelDef, promptText: string, loc: UserLocation)
     structuredUrls.length > 0
       ? `${response}\n\nSources:\n${structuredUrls.map((u) => `- ${u}`).join('\n')}`
       : response;
-  // OpenRouter exposes per-call cost on response.usage.cost (USD) when available.
-  const usage = (completion as unknown as { usage?: { cost?: number } }).usage;
-  const costUsd = typeof usage?.cost === 'number' ? usage.cost : null;
-  return { response: enrichedResponse, latencyMs: Date.now() - startedAt, costUsd };
+  return {
+    response: enrichedResponse,
+    latencyMs: out.latencyMs,
+    costUsd: out.costUsd,
+    usageLedgerEntryId: out.ledgerEntryId ?? null,
+  };
 }
 
 // ── Response analysis ──────────────────────────────────────────────────────
@@ -690,23 +723,48 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function scoreWithRetry(input: LlmScoreInput): Promise<Awaited<ReturnType<typeof llmScoreResponse>>> {
+async function scoreWithRetry(
+  input: LlmScoreInput,
+  usageContext?: {
+    userId: number | null;
+    domainId: number;
+    domainHost: string;
+    runId: number;
+    promptId: number;
+    feature: string;
+    operation?: string;
+  }
+): Promise<Awaited<ReturnType<typeof llmScoreResponse>>> {
   if (!shouldUseLlmScorer(input)) return null;
   const attempts = Math.max(1, DEEP_SCORING_RETRIES);
   for (let attempt = 0; attempt < attempts; attempt += 1) {
-    const scored = await llmScoreResponse(input).catch(() => null);
+    const scored = await llmScoreResponse(input, usageContext ? {
+      userId: usageContext.userId,
+      domainId: usageContext.domainId,
+      domainHost: usageContext.domainHost,
+      runId: usageContext.runId,
+      promptId: usageContext.promptId,
+      feature: usageContext.feature,
+      operation: usageContext.operation ?? 'score_response',
+      metadata: { attempt: attempt + 1 },
+    } : undefined).catch(() => null);
     if (scored) return scored;
     if (attempt < attempts - 1) await sleep(350 * (attempt + 1));
   }
   return null;
 }
 
-async function callModelWithRetry(model: ModelDef, promptText: string, loc: UserLocation): Promise<CallOutcome> {
+async function callModelWithRetry(
+  model: ModelDef,
+  promptText: string,
+  loc: UserLocation,
+  usageContext: ModelUsageContext
+): Promise<CallOutcome> {
   const attempts = Math.max(1, DEEP_ANSWER_RETRIES);
   let lastErr: unknown = null;
   for (let attempt = 0; attempt < attempts; attempt += 1) {
     try {
-      return await callModel(model, promptText, loc);
+      return await callModel(model, promptText, loc, usageContext);
     } catch (err) {
       lastErr = err;
       if (attempt < attempts - 1) await sleep(500 * (attempt + 1));
@@ -991,15 +1049,25 @@ export async function runDeepScoringForRun(args: {
       let response = row.response ?? '';
       let latencyMs: number | null = null;
       let costUsd: number | null = null;
+      let usageLedgerEntryId: number | null = null;
       let resultStatus: 'success' | 'failed' = row.status === 'failed' ? 'failed' : 'success';
       let errorMessage: string | null = null;
 
       if (!response.trim() && model) {
         try {
-          const retried = await callModelWithRetry(model, row.prompt.text, userLocation);
+          const retried = await callModelWithRetry(model, row.prompt.text, userLocation, {
+            userId: domainRow.userId,
+            domainId,
+            domainHost: domainRow.host,
+            runId,
+            promptId: row.promptId,
+            feature: 'prompt_tracking',
+            operation: 'background_answer_retry',
+          });
           response = retried.response;
           latencyMs = retried.latencyMs;
           costUsd = retried.costUsd;
+          usageLedgerEntryId = retried.usageLedgerEntryId ?? null;
           if (!response.trim()) {
             console.warn(`[run:${runId}] ${model.id} returned an empty response during background retry for prompt ${row.promptId}`);
             resultStatus = 'failed';
@@ -1030,7 +1098,14 @@ export async function runDeepScoringForRun(args: {
         competitors: competitorRoster,
         brandFacts,
       };
-      const llm = resultStatus === 'success' && response.trim() ? await scoreWithRetry(scoreInput) : null;
+      const llm = resultStatus === 'success' && response.trim() ? await scoreWithRetry(scoreInput, {
+        userId: domainRow.userId,
+        domainId,
+        domainHost: domainRow.host,
+        runId,
+        promptId: row.promptId,
+        feature: 'scorer',
+      }) : null;
       const final = resultStatus === 'success' && heuristic
         ? finalFromLlmOrHeuristic({ llm, heuristic, competitorRoster })
         : failedFinalScore();
@@ -1069,6 +1144,12 @@ export async function runDeepScoringForRun(args: {
           ...(costUsd !== null ? { costUsd } : {}),
         },
       });
+      if (usageLedgerEntryId) {
+        await prisma.usageLedgerEntry.update({
+          where: { id: usageLedgerEntryId },
+          data: { aiQueryResultId: row.id },
+        }).catch(() => undefined);
+      }
     }
   }
 
@@ -1132,7 +1213,7 @@ export async function runQueries({
   selection = 'selected',
   kind = 'audit',
 }: RunOptions): Promise<void> {
-  if (!router) {
+  if (!isOpenRouterConfigured()) {
     onProgress({ type: 'error', error: 'OPENROUTER_API_KEY not configured.' });
     return;
   }
@@ -1295,13 +1376,23 @@ export async function runQueries({
       let response = '';
       let latencyMs = 0;
       let costUsd: number | null = null;
+      let usageLedgerEntryId: number | null = null;
       let resultStatus: 'success' | 'failed' = 'success';
       let errorMessage: string | null = null;
       try {
-        const out = await callModel(item.model, item.prompt.text, userLocation);
+        const out = await callModel(item.model, item.prompt.text, userLocation, {
+          userId: domain!.userId,
+          domainId,
+          domainHost: domain!.host,
+          runId: run.id,
+          promptId: item.prompt.id,
+          feature: kind === 'weekly' ? 'prompt_tracking' : 'domain_analysis',
+          operation: 'answer_generation',
+        });
         response = out.response;
         latencyMs = out.latencyMs;
         costUsd = out.costUsd;
+        usageLedgerEntryId = out.usageLedgerEntryId ?? null;
         if (!response.trim()) {
           console.warn(`[run:${run.id}] ${item.model.id} returned an empty response for prompt ${item.prompt.id}`);
           resultStatus = 'failed';
@@ -1333,6 +1424,13 @@ export async function runQueries({
             brand: { name: brandName, aliases: [], host: domain!.host },
             competitors: competitorRoster,
             brandFacts,
+          }, {
+            userId: domain!.userId,
+            domainId,
+            domainHost: domain!.host,
+            runId: run.id,
+            promptId: item.prompt.id,
+            feature: 'scorer',
           })
         : null;
       const final = resultStatus === 'success' && heuristic
@@ -1379,7 +1477,7 @@ export async function runQueries({
       // Build the legacy `competitorHosts` array column from final.competitorMentions.
       const competitorHostsForRow = Array.from(new Set(final.competitorMentions.map((m) => m.host).filter(Boolean)));
 
-      await prisma.aiQueryResult.create({
+      const created = await prisma.aiQueryResult.create({
         data: {
           runId: run.id,
           promptId: item.prompt.id,
@@ -1402,6 +1500,12 @@ export async function runQueries({
           costUsd,
         },
       });
+      if (usageLedgerEntryId) {
+        await prisma.usageLedgerEntry.update({
+          where: { id: usageLedgerEntryId },
+          data: { aiQueryResultId: created.id },
+        }).catch(() => undefined);
+      }
 
       completedQueries++;
       const pm = perModel[item.model.id];
@@ -1593,7 +1697,7 @@ export async function runOnePrompt(
   prisma: PrismaClient,
   args: { domainId: number; promptId: number }
 ): Promise<RunOnePromptResult> {
-  if (!router) {
+  if (!isOpenRouterConfigured()) {
     throw new Error('OPENROUTER_API_KEY not configured.');
   }
   const { domainId, promptId } = args;
@@ -1671,13 +1775,23 @@ export async function runOnePrompt(
       let response = '';
       let latencyMs = 0;
       let costUsd: number | null = null;
+      let usageLedgerEntryId: number | null = null;
       let resultStatus: 'success' | 'failed' = 'success';
       let errorMessage: string | null = null;
       try {
-        const out = await callModel(model, promptRow.text, userLocation);
+        const out = await callModel(model, promptRow.text, userLocation, {
+          userId: domain.userId,
+          domainId,
+          domainHost: domain.host,
+          runId: run.id,
+          promptId: promptRow.id,
+          feature: 'prompt_tracking',
+          operation: 'adhoc_answer_generation',
+        });
         response = out.response;
         latencyMs = out.latencyMs;
         costUsd = out.costUsd;
+        usageLedgerEntryId = out.usageLedgerEntryId ?? null;
         if (!response.trim()) {
           console.warn(`[run:${run.id}] ${model.id} returned an empty response for ad-hoc prompt ${promptRow.id}`);
           resultStatus = 'failed';
@@ -1705,6 +1819,13 @@ export async function runOnePrompt(
             brand: { name: brandName, aliases: [], host: domain.host },
             competitors: competitorRoster,
             brandFacts,
+          }, {
+            userId: domain.userId,
+            domainId,
+            domainHost: domain.host,
+            runId: run.id,
+            promptId: promptRow.id,
+            feature: 'scorer',
           })
         : null;
       const final = resultStatus === 'success' && heuristic
@@ -1738,6 +1859,12 @@ export async function runOnePrompt(
           costUsd,
         },
       });
+      if (usageLedgerEntryId) {
+        await prisma.usageLedgerEntry.update({
+          where: { id: usageLedgerEntryId },
+          data: { aiQueryResultId: created.id },
+        }).catch(() => undefined);
+      }
       persistedResults.push({
         id: created.id,
         model: model.id,

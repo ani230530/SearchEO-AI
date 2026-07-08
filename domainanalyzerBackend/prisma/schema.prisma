@@ -835,6 +835,46 @@ model ApiSpendLog {
   @@index([createdAt])
 }
 
+model UsageLedgerEntry {
+  id                   Int      @id @default(autoincrement())
+  userId               Int?
+  sessionId            Int?
+  domainId             Int?
+  domainHost           String?
+  runId                Int?
+  promptId             Int?
+  aiQueryResultId      Int?
+  provider             String
+  feature              String
+  operation            String
+  callType             String
+  status               String
+  modelRequested       String?
+  modelUsed            String?
+  providerGenerationId String?
+  promptTokens         Int?
+  completionTokens     Int?
+  totalTokens          Int?
+  cachedTokens         Int?
+  reasoningTokens      Int?
+  costUsd              Decimal  @default(0) @db.Decimal(18, 8)
+  costSource           String
+  latencyMs            Int?
+  httpStatus           Int?
+  errorCode            String?
+  errorMessage         String?
+  metadata             Json?
+  createdAt            DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([userId, createdAt])
+  @@index([domainId, createdAt])
+  @@index([promptId, createdAt])
+  @@index([provider, createdAt])
+  @@index([feature, createdAt])
+  @@index([modelUsed, createdAt])
+}
+
 model Folder {
   id        Int      @id @default(autoincrement())
   name      String

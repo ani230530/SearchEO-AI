@@ -8,7 +8,6 @@ import {
   checkAnonRunRateLimit,
   checkUserRunQuota,
   checkWizardAccess,
-  estimateOpenRouterCostUsd,
   getDailyBudgetStatus,
   recordApiSpend,
 } from './antiAbuseService';
@@ -41,62 +40,23 @@ const fakeSession = (overrides: Partial<WizardSession> = {}): WizardSession =>
     ...overrides,
   } as WizardSession);
 
-describe('estimateOpenRouterCostUsd', () => {
-  it('uses model-specific pricing', () => {
-    const cheap = estimateOpenRouterCostUsd({
-      model: 'openai/gpt-4o-mini',
-      inputTokens: 1000,
-      outputTokens: 0,
-    });
-    const expensive = estimateOpenRouterCostUsd({
-      model: 'anthropic/claude-sonnet-4.5',
-      inputTokens: 1000,
-      outputTokens: 0,
-    });
-    expect(expensive).toBeGreaterThan(cheap);
-  });
-  it('falls back to mini pricing for unknown models', () => {
-    const unknown = estimateOpenRouterCostUsd({
-      model: 'fictional/model-9',
-      inputTokens: 1000,
-    });
-    const mini = estimateOpenRouterCostUsd({
-      model: 'openai/gpt-4o-mini',
-      inputTokens: 1000,
-    });
-    expect(unknown).toBe(mini);
-  });
-  it('combines input + output costs', () => {
-    const sum = estimateOpenRouterCostUsd({
-      model: 'openai/gpt-4o-mini',
-      inputTokens: 1000,
-      outputTokens: 1000,
-    });
-    const inOnly = estimateOpenRouterCostUsd({
-      model: 'openai/gpt-4o-mini',
-      inputTokens: 1000,
-    });
-    expect(sum).toBeGreaterThan(inOnly);
-  });
-});
-
 describe('recordApiSpend', () => {
-  it('writes a row with the supplied service + cost', async () => {
+  it('bridges legacy spend calls into the usage ledger', async () => {
     const prisma = createPrismaMock();
     await recordApiSpend(prisma, {
       service: 'openrouter',
       userId: 7,
       costEstimateUsd: 0.12,
     });
-    const count = await prisma.apiSpendLog.count({
-      where: { service: 'openrouter' },
+    const count = await prisma.usageLedgerEntry.count({
+      where: { provider: 'openrouter', feature: 'legacy' },
     });
     expect(count).toBe(1);
   });
   it('does not throw when persistence fails', async () => {
     const prisma = createPrismaMock();
     // Break the table to simulate DB failure.
-    (prisma as any).apiSpendLog.create = async () => {
+    (prisma as any).usageLedgerEntry.create = async () => {
       throw new Error('db down');
     };
     await expect(
@@ -114,8 +74,8 @@ describe('getDailyBudgetStatus', () => {
     await recordApiSpend(prisma, { service: 'openrouter', costEstimateUsd: 1 });
     // Manually backdate one row by reaching into the mock store.
     const stores = (prisma as any).__stores;
-    stores.apiSpendLog.rows.set(1, {
-      ...stores.apiSpendLog.rows.get(1),
+    stores.usageLedgerEntry.rows.set(1, {
+      ...stores.usageLedgerEntry.rows.get(1),
       createdAt: new Date('2026-05-12T12:00:00Z'),
     });
     await recordApiSpend(prisma, { service: 'openrouter', costEstimateUsd: 2 });
@@ -265,14 +225,16 @@ describe('checkUserRunQuota', () => {
     const user = await prisma.user.create({
       data: { email: 'a@b.com', password: 'h', wizardRunsAllowed: 1 },
     });
-    // Seed 70 openrouter rows = 1 "run" by the proxy heuristic.
-    for (let i = 0; i < 70; i++) {
-      await recordApiSpend(prisma, {
-        service: 'openrouter',
+    const domain = await prisma.domain.create({
+      data: {
         userId: user.id,
-        costEstimateUsd: 0.01,
-      });
-    }
+        url: 'https://example.com',
+        host: 'example.com',
+      },
+    });
+    await prisma.aiRun.create({
+      data: { domainId: domain.id, kind: 'audit', status: 'complete' },
+    });
     const decision = await checkUserRunQuota(prisma, user.id, NOW);
     expect(decision.allowed).toBe(false);
     expect(decision.status).toBe(402);

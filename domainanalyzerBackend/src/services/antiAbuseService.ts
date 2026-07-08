@@ -5,20 +5,12 @@
  *
  *   1. Per-IP / per-cookie / per-fingerprint rate limit on starting NEW
  *      anonymous runs. Defense-in-depth against signup-flood attackers.
- *   2. Daily budget circuit breaker. Sums ApiSpendLog for the current UTC
+ *   2. Daily budget circuit breaker. Sums UsageLedgerEntry for the current UTC
  *      day; when total ≥ threshold, anonymous calls are denied. The
  *      already-authenticated path stays open so paying users aren't
  *      collateral damage.
- *   3. Per-user quota. `User.wizardRunsAllowed` minus runs counted in
- *      ApiSpendLog. Enforced for kind='user' identities; n/a for anon.
- *
- * Cost estimation
- * ---------------
- * `estimateOpenRouterCostUsd` is a static lookup keyed on model+token-count.
- * Numbers are approximate snapshots from the OpenRouter pricing page; the
- * goal is "right within 2x" so the budget breaker fires before runaway,
- * not exact cost accounting. If you migrate to per-token actual cost,
- * swap this function but keep the call signature.
+ *   3. Per-user quota. `User.wizardRunsAllowed` minus real AiRun rows for
+ *      the user's domains. Enforced for kind='user' identities; n/a for anon.
  *
  * Determinism
  * -----------
@@ -27,59 +19,6 @@
  */
 
 import type { PrismaClient, WizardSession } from '../../generated/prisma';
-
-// =============================================================================
-// Cost estimation
-// =============================================================================
-
-/** Approximate USD per 1K input tokens, OpenRouter sticker prices May 2026. */
-const OPENROUTER_INPUT_USD_PER_1K: Record<string, number> = {
-  'openai/gpt-4o-mini': 0.00015,
-  'openai/gpt-4o': 0.0025,
-  'anthropic/claude-sonnet-4.5': 0.003,
-  'anthropic/claude-3.5-sonnet': 0.003,
-  'google/gemini-2.0-flash': 0.000075,
-  'google/gemini-2.0-flash:online': 0.000075,
-};
-
-/** Approximate USD per 1K output tokens. */
-const OPENROUTER_OUTPUT_USD_PER_1K: Record<string, number> = {
-  'openai/gpt-4o-mini': 0.0006,
-  'openai/gpt-4o': 0.01,
-  'anthropic/claude-sonnet-4.5': 0.015,
-  'anthropic/claude-3.5-sonnet': 0.015,
-  'google/gemini-2.0-flash': 0.0003,
-  'google/gemini-2.0-flash:online': 0.0003,
-};
-
-export interface OpenRouterCostInput {
-  model: string;
-  inputTokens?: number;
-  outputTokens?: number;
-}
-
-/**
- * Estimate OpenRouter call cost in USD. Falls back to gpt-4o-mini pricing
- * for unknown models so the budget breaker still catches them.
- */
-export const estimateOpenRouterCostUsd = (
-  input: OpenRouterCostInput
-): number => {
-  const inPrice =
-    OPENROUTER_INPUT_USD_PER_1K[input.model] ??
-    OPENROUTER_INPUT_USD_PER_1K['openai/gpt-4o-mini'];
-  const outPrice =
-    OPENROUTER_OUTPUT_USD_PER_1K[input.model] ??
-    OPENROUTER_OUTPUT_USD_PER_1K['openai/gpt-4o-mini'];
-  const inCost = (input.inputTokens ?? 0) * (inPrice / 1000);
-  const outCost = (input.outputTokens ?? 0) * (outPrice / 1000);
-  return inCost + outCost;
-};
-
-/** Flat-rate cost per external service call (when no token info available). */
-export const SERPAPI_CALL_USD = 0.005;
-export const PAGESPEED_CALL_USD = 0.0;
-export const N8N_CALL_USD = 0.0;
 
 // =============================================================================
 // Spend logging
@@ -95,22 +34,26 @@ export interface RecordSpendInput {
 }
 
 /**
- * Log an external API call to ApiSpendLog. Never throws — spend tracking
- * shouldn't tear down a working request. Caller proceeds even if persistence
- * fails (we'd rather underreport than break the wizard).
+ * Compatibility shim for older callers. New code should use usageLedgerService
+ * directly. This no longer writes ApiSpendLog.
  */
 export async function recordApiSpend(
   prisma: PrismaClient,
   input: RecordSpendInput
 ): Promise<void> {
   try {
-    await prisma.apiSpendLog.create({
+    await prisma.usageLedgerEntry.create({
       data: {
-        service: input.service,
+        provider: input.service,
+        feature: 'legacy',
+        operation: 'legacy_record_api_spend',
+        callType: 'external',
+        status: 'success',
         userId: input.userId ?? null,
         sessionId: input.sessionId ?? null,
         domainHost: input.domainHost ?? null,
-        costEstimateUsd: input.costEstimateUsd,
+        costUsd: input.costEstimateUsd,
+        costSource: 'legacy_estimate',
         metadata: (input.metadata ?? null) as any,
       },
     });
@@ -150,18 +93,18 @@ export interface BudgetStatus {
   anonShedding: boolean;
 }
 
-/** Sum ApiSpendLog.costEstimateUsd for the current UTC day. */
+/** Sum UsageLedgerEntry.costUsd for the current UTC day. */
 export async function getDailyBudgetStatus(
   prisma: PrismaClient,
   capUsd: number = DAILY_BUDGET_USD,
   now: Date = new Date()
 ): Promise<BudgetStatus> {
   const since = startOfUtcDay(now);
-  const agg = await prisma.apiSpendLog.aggregate({
-    _sum: { costEstimateUsd: true },
+  const agg = await prisma.usageLedgerEntry.aggregate({
+    _sum: { costUsd: true },
     where: { createdAt: { gte: since } },
   });
-  const spent = agg._sum.costEstimateUsd ?? 0;
+  const spent = Number(agg._sum.costUsd ?? 0);
   const remaining = Math.max(0, capUsd - spent);
   return {
     spentUsd: spent,
@@ -258,8 +201,8 @@ export async function checkAnonRunRateLimit(
  *
  * Checks two things:
  *   - `lastWizardRunAt` cooldown — prevents accidental double-runs.
- *   - `wizardRunsAllowed` minus historical runs in ApiSpendLog (proxy for
- *     "number of paid wizard runs this user has had"). When the quota is
+ *   - `wizardRunsAllowed` minus historical AiRun audit rows for domains this
+ *     user owns. When the quota is
  *     reached we deny with status 402 (Payment Required) so the UI can
  *     prompt to upgrade.
  */
@@ -284,17 +227,12 @@ export async function checkUserRunQuota(
     }
   }
 
-  // Count this user's wizard "runs" — proxied by openrouter spend rows.
-  // Each Step-5 run produces multiple openrouter rows; we count distinct
-  // (userId, domainHost, day) tuples instead, but that's hard in a single
-  // query without a window function. For the backbone we use a simpler
-  // proxy: the number of openrouter rows / 70 (rough per-run call count).
-  // This is intentionally approximate — exact accounting will move to a
-  // dedicated `WizardRunLog` table in the follow-up.
-  const spendRows = await prisma.apiSpendLog.count({
-    where: { userId, service: 'openrouter' },
+  const runsUsed = await prisma.aiRun.count({
+    where: {
+      kind: 'audit',
+      domain: { userId },
+    },
   });
-  const runsUsed = Math.ceil(spendRows / 70);
   if (runsUsed >= user.wizardRunsAllowed) {
     return {
       allowed: false,

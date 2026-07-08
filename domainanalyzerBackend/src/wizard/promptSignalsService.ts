@@ -1,5 +1,6 @@
 import axios from 'axios';
 import type { EnrichedContext } from './enrichmentService';
+import { logExternalUsage } from '../services/externalUsageClient';
 
 export type PromptSignalSource = 'serper_organic' | 'serper_people_also_ask' | 'serper_related_search' | 'domain_context';
 
@@ -174,52 +175,81 @@ export function buildSerperQueries(input: CollectPromptSignalsInput): string[] {
   return Array.from(new Set(queries.map((q) => q.replace(/\s+/g, ' ').trim()).filter(Boolean))).slice(0, 8);
 }
 
-async function searchSerper(apiKey: string, query: string): Promise<PromptSeedSignal[]> {
-  const response = await axios.post<SerperResponse>(
-    SERPER_ENDPOINT,
-    { q: query, num: 10, gl: 'us', hl: 'en' },
-    {
-      headers: {
-        'X-API-KEY': apiKey,
-        'Content-Type': 'application/json',
-      },
-      timeout: SERPER_TIMEOUT_MS,
-    }
-  );
+async function searchSerper(apiKey: string, query: string, host: string): Promise<PromptSeedSignal[]> {
+  const startedAt = Date.now();
+  let responseStatus: number | null = null;
+  try {
+    const response = await axios.post<SerperResponse>(
+      SERPER_ENDPOINT,
+      { q: query, num: 10, gl: 'us', hl: 'en' },
+      {
+        headers: {
+          'X-API-KEY': apiKey,
+          'Content-Type': 'application/json',
+        },
+        timeout: SERPER_TIMEOUT_MS,
+      }
+    );
+    responseStatus = response.status;
 
-  const organic = (response.data.organic ?? []).map<PromptSeedSignal>((item, index) => ({
-    id: index + 1,
-    source: 'serper_organic',
-    query,
-    title: item.title?.trim() ?? '',
-    snippet: item.snippet?.trim() ?? '',
-    host: hostFromUrl(item.link),
-    link: item.link ?? null,
-  }));
+    const organic = (response.data.organic ?? []).map<PromptSeedSignal>((item, index) => ({
+      id: index + 1,
+      source: 'serper_organic',
+      query,
+      title: item.title?.trim() ?? '',
+      snippet: item.snippet?.trim() ?? '',
+      host: hostFromUrl(item.link),
+      link: item.link ?? null,
+    }));
 
-  const peopleAlsoAsk = (response.data.peopleAlsoAsk ?? []).map<PromptSeedSignal>((item, index) => ({
-    id: index + 1,
-    source: 'serper_people_also_ask',
-    query,
-    title: (item.question || item.title || '').trim(),
-    snippet: item.snippet?.trim() ?? '',
-    host: hostFromUrl(item.link),
-    link: item.link ?? null,
-  }));
+    const peopleAlsoAsk = (response.data.peopleAlsoAsk ?? []).map<PromptSeedSignal>((item, index) => ({
+      id: index + 1,
+      source: 'serper_people_also_ask',
+      query,
+      title: (item.question || item.title || '').trim(),
+      snippet: item.snippet?.trim() ?? '',
+      host: hostFromUrl(item.link),
+      link: item.link ?? null,
+    }));
 
-  const related = (response.data.relatedSearches ?? []).map<PromptSeedSignal>((item, index) => ({
-    id: index + 1,
-    source: 'serper_related_search',
-    query,
-    title: item.query?.trim() ?? '',
-    snippet: '',
-    host: null,
-    link: null,
-  }));
+    const related = (response.data.relatedSearches ?? []).map<PromptSeedSignal>((item, index) => ({
+      id: index + 1,
+      source: 'serper_related_search',
+      query,
+      title: item.query?.trim() ?? '',
+      snippet: '',
+      host: null,
+      link: null,
+    }));
 
-  return [...organic, ...peopleAlsoAsk, ...related].filter((signal) =>
-    `${signal.title} ${signal.snippet}`.trim().length > 24
-  );
+    const signals = [...organic, ...peopleAlsoAsk, ...related].filter((signal) =>
+      `${signal.title} ${signal.snippet}`.trim().length > 24
+    );
+    await logExternalUsage({
+      provider: 'serper',
+      feature: 'prompt_research',
+      operation: 'serper_prompt_signals',
+      context: { domainHost: host },
+      latencyMs: Date.now() - startedAt,
+      httpStatus: responseStatus,
+      metadata: { query, results: signals.length },
+    });
+    return signals;
+  } catch (err: any) {
+    await logExternalUsage({
+      provider: 'serper',
+      feature: 'prompt_research',
+      operation: 'serper_prompt_signals',
+      context: { domainHost: host },
+      status: err?.code === 'ECONNABORTED' ? 'timeout' : 'failed',
+      latencyMs: Date.now() - startedAt,
+      httpStatus: err?.response?.status ?? responseStatus,
+      errorCode: err?.code ?? null,
+      errorMessage: err?.message ?? null,
+      metadata: { query },
+    });
+    throw err;
+  }
 }
 
 export async function collectPromptSeedSignals(input: CollectPromptSignalsInput): Promise<PromptSeedSignal[]> {
@@ -238,7 +268,7 @@ export async function collectPromptSeedSignals(input: CollectPromptSignalsInput)
   if (cached && cached.expiresAt > Date.now()) return cached.signals;
 
   const queries = buildSerperQueries(input);
-  const settled = await Promise.allSettled(queries.map((query) => searchSerper(apiKey, query)));
+  const settled = await Promise.allSettled(queries.map((query) => searchSerper(apiKey, query, input.host)));
   const signals = dedupeSignals(
     settled.flatMap((result) => (result.status === 'fulfilled' ? result.value : [])),
     limit

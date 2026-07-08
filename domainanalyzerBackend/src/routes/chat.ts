@@ -13,9 +13,10 @@ import { streamText, convertToModelMessages, stepCountIs, type UIMessage } from 
 
 import { prisma } from '../lib/prisma';
 import { authenticateToken, AuthenticatedRequest } from '../middleware/auth';
-import { getAgentModel, isAgentConfigured } from '../chat/model';
+import { AGENT_MODEL_ID, getAgentModel, isAgentConfigured } from '../chat/model';
 import { buildSystemPrompt } from '../chat/systemPrompt';
 import { buildTools } from '../chat/tools';
+import { recordUsageAttempt } from '../services/usageLedgerService';
 import {
   getLatestThread,
   createThread,
@@ -83,6 +84,7 @@ router.post('/', authenticateToken, asyncHandler(async (req, res) => {
   }
 
   const modelMessages = await convertToModelMessages(uiMessages);
+  const startedAt = Date.now();
   const result = streamText({
     model: getAgentModel(),
     system: buildSystemPrompt({ currentDomainId, currentPath }),
@@ -90,6 +92,37 @@ router.post('/', authenticateToken, asyncHandler(async (req, res) => {
     tools: buildTools({ jwt, currentDomainId }),
     // Agent loop: allow several tool round-trips before forcing a final answer.
     stopWhen: stepCountIs(8),
+    onFinish: ({ totalUsage, providerMetadata, response, finishReason }) => {
+      const openRouterUsage = (providerMetadata?.openrouter as any)?.usage ?? {};
+      recordUsageAttempt({
+        userId,
+        domainId: currentDomainId,
+        provider: 'openrouter',
+        feature: 'chat_agent',
+        operation: 'agent_turn',
+        callType: 'stream_chat_completion',
+        modelRequested: AGENT_MODEL_ID,
+        metadata: { threadId, finishReason, path: currentPath },
+      }, {
+        status: 'success',
+        modelUsed: AGENT_MODEL_ID,
+        providerGenerationId: (response as any)?.id ?? null,
+        promptTokens: openRouterUsage.promptTokens ?? openRouterUsage.prompt_tokens ?? totalUsage.inputTokens,
+        completionTokens: openRouterUsage.completionTokens ?? openRouterUsage.completion_tokens ?? totalUsage.outputTokens,
+        totalTokens: openRouterUsage.totalTokens ?? openRouterUsage.total_tokens ?? totalUsage.totalTokens,
+        cachedTokens:
+          openRouterUsage.cachedTokens ??
+          openRouterUsage.cached_tokens ??
+          totalUsage.inputTokenDetails?.cacheReadTokens,
+        reasoningTokens:
+          openRouterUsage.reasoningTokens ??
+          openRouterUsage.reasoning_tokens ??
+          totalUsage.outputTokenDetails?.reasoningTokens,
+        costUsd: openRouterUsage.cost ?? openRouterUsage.costUsd ?? 0,
+        costSource: openRouterUsage.cost || openRouterUsage.costUsd ? 'provider_reported' : 'none',
+        latencyMs: Date.now() - startedAt,
+      }).catch((err) => console.warn('[chat] usage ledger write failed', err));
+    },
   });
 
   result.pipeUIMessageStreamToResponse(res, {

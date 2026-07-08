@@ -3,6 +3,7 @@ import puppeteer from "puppeteer";
 import { prisma } from "../lib/prisma";
 import { authenticateToken, AuthenticatedRequest } from "../middleware/auth";
 import { uploadScreenshot, deleteScreenshot } from "../utils/cloudinary";
+import { logExternalUsage } from "../services/externalUsageClient";
 
 const router = express.Router();
 
@@ -111,15 +112,56 @@ router.post("/", authenticateToken, asyncHandler(async (req: Request, res: Respo
       formatted
     )}&category=PERFORMANCE&category=SEO&category=BEST_PRACTICES&category=ACCESSIBILITY&strategy=DESKTOP&key=${apiKey}`;
 
-    const response = await fetch(endpoint);
+    const pageSpeedStartedAt = Date.now();
+    let response: globalThis.Response;
+    try {
+      response = await fetch(endpoint);
+    } catch (error: any) {
+      await logExternalUsage({
+        provider: "pagespeed",
+        feature: "domain_audit",
+        operation: "pagespeed_insights",
+        context: { userId, domainId: companyDomain.id, domainHost: companyDomain.host },
+        status: "failed",
+        costSource: "none",
+        latencyMs: Date.now() - pageSpeedStartedAt,
+        errorCode: error?.code ?? null,
+        errorMessage: error?.message ?? null,
+        metadata: { url: formatted, strategy: "DESKTOP" },
+      });
+      throw error;
+    }
     if (!response.ok) {
       const text = await response.text();
+      await logExternalUsage({
+        provider: "pagespeed",
+        feature: "domain_audit",
+        operation: "pagespeed_insights",
+        context: { userId, domainId: companyDomain.id, domainHost: companyDomain.host },
+        status: "failed",
+        costSource: "none",
+        latencyMs: Date.now() - pageSpeedStartedAt,
+        httpStatus: response.status,
+        errorCode: "pagespeed_api_error",
+        errorMessage: response.statusText,
+        metadata: { url: formatted, strategy: "DESKTOP" },
+      });
       return res.status(response.status).json({
         success: false,
         error: "Pagespeed API error",
         details: text,
       });
     }
+    await logExternalUsage({
+      provider: "pagespeed",
+      feature: "domain_audit",
+      operation: "pagespeed_insights",
+      context: { userId, domainId: companyDomain.id, domainHost: companyDomain.host },
+      costSource: "none",
+      latencyMs: Date.now() - pageSpeedStartedAt,
+      httpStatus: response.status,
+      metadata: { url: formatted, strategy: "DESKTOP" },
+    });
 
     const data = await response.json();
     const lighthouse = data.lighthouseResult;

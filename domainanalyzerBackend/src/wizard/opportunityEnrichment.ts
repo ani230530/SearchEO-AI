@@ -18,22 +18,8 @@
  * just read the cached payload.
  */
 
-import OpenAI from 'openai';
 import type { OutrankOpportunity } from './analyticsService';
-
-const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
-const APP_URL = process.env.OPENROUTER_REFERRER || 'http://localhost:3002';
-
-const router = OPENROUTER_API_KEY
-  ? new OpenAI({
-      apiKey: OPENROUTER_API_KEY,
-      baseURL: 'https://openrouter.ai/api/v1',
-      defaultHeaders: {
-        'HTTP-Referer': APP_URL,
-        'X-Title': 'AI Visibility / Opportunity enrichment',
-      },
-    })
-  : null;
+import { callOpenRouterChat, isOpenRouterConfigured } from '../services/openRouterClient';
 
 const MODEL = 'openai/gpt-4o-mini';
 const TIMEOUT_MS = 30_000;
@@ -100,14 +86,14 @@ export async function enrichOpportunities(
   context: EnrichmentContext
 ): Promise<EnrichedOpportunity[]> {
   if (opportunities.length === 0) return [];
-  if (!router) return opportunities.map((o) => withDefaultBrief(o));
+  if (!isOpenRouterConfigured()) return opportunities.map((o) => withDefaultBrief(o));
 
   const userPrompt = buildPrompt(opportunities, context);
   let parsed: LlmEnrichmentResponse | null = null;
 
   try {
-    const completion = await Promise.race([
-      router.chat.completions.create({
+    const completion = await callOpenRouterChat({
+      payload: {
         model: MODEL,
         messages: [
           {
@@ -120,10 +106,16 @@ export async function enrichOpportunities(
         response_format: { type: 'json_object' },
         temperature: 0.4,
         max_tokens: 4500,
-      }),
-      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('enrichment timeout')), TIMEOUT_MS)),
-    ]);
-    const text = completion.choices[0]?.message?.content ?? '';
+      },
+      timeoutMs: TIMEOUT_MS,
+      context: {
+        domainHost: context.brandHost,
+        feature: 'opportunity_enrichment',
+        operation: 'enrich_opportunities',
+        modelRequested: MODEL,
+      },
+    });
+    const text = completion.content ?? '';
     parsed = JSON.parse(text) as LlmEnrichmentResponse;
   } catch {
     return opportunities.map((o) => withDefaultBrief(o));

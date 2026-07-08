@@ -51,6 +51,7 @@ import {
   invalidateReportCacheForDomain,
   reportCacheKey,
 } from './reportCache';
+import { callOpenRouterJson, isOpenRouterConfigured } from '../services/openRouterClient';
 
 const router = Router();
 
@@ -1266,7 +1267,15 @@ router.post('/domain', authenticateOrSession(), async (req: Request, res: Respon
         if (cachedEmbedding && existingInferred?.crawlHash === crawlHash) {
           return cachedEmbedding;
         }
-        return embedText(embedSource);
+        return embedText(embedSource, undefined, {
+          userId: ownerId,
+          sessionId: req.identity?.kind === 'anon' ? req.identity.session.id : null,
+          domainId: domain.id,
+          domainHost: domain.host,
+          feature: 'domain_analysis',
+          operation: 'domain_embedding',
+          metadata: { crawlHash },
+        });
       });
 
     await prisma.crawlSnapshot.create({
@@ -3649,7 +3658,7 @@ router.post('/domain/:id/keywords/:kwId/prompts', authenticateToken, async (req:
   const keyword = await prisma.keyword.findFirst({ where: { id: kwId, domainId: domain.id } });
   if (!keyword) return res.status(404).json({ error: 'Keyword not found for this domain' });
 
-  if (!process.env.OPENROUTER_API_KEY) {
+  if (!isOpenRouterConfigured()) {
     return res.status(500).json({ error: 'OPENROUTER_API_KEY not configured' });
   }
 
@@ -3662,25 +3671,10 @@ router.post('/domain/:id/keywords/:kwId/prompts', authenticateToken, async (req:
 
   let newPrompts: string[] = [];
   try {
-    const OpenAI = (await import('openai')).default;
-    const router2 = new OpenAI({
-      apiKey: process.env.OPENROUTER_API_KEY,
-      baseURL: 'https://openrouter.ai/api/v1',
-      defaultHeaders: {
-        'HTTP-Referer': process.env.OPENROUTER_REFERRER || 'http://localhost:3002',
-        'X-Title': 'AI Visibility Wizard / Load more prompts',
-      },
-    });
-    const completion = await router2.chat.completions.create({
+    const parsed = await callOpenRouterJson<{ prompts?: unknown[] }>({
       model: 'openai/gpt-4o-mini',
-      messages: [
-        {
-          role: 'system',
-          content: 'You write natural prompts a real user would ask ChatGPT/Claude/Gemini. Output strict JSON only. Each prompt MUST be a full question or task — never a bare keyword phrase.',
-        },
-        {
-          role: 'user',
-          content: [
+      system: 'You write natural prompts a real user would ask ChatGPT/Claude/Gemini. Output strict JSON only. Each prompt MUST be a full question or task — never a bare keyword phrase.',
+      user: [
             `Domain: ${domain.url}`,
             domain.profile?.industry ? `Industry: ${domain.profile.industry}` : '',
             `Keyword: "${keyword.term}" (intent: ${keyword.intent})`,
@@ -3693,13 +3687,16 @@ router.post('/domain/:id/keywords/:kwId/prompts', authenticateToken, async (req:
             '',
             'Return JSON: { "prompts": string[] }',
           ].filter(Boolean).join('\n'),
-        },
-      ],
-      response_format: { type: 'json_object' },
       temperature: 0.5,
-      max_tokens: 600,
+      maxTokens: 600,
+      context: {
+        userId: authReq(req).user.userId,
+        domainId: domain.id,
+        domainHost: domain.host,
+        feature: 'prompt_research',
+        operation: 'load_more_keyword_prompts',
+      },
     });
-    const parsed = JSON.parse(completion.choices[0]?.message?.content ?? '{}');
     if (Array.isArray(parsed.prompts)) {
       const seen = new Set(existing.map((p) => p.text.toLowerCase().trim()));
       newPrompts = parsed.prompts
@@ -3765,31 +3762,20 @@ router.post('/domain/:id/prompts/custom', authenticateOrSession(), async (req: R
   // keyword group, never floats orphan.
   let newKeywordTerm: string | null = null;
 
-  if (process.env.OPENROUTER_API_KEY) {
+  if (isOpenRouterConfigured()) {
     try {
-      const OpenAI = (await import('openai')).default;
-      const router = new OpenAI({
-        apiKey: process.env.OPENROUTER_API_KEY,
-        baseURL: 'https://openrouter.ai/api/v1',
-        defaultHeaders: {
-          'HTTP-Referer': process.env.OPENROUTER_REFERRER || 'http://localhost:3002',
-          'X-Title': 'AI Visibility Wizard / Custom prompt',
-        },
-      });
-      const completion = await router.chat.completions.create({
+      const parsed = await callOpenRouterJson<{
+        keywordId?: unknown;
+        newKeyword?: unknown;
+        intent?: unknown;
+      }>({
         model: 'openai/gpt-4o-mini',
-        messages: [
-          {
-            role: 'system',
-            content:
+        system:
               'You assign a user-supplied prompt to a keyword group. ' +
               'First try to match it to one of the existing keywords. ' +
               'If none of them fits, propose a brand new short keyword (1–4 words, lowercase, no quotes) that captures the prompt\'s topic. ' +
               'Output strict JSON only.',
-          },
-          {
-            role: 'user',
-            content: [
+        user: [
               `User's prompt: "${text}"`,
               '',
               keywords.length > 0
@@ -3806,13 +3792,16 @@ router.post('/domain/:id/prompts/custom', authenticateOrSession(), async (req: R
               '  "intent": "Informational"|"Commercial"|"Transactional"|"Navigational"',
               '}',
             ].join('\n'),
-          },
-        ],
-        response_format: { type: 'json_object' },
         temperature: 0.1,
-        max_tokens: 120,
+        maxTokens: 120,
+        context: {
+          userId: authReq(req).user.userId,
+          domainId: domain.id,
+          domainHost: domain.host,
+          feature: 'prompt_research',
+          operation: 'assign_custom_prompt_keyword',
+        },
       });
-      const parsed = JSON.parse(completion.choices[0]?.message?.content ?? '{}');
       const allowedIds = new Set(keywords.map((k) => k.id));
       if (typeof parsed.keywordId === 'number' && allowedIds.has(parsed.keywordId)) {
         assignedKeywordId = parsed.keywordId;
@@ -3945,31 +3934,20 @@ router.post('/domain/:id/prompts/analyze', authenticateToken, async (req: Reques
   let assignedIntent: string | null = null;
   let newKeywordTerm: string | null = null;
 
-  if (process.env.OPENROUTER_API_KEY) {
+  if (isOpenRouterConfigured()) {
     try {
-      const OpenAI = (await import('openai')).default;
-      const llm = new OpenAI({
-        apiKey: process.env.OPENROUTER_API_KEY,
-        baseURL: 'https://openrouter.ai/api/v1',
-        defaultHeaders: {
-          'HTTP-Referer': process.env.OPENROUTER_REFERRER || 'http://localhost:3002',
-          'X-Title': 'AI Visibility / Analyze prompt',
-        },
-      });
-      const completion = await llm.chat.completions.create({
+      const parsed = await callOpenRouterJson<{
+        keywordId?: unknown;
+        newKeyword?: unknown;
+        intent?: unknown;
+      }>({
         model: 'openai/gpt-4o-mini',
-        messages: [
-          {
-            role: 'system',
-            content:
+        system:
               'You assign a user-supplied prompt to a keyword group. ' +
               'First try to match it to one of the existing keywords. ' +
               "If none fit, propose a brand new short keyword (1–4 words, lowercase, no quotes) that captures the prompt's topic. " +
               'Output strict JSON only.',
-          },
-          {
-            role: 'user',
-            content: [
+        user: [
               `User's prompt: "${text}"`,
               '',
               keywords.length > 0
@@ -3986,13 +3964,16 @@ router.post('/domain/:id/prompts/analyze', authenticateToken, async (req: Reques
               '  "intent": "Informational"|"Commercial"|"Transactional"|"Navigational"',
               '}',
             ].join('\n'),
-          },
-        ],
-        response_format: { type: 'json_object' },
         temperature: 0.1,
-        max_tokens: 120,
+        maxTokens: 120,
+        context: {
+          userId: authReq(req).user.userId,
+          domainId: domain.id,
+          domainHost: domain.host,
+          feature: 'prompt_tracking',
+          operation: 'assign_analyze_prompt_keyword',
+        },
       });
-      const parsed = JSON.parse(completion.choices[0]?.message?.content ?? '{}');
       const allowedIds = new Set(keywords.map((k) => k.id));
       if (typeof parsed.keywordId === 'number' && allowedIds.has(parsed.keywordId)) {
         assignedKeywordId = parsed.keywordId;

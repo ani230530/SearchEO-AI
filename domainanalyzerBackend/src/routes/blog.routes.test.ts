@@ -133,30 +133,32 @@ afterEach(() => {
 describe('blog routes', () => {
   it('returns only published posts publicly and hides drafts', async () => {
     const prisma = state.prisma!;
-    await prisma.post.create({
+    await prisma.blogPost.create({
       data: {
         title: 'Draft Post',
         slug: 'draft-post',
         excerpt: 'Hidden',
-        body: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Hidden' }] }] },
-        heroImage: 'https://cdn.example/draft.jpg',
+        contentHtml: '<p>Hidden</p>',
+        heroImageUrl: 'https://cdn.example/draft.jpg',
         seoTitle: 'Draft Post',
         seoDescription: 'Draft description',
         status: 'DRAFT',
         publishedAt: null,
+        createdById: 1,
       },
     });
-    await prisma.post.create({
+    await prisma.blogPost.create({
       data: {
         title: 'Published Post',
         slug: 'published-post',
         excerpt: 'Visible',
-        body: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Hello company' }] }] },
-        heroImage: 'https://cdn.example/published.jpg',
+        contentHtml: '<p>Hello company</p>',
+        heroImageUrl: 'https://cdn.example/published.jpg',
         seoTitle: 'Published Post',
         seoDescription: 'Published description',
         status: 'PUBLISHED',
         publishedAt: new Date('2026-06-20T10:00:00.000Z'),
+        createdById: 1,
       },
     });
 
@@ -168,7 +170,7 @@ describe('blog routes', () => {
     expect(listJson.pagination.total).toBe(1);
     expect(listJson.pagination.pages).toBe(1);
     expect(listJson.posts[0].slug).toBe('published-post');
-    expect(listJson.posts[0].body.type).toBe('doc');
+    expect(listJson.posts[0].contentHtml).toBe('<p>Hello company</p>');
 
     const detailResponse = await request('/api/blog/published-post');
     const detailJson = await readJson(detailResponse);

@@ -3,6 +3,7 @@ import type { EnrichedContext } from './enrichmentService';
 import { callJson, Models } from './llmClient';
 import type { PromptCategory } from './topicsService';
 import type { PromptSeedSignal } from './promptSignalsService';
+import { callOpenRouterJson as callLoggedOpenRouterJson } from '../services/openRouterClient';
 
 export interface HumanAuditPrompt {
   text: string;
@@ -333,41 +334,23 @@ function topicCoverage(prompts: string[], themes: PromptDiversityTheme[]): {
   };
 }
 
-function stripCodeFence(text: string): string {
-  return text.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
-}
-
-async function callOpenRouterJson<T>(args: {
+async function callOpenRouterPromptJson<T>(args: {
   system: string;
   user: string;
   temperature: number;
   maxTokens: number;
 }): Promise<T> {
-  const apiKey = process.env.OPENROUTER_API_KEY?.trim();
-  if (!apiKey) throw new Error('OPENROUTER_API_KEY not configured');
-  const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-      'HTTP-Referer': process.env.OPENROUTER_REFERRER || 'http://localhost:3002',
-      'X-Title': 'SearchEO-AI Human Prompt Generator',
+  return callLoggedOpenRouterJson<T>({
+    model: 'openai/gpt-4o-mini',
+    system: args.system,
+    user: args.user,
+    temperature: args.temperature,
+    maxTokens: args.maxTokens,
+    context: {
+      feature: 'prompt_research',
+      operation: 'human_prompt_generation_fallback',
     },
-    body: JSON.stringify({
-      model: 'openai/gpt-4o-mini',
-      messages: [
-        { role: 'system', content: args.system },
-        { role: 'user', content: args.user },
-      ],
-      response_format: { type: 'json_object' },
-      temperature: args.temperature,
-      max_tokens: args.maxTokens,
-    }),
   });
-  const text = await response.text();
-  if (!response.ok) throw new Error(`OpenRouter HTTP ${response.status}: ${text.slice(0, 240)}`);
-  const content = JSON.parse(text).choices?.[0]?.message?.content ?? '{}';
-  return JSON.parse(stripCodeFence(content)) as T;
 }
 
 async function callPromptJson<T>(args: {
@@ -386,7 +369,7 @@ async function callPromptJson<T>(args: {
     });
   } catch (err) {
     if (!process.env.OPENROUTER_API_KEY?.trim()) throw err;
-    return callOpenRouterJson<T>(args);
+    return callOpenRouterPromptJson<T>(args);
   }
 }
 

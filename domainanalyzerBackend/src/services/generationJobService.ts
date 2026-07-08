@@ -39,6 +39,7 @@ import { normalizePublishGenerateResponse } from './contentFlowService';
 import { decryptToken } from './tokenEncryption';
 import { normalizeKeyword as normalizeKw } from '../utils/payloadNormalization';
 import { broadcastToUser } from './sseService';
+import { logExternalUsage } from './externalUsageClient';
 
 
 const N8N_UNIVERSAL_WEBHOOK_URL =
@@ -458,6 +459,7 @@ async function runGenerationJob(jobId: string, input: RunGenerationInput): Promi
     if (process.env.NODE_ENV !== 'production') {
       console.log('[gen] POST n8n', { jobId, url: N8N_UNIVERSAL_WEBHOOK_URL });
     }
+    const n8nStartedAt = Date.now();
     const response = await axios.post(N8N_UNIVERSAL_WEBHOOK_URL, payload, {
       headers: {
         'Content-Type': 'application/json',
@@ -465,9 +467,30 @@ async function runGenerationJob(jobId: string, input: RunGenerationInput): Promi
       },
       timeout: N8N_TIMEOUT_MS,
     });
+    await logExternalUsage({
+      provider: 'n8n',
+      feature: 'campaign_generation',
+      operation: 'universal_generation',
+      context: { userId, domainId: topic.campaign.domain.id, domainHost: topic.campaign.domain.host },
+      status: 'success',
+      latencyMs: Date.now() - n8nStartedAt,
+      httpStatus: response.status,
+      metadata: { jobId, topicId, templateType },
+    });
     webhookResponse = response.data;
   } catch (err: any) {
     stopHeartbeat();
+    await logExternalUsage({
+      provider: 'n8n',
+      feature: 'campaign_generation',
+      operation: 'universal_generation',
+      context: { userId, domainId: topic.campaign.domain.id, domainHost: topic.campaign.domain.host },
+      status: err?.code === 'ECONNABORTED' ? 'timeout' : 'failed',
+      httpStatus: err?.response?.status ?? null,
+      errorCode: err?.code ?? null,
+      errorMessage: err?.message ?? null,
+      metadata: { jobId, topicId, templateType },
+    });
     const detail =
       err?.response?.data?.message ||
       err?.response?.statusText ||

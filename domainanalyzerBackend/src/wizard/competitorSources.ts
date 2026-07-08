@@ -19,26 +19,16 @@
 
 import axios from 'axios';
 import crypto from 'crypto';
-import OpenAI from 'openai';
 import type { PrismaClient } from '../../generated/prisma';
 import type { CompetitorCandidate } from './types';
 import { extractHost } from './urlNormalize';
 import { redisService } from '../services/RedisService';
+import { callOpenRouterChat, isOpenRouterConfigured } from '../services/openRouterClient';
+import { logExternalUsage } from '../services/externalUsageClient';
 
 // Accept either SERP_API_KEY (existing project convention) or SERPAPI_KEY.
 const SERPAPI_KEY = process.env.SERP_API_KEY || process.env.SERPAPI_KEY;
 const CLEARBIT_KEY = process.env.CLEARBIT_KEY;
-const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
-const APP_URL = process.env.OPENROUTER_REFERRER || 'http://localhost:3002';
-
-// OpenRouter — used by the LLM-context proposer. One key, one model.
-const router = OPENROUTER_API_KEY
-  ? new OpenAI({
-      apiKey: OPENROUTER_API_KEY,
-      baseURL: 'https://openrouter.ai/api/v1',
-      defaultHeaders: { 'HTTP-Referer': APP_URL, 'X-Title': 'AI Visibility Wizard' },
-    })
-  : null;
 
 const BLOCKED_HOSTS = new Set([
   'amazon.com', 'ebay.com', 'walmart.com', 'etsy.com', 'aliexpress.com',
@@ -101,9 +91,17 @@ export async function fromSerpApi(
             location: location ?? undefined,
           },
           timeout: 15_000,
-        });
-        organic = res.data?.organic_results ?? [];
-        // Persist the response shape we actually consume (drops the heavy
+	        });
+	        organic = res.data?.organic_results ?? [];
+        await logExternalUsage({
+          provider: 'serpapi',
+          feature: 'competitor_intelligence',
+          operation: 'competitor_serp_discovery',
+          status: 'success',
+          context: { domainHost: ownDomainHost },
+          metadata: { query: q, location },
+	        });
+	        // Persist the response shape we actually consume (drops the heavy
         // ad/snippet/answer-box fields SerpAPI returns alongside).
         const slim: SerpOrganicResult[] = (organic ?? []).map((r) => ({
           link: r.link,
@@ -187,7 +185,7 @@ export async function fromLlmContext(args: {
   summary: string;
   location: string | null;
 }): Promise<CompetitorCandidate[]> {
-  if (!router) {
+  if (!isOpenRouterConfigured()) {
     console.warn('[COMPETITOR] OpenRouter not initialized. OPENROUTER_API_KEY missing?');
     return [];
   }
@@ -221,35 +219,43 @@ export async function fromLlmContext(args: {
       console.log(`[COMPETITOR] LLM cache hit for ${args.ownDomainHost}`);
     } else {
       console.log(`[COMPETITOR] Calling OpenRouter for ${args.ownDomainHost}...`);
-      const completion = await router.chat.completions.create({
-        model: 'openai/gpt-4o-mini',
-        messages: [
-          {
-            role: 'system',
-            content:
-              'You identify direct competitors of a target company. ' +
-              'Return real, verifiable companies that operate in the same market and serve a similar audience. ' +
-              'Use lowercase host names without "www." (e.g. "stripe.com"). ' +
-              'No marketplaces (amazon, ebay, walmart), no social platforms, no review aggregators. ' +
-              'No fictional or generic names. ' +
-              'Output strict JSON.',
-          },
-          {
-            role: 'user',
-            content: [
-              'Propose 8–12 direct competitors for this company.',
-              '',
-              profileLines,
-              '',
-              'Return JSON: { "competitors": [ { "host": "example.com", "name": "Example Inc", "reason": "one sentence on why they compete" } ] }',
-            ].join('\n'),
-          },
-        ],
-        response_format: { type: 'json_object' },
-        temperature: 0.2,
-        max_tokens: 1500,
+      const completion = await callOpenRouterChat({
+        payload: {
+          model: 'openai/gpt-4o-mini',
+          messages: [
+            {
+              role: 'system',
+              content:
+                'You identify direct competitors of a target company. ' +
+                'Return real, verifiable companies that operate in the same market and serve a similar audience. ' +
+                'Use lowercase host names without "www." (e.g. "stripe.com"). ' +
+                'No marketplaces (amazon, ebay, walmart), no social platforms, no review aggregators. ' +
+                'No fictional or generic names. ' +
+                'Output strict JSON.',
+            },
+            {
+              role: 'user',
+              content: [
+                'Propose 8–12 direct competitors for this company.',
+                '',
+                profileLines,
+                '',
+                'Return JSON: { "competitors": [ { "host": "example.com", "name": "Example Inc", "reason": "one sentence on why they compete" } ] }',
+              ].join('\n'),
+            },
+          ],
+          response_format: { type: 'json_object' },
+          temperature: 0.2,
+          max_tokens: 1500,
+        },
+        context: {
+          domainHost: args.ownDomainHost,
+          feature: 'competitor_intelligence',
+          operation: 'competitor_llm_discovery',
+          modelRequested: 'openai/gpt-4o-mini',
+        },
       });
-      const text = completion.choices[0]?.message?.content ?? '';
+      const text = completion.content ?? '';
       console.log(`[COMPETITOR] LLM response for ${args.ownDomainHost}: ${text.slice(0, 200)}...`);
       payload = JSON.parse(text);
       redisService
